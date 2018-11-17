@@ -783,7 +783,7 @@ JobPrintCommand (char *cmd, Job *job)
 #elif defined(_WIN32)
     {
 	char *cmdExec      = cmd;
-	char  filename[13] = "TMPXXXXXX";
+	char  filename[17];
 	int   freeIt       = 0;
 
 	/*
@@ -803,13 +803,15 @@ JobPrintCommand (char *cmd, Job *job)
 		i++;
 	    }
 
+		strcpy(filename, "TMPXXXXXX");
 	    mktemp(filename);
+		strcat(filename, ".");
 	    argFile = fopen(filename, "wt");
 
 	    fprintf(argFile, "%s", &cmd[i]);
 	    fclose(argFile);
 
-	    cmdExec = (char *) malloc(i + 16);
+	    cmdExec = (char *) malloc(i + 16 +4);
 	    strncpy(cmdExec, cmd, i);
             cmdExec[i] = '\0';
 	    strcat(cmdExec, " @");
