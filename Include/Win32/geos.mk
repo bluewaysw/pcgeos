@@ -187,8 +187,8 @@ PRODUCT_VMS	!= echo $(PRODUCT_VMS) | tr ' ' '\012' | egrep -v "${EXEMPTPRODUCTS}
 # which application/library/driver is being made. It's also useful to have
 # anyway.
 #
-CURRENT_DIR	!= pwd
-#CURRENT_DIR	:= $(CURRENT_DIR:S,\\,/,g)
+CURRENT_DIR	!= cd
+CURRENT_DIR	:= $(CURRENT_DIR:S,\\,/,g)
 
 ##
 ## Deal with having pieces of the Installed tree on local disks, not under
@@ -474,7 +474,8 @@ LINKFLAGS	+= `$(PRODUCT_FLAGS) glue "$(PRODUCT)" $(DEVEL_DIR)/Include $(LOBJ_DIR
 # floating point math. It applies only to 2.0 and later revs.
 #
 OPTIONAL_LIB		?=
-OPTIONAL_LIB_TAIL	= Library/BorlandRTL/BORLAND.OBJ
+#OPTIONAL_LIB_TAIL	= Library/BorlandRTL/BORLAND.OBJ
+OPTIONAL_LIB_TAIL	=
 #if exists($(DEVEL_DIR)/$(OPTIONAL_LIB_TAIL))
 OPTIONAL_LIB		+= -l$(DEVEL_DIR)/$(OPTIONAL_LIB_TAIL)
 #else
@@ -581,7 +582,7 @@ CCOMFLAGS       += -D__GEOS__ -D__WATCOM__ -Ot -d3 -w4 \
 		   	-os -ol -ol+ -hc -s \
 		   	$(CCOM_MODEL) \
             $(.INCLUDES:N*/Include*:S/^-I/-i=/g) \
-						-i=/home/frehwagen/watcom-v2/h \
+						-i="$(WATCOM)/h" \
 		   	 		`$(PRODUCT_FLAGS) highc $(PRODUCT)` \
 					$(XCCOMFLAGS)
 
