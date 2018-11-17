@@ -1,0 +1,144 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		User Interface
+FILE:		ScreenSaver
+
+DESCRIPTION:	Screen Saver Mechanism
+
+	$Id: ScreenSaver.doc,v 1.2.34.1 97/03/29 03:37:12 canavese Exp $
+
+------------------------------------------------------------------------------@
+
+
+About the Screen Saver
+----------------------
+PC/GEOS provides built-in screen-saver logic to detect when the user has
+been away from the machine for a given period of time, to turn a screen-saver
+on at that time, & to turn it off when the user once again returns.
+Screen Saver applications may be written to replace the default, black-screen
+behavior.
+
+
+Detection of User
+-----------------
+When screen saving is enabled, the input manager watches for the following
+methods, & resets the screen-saver timer to the full time-out value whenever
+one is encountered:
+
+	METHOD_PTR_CHANGE	(which results in ptr movement)
+	METHOD_BUTTON_CHANGE
+	METHOD_KBD_SCAN
+	METHOD_PRESSURE_CHANGE
+	METHOD_DIRECTION_CHANGE
+
+The counter is decremented each minute, & should it reach zero, the user is
+assumed to be away from the station, & the screen saver is turned on.  The
+moment that any of the above methods is detected, the saver is turned back
+off, & the counter reset.
+
+
+Mechanism, Preferences
+----------------------
+The Kernel defaults the screen saver to OFF, with a time-out value of 15
+minutes.  The user interface, on startup, adjusts the screen saver status &
+timeout based on the following keys within the [ui] category of geos.ini:
+
+	screenBlanker		(boolean)
+	screenBlankerTimeout	(integer)
+
+If these keys are missing, the UI defaults to OFF & 15 minutes.  The On/off
+status may be changed by sending either to the IM:
+
+METHOD_IM_ENABLE_SCREEN_SAVER              method
+;
+;       This method is provided to enable the screen blanking support of
+; the flow object.
+;
+;       Pass:   nothing
+;       Return: nothing
+;
+
+METHOD_IM_DISABLE_SCREEN_SAVER             method
+;
+;       This method is provided to disable the screen blanking support of
+; the flow object.
+;
+;       Pass:   nothing
+;       Return: nothing
+;
+
+The time delay may be adjusted by sending:
+
+METHOD_IM_GET_SCREEN_SAVER_DELAY                method
+;
+; This method is provided to fetch the current screen saver delay
+;
+;       Pass:   nothing
+;       Return: ax      - count, in minutes
+;
+
+METHOD_IM_SET_SCREEN_SAVER_DELAY                method
+;
+; This method is provided to change the delay between the last user
+; input and the screen blanking action.
+;
+;       Pass:   cx      - new count, in minutes, must be 2 or larger
+;                         ( A time-out of 1 will blank every minute regardless
+;                           of user activity)
+;       Return: nothing
+;
+
+
+The application "Preferences", part of the GeoWorks Ensemble package, provides
+a user-interface to the user for adjusting the above-mentioned geos.ini values.
+
+
+Writing a screen saver
+----------------------
+An application may override the default black-screen behavior, or
+override any active screen-saver, by sending the following:
+
+METHOD_IM_INSTALL_SCREEN_SAVER          method
+;
+;       This method is provided to change the action taken when the screen
+; blank delay has expired.  A new OD is passed, along with the method numbers
+; to use.  When screen blank is enabled and SAVER_DELAY minutes have expired
+; since the last user input, the passed message "begin method" is sent
+; to the passed OD.  The method "end method" is sent when the display
+; is re-enabled.  Use METHOD_IM_REMOVE_SCREEN_SAVER to remove the OD reference
+; when it will no longer be available.
+;
+;       Pass:   cx:dx   - OD of screen saver to install
+;               si      - begin method
+;               bp      - end method
+;
+;       Return: nothing
+;
+
+
+The OD specified will receive the "beginMethod" indicating the saver should
+be turned on, & the "endMethod" to indicate it should be shut off.
+
+To restore default behavior (as a screen saver should do if it is exited),
+send:
+
+METHOD_IM_REMOVE_SCREEN_SAVER           method
+;
+;       This method is provided to change the action taken when the screen
+; blank delay has expired to the default action (blank the screen).
+;
+;       Pass:   cx:dx   - OD of screen saver to remove
+;       Return: nothing
+;
+
+Upon receipt of the "beginMethod", it is the responsibility of the screen-saver
+to do something to preserve the user's video monitor, should it be left on
+for hours or days.  To do this, the application should open a window the size
+of the screen, placed as a high-priority child of the screen window (so as
+to appear on top), & draw predominantly dark and preferably moving images to
+it.  The screen window may be found by calling ImGetPtrWin.
+
+

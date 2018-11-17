@@ -1,0 +1,118 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		cdesktopToolManager.def
+
+AUTHOR:		Adam de Boor, Aug 25, 1992
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	8/25/92		Initial revision
+
+
+DESCRIPTION:
+	Definitions for the ToolManagerClass, if the file manager supports
+	installable tools.
+		
+	$Id: cdesktopToolManager.def,v 1.1 97/04/04 15:01:02 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+if INSTALLABLE_TOOLS
+
+;------------------------------------------------------------------------------
+;			  Tool Manager Class
+;------------------------------------------------------------------------------
+
+ToolManagerClass	class	GenInteractionClass
+
+MSG_TM_SET_FILE_SELECTION_STATE	message
+; Alert the tool manager to whether there are any files/directories selected
+; in the target folder/tree.
+;
+; Context:	This is sent whenever the target changes, to allow the tool
+; 		manager to enable or disable the available tools, if they've
+;		indicated they want to be available only when there is at least
+;		one file selected (via the FMTF_SELECTED_ONLY bit)
+; Source:	Sent by the Tree or Folder objects when they gain the target
+; Destination:  ToolManager object
+; Interception: not intercepted
+;
+; Pass:
+;		cx - non-zero if there's a file or directory selected on which
+;		     a tool might operate.
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_TM_ACTIVATE_TOOL_ON_PROCESS_THREAD	message
+; Call the appropriate routine within the tool library on the process thread,
+; rather than the UI thread, where the ToolManager is run.
+;
+; Context:	Called by a ToolTrigger object when it is activated.
+; Source:	ToolTrigger object
+; Destination:  ToolManager object
+; Interception: not intercepted
+;
+; Pass:
+;		cx - library number (index into TMI_tools)
+;		bp - routine number to call
+;		dx - tool number (within library) activated
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_TM_REBUILD				message
+;
+; Rebuild tool library list.
+;
+; Context:	Sent on "Rescan drives".
+; Source:	process
+; Destination:	ToolManager object
+; Interception:	not intercepted
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;
+
+MSG_TM_REBUILD_IF_ON_DISK		message
+;
+; Rebuild tool library list if one of the libraries on the list is on
+; the passed disk.
+;
+; Context:	Sent on MSG_META_REMOVING_DISK
+; Source:	process
+; Destination:	ToolManager object
+; Interception:	not intercepted
+;
+; Pass:
+;		cx - disk handle
+; Return:
+;		nothing
+;
+
+ToolLibrary	struct	; Descriptor for a library that provides tools for
+			;  the file manager
+    TL_name	FileLongName	; name of library file.
+    TL_handle	hptr		; handle of library, if loaded
+ToolLibrary	ends
+
+    TMI_tools		lptr.ChunkArrayHeader	; array of ToolLibrary
+						;  structures
+    TMI_selectState	word			; last selection state we
+						;  were told of
+ToolManagerClass	endc
+
+endif

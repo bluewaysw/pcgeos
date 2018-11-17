@@ -1,0 +1,630 @@
+@include <StdApp.goh>
+#include <ansi/stdio.h>
+#include <ansi/string.h>
+#include <ansi/stdlib.h>
+
+@include "NewsRead.goh"
+@include "Extern.goh"
+@include "Localize/Strings.goh"
+@include "UIClass/StatDiag.goh"
+@include "NewsData.goh"
+#include "news.h"
+
+
+
+/*************************************************************************/
+
+Boolean G_postWinVisible = FALSE ;
+dword G_headerLen = 0 ;
+
+extern MemHandle G_articleListRespondReference ;
+
+extern NewsgroupEntry *G_group;
+
+extern byte G_mainListLevel ;
+extern word G_mainListPath[] ;
+extern word G_mainListMessage ;
+extern NewsSenderName G_newsSender ;
+extern word G_readCurrentGroup ;
+extern word G_readCurrentThread ;
+extern word G_readCurrentArticle ;
+
+extern word G_groupListSelection ;
+
+/*************************************************************************/
+
+@extern method NewsProcessClass, MSG_NP_POST_WIN_VISIBILITY_NOTIFICATION {
+
+    G_postWinVisible = opening ;
+
+    @send oself::MSG_NP_ACTION_BAR_UPDATE_BUTTONS() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  NewsProcessClass::MSG_NP_POST_WIN_SEND_ACTION
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    User has hit the post button from the post dialog.  Let's post it.
+ |
+ | Inputs:
+ |    optr trigger                -- Trigger on window requesting post
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    EDG  ??/??/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@extern method NewsProcessClass, MSG_NP_POST_WIN_SEND_ACTION
+{
+    MemHandle groupsMH, subjectMH ;
+    VMBlockHandle textVMH;
+    word grouplen, bodylen;
+    Boolean result ;
+
+    /* Get information about this post */
+    grouplen = @call PostGroupsText::MSG_VIS_TEXT_GET_TEXT_SIZE();
+    bodylen = @call NewsPostText::MSG_VIS_TEXT_GET_TEXT_SIZE();
+
+    /* Got to have groups to post.  Report error if none. */
+    if (grouplen == 0) {
+        
+        ErrorMessage(@ErrorNoGroupsEntered);
+        return;
+    
+    }
+
+    /* Got to have text to post.  Report error if none. */
+    if (bodylen == 0) {
+    
+        ErrorMessage(@ErrorNoMessageText);
+        return;
+    }
+
+    /* Ok, Let's start */
+    @send application::MSG_GEN_APPLICATION_MARK_BUSY();
+
+    /* Connect to the server if not already */
+    if ((NewsConnectionStatus & NCS_CONNECTED) == 0) {
+    
+        ConnectToServer();
+    }
+
+    /* Are we connected?  Stop if we are not */
+    if ((NewsConnectionStatus & NCS_CONNECTED) == 0) {
+    
+        @send application::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+        return;
+    }
+
+    /* Status:  We're posting */
+    @call DownloadGroupsDialog::MSG_STATUS_DIALOG_SET_TITLE_OPTR(
+          @StatusPostingMsg) ;
+    
+    @call DownloadGroupsDialog::MSG_STATUS_DIALOG_SET_TEXT_PTR(""); 
+    @send DownloadGroupsDialog::MSG_STATUS_DIALOG_OPEN(FALSE, TRUE, 0, FALSE) ;
+
+    /* Get the blocks of text */
+    groupsMH = @call PostGroupsText::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+    subjectMH = @call PostSubjectText::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+    textVMH = @call NewsPostText::MSG_VIS_TEXT_GET_ALL_HUGE_ARRAY(
+            G_databaseVMFH, 0);
+
+    /* Hold on, let's validate the text */
+    PrepareText(textVMH);
+
+    /* Ok, post it */
+    result = PostMessage(
+                groupsMH, subjectMH, G_articleListRespondReference, textVMH);
+
+    if(G_articleListRespondReference)
+    {
+        MemFree(G_articleListRespondReference);
+        G_articleListRespondReference = 0;
+    }
+
+    /* Free it up. */
+    MemFree(groupsMH);
+    MemFree(subjectMH);
+    HugeArrayDestroy(G_databaseVMFH, textVMH);
+
+    /* Get rid of the window */
+    if(!result)
+@ifndef COMPILE_OPTION_PRIMARY_MESSAGE_COMPOSER
+        @send PostWindow::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+@else
+        @send PostPrimary::MSG_GEN_DISPLAY_CLOSE();
+@endif
+
+    @send DownloadGroupsDialog::MSG_STATUS_DIALOG_CLOSE() ;
+
+    /* Done! */
+    @send application::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+	if (!result)
+	{
+		/* Notify the user that the post has completed. */
+		if (!@call PostNotifyCheckGroup::
+		  MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS())
+			@send PostNotifyDialog::MSG_GEN_INTERACTION_INITIATE();
+	}
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  NewsProcessClass::MSG_NP_POST_WIN_REPLY_MESSAGE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Open up the posting dialog and set it up with the selected
+ |    newsgroup(s).
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/30/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@extern method NewsProcessClass, MSG_NP_POST_WIN_REPLY_MESSAGE
+{
+//    word numItems ;
+//    NewsgroupEntryBuffer *p_group ;
+//    word count ;
+    VMFileHandle vmf;
+    VMBlockHandle textArray ;
+    VisTextGetHugeArrayReturnStruct getArrayRet;
+    VisTextRange selRange;
+    dword skip ;
+
+    /* delete to string */
+    @send PostGroupsText::MSG_VIS_TEXT_DELETE_ALL();
+    
+    /* clear the subject */
+    @send PostSubjectText::MSG_VIS_TEXT_DELETE_ALL();
+
+    {
+
+//        word msgIndex;
+//        ArticleEntry *p_article;
+        char *p_subject;
+
+        /* if reply */
+
+        /* get the reference id */
+        NewsDataLock();
+        NewsDataSelectGroup(G_readCurrentGroup);
+        
+        if(G_articleListRespondReference) {
+
+            MemFree(G_articleListRespondReference);
+            G_articleListRespondReference = 0 ;
+        }
+
+        NewsDataGroupSelectThread(G_readCurrentThread);
+        NewsDataThreadSelectArticle(G_readCurrentArticle);
+
+        /* get the groups name */
+        @call PostGroupsText::MSG_VIS_TEXT_APPEND_PTR(
+                  G_group->NE_groupName,
+                  0) ;
+
+        /* get the subject RE:*/
+//      G_article = NewsDataArticleLock(G_readCurrentArticle) ;
+
+        if (G_article)  {
+
+            p_subject = NewsDataLockArticleHeaderLine(G_article, "Subject: ") ;
+
+            if (p_subject)  {
+                word offset;
+                
+                offset = 9;
+
+                /* And strip off any Re: on the thread name */
+                if ((toupper((byte) p_subject[9]) == 'R') &&
+                    (toupper((byte) p_subject[10]) == 'E') &&
+                    (p_subject[11] == ':') &&
+                    (p_subject[12] == ' '))
+                    offset = 13 ;
+
+                @call PostSubjectText::MSG_VIS_TEXT_REPLACE_ALL_PTR("Re: ", 0);
+                @call PostSubjectText::MSG_VIS_TEXT_APPEND_PTR(p_subject + offset, 0);
+    
+                NewsDataUnlockHeaderLine(p_subject) ;
+            }
+
+//          NewsDataArticleUnlock(p_article) ;
+        }        
+
+        /* get the reference id */
+        G_articleListRespondReference = NewDataArticleGetMessageID(
+                                                    G_readCurrentArticle);
+        NewsDataThreadUnselectArticle();
+        NewsDataGroupUnselectThread();
+        NewsDataUnselectGroup();
+        NewsDataUnlock();
+    }
+
+    @send NewsPostText::MSG_META_SUSPEND() ;
+
+@ifndef COMPILE_OPTION_PRIMARY_MESSAGE_COMPOSER
+    @send PostWindow::MSG_GEN_INTERACTION_INITIATE() ;
+@else
+    @send PostPrimary::MSG_GEN_SET_USABLE(VUM_NOW) ;
+    @send PostPrimary::MSG_GEN_DISPLAY_SET_NOT_MINIMIZED();
+    @send PostPrimary::MSG_GEN_BRING_TO_TOP();
+@endif
+
+    vmf = ClipboardGetClipboardFile();
+    
+    /* take over the selected text */
+    @call ArticleText::MSG_VIS_TEXT_GET_SELECTION_RANGE(&selRange);
+
+    if(selRange.VTR_start == selRange.VTR_end) {
+
+        textArray = @call ArticleText::
+                MSG_VIS_TEXT_GET_ALL_HUGE_ARRAY(vmf, 0) ;
+
+        skip = G_headerLen ;
+
+    } else {
+
+        @call ArticleText::
+                MSG_VIS_TEXT_GET_SELECTION_HUGE_ARRAY(&getArrayRet, vmf, 0) ;
+
+        if(G_headerLen > selRange.VTR_start) {
+
+            skip =  G_headerLen - selRange.VTR_start ;
+        
+        } else {
+        
+            skip = 0 ;
+        }
+        
+        textArray = getArrayRet.VTGHARS_handle;
+    }
+     
+    if(textArray) {
+
+        dword loopCount, lineCount;  
+        
+        /* remove skip */
+        HugeArrayDelete(vmf, textArray, skip, 0) ;
+
+        loopCount = 0 ;
+        lineCount = HugeArrayGetCount(vmf, textArray);      
+
+        /* loop putting out the stuff */
+        while(loopCount < lineCount) {
+
+            TCHAR *elemPtr;
+            word elemSize;
+
+            if(loopCount == 0) {
+
+                TCHAR buffer[64] ;
+                
+                /* get headers? */
+                /* set a XYZ wrote text: */
+                if(*G_newsSender) {
+
+                    sprintf(buffer, "\r%s wrote:\r> ", G_newsSender) ;
+
+                } else {
+
+                    sprintf(buffer, "\r>") ;
+                }   
+
+                HugeArrayInsert(vmf, textArray, strlen(buffer), 0, buffer);
+
+                loopCount += strlen(buffer) ;
+                lineCount += strlen(buffer) ;
+            }
+    
+            HugeArrayLock(vmf, textArray, loopCount, &elemPtr, &elemSize);
+            
+            if(*elemPtr == '\r') {
+
+                HugeArrayUnlock(elemPtr);
+               
+                if((loopCount + 1) != lineCount) { 
+
+                    loopCount ++;
+                    lineCount ++;
+                    HugeArrayInsert(vmf, textArray, 2, loopCount, "> ");
+                    loopCount ++;
+                    lineCount ++;
+
+                }
+            }
+            else
+                HugeArrayUnlock(elemPtr);
+                    
+            loopCount++ ;
+        }    
+
+        if(lineCount)
+            @call NewsPostText::
+                MSG_VIS_TEXT_REPLACE_ALL_HUGE_ARRAY(vmf, textArray, 0) ;
+        else
+            @send NewsPostText::MSG_VIS_TEXT_DELETE_ALL();
+
+        HugeArrayDestroy(ClipboardGetClipboardFile(), textArray);
+    
+    } else
+        @send NewsPostText::MSG_VIS_TEXT_DELETE_ALL();
+
+/*    @send oself::MSG_NP_POST_WIN_ADD_SIGNATURE();*/
+
+    @send NewsPostText::MSG_VIS_TEXT_SELECT_START(); 
+
+    if(@call PostGroupsText::MSG_VIS_TEXT_GET_TEXT_SIZE()) {
+
+        if(@call PostSubjectText::MSG_VIS_TEXT_GET_TEXT_SIZE()) {
+
+@if 0
+@ifndef COMPILE_OPTION_PRIMARY_MESSAGE_COMPOSER
+        	@send PostWindow::MSG_META_MUP_ALTER_FTVMC_EXCL(   
+			        @NewsPostText, 
+					MAEF_GRAB | MAEF_FOCUS | MAEF_TARGET/* | MAEF_EXCL*/);  
+@else
+        	@send PostPrimary::MSG_META_MUP_ALTER_FTVMC_EXCL(   
+			        @NewsPostText, 
+					MAEF_GRAB | MAEF_FOCUS | MAEF_TARGET/* | MAEF_EXCL*/);  
+@endif
+@endif
+			@send NewsPostText::MSG_META_GRAB_FOCUS_EXCL();
+			@send NewsPostText::MSG_META_GRAB_TARGET_EXCL();
+        } else
+            /* focus the subject */
+            @send PostSubjectText::MSG_META_GRAB_FOCUS_EXCL();
+
+    } else
+        /* focus the subject */
+        @send PostGroupsText::MSG_META_GRAB_FOCUS_EXCL() ;
+
+    @send NewsPostText::MSG_META_UNSUSPEND() ;
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  NewsProcessClass::MSG_NP_POST_WIN_POST_MESSAGE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Open up the posting dialog and set it up with the selected
+ |    newsgroup(s).
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/30/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@extern method NewsProcessClass, MSG_NP_POST_WIN_POST_MESSAGE
+{
+    NewsgroupEntryBuffer *p_group ;
+@ifndef COMPILE_OPTION_UNSUBSCRIBE_GROUP_SELECTOR
+    word numItems ;
+    word count ;
+@endif
+
+    /* delete to string */
+    @send PostGroupsText::MSG_VIS_TEXT_DELETE_ALL();
+    
+    /* clear the subject */
+    @send PostSubjectText::MSG_VIS_TEXT_DELETE_ALL();
+
+    @send NewsPostText::MSG_META_SUSPEND() ;
+
+@ifndef COMPILE_OPTION_PRIMARY_MESSAGE_COMPOSER
+    @send PostWindow::MSG_GEN_INTERACTION_INITIATE() ;
+@else
+    @send PostPrimary::MSG_GEN_SET_USABLE(VUM_NOW) ;
+    @send PostPrimary::MSG_GEN_DISPLAY_SET_NOT_MINIMIZED();
+    @send PostPrimary::MSG_GEN_BRING_TO_TOP();
+@endif
+
+    /* clear the post window message text */
+    @send NewsPostText::MSG_VIS_TEXT_DELETE_ALL();
+
+/*    @send oself::MSG_NP_POST_WIN_ADD_SIGNATURE();*/
+
+    @send NewsPostText::MSG_VIS_TEXT_SELECT_START(); 
+
+@ifndef COMPILE_OPTION_UNSUBSCRIBE_GROUP_SELECTOR
+    if(G_mainListLevel == 0) {
+        
+        /* Get the number of p_selectList group names.  Quit if none */
+        numItems = @call NewsArticleList::
+                                MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS();
+
+        count = 0 ;
+        while(numItems > count) {
+
+            if(@call NewsArticleList::
+                    MSG_GEN_ITEM_GROUP_IS_ITEM_SELECTED(count)) {
+
+                p_group = NewsDataGroupLock(count) ;
+        
+                if(@call PostGroupsText::MSG_VIS_TEXT_GET_TEXT_SIZE())
+                    @call PostGroupsText::MSG_VIS_TEXT_APPEND_PTR(",", 0);
+
+                @call PostGroupsText::MSG_VIS_TEXT_APPEND_PTR(
+                          p_group->NE_groupName,
+                          0) ;
+                NewsDataGroupUnlock(p_group) ;
+            }
+
+            count++ ;
+        }
+                
+    } else {
+
+        /* get the current groups name */
+        NewsDataLock();
+        NewsDataSelectGroup(G_mainListPath[0]);
+
+        /* get the groups name */
+        @call PostGroupsText::MSG_VIS_TEXT_APPEND_PTR(
+                  G_group->NE_groupName,
+                  0) ;
+        
+        NewsDataUnselectGroup() ;
+        NewsDataUnlock() ;
+    }
+@else
+    if(G_groupListSelection != 0xFFFF) {
+
+        p_group = NewsDataGroupLock(G_groupListSelection) ;
+
+        @call PostGroupsText::MSG_VIS_TEXT_APPEND_PTR(
+                  p_group->NE_groupName,
+                  0) ;
+        NewsDataGroupUnlock(p_group) ;
+    }
+@endif
+
+    if(@call PostGroupsText::MSG_VIS_TEXT_GET_TEXT_SIZE()) {
+
+        /* focus the subject */
+        @send PostSubjectText::MSG_META_GRAB_FOCUS_EXCL();
+
+    } else
+        /* focus the subject */
+        @send PostGroupsText::MSG_META_GRAB_FOCUS_EXCL() ;
+
+    @send NewsPostText::MSG_META_UNSUSPEND() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  NewsProcessClass::MSG_NP_POST_WIN_ADD_SIGNATURE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Adds the under settings specified signature file at the end of
+ |    the composers texts.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    FR   01/21/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@extern method NewsProcessClass, MSG_NP_POST_WIN_ADD_SIGNATURE
+{
+@ifdef COMPILE_OPTION_SIMPLE_SETTINGS
+    MemHandle textBlock ;
+    
+    @call NewsPostText::
+            MSG_VIS_TEXT_APPEND_PTR("\r", 0) ;
+
+    textBlock = @call SignatureEntry::MSG_VIS_TEXT_GET_ALL_BLOCK(0) ;
+
+    if(textBlock) {
+            
+        @call NewsPostText::MSG_VIS_TEXT_APPEND_BLOCK(textBlock, 0) ;
+    
+        MemFree(textBlock) ;
+    }
+@else
+
+    TCHAR pathBuf[81] ;
+    DiskHandle diskHandle = SP_DOCUMENT ;
+    TCHAR *fileName = pathBuf;
+    FileHandle fileHdl ;
+    Boolean pathExists = FALSE ;
+
+    @call EmailSignatureFile::MSG_VIS_TEXT_GET_ALL_PTR(pathBuf);
+
+    if( (toupper((byte) pathBuf[0]) >= 'A') &&
+        (toupper((byte) pathBuf[0]) <= 'Z') &&
+        (pathBuf[1] == ':') ) {
+
+        diskHandle = DiskRegisterDiskSilently(toupper((byte) pathBuf[0]) - 'A') ;
+
+        fileName = &pathBuf[2] ;
+
+    } 
+
+    if(diskHandle) {
+    
+        TCHAR *loopPtr ;
+
+        loopPtr = fileName ;
+
+        while(*loopPtr) {
+        
+            if(*loopPtr == '\\') {
+
+                fileName = loopPtr + 1 ;
+            
+                pathExists = TRUE ;
+            }
+
+            loopPtr++ ;
+        }
+
+        FilePushDir() ;
+
+        if(!pathExists) {
+
+            FileSetCurrentPath(diskHandle, ".") ;
+        
+        } else {
+
+            *(fileName - 1) = 0 ;
+
+            FileSetCurrentPath(diskHandle, &pathBuf[2]) ;
+                    
+        }
+    
+        fileHdl = FileOpen(fileName, FILE_DENY_W  | FILE_ACCESS_R) ;
+
+        if(fileHdl) {
+        
+            word bytesRead ;
+
+            @call NewsPostText::
+                    MSG_VIS_TEXT_APPEND_PTR("\r", 0) ;
+
+            do {
+            
+                bytesRead = FileRead(fileHdl, pathBuf, 80, 0);
+
+                if(bytesRead) {
+                
+                    word loopCount, destCount ;
+
+                    loopCount = 0;
+                    destCount = 0;
+
+                    while(loopCount != bytesRead) {
+                    
+                        if(pathBuf[loopCount] != 0x0A) {
+
+                            pathBuf[destCount] = pathBuf[loopCount] ;
+
+                            destCount ++;
+                        }
+
+                        loopCount ++ ;
+                    }
+
+                    pathBuf[destCount] = 0 ;
+
+                    if(destCount)
+                        @call NewsPostText::
+                                MSG_VIS_TEXT_APPEND_PTR(pathBuf, 0) ;
+                }
+                            
+            } while(bytesRead) ;
+        }
+
+        FilePopDir() ;
+    }
+
+@endif
+}
+

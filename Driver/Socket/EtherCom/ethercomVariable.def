@@ -1,0 +1,85 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Tedious Endeavors 1998 -- All Rights Reserved
+
+PROJECT:	Native ethernet support
+MODULE:		Ethernet link driver
+FILE:		ethercomVariable.def
+
+AUTHOR:		Todd Stumpf, July 8th, 1998
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	TDS	07/08/98   	Initial revision
+
+DESCRIPTION:
+	Global variable definitions common to all ethernet link drivers
+
+	$Id:$
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+;-----------------------------------------------------------------------------
+; RESOURCES
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+; IDATA
+;-----------------------------------------------------------------------------
+idata		segment
+	myHandle	hptr	handle 0	; Needed for callsuper
+	DriverTable	SocketDriverInfoStruct <
+			<EtherStrategy,
+			<>,
+			DRIVER_TYPE_SOCKET>,
+			0,
+			0, 
+			LINK_HEADER_SIZE
+	>
+	ForceRef DriverTable
+	
+idata		ends
+
+ForceRef	myHandle
+
+;-----------------------------------------------------------------------------
+; UDATA
+;-----------------------------------------------------------------------------
+udata		segment
+
+	;
+	;  Someone will register as a client (likely TCP/IP), and
+	;  we will need to know how to contact that client when
+	;  we receive an incoming packet... it provides a callback
+	;  routine for our use on registering, and we store that here.
+	clientStrategy		fptr.far
+
+	;
+	;  Once we've made contact with the ODI level, we'll load.
+	;  Before we actually send data, however, we must establish
+	;  a "link" to the network, a fairly easy thing for us to
+	;  do.  In case there's something extra (perhaps a compression
+	;  shim or other software object we want to have activated),
+	;  we provide for establishing a "link", although we really
+	;  don't care how we do it.  Once the link is established,
+	;  and we are free to send and receive packets, we set this true.
+	linkEstablished		byte
+
+	clientDomainHandle	word
+
+	;
+	;  IP address of this machine, in network byte order.
+	localIpAddr		IPAddr	<0, 0, 0, 0>
+	gatewayAddr		IPAddr	<0, 0, 0, 0>
+	subnetMask		IPAddr	<0, 0, 0, 0>
+
+	;
+	; HugeLMem handle for allocating chunks for incoming packets.
+	recvHugeLMem		hptr.HugeLMemMap
+
+	etherThread		hptr
+
+udata		ends
+
+
+

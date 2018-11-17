@@ -1,0 +1,343 @@
+/*
+ **************************************************************************
+ *  FILE:		exp_mtds.goc
+ *  PROJECT:		Breadbox HomeBase
+ *  DESCRIPTION:	This file has methods for exporting to .CSV
+ *			
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+@include "hbase.goh"
+
+/*
+ ***************************************************************************
+ *		External Objects
+ ***************************************************************************
+ */
+
+ @extern object ExportDBox;
+ @extern object ExpFileSel;
+ @extern object ExpFileName;
+ @extern object ExpFieldSel;
+ @extern object HBaseApp;
+
+ @extern chunk ExpCreateErrMsg;
+ @extern chunk ExpOpenErrMsg;
+ @extern chunk ExpCloseErrMsg;
+ @extern chunk ExpWriteErrMsg;
+ @extern chunk FileExistsErrMsg;
+ @extern chunk DefaultCSV;
+
+/*
+ ***************************************************************************
+ *		Code for HBaseProcessClass   exporting to .CSV
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * FUNCTION:	MakeDblQuote for HBaseProcessClass
+ *              (char* preString, char* postString)
+ * CALLED BY:	MSG_EXPORT_CSV
+ *      	
+ *
+ * STRATEGY:    Adds another quote to every quote before 
+ *		exporting to csv
+ *
+ ***********************************************************************/
+
+void MakeDblQuote (char* preString, char* postString)
+{
+    word	i;
+    char	charBuffer[2];
+
+
+    /* initialize postString */
+    postString[0] = 0;
+
+    /* cycle through preString */
+    for (i = 0; i <= (strlen(preString)); i++) {
+       /* add the char to post string */
+       charBuffer[0] = preString[i];
+       charBuffer[1] = '\000';
+       strcat(postString, charBuffer);
+       /* if a " add another */
+       if (preString[i] == '"')  strcat(postString, "\"");  
+       }
+
+    return;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_EXPORT for HBaseProcessClass
+ *              
+ *
+ * DESCRIPTION:	Calls the dialog box when the trigger
+ *              is clicked
+ *              
+ *
+ ***********************************************************************/
+@extern method HBaseProcessClass, MSG_OPEN_EXPORT
+{
+char*	msgString;
+
+
+    /* start out in Document */
+    @send ExpFileSel::MSG_GEN_PATH_SET(".", SP_DOCUMENT);
+
+    /* set default name */
+    MemLock (OptrToHandle(@DefaultCSV));
+    msgString = LMemDeref(@DefaultCSV);
+    MemUnlock (OptrToHandle(@DefaultCSV));
+    @send ExpFileName::MSG_VIS_TEXT_REPLACE_ALL_PTR(msgString, 0);
+
+    /* select UNNAMED */
+    @send ExpFileName::MSG_VIS_TEXT_SELECT_RANGE_SMALL(0, 7);
+
+    /* Open the dialog box */
+    @call ExportDBox::MSG_GEN_INTERACTION_INITIATE();
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_EXPORT_CSV for HBaseProcessClass
+ *              
+ *
+ * DESCRIPTION:	exports field names (if selected) and field data
+ *		to a csv dos file.  All exported info is enclosed
+ *		in double quotes.  Any internal quotes are
+ *              doubled.
+ *
+ ***********************************************************************/
+@extern method HBaseProcessClass, MSG_EXPORT_CSV
+{
+    char		CSVName[13];
+    char		CSVPath[PATH_BUFFER_SIZE];
+    char		CSVfieldBuffer[DATA_LEN + 10]; /* allow for extra "s */
+    char		charBuffer[1];
+    dword		selFlags, CSVfileSize;
+    FileHandle		CSVFileHandle;
+    DiskHandle		CSVDiskhandle;
+    word		fileCloseError, length, i, fieldSelect;
+    RecordStruct	*record;
+    GroupStruct		*group;
+    DBItem		*index;
+    DBMapStruct* 	mapPtr;
+    DBItem		recordItem, indexItem;
+    DBGroup		groupGroup;
+    VMBlockHandle	vmbh;
+    VMMapStruct		*VMmapPtr;
+    MemHandle		mh;
+    word		j, currentGroup, currentGroupRec;
+    word		bufCount, fieldCount, currentNumGroupRecs;
+    char		fieldString[DATA_LEN];
+    char		strBuffer[(10 * DATA_LEN)]; /* HBase data */
+    char		recordBuffer[(12 * DATA_LEN)]; /* csv data */
+
+
+    /* get the exp file name */
+    length = @call ExpFileName::MSG_VIS_TEXT_GET_ALL_PTR(CSVName);
+    if (length == 0) return;
+
+    /* get the file's path and disk handle */
+    @call ExpFileSel::MSG_GEN_PATH_GET(CSVPath, sizeof(CSVPath));
+    CSVDiskhandle = @call ExpFileSel::MSG_GEN_PATH_GET_DISK_HANDLE();
+
+    /* save our HomeBase file directory */
+    FilePushDir();
+
+    /* and set the CSV file dir  - FileSel doesn't do this */
+    FileSetCurrentPath(CSVDiskhandle, CSVPath);
+
+    /* and create the CSV file */
+    CSVFileHandle = FileCreate(CSVName,
+			       ((FILE_CREATE_ONLY | FCF_NATIVE)
+			       | (FILE_ACCESS_RW | FILE_DENY_RW)),
+			       0);
+    /* if CSVFileHandle is NULL then there was an error */
+    if (CSVFileHandle == NullHandle)  {
+       /* if file exists just tell user & wait for new name */
+       if (ThreadGetError() == ERROR_FILE_EXISTS)  {
+	  NotifyDBox(@FileExistsErrMsg);
+          }
+        /* for any other error - bail out */
+	else  {
+	  NotifyDBox(@ExpCreateErrMsg);
+          @send ExportDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+	  }
+       FilePopDir();
+       return;
+       }
+
+    /* dismiss the file selector box now */
+    @send ExportDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+    /* mark app busy */
+    @send HBaseApp::MSG_GEN_APPLICATION_MARK_BUSY();
+    /* initialize things */
+    strcpy(recordBuffer, "\"");
+
+    /* first see if user wants field names as the first record */
+    fieldSelect = @call ExpFieldSel::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    if (fieldSelect == E_FIELD) {
+       /* OK do field names first */
+       for (j = 1; j <= numFields; j++)  {
+	  /* buffer the field name */
+	  vmbh = VMGetMapBlock(HBFile);
+          VMmapPtr = (VMMapStruct *) VMLock(HBFile, vmbh, &mh);
+	  switch (j)  {
+	     case 1: MakeDblQuote(VMmapPtr->VMS_fn1, CSVfieldBuffer);
+		strcat(recordBuffer, CSVfieldBuffer);
+		break;
+	     case 2: MakeDblQuote(VMmapPtr->VMS_fn2, CSVfieldBuffer);
+		strcat(recordBuffer, CSVfieldBuffer);
+		break;
+	     case 3: MakeDblQuote(VMmapPtr->VMS_fn3, CSVfieldBuffer);
+		strcat(recordBuffer, CSVfieldBuffer);
+		break;
+	     case 4: MakeDblQuote(VMmapPtr->VMS_fn4, CSVfieldBuffer);
+		strcat(recordBuffer, CSVfieldBuffer);
+		break;
+	     case 5: MakeDblQuote(VMmapPtr->VMS_fn5, CSVfieldBuffer);
+		strcat(recordBuffer, CSVfieldBuffer);
+		break;
+	     case 6: MakeDblQuote(VMmapPtr->VMS_fn6, CSVfieldBuffer);
+		strcat(recordBuffer, CSVfieldBuffer);
+		break;
+	     case 7: MakeDblQuote(VMmapPtr->VMS_fn7, CSVfieldBuffer);
+		strcat(recordBuffer, CSVfieldBuffer);
+		break;
+	     case 8: MakeDblQuote(VMmapPtr->VMS_fn8, CSVfieldBuffer);
+		strcat(recordBuffer, CSVfieldBuffer);
+		break;
+	     case 9: MakeDblQuote(VMmapPtr->VMS_fn9, CSVfieldBuffer);
+		strcat(recordBuffer, CSVfieldBuffer);
+		break;
+	     case 10: MakeDblQuote(VMmapPtr->VMS_fn10, CSVfieldBuffer);
+		strcat(recordBuffer, CSVfieldBuffer);
+		break;
+	     } /* end of switch */
+          VMUnlock(mh);
+	  /* add comma or \r */
+	  if (j == numFields)  strcat (recordBuffer, "\"\r\n");
+	   else strcat (recordBuffer, "\",\"");
+	  }  /* end of field name for loop */
+
+       /* now write the fields buffer to the .csv file */
+       length = FileWrite(CSVFileHandle,
+			  recordBuffer,
+			  strlen(recordBuffer),
+			  FALSE);
+       /* check for write error */
+       if (length != strlen(recordBuffer))  {
+          /* show message and bail out */
+          NotifyDBox(@ExpWriteErrMsg);
+          fileCloseError = FileClose(CSVFileHandle, FALSE);
+          if (fileCloseError != 0)  {
+             NotifyDBox(@ExpCloseErrMsg);
+	     }
+          FilePopDir();
+	  @send HBaseApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+          return;
+          }
+       /* re-init the buffer */
+       strcpy(recordBuffer, "\"");
+
+       } /* end of field name if */
+
+
+    /* OK - now lets read the records */
+    for (i = 0; i < numRecords; i++)  {
+       /* first get the cG and cGR based on currentRecord */
+       GetGroupAndGrpRec (i,
+		          &currentGroup,
+		          &currentGroupRec,
+		          &currentNumGroupRecs);
+
+       /* Get the record info */
+       mapPtr = DBLockMap(HBFile);
+       group = (GroupStruct *) (mapPtr + 1);
+       groupGroup = group[currentGroup].GS_group;
+       /* Extract the item handle for the record. */
+       indexItem = group[currentGroup].GS_indexStart;
+       DBUnlock(mapPtr);
+
+       /* get the index array address */
+       index = DBLock(HBFile, groupGroup, indexItem);
+       recordItem = index[currentGroupRec];
+       DBUnlock(index);
+
+       /* get the record struct address */
+       record = DBLock(HBFile, groupGroup, recordItem);
+       /* copy the record to the buffer */
+       strcpy(strBuffer, record->RS_data);
+       DBUnlock(record);
+
+       /* now cycle the data into the recordBuffer */
+       bufCount = 0;
+       for (j = 1; j <= numFields; j++)  {
+          for (fieldCount = 0; fieldCount < DATA_LEN; fieldCount++)  {
+	     if (strBuffer[bufCount] != '~')  {  /* fill fieldStr */
+	        fieldString[fieldCount] = strBuffer[bufCount];
+	        bufCount++;
+                }
+	     else  {   /* end of field */
+	        fieldString[fieldCount] = NULL;
+		bufCount++;
+
+		/* collect the field data */
+	        MakeDblQuote(fieldString, CSVfieldBuffer);
+	        strcat (recordBuffer, CSVfieldBuffer);
+                /* add " and comma or \r */
+	        if (j == numFields)  strcat (recordBuffer, "\"\r\n");
+	         else strcat (recordBuffer, "\",\"");
+
+		fieldCount = DATA_LEN; /* force exit loop */
+	        }  /* end field else */
+
+	     } /* end this field for */
+
+          } /* end cycle thru fields for */
+
+       /* now write the buffer to the .csv file */
+       length = FileWrite(CSVFileHandle,
+			  recordBuffer,
+			  strlen(recordBuffer),
+			  FALSE);
+       /* check for write error */
+       if (length != strlen(recordBuffer))  {
+          /* show message and bail out */
+          NotifyDBox(@ExpWriteErrMsg);
+          fileCloseError = FileClose(CSVFileHandle, FALSE);
+          if (fileCloseError != 0)  {
+             NotifyDBox(@ExpCloseErrMsg);
+	     }
+          FilePopDir();
+	  @send HBaseApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+          return;
+          }
+       /* re-init the buffer */
+       strcpy(recordBuffer,"\"");
+
+    } /* end of loop thru records for */
+
+
+    /* Done so close the file */
+    fileCloseError = FileClose(CSVFileHandle, FALSE);
+    if (fileCloseError != 0)  {
+        NotifyDBox(@ExpCloseErrMsg);
+	}
+    FilePopDir();
+    @send HBaseApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+
+}
+

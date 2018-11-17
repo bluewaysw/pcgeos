@@ -1,0 +1,897 @@
+/*
+ * Project:	CWrite
+ * File:	UI/uiMain.goc
+ *
+ * Author:	jfh
+ *
+ *	This file contains the user interface description for the main
+ * part of the word processor.
+ *
+ *
+ */
+
+//#include "Art/mkrEditTextTool.ui"
+//#include "Art/mkrBitmapPtrTool.ui"
+
+//#include "Art/mkrGeoWrite.ui"
+//#include "Art/mkrGeoWriteTiny.ui"
+
+@include "geode.goh"
+@include "app.goh"
+@include "doc.goh"
+@include "display.goh"
+@include <objects\gViewCC.goh>
+@include <objects\gPageCC.goh>
+
+@start ApplicationUI;
+
+/* ----------------------------------------------------------------------------
+	Application object
+-----------------------------------------------------------------------------*/
+
+@object WriteApplicationClass WriteApp = {
+	GI_visMoniker = list {
+			@WriteTextMoniker/*,
+			GeoWriteLCMoniker,
+			GeoWriteTinyTCMoniker, */
+			}
+	GI_comp = @WritePrimary;
+
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) =
+		@WritePrimary;
+
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) =
+		@WriteDocumentControl;
+
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) =
+		@WriteDocumentControl,
+		@WriteDisplayControl,
+		@WriteViewControl/*,
+
+			/* Text library */
+
+/*		WriteRulerShowControl,
+		WriteTextRulerControl, WriteTabControl*/;
+
+/*	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_STARTUP_LOAD_OPTIONS) =
+		WriteToolControl,
+		ShowBarList, MiscSettingsList, UserLevelList;
+*/
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+		@WriteDocumentControl, /*WritePrintControl,
+		WriteEditControl, */@WritePageControl,
+		@WriteDisplayControl, @WriteViewControl/*,
+
+			/* Spell library */
+
+/*		WriteSpellControl, WriteThesaurusControl,
+
+			/* Text library */
+
+/*		WriteTextStyleSheetControl,
+		WriteSearchReplaceControl, WriteTextRulerControl,
+		WriteLineSpacingControl,
+		WriteJustificationControl, WriteParaSpacingControl,
+		WriteParaBGColorControl, WriteParaAttrControl,
+		WriteMarginControl, WriteTabControl, WriteDefaultTabsControl,
+		WriteBorderControl, WriteBorderColorControl,
+		WriteHyphenationControl,
+		WriteFontControl, WriteTextStyleControl, WritePointSizeControl,
+		WriteCharFGColorControl, WriteCharBGColorControl,
+		WriteFontAttrControl, WriteTextCountControl,
+
+			/* GrObj library */
+
+/*		WriteGrObjToolControl, @WriteGrObjBitmapToolControl,
+		WriteInstructionControl,
+		WriteAreaColorControl, WriteBackgroundColorControl,
+		WriteAreaAttrControl, WriteBackgroundAttrControl,
+		WriteLineColorControl, WriteLineAttrControl,
+		WriteGrObjObscureAttrControl, WriteAlignDistributeControl,
+		WriteAlignToGridControl,
+		WriteGroupControl, WriteDepthControl,
+		WriteFlipControl, WriteNudgeControl,
+		WriteRotateControl, WriteScaleControl, WriteSkewControl,
+		WriteTransformControl, WriteArcControl,
+		WriteStartingGradientColorControl,
+		WriteEndingGradientColorControl, WriteGradientFillControl,
+		WriteGrObjStyleSheetControl, 
+		WriteSplineOpenCloseControl,
+		WriteSplinePointControl, WriteSplineSmoothnessControl,
+		WriteCustomShapeControl, WriteHandleControl,
+		WriteHideShowControl, WriteDraftModeControl,
+		WriteDuplicateControl, 
+		WritePasteInsideControl, 
+		WriteMoveInsideControl, 
+		WriteConvertControl,
+		WriteDefaultAttributesControl, WriteCustomDuplicateControl,
+		WriteMultiDuplicateControl,
+		WriteGrObjObscureAttrControl2, WriteGrObjCreateControl,
+		WriteGrObjLocksControl,
+
+			/* Bitmap library */
+/*#if _BITMAP_EDITING
+		WriteBitmapFormatControl,
+/*#endif
+			/* Ruler library */
+
+/*		WriteRulerTypeControl, WriteGridSpacingControl,
+		WriteRulerGuideControl, WriteRulerShowControl,
+
+			/* Help editor stuff */
+
+/*		WriteTextHelpControl,
+
+			/* Impex Library */
+
+/*		WriteImportControl, WriteExportControl*/
+		;
+
+	ATTR_GEN_INIT_FILE_CATEGORY  = "write";
+//	ATTR_GEN_APPLICATION_PRINT_CONTROL = @WritePrintControl;
+	ATTR_GEN_HELP_FILE = "writer";
+}
+@visMoniker WriteTextMoniker = "CWriter";
+
+@end ApplicationUI;
+
+/* ----------------------------------------------------------------------------
+	Primary window
+-----------------------------------------------------------------------------*/
+
+@start PrimaryUI;
+
+@object GenPrimaryClass WritePrimary =  {
+	GI_comp = @FileMenu, /*@WriteEditControl,*/ @ViewMenu, /*@OptionsMenu,
+			@LayoutMenu, @GraphicsMenu, @ParagraphMenu,
+			@CharacterMenu, @HelpEditMenu,*/ @WriteDisplayControl,
+			@GraphicsToolbar, @FunctionToolbar, @StyleToolbar,
+			@DisplayGroup/*, @HiddenDialog*/;
+	HINT_PRIMARY_FULL_SCREEN;
+	HINT_CUSTOM_CHILD_SPACING = {SST_PIXELS | 2};
+	ATTR_GEN_HELP_CONTEXT = "TOC";
+
+}
+
+
+/* ----------------------------------------------------------------------------
+	Always visible objects
+-----------------------------------------------------------------------------*/
+
+@object GenInteractionClass DisplayGroup =  {
+	GI_comp = @GrObjToolsToolbar, @WriteDisplayGroup;
+	GII_visibility = GIV_SUB_GROUP;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenDisplayGroupClass WriteDisplayGroup = {
+	HINT_DEFAULT_FOCUS;
+	HINT_DEFAULT_TARGET;
+	HINT_INITIAL_SIZE = {SST_PCT_OF_FIELD_WIDTH | PCT_70,
+								SST_PCT_OF_FIELD_HEIGHT | PCT_55, 0 };
+	HINT_DISPLAY_GROUP_FULL_SIZED_IF_TRANSPARENT_DOC_CTRL_MODE;
+}
+
+/* -----------------------
+	Drawing Tools Toolbar
+-------------------------- */
+
+@object GenInteractionClass GrObjToolsToolbar = {
+	GI_attrs = @default | GA_NOTIFY_VISIBILITY;
+	GII_visibility = GIV_POPOUT;
+	HINT_TOOLBOX;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_ALLOW_CHILDREN_TO_WRAP;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+//	ATTR_GEN_VISIBILITY_MESSAGE = MSG_WRITE_APPLICATION_TOOLBAR_VISIBILITY;
+	ATTR_GEN_VISIBILITY_DATA = WBS_SHOW_DRAWING_TOOLS | WBS_SHOW_BITMAP_TOOLS;
+}
+
+
+@end PrimaryUI;
+
+@start GraphicToolsUI;
+
+
+/*EditTextTool = GrObjToolItem {
+	genStates = default -usable;
+	moniker = list {
+		EditTextToolTCMoniker,
+		EditTextToolTMMoniker,
+		EditTextToolTCGAMoniker
+	}
+	toolClass = "EditTextGuardianClass";
+	identifier = "-1";
+	hints = { ATTR_GEN_FOCUS_HELP { optr EditTextHelpString } }
+}
+
+chunk EditTextHelpString = "Edit Text";
+*/
+@end GraphicToolsUI;
+
+/* -----------------------
+	Graphics Toolbar
+-------------------------- */
+
+@start PrimaryUI;
+
+@object GenInteractionClass GraphicsToolbar = {
+	GI_states = @default & ~GS_USABLE;
+	GI_comp = @AreaColorTools, @LineColorTools, @LineAttrTools,
+			@TextColorTools, @GroupTools, @DuplicateTools,
+			@PasteInsideTools, @DepthTools,
+			@FlipTools;
+	GI_attrs = @default | GA_NOTIFY_VISIBILITY;
+	GII_visibility = GIV_POPOUT;
+	HINT_TOOLBOX;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_ALLOW_CHILDREN_TO_WRAP;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+//	ATTR_GEN_VISIBILITY_MESSAGE = MSG_WRITE_APPLICATION_TOOLBAR_VISIBILITY;
+	ATTR_GEN_VISIBILITY_DATA = WBS_SHOW_GRAPHIC_BAR;
+}
+@end PrimaryUI;
+ 
+@start GraphicBarUI;
+
+@object GenToolGroupClass AreaColorTools = {
+//	GTGI_controller = @WriteAreaColorControl;
+	HINT_SAME_ORIENTATION_AS_PARENT;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass LineColorTools = {
+//	GTGI_controller = @WriteLineColorControl;
+	HINT_SAME_ORIENTATION_AS_PARENT;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass LineAttrTools = {
+//	GTGI_controller = @WriteLineAttrControl;
+	HINT_SAME_ORIENTATION_AS_PARENT;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass TextColorTools = {
+//	GTGI_controller = @WriteCharFGColorControl;
+	HINT_SAME_ORIENTATION_AS_PARENT;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass GroupTools = {
+//	GTGI_controller = @WriteGroupControl;
+	HINT_SAME_ORIENTATION_AS_PARENT;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass DuplicateTools = {
+//	GTGI_controller = @WriteDuplicateControl;
+	HINT_SAME_ORIENTATION_AS_PARENT;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass PasteInsideTools = {
+//	GTGI_controller = @WritePasteInsideControl;
+	HINT_SAME_ORIENTATION_AS_PARENT;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass DepthTools = {
+//	GTGI_controller = @WriteDepthControl;
+	HINT_SAME_ORIENTATION_AS_PARENT;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass FlipTools = {
+//	GTGI_controller = @WriteFlipControl;
+	HINT_SAME_ORIENTATION_AS_PARENT;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@end GraphicBarUI;
+
+/* -----------------------
+	Function Toolbar
+-------------------------- */
+
+@start PrimaryUI;
+
+@object GenInteractionClass FunctionToolbar = {
+	GI_comp = @DocumentTools, @TextStyleSheetTools, @SearchReplaceTools,
+				 @EditTools, @HyphenationTools;
+	GI_states = @default & ~GS_USABLE;
+	GI_attrs = @default | GA_NOTIFY_VISIBILITY;
+	GII_visibility = GIV_POPOUT;
+	HINT_TOOLBOX;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_ALLOW_CHILDREN_TO_WRAP;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+//	ATTR_GEN_VISIBILITY_MESSAGE = MSG_WRITE_APPLICATION_TOOLBAR_VISIBILITY;
+	ATTR_GEN_VISIBILITY_DATA = WBS_SHOW_FUNCTION_BAR;
+}
+
+@end PrimaryUI;
+
+@start FunctionBarUI;
+
+@object GenToolGroupClass DocumentTools = {
+//	GTGI_controller = @WriteDocumentControl;
+	HINT_SAME_ORIENTATION_AS_PARENT;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass TextStyleSheetTools = {
+//	GTGI_controller = @WriteTextStyleSheetControl;
+	HINT_SAME_ORIENTATION_AS_PARENT;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass SearchReplaceTools = {
+//	GTGI_controller = @WriteSearchReplaceControl;
+	HINT_SAME_ORIENTATION_AS_PARENT;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass EditTools = {
+//	GTGI_controller = @WriteEditControl;
+	HINT_SAME_ORIENTATION_AS_PARENT;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass HyphenationTools = {
+//	GTGI_controller = @WriteHyphenationControl;
+	HINT_SAME_ORIENTATION_AS_PARENT;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@end FunctionBarUI;
+
+/* -----------------------
+	Style Toolbar
+-------------------------- */
+
+@start PrimaryUI;
+
+@object GenInteractionClass StyleToolbar = {
+	GI_comp = @ViewTools, @PageTools, @SpellTools,
+				 @PrintTools, @GrObjDrawingTools, @FontTools,
+				 @PointSizeTools, @TextStyleTools, @JustificationTools,
+				 @LineSpacingTools;
+	GI_attrs = @default | GA_NOTIFY_VISIBILITY;
+	GII_visibility = GIV_POPOUT;
+	HINT_TOOLBOX;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_ALLOW_CHILDREN_TO_WRAP;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+//	ATTR_GEN_VISIBILITY_MESSAGE = MSG_WRITE_APPLICATION_TOOLBAR_VISIBILITY;
+	ATTR_GEN_VISIBILITY_DATA = WBS_SHOW_STYLE_BAR;
+}
+
+@end PrimaryUI;
+
+@start StyleBarUI;
+
+@object GenToolGroupClass ViewTools = {
+	GTGI_controller = @WriteViewControl;
+	HINT_SAME_ORIENTATION_AS_PARENT;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass PageTools = {
+	GTGI_controller = @WritePageControl;
+	HINT_SAME_ORIENTATION_AS_PARENT;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass SpellTools = {
+//	GTGI_controller = @WriteSpellControl;
+	HINT_SAME_ORIENTATION_AS_PARENT;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass PrintTools = {
+//	GTGI_controller = @WritePrintControl;
+	HINT_SAME_ORIENTATION_AS_PARENT;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass JustificationTools = {
+//	GTGI_controller = @WriteJustificationControl;
+	HINT_SAME_ORIENTATION_AS_PARENT;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass LineSpacingTools = {
+//	GTGI_controller = @WriteLineSpacingControl;
+	HINT_SAME_ORIENTATION_AS_PARENT;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass FontTools = {
+//	GTGI_controller = @WriteFontControl;
+	HINT_SAME_ORIENTATION_AS_PARENT;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass PointSizeTools = {
+//	GTGI_controller = @WritePointSizeControl;
+	HINT_SAME_ORIENTATION_AS_PARENT;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass TextStyleTools = {
+//	GTGI_controller = @WriteTextStyleControl;
+	HINT_SAME_ORIENTATION_AS_PARENT;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass GrObjDrawingTools = {
+//	GTGI_controller = @WriteGrObjToolControl;
+	HINT_SAME_ORIENTATION_AS_PARENT;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@end StyleBarUI;
+
+/* ----------------------------------------------------------------------------
+	File menu
+-----------------------------------------------------------------------------*/
+
+@start PrimaryUI;
+
+@object GenInteractionClass FileMenu =  {
+	GI_comp = @WriteDocumentControl/*, @WriteImportControl,
+				 @WriteExportControl, @PrintSubGroup,
+				 @WriteGrObjToolControl, @WriteGrObjBitmapToolControl,
+				 @WriteFileExit*/;
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_FILE_MENU;
+}
+
+@end PrimaryUI;
+
+@start FileMenuUI;
+
+/*WriteFileExit = GenTrigger {
+    action = MSG_GEN_DISPLAY_CLOSE, WritePrimary;
+    hints = {
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND {
+	    InteractionCommand IC_EXIT
+	}
+    }
+}
+*/
+/*#if _SUPER_IMPEX
+@object WriteDocumentCtrlClass WriteDocumentControl =  {
+/*#else */
+@object GenDocumentControlClass WriteDocumentControl = {
+/*#endif */
+
+	GDCI_documentToken = {"WDAT", MANUFACTURER_ID_GEOWORKS};
+	GDCI_templateDir = "Writer Templates";
+	/*
+	 * Special attributes: allow multiple open files, don't display
+	 * name on primary (this will be handled via the display control)
+	 */
+//	GDCI_attrs = @default & GDCA_MULTIPLE_OPEN_FILES;
+	GDCI_features = @default & ~GDCF_NAME_ON_PRIMARY;
+	GDCI_noNameText = "No Document";
+	GDCI_documentGroup = WriteDocumentGroup;
+	/*
+	 * List of objects to enable/disable based on whether or not a
+	 * document exists
+	 */
+//	GDCI_enableDisableList = @WriteEnableList;
+	/*
+	 * Set user level dialog
+	 */
+//	GDCI_userLevelGroup = @SetUserLevelDialog;
+	/*
+	 * Import and export UI
+	 */
+//	GDCI_importGroup = @WriteImportControl;
+//	GDCI_exportGroup = @WriteExportControl;
+	/*
+	 * Special strings
+	 */
+//	GDCI_dialogImportText = "Import:\\\rImport text from another word processor to create a new document.";
+//	GDCI_dialogUserLevelText = "Change Program Level:\\\rChange how simple or complex you would like Writer to be.";
+
+/*#if _SUPER_IMPEX
+	saveAsGroup = WriteFileTypeInteraction;
+/*#endif */
+/*	hints = {
+	    HINT_GEN_CONTROL_SCALABLE_UI_DATA { GenControlScalableUIEntry <
+		 GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		 UIIL_INTRODUCTORY,
+		 GDC_SUGGESTED_INTRODUCTORY_FEATURES or mask GDCF_SAVE_AS>,
+		<GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		 UIIL_BEGINNING,
+		 GDC_SUGGESTED_BEGINNING_FEATURES or mask GDCF_SAVE_AS>,
+		<GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		 UIIL_INTERMEDIATE,
+		 GDC_SUGGESTED_INTERMEDIATE_FEATURES or mask GDCF_SAVE_AS>,
+		<GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		 UIIL_ADVANCED,
+		 GDC_SUGGESTED_ADVANCED_FEATURES or mask GDCF_SAVE_AS>}
+	} */
+} /* end of WriteDocumentControl */
+
+/*chunk WriteEnableList = data {
+	UN_OPTR WritePrintControl
+	UN_OPTR WritePageSizeControl
+	UN_OPTR WritePageSetupDialog
+	UN_OPTR LayoutMenu
+	UN_OPTR WriteSearchReplaceControl
+	UN_OPTR WriteSpellControl
+	UN_OPTR ViewTypeSubGroup
+}
+
+/*WriteImportControl = ImportControl vardataReloc {
+	moniker = "Import Document";
+	attributes = default +notUserInitiatable;
+	importDataClasses = text;
+	importDestination = WriteDocumentControl;
+	importMessage = MSG_GEN_DOCUMENT_CONTROL_OPEN_IMPORT_SELECTED;
+	hints = {
+		ATTR_IMPORT_CONTROL_CANCEL_DESTINATION {
+			UN_OPTR WriteDocumentControl
+		},
+		ATTR_IMPORT_CONTROL_CANCEL_MESSAGE {
+			word MSG_GEN_DOCUMENT_CONTROL_IMPORT_CANCELLED
+		},
+	}
+}
+
+WriteExportControl = ExportControl {
+	moniker = "Export Document";
+	attributes = default +notUserInitiatable;
+	exportDataClasses = text;
+	exportDestination = "TO_APP_MODEL";
+	exportMessage = MSG_GEN_DOCUMENT_EXPORT;
+}
+*/
+/*PrintSubGroup = GenInteraction {
+	children =
+			WritePageSizeControl,
+		   WritePageSetupDialog;
+	visibility = subGroup;
+}
+
+WriteGrObjToolControl = GrObjToolControl vardataReloc {
+	hints = {
+		ATTR_GEN_CONTROL_APP_TOOLBOX_UI {
+			UN_OPTR	EditTextTool
+		},
+		ATTR_GROBJ_TOOL_CONTROL_POSITION_FOR_ADDED_TOOLS {
+			word CCO_FIRST
+		},
+		ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI {
+		    word mask GOTCF_POLYCURVE
+		},
+		HINT_GEN_CONTROL_SCALABLE_UI_DATA { GenControlScalableUIEntry <
+		            GCSUIC_SET_TOOLBOX_FEATURES_IF_APP_LEVEL,
+			    UIIL_INTRODUCTORY,
+			    mask GOTCF_PTR>,
+			   <GCSUIC_SET_TOOLBOX_FEATURES_IF_APP_LEVEL,
+			    UIIL_INTERMEDIATE,
+			    mask GOTCF_PTR or mask GOTCF_TEXT or \
+			    mask GOTCF_LINE or mask GOTCF_ROTATE_PTR or \
+			    mask GOTCF_ELLIPSE or \
+			    mask GOTCF_RECT or mask GOTCF_ROUNDED_RECT>,
+			   <GCSUIC_SET_TOOLBOX_FEATURES_IF_APP_LEVEL,
+			    UIIL_ADVANCED,
+			    GOTC_DEFAULT_TOOLBOX_FEATURES>
+		} 
+	}
+
+	output = WriteHead;	/* Speeds things up if direct */
+/*}
+*/
+/*@object GrObjBitmapToolControlClass WriteGrObjBitmapToolControl =  {
+	GI_states = @default & ~GS_ENABLED;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI = VBTCF_DRAW_RECT | VBTCF_DRAW_ELLIPSE;
+	ATTR_GEN_CONTROL_APP_TOOLBOX_UI = @BitmapPtrTool;
+	ATTR_VIS_BITMAP_TOOL_CONTROL_POSITION_FOR_ADDED_TOOLS = CCO_FIRST;
+
+//	output = WriteHead;	/* Speeds things up if direct */
+/*}
+
+/*BitmapPtrTool = VisBitmapToolItem {
+	genStates = default -usable;
+	moniker = list {
+		BitmapPtrToolTCMoniker,
+		BitmapPtrToolTMMoniker,
+		BitmapPtrToolTCGAMoniker
+	}
+	toolClass = 0;
+	identifier = -1;
+	hints = { ATTR_GEN_FOCUS_HELP { optr BitmapPtrHelpString } }
+}
+
+chunk BitmapPtrHelpString = "Bitmap Pointer";
+*/
+@end FileMenuUI;
+
+/* ----------------------------------------------------------------------------
+	App document Group
+-----------------------------------------------------------------------------*/
+@start AppDCUI;
+
+@object GenDocumentGroupClass WriteDocumentGroup =  {
+	GDGI_untitledName = "Writer Untitled";
+	GDGI_protocolMajor = DOCUMENT_PROTOCOL_MAJOR;
+	GDGI_protocolMinor = DOCUMENT_PROTOCOL_MINOR;
+	GDGI_genDocument = @WriteDocumentTemplate;
+	GDGI_documentControl = WriteDocumentControl;
+	/*
+	 * GenDisplay to automatically duplicate, GenDisplayGroup to attach
+	 * duplicated displays to and GenView to attach documents to
+	 */
+	GDGI_genDisplayGroup = @WriteDisplayGroup;
+	GDGI_genDisplay = @MainDisplay;
+	GDGI_genView = @MainView;
+	GDGI_attrs = @default | GDGA_VM_FILE_CONTAINS_OBJECTS | GDGA_LARGE_CONTENT;
+
+}
+
+/*WriteHead = WriteGrObjHead {
+	currentTool = "EditTextGuardianClass";
+}
+*/
+@end AppDCUI;
+
+/* ----------------------------------------------------------------------------
+	 Block to duplicate when creating a document
+-----------------------------------------------------------------------------*/
+
+@start DocumentTempUI;
+
+/*chunk OpenMasterPageArray = data {
+	ChunkArrayHeader <0, size OpenMasterPage, 0, size ChunkArrayHeader>
+}
+*/
+@object WriteDocumentClass WriteDocumentTemplate = {
+	GI_states = @default & ~GS_USABLE; /* added jfh */
+}
+
+/*
+ * The WriteColumnContentTemplate is duplicated as part of creating a
+ * new document and is the content for the ruler that runs horizontally
+ * across the top of the document.
+ */
+
+@object RulerContentClass MainHorizontalContent = {
+	VI_bounds = {0, 0, 8192, TEXT_RULER_HEIGHT};
+	VI_attrs = @default & ~VA_MANAGED;
+	VI_optFlags = @default & ~(VOF_GEOMETRY_INVALID | VOF_GEO_UPDATE_PATH);
+	/* check the second flag above */
+	VCI_geoAttrs = @default | VCGA_CUSTOM_MANAGE_CHILDREN;
+	VCNI_attrs = VCNA_SAME_HEIGHT_AS_VIEW | VCNA_LARGE_DOCUMENT_MODEL
+					 | VCNA_WINDOW_COORDINATE_MOUSE_EVENTS;
+}
+
+/*
+ * The WriteRowContentTemplate is duplicated as part of creating a
+ * new document and is the content for the ruler that runs vertically
+ * down the left side of the document.
+ */
+
+@object RulerContentClass MainVerticalContent = {
+	VI_bounds = {0, 0, VIS_RULER_HEIGHT, 8192};
+	VI_attrs = @default & ~VA_MANAGED;
+	VI_optFlags = @default & ~(VOF_GEOMETRY_INVALID | VOF_GEO_UPDATE_PATH);
+	/* check the second flag above */
+	VCI_geoAttrs = @default | VCGA_CUSTOM_MANAGE_CHILDREN;
+	VCNI_attrs = VCNA_SAME_WIDTH_AS_VIEW | VCNA_LARGE_DOCUMENT_MODEL
+					 | VCNA_WINDOW_COORDINATE_MOUSE_EVENTS;
+}
+
+@end DocumentTempUI;
+
+/* ----------------------------------------------------------------------------
+	Main Display
+-----------------------------------------------------------------------------*/
+
+@start DisplayTempUI;
+
+@object WriteMainDisplayClass MainDisplay =  {
+	/*
+	 * The display starts not usable since it is not in the generic tree.
+	 * It will be set usable after being added to the display control.
+	 */
+	GI_states = @default & ~GS_USABLE;
+	GI_comp = @DisplayTopGroup, @DisplayBottomGroup;
+	ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+	HINT_SIZE_WINDOW_AS_RATIO_OF_PARENT = {SWSS_RATIO | PCT_80,
+														SWSS_RATIO | PCT_80};
+	HINT_MINIMIZE_CHILD_SPACING;
+	ATTR_GEN_WINDOW_KBD_OVERRIDE = KO_NO_KEYBOARD;
+}
+
+@object GenInteractionClass DisplayTopGroup = {
+	GI_comp = @CornerGlyph, @MainHorizontalRulerView;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenInteractionClass DisplayBottomGroup = {
+	GI_comp = @MainVerticalRulerView, @MainView;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+/*
+ * The CornerGlyph is the filler between the two views
+ */
+
+@object GenGlyphClass CornerGlyph =  {
+	HINT_FIXED_SIZE = {SST_PIXELS | VIS_RULER_HEIGHT+2,
+						  SST_PIXELS | TEXT_RULER_HEIGHT};
+}
+
+@object RulerViewClass MainHorizontalRulerView =  {
+	GVI_origin = {{0, 0}, {-PAGE_BORDER_SIZE,0}};
+	GVI_docBounds = {-PAGE_BORDER_SIZE, 0,
+						  DEFAULT_DOCUMENT_WIDTH+PAGE_BORDER_SIZE, 0};
+	GVI_horizAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT;
+	GVI_vertLink = @MainView;
+	HINT_FIXED_SIZE = {0, SST_PIXELS | TEXT_RULER_HEIGHT};
+}
+
+@object RulerViewClass MainVerticalRulerView = {
+	GVI_origin = {{0, 0}, {0, -PAGE_BORDER_SIZE}};
+	GVI_docBounds = {0, -PAGE_BORDER_SIZE,
+						  VIS_RULER_HEIGHT, DEFAULT_DOCUMENT_HEIGHT+PAGE_BORDER_SIZE};
+	GVI_vertAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT;
+	GVI_horizLink = @MainView;
+	RVI_attrs = @default & ~RVA_HORIZONTAL;
+	HINT_FIXED_SIZE = {SST_PIXELS | VIS_RULER_HEIGHT, 0};
+}
+
+@object GenViewClass MainView = {
+	GI_attrs = @default | GA_TARGETABLE;
+	GVI_horizAttrs = @default | GVDA_SCROLLABLE | GVDA_NO_LARGER_THAN_CONTENT;
+	GVI_vertAttrs = @default | GVDA_SCROLLABLE | GVDA_NO_LARGER_THAN_CONTENT;
+	/* jfh - track scrolling off for now */
+	GVI_attrs = GVA_CONTROLLED | /*GVA_TRACK_SCROLLING |*/ GVA_DRAG_SCROLLING |
+			 GVA_WINDOW_COORDINATE_MOUSE_EVENTS | GVA_FOCUSABLE;
+	GVI_docBounds = {0, 0,
+						  DEFAULT_DOCUMENT_WIDTH+PAGE_BORDER_SIZE,
+						  DEFAULT_DOCUMENT_HEIGHT+PAGE_BORDER_SIZE};
+	GVI_increment = {72, 72};
+	GVI_horizLink = @MainVerticalRulerView;
+	GVI_vertLink = @MainHorizontalRulerView;
+	HINT_DEFAULT_TARGET;
+	HINT_DEFAULT_FOCUS;
+	ATTR_GEN_VIEW_PAGE_SIZE = {8*72+36, 11*72};
+}
+
+@end DisplayTempUI;
+
+/* ----------------------------------------------------------------------------
+	Window menu
+-----------------------------------------------------------------------------*/
+
+@start PrimaryUI;
+
+@object GenDisplayControlClass WriteDisplayControl = {
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_WINDOW_MENU;
+
+	HINT_DISPLAY_CONTROL_NO_FEATURES_IF_TRANSPARENT_DOC_CTRL_MODE;
+   /*
+		HINT_GEN_CONTROL_SCALABLE_UI_DATA { GenControlScalableUIEntry <
+		     GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		     UIIL_INTRODUCTORY,
+		     mask GDCTF_DISPLAY_LIST>,
+		    <GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		     UIIL_INTERMEDIATE,
+		     GDC_DEFAULT_FEATURES>} */
+}
+
+@end PrimaryUI;
+
+/*-----------------------------------------------------------------------------
+	View menu
+-----------------------------------------------------------------------------*/
+
+@start PrimaryUI;
+
+@object GenInteractionClass ViewMenu = {
+	GI_comp = @ViewControlGroup, @ViewTypeSubGroup, @WritePageControl;
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_VIEW_MENU;
+}
+
+@end PrimaryUI;
+
+@start ViewMenuUI;
+
+/* This object exists so that the ViewControl can be easily enabled/disabled
+ * without interfering with the GenControl mechanism */
+@object GenInteractionClass ViewControlGroup = {
+	GI_comp = @WriteViewControl;
+}
+
+@object GenViewControlClass WriteViewControl = {
+/*	HINT_GEN_CONTROL_SCALABLE_UI_DATA { GenControlScalableUIEntry <
+		 GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		 UIIL_INTRODUCTORY,
+		 GVC_SUGGESTED_INTRODUCTORY_FEATURES>,
+		<GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		 UIIL_BEGINNING,
+		 GVC_SUGGESTED_BEGINNING_FEATURES or mask GVCF_REDRAW>,
+		<GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		 UIIL_INTERMEDIATE,
+		 GVC_DEFAULT_FEATURES or mask GVCF_REDRAW>,
+		<GCSUIC_SET_TOOLBOX_FEATURES_IF_APP_LEVEL,
+		 UIIL_BEGINNING,
+		 GVC_DEFAULT_TOOLBOX_FEATURES or mask GVCTF_REDRAW>}
+*/}
+
+@object GenInteractionClass ViewTypeSubGroup = {
+	GI_comp = @ViewTypeList;
+	GI_visMoniker = 'D', "Display Modes";
+	GI_states = @default & ~GS_ENABLED;
+	GII_visibility = GIV_POPUP;
+}
+
+@object GenItemGroupClass ViewTypeList = {
+	GI_comp = @PageEntry, @CondensedEntry, @GalleyEntry,
+				 @DraftWithStylesEntry, @DraftWithoutStylesEntry;
+	GI_attrs = @default | GA_NOTIFY_VISIBILITY;
+//	GIGI_destination = TO_APP_MODEL;
+//	GIGI_applyMsg = MSG_WRITE_DOCUMENT_SET_DISPLAY_MODE;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&WriteDocumentClass};
+	ATTR_GEN_VISIBILITY_DATA = GV_DISPLAY_MODE;
+}
+
+@object GenItemClass PageEntry = {
+	GI_visMoniker = 'P', "Page";
+	GII_identifier = VLTDM_PAGE;
+}
+
+@object GenItemClass CondensedEntry = {
+	GI_visMoniker = 'C', "Condensed";
+	GII_identifier = VLTDM_CONDENSED;
+}
+
+@object GenItemClass GalleyEntry = {
+	GI_visMoniker = 'G', "Galley";
+	GII_identifier = VLTDM_GALLEY;
+}
+
+@object GenItemClass DraftWithStylesEntry = {
+	GI_visMoniker = 'D', "Draft With Styles";
+	GII_identifier = VLTDM_DRAFT_WITH_STYLES;
+}
+
+@object GenItemClass DraftWithoutStylesEntry = {
+	GI_visMoniker = 'S', "Draft Without Styles";
+	GII_identifier = VLTDM_DRAFT_WITHOUT_STYLES;
+}
+
+@object GenPageControlClass WritePageControl = {
+//	GCI_output = TO_APP_MODEL;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&WriteDocumentClass};
+/*		HINT_GEN_CONTROL_SCALABLE_UI_DATA { GenControlScalableUIEntry <
+		      GCSUIC_SET_TOOLBOX_FEATURES_IF_APP_FEATURE_ON,
+		      mask WF_SIMPLE_TEXT_ATTRIBUTES,
+		      mask GPCTF_PREVIOUS_PAGE or mask GPCTF_GOTO_PAGE or \
+		      mask GPCTF_NEXT_PAGE>
+		} */
+}
+
+@end ViewMenuUI;
+
+

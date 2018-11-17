@@ -1,0 +1,887 @@
+/***************************************************************************
+ *  FILE:           grade.goc
+ *  PROJECT:        Breadbox Test Generator
+ *  DESCRIPTION:    This file has methods for grading tests
+ *
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *      Include files
+ ***************************************************************************
+ */
+
+@include "tgen.goh"
+@include "externs.goh"
+
+
+/*
+ ***************************************************************************
+ *      Code for Test Grading
+ ***************************************************************************
+ */
+
+/* file scope globals */
+word g_numTestQs, g_numUngraded, g_numCorrect;
+Boolean g_changing;
+
+
+/***********************************************************************
+ *
+ * FUNCTION:		GetFracNum(dword frac)
+ *
+ *
+ * DESCRIPTION:   this is to manipulate the goofy WWFixed bs from the GenValue
+
+ *
+ *
+ ***********************************************************************/
+word GetFracNum(dword frac)
+{
+
+	frac *= (dword)100;
+	frac /= (dword)0xffff;
+	frac += (dword)1;
+	frac /= (dword)10;
+
+	return ((word)frac);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:		ShowNumRight(void)
+ *
+ *
+ * DESCRIPTION:   displays the number right
+
+ *
+ *
+ ***********************************************************************/
+void ShowNumRight(void)
+{
+ char			numStr[20];
+ word			len;
+
+
+	UtilHex32ToAscii(numStr, (dword)(g_numCorrect), UHTAF_NULL_TERMINATE);
+	/* now we need to see if this is going to be a decimal number */
+	len = strlen(numStr);
+	if (numStr[len-1] == '0') {
+		/* axe the 0 */
+		numStr[len-1] = 0;
+		}
+	else {
+		/* throw in a decimal */
+		numStr[len+1] = 0;
+		numStr[len] = numStr[len-1];
+		numStr[len-1] = '.';
+		}
+	@call GIRight::MSG_VIS_TEXT_REPLACE_ALL_PTR(numStr, 0);
+
+	return;
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_TGEN_DOCUMENT_OPEN_GRADE_SEL for TGenDocumentClass
+ *
+ *
+ * DESCRIPTION:	Opens grade test file selection dialog box
+ *
+ *
+ ***********************************************************************/
+@extern method TGenDocumentClass, MSG_TGEN_DOCUMENT_OPEN_GRADE_SEL
+{
+
+
+	@send GradeFileSel::MSG_GEN_PATH_SET(".", SP_DOCUMENT);
+
+	/* Open the dialog box */
+	@call SelGradeFileDBox::MSG_GEN_INTERACTION_INITIATE();
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	(GEN_FILE_SELECTOR_NOTIFICATION_MSG)
+ *                              MSG_TGEN_DOCUMENT_GRADE_SELECTOR_ACTION
+ *                 for TGenDocumentClass
+ *             (word entryNum, word entryFlags)
+ * DESCRIPTION:	 
+ *
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method TGenDocumentClass, MSG_TGEN_DOCUMENT_GRADE_SELECTOR_ACTION
+{
+
+	/* was it a double click? */
+	if (GFS_GET_ENTRY_FLAGS(entryFlags) & GFSEF_OPEN) {
+		if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE)
+			@send, forceQueue oself::MSG_TGEN_DOCUMENT_OPEN_GRADE();
+		}
+
+	else  {  /* if not dbl click see if we're on a file */
+		if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE)
+			@send SelGrade::MSG_GEN_SET_ENABLED(VUM_NOW);
+		else
+			@send SelGrade::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_TGEN_DOCUMENT_OPEN_GRADE for TGenDocumentClass
+ *
+ *
+ * DESCRIPTION:	Opens grading dialog box
+ *
+ *
+ ***********************************************************************/
+@extern method TGenDocumentClass, MSG_TGEN_DOCUMENT_OPEN_GRADE
+{
+ char		testName[FILE_LONGNAME_BUFFER_SIZE];
+ char		testPath[PATH_BUFFER_SIZE], numStr[11];
+ dword		selFlags;
+ DiskHandle		testDiskhandle;
+ TestMapStruct        *TMapPtr;
+ MemHandle      mh;
+ VMBlockHandle      vmbh;
+ Boolean		misMatch, finished, stuGradable;
+ word			i, size, ans, stuAns, score;
+ byte			type;
+ BasicDBFieldID	fieldID;
+ BasicDBError		error;
+
+
+	/* open the selected test */
+	selFlags = @call GradeFileSel::MSG_GEN_FILE_SELECTOR_GET_SELECTION(testName);
+	/* check to see if it's a file - redundant if dbl clicked */
+	if (GFS_GET_ENTRY_TYPE(selFlags) != GFSET_FILE)  {
+		return;
+		}
+	/* get the file's path and disk handle */
+	@call GradeFileSel::MSG_GEN_PATH_GET(testPath, PATH_BUFFER_SIZE);
+	testDiskhandle = @call GradeFileSel::MSG_GEN_PATH_GET_DISK_HANDLE();
+	/* save our TGen file directory */
+	FilePushDir();
+	/* and set the test file dir  - FileSel doesn't do this */
+	FileSetCurrentPath(testDiskhandle, testPath);
+
+	g_testFileHandle = VMOpen(testName, VMAF_FORCE_READ_ONLY, VMO_OPEN, 0);
+	if (!g_testFileHandle) {
+		NotifyDBox(0, @TestOpenErrMsg);
+		FilePopDir();
+		return;
+		}
+
+	misMatch = FALSE;
+	/* get our VMmap block */
+	vmbh = VMGetMapBlock(g_testFileHandle);
+	TMapPtr = VMLock(g_testFileHandle, vmbh, &mh);
+	/* make sure this test is from this bank */
+	if (strlen(TMapPtr->TMS_bankName) != strlen(pself->GDI_fileName))
+		misMatch = TRUE;
+	else {
+		if (LocalCmpStrings(TMapPtr->TMS_bankName, pself->GDI_fileName,
+								strlen(pself->GDI_fileName)))
+			misMatch = TRUE;
+		}
+	if (!misMatch) {
+      /* ok - we can grab the info */
+		@call GTILine1::MSG_VIS_TEXT_REPLACE_ALL_PTR(TMapPtr->TMS_titleLine1, 0);
+		@call GTILine2::MSG_VIS_TEXT_REPLACE_ALL_PTR(TMapPtr->TMS_titleLine2, 0);
+		@call GTILine3::MSG_VIS_TEXT_REPLACE_ALL_PTR(TMapPtr->TMS_titleLine3, 0);
+		@call GTIName::MSG_VIS_TEXT_REPLACE_ALL_PTR(TMapPtr->TMS_nameLine, 0);
+		@call GTIDate::MSG_VIS_TEXT_REPLACE_ALL_PTR(TMapPtr->TMS_dateLine, 0);
+		g_numTestQs = TMapPtr->TMS_numQuestions;
+		pself->TGDI_testDBHan = TMapPtr->TMS_testDBHan;
+		finished = TMapPtr->TMS_finished;
+		stuGradable = TMapPtr->TMS_studentGradable;
+		}
+	VMUnlock(mh);
+
+	if(misMatch) {
+		VMClose(g_testFileHandle, FALSE);
+		FilePopDir();
+      g_testFileHandle = 0;
+		NotifyDBox(0, @GradeFileMisMatchErrMsg);
+		return;
+		}
+
+	if (!finished)  {
+		if(AckDBox(0, 0, @ConfirmNotFinished) == ACK_NO) {
+			VMClose(g_testFileHandle, FALSE);
+			FilePopDir();
+         g_testFileHandle = 0;
+			return;
+			}
+		}
+
+	/* init qArray for any ungraded questions */
+	if (!stuGradable) {
+		for (i = 0; i < MAX_NUM_QUESTIONS; i++) {
+			pself->TGDI_qArray[i] = 0;
+			}
+		}
+
+	/* Go thru the questions to compare stu and correct answers */
+	g_numCorrect = 0;
+//	g_numWrong = 0;
+	g_numUngraded = 0;
+	for (i = 0; i < g_numTestQs; i++) {
+		/* grab the question record */
+		error = BasicDBGetRecordByElemNum(g_testFileHandle,
+									pself->TGDI_testDBHan, i, &mh);
+		if (error) {
+			NotifyDBox(0, @BDBGetByIndexError);
+			return;
+			}
+		/* get the type */
+		fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_Q_TYPE, 1);
+		BasicDBGetFieldData(mh, fieldID, &type, sizeof(byte));
+		if (type != QTYPE_FILL) {
+			/* get the answer */
+			fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_ANSWER, 1);
+			size = BasicDBGetFieldData(mh, fieldID, &ans, sizeof(word));
+			if (!size) ans = 0;
+			/* and the student's answer */
+			fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_STU_ANS, 1);
+			size = BasicDBGetFieldData(mh, fieldID, &stuAns, sizeof(word));
+			if (!size) stuAns = 0;
+			/* and see if it is correct */
+			if (ans == stuAns) g_numCorrect++;
+//			else  g_numWrong++;
+			BasicDBDiscardRecord(mh);
+			}
+		else {
+			/* throw the ungraded q nums into the qArray so that we can show them
+				in a dlist for grading */
+			pself->TGDI_qArray[g_numUngraded * 3] = i;
+			/* and mark it as ungraded */
+			pself->TGDI_qArray[g_numUngraded * 3 + 1] = 0xffff;
+			pself->TGDI_qArray[g_numUngraded * 3 + 2] = 0xffff;
+			g_numUngraded++;
+			}
+		}
+
+	/* show the info */
+	UtilHex32ToAscii(numStr, (dword)g_numTestQs, UHTAF_NULL_TERMINATE);
+	@call GIQs::MSG_VIS_TEXT_REPLACE_ALL_PTR(numStr, 0);
+	UtilHex32ToAscii(numStr, (dword)g_numCorrect, UHTAF_NULL_TERMINATE);
+	@call GIRight::MSG_VIS_TEXT_REPLACE_ALL_PTR(numStr, 0);
+//	UtilHex32ToAscii(numStr, (dword)g_numWrong, UHTAF_NULL_TERMINATE);
+//	@call GIWrong::MSG_VIS_TEXT_REPLACE_ALL_PTR(numStr, 0);
+	UtilHex32ToAscii(numStr, (dword)g_numUngraded, UHTAF_NULL_TERMINATE);
+	@call GIUngraded::MSG_VIS_TEXT_REPLACE_ALL_PTR(numStr, 0);
+	score = (100 * g_numCorrect) / g_numTestQs;
+	UtilHex32ToAscii(numStr, (dword)score, UHTAF_NULL_TERMINATE);
+	@call GIScore::MSG_VIS_TEXT_REPLACE_ALL_PTR(numStr, 0);
+
+	/* show any grading to be done */
+	if (g_numUngraded) {
+		@send GTMarkStuff::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send GTMDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(g_numUngraded);
+		@send GTStatsButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		@send GTTAideButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+	else {
+		@send GTMarkStuff::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+		@send GTStatsButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		@send GTTAideButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+
+	/* and before we leave here we'll mply the number correct by 10 now
+		so that we don't have to mess with floats for partial credit free
+		form answers */
+	g_numCorrect *=10;
+
+	/* Open the dialog box */
+	@call GradeFileDBox::MSG_GEN_INTERACTION_INITIATE();
+
+	/* NOTICE that we're leaving the test file open here! It gets closed
+   	when the Grade DBox gets closed. */
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_TGEN_DOCUMENT_MARK_DLIST_MONIKER_QUERY for TGenDocumentClass
+ *
+ * DESCRIPTION:	Queries for monikers for marking list.
+ *
+ * PARAMETERS:  void (optr list, word item)
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method TGenDocumentClass, MSG_TGEN_DOCUMENT_MARK_DLIST_MONIKER_QUERY
+{
+ MemHandle		mh;
+ char			qString[MAX_QUESTION_LENGTH], monString[MAX_QUESTION_LENGTH+5];
+ word			size, question, gradeFrac, gradeInt;
+ BasicDBFieldID	fieldID;
+ char					numStr[13];
+
+
+	question = pself->TGDI_qArray[item * 3];
+	/* get the grade (if any) */
+	if ((pself->TGDI_qArray[item * 3 + 1] == 0xffff) &&
+			  (pself->TGDI_qArray[item * 3 + 2] == 0xffff)) {
+		/* no grade yet */
+		strcpy(monString, "  X  ");
+		}
+	else {
+		gradeInt = pself->TGDI_qArray[item * 3 + 2];
+		gradeFrac = GetFracNum((dword)pself->TGDI_qArray[item * 3 + 1]);
+		if (gradeFrac == 10)  {
+			gradeFrac = 0;
+			gradeInt +=1;
+         }
+		UtilHex32ToAscii(numStr, (dword)gradeInt, UHTAF_NULL_TERMINATE);
+		strcpy(monString, numStr);
+		strcat(monString, ".");
+		UtilHex32ToAscii(numStr, (dword)gradeFrac, UHTAF_NULL_TERMINATE);
+		strcat(monString, numStr);
+		strcat(monString, " ");
+		}
+
+	/* open the record */
+	BasicDBGetRecordByElemNum(g_testFileHandle,
+									pself->TGDI_testDBHan, question, &mh);
+	/* grab the question */
+	fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_QUESTION, 1);
+	size = BasicDBGetFieldData(mh, fieldID, qString, MAX_QUESTION_LENGTH+1);
+	qString[size] = 0;
+	BasicDBDiscardRecord(mh);
+	strcat(monString, qString);
+
+	/* and tell the DList */
+	@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, monString) ;
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_TGEN_DOCUMENT_MARK_DLIST_DBL_CLICK for TGenDocumentClass
+ *
+ * DESCRIPTION:	Opens the free form Q, A and student A dbox for grade.
+ *
+ *
+ *
+ * PARAMETERS:
+ *
+ ***********************************************************************/
+@extern method TGenDocumentClass, MSG_TGEN_DOCUMENT_MARK_DLIST_DBL_CLICK
+{
+ MemHandle		mh;
+ char			qString[MAX_QUESTION_LENGTH];
+ word			sel, size, question;
+ BasicDBFieldID	fieldID;
+ BasicDBRecordID	recID;
+ WWFixedAsDWord	grade, gradeInt;
+
+
+	g_changing = FALSE;
+	sel = @call GTMDList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	if (sel == GIGS_NONE) return;
+
+	if ((pself->TGDI_qArray[sel * 3 + 1] != 0xffff) &&
+			  (pself->TGDI_qArray[sel * 3 + 2] != 0xffff)) g_changing = TRUE;
+
+	question = pself->TGDI_qArray[sel * 3];
+
+	/* open the record */
+	BasicDBGetRecordByElemNum(g_testFileHandle,
+									pself->TGDI_testDBHan, question, &mh);
+	/* get its bank recID */
+	fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_BANK_ID, 1);
+	BasicDBGetFieldData(mh, fieldID, &recID, sizeof(recID));
+	/* show the question */
+	fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_QUESTION, 1);
+	size = BasicDBGetFieldData(mh, fieldID, qString, MAX_QUESTION_LENGTH+1);
+	@call GradeQText::MSG_VIS_TEXT_REPLACE_ALL_PTR(qString, size);
+	/* show the student's answer */
+	fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_STU_ANS, 1);
+	size = BasicDBGetFieldData(mh, fieldID, qString, MAX_QUESTION_LENGTH+1);
+	if (size)
+		@call GradeSAText::MSG_VIS_TEXT_REPLACE_ALL_PTR(qString, size);
+	else
+		@send GradeSAText::MSG_VIS_TEXT_DELETE_ALL();
+	BasicDBDiscardRecord(mh);
+
+	/* and show the bank answer */
+	BasicDBGetRecord(pself->GDI_fileHandle, pself->TGDI_bankDBHan, recID, &mh);
+	fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_ANSWER, 1);
+	size = BasicDBGetFieldData(mh, fieldID, qString, MAX_QUESTION_LENGTH+1);
+	@call GradeAText::MSG_VIS_TEXT_REPLACE_ALL_PTR(qString, size);
+	BasicDBDiscardRecord(mh);
+
+	/* and show the grade if it exists */
+	if (!g_changing) {
+		/* no grade yet */
+		@send GradeValue::MSG_GEN_VALUE_SET_VALUE(MakeWWFixed(0.0), FALSE);
+		}
+	else {
+		grade = (WWFixedAsDWord)pself->TGDI_qArray[sel * 3 + 1];
+		gradeInt = (WWFixedAsDWord)pself->TGDI_qArray[sel * 3 + 2];
+		grade += (gradeInt << 16);
+		@send GradeValue::MSG_GEN_VALUE_SET_VALUE(grade, FALSE);
+		}
+
+	/* and open the dbox */
+	@send GradeFreeFormQDBox::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_TGEN_DOCUMENT_ENTER_GRADE for TGenDocumentClass
+ *
+ * DESCRIPTION:	Assigns grade to ungraded question
+ *
+ *
+ *
+ * PARAMETERS:
+ *
+ ***********************************************************************/
+@extern method TGenDocumentClass, MSG_TGEN_DOCUMENT_ENTER_GRADE
+{
+ WWFixedAsDWord	grade;
+ word			sel, newInt, newFrac, oldInt, oldFrac, score;
+ char			numStr[20];
+
+
+	/* grab the selection */
+	sel = @call GTMDList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+	/* get any previous mark */
+	if (g_changing) {
+		oldFrac = pself->TGDI_qArray[sel * 3 + 1];
+		oldInt = pself->TGDI_qArray[sel * 3 + 2];
+		}
+
+	/* get the (new) mark and store it */
+	grade = @call GradeValue::MSG_GEN_VALUE_GET_VALUE();
+	newFrac = FractionOf(grade);
+	newInt = IntegerOf(grade);
+	pself->TGDI_qArray[sel * 3 + 1] = newFrac;
+	pself->TGDI_qArray[sel * 3 + 2] = newInt;
+
+	/* redraw the dlist moniker to show the mark */
+	@send oself::MSG_TGEN_DOCUMENT_MARK_DLIST_MONIKER_QUERY(@GTMDList, sel);
+
+	/* change the other UI elements */
+	if (!g_changing)  {
+		g_numUngraded--;
+		UtilHex32ToAscii(numStr, (dword)g_numUngraded, UHTAF_NULL_TERMINATE);
+		@call GIUngraded::MSG_VIS_TEXT_REPLACE_ALL_PTR(numStr, 0);
+		}
+
+	if (!newFrac && !newInt) {
+   	/* a wrong answer -> zero points awarded */
+//		g_numWrong++;
+//		UtilHex32ToAscii(numStr, (dword)g_numWrong, UHTAF_NULL_TERMINATE);
+//		@call GIWrong::MSG_VIS_TEXT_REPLACE_ALL_PTR(numStr, 0);
+		if (g_changing) {
+			/* we'll need to subtract out the previous points... */
+			if (oldInt == 1)  g_numCorrect -= 10;
+			else  g_numCorrect -= GetFracNum((dword)oldFrac);
+			ShowNumRight();
+			}
+		/* otherwise do nothing */
+		}
+
+	else {
+		/* a right or partially right answer */
+		if( g_changing) {
+			/* we'll need to subtract out the previous points... */
+			if (oldInt == 1)  g_numCorrect -= 10;
+			else  g_numCorrect -= GetFracNum((dword)oldFrac);
+			}
+      /* and add in the new points in any case */
+		if (newInt == 1)  g_numCorrect += 10;
+		else  g_numCorrect += GetFracNum((dword)newFrac);
+		ShowNumRight();
+		}
+
+	score = (10 * g_numCorrect) / g_numTestQs;
+	UtilHex32ToAscii(numStr, (dword)score, UHTAF_NULL_TERMINATE);
+	@call GIScore::MSG_VIS_TEXT_REPLACE_ALL_PTR(numStr, 0);
+
+	if (!g_numUngraded) {
+		@send GTStatsButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		@send GTTAideButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_TGEN_DOCUMENT_SAVE_STATS for TGenDocumentClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ *
+ * PARAMETERS:
+ *
+ ***********************************************************************/
+@extern method TGenDocumentClass, MSG_TGEN_DOCUMENT_SAVE_STATS
+{
+ MemHandle      mh;
+ word			i, size, ans, stuAns, tGraded, num;
+ byte			type;
+ BasicDBFieldID	fieldID;
+ BasicDBRecordID	recID;
+ BasicDBError		error;
+ Boolean				isRight;
+ char			qString[MAX_QUESTION_LENGTH];
+
+
+   tGraded = 0;
+	for (i = 0; i < g_numTestQs; i++) {
+		/* grab the question record */
+		error = BasicDBGetRecordByElemNum(g_testFileHandle,
+									pself->TGDI_testDBHan, i, &mh);
+		if (error) {
+			NotifyDBox(0, @BDBGetByIndexError);
+			return;
+			}
+		/* get the type */
+		fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_Q_TYPE, 1);
+		BasicDBGetFieldData(mh, fieldID, &type, sizeof(byte));
+		fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_BANK_ID, 1);
+		BasicDBGetFieldData(mh, fieldID, &recID, sizeof(recID));
+		fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_QUESTION, 1);
+		size = BasicDBGetFieldData(mh, fieldID, qString, MAX_QUESTION_LENGTH+1);
+		qString[size] = 0;
+		if (type != QTYPE_FILL) {
+			/* get the answer */
+			fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_ANSWER, 1);
+			size = BasicDBGetFieldData(mh, fieldID, &ans, sizeof(word));
+			if (!size) ans = 0;
+			/* and the student's answer */
+			fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_STU_ANS, 1);
+			size = BasicDBGetFieldData(mh, fieldID, &stuAns, sizeof(word));
+			if (!size) stuAns = 0;
+			/* and see if it is correct */
+			if (ans == stuAns) isRight = TRUE;
+			else  isRight = FALSE;
+			}
+		else {
+			/* grab the freeform mark */
+			if (pself->TGDI_qArray[tGraded * 3 + 2]) isRight = TRUE;
+			else  isRight = FALSE;
+			tGraded++;
+			}
+		BasicDBDiscardRecord(mh);
+
+		/* now get the testbank record (using its recID) and enter the data */
+		BasicDBGetRecord(pself->GDI_fileHandle, pself->TGDI_bankDBHan, recID, &mh);
+		if (isRight)
+			fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_ANS_RIGHT, 1);
+		else
+			fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_ANS_WRONG, 1);
+		size = BasicDBGetFieldData(mh, fieldID, &num, sizeof(word));
+		if (!size) num = 0;
+		num++;
+		BasicDBSetFieldData(mh, fieldID, &num, sizeof(word));
+		BasicDBSaveRecord(pself->GDI_fileHandle,
+						pself->TGDI_bankDBHan, mh, TypesIndexCallBack, 0);
+		}  /* end of loop thru test questions for */
+
+	/* this closes the open test file */
+//	@send GradeFileDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+   /* and update the stats */
+	if (g_showingStats)
+		@send MESummaryDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(g_numQuestions);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_TGEN_DOCUMENT_OPEN_ADD_DATA for TGenDocumentClass
+ *
+ * DESCRIPTION:	Opens the add data dbox
+ *
+ *
+ *
+ * PARAMETERS:
+ *
+ ***********************************************************************/
+@extern method TGenDocumentClass, MSG_TGEN_DOCUMENT_OPEN_ADD_DATA
+{
+ word		sel, size, ans;
+ byte		type;
+ MemHandle		mh;
+ BasicDBFieldID	fieldID;
+ BasicDBError		error;
+ char					qString[MAX_QUESTION_LENGTH];
+
+
+	/* make sure there's a question selected */
+	sel = @call MESummaryDList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	if (sel == GIGS_NONE) return;
+
+	/* grab the info from the db and show it */
+	if (pself->TGDI_bankCurrentIndex)
+		error = BasicDBGetRecordByIndex(pself->GDI_fileHandle,
+									pself->TGDI_bankDBHan,
+									pself->TGDI_bankCurrentIndex,
+									sel, &mh);
+	else
+		error = BasicDBGetRecordByElemNum(pself->GDI_fileHandle,
+									pself->TGDI_bankDBHan,
+									sel, &mh);
+	if (error) {
+		NotifyDBox(0, @BDBGetByIndexError);
+		return;
+		}
+
+	/* get the type */
+	fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_Q_TYPE, 1);
+	BasicDBGetFieldData(mh, fieldID, &type, sizeof(byte));
+	MemLock(OptrToHandle(@MCLongText));
+	switch (type) {
+		case QTYPE_MC:
+			strcpy(qString, LMemDeref(@MCLongText));
+			break;
+		case QTYPE_TF:
+			strcpy(qString, LMemDeref(@TFLongText));
+			break;
+		case QTYPE_FILL:
+			strcpy(qString, LMemDeref(@FFLongText));
+			break;
+		}
+	MemUnlock(OptrToHandle(@MCLongText));
+	@call ADQuestionType::MSG_VIS_TEXT_REPLACE_ALL_PTR(qString, 0);
+
+	/* get the question */
+	fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_QUESTION, 1);
+	size = BasicDBGetFieldData(mh, fieldID, qString, MAX_QUESTION_LENGTH);
+	@call ADQuestionText::MSG_VIS_TEXT_REPLACE_ALL_PTR(qString, size);
+
+	/* and the stats */
+	fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_ANS_RIGHT, 1);
+	size = BasicDBGetFieldData(mh, fieldID, &ans, MAX_QUESTION_LENGTH);
+	if (!size) ans = 0;
+	UtilHex32ToAscii(qString, (dword)ans, UHTAF_NULL_TERMINATE);
+	@call ADRightText::MSG_VIS_TEXT_REPLACE_ALL_PTR(qString, 0);
+	fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_ANS_WRONG, 1);
+	size = BasicDBGetFieldData(mh, fieldID, &ans, MAX_QUESTION_LENGTH);
+	if (!size) ans = 0;
+ 	UtilHex32ToAscii(qString, (dword)ans, UHTAF_NULL_TERMINATE);
+	@call ADWrongText::MSG_VIS_TEXT_REPLACE_ALL_PTR(qString, 0);
+	BasicDBDiscardRecord(mh);
+
+
+	@send AddDataDBox::MSG_GEN_INTERACTION_INITIATE();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_TGEN_DOCUMENT_ENTER_STATS_DATA for TGenDocumentClass
+ *
+ * DESCRIPTION:	adds the stats to the databank
+ *
+ *
+ *
+ * PARAMETERS:
+ *
+ ***********************************************************************/
+@extern method TGenDocumentClass, MSG_TGEN_DOCUMENT_ENTER_STATS_DATA
+{
+ word		sel, size, ans, num;
+ MemHandle		mh;
+ BasicDBFieldID	fieldID;
+ BasicDBError		error;
+ Boolean				changed = FALSE;
+
+
+	/* make sure there's a question selected */
+	sel = @call MESummaryDList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	if (sel == GIGS_NONE) return;
+
+	/* grab the info from the db and update it */
+	if (pself->TGDI_bankCurrentIndex)
+		error = BasicDBGetRecordByIndex(pself->GDI_fileHandle,
+									pself->TGDI_bankDBHan,
+									pself->TGDI_bankCurrentIndex,
+									sel, &mh);
+	else
+		error = BasicDBGetRecordByElemNum(pself->GDI_fileHandle,
+									pself->TGDI_bankDBHan,
+									sel, &mh);
+	if (error) {
+		NotifyDBox(0, @BDBGetByIndexError);
+		return;
+		}
+
+	ans = @call ADRightValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+	if (ans) {
+		fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_ANS_RIGHT, 1);
+		size = BasicDBGetFieldData(mh, fieldID, &num, sizeof(word));
+		if (!size) num = 0;
+		num += ans;
+		BasicDBSetFieldData(mh, fieldID, &num, sizeof(word));
+		changed = TRUE;
+		}
+	ans = @call ADWrongValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+	if (ans) {
+		fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_ANS_WRONG, 1);
+		size = BasicDBGetFieldData(mh, fieldID, &num, sizeof(word));
+		if (!size) num = 0;
+		num += ans;
+		BasicDBSetFieldData(mh, fieldID, &num, sizeof(word));
+		changed = TRUE;
+		}
+
+	if (changed) {
+		BasicDBSaveRecord(pself->GDI_fileHandle,
+						pself->TGDI_bankDBHan, mh, TypesIndexCallBack, 0);
+		@call self::MSG_TGEN_DOCUMENT_SUMMARY_DLIST_MONIKER_QUERY(
+							 @MESummaryDList, sel);
+		}
+	else
+		BasicDBDiscardRecord(mh);
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_TGEN_DOCUMENT_DELETE_DATA for TGenDocumentClass
+ *
+ * DESCRIPTION:	deletes the R/W data for the selected question
+ *
+ *
+ *
+ * PARAMETERS:
+ *
+ ***********************************************************************/
+@extern method TGenDocumentClass, MSG_TGEN_DOCUMENT_DELETE_DATA
+{
+ word		sel, size, num;
+ MemHandle		mh;
+ BasicDBFieldID	fieldID;
+ BasicDBError		error;
+ Boolean				changed = FALSE;
+
+
+	/* make sure there's a question selected */
+	sel = @call MESummaryDList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	if (sel == GIGS_NONE) return;
+
+	/* grab the info from the db and update it */
+	if (pself->TGDI_bankCurrentIndex)
+		error = BasicDBGetRecordByIndex(pself->GDI_fileHandle,
+									pself->TGDI_bankDBHan,
+									pself->TGDI_bankCurrentIndex,
+									sel, &mh);
+	else
+		error = BasicDBGetRecordByElemNum(pself->GDI_fileHandle,
+									pself->TGDI_bankDBHan,
+									sel, &mh);
+	if (error) {
+		NotifyDBox(0, @BDBGetByIndexError);
+		return;
+		}
+
+	fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_ANS_RIGHT, 1);
+	size = BasicDBGetFieldData(mh, fieldID, &num, sizeof(word));
+	if (size) {
+		num = 0;
+		BasicDBSetFieldData(mh, fieldID, &num, sizeof(word));
+		changed = TRUE;
+		}
+
+	fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_ANS_WRONG, 1);
+	size = BasicDBGetFieldData(mh, fieldID, &num, sizeof(word));
+	if (size) {
+		num = 0;
+		BasicDBSetFieldData(mh, fieldID, &num, sizeof(word));
+		changed = TRUE;
+		}
+
+	if (changed) {
+		BasicDBSaveRecord(pself->GDI_fileHandle,
+						pself->TGDI_bankDBHan, mh, TypesIndexCallBack, 0);
+		@call self::MSG_TGEN_DOCUMENT_SUMMARY_DLIST_MONIKER_QUERY(
+							 @MESummaryDList, sel);
+		}
+	else
+		BasicDBDiscardRecord(mh);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_TGEN_DOCUMENT_ERASE_STATS for TGenDocumentClass
+ *
+ * DESCRIPTION:	zeros out all the stats
+ *
+ *
+ *
+ * PARAMETERS:
+ *
+ ***********************************************************************/
+@extern method TGenDocumentClass, MSG_TGEN_DOCUMENT_ERASE_STATS
+{
+ word		i, size, num;
+ MemHandle		mh;
+ BasicDBFieldID	fieldID;
+ BasicDBError		error;
+ Boolean				changed;
+
+
+	for (i = 0; i < g_numQuestions; i++) {
+		/* grab the info from the db and update it */
+		if (pself->TGDI_bankCurrentIndex)
+			error = BasicDBGetRecordByIndex(pself->GDI_fileHandle,
+									pself->TGDI_bankDBHan,
+									pself->TGDI_bankCurrentIndex,
+									i, &mh);
+		else
+			error = BasicDBGetRecordByElemNum(pself->GDI_fileHandle,
+									pself->TGDI_bankDBHan,
+									i, &mh);
+		if (error) {
+			NotifyDBox(0, @BDBGetByIndexError);
+			return;
+			}
+      changed = FALSE;
+		/* zero out the right/wrong ans stuff */
+		fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_ANS_RIGHT, 1);
+		size = BasicDBGetFieldData(mh, fieldID, &num, sizeof(word));
+		if (size && (num != 0))  {
+			num = 0;
+			BasicDBSetFieldData(mh, fieldID, &num, sizeof(word));
+			changed = TRUE;
+			}
+		fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, FIELD_CAT_ANS_WRONG, 1);
+		size = BasicDBGetFieldData(mh, fieldID, &num, sizeof(word));
+		if (size && (num != 0))  {
+			num = 0;
+			BasicDBSetFieldData(mh, fieldID, &num, sizeof(word));
+			changed = TRUE;
+			}
+
+		if (changed) {
+			BasicDBSaveRecord(pself->GDI_fileHandle,
+						pself->TGDI_bankDBHan, mh, TypesIndexCallBack, 0);
+			}
+		else
+			BasicDBDiscardRecord(mh);
+		} /*end of loop thru databank for */
+
+	/* and redraw the dlist */
+	@send MESummaryDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(g_numQuestions);
+
+}
+
+

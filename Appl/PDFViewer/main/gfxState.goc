@@ -1,0 +1,1141 @@
+//========================================================================
+//
+// GfxState.cc
+//
+// Copyright 1996 Derek B. Noonburg
+//
+//========================================================================
+
+#ifdef __GNUC__
+#pragma implementation
+#endif
+
+
+@include "pdfvu.goh"
+
+#include <stddef.h>
+#include <math.h>
+#include <Ansi/string.h> // for memcpy()
+@include "gmem.goh"
+@include "obj.goh"
+@include "gfxState.goh"
+
+/*
+ * Forward decls
+ */
+
+void GfxColorSpaceSetMode(GfxColorSpace *this, Obj *colorSpace, XRef *xref);
+
+
+
+//------------------------------------------------------------------------
+// GfxColor
+//------------------------------------------------------------------------
+
+void GfxColorSetCMYK(GfxColor *this, short c, short m, short y, short k) {
+  if ((this->r = 255 - (c + k)) < 0)
+    this->r = 0;
+  if ((this->g = 255 - (m + k)) < 0)
+    this->g = 0;
+  if ((this->b = 255 - (y + k)) < 0)
+    this->b = 0;
+}
+
+  // Set color.
+void GfxColorSetGray(GfxColor *this, short gray)
+    { this->r = this->g = this->b = gray; }
+void GfxColorSetRGB(GfxColor *this, short r1, short g1, short b1)
+    { this->r = r1; this->g = g1; this->b = b1; }
+
+
+//------------------------------------------------------------------------
+// GfxColorSpace
+//------------------------------------------------------------------------
+
+void GfxColorSpaceInit(GfxColorSpace *this, Obj *colorSpace, XRef *xref) {
+  Obj csObj;
+  Obj obj, obj2;
+  char *s;
+  long x;
+  short i, j;
+
+  this->ok = gTrue;
+  this->lookup = NULL;
+/*
+ * Haven't ported Function yet...
+ */
+  // check for Separation colorspace
+  ObjCopy(&csObj, colorSpace);
+//  sepFunc = NULL;
+  if (isArray(colorSpace)) {
+    ObjArrayGet(colorSpace, 0, &obj, xref);
+    if (isNameSame(&obj, "Separation")) {
+      ObjFree(&csObj);
+      ObjArrayGet(colorSpace, 2, &csObj, xref);
+//      sepFunc = new Function(colorSpace->arrayGet(3, &obj2));
+      ObjFree(&obj2);
+//      if (!sepFunc->isOk()) {
+//	delete sepFunc;
+//	sepFunc = NULL;
+//      }
+    }
+    ObjFree(&obj);
+  }
+
+  // get mode
+  this->indexed = gFalse;
+  if (isName(&csObj)) {
+    GfxColorSpaceSetMode(this, &csObj, xref);
+  } else if (isArray(&csObj)) {
+    ObjArrayGet(&csObj, 0, &obj, xref);
+    if (isNameSame(&obj, "Indexed") || isNameSame(&obj, "I")) {
+      this->indexed = gTrue;
+      ObjArrayGet(&csObj, 1, &obj2, xref);
+      GfxColorSpaceSetMode(this, &obj2, xref);
+      ObjFree(&obj2);
+    } else {
+      GfxColorSpaceSetMode(this, &csObj, xref);
+    }
+    ObjFree(&obj);
+  } else {
+    goto err1;
+  }
+  if (!this->ok)
+    return;
+
+  // get lookup table for indexed colorspace
+  if (this->indexed) {
+    ObjArrayGet(&csObj, 2, &obj, xref);
+    if (!isInt(&obj))
+      goto err2;
+    this->indexHigh = getInt(&obj);
+    ObjFree(&obj);
+    this->lookup = (Guchar (*)[4])gmalloc((this->indexHigh + 1) * 4 * sizeof(Guchar));
+    ObjArrayGet(&csObj, 3, &obj, xref);
+    if (isStream(&obj)) {
+      ObjStreamReset(&obj);
+      for (i = 0; i <= this->indexHigh; ++i) {
+	for (j = 0; j < this->numComps; ++j) {
+	  if ((x = ObjStreamGetChar(&obj)) == EOF)
+	    goto err2;
+	  this->lookup[i][j] = (Guchar)x;
+	}
+      }
+    } else if (isString(&obj)) {
+      s = GStrGetCString(getString(&obj));
+      for (i = 0; i <= this->indexHigh; ++i)
+	for (j = 0; j < this->numComps; ++j)
+	  this->lookup[i][j] = (Guchar)*s++;
+    } else {
+      goto err2;
+    }
+    ObjFree(&obj);
+  }
+
+  ObjFree(&csObj);
+  return;
+
+ err2:
+  ObjFree(&obj);
+ err1:
+  ObjFree(&csObj);
+  this->ok = gFalse;
+  EC_WARNING(-1);
+}
+
+#if 0
+
+GfxColorSpace::GfxColorSpace(GfxColorMode mode1) {
+  sepFunc = NULL;
+  mode = mode1;
+  indexed = gFalse;
+  switch (mode) {
+  case colorGray: numComps = 1; break;
+  case colorCMYK: numComps = 4; break;
+  case colorRGB:  numComps = 3; break;
+  }
+  lookup = NULL;
+  ok = gTrue;
+}
+#endif /* 0 */
+
+void GfxColorSpaceFree(GfxColorSpace *this) {
+//  if (sepFunc)
+//    delete sepFunc;
+  gfree(this->lookup);
+}
+
+#if 0
+
+GfxColorSpace::GfxColorSpace(GfxColorSpace *colorSpace) {
+  int size;
+
+  if (colorSpace->sepFunc)
+    sepFunc = colorSpace->sepFunc->copy();
+  else
+    sepFunc = NULL;
+  mode = colorSpace->mode;
+  indexed = colorSpace->indexed;
+  numComps = colorSpace->numComps;
+  indexHigh = colorSpace->indexHigh;
+  if (indexed) {
+    size = (indexHigh + 1) * 4 * sizeof(Guchar);
+    lookup = (Guchar (*)[4])gmalloc(size);
+    memcpy(lookup, colorSpace->lookup, size);
+  } else {
+    lookup = NULL;
+  }
+  ok = gTrue;
+}
+
+#endif /* 0 */
+
+void GfxColorSpaceSetMode(GfxColorSpace *this, Obj *colorSpace, XRef *xref) {
+  Obj obj;
+
+  if (isNameSame(colorSpace, "DeviceGray") || isNameSame(colorSpace, "G")) {
+    this->mode = colorGray;
+    this->numComps = 1;
+  } else if (isNameSame(colorSpace, "DeviceRGB") || isNameSame(colorSpace, "RGB")) {
+    this->mode = colorRGB;
+    this->numComps = 3;
+  } else if (isNameSame(colorSpace, "DeviceCMYK") || isNameSame(colorSpace, "CMYK")) {
+    this->mode = colorCMYK;
+    this->numComps = 4;
+  } else if (isArray(colorSpace)) {
+    ObjArrayGet(colorSpace, 0, &obj, xref);
+    if (isNameSame(&obj, "CalGray")) {
+      this->mode = colorGray;
+      this->numComps = 1;
+    } else if (isNameSame(&obj, "CalRGB")) {
+      this->mode = colorRGB;
+      this->numComps = 3;
+    } else if (isNameSame(&obj, "CalCMYK")) {
+      this->mode = colorCMYK;
+      this->numComps = 4;
+    } else {
+      this->ok = gFalse;
+    }
+    ObjFree(&obj);
+  } else {
+    this->ok = gFalse;
+  }
+}
+
+void GfxColorSpaceGetColor(GfxColorSpace *this, short x[4], GfxColor *color) {
+  short y[4];
+  Guchar *p;
+
+//  if (sepFunc) {
+//    sepFunc->transform(x, y);
+//  } else {
+    y[0] = x[0];
+    y[1] = x[1];
+    y[2] = x[2];
+    y[3] = x[3];
+//  }
+  if (this->indexed) {
+    p = this->lookup[y[0]];
+    switch (this->mode) {
+    case colorGray:
+      GfxColorSetGray(color, p[0]);
+      break;
+    case colorCMYK:
+      GfxColorSetCMYK(color, p[0], p[1], p[2], p[3]);
+      break;
+    case colorRGB:
+      GfxColorSetRGB(color, p[0], p[1], p[2]);
+      break;
+    }
+  } else {
+    switch (this->mode) {
+    case colorGray:
+      GfxColorSetGray(color, y[0]);
+      break;
+    case colorCMYK:
+      GfxColorSetCMYK(color, y[0], y[1], y[2], y[3]);
+      break;
+    case colorRGB:
+      GfxColorSetRGB(color, y[0], y[1], y[2]);
+      break;
+    }
+  }
+}
+
+short GfxColorSpaceGetNumPixelComps(GfxColorSpace *this) {
+    return this->indexed ? 1 : this->numComps; 
+}
+
+#if 0
+
+//------------------------------------------------------------------------
+// Function
+//------------------------------------------------------------------------
+
+Function::Function(Object *funcObj) {
+  Stream *str;
+  Dict *dict;
+  int nSamples, sampleBits;
+  double sampleMul;
+  Object obj1, obj2;
+  Guint buf, bitMask;
+  int bits;
+  int s;
+  int i;
+
+  ok = gFalse;
+  samples = NULL;
+
+  if (!funcObj->isStream()) {
+    error(-1, "Expected function dictionary");
+    goto err3;
+  }
+  str = funcObj->getStream();
+  dict = str->getDict();
+
+  //----- FunctionType
+  if (!dict->lookup("FunctionType", &obj1)->isInt() ||
+      obj1.getInt() != 0) {
+    error(-1, "Unknown function type");
+    goto err2;
+  }
+  obj1.free();
+
+  //----- Domain
+  if (!dict->lookup("Domain", &obj1)->isArray()) {
+    error(-1, "Function is missing domain");
+    goto err2;
+  }
+  m = obj1.arrayGetLength() / 2;
+  if (m > 4) {
+    error(-1, "Functions with more than 1 input are unsupported");
+    goto err2;
+  }
+  for (i = 0; i < m; ++i) {
+    obj1.arrayGet(2*i, &obj2);
+    if (!obj2.isNum()) {
+      error(-1, "Illegal value in function domain array");
+      goto err1;
+    }
+    domain[i][0] = obj2.getNum();
+    obj2.free();
+    obj1.arrayGet(2*i+1, &obj2);
+    if (!obj2.isNum()) {
+      error(-1, "Illegal value in function domain array");
+      goto err1;
+    }
+    domain[i][1] = obj2.getNum();
+    obj2.free();
+  }
+  obj1.free();
+
+  //----- Range
+  if (!dict->lookup("Range", &obj1)->isArray()) {
+    error(-1, "Function is missing range");
+    goto err2;
+  }
+  n = obj1.arrayGetLength() / 2;
+  if (n > 4) {
+    error(-1, "Functions with more than 4 outputs are unsupported");
+    goto err2;
+  }
+  for (i = 0; i < n; ++i) {
+    obj1.arrayGet(2*i, &obj2);
+    if (!obj2.isNum()) {
+      error(-1, "Illegal value in function range array");
+      goto err1;
+    }
+    range[i][0] = obj2.getNum();
+    obj2.free();
+    obj1.arrayGet(2*i+1, &obj2);
+    if (!obj2.isNum()) {
+      error(-1, "Illegal value in function range array");
+      goto err1;
+    }
+    range[i][1] = obj2.getNum();
+    obj2.free();
+  }
+  obj1.free();
+
+  //----- Size
+  if (!dict->lookup("Size", &obj1)->isArray() ||
+      obj1.arrayGetLength() != m) {
+    error(-1, "Function has missing or invalid size array");
+    goto err2;
+  }
+  for (i = 0; i < m; ++i) {
+    obj1.arrayGet(i, &obj2);
+    if (!obj2.isInt()) {
+      error(-1, "Illegal value in function size array");
+      goto err1;
+    }
+    sampleSize[i] = obj2.getInt();
+    obj2.free();
+  }
+  obj1.free();
+
+  //----- BitsPerSample
+  if (!dict->lookup("BitsPerSample", &obj1)->isInt()) {
+    error(-1, "Function has missing or invalid BitsPerSample");
+    goto err2;
+  }
+  sampleBits = obj1.getInt();
+  sampleMul = 1.0 / (double)((1 << sampleBits) - 1);
+  obj1.free();
+
+  //----- Encode
+  if (dict->lookup("Encode", &obj1)->isArray() &&
+      obj1.arrayGetLength() == 2*m) {
+    for (i = 0; i < m; ++i) {
+      obj1.arrayGet(2*i, &obj2);
+      if (!obj2.isNum()) {
+	error(-1, "Illegal value in function encode array");
+	goto err1;
+      }
+      encode[i][0] = obj2.getNum();
+      obj2.free();
+      obj1.arrayGet(2*i+1, &obj2);
+      if (!obj2.isNum()) {
+	error(-1, "Illegal value in function encode array");
+	goto err1;
+      }
+      encode[i][1] = obj2.getNum();
+      obj2.free();
+    }
+  } else {
+    for (i = 0; i < m; ++i) {
+      encode[i][0] = 0;
+      encode[i][1] = sampleSize[i] - 1;
+    }
+  }
+  obj1.free();
+
+  //----- Decode
+  if (dict->lookup("Decode", &obj1)->isArray() &&
+      obj1.arrayGetLength() == 2*n) {
+    for (i = 0; i < n; ++i) {
+      obj1.arrayGet(2*i, &obj2);
+      if (!obj2.isNum()) {
+	error(-1, "Illegal value in function decode array");
+	goto err1;
+      }
+      decode[i][0] = obj2.getNum();
+      obj2.free();
+      obj1.arrayGet(2*i+1, &obj2);
+      if (!obj2.isNum()) {
+	error(-1, "Illegal value in function decode array");
+	goto err1;
+      }
+      decode[i][1] = obj2.getNum();
+      obj2.free();
+    }
+  } else {
+    for (i = 0; i < n; ++i) {
+      decode[i][0] = range[i][0];
+      decode[i][1] = range[i][1];
+    }
+  }
+  obj1.free();
+
+  //----- samples
+  nSamples = n;
+  for (i = 0; i < m; ++i)
+    nSamples *= sampleSize[i];
+  samples = (double *)gmalloc(nSamples * sizeof(double));
+  buf = 0;
+  bits = 0;
+  bitMask = (1 << sampleBits) - 1;
+  str->reset();
+  for (i = 0; i < nSamples; ++i) {
+    if (sampleBits == 8) {
+      s = str->getChar();
+    } else if (sampleBits == 16) {
+      s = str->getChar();
+      s = (s << 8) + str->getChar();
+    } else if (sampleBits == 32) {
+      s = str->getChar();
+      s = (s << 8) + str->getChar();
+      s = (s << 8) + str->getChar();
+      s = (s << 8) + str->getChar();
+    } else {
+      while (bits < sampleBits) {
+	buf = (buf << 8) | (str->getChar() & 0xff);
+	bits += 8;
+      }
+      s = (buf >> (bits - sampleBits)) & bitMask;
+      bits -= sampleBits;
+    }
+    samples[i] = (double)s * sampleMul;
+  }
+
+  ok = gTrue;
+  return;
+
+ err1:
+  obj2.free();
+ err2:
+  obj1.free();
+ err3:
+  return;
+}
+
+Function::Function(Function *func) {
+  int nSamples, i;
+
+  m = func->m;
+  n = func->n;
+  memcpy(domain, func->domain, sizeof(domain));
+  memcpy(range, func->range, sizeof(range));
+  memcpy(sampleSize, func->sampleSize, sizeof(sampleSize));
+  memcpy(encode, func->encode, sizeof(encode));
+  memcpy(decode, func->decode, sizeof(decode));
+
+  nSamples = n;
+  for (i = 0; i < m; ++i)
+    nSamples *= sampleSize[i];
+  samples = (double *)gmalloc(nSamples * sizeof(double));
+  memcpy(samples, func->samples, nSamples * sizeof(double));
+
+  ok = gTrue;
+}
+
+Function::~Function() {
+  if (samples)
+    gfree(samples);
+}
+
+void Function::transform(double *in, double *out) {
+  double e[4];
+  double s;
+  double x0, x1;
+  int e0, e1;
+  double efrac;
+  int i;
+
+  // map input values into sample array
+  for (i = 0; i < m; ++i) {
+    e[i] = ((in[i] - domain[i][0]) / (domain[i][1] - domain[i][0])) *
+           (encode[i][1] - encode[i][0]) + encode[i][0];
+    if (e[i] < 0)
+      e[i] = 0;
+    else if (e[i] > sampleSize[i] - 1)
+      e[i] = sampleSize[i] - 1;
+  }
+
+  for (i = 0; i < n; ++i) {
+
+    // m-linear interpolation
+    // (only m=1 is currently supported)
+    e0 = (int)floor(e[0]);
+    e1 = (int)ceil(e[0]);
+    efrac = e[0] - e0;
+    x0 = samples[e0 * n + i];
+    x1 = samples[e1 * n + i];
+    s = (1 - efrac) * x0 + efrac * x1;
+
+    // map output values to range
+    out[i] = s * (decode[i][1] - decode[i][0]) + decode[i][0];
+    if (out[i] < range[i][0])
+      out[i] = range[i][0];
+    else if (out[i] > range[i][1])
+      out[i] = range[i][1];
+  }
+}
+
+#endif /* 0 */
+//------------------------------------------------------------------------
+// GfxImageColorMap
+//------------------------------------------------------------------------
+
+void GfxImageColorMapInit(GfxImageColorMap *this, short bits1, Obj *decode,
+				   GfxColorSpace *colorSpace1, XRef *xref) {
+  GfxColor color;
+  short x[4];
+  short maxPixel;
+  Obj obj;
+  short i, j;
+
+  this->ok = gTrue;
+
+  // bits per component and colorspace
+  this->bits = bits1;
+  maxPixel = (1 << this->bits) - 1;
+  this->colorSpace = colorSpace1;
+  this->mode = colorSpace1->mode;
+
+  // get decode map
+  if (isNull(decode)) {
+    if (this->colorSpace->indexed) {
+      this->indexed = gTrue;
+      this->numComps = 1;
+      this->decodeLow[0] = 0;
+      this->decodeRange[0] = IntToGdouble(maxPixel);
+    } else {
+      this->indexed = gFalse;
+      this->numComps = GfxColorSpaceGetNumPixelComps(this->colorSpace);
+      for (i = 0; i < this->numComps; ++i) {
+	this->decodeLow[i] = 0;
+	this->decodeRange[i] = IntToGdouble(1);
+      }
+    }
+  } else if (isArray(decode)) {
+    this->numComps = ObjArrayGetLength(decode) / 2;
+    if (this->numComps != GfxColorSpaceGetNumPixelComps(this->colorSpace))
+      goto err1;
+    this->indexed = this->colorSpace->indexed;
+    for (i = 0; i < this->numComps; ++i) {
+      ObjArrayGet(decode, 2*i, &obj, xref);
+      if (!isNum(&obj))
+	goto err2;
+      this->decodeLow[i] = getNum(&obj);
+      ObjFree(&obj);
+      ObjArrayGet(decode, 2*i+1, &obj, xref);
+      if (!isNum(&obj))
+	goto err2;
+      this->decodeRange[i] = getNum(&obj) - this->decodeLow[i];
+      ObjFree(&obj);
+    }
+  } else {
+    goto err1;
+  }
+
+  // construct lookup table
+  this->lookup = (short (*)[4])gmalloc((maxPixel + 1) * 4 * sizeof(short));
+  if (this->indexed) {
+    for (i = 0; i <= maxPixel; ++i) {
+      x[0] = i;
+      GfxColorSpaceGetColor(this->colorSpace, x, &color);
+      this->lookup[i][0] = color.r;
+      this->lookup[i][1] = color.g;
+      this->lookup[i][2] = color.b;
+    }
+  } else {
+    for (i = 0; i <= maxPixel; ++i)
+      for (j = 0; j < this->numComps; ++j)
+	this->lookup[i][j] = GdoubleToWord(255 * (this->decodeLow[j] + 
+					   (i * this->decodeRange[j]) / maxPixel));
+  }
+
+  return;
+
+ err2:
+  ObjFree(&obj);
+ err1:
+  this->ok = gFalse;
+}
+
+void GfxImageColorMapFree(GfxImageColorMap *this) {
+  GfxColorSpaceFree(this->colorSpace);
+  gfree(this->lookup);
+}
+
+short GfxImageColorMapGetNumPixelComps(GfxImageColorMap *this) {
+    return this->numComps; 
+}
+
+short GfxImageColorMapGetBits(GfxImageColorMap *this) {
+    return this->bits; 
+}
+
+void GfxImageColorMapGetColor(GfxImageColorMap *this, Guchar x[4], GfxColor *color) {
+  short *p;
+
+  if (this->indexed) {
+    p = this->lookup[x[0]];
+    GfxColorSetRGB(color, p[0], p[1], p[2]);
+  } else {
+    switch (this->mode) {
+    case colorGray:
+      GfxColorSetGray(color, this->lookup[x[0]][0]);
+      break;
+    case colorCMYK:
+      GfxColorSetCMYK(color, this->lookup[x[0]][0], this->lookup[x[1]][1],
+		     this->lookup[x[2]][2], this->lookup[x[3]][3]);
+      break;
+    case colorRGB:
+      GfxColorSetRGB(color, this->lookup[x[0]][0], this->lookup[x[1]][1], 
+		     this->lookup[x[2]][2]);
+      break;
+    }
+  }
+}
+
+#if 0
+
+//------------------------------------------------------------------------
+// GfxSubpath and GfxPath
+//------------------------------------------------------------------------
+
+GfxSubpath::GfxSubpath(double x1, double y1) {
+  size = 16;
+  x = (double *)gmalloc(size * sizeof(double));
+  y = (double *)gmalloc(size * sizeof(double));
+  curve = (GBool *)gmalloc(size * sizeof(GBool));
+  n = 1;
+  x[0] = x1;
+  y[0] = y1;
+  curve[0] = gFalse;
+}
+
+GfxSubpath::~GfxSubpath() {
+  gfree(x);
+  gfree(y);
+  gfree(curve);
+}
+
+// Used for copy().
+GfxSubpath::GfxSubpath(GfxSubpath *subpath) {
+  size = subpath->size;
+  n = subpath->n;
+  x = (double *)gmalloc(size * sizeof(double));
+  y = (double *)gmalloc(size * sizeof(double));
+  curve = (GBool *)gmalloc(size * sizeof(GBool));
+  memcpy(x, subpath->x, n * sizeof(double));
+  memcpy(y, subpath->y, n * sizeof(double));
+  memcpy(curve, subpath->curve, n * sizeof(GBool));
+}
+
+void GfxSubpath::lineTo(double x1, double y1) {
+  if (n >= size) {
+    size += 16;
+    x = (double *)grealloc(x, size * sizeof(double));
+    y = (double *)grealloc(y, size * sizeof(double));
+    curve = (GBool *)grealloc(curve, size * sizeof(GBool));
+  }
+  x[n] = x1;
+  y[n] = y1;
+  curve[n] = gFalse;
+  ++n;
+}
+
+void GfxSubpath::curveTo(double x1, double y1, double x2, double y2,
+			 double x3, double y3) {
+  if (n+3 > size) {
+    size += 16;
+    x = (double *)grealloc(x, size * sizeof(double));
+    y = (double *)grealloc(y, size * sizeof(double));
+    curve = (GBool *)grealloc(curve, size * sizeof(GBool));
+  }
+  x[n] = x1;
+  y[n] = y1;
+  x[n+1] = x2;
+  y[n+1] = y2;
+  x[n+2] = x3;
+  y[n+2] = y3;
+  curve[n] = curve[n+1] = gTrue;
+  curve[n+2] = gFalse;
+  n += 3;
+}
+
+GfxPath::GfxPath() {
+  justMoved = gFalse;
+  size = 16;
+  n = 0;
+  subpaths = (GfxSubpath **)gmalloc(size * sizeof(GfxSubpath *));
+}
+
+GfxPath::~GfxPath() {
+  int i;
+
+  for (i = 0; i < n; ++i)
+    delete subpaths[i];
+  gfree(subpaths);
+}
+
+// Used for copy().
+GfxPath::GfxPath(GBool justMoved1, double firstX1, double firstY1,
+		 GfxSubpath **subpaths1, int n1, int size1) {
+  int i;
+
+  justMoved = justMoved1;
+  firstX = firstX1;
+  firstY = firstY1;
+  size = size1;
+  n = n1;
+  subpaths = (GfxSubpath **)gmalloc(size * sizeof(GfxSubpath *));
+  for (i = 0; i < n; ++i)
+    subpaths[i] = subpaths1[i]->copy();
+}
+
+void GfxPath::moveTo(double x, double y) {
+  justMoved = gTrue;
+  firstX = x;
+  firstY = y;
+}
+
+void GfxPath::lineTo(double x, double y) {
+  if (justMoved) {
+    if (n >= size) {
+      size += 16;
+      subpaths = (GfxSubpath **)
+	           grealloc(subpaths, size * sizeof(GfxSubpath *));
+    }
+    subpaths[n] = new GfxSubpath(firstX, firstY);
+    ++n;
+    justMoved = gFalse;
+  }
+  subpaths[n-1]->lineTo(x, y);
+}
+
+void GfxPath::curveTo(double x1, double y1, double x2, double y2,
+	     double x3, double y3) {
+  if (justMoved) {
+    if (n >= size) {
+      size += 16;
+      subpaths = (GfxSubpath **)
+	           grealloc(subpaths, size * sizeof(GfxSubpath *));
+    }
+    subpaths[n] = new GfxSubpath(firstX, firstY);
+    ++n;
+    justMoved = gFalse;
+  }
+  subpaths[n-1]->curveTo(x1, y1, x2, y2, x3, y3);
+}
+
+//------------------------------------------------------------------------
+// GfxState
+//------------------------------------------------------------------------
+
+GfxState::GfxState(int dpi, double px1a, double py1a, double px2a, double py2a,
+		   int rotate, GBool upsideDown) {
+  double k;
+
+  px1 = px1a;
+  py1 = py1a;
+  px2 = px2a;
+  py2 = py2a;
+  k = (double)dpi / 72.0;
+  if (rotate == 90) {
+    ctm[0] = 0;
+    ctm[1] = upsideDown ? k : -k;
+    ctm[2] = k;
+    ctm[3] = 0;
+    ctm[4] = -k * py1;
+    ctm[5] = k * (upsideDown ? -px1 : px2);
+    pageWidth = (int)(k * (py2 - py1));
+    pageHeight = (int)(k * (px2 - px1));
+  } else if (rotate == 180) {
+    ctm[0] = -k;
+    ctm[1] = 0;
+    ctm[2] = 0;
+    ctm[3] = upsideDown ? k : -k;
+    ctm[4] = k * px2;
+    ctm[5] = k * (upsideDown ? -py1 : py2);
+    pageWidth = (int)(k * (px2 - px1));
+    pageHeight = (int)(k * (py2 - py1));
+  } else if (rotate == 270) {
+    ctm[0] = 0;
+    ctm[1] = upsideDown ? -k : k;
+    ctm[2] = -k;
+    ctm[3] = 0;
+    ctm[4] = k * py2;
+    ctm[5] = k * (upsideDown ? px2 : -px1);
+    pageWidth = (int)(k * (py2 - py1));
+    pageHeight = (int)(k * (px2 - px1));
+  } else {
+    ctm[0] = k;
+    ctm[1] = 0;
+    ctm[2] = 0;
+    ctm[3] = upsideDown ? -k : k;
+    ctm[4] = -k * px1;
+    ctm[5] = k * (upsideDown ? py2 : -py1);
+    pageWidth = (int)(k * (px2 - px1));
+    pageHeight = (int)(k * (py2 - py1));
+  }
+
+  fillColorSpace = new GfxColorSpace(colorGray);
+  strokeColorSpace = new GfxColorSpace(colorGray);
+  fillColor.setGray(0);
+  strokeColor.setGray(0);
+
+  lineWidth = 1;
+  lineDash = NULL;
+  lineDashLength = 0;
+  lineDashStart = 0;
+  flatness = 0;
+  lineJoin = 0;
+  lineCap = 0;
+  miterLimit = 10;
+
+  font = NULL;
+  fontSize = 0;
+  textMat[0] = 1; textMat[1] = 0;
+  textMat[2] = 0; textMat[3] = 1;
+  textMat[4] = 0; textMat[5] = 0;
+  charSpace = 0;
+  wordSpace = 0;
+  horizScaling = 1;
+  leading = 0;
+  rise = 0;
+  render = 0;
+
+  path = new GfxPath();
+  curX = curY = 0;
+  lineX = lineY = 0;
+
+  saved = NULL;
+}
+
+#endif /* 0 */
+
+void GfxStateInit(GfxState *state, Handle gstring) {
+
+
+    state->gstring = gstring;
+    state->font = NULL;
+    state->fontSize = 0;
+    state->textMat[0] = 1; state->textMat[1] = 0;
+    state->textMat[2] = 0; state->textMat[3] = 1;
+    state->textMat[4] = 0; state->textMat[5] = 0;
+    state->charSpace = 0;
+    state->wordSpace = 0;
+    state->horizScaling = 1L<<16;
+    state->leading = 0;
+    state->rise = 0;
+    state->render = 0;
+    state->lineX = state->lineY = 0;
+    state->saved = NULL;
+    state->pathType = PATH_NONE;
+}
+
+void GfxStateFree(GfxState *state) {
+//  if (fillColorSpace)
+//    delete fillColorSpace;
+//  if (strokeColorSpace)
+//    delete strokeColorSpace;
+//  gfree(lineDash);
+//  delete path;
+
+    if (state->saved) {
+/*
+ * Is this needed?  We save one of these for each GfxState saved...
+ */
+	GrRestoreState(state->gstring);
+
+	GfxStateFree(state->saved);
+	gfree(state->saved);
+    }
+}
+
+// Used for copy();
+void GfxStateCopy(GfxState *dest, GfxState *state) {
+  memcpy(dest, state, sizeof(GfxState));
+
+//  if (fillColorSpace)
+//    fillColorSpace = state->fillColorSpace->copy();
+//  if (strokeColorSpace)
+//    strokeColorSpace = state->strokeColorSpace->copy();
+//  if (lineDashLength > 0) {
+//    lineDash = (double *)gmalloc(lineDashLength * sizeof(double));
+//    memcpy(lineDash, state->lineDash, lineDashLength * sizeof(double));
+//  }
+//  path = state->path->copy();
+
+    dest->saved = NULL;
+}
+
+#if 0
+
+double GfxState::transformWidth(double w) {
+  double x, y;
+
+  x = ctm[0] + ctm[2];
+  y = ctm[1] + ctm[3];
+  return w * sqrt(0.5 * (x * x + y * y));
+}
+
+double GfxState::getTransformedFontSize() {
+  double x1, y1, x2, y2;
+
+  x1 = textMat[2] * fontSize;
+  y1 = textMat[3] * fontSize;
+  x2 = ctm[0] * x1 + ctm[2] * y1;
+  y2 = ctm[1] * x1 + ctm[3] * y1;
+  return sqrt(x2 * x2 + y2 * y2);
+}
+
+void GfxState::getFontTransMat(double *m11, double *m12,
+			       double *m21, double *m22) {
+  *m11 = (textMat[0] * ctm[0] + textMat[1] * ctm[2]) * fontSize;
+  *m12 = (textMat[0] * ctm[1] + textMat[1] * ctm[3]) * fontSize;
+  *m21 = (textMat[2] * ctm[0] + textMat[3] * ctm[2]) * fontSize;
+  *m22 = (textMat[2] * ctm[1] + textMat[3] * ctm[3]) * fontSize;
+}
+
+void GfxState::concatCTM(double a, double b, double c,
+			 double d, double e, double f) {
+  double a1 = ctm[0];
+  double b1 = ctm[1];
+  double c1 = ctm[2];
+  double d1 = ctm[3];
+
+  ctm[0] = a * a1 + b * c1;
+  ctm[1] = a * b1 + b * d1;
+  ctm[2] = c * a1 + d * c1;
+  ctm[3] = c * b1 + d * d1;
+  ctm[4] = e * a1 + f * c1 + ctm[4];
+  ctm[5] = e * b1 + f * d1 + ctm[5];
+}
+
+void GfxState::setFillColorSpace(GfxColorSpace *colorSpace) {
+  if (fillColorSpace)
+    delete fillColorSpace;
+  fillColorSpace = colorSpace;
+}
+
+void GfxState::setStrokeColorSpace(GfxColorSpace *colorSpace) {
+  if (strokeColorSpace)
+    delete strokeColorSpace;
+  strokeColorSpace = colorSpace;
+}
+
+void GfxState::setLineDash(double *dash, int length, double start) {
+  if (lineDash)
+    gfree(lineDash);
+  lineDash = dash;
+  lineDashLength = length;
+  lineDashStart = start;
+}
+
+void GfxState::clearPath() {
+  delete path;
+  path = new GfxPath();
+}
+
+#endif /* 0 */
+
+/*
+ * I wrote these such that "state" still points to the top of the chain.
+ * That saves us from passing pointers to the state pointer in the
+ * caller of these functions.
+ */
+void GfxStateSave(GfxState *state) {
+  GfxState *newState;
+
+  newState = gmalloc( sizeof(GfxState) );
+  GfxStateCopy(newState, state);
+  newState->saved = state->saved;
+  state->saved = newState;
+}
+
+void GfxStateRestore(GfxState *state) {
+  GfxState *oldState;
+
+  if (state->saved) {
+    oldState = state->saved;
+    GfxStateCopy(state, oldState);
+    state->saved = oldState->saved;
+    oldState->saved = NULL;
+    GfxStateFree(oldState);
+    gfree(oldState);
+  } 
+}
+
+  // Accessors.
+
+  GfxFont *GfxStateGetFont(GfxState *state) { return state->font; }
+  gdouble *GfxStateGetTextMat(GfxState *state) { return state->textMat; }
+  sdword GfxStateGetCharSpace(GfxState *state) { return state->charSpace; }
+  gdouble GfxStateGetWordSpace(GfxState *state) { return state->wordSpace; }
+  sdword GfxStateGetHorizScaling(GfxState *state) { return state->horizScaling; }
+  gdouble GfxStateGetLeading(GfxState *state) { return state->leading; }
+  sdword GfxStateGetRise(GfxState *state) { return state->rise; }
+  short GfxStateGetRender(GfxState *state) { return state->render; }
+  gdouble GfxStateGetLineX(GfxState *state) { return state->lineX; }
+  gdouble GfxStateGetLineY(GfxState *state) { return state->lineY; }
+
+gdouble GfxStateGetFontSize(GfxState *state) { 
+    return state->fontSize;
+}
+
+  // Transforms.
+  void textTransform(GfxState *state, gdouble x1, gdouble y1, gdouble *x2, gdouble *y2)
+    { *x2 = state->textMat[0] * x1 + state->textMat[2] * y1 + state->textMat[4];
+      *y2 = state->textMat[1] * x1 + state->textMat[3] * y1 + state->textMat[5]; }
+  void textTransformDelta(GfxState *state, gdouble x1, gdouble y1, gdouble *x2, gdouble *y2)
+    { *x2 = state->textMat[0] * x1 + state->textMat[2] * y1;
+      *y2 = state->textMat[1] * x1 + state->textMat[3] * y1; }
+
+
+  // Change state parameters.
+  void GfxStateSetFont(GfxState *state, GfxFont *font1, gdouble fontSize1)
+    { state->font = font1; state->fontSize = fontSize1; }
+
+
+void GfxStateSetTextMat(GfxState *state, gdouble a, gdouble b, gdouble c,
+			  gdouble d, gdouble e, gdouble f) { 
+
+    WWFixedAsDWord tm[7];
+    /*
+     * Restore to saved transform, then apply this one
+     */
+    GrRestoreTransform(state->gstring);
+    GrSaveTransform(state->gstring);
+
+    /*
+     * I'm simulating a 6-element array with DWFixed as the last two 
+     * elements as a 7-element array with all WWFixed elements.  So, 
+     * the last two elements have to be jiggered a bit:
+     *
+     * frac int-low int-high=0  frac int-low int-high=0
+     * ^tm[4]       ^tm[5]           ^tm[6]
+     */
+    tm[0] = GdoubleToWWFixed(a);
+    tm[1] = GdoubleToWWFixed(b);
+    tm[2] = GdoubleToWWFixed(c);
+    tm[3] = GdoubleToWWFixed(d);
+    tm[4] = GdoubleToWWFixed(e);
+    tm[6] = GdoubleToWWFixed(f);
+
+    tm[5] = tm[6] << 16;
+    tm[6] >>= 16;
+
+    GrApplyTransform(state->gstring, tm);
+}
+
+
+  void GfxStateSetCharSpace(GfxState *state, gdouble space)
+    { state->charSpace = GdoubleToWWFixed(space); }
+
+  void GfxStateSetWordSpace(GfxState *state, gdouble space)
+    { state->wordSpace = space; }
+
+  void GfxStateSetHorizScaling(GfxState *state, gdouble scale)
+    { state->horizScaling = GdoubleToWWFixed(0.01 * scale); }
+
+  void GfxStateSetLeading(GfxState *state, gdouble leading1)
+    { state->leading = leading1; }
+
+  void GfxStateSetRise(GfxState *state, gdouble rise1)
+    { state->rise = GdoubleToWWFixed(rise1); }
+
+  void GfxStateSetRender(GfxState *state, short render1)
+    { state->render = render1; }
+
+  // Text position.
+void GfxStateTextMoveTo(GfxState *state, gdouble tx, gdouble ty) { 
+//    double curX, curY;
+    sdword x, y;
+
+    state->lineX = tx; 
+    state->lineY = ty; 
+
+//    textTransform(state, tx, ty, &curX, &curY); 
+//    GrMoveTo(state->gstring, curX, curY);
+
+    x = GdoubleToWWFixed(tx);
+    y = GdoubleToWWFixed(ty);
+    state->curTextX = x;
+
+    GrMoveToWWFixed(state->gstring, x, y);
+}
+
+void GfxStateTextShift(GfxState *state, gdouble tx) {
+//    double dx, dy;
+
+//  textTransformDelta(state, tx, 0, &dx, &dy);
+//  GrRelMoveTo(state->gstring, MakeWWFixed(dx), MakeWWFixed(dy));
+
+  state->curTextX += GdoubleToWWFixed(tx);
+  GrRelMoveTo(state->gstring, GdoubleToWWFixed(tx) * FONT_SCALING_FACTOR, 0);
+}

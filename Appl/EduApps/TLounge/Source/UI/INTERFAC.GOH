@@ -1,0 +1,444 @@
+/***************************************************************************
+ *  FILE:  SOURCE\UI\INTERFAC.GOH
+ ***************************************************************************/
+
+/*-------------------------------------------------------------------------
+ | Project:  Lysle's IRC Chat program
+ |           Copyright (c) 1998 Breadbox Computer Company
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/01/98  Created.
+ |                   (LES = Lysle Shields)
+ |    
+ *-----------------------------------------------------------------------*/
+
+@start	Interface ;
+    /*---------------------------------------------------------------------*/
+    @object GenPrimaryClass IRCPrimary  = {
+	   GI_attrs = @default | GA_KBD_SEARCH_PATH
+					   | GA_TARGETABLE;
+	   GI_comp = @IRCMenuBar, @IRCLeft, @IRCRight, @IRCDialogs ;
+	   ATTR_GEN_INIT_FILE_CATEGORY = "TLChat" ;
+	   ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+	   HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+	   HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	   HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+	   HINT_DEFAULT_TARGET ;
+	   HINT_PRIMARY_NO_FILE_MENU;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass IRCMenuBar = {
+	   GI_attrs = @default | GA_KBD_SEARCH_PATH ;
+	   GI_comp = @IRCMenuCommand, @IRCSettings;
+	   HINT_DEFAULT_TARGET ;
+    }
+
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass IRCMenuCommand = {
+        GI_attrs = @default | GA_KBD_SEARCH_PATH ;
+	   GI_visMoniker = 'C', "Command" ;
+	   GI_comp =
+		  @IRCCommandConnect,
+		  @IRCCommandChangeNickname,
+		  @IRCCommandDisconnect, @AboutDBox ;
+	   GII_visibility = GIV_POPUP ;
+        HINT_SEEK_MENU_BAR ;
+    }
+
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass IRCCommandConnect = {
+        GI_attrs = @default | GA_KBD_SEARCH_PATH ;
+	   GI_visMoniker = 'C', "Connect to Teacher's Lounge" ;
+	   GTI_actionMsg = MSG_IRC_START_CONNECT ;
+        GTI_destination = process ;
+	   GI_kbdAccelerator = ctrl 'C' ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass IRCCommandDisconnect = {
+        GI_attrs = @default | GA_KBD_SEARCH_PATH ;
+	   GI_states = @default & (~GS_ENABLED) ;
+	   GI_visMoniker = 'D', "Disconnect from Teacher's Lounge" ;
+	   GTI_actionMsg = MSG_IRC_END_CONNECT ;
+        GTI_destination = process ;
+	   GI_kbdAccelerator = ctrl 'D' ;
+    }
+
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass IRCLeft = {
+	   GI_attrs = @default | GA_KBD_SEARCH_PATH
+					   | GA_TARGETABLE;
+	   GI_comp =
+		  @IRCChannelHeader,
+		  @IRCText,
+		  @IRCEntry
+		  ;
+	   ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+	   HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	   HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+	   HINT_DEFAULT_TARGET ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass IRCChannelHeader = {
+        GI_visMoniker = "Channel: " ;
+	   GI_attrs = @default | GA_READ_ONLY ;
+        GTXI_text = "Not in a channel." ;
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT | GTA_ALLOW_TEXT_OFF_END;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextLimitClass IRCText = {
+	   GI_attrs = @default | GA_READ_ONLY
+					   | GA_KBD_SEARCH_PATH
+					   | GA_TARGETABLE;
+	   GTXI_attrs = @default | GTA_INIT_SCROLLING | GTA_TAIL_ORIENTED;
+	   HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+	   HINT_DEFAULT_TARGET ;
+	   HINT_DEFAULT_FOCUS ;
+	   ATTR_GEN_TEXT_SELECTABLE;
+	   ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @InitialCharAttrs ;
+	   ATTR_GEN_TEXT_PARA_ATTR = (ChunkHandle) @InitialParaAttrs ;
+	   HINT_TEXT_WHITE_WASH_COLOR;
+    }
+    /*---------------------------------------------------------------------*/
+    @chunk VisTextCharAttr InitialCharAttrs =
+	    CHAR_ATTR_FONT_SIZE_STYLE(FID_DTC_URW_SANS, 12, 0);
+
+
+    /* this sets the left margin to 1.25" to match the tab and a hanging
+	* outdent of 1.25" to have para starts at the left edge.  The effect
+	* is to have multiple text lines even with the tab and the nicks
+	* outdented - I still don't know why the 8 but I got it from Ed Ballot
+	* a couple of years ago when I did DirList */
+    @chunk VisTextParaAttr InitialParaAttrs =
+	    PARA_ATTR_STYLE_JUST_LEFT_RIGHT_PARA(
+		    0, 0, J_LEFT, (1.25 * 8), 0, (-1.25 * 8));
+
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass IRCEntry = {
+	   GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT
+						| GA_KBD_SEARCH_PATH ;
+	   GTXI_destination = process ;
+        GTXI_applyMsg = MSG_IRC_SEND_LINE ;
+        GTXI_maxLength = 400 ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	   HINT_TEXT_WHITE_WASH_COLOR;
+        HINT_DEFAULT_FOCUS ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass IRCRight = {
+        GI_attrs = @default | GA_KBD_SEARCH_PATH ;
+	   GI_comp =
+		  @IRCList,
+		  @Logo ;
+	   HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+	   HINT_CENTER_CHILDREN_HORIZONTALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object SortDynamicListClass IRCList = {
+	   GI_visMoniker = "People here:" ;
+	   GI_attrs = @default | GA_KBD_SEARCH_PATH ;
+	   SDLI_entrySize = 51 ;
+	   GIGI_behaviorType = GIGBT_EXCLUSIVE_NONE;
+	   GIGI_destination = @IRCList ;
+	   GDLI_queryMsg = MSG_SORT_LIST_QUERY ;
+	   HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_FIXED_SIZE = { SST_PIXELS | 100, 0, 0 } ;
+        HINT_ITEM_GROUP_SCROLLABLE;
+        HINT_PLACE_MONIKER_ABOVE;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass Logo = {
+	   GI_visMoniker = list { @BlueBreadbox } ;
+        GI_attrs = @default | GA_READ_ONLY ;
+    }
+
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass IRCDialogs = {
+	   GI_attrs = @default | GA_KBD_SEARCH_PATH ;
+	   GI_comp = @IRCConnectDialog, @ExpireDialog;
+	   GII_attrs = @default | GIA_NOT_USER_INITIATABLE ;
+	   GII_visibility = GIV_DIALOG ;
+	   ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+	   HINT_STAGGER_WINDOW;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass IRCConnectDialog = {
+	   GI_visMoniker = 'C', "Connect to Teacher's Lounge" ;
+	   GI_comp =
+		  @ConnectSiteName,
+		  @ConnectSitePort,
+		  @ConnectSiteNick,
+		  @ConnectSiteChannel,
+		  @ConnectOK,
+		  @ConnectQuit ;
+	   GII_attrs = @default |
+                    GIA_NOT_USER_INITIATABLE |
+                    GIA_INITIATED_VIA_USER_DO_DIALOG |
+                    GIA_MODAL ;
+        GII_type = GIT_COMMAND ;
+        GII_visibility = GIV_DIALOG ;
+	   ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+	   HINT_CENTER_CHILDREN_ON_MONIKERS ;
+	   HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	   HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass ConnectSiteName = {
+	   GI_states = @default & ~GS_USABLE;
+	   GI_visMoniker = "Site:" ;
+	   GTXI_text = "irc.breadbox.com" ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 /*  ATTR_GEN_INIT_FILE_KEY = "site" ;
+	   HINT_TEXT_SELECT_TEXT ;  */
+	   GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass ConnectSitePort = {
+	   GI_states = @default & ~GS_USABLE;
+	   GI_visMoniker = "Port:" ;
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT ;
+        GTXI_text = "6667" ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 /*  ATTR_GEN_INIT_FILE_KEY = "port" ;
+	   HINT_TEXT_SELECT_TEXT ; */
+	   GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object NickGenTextClass ConnectSiteNick = {
+	   GI_visMoniker = "Nickname:" ;
+	   GTXI_text = "MyNick" ;
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT ;
+        GTXI_maxLength = 9 ;
+	   ATTR_GEN_TEXT_CUSTOM_FILTER = (ChunkHandle) @NickFilter;
+	   HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        ATTR_GEN_INIT_FILE_KEY = "nick" ;
+        HINT_TEXT_SELECT_TEXT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass ConnectSiteChannel = {
+	   GI_states = @default & ~GS_USABLE;
+	   GI_visMoniker = "Channel:" ;
+	   GTXI_text = "\043TeachersLounge" ;
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT ;
+        GTXI_maxLength = 70 ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 /*  ATTR_GEN_INIT_FILE_KEY = "channel" ;
+        HINT_TEXT_SELECT_TEXT ; */
+	   GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass ConnectOK = {
+        GI_visMoniker = 'C', "Connect" ;
+    /*    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ; */
+	   ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_OK ;
+        HINT_SEEK_REPLY_BAR ;
+	   HINT_DEFAULT_DEFAULT_ACTION ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass ConnectQuit = {
+        GI_visMoniker = 'Q', "Quit" ;
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_DISMISS ;
+        HINT_SEEK_REPLY_BAR ;
+    }
+/*---------------------------------------------------------------------*/
+    @object GenInteractionClass IRCCommandChangeNickname = {
+	   GI_visMoniker = 'N', "Change Nickname" ;
+	   GI_comp = @IRCNewNickname, @IRCNicknameOk ;
+	   GI_attrs = @default | GA_KBD_SEARCH_PATH ;
+        GI_states = @default & (~GS_ENABLED) ;
+	   GI_kbdAccelerator = ctrl 'N' ;
+	   GII_type = GIT_COMMAND ;
+        GII_visibility = GIV_DIALOG ;
+        GII_attrs = @default |
+                    GIA_MODAL ;
+	   HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	   HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object NickGenTextClass IRCNewNickname = {
+        GI_visMoniker = 'N', "Nickname" ;
+	   GTXI_maxLength = 9 ;
+	   GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT | GTA_ALLOW_TEXT_OFF_END;
+	   ATTR_GEN_TEXT_SET_OBJECT_ENABLED_WHEN_TEXT_EXISTS = @IRCNicknameOk;
+	   ATTR_GEN_TEXT_CUSTOM_FILTER = (ChunkHandle) @NickFilter;
+	   HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	   HINT_DEFAULT_TARGET ;
+        HINT_DEFAULT_FOCUS ;
+    }
+    /*---------------------------------------------------------------------*/
+    /* our server allows only 0-9, a-z, A-Z, and - */
+    /* I would really like 5 prohibited zones but if I use five
+	* the app crashes with a range end before start error...
+	* so I'll trap the . and / with MSG...CHAR */
+    @chunkArray VisTextCustomFilterData NickFilter = {
+	    {C_NULL, C_COMMA},
+	  /*  {C_PERIOD, C_SLASH}, */
+	    {C_COLON, C_AT_SIGN},
+	    {C_LEFT_BRACKET, C_BACKQUOTE},
+	    {C_LEFT_BRACE, C_CARON}
+	    };
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass IRCNicknameOk = {
+	   GI_states = @default & (~GS_ENABLED) ; /* enabled by text */
+	   GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+	   GTI_destination = process ;
+        GTI_actionMsg = MSG_IRC_CHANGE_NICKNAME ;
+	   ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_OK ;
+	   HINT_SEEK_REPLY_BAR ;
+        HINT_DEFAULT_DEFAULT_ACTION ;
+    }
+    /*---------------------------------------------------------------------*/
+    @chunk char MessageNicknameInUse[] =
+        "The nickname you entered is already being used.  " \
+        "Please enter a different name in the next dialog." ;
+
+    /*---------------------------------------------------------------------*/
+    @chunk char BadNickErrMsg[] =
+	   "Your nickname must start with a letter.";
+
+
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass IRCSettings = {
+	   GI_comp =
+		  @IRCFontControlGroup,
+		  @IRCPointControlGroup;
+	   GI_visMoniker = 'S', "Settings";
+	   GII_visibility = GIV_POPUP;
+	   GI_attrs = @default | GA_KBD_SEARCH_PATH
+					   | GA_TARGETABLE;
+	   ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass IRCFontControlGroup = {
+        GI_comp = @IRCFontControl ;
+        GI_visMoniker = 'F', "Font";
+        GII_visibility = GIV_POPUP;
+        GI_attrs = @default | GA_KBD_SEARCH_PATH
+					   | GA_TARGETABLE;
+	   ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+    }
+    /*---------------------------------------------------------------------*/
+    @object FontControlClass IRCFontControl = {
+        GII_visibility = GIV_SUB_GROUP;
+        GCI_output = @IRCText ;
+	/*   ATTR_GEN_CONTROL_REQUIRE_UI = (FCF_SHORT_LIST);
+	   ATTR_GEN_CONTROL_PROHIBIT_UI = (FCF_LONG_LIST); */
+	   ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass IRCPointControlGroup = {
+        GI_comp = @IRCPointControl ;
+        GI_visMoniker = 'S', "Size";
+        GII_visibility = GIV_POPUP;
+        GI_attrs = @default | GA_KBD_SEARCH_PATH;
+        ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+    }
+    /*---------------------------------------------------------------------*/
+    @object PointSizeControlClass IRCPointControl = {
+        GI_attrs = @default | GA_KBD_SEARCH_PATH;
+        GII_visibility = GIV_SUB_GROUP;
+        GCI_output = @IRCText ;
+	   ATTR_GEN_CONTROL_REQUIRE_UI = (PSCF_10 | PSCF_12 | PSCF_14 | PSCF_18 |
+							    PSCF_24);
+	   ATTR_GEN_CONTROL_PROHIBIT_UI = (PSCF_36 | PSCF_54 |
+							  PSCF_72 | PSCF_SMALLER | PSCF_LARGER |
+							  PSCF_CUSTOM_SIZE);
+	   ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+    }
+@end Interface
+
+/*---------------------------------------------------------------------*/
+@start AboutResource;
+@object GenInteractionClass AboutDBox = {
+    GI_visMoniker = 'A', "About";
+    @localize "title of the about dialog box";
+    GI_comp = @ADBTitle, @ADBTextGroup,
+		 @ADBCopyright, @ADBok;
+    GII_visibility = GIV_DIALOG;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_SEEK_MENU_BAR ;
+}
+
+@object GenGlyphClass ADBTitle = {
+    GI_visMoniker = "Teacher's Lounge";
+}
+
+@object GenInteractionClass ADBTextGroup = {
+    GI_comp = @LeftGroup, @RightGroup;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_DIVIDE_WIDTH_EQUALLY;
+}
+
+@object GenInteractionClass LeftGroup = {
+    GI_comp = @Left1, @Left2, @Left3, @Left4, @Left5, @Left6;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_DRAW_IN_BOX;
+}
+
+@object GenGlyphClass Left1 = {
+    GI_visMoniker = "Enjoy meeting with your fellow teachers on the web";
+}
+
+@object GenGlyphClass Left2 = {
+    GI_visMoniker = "with this easy to use chat program.";
+}
+
+@object GenGlyphClass Left3 = {
+    GI_visMoniker = "This program is a subset of ";
+}
+
+@object GenGlyphClass Left4 = {
+    GI_visMoniker = "the Breadbox Chat application";
+}
+
+@object GenGlyphClass Left5 = {
+    GI_visMoniker = "with private messaging and much, much more";
+}
+
+@object GenGlyphClass Left6 = {
+    GI_visMoniker = "available from Breadbox.";
+}
+
+@object GenInteractionClass RightGroup = {
+    GI_comp = @ADBLogo, @Right1, @Right2;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenGlyphClass ADBLogo = {
+  GI_visMoniker = list {@BlueBreadbox};
+}
+
+@object GenGlyphClass Right1 = {
+    GI_visMoniker = "web:  www.breadbox.com";
+}
+
+@object GenGlyphClass Right2 = {
+    GI_visMoniker = "email:  info@breadbox.com";
+}
+
+@object GenGlyphClass ADBCopyright = {
+    GI_visMoniker = "Copyright 1994 - 2004 Breadbox Computer Company LLC. All Rights Reserved";
+}
+
+@object GenTriggerClass ADBok = {
+    GI_visMoniker = "OK";
+    @localize "button to cancel the about dialog box";
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@end AboutResource;
+
+
+@include "Source\UI\BlueBB.goh"
+
+
+/***************************************************************************
+ *  FILE:  SOURCE\UI\INTERFAC.GOH
+ ***************************************************************************/
+

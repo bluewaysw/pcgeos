@@ -1,0 +1,274 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1994 -- All Rights Reserved
+ *
+ * PROJECT:	  
+ * MODULE:	  
+ * FILE:	  uiPoof.ui
+ *
+ * AUTHOR:  	  Allen Yuen, Oct 16, 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AY	10/16/94   	Initial version
+ *
+ * DESCRIPTION:
+ *	Definition of UI objects for sending and receiving system (Poof)
+ *	messages.
+ *
+ * 	$Id: uiPoof.ui,v 1.1 97/04/05 01:18:53 newdeal Exp $
+ *
+ ***********************************************************************/
+
+#if	_POOF_MESSAGE_CREATION
+
+start	SendQuickMessageDialogUI, notDetachable;
+
+PoofQuickMessageSendPanel = PoofQuickMessageSendDialog {
+	moniker = "Send Quick Message";
+	localize "Moniker used in the title bar of the Send Quick Message dialog.";
+	genStates = default -usable;
+	children = PoofQuickMessageSendTransportGroup,
+		   PoofQuickMessageSendText, PoofQuickMessageSendSendTrigger,
+		   PoofQuickMessageSendCancelTrigger;
+	sendTrigger = PoofQuickMessageSendSendTrigger;
+	transportList = PoofQuickMessageSendTransports;
+}
+
+PoofQuickMessageSendTransportGroup = GenInteraction {
+	moniker = "How:";
+	children = PoofQuickMessageSendTransports;
+	hints = { 
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+
+PoofQuickMessageSendTransports = OutboxTransportList {
+	destination = PoofQuickMessageSendPanel;
+	applyMsg = MSG_PSD_SET_TRANSPORT;
+	monikerSource = PoofQuickMessageSendTransportMonikers;
+	attrs = default +notifyOfInitialSet;
+	hints = {
+		HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION,
+		HINT_ITEM_GROUP_MINIMIZE_SIZE
+	}
+}
+
+PoofQuickMessageSendTransportMonikers = OutboxTransportMonikerSource {
+	type = filtered;
+	filter = "mask MBTC_CAN_SEND_QUICK_MESSAGE";
+}
+
+PoofQuickMessageSendText = GenText {
+	maxLength = "0xfffe - size VMChainLink - 2";
+				/* such that we can fit null-terminated    */
+				/* text and VM chain header in a 64K block */
+}
+
+PoofQuickMessageSendSendTrigger = GenTrigger {
+	moniker = 'S', "Send";
+	action = MSG_MAILBOX_SEND_CONTROL_GET_ADDRESSES, "TO_OBJ_BLOCK_OUTPUT";
+	genStates = default -enabled;
+	hints = { HINT_SEEK_REPLY_BAR,
+		  HINT_DEFAULT_DEFAULT_ACTION }
+}
+
+PoofQuickMessageSendCancelTrigger = GenTrigger {
+	action = MSG_MSD_CANCEL, PoofQuickMessageSendPanel;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {
+			InteractionCommand IC_DISMISS
+		}
+			/* It doesn't really send MSG_GEN_GUP_INTERACTION
+			   _INTERACTION_COMMAND here, since we specify
+			   our own action.  But still need it so that the
+			   dialog won't create another "Cancel" button. */
+	}
+}
+
+end	SendQuickMessageDialogUI;
+
+start	SendFileDialogUI, notDetachable;
+
+PoofFileSendPanel = PoofFileSendDialog {
+	moniker = "Send File";
+	localize "Moniker used in the title bar of the Send File dialog.";
+	genStates = default -usable;
+	children = PoofFileSendTransportGroup, PoofFileSendFileSelector,
+		   PoofFileSendSendTrigger, PoofFileSendCancelTrigger;
+	sendTrigger = PoofFileSendSendTrigger;
+	transportList = PoofFileSendTransports;
+}
+
+PoofFileSendTransportGroup = GenInteraction {
+	moniker = "How:";
+	children = PoofFileSendTransports;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+
+PoofFileSendTransports = OutboxTransportList {
+	destination = PoofFileSendPanel;
+	applyMsg = MSG_PSD_SET_TRANSPORT;
+	monikerSource = PoofFileSendTransportMonikers;
+	attrs = default +notifyOfInitialSet;
+	hints = {
+		HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION,
+		HINT_ITEM_GROUP_MINIMIZE_SIZE
+	}
+}
+
+PoofFileSendTransportMonikers = OutboxTransportMonikerSource {
+	type = filtered;
+	filter = "mask MBTC_CAN_SEND_FILE";
+}
+
+PoofFileSendFileSelector = GenFileSelector {
+	action = MSG_PFSD_FILE_SELECTION_CHANGED, PoofFileSendPanel;
+}
+
+PoofFileSendSendTrigger = GenTrigger {
+	moniker = 'S', "Send";
+	action = MSG_MAILBOX_SEND_CONTROL_GET_ADDRESSES, "TO_OBJ_BLOCK_OUTPUT";
+	genStates = default -enabled;
+	hints = { HINT_SEEK_REPLY_BAR,
+		  HINT_DEFAULT_DEFAULT_ACTION }
+}
+
+PoofFileSendCancelTrigger = GenTrigger {
+	action = MSG_MSD_CANCEL, PoofFileSendPanel;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {
+			InteractionCommand IC_DISMISS
+		}
+			/* It doesn't really send MSG_GEN_GUP_INTERACTION
+			   _INTERACTION_COMMAND here, since we specify
+			   our own action.  But still need it so that the
+			   dialog won't create another "Cancel" button. */
+	}
+}
+
+end	SendFileDialogUI;
+
+start	SendClipboardDialogUI, notDetachable;
+
+PoofClipboardSendPanel = PoofClipboardSendDialog {
+	moniker = "Send Clipboard";
+	localize "Moniker used in the title bar of the Send Clipboard dialog.";
+	genStates = default -usable;
+	children = PoofClipboardSendTransportGroup,
+		   PoofClipboardSendSendTrigger,
+		   PoofClipboardSendCancelTrigger;
+	sendTrigger = PoofClipboardSendSendTrigger;
+	transportList = PoofClipboardSendTransports;
+}
+
+PoofClipboardSendTransportGroup = GenInteraction {
+	moniker = "How:";
+	children = PoofClipboardSendTransports;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+PoofClipboardSendTransports = OutboxTransportList {
+	destination = PoofClipboardSendPanel;
+	applyMsg = MSG_PSD_SET_TRANSPORT;
+	monikerSource = PoofClipboardSendTransportMonikers;
+	attrs = default +notifyOfInitialSet;
+	hints = {
+		HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION,
+		HINT_ITEM_GROUP_MINIMIZE_SIZE
+	}
+}
+
+PoofClipboardSendTransportMonikers = OutboxTransportMonikerSource {
+	type = filtered;
+	filter = "mask MBTC_CAN_SEND_CLIPBOARD";
+}
+
+PoofClipboardSendSendTrigger = GenTrigger {
+	moniker = 'S', "Send";
+	action = MSG_MAILBOX_SEND_CONTROL_GET_ADDRESSES, "TO_OBJ_BLOCK_OUTPUT";
+	genStates = default -enabled;
+	hints = { HINT_SEEK_REPLY_BAR,
+		  HINT_DEFAULT_DEFAULT_ACTION }
+}
+
+PoofClipboardSendCancelTrigger = GenTrigger {
+	action = MSG_MSD_CANCEL, PoofClipboardSendPanel;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {
+			InteractionCommand IC_DISMISS
+		}
+			/* It doesn't really send MSG_GEN_GUP_INTERACTION
+			   _INTERACTION_COMMAND here, since we specify
+			   our own action.  But still need it so that the
+			   dialog won't create another "Cancel" button. */
+	}
+}
+
+end	SendClipboardDialogUI;
+
+#endif	/* _POOF_MESSAGE_CREATION */
+
+start	ReceiveQuickMessageDialogUI, notDetachable;
+
+PoofQuickMessageReceivePanel = GenInteraction {
+	moniker = "\\1 Received";
+	localize "Moniker used in the title bar of the Receive Quick Message dialog. @1 is replaced by the subject of the message.";
+	genStates = default -usable;
+	attributes = notUserInitiatable, sysModal;
+	visibility = dialog;
+	type = notification;
+	children = PoofQuickMessageReceiveText,
+		   PoofQuickMessageReceiveOkTrigger;
+}
+
+PoofQuickMessageReceiveText = GenText {
+	genAttributes = default +readOnly;
+	hints = {
+		HINT_DRAW_IN_BOX,
+		HINT_MINIMUM_SIZE {
+			SpecWidth <>
+			SpecHeight <SST_LINES_OF_TEXT, 4>
+		}
+	}
+}
+
+PoofQuickMessageReceiveOkTrigger = GenTrigger {
+	action = MSG_GEN_DESTROY_AND_FREE_BLOCK, PoofQuickMessageReceivePanel;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {InteractionCommand IC_OK}
+			/* It doesn't really send MSG_GEN_GUP_INTERACTION
+			   _INTERACTION_COMMAND here, since we specify
+			   our own action.  But still need it so that the
+			   dialog won't create another "OK" button. */
+	}
+}
+
+end	ReceiveQuickMessageDialogUI;
+
+start	ROStrings, data;
+
+visMoniker uiPoofReceiveFileOverwriteRemote = "Overwrite Remote";
+
+visMoniker uiPoofReceiveFilePlaceInLocal = "Place in Local Tree";
+
+visMoniker uiPoofCancel = "VMO_CANCEL", "Cancel";
+
+#if	_POOF_MESSAGE_CREATION
+
+visMoniker uiToWhom = "To Whom";
+
+#endif	/* _POOF_MESSAGE_CREATION */
+
+end	ROStrings;

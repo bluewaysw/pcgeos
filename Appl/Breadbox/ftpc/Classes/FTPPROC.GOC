@@ -1,0 +1,2604 @@
+/*************************************************************************
+
+               Copyright (c) Breadbox Computer Company 1998
+                        -- All Rights Reserved --
+
+  PROJECT:      FTP Client
+  MODULE:       Application Process Class
+  FILE:         ftpProc.goc
+
+  AUTHOR:       Gerd Boerrigter
+
+  $Id: ftpproc.goc 1.2 1998/12/22 22:50:45 gerdb Exp $
+
+  DESCRIPTION:
+    This file contains the code for FtpProcessClass.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-08-26  GerdB     Initial version.
+
+*************************************************************************/
+
+@include <stdapp.goh>
+@include <socket.goh>
+#include <sockmisc.h>
+
+#include <Ansi/stdio.h>
+#include <Ansi/string.h>
+@include <Ansi/stdlib.h>
+
+@include "Objects/ftpC.goh"
+@include <ExtUI/statBar.goh>
+
+@include "options.goh"
+@include "expire.goh"
+@include "internal.goh"
+@include <sitelist.goh>
+@include <parentc.goh>
+
+@include "UI/ftpui.goh"
+#include "initfile.h"
+
+/*#define ERROR_DIALOG_FLAGS \
+    (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) | \
+    (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)
+
+/*#define WARNING_DIALOG_FLAGS \
+    (CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) | \
+    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET)
+*/
+word G_progressDialogOn = 0 ;
+
+#define SUB_PROCESS_STACK_SIZE     6000
+
+
+@include "resource.goh"
+
+
+void LevelsInit(void) ;
+Boolean LevelsInUse(void) ;
+sword LevelsUsed(void) ;
+void LevelsAddName(char *filename) ;
+void LevelsDown(void) ;
+void LevelsUp(void) ;
+void LevelsAbort(void) ;
+Boolean LevelsGetNext(char *p_name /* output */) ;
+char G_lastSubdir[128] ;
+Boolean g_details = FALSE;
+Boolean g_tools = TRUE;
+
+Boolean AckDBox (char* string1, char* string2, optr ackMsg);
+void NotifyDBox (char* string1, optr notifyMsg);
+
+@extern chunk StatusOpenConnection;
+@extern chunk StatusLogin;
+/*---------------------------------------------------------------------*/
+@class SubProcessClass, ProcessClass ;
+@endc
+/*---------------------------------------------------------------------*/
+
+/*************************************************************************
+    Global Variables
+*************************************************************************/
+optr G_ftpObject;
+ThreadHandle G_ftpThread;
+MemHandle G_ftpBlock;
+Boolean G_changedLocalDir = FALSE ;
+Boolean G_changedRemoteDir = FALSE ;
+
+/* Data for top level level handling */
+#define MAX_LEVELS_DEEP 20
+typedef struct {
+    optr names ;
+    word index ;
+} T_level ;
+T_level G_levels[MAX_LEVELS_DEEP] ;
+sword G_currentLevel = -1 ;
+MemHandle G_topLevelPath = NullHandle ;
+
+/* HACK!  The following is a flag to note when a directory has */
+/* been completely downloaded.  Until it is, ..._PROCESS_BATCH doesn't */
+/* work.  It is used as a control when processing multiple directories */
+/* in a batch transaction. */
+Boolean G_updatedDirectory = FALSE ;
+
+/*************************************************************************
+    Class Declarations
+*************************************************************************/
+@classdecl FtpProcessClass, neverSaved;
+
+
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpProcessClass::MSG_FTP_PROCESS_CONNECT
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Build an FTP object in its own thread and try to connect to the
+ |     FTP server.  Interpret the response and report any errors.
+ |     If all goes well, the UI is activated and a directory is requested.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    GB   98/09/16  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method FtpProcessClass, MSG_FTP_PROCESS_CONNECT
+{
+    FtpReplyCode replyCode;
+    char hostname[ FTP_MAX_HOST_NAME + 1 ];
+    char username[ 50 ];
+    char password[ 50 ];
+//    Boolean doLogging = FALSE ;
+
+    /* Grab the entered information */
+    @call GeodeGetOptrNS(@FTPSiteList)::
+            MSG_SITE_SELECTION_GET_SITE(hostname, sizeof(hostname)) ;
+    if ((@call GeodeGetOptrNS(@FTPSiteList)::
+            MSG_SITE_SELECTION_GET_PASSWORD_TYPE()) == SITE_ENTRY_TYPE_PASSWORD)  {
+        @call GeodeGetOptrNS(@FTPSiteList)::
+                MSG_SITE_SELECTION_GET_USERNAME(username, sizeof(username)) ;
+        @call GeodeGetOptrNS(@FTPSiteList)::
+                MSG_SITE_SELECTION_GET_PASSWORD(password, sizeof(password)) ;
+    } else {
+        strcpy(username, "anonymous") ;
+        strcpy(password, "nowhere@email.com") ;
+    }
+
+    /* If we have no name, just abort. */
+    if (!hostname[0])
+        return ;
+
+    /* Don't allow multiple connects. */
+    @send GeodeGetOptrNS(@FtpOpenConnectionTrigger)::
+            MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	 @send GeodeGetOptrNS(@ConnectTool)::
+				MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+    /* Create our FTP object from the template. */
+    G_ftpObject = NullHandle;
+    @call self::MSG_PROCESS_CREATE_EVENT_THREAD(
+            &G_ftpThread, 
+            &SubProcessClass, 
+            SUB_PROCESS_STACK_SIZE);
+    if (G_ftpThread)  {
+        G_ftpBlock = ObjDuplicateResource(
+                OptrToHandle(@FtpTemplateObject), 
+                -1, 
+                G_ftpThread);
+        if (G_ftpBlock)  {
+            G_ftpObject = ConstructOptr(
+                              G_ftpBlock, 
+                              OptrToChunk(@FtpTemplateObject));
+        }
+    }
+
+    if (G_ftpObject)  {
+        /* We have a valid FTP-Object. */
+
+        /* Setup the logging */
+/*@ifdef ALLOW_SHOW_LOGGING
+		  if (!InitFileReadBoolean("ftp", "logging", &doLogging))  {  */
+				if (g_details)  {
+					 @call G_ftpObject::MSG_FTP_SET_LOGGING_DESTINATION(
+											  GeodeGetOptrNS(@FtpControlConnectionView)) ;
+//					 @call logView::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+            }
+//        }
+/*@endif  */
+
+        @call G_ftpObject::MSG_FTP_SET_STATUS_DESTINATION(
+                GeodeGetOptrNS(@FtpStatusText));
+        @call G_ftpObject::MSG_FTP_SET_STATUS_MESSAGE(
+                MSG_FTP_STATUS_TEXT_SET_TEXT);
+
+        /* Try to log in the user */
+        replyCode = @call G_ftpObject::
+                        MSG_FTP_LOGIN(
+                            &hostname, 
+                            &username, 
+                            &password);
+
+        /* Interpret the state of the object */
+	  /*   if (replyCode == MAKEFOURCC('3','3','2', 0))  {
+            /* Send account information. */
+            /* XXX: Not supported, yet! */
+     /*   }
+		  /*else */if (replyCode == MAKEFOURCC('2','3','0', 0))
+        {
+            /* We are in.  Activate the UI */
+            @send GeodeGetOptrNS(@FtpCommandMenu)::
+                    MSG_GEN_SET_ENABLED(VUM_NOW);
+				@send GeodeGetOptrNS(@XferToolGroup)::
+						  MSG_GEN_SET_ENABLED(VUM_NOW);
+				@send GeodeGetOptrNS(@FtpCloseConnectionTrigger)::
+						  MSG_GEN_SET_ENABLED(VUM_NOW);
+				@send GeodeGetOptrNS(@DisconnectTool)::
+						  MSG_GEN_SET_ENABLED(VUM_NOW);
+
+            /* Turn on the list by finally telling it who they */
+            /* are concerned with */
+            @call GeodeGetOptrNS(@FtpRemoteFileSelector)::
+                        MSG_FTP_LIST_SET_FTP(
+                            G_ftpObject,
+                            G_ftpThread) ;
+
+            /* Start reading a new directory as the first command */
+            @send ,forceQueue self::MSG_FTP_PROCESS_READ_DIRECTORY();
+        }
+        else
+        {
+            /* We could not open a connection to the FTP server. */
+            word errno = @call G_ftpObject::MSG_FTP_GET_SOCKET_ERROR();
+            char errNum[ 6 ];
+
+            sprintf(errNum, "%d", errno);
+
+            MemLock(OptrToHandle(@ConnectionError));
+
+            if (replyCode == 0)
+            {
+                /* Problems during connection */
+					 NotifyDBox(errNum, @ConnectionError);
+			  }
+            else
+            {
+                /* Problems during login */
+					 NotifyDBox(errNum, @LoginError);
+            }
+
+            MemUnlock(OptrToHandle(@ConnectionError));
+
+            /* Close the connection, at least all that is already opened. */
+            @call self::MSG_FTP_PROCESS_DISCONNECT();
+        }
+    }
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpProcessClass::MSG_FTP_PROCESS_DISCONNECT
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Disconnect the server and deactivate everything that we can.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    GB   98/09/16  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method FtpProcessClass, MSG_FTP_PROCESS_DISCONNECT
+{
+    /* Turn off UI and break the ftp link in the UI */
+    @call GeodeGetOptrNS(@FtpRemoteFileSelector)::
+                MSG_FTP_LIST_SET_FTP(
+                    NullHandle,
+                    NullHandle) ;
+	 @send GeodeGetOptrNS(@FtpCommandMenu)::
+            MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	 @send GeodeGetOptrNS(@XferToolGroup)::
+						  MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	 @send GeodeGetOptrNS(@FtpCloseConnectionTrigger)::
+				MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	 @send GeodeGetOptrNS(@DisconnectTool)::
+				MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+    /* Have the ftp object close the connection (if any) */
+	 if (G_ftpObject)
+		  @call G_ftpObject::MSG_FTP_CLOSE_CONNECTION();
+
+	 if (G_ftpObject && g_details)
+		@call G_ftpObject::MSG_FTP_SET_LOGGING_DESTINATION(0) ;
+
+	 /* Destroy the thread by detaching it */
+    if (G_ftpThread)  {
+        @call ConstructOptr(G_ftpThread, 0)::MSG_META_DETACH(0, NullOptr) ;
+
+        /* Wait for the ftp thread to finally be destroyed */
+        while (G_ftpThread)
+           {}
+
+        @call GeodeGetOptrNS(@FtpRemoteFileSelector)::MSG_GEN_FILE_LIST_CLEAR() ;
+    }
+
+    /* Now get rid of the used memory */
+    if (G_ftpObject)  {
+        MemFree(OptrToHandle(G_ftpObject)) ;
+        G_ftpObject = NullHandle;
+    }
+
+    /* Allow to open another connection, again. */
+	 @send GeodeGetOptrNS(@FtpOpenConnectionTrigger)::
+        MSG_GEN_SET_ENABLED(VUM_NOW);
+	 @send GeodeGetOptrNS(@ConnectTool)::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpProcessClass::MSG_GEN_PROCESS_OPEN_APPLICATION
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Check for expiration for alpha testing.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    GB   98/09/16  Created
+ |
+ *-----------------------------------------------------------------------*/
+//@extern object ExpireDialog ;
+@method FtpProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+ AccessFlags		pcAccess;
+ InteractionCommand	answer;
+ Boolean				initError;
+
+
+	/* show details window? */
+	initError = InitFileReadBoolean("ftp", "details", &g_details);
+	if (initError || !g_details) {
+		@send GeodeGetOptrNS(@DetailWinOptTrigger)::MSG_GEN_USE_VIS_MONIKER(
+								OptrToChunk(GeodeGetOptrNS(@ShowDetailWinMoniker)),
+								VUM_DELAYED_VIA_APP_QUEUE);
+		@send GeodeGetOptrNS(@FtpControlConnectionView)::MSG_GEN_SET_NOT_USABLE(
+															  VUM_DELAYED_VIA_APP_QUEUE);
+		}
+	else  {
+		@send GeodeGetOptrNS(@DetailWinOptTrigger)::MSG_GEN_USE_VIS_MONIKER(
+								OptrToChunk(GeodeGetOptrNS(@HideDetailWinMoniker)),
+								VUM_DELAYED_VIA_APP_QUEUE);
+		@send GeodeGetOptrNS(@FtpControlConnectionView)::MSG_GEN_SET_USABLE(
+																 VUM_DELAYED_VIA_APP_QUEUE);
+		}
+
+	/* show toolbar? */
+	initError = InitFileReadBoolean("ftp", "tools", &g_tools);
+	if (initError || g_tools) {
+		@send GeodeGetOptrNS(@ToolbarOptTrigger)::MSG_GEN_USE_VIS_MONIKER(
+								OptrToChunk(GeodeGetOptrNS(@HideToolbarMoniker)),
+								VUM_DELAYED_VIA_APP_QUEUE);
+		@send GeodeGetOptrNS(@Toolbar)::MSG_GEN_SET_USABLE(
+																 VUM_DELAYED_VIA_APP_QUEUE);
+		}
+	else  {
+		@send GeodeGetOptrNS(@ToolbarOptTrigger)::MSG_GEN_USE_VIS_MONIKER(
+								OptrToChunk(GeodeGetOptrNS(@ShowToolbarMoniker)),
+								VUM_DELAYED_VIA_APP_QUEUE);
+		@send GeodeGetOptrNS(@Toolbar)::MSG_GEN_SET_NOT_USABLE(
+															  VUM_DELAYED_VIA_APP_QUEUE);
+		}
+
+
+	 @callsuper();
+
+	 /* check for parental control */
+    pcAccess = ParentalControlGetAccessInfo();
+    /* if no access, ask for password */
+	 if (pcAccess & AF_FTP)  {
+		answer = @call GeodeGetOptrNS(@PCRoot)::MSG_PC_CHECK_PASSWORD_DB(PC_FTP);
+	   if (answer == IC_OK) {
+		/* allow access */
+		}
+	  else {
+		@send, forceQueue GeodeGetOptrNS(@FtpApp)::MSG_META_QUIT();
+		}
+	  }
+
+	 LevelsInit() ;
+
+/*    @call FtpOpenConnectionConnectTrigger::MSG_GEN_TRIGGER_SET_DESTINATION(oself) ; */
+@if @COMPILE_OPTION_EXPIRE_ON
+    @call GeodeGetOptrNS(@ExpireDialog)::MSG_EXPIRE_DIALOG_CHECK_DATE(
+              @EXPIRE_DATE_MONTH,
+              @EXPIRE_DATE_DAY,
+              @EXPIRE_DATE_YEAR,
+              TRUE) ;
+@endif
+    /* Start the user with the connection dialog */
+	 @send GeodeGetOptrNS(@FtpOpenConnectionTrigger)::MSG_GEN_INTERACTION_INITIATE() ;
+
+//    FilePushDir() ;
+//    FileSetStandardPath(SP_PRIVATE_DATA) ;
+	 @call GeodeGetOptrNS(@FTPSiteList)::MSG_SITE_SELECTION_OPEN_DATABASE() ;
+//    FilePopDir() ;
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpProcessClass::MSG_GEN_PROCESS_CLOSE_APPLICATION
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Make sure we are disconnected and all memory freed.  Then close.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    GB   98/09/16  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method FtpProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+    @call self::MSG_FTP_PROCESS_DISCONNECT();
+    @call GeodeGetOptrNS(@FTPSiteList)::MSG_SITE_SELECTION_CLOSE_DATABASE() ;
+
+    return @callsuper() ; /*NullHandle; */
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpProcessClass::MSG_FTP_PROCESS_MAKE_DIR
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Create a new directory either on the remote server or on our computer.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    GB   09/20/98  Created
+ |    LES  11/04/99  Made empty names do nothing.
+ |
+ *-----------------------------------------------------------------------*/
+@method FtpProcessClass, MSG_FTP_PROCESS_MAKE_DIR
+{
+    FtpReplyCode replyCode;
+    PathName pathname;
+
+    @call GeodeGetOptrNS(@FtpMakeDirFilename)::
+            MSG_VIS_TEXT_GET_ALL_PTR(&pathname);
+
+    /* Enter nothing, do nothing */
+    if (pathname[0])  {
+        /* Figure out if we are currently working in the local or remote
+           directory. */
+
+        /* We are dealing with the remote system. */
+        replyCode = @call G_ftpObject::
+                MSG_FTP_SEND_MKD(&pathname);
+
+        if (replyCode == MAKEFOURCC('2','5','7', 0))
+        {
+            /* Change was successful. */
+            @call self::MSG_FTP_PROCESS_READ_DIRECTORY();
+        }
+        @call G_ftpObject::MSG_FTP_REPORT_LAST_ERROR_IF_ANY() ;
+    }
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpProcessClass::MSG_FTP_PROCESS_READ_DIRECTORY
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Have the FTP server report the current directory.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    GB   98/09/16  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method FtpProcessClass, MSG_FTP_PROCESS_READ_DIRECTORY
+{
+    MemHandle pathHandle = NullHandle;
+    TCHAR *p_path ;
+    optr fs ;
+
+    /* Get working directory (with PWD command) and store in text entry. */
+    /* Then send it off to the file selector which will cause the */
+    /* the list to reload */
+    @call G_ftpObject::MSG_FTP_GET_WORKING_DIR(&pathHandle);
+    if (pathHandle)  {
+		  p_path = MemLock(pathHandle) ;
+        fs = GeodeGetOptrNS(@FtpRemoteFileSelector) ;
+        @call fs::MSG_META_SUSPEND() ;
+        @call fs::MSG_GEN_FILE_LIST_SET_PATH(p_path) ;
+        @call fs::MSG_GEN_FILE_LIST_RELOAD() ;
+        @call fs::MSG_META_UNSUSPEND() ;
+        MemUnlock(pathHandle) ;
+        MemFree(pathHandle);
+    }
+    @call G_ftpObject::MSG_FTP_REPORT_LAST_ERROR_IF_ANY() ;
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpProcessClass::MSG_FTP_PROCESS_UPLOAD_SELECTION
+ *-------------------------------------------------------------------------
+ | Description:
+ |     The user has marked files for uploading.  Go through the list and
+ |     upload those items.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/27/99  Created.
+ |
+ *-----------------------------------------------------------------------*/
+@method FtpProcessClass, MSG_FTP_PROCESS_UPLOAD_SELECTION
+{
+    optr list ;
+    T_fileListID lastFile ;
+
+	 list = GeodeGetOptrNS(@LocalFileSelector) ;
+
+    /* Has at least one file been selected? */
+    lastFile = @call list::MSG_GEN_FILE_LIST_QUERY_SINGLE_SELECTION() ;
+    if (lastFile == FILE_LIST_ID_BAD)  {
+		  /* Put a message saying no items are selected */
+		  NotifyDBox(0, @NoFilesToUpload);
+	 } else {
+        @send ,forceQueue oself::MSG_FTP_PROCESS_PROCESS_BATCH(
+                list, 
+                MSG_FTP_PROCESS_UPLOAD_SINGLE_FILE, 
+                MSG_FTP_PROCESS_UPLOAD_SINGLE_DIR, 
+                0,
+                FALSE) ;
+    }
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpProcessClass::MSG_FTP_PROCESS_DOWNLOAD_SELECTION
+ *-------------------------------------------------------------------------
+ | Description:
+ |     The user has marked files for downloading.  Go through the list and
+ |     download those items.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/27/99  Created.
+ |
+ *-----------------------------------------------------------------------*/
+@method FtpProcessClass, MSG_FTP_PROCESS_DOWNLOAD_SELECTION
+{
+    optr list ;
+    T_fileListID lastFile ;
+
+    list = GeodeGetOptrNS(@FtpRemoteFileSelector) ;
+
+    /* Has at least one file been selected? */
+    lastFile = @call list::MSG_GEN_FILE_LIST_QUERY_SINGLE_SELECTION() ;
+    if (lastFile == FILE_LIST_ID_BAD)  {
+        /* Put a message saying no items are selected */
+		  NotifyDBox(0, @NoFilesToDownload);
+	 } else {
+        @send ,forceQueue oself::MSG_FTP_PROCESS_PROCESS_BATCH(
+                list, 
+                MSG_FTP_PROCESS_DOWNLOAD_SINGLE_FILE, 
+                MSG_FTP_PROCESS_DOWNLOAD_SINGLE_DIR, 
+                0,
+                FALSE) ;
+    }
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpProcessClass::MSG_FTP_PROCESS_DELETE_SELECTION
+ *-------------------------------------------------------------------------
+ | Description:
+ |     The user has marked files for deleting on the remote machine.  
+ |     Go through the list and delete those items.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/01/99  Created.
+ |
+ *-----------------------------------------------------------------------*/
+@method FtpProcessClass, MSG_FTP_PROCESS_DELETE_SELECTION
+{
+    optr list ;
+    T_fileListID lastFile ;
+
+    list = GeodeGetOptrNS(@FtpRemoteFileSelector) ;
+
+    /* Has at least one file been selected? */
+	 lastFile = @call list::MSG_GEN_FILE_LIST_QUERY_SINGLE_SELECTION() ;
+    if (lastFile == FILE_LIST_ID_BAD)  {
+        /* Put a message saying no items are selected */
+		  NotifyDBox(0, @NoFilesToDelete);
+	 } else {
+		  if (@call list::MSG_GEN_FILE_LIST_QUERY_IS_DIR(lastFile)) {
+            /* delete the selected dir */
+				if (AckDBox(0, 0, @ConfirmDeleteDir)) {
+					@send oself::MSG_FTP_PROCESS_DELETE_SINGLE_DIR(list, lastFile, 0);
+				}
+		  } else {
+				/* delete any number of selected files */
+				if (AckDBox(0, 0, @ConfirmDeleteFile)) {
+					@send ,forceQueue oself::MSG_FTP_PROCESS_PROCESS_BATCH(
+						list,
+						MSG_FTP_PROCESS_DELETE_SINGLE_FILE,
+						0,
+						0,
+						FALSE) ;
+				}
+		  }
+    }
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpProcessClass::MSG_FTP_PROCESS_RENAME_SELECTION
+ *-------------------------------------------------------------------------
+ | Description:
+ |     The user has marked files for renaming on the remote machine.  
+ |     Go through the list and rename those items.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/01/99  Created.
+ |
+ *-----------------------------------------------------------------------*/
+@method FtpProcessClass, MSG_FTP_PROCESS_RENAME_SELECTION
+{
+    optr list ;
+    T_fileListID lastFile ;
+
+    list = GeodeGetOptrNS(@FtpRemoteFileSelector) ;
+
+    /* Has at least one file been selected? */
+    lastFile = @call list::MSG_GEN_FILE_LIST_QUERY_SINGLE_SELECTION() ;
+    if (lastFile == FILE_LIST_ID_BAD)  {
+        /* Put a message saying no items are selected */
+		  NotifyDBox(0, @NoFilesToRename);
+	 } else {
+        @send ,forceQueue oself::MSG_FTP_PROCESS_PROCESS_BATCH(
+                list, 
+                MSG_FTP_PROCESS_RENAME_SINGLE_FILE, 
+                0,
+                0,
+                TRUE) ;
+    }
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpProcessClass::MSG_FTP_PROCESS_PROCESS_BATCH
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Go through all the files in a file selector and send the file
+ |     to another method on a one by one basis.  The method that processes
+ |     a single file will fire back an event here if it wants to continue
+ |     or else must call MSG_FTP_PROCESS_BATCH_COMPLETED (like if an error
+ |     occured).
+ |
+ | Inputs:
+ |     optr list                  -- List to process
+ |     Message msgToCall          -- Message of prototype 
+ |                                   FTP_PROCESS_SINGLE_FILE_METHOD
+ |     Message msgToCallForDir    -- Message of prototype 
+ |                                   FTP_PROCESS_SINGLE_DIR_METHOD
+ |     word index                 -- Index currently being processed.
+ |                                   Must be 0 to start a batch, not 0
+ |                                   to continue a batch process.
+ |     Boolean doDirs             -- FALSE normally to skip dirs, TRUE
+ |                                   to pass dirs on.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/27/99  Created.
+ |    LES  11/04/99  Added doDirs parameter
+ |
+ *-----------------------------------------------------------------------*/
+@method FtpProcessClass, MSG_FTP_PROCESS_PROCESS_BATCH
+{
+    T_fileListID file ;
+    Boolean isSelected ;
+    optr listFTP = GeodeGetOptrNS(@FtpRemoteFileSelector) ;
+
+    if (!G_updatedDirectory)  {
+        /* Send ourselves to the end of the queue (while we wait) */
+        @send ,forceQueue oself::MSG_FTP_PROCESS_PROCESS_BATCH(
+                        list,
+                        msgToCall,
+                        msgToCallForDir,
+                        index,
+                        doDirs) ;
+    } else {
+        if ((index == 0) && (!LevelsInUse()))  {
+            SetTitleAndData(
+                GeodeGetOptrNS(@FtpStatusTitle),
+                @TitleStartingBatchTransfer,
+                "") ;
+
+            @call oself::MSG_FTP_PROCESS_BATCH_STARTED() ;
+
+            /* Start a level regardless if we need it */
+            LevelsDown() ;
+        }
+
+        /* Find the first selected file */
+        while (1)  {
+            file = @call list::MSG_GEN_FILE_LIST_FIND_NTH(index) ;
+            if (file == FILE_LIST_ID_BAD)
+                break ;
+            index++ ;
+
+            isSelected = @call list::MSG_GEN_FILE_LIST_QUERY_SELECTED(file) ;
+            if (LevelsUsed() > 1)
+                isSelected = TRUE ;
+
+            /* Is this item selected and not a directory? */
+            if (isSelected)  {
+                @call list::MSG_GEN_FILE_LIST_SELECT_FILE(file) ;
+                @call list::MSG_GEN_FILE_LIST_UNSELECT_FILE(file) ;
+
+                if (@call list::MSG_GEN_FILE_LIST_QUERY_IS_DIR(file))  {
+                    if (msgToCallForDir)  {
+                        /* Put it on the levels list in string form */
+                        char filename[128] ;
+                        word id = @call list::MSG_GEN_FILE_LIST_FIND_NTH(index-1) ;
+                        @call list::MSG_GEN_FILE_LIST_GET_INFO(id, filename, sizeof(filename)-1, NULL, NULL) ;
+                        LevelsAddName(filename) ;
+                    }
+                }
+
+                if (doDirs)
+                    break ;
+
+                if (!(@call list::MSG_GEN_FILE_LIST_QUERY_IS_DIR(file)))  {
+                    break ;
+                }
+            }
+        }
+
+        /* If we got a file, send it */
+        if (file != FILE_LIST_ID_BAD)  {
+            @send ,forceQueue oself::
+                    {FTP_PROCESS_SINGLE_FILE_METHOD}(msgToCall)
+                        (list, file, index) ;
+        } else {
+            /* Done with this group -- now do the waiting directories */
+				if ((LevelsGetNext(G_lastSubdir)) && (msgToCallForDir))  {
+                @send ,forceQueue oself::
+                        {FTP_PROCESS_SINGLE_DIR_METHOD}(msgToCallForDir)
+									 (list, G_lastSubdir) ;
+            } else {
+                /* Nothing to get, down with level */
+                LevelsUp() ;
+                if (LevelsInUse())  {
+						  /* Stil more to go.  But we're done with this level */
+                    /* Go back up one directory */
+                    G_updatedDirectory = FALSE ;
+
+						  /* If this list is the remote (when DLing) then this call
+							* will force a dir reload, after which G_updatedDirectory
+							* goes to TRUE. */
+						  @call list::MSG_GEN_FILE_LIST_UP_DIRECTORY() ;
+						  /* So if we're ULing we need to force a remote dir reload
+							* to make G_updatedDirectory go back to TRUE to avoid an
+                     * endless loop */
+						  if (list != listFTP)
+						  		@call listFTP::MSG_GEN_FILE_LIST_UP_DIRECTORY() ;
+
+                    /* Now continue from where we were on the previous directory */
+                    /* with the same parameters */
+                    @send ,forceQueue oself::MSG_FTP_PROCESS_PROCESS_BATCH(
+                                    list,
+                                    msgToCall,
+                                    msgToCallForDir,
+                                    0xFFFF,  /* Past the end of the list always -- only doing bufferred dirs now */
+                                    doDirs) ;
+                } else {
+//                    LevelsAbort() ;  putting in vvv
+                    @call oself::MSG_FTP_PROCESS_BATCH_COMPLETED() ;
+                }
+            }
+        }
+    }
+}
+
+
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpProcessClass::MSG_FTP_PROCESS_UPLOAD_SINGLE_DIR
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Changes directories to another directory and sets up to upload
+ | the next group of files.
+ |
+ | Inputs:
+ |     optr list                  -- GenFileList to process containing info
+ |     char *p_subdir             -- Subdirectory to use
+ |
+ | Revision History:
+ |    Who  Date:       Comments:
+ |    ---  ----------  ---------
+ |    LES  01/23/2002  Created.
+ *-----------------------------------------------------------------------*/
+@method FtpProcessClass, MSG_FTP_PROCESS_UPLOAD_SINGLE_DIR
+{
+    /* Primary goal is to change paths */
+    optr list2 = GeodeGetOptrNS(@FtpRemoteFileSelector) ;
+    char *p_path ;
+    char end[2] ;
+    FtpReplyCode replyCode ;
+    MemHandle mem = MemAlloc(4000, HF_DYNAMIC | HF_SHARABLE, 0) ;
+    p_path = MemLock(mem) ;
+    @call list::MSG_GEN_FILE_LIST_CONSTRUCT_PATH_STRING(p_path, 3500, FALSE, FALSE) ;
+
+    /* Note we are about to change FTP directories */
+    G_updatedDirectory = FALSE ;
+
+    /* First character of path is a directory separator */
+    end[0] = p_path[0] ;
+    end[1] = '\0' ;
+
+    if (p_path[strlen(p_path)-1] != end[0])
+        strcat(p_path, end) ;
+    strcat(p_path, p_subdir) ;
+
+    @call list::MSG_GEN_FILE_LIST_SET_PATH(p_path) ;
+
+    @call list2::MSG_GEN_FILE_LIST_CONSTRUCT_PATH_STRING(p_path, 3500, FALSE, FALSE) ;
+    /* First character of path is a directory separator */
+    end[0] = p_path[0] ;
+    end[1] = '\0' ;
+    if (p_path[strlen(p_path)-1] != end[0])
+        strcat(p_path, end) ;
+    strcat(p_path, p_subdir) ;
+    replyCode = @call G_ftpObject::MSG_FTP_SEND_MKD(p_path);
+	 if (replyCode == MAKEFOURCC('2','5','7', 0))
+	 {
+        /* Make dir was successful. */
+/*        @call self::MSG_FTP_PROCESS_READ_DIRECTORY(); */
+        @call list2::MSG_GEN_FILE_LIST_SET_PATH(p_path) ;
+        /* Continue the process */
+        LevelsDown() ;
+        @send ,forceQueue oself::MSG_FTP_PROCESS_PROCESS_BATCH(
+                list, 
+                MSG_FTP_PROCESS_UPLOAD_SINGLE_FILE, 
+                MSG_FTP_PROCESS_UPLOAD_SINGLE_DIR, 
+                0,
+                FALSE) ;
+	 } else {
+		  @call oself::MSG_FTP_PROCESS_BATCH_COMPLETED() ;
+		  @call G_ftpObject::MSG_FTP_REPORT_LAST_ERROR_IF_ANY() ;
+	 }
+
+    MemUnlock(mem) ;
+    MemFree(mem) ;
+
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpProcessClass::MSG_FTP_PROCESS_UPLOAD_SINGLE_FILE
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Upload one single file from the local file list to the server.
+ |
+ | Inputs:
+ |     optr list                  -- GenFileList to process containing info
+ |     T_fileListID file          -- File in list to use
+ |     word index                 -- Index to pass back to BATCH_PROCESS
+ |                                   if wish to continue
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/01/99  Created.
+ |    jfh  02/12/02  Uplaod Geos files with DOS name
+ *-----------------------------------------------------------------------*/
+@method FtpProcessClass, MSG_FTP_PROCESS_UPLOAD_SINGLE_FILE
+{
+    DiskHandle disk ;
+    PathName pathname ;
+    FileHandle localFile ;
+    FileLongName filename ;
+    FtpReplyCode replyCode;
+	 GeosFileType type ;
+	 char dosName[34];
+
+
+    /* Set current path to local file directory. */
+    FilePushDir() ;
+    disk = @call list::MSG_GEN_LOCAL_FILE_LIST_GET_DISK_HANDLE();
+    @call list::MSG_GEN_FILE_LIST_GET_PATH(pathname, sizeof(pathname));
+    FileSetCurrentPath(disk, pathname);
+
+    /* Get the name of the file we are processing */
+    @call list::MSG_GEN_FILE_LIST_GET_INFO(
+                    file,
+						  filename,
+                    sizeof(filename)-1,
+                    NULL,
+                    NULL) ;
+
+    SetTitleAndData(
+        GeodeGetOptrNS(@FtpStatusTitle),
+        @TitleUploading,
+        &filename) ;
+
+	 /* if it's a Geos file upload it with it's DOS file name so
+	  * that we will have it when we download it */
+	 FileGetPathExtAttributes(filename, FEA_FILE_TYPE, &type, sizeof(type)) ;
+	 if (type != GFT_NOT_GEOS_FILE) {
+			/* grab the DOS name */
+			FileGetPathExtAttributes(filename, FEA_DOS_NAME, dosName, 34) ;
+		  }
+
+	 /* Now open it and return our directory */
+    localFile = FileOpen(
+                    filename, 
+                    (FILE_ACCESS_R | FILE_DENY_RW));
+    FilePopDir() ;
+
+    /* If we didn't get the file, report an error. */
+    /* If we did get the file, try to upload the file */
+	 if (!localFile)  {
+		  NotifyDBox(0, @CannotOpenFileForUpload);
+        @call oself::MSG_FTP_PROCESS_BATCH_COMPLETED() ;
+    } else {
+		  /* upload the file */
+		  if (type != GFT_NOT_GEOS_FILE) {
+				/* use the DOS name */
+				strcpy(filename, dosName);
+		  }
+		  replyCode = @call G_ftpObject::MSG_FTP_UPLOAD_FILE(filename, localFile);
+		  G_changedRemoteDir = TRUE ;
+        FileClose(localFile, FALSE);
+
+        /* If we uploaded with no problems, continue processing. */
+		  /* Otherwise, stop with an error. */
+		  if (replyCode == 0)  {
+            /* Problems. */
+
+				/* XXX - let's ask the user if he wants to skip this file & continue
+			  		the batch or stop the whole thing. */
+				if (AckDBox(filename, 0, @BatchULFailQuestion))
+					/* user says keep going */
+					@send, forceQueue oself::MSG_FTP_PROCESS_PROCESS_BATCH(
+							list, MSG_FTP_PROCESS_UPLOAD_SINGLE_FILE,
+							MSG_FTP_PROCESS_UPLOAD_SINGLE_DIR, index, FALSE) ;
+
+				else {
+					//@call G_ftpObject::MSG_FTP_REPORT_LAST_ERROR_IF_ANY() ;
+					@call oself::MSG_FTP_PROCESS_BATCH_COMPLETED() ;
+					@call oself::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+					}
+        }
+        /* Continue processing the batch */
+        else @send ,forceQueue oself::MSG_FTP_PROCESS_PROCESS_BATCH(
+                list, 
+                MSG_FTP_PROCESS_UPLOAD_SINGLE_FILE, 
+                MSG_FTP_PROCESS_UPLOAD_SINGLE_DIR, 
+                index,
+                FALSE) ;
+    }
+}
+
+/* Determine if the file exists by trying to 'create only' it */
+/*Boolean FileExists(char *filename)
+{
+    Boolean exists = FALSE ;
+    FileHandle file ;
+
+    file = FileCreate(
+               filename,
+               (FILE_CREATE_ONLY | FCF_NATIVE) |
+               (FILE_ACCESS_RW | FILE_DENY_RW),
+               FALSE);
+    if (file)  {
+        FileClose(file, FALSE) ;
+        FileDelete(filename) ;
+    } else {
+        exists = TRUE ;
+    }
+
+    return exists ;
+}
+
+void FileRenameIfGEOS(char *from, char *to)
+{
+    FileHandle file ;
+    byte tag[4] ;
+    Boolean isGEOS = FALSE ;
+	 GeosFileType type ;
+	 char dosName[80] ;
+    word i ;
+    char extender[5] ;
+
+    file = FileOpen(from, FILE_ACCESS_R | FILE_DENY_NONE) ;
+    if (file)  {
+        FileRead(file, tag, sizeof(tag), FALSE) ;
+        if ((tag[0] == 0xC7) &&
+            (tag[1] == 0x45) &&
+            (tag[2] == 0xC1) &&
+            (tag[3] == 0x53))  {
+            isGEOS = TRUE ;
+        }
+
+        type = GFT_NOT_GEOS_FILE ;
+		  FileGetHandleExtAttributes(file, FEA_FILE_TYPE, &type, sizeof(type)) ;
+        if (type != GFT_NOT_GEOS_FILE)  
+            isGEOS = TRUE ;
+        FileClose(file, FALSE) ;
+
+        if (isGEOS)  {
+            i = 0 ;
+
+            /* Try to create a dos name that doesn't exist already */
+/*            do {
+                i++ ;
+                sprintf(extender, ".%03d", i) ;
+                strcpy(dosName, from) ;
+                strcat(dosName, extender) ;
+
+                /* If we can't create 100 of these, just abort */
+/*                if (i==100)
+                    return ;
+				} while (FileExists(dosName)) ;
+
+            /* Rename the file first to something GEOS like */
+/*            FileRename(from, dosName) ;
+            FileRename(dosName, to) ;
+        }
+    }
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpProcessClass::MSG_FTP_PROCESS_DOWNLOAD_SINGLE_DIR
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Changes directories to another directory and sets up to download
+ | the next group of files.
+ |
+ | Inputs:
+ |     optr list                  -- GenFileList to process containing info
+ |     char *p_subdir             -- Subdirectory to use
+ |
+ | Revision History:
+ |    Who  Date:       Comments:
+ |    ---  ----------  ---------
+ |    LES  01/23/2002  Created.
+ *-----------------------------------------------------------------------*/
+@method FtpProcessClass, MSG_FTP_PROCESS_DOWNLOAD_SINGLE_DIR
+{
+    DiskHandle disk ;
+    PathName pathname ;
+    /* Primary goal is to change paths */
+    optr list2 = GeodeGetOptrNS(@LocalFileSelector) ;
+    char *p_path ;
+    char end[2] ;
+    FtpReplyCode replyCode ;
+    MemHandle mem = MemAlloc(4000, HF_DYNAMIC | HF_SHARABLE, 0) ;
+    p_path = MemLock(mem) ;
+    @call list::MSG_GEN_FILE_LIST_CONSTRUCT_PATH_STRING(p_path, 3500, FALSE, FALSE) ;
+
+    /* Note we are about to change FTP directories */
+    G_updatedDirectory = FALSE ;
+
+    /* First character of path is a directory separator */
+    end[0] = p_path[0] ;
+    end[1] = '\0' ;
+    if (p_path[strlen(p_path)-1] != end[0])
+        strcat(p_path, end) ;
+    strcat(p_path, p_subdir) ;
+    @call list::MSG_GEN_FILE_LIST_SET_PATH(p_path) ;
+
+    /* Go to the current local directory and make the subdir */
+    FilePushDir() ;
+    disk = @call list2::MSG_GEN_LOCAL_FILE_LIST_GET_DISK_HANDLE();
+    @call list2::MSG_GEN_FILE_LIST_GET_PATH(pathname, sizeof(pathname));
+    FileSetCurrentPath(disk, pathname);
+    FileCreateDir(p_subdir) ;
+    FilePopDir() ;
+
+    @call list2::MSG_GEN_FILE_LIST_CONSTRUCT_PATH_STRING(p_path, 3500, FALSE, FALSE) ;
+    /* First character of path is a directory separator */
+    end[0] = p_path[0] ;
+    end[1] = '\0' ;
+    if (p_path[strlen(p_path)-1] != end[0])
+        strcat(p_path, end) ;
+    strcat(p_path, p_subdir) ;
+
+/*    if (replyCode == MAKEFOURCC('2','5','7', 0))
+    { */
+        /* Make dir was successful. */
+/*        @call self::MSG_FTP_PROCESS_READ_DIRECTORY(); */
+        @call list2::MSG_GEN_FILE_LIST_SET_PATH(p_path) ;
+        /* Continue the process */
+		  LevelsDown() ;
+		  @send ,forceQueue oself::MSG_FTP_PROCESS_PROCESS_BATCH(
+                list, 
+                MSG_FTP_PROCESS_DOWNLOAD_SINGLE_FILE, 
+                MSG_FTP_PROCESS_DOWNLOAD_SINGLE_DIR, 
+                0,
+                FALSE) ;
+/*    } else {
+        @call G_ftpObject::MSG_FTP_REPORT_LAST_ERROR_IF_ANY() ;
+    } */
+
+    MemUnlock(mem) ;
+    MemFree(mem) ;
+
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpProcessClass::MSG_FTP_PROCESS_DOWNLOAD_SINGLE_FILE
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Download one single file from to the server the local machine.
+ |
+ | Inputs:
+ |     optr list                  -- GenFileList to process containing info
+ |     T_fileListID file          -- File in list to use
+ |     word index                 -- Index to pass back to BATCH_PROCESS
+ |                                   if wish to continue
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/01/99  Created.
+ |    jfh  02/08/02  Added deleting of cancelled DL
+ |		jfh  02/12/02  Removed Geos name conversions.  No Geos names will
+ |							get uploaded
+ |    jfh  07/25/02  put long name conversion back since we may get Win
+ |							long names   D'oh!
+ *-----------------------------------------------------------------------*/
+@method FtpProcessClass, MSG_FTP_PROCESS_DOWNLOAD_SINGLE_FILE
+{
+    DiskHandle disk ;
+    PathName pathname ;
+    FileHandle localFile ;
+    FileLongName filename ;
+    FtpReplyCode replyCode;
+    optr local ;
+	 PathName shortpathname;
+
+    local = GeodeGetOptrNS(@LocalFileSelector) ;
+
+    /* Set current path to local file directory. */
+    FilePushDir() ;
+    disk = @call local::MSG_GEN_LOCAL_FILE_LIST_GET_DISK_HANDLE();
+    @call local::MSG_GEN_FILE_LIST_GET_PATH(pathname, sizeof(pathname));
+    FileSetCurrentPath(disk, pathname);
+
+    /* Get the name of the file we are processing */
+    @call list::MSG_GEN_FILE_LIST_GET_INFO(
+                    file,
+                    filename,
+                    sizeof(filename)-1,
+                    NULL,
+                    NULL) ;
+
+    /* Create a short named file and create the file locally */
+	 Make8Dot3Name(&shortpathname, &filename);
+    localFile = FileCreate(
+						  shortpathname,
+                    (FILE_CREATE_TRUNCATE | FCF_NATIVE) |
+                        (FILE_ACCESS_RW | FILE_DENY_RW),
+                    FALSE);
+
+    SetTitleAndData(
+        GeodeGetOptrNS(@FtpStatusTitle),
+        @TitleDownloading,
+		  &filename) ;
+
+    /* If we didn't get the file, report an error. */
+    /* If we did get the file, try to download the file */
+    if (!localFile)  {
+		  NotifyDBox(shortpathname, @DownloadCannotOpenFileString);
+		  @call oself::MSG_FTP_PROCESS_BATCH_COMPLETED() ;
+    } else {
+		  replyCode = @call G_ftpObject::MSG_FTP_DOWNLOAD_FILE(
+                        filename, 
+								localFile);
+		  G_changedLocalDir = TRUE ;
+		  FileClose(localFile, FALSE);
+		  /* if the download was cancelled the reply code will be
+			* 450.  If it was delete the partial file */
+/*		  if (replyCode == MAKEFOURCC('4','5','0', 0)) {
+				FileDelete(shortpathname);
+ //		  } else {
+				/* Try renaming it to the correct long name */
+//				FileRenameIfGEOS(shortpathname, filename) ;
+/*		  }
+
+		  /* If we downloaded with no problems, continue processing. */
+        /* Otherwise, stop with an error. */
+		  if (replyCode == 0)  {
+				/* Problems. */
+				@call G_ftpObject::MSG_FTP_REPORT_LAST_ERROR_IF_ANY() ;
+				@call oself::MSG_FTP_PROCESS_BATCH_COMPLETED() ;
+		  } else if (replyCode == 1)  {
+				/* User cancelled */
+				FileDelete(shortpathname);
+				@call oself::MSG_FTP_PROCESS_BATCH_COMPLETED() ;
+		  } else {
+            /* Continue processing the batch */
+            @send ,forceQueue oself::MSG_FTP_PROCESS_PROCESS_BATCH(
+                    list, 
+                    MSG_FTP_PROCESS_DOWNLOAD_SINGLE_FILE, 
+                    MSG_FTP_PROCESS_DOWNLOAD_SINGLE_DIR, 
+                    index,
+                    FALSE) ;
+        }
+    }
+    FilePopDir() ;
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpProcessClass::MSG_FTP_PROCESS_DELETE_SINGLE_FILE
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Delete one single file on the server machine.
+ |
+ | Inputs:
+ |     optr list                  -- GenFileList to process containing info
+ |     T_fileListID file          -- File in list to use
+ |     word index                 -- Index to pass back to BATCH_PROCESS
+ |                                   if wish to continue
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/01/99  Created.
+ |
+ *-----------------------------------------------------------------------*/
+@method FtpProcessClass, MSG_FTP_PROCESS_DELETE_SINGLE_FILE
+{
+	 char filename[128] ;
+	 FtpReplyCode replyCode;
+
+	  /* Get the name of the file we are processing */
+	 @call list::MSG_GEN_FILE_LIST_GET_INFO(
+						  file,
+						  filename,
+						  sizeof(filename)-1,
+						  NULL,
+						  NULL) ;
+
+	 SetTitleAndData(
+		  GeodeGetOptrNS(@FtpStatusTitle),
+		  @TitleDeleting,
+		  &filename) ;
+
+	 replyCode = @call G_ftpObject::MSG_FTP_DELETE_FILE(filename) ;
+	 G_changedRemoteDir = TRUE ;
+
+	 /* If we uploaded with no problems, continue processing. */
+	 /* Otherwise, stop with an error. */
+	 if (replyCode == 0)  {
+		  /* Problems. */
+		  @call G_ftpObject::MSG_FTP_REPORT_LAST_ERROR_IF_ANY() ;
+		  @call oself::MSG_FTP_PROCESS_BATCH_COMPLETED() ;
+	 } else {
+		  /* Continue processing the batch */
+		  @send ,forceQueue oself::MSG_FTP_PROCESS_PROCESS_BATCH(
+                list, 
+                MSG_FTP_PROCESS_DELETE_SINGLE_FILE, 
+					 0,
+					 index,
+					 TRUE) ;
+	 }
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpProcessClass::MSG_FTP_PROCESS_DELETE_SINGLE_DIR
+ *-------------------------------------------------------------------------
+ | Description:  Deletes the selected folder
+ |     NOTE: This is prototyped on the FILE vs DIR setup
+ |
+ |
+ | Inputs:
+ |     optr list                  -- GenFileList to process containing info
+ |     T_fileListID file          -- File in list to use
+ |     word index                 -- Index to pass back to BATCH_PROCESS
+ |                                   if wish to continue
+ | Revision History:
+ |    Who  Date:       Comments:
+ |    ---  ----------  ---------
+ |    jfh  02/06/2002  Created.
+ *-----------------------------------------------------------------------*/
+@method FtpProcessClass, MSG_FTP_PROCESS_DELETE_SINGLE_DIR
+{
+	 char filename[128] ;
+	 FtpReplyCode replyCode;
+
+	  /* Get the name of the folder we are deleting */
+	 @call list::MSG_GEN_FILE_LIST_GET_INFO(
+						  file,
+						  filename,
+						  sizeof(filename)-1,
+						  NULL,
+						  NULL) ;
+
+	 SetTitleAndData(
+		  GeodeGetOptrNS(@FtpStatusTitle),
+		  @TitleDeleting,
+		  &filename) ;
+
+	 replyCode = @call G_ftpObject::MSG_FTP_DELETE_DIR(filename) ;
+	 G_changedRemoteDir = TRUE ;
+
+	 /* If we had a problem show an error. */
+	 if (replyCode == 0)  {
+		  /* Problems. */
+		  @call G_ftpObject::MSG_FTP_REPORT_LAST_ERROR_IF_ANY() ;
+	 }
+
+	 @call self::MSG_FTP_PROCESS_READ_DIRECTORY();
+
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpProcessClass::MSG_FTP_PROCESS_RENAME_SINGLE_FILE
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Rename one single file on the server machine.
+ |
+ | Inputs:
+ |     optr list                  -- GenFileList to process containing info
+ |     T_fileListID file          -- File in list to use
+ |     word index                 -- Index to pass back to BATCH_PROCESS
+ |                                   if wish to continue
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/01/99  Created.
+ |
+ *-----------------------------------------------------------------------*/
+@method FtpProcessClass, MSG_FTP_PROCESS_RENAME_SINGLE_FILE
+{
+	 char filename[128] ;
+	 char newname[128] ;
+	 FtpReplyCode replyCode;
+
+	  /* Get the name of the file we are processing */
+	 @call list::MSG_GEN_FILE_LIST_GET_INFO(
+						  file,
+						  filename,
+						  sizeof(filename)-1,
+						  NULL,
+						  NULL) ;
+
+	 SetTitleAndData(
+		  GeodeGetOptrNS(@FtpStatusTitle),
+		  @TitleRenaming,
+		  &filename) ;
+
+	 /* Now, determine what the user wants to rename it to */
+	 @call GeodeGetOptrNS(@FtpRenameFilenameFrom)::
+				  MSG_VIS_TEXT_REPLACE_ALL_PTR(filename, 0) ;
+	 @call GeodeGetOptrNS(@FtpRenameFilenameTo)::
+				  MSG_VIS_TEXT_REPLACE_ALL_PTR(filename, 0) ;
+	 @call GeodeGetOptrNS(@FtpRenameFilenameTo)::
+				  MSG_VIS_TEXT_SELECT_ALL() ;
+	 if (UserDoDialog(GeodeGetOptrNS(@FtpRenameDialog)) == IC_OK)  {
+        @call (GeodeGetOptrNS(@FtpRenameFilenameTo))::
+             MSG_VIS_TEXT_GET_ALL_PTR(&newname) ;
+
+		  /* Only process if the user entered a name */
+        if (newname[0] != '\0')  {
+            /* Do it */
+            replyCode = @call G_ftpObject::MSG_FTP_RENAME_FILE(
+                            filename,
+                            newname);
+            G_changedRemoteDir = TRUE ;
+
+            /* If we uploaded with no problems, continue processing. */
+            /* Otherwise, stop with an error. */
+            if (replyCode == 0)  {
+                /* Problems. */
+                @call G_ftpObject::MSG_FTP_REPORT_LAST_ERROR_IF_ANY() ;
+                @call oself::MSG_FTP_PROCESS_BATCH_COMPLETED() ;
+            } else {
+                /* Continue processing the batch */
+                @send ,forceQueue oself::MSG_FTP_PROCESS_PROCESS_BATCH(
+                        list, 
+                        MSG_FTP_PROCESS_RENAME_SINGLE_FILE, 
+                        0,
+                        index,
+                        TRUE) ;
+            }
+        } else {
+            /* No name entered, then stop */
+		  		NotifyDBox(0, @NoNewName);
+				@call oself::MSG_FTP_PROCESS_BATCH_COMPLETED() ;
+        }
+    } else {
+        @call oself::MSG_FTP_PROCESS_BATCH_COMPLETED() ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpProcessClass::MSG_FTP_PROCESS_GET_DIRECTORY
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Given a path, download that directory and show it in the FTP list.
+ |
+ | Inputs:
+ |    MemHandle mem               - Path string
+ |    optr fileList               - File List object
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/15/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method FtpProcessClass, MSG_FTP_PROCESS_GET_DIRECTORY
+{
+    FtpReplyCode replyCode;
+    FileHandle localFile;
+    char tempfile[20] ;
+    
+    /* Create a file to store the directory */
+    FilePushDir();
+    FileSetStandardPath(SP_WASTE_BASKET);
+    tempfile[0] = '\0' ;
+    localFile = FileCreateTempFile(
+            tempfile,
+            (FILE_CREATE_TRUNCATE | FCF_NATIVE) |
+            (FILE_ACCESS_RW | FILE_DENY_RW),
+            0);
+
+    if (localFile)  {
+        /* Change to that directory */
+        MemLock(mem) ;
+        replyCode = @call G_ftpObject::MSG_FTP_SEND_CWD(MemDeref(mem));
+        MemUnlock(mem) ;
+        MemFree(mem) ;
+
+        if (replyCode == MAKEFOURCC('2','5','0',0))   {
+            /* Download the directory */
+            replyCode = @call G_ftpObject::
+                    MSG_FTP_DOWNLOAD_DIRECTORY("", localFile);
+
+            if (replyCode == MAKEFOURCC('2','2','6',0) ||
+                replyCode == MAKEFOURCC('2','5','0',0))
+            {
+                /* Convert directory. */
+                @call self::MSG_FTP_PROCESS_PARSE_DIRECTORY(
+                        localFile, 
+                        fileList);
+            }
+        }
+
+        @call G_ftpObject::MSG_FTP_REPORT_LAST_ERROR_IF_ANY() ;
+        FileClose(localFile, FALSE);
+        FileDelete(tempfile) ;
+        @call fileList::MSG_GEN_FILE_LIST_MARK_RELOAD_ENDED() ;
+    }
+
+    FilePopDir();
+    G_updatedDirectory = TRUE ;
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpProcessClass::MSG_FTP_PROCESS_VALIDATE_PATH
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Once again the UI is not in the right thread, however, the process
+ |    is.  All we are going to do is try to change directories and check
+ |    if the path exists.  If it does, accept the given path.  If not,
+ |    deny the path.  Finally, report any errors we found.
+ |
+ | Inputs:
+ |    DirPathHandle dirPath       - path to validate
+ |    optr fileList               - originating FtpFileListClass
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/15/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method FtpProcessClass, MSG_FTP_PROCESS_VALIDATE_PATH
+{
+    FtpReplyCode replyCode;
+    MemHandle mem ;
+
+    mem = MemAlloc(1000, HF_DYNAMIC | HF_SHARABLE, 0) ;
+    MemLock(mem) ;
+    DirPathConstructString(
+        dirPath,
+        MemDeref(mem),
+        1000-1,
+        0,
+        '/',
+        '/',
+        FALSE,
+        FALSE) ;
+
+    replyCode = @call G_ftpObject::MSG_FTP_SEND_CWD(MemDeref(mem));
+    MemUnlock(mem) ;
+    MemFree(mem) ;
+
+    if (replyCode == MAKEFOURCC('2','5','0',0))   {
+        /* Could go to that directory! */
+        @send ,forceQueue fileList::MSG_GEN_FILE_LIST_ACCEPT_PATH(
+                    dirPath, 
+                    VOLUME_ID_BAD) ;
+    } else {
+        /* Could NOT go to that directory! */
+        @send ,forceQueue fileList::MSG_GEN_FILE_LIST_DENY_PATH(
+                   dirPath) ;
+    }
+    @call G_ftpObject::MSG_FTP_REPORT_LAST_ERROR_IF_ANY() ;
+}
+
+dword ParseSize(char *p)
+{
+    dword value = 0 ;
+
+    /* Skip the white spaces at the beginning */
+    while ((isspace(*p)) && (*p))
+        p++ ;
+
+    /* Grab all the digits */
+    while (isdigit(*p))
+        value = ((dword)(*(p++) - '0')) + (value * 10L) ;
+
+    return value ;
+}
+
+void ParseString(char **p_string, char *p_buffer, word n)
+{
+    char *p = *p_string ;
+
+    /* Skip the white spaces at the beginning */
+    while ((isspace(*p)) && (*p))
+        p++ ;
+
+    /* Grab all the non-spaces and trail the string with a null */
+    while ((*p) && (!isspace(*p)) && n)  {
+        *(p_buffer++) = *(p++) ;
+        n-- ;
+    }
+    *p_buffer = '\0' ;
+
+    *p_string = p ;
+}
+
+word ParseValue(char **p_string)
+{
+    char token[20] ;
+
+    ParseString(p_string, token, sizeof(token)-1) ;
+    return atoi(token) ;
+}
+
+void strupr(char *p)
+{
+    while (*p)  {
+        *p = toupper(*p) ;
+        p++ ;
+    }
+}
+
+FileDateAndTime ParseDate(char *p, word defaultYear)
+{
+    char token[20] ;
+    typedef struct {
+        char month[4] ;
+        word value ;
+    } T_monthToValue ;
+    static T_monthToValue monthToValue[] = {
+        { "JAN", 1 },
+        { "FEB", 2 },
+        { "MAR", 3 },
+        { "APR", 4 },
+        { "MAY", 5 },
+        { "JUN", 6 },
+        { "JUL", 7 },
+        { "AUG", 8 },
+        { "SEP", 9 },
+        { "OCT", 10 },
+        { "NOV", 11 },
+        { "DEC", 12 },
+        { "***", 0 }
+    } ;
+
+    word i ;
+    FileDateAndTime dateAndTime ;
+    word month, day, year, hour, min ;
+    word value1, value2 ;
+
+    ParseString(&p, token, sizeof(token)-1) ;
+    strupr(token) ;
+    i = 0 ;
+    while (monthToValue[i].value)  {
+        if (strcmp(monthToValue[i].month, token) == 0)
+            break ;
+        i++ ;
+    }
+    month = monthToValue[i].value ;
+
+    /* Get day */
+    day = ParseValue(&p) ;
+
+    /* Get time or year */
+    ParseString(&p, token, sizeof(token)-1) ;
+    hour = ParseValue(&p) ;
+    if (token[2] == ':')  {
+        hour = atoi(token) ;
+        min = atoi(token+3) ;
+        year = defaultYear ;
+    } else {
+        year = atoi(token) ;
+        hour = 1 ;
+        min = 1 ;
+    }
+
+    if (year < 1980)
+        year = 0 ;
+    else
+        year -= 1980 ;
+
+    if (min >= 60)
+        min = 0 ;
+    if (hour >= 24)
+        hour = 0 ;
+
+    if (day > 31)
+        day = 31 ;
+    if (day == 0)
+        day = 1 ;
+
+    if (month > 12)
+        month = 12 ;
+    if (month == 0)
+        month = 1 ;
+
+    value1 = (hour << 11) | (min << 5) ;
+    value2 = (year << FDAT_YEAR_OFFSET) |
+             (month << FDAT_MONTH_OFFSET) |
+             day ;
+    dateAndTime = (((dword)value1)<<16) | value2 ;
+
+    return dateAndTime ;
+}
+
+word ParseSkip(char **p)
+{
+    word token[100] ;
+    word found = 0 ;
+
+    ParseString(p, token, sizeof(token)-1) ;
+    if (**p)  {
+        found++ ;
+        while ((**p) && (isspace(**p)))
+            (*p)++ ;
+    }
+
+    return found ;
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpProcessClass::MSG_FTP_PROCESS_PARSE_DIRECTORY
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Parse a directory into its parts and add to the file listing.
+ |
+ | Inputs:
+ |    FileHandle dirFile          - File that was downloaded
+ |    optr fileList               - File List object
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    GB   10/04/98  Created
+ |    LES  10/15/99  Modified for new selector
+ |
+ *-----------------------------------------------------------------------*/
+@method FtpProcessClass, MSG_FTP_PROCESS_PARSE_DIRECTORY
+{
+    MemHandle bufMem ;
+    const word sizeBuffer = 1024 ;
+    char *buf ;
+    Boolean isDir ;
+    char *              p;
+    char *              start;
+    TimerDateAndTime datetime ;
+    word i ;
+    word count ;
+
+    @call fileList::MSG_META_SUSPEND() ;
+    bufMem = MemAlloc(sizeBuffer, HF_DYNAMIC, 0) ;
+    buf = MemLock(bufMem) ;
+
+    TimerGetDateAndTime(&datetime) ;
+
+    EC(ECCheckFileHandle(dirFile));
+
+    /* Analyse the file from the beginning. */
+    FilePos(dirFile, 0, FILE_POS_START);
+
+    while (my_fgets(buf, sizeBuffer, dirFile))
+    {
+        if (!LocalCmpStringsNoCase(buf, "tota", 4)) 
+            continue;
+        if (!LocalCmpStringsNoCase(buf, "ch", 2)) 
+            continue;
+
+        isDir = FALSE ;
+        /* Has a dash if its a file, otherwise its a */
+        /* link or directory */
+        if (buf[0] != '-')
+            isDir = TRUE ;
+
+        /* Go to the end of the string */
+        p = &buf[strlen(buf) - 1];
+        *(p--) = '\0';
+
+        /* special for ftp.cdrom.com */
+        if ( *p == 13 ) 
+            *p = '\0';
+
+        /* search from the end of the line to the first space. */
+        p = buf ;
+        count = 0 ;
+        for (i=0; i<8; i++)
+            count += ParseSkip(&p) ;
+
+        if (count < 7)
+            continue ;
+
+        /* Here we should be on the start of the name. */
+        /* Find the end */
+        start = p;
+        while (/*(*p != ' ') && */(*p != '\r') && (*p!='\n') && (*p))  {
+            if ((buf[0] == 'l') && (p[0] == ' ') && (p[1] == '-'))
+                break ;
+            p++;
+        }
+        *p = '\0';
+
+        /* Add more names (if not . or ..) */
+        if ((strcmp(start, ".")) && (strcmp(start, "..")))  {
+            @call fileList::MSG_GEN_FILE_LIST_APPEND(
+                      start,
+                      ParseSize(start-23),
+                      ParseDate(start-14, datetime.TDAT_year),
+                      isDir) ;
+        }
+    }
+
+    MemUnlock(bufMem) ;
+    MemFree(bufMem) ;
+    @call fileList::MSG_META_UNSUSPEND() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpFileListClass::MSG_FTP_PROCESS_BATCH_STARTED
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Mark when a batch of files have been started.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/01/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method FtpProcessClass, MSG_FTP_PROCESS_BATCH_STARTED
+{
+    ShowProgressDialog() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpFileListClass::MSG_FTP_PROCESS_BATCH_COMPLETED
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Mark when a batch of files have been completed.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/01/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method FtpProcessClass, MSG_FTP_PROCESS_BATCH_COMPLETED
+{
+	 HideProgressDialog() ;
+    LevelsAbort();
+    if (G_changedRemoteDir)  {
+        G_changedRemoteDir = FALSE ;
+        @send ,forceQueue oself::
+                    MSG_FTP_PROCESS_READ_DIRECTORY();
+    }
+    if (G_changedLocalDir)  {
+        G_changedLocalDir = FALSE ;
+		  @send ,forceQueue GeodeGetOptrNS(@LocalFileSelector)::
+                    MSG_GEN_FILE_LIST_RELOAD();
+    }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_FTP_PROCESS_TOGGLE_DETAIL_WINDOW for FtpProcessClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method FtpProcessClass, MSG_FTP_PROCESS_TOGGLE_DETAIL_WINDOW
+{
+
+
+	if (g_details) {
+		/* turn off details */
+		@send GeodeGetOptrNS(@DetailWinOptTrigger)::MSG_GEN_USE_VIS_MONIKER(
+						OptrToChunk(GeodeGetOptrNS(@ShowDetailWinMoniker)), VUM_NOW);
+		g_details = FALSE;
+		if (G_ftpObject)
+			@call G_ftpObject::MSG_FTP_SET_LOGGING_DESTINATION(0) ;
+		@send GeodeGetOptrNS(@FtpControlConnectionView)::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+		}
+	else  {
+		/* turn on details */
+		@send GeodeGetOptrNS(@DetailWinOptTrigger)::MSG_GEN_USE_VIS_MONIKER(
+								OptrToChunk(GeodeGetOptrNS(@HideDetailWinMoniker)), VUM_NOW);
+		g_details = TRUE;
+		if (G_ftpObject)
+			@call G_ftpObject::MSG_FTP_SET_LOGGING_DESTINATION(
+											  GeodeGetOptrNS(@FtpControlConnectionView)) ;
+		@send GeodeGetOptrNS(@FtpControlConnectionView)::MSG_GEN_SET_USABLE(VUM_NOW);
+		/* Point to the end - needed if user turned off then back on during a
+			session.  Otherwise cursor is stuck at top of window. */
+		if (@call GeodeGetOptrNS(@FtpControlConnectionView)::MSG_VIS_TEXT_GET_TEXT_SIZE())
+			@send GeodeGetOptrNS(@FtpControlConnectionView)::MSG_VIS_TEXT_SELECT_END();
+		}
+
+
+
+	InitFileWriteBoolean("ftp", "details", g_details);
+	InitFileCommit();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_FTP_PROCESS_TOGGLE_TOOLBAR for FtpProcessClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method FtpProcessClass, MSG_FTP_PROCESS_TOGGLE_TOOLBAR
+{
+
+	if (g_tools) {
+		/* turn off tools */
+		@send GeodeGetOptrNS(@ToolbarOptTrigger)::MSG_GEN_USE_VIS_MONIKER(
+						OptrToChunk(GeodeGetOptrNS(@ShowToolbarMoniker)), VUM_NOW);
+		g_tools = FALSE;
+		@send GeodeGetOptrNS(@Toolbar)::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+		}
+	else  {
+		/* turn on tools */
+		@send GeodeGetOptrNS(@ToolbarOptTrigger)::MSG_GEN_USE_VIS_MONIKER(
+								OptrToChunk(GeodeGetOptrNS(@HideToolbarMoniker)), VUM_NOW);
+		g_tools = TRUE;
+		@send GeodeGetOptrNS(@Toolbar)::MSG_GEN_SET_USABLE(VUM_NOW);
+		}
+
+	InitFileWriteBoolean("ftp", "tools", g_tools);
+	InitFileCommit();
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_FTP_PROCESS_OPEN_CONNECT for FtpProcessClass
+ *
+ * DESCRIPTION:	Open the connect dbox from the tool bar
+ *
+ *
+ ***********************************************************************/
+@method FtpProcessClass, MSG_FTP_PROCESS_OPEN_CONNECT
+{
+
+	@send GeodeGetOptrNS(@FtpOpenConnectionTrigger)::MSG_GEN_INTERACTION_INITIATE();
+
+}
+
+
+
+
+
+
+
+
+
+/**************************************************************************
+ * Class Definition:  FtpStatusTextClass
+ **************************************************************************/
+
+@classdecl FtpFileListClass ;
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpFileListClass::MSG_FTP_LIST_SET_FTP
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Declare the object and thread to use as a ftp client for working
+ |    directories and locations.  Pass Null values to turn off the object.
+ |
+ | Inputs:
+ |    optr obj                    - FtpClass object
+ |    ThreadHandle thread         - Thread that above object works in
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/15/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method FtpFileListClass, MSG_FTP_LIST_SET_FTP
+{
+    pself->FFLI_ftpObject = obj ;
+    pself->FFLI_ftpThread = thread ;
+    if (obj)  {
+        @call oself::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+    } else {
+        @call oself::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpFileListClass::MSG_GEN_FILE_LIST_VALIDATE_PATH
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Check to see if the path really exists.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/15/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method FtpFileListClass, MSG_GEN_FILE_LIST_VALIDATE_PATH
+{
+    @send process::MSG_FTP_PROCESS_VALIDATE_PATH(path, oself) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpFileListClass::MSG_GEN_FILE_LIST_RELOAD
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Intercept to do the actual dirty work of downloading and parsing
+ |     the directory of objects.
+ |
+ |     Caveat:  Make sure you mark the reload flag if in suspend mode.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/15/99  Created
+ |
+ | Last tested:  Never
+ *-----------------------------------------------------------------------*/
+@method FtpFileListClass, MSG_GEN_FILE_LIST_RELOAD
+{
+    MemHandle mem ;
+    
+    /* Don't do if we are suspended */
+    if (pself->GFLI_suspendCount)  {
+        pself->GFLI_suspendFlags |= GEN_FILE_LIST_SUSPEND_RELOAD_PENDING ;
+    } else {
+        if (pself->FFLI_ftpObject)  {
+            /* Call the super to clear the list */
+            @callsuper() ;
+
+            /* Since the UI thread would be blocked while downloading */
+            /* the ftp list, just pass it on to the process thread that */
+            /* will do all the real work */
+            /* Give it a fully constructed path to the directory */
+            mem = MemAlloc(4000, HF_DYNAMIC | HF_SHARABLE, 0) ;
+            MemLock(mem) ;
+            @call oself::MSG_GEN_FILE_LIST_CONSTRUCT_PATH_STRING(
+                              MemDeref(mem),
+                              4000-1,
+                              FALSE,
+                              FALSE) ;
+            MemUnlock(mem) ;
+
+            @send ,forceQueue process::MSG_FTP_PROCESS_GET_DIRECTORY(
+                        mem,
+                        oself) ;
+            @send ,forceQueue oself::MSG_GEN_FILE_LIST_UPDATE_FOCUS() ;
+        }
+    }
+}
+
+/**************************************************************************
+ * Class Definition:  FtpStatusTextClass
+ **************************************************************************/
+
+@classdecl FtpStatusTextClass ;
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpStatusTextClass::MSG_FTP_STATUS_TEXT_SET_TEXT
+ *-------------------------------------------------------------------------
+ | Description:
+ |    The FTP status has changed and needs to be reported.  Convert it
+ |    to something a bit more understandable.  In truth, this method
+ |    affects itself and the other object FtpStatusTransferText.  This
+ |    method affects the status on a dialog, but provides more information
+ |    to the status line on the main application (to show a status bar
+ |    on the dialog and a bytes transferred message on the status line).
+ |
+ | Inputs:
+ |    optr msgText               -- String to use for message
+ |                                  NullHandle means to clear the status.
+ |    long progress              -- bytes of total, or -1 for now
+ |    long total                 -- total bytes, -1 if not known
+ |    dword token                -- Particular id of this item.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    GB   ??/??/99  Created
+ |    jfh  04/27/02  Added sites to connect & login status strings
+ *-----------------------------------------------------------------------*/
+@method FtpStatusTextClass, MSG_FTP_STATUS_TEXT_SET_TEXT
+{
+    char buffer[1000] ;
+    word percent = 0 ;
+    Boolean doCancel = FALSE ;
+	 Boolean addSite = FALSE;
+
+    /* No message means we clear, else present a status message with */
+    /* percentange or bytes */
+    if (msgText)  {
+        /* Try to calculate a percentage (but only 
+        /* if we have a progress and total) */
+        if ((total > 0) && (progress >= 0))
+            percent = (100L*progress)/total ;
+
+        /* Update the status bar.  If no percentage, disable status */
+        if (percent)  {
+            @call GeodeGetOptrNS(@FtpStatusBar)::
+                      MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+            @call GeodeGetOptrNS(@FtpStatusBar)::
+                      MSG_SB_SET_STATUS_VALUE(percent);
+        } else {
+            @call GeodeGetOptrNS(@FtpStatusBar)::
+                      MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+        }
+
+        /* On the other status line, show the bytes transered in K */
+        if ((progress) && (progress != -1))  {
+            sprintf(buffer, "%ld Kbytes", progress/1024L) ;
+            @call GeodeGetOptrNS(@FtpStatusTransferText)::
+                    MSG_VIS_TEXT_REPLACE_ALL_PTR(buffer, 0) ;
+        } else {
+            @call GeodeGetOptrNS(@FtpStatusTransferText)::
+                    MSG_VIS_TEXT_DELETE_ALL() ;
+        }
+
+        /* But for ourselves, just report the message */
+		  @call oself::MSG_VIS_TEXT_REPLACE_ALL_OPTR(msgText, 0) ;
+		  /* jfh added the site name to connecting and login strings */
+		  MemLock (OptrToHandle(msgText));
+		  MemLock (OptrToHandle(@StatusOpenConnection));
+		  if (!strcmp(LMemDeref(msgText), LMemDeref(@StatusOpenConnection)))
+			  addSite = TRUE;
+		  else if (!strcmp(LMemDeref(msgText), LMemDeref(@StatusLogin)))
+			  addSite = TRUE;
+		  MemUnlock (OptrToHandle(msgText));
+		  MemUnlock (OptrToHandle(@StatusOpenConnection));
+		  if (addSite) {
+			  char hostname[ FTP_MAX_HOST_NAME + 1 ];
+			  /* Grab the site name */
+			  @call GeodeGetOptrNS(@FTPSiteList)::
+						MSG_SITE_SELECTION_GET_SITE(hostname, sizeof(hostname)) ;
+			  /* and append it */
+			  @call oself::MSG_VIS_TEXT_APPEND_PTR(hostname, 0);
+			  }
+
+
+    } else {
+        /* No status message, then delete all text for both objects */
+        @call oself::MSG_VIS_TEXT_DELETE_ALL() ;
+        @call GeodeGetOptrNS(@FtpStatusTransferText)::MSG_VIS_TEXT_DELETE_ALL() ;
+    }
+
+    /* Notice if the cancel button was pressed and disabled */
+    if (G_progressDialogOn)  {
+        if (@call GeodeGetOptrNS(@FtpStatusCancelButton)::
+                MSG_GEN_CHECK_IF_FULLY_ENABLED())  {
+            doCancel = FALSE ;
+        } else {
+            doCancel = TRUE ;
+        }
+    }
+
+    return doCancel ;
+}
+
+
+/**************************************************************************
+ * Class Definition:  FtpCancelButtonClass
+ **************************************************************************/
+
+@classdecl FtpCancelButtonClass ;
+
+/*-------------------------------------------------------------------------
+ | Method:  FtpCancelButtonClass::MSG_FTP_CANCEL_BUTTON_CANCEL
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Force a cancel state by disabling the button.  Basically we are
+ |     just marking that the cancel is in progress.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    GB   ??/??/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method FtpCancelButtonClass, MSG_FTP_CANCEL_BUTTON_CANCEL
+{
+    @call oself::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+}
+
+
+/**************************************************************************
+ * Class Definition:  SubProcessClass
+ **************************************************************************/
+
+@classdecl SubProcessClass ;
+
+/*-------------------------------------------------------------------------
+ | Method:  SubProcessClass::MSG_META_DETACH
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Note when the process is detached and make sure we kill the pointer
+ |     to the ftp thread.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    GB   ??/??/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method SubProcessClass, MSG_META_DETACH
+{
+    @callsuper() ;
+    G_ftpThread = NullHandle ;
+}
+
+/**************************************************************************
+ * Support Routines:
+ **************************************************************************/
+
+/*-------------------------------------------------------------------------
+ | Routine:  ShowProgressDialog
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Bring up the status dialog and initialize it with a 0% completed
+ |     status bar.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    GB   ??/??/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void ShowProgressDialog(void)
+{
+    G_progressDialogOn++ ;
+    if (G_progressDialogOn==1)  {
+        @call GeodeGetOptrNS(@FtpStatusCancelButton)::
+                  MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+        @call GeodeGetOptrNS(@FtpStatusBar)::
+                  MSG_SB_SET_STATUS_VALUE(0);
+        @call GeodeGetOptrNS(@FtpTransferProgressDialog)::
+                  MSG_GEN_INTERACTION_INITIATE() ;
+        @call GeodeGetOptrNS(@FtpStatusBar)::
+                  MSG_SB_START_PROCESS();
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  HideProgressDialog
+ *-------------------------------------------------------------------------
+ | Description:
+ |     We are done with the progress dialog.  End it.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    GB   ??/??/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void HideProgressDialog(void)
+{
+    G_progressDialogOn-- ;
+    if (G_progressDialogOn==0)  {
+        @call GeodeGetOptrNS(@FtpStatusBar)::MSG_SB_END_PROCESS() ;
+        @call GeodeGetOptrNS(@FtpTransferProgressDialog)::
+                  MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  Make8Dot3Name
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Convert a filename that may be too long down to a regular DOS
+ |     style name (XXXXXXXX.EEE)
+ |
+ | Inputs:
+ |    char *shortpathname         -- Where to store the resulting string
+ |    char *pathname              -- Current longer file name
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    GB   10/04/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+void Make8Dot3Name(char* shortpathname, char* pathname)
+{
+    int i ;
+
+	 /* Copy up to the first 8 characters before the dot or end */
+	 for (i=0; i<8; i++)  {
+        if ((*pathname == '.') || (*pathname == '\0'))
+            break ;
+
+        /* Skip anything that is not letters or numbers */
+		  if (!isalnum(*pathname))  {
+            i-- ;
+            pathname++ ;
+            continue ;
+        }
+
+		  *(shortpathname++) = *(pathname++) ;
+    }
+
+    /* Skip over to the dot or end */
+	 while ((*pathname != '\0') && (*pathname != '.'))
+        pathname++ ;
+
+    /* If we did find a dot, then copy the first 3 characters */
+	 if (*pathname == '.')  {
+        *(shortpathname++) = *(pathname++) ;
+        for (i=0; i<3; i++)  {
+            if (*pathname == '\0')
+					 break ;
+
+            /* Skip anything that is not letters or numbers */
+				if (!isalnum(*pathname))  {
+                i-- ;
+                pathname++ ;
+                continue ;
+            }
+
+            *(shortpathname++) = *(pathname++) ;
+        }
+    }
+
+    /* Cap off the end */
+	 *shortpathname = '\0' ;
+
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  my_fgets
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Read in a line up to the end of file or line feed.
+ |
+ | Inputs:
+ |    char *buf                   -- Where to store the string
+ |    int n                       -- Number to read up to
+ |    FileHandle file             -- File to read from
+ |
+ | Outputs:
+ |    char *                      -- same as input char *buf
+ |                                   or NULL if nothing read.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    GB   10/04/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+char* _pascal my_fgets(char *buf, int n, FileHandle file)
+{
+    int i;
+    char c;
+
+    /* keep reading until we reach the limit, EOF, or carraige return */
+    i=0;
+    do
+    {
+        if (FileRead(file, &c, 1, 0) != 1)
+        {
+            c = EOF;
+        }
+        else
+        {
+            buf[i++] = (char)c;
+        }
+    } while(i<n-1 && c != EOF && c !='\n');
+    buf[i] = 0;
+
+    /* If we never got anything, return NULL */
+    if (i==0)
+    {
+        return NULL;
+    }
+
+    return buf;
+}
+
+void SetTitleAndData(optr text, optr title, char *p_string)
+{
+    char buffer[200] ;
+
+    MemLock(OptrToHandle(title)) ;
+    sprintf(buffer, LMemDeref(title), p_string) ;
+    @call text::MSG_VIS_TEXT_REPLACE_ALL_PTR(buffer, 0) ;
+    MemUnlock(OptrToHandle(title)) ;
+}
+
+
+/**************************************************************************
+ * Support Routines:  Levels code (to track subdirectory progressing)
+ *
+ * A level is a group of filenames for that current directory.
+ * It is stored in a single LMem chunk (in a Mem handle) as a chunk
+ * array of variable sized strings containing the filename of the next
+ * subdirectory.  We never store filenames in these structures, just
+ * directories.
+ **************************************************************************/
+
+/*-------------------------------------------------------------------------
+ | Routine:  LevelsInit
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Start up the levels manager code.
+ |
+ | Revision History:
+ |    Who  Date:       Comments:
+ |    ---  ----------  ---------
+ |    LES  01/23/2002  Created
+ *-----------------------------------------------------------------------*/
+void LevelsInit(void)
+{
+    memset(G_levels, 0, sizeof(G_levels)) ;
+    G_currentLevel = -1 ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  LevelsInUse
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Do we have any levels in use yet?
+ |
+ | Returns:
+ |    Boolean                     -- TRUE if any levels, else FALSE
+ |
+ | Revision History:
+ |    Who  Date:       Comments:
+ |    ---  ----------  ---------
+ |    LES  01/23/2002  Created
+ *-----------------------------------------------------------------------*/
+Boolean LevelsInUse(void)
+{
+    if (G_currentLevel >= 0)
+        return TRUE ;
+    return FALSE ;
+}
+
+sword LevelsUsed(void)
+{
+    return G_currentLevel+1 ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  LevelsAddName
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Add a filename to the end of the current level.
+ |
+ | Inputs:
+ |    char *filename              -- Filename to add (null terminated)
+ |
+ | Revision History:
+ |    Who  Date:       Comments:
+ |    ---  ----------  ---------
+ |    LES  01/23/2002  Created
+ *-----------------------------------------------------------------------*/
+void LevelsAddName(char *filename)
+{
+    word len ;
+    char *p ;
+    if ((G_currentLevel < MAX_LEVELS_DEEP) && (G_currentLevel >= 0))  {
+        optr names = G_levels[G_currentLevel].names ;
+        MemLock(OptrToHandle(names)) ;
+        len = strlen(filename)+1 ;
+        ChunkArrayAppend(names, len) ;
+        p = ChunkArrayElementToPtr(names, ChunkArrayGetCount(names)-1, &len) ;
+        strcpy(p, filename) ;
+        MemUnlock(OptrToHandle(names)) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  LevelsDown
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Start up a new level "down" from the previous one.
+ |
+ | Revision History:
+ |    Who  Date:       Comments:
+ |    ---  ----------  ---------
+ |    LES  01/23/2002  Created
+ *-----------------------------------------------------------------------*/
+void LevelsDown(void)
+{
+    ChunkHandle chunk ;
+
+    G_currentLevel++ ;
+    if ((G_currentLevel < MAX_LEVELS_DEEP) && (G_currentLevel >= 0))  {
+        /* Create a new mem block with a chunk handle */
+        MemHandle mem = MemAllocLMem(LMEM_TYPE_GENERAL, 0) ;
+        MemLock(mem) ;
+        chunk = ChunkArrayCreate(mem, 0, 0, 0) ;
+        G_levels[G_currentLevel].names = ConstructOptr(mem, chunk) ;
+        G_levels[G_currentLevel].index = 0 ;
+        MemUnlock(mem) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  LevelsUp
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Done with the current level, go up a level destroying the current
+ | level.
+ |
+ | Revision History:
+ |    Who  Date:       Comments:
+ |    ---  ----------  ---------
+ |    LES  01/23/2002  Created
+ *-----------------------------------------------------------------------*/
+void LevelsUp(void)
+{
+    if ((G_currentLevel < MAX_LEVELS_DEEP) && (G_currentLevel >= 0))  {
+        MemHandle mem = OptrToHandle(G_levels[G_currentLevel].names) ;
+        MemFree(mem) ;
+        G_levels[G_currentLevel].names = NullHandle ;
+        G_levels[G_currentLevel].index = 0 ;
+        G_currentLevel-- ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  LevelsAbort
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Destroy all the levels.
+ |
+ | Revision History:
+ |    Who  Date:       Comments:
+ |    ---  ----------  ---------
+ |    LES  01/23/2002  Created
+ *-----------------------------------------------------------------------*/
+void LevelsAbort(void)
+{
+    /* Just back out of all the levels (thus deleting all of them) */
+    while (G_currentLevel >= 0)
+        LevelsUp() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  LevelsGetNext
+ *-------------------------------------------------------------------------
+ | Description:
+ |    Fetch the next filename available at the current level.
+ |
+ | Outputs:
+ |    Boolean                     -- returns TRUE if fetch succeeded
+ |    char *p_name                -- Returned filename
+ |
+ | Revision History:
+ |    Who  Date:       Comments:
+ |    ---  ----------  ---------
+ |    LES  01/23/2002  Created
+ *-----------------------------------------------------------------------*/
+Boolean LevelsGetNext(char *p_name /* output */)
+{
+    word len ;
+    if ((G_currentLevel < MAX_LEVELS_DEEP) && (G_currentLevel >= 0))  {
+        word num, index ;
+        optr names = G_levels[G_currentLevel].names ;
+        MemLock(OptrToHandle(names)) ;
+        num = ChunkArrayGetCount(names) ;
+        index = G_levels[G_currentLevel].index ;
+        if (index < num)  {
+            char *p_storedName = ChunkArrayElementToPtr(names, index, &len) ;
+            strcpy(p_name, p_storedName) ;
+            G_levels[G_currentLevel].index++ ;
+            return TRUE ;
+        }
+        MemUnlock(OptrToHandle(names)) ;
+    }
+    return FALSE ;
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	AckDBox (char* string1, char* string2, optr ackMsg)
+ *
+ * CALLED BY:
+ *
+ *
+ * STRATEGY:    returns user's Yes or No response
+ *
+ *
+ ***********************************************************************/
+Boolean AckDBox (char* string1, char* string2, optr ackMsg)
+{
+
+    /* put up an Are you sure box */
+	 MemLock (OptrToHandle(@ConnectionError));
+	 if ((UserStandardDialog(0, 0,
+				 string2,
+			    string1,
+			    LMemDeref(ackMsg),
+			    ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+			    ) != IC_YES))  {
+	  MemUnlock (OptrToHandle(@ConnectionError));
+	  return(FALSE);
+	  }
+	 else  {
+	  MemUnlock (OptrToHandle(@ConnectionError));
+	  return(TRUE);
+	  }
+
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	NotifyDBox  (char* string1, optr notifyMsg)
+ *
+ * CALLED BY:
+ *
+ *
+ * STRATEGY:    Puts up selected notification box
+ *
+ *
+ ***********************************************************************/
+void NotifyDBox (char* string1, optr notifyMsg)
+{
+
+    /* put up a notification box */
+	 MemLock (OptrToHandle(@ConnectionError));
+	 UserStandardDialog(0, 0, 0,
+			  string1,
+			  LMemDeref(notifyMsg),
+			  ((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+			  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+	 MemUnlock (OptrToHandle(@ConnectionError));
+
+}
+
+/* ftpProc.goc */
+

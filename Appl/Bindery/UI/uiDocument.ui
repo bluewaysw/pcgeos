@@ -1,0 +1,251 @@
+/*
+ * Project:	Studio
+ * File:	UI/uiDocument.ui
+ *
+ * Author:	Jenny Greenwood   7 March 1994
+ *
+ *	This file contains the user interface description for the document
+ * control.
+ *
+ *	$Id: uiDocument.ui,v 1.1 97/04/04 14:40:10 newdeal Exp $
+ *
+ */
+
+/* ----------------------------------------------------------------------------
+	UI Document Control
+-----------------------------------------------------------------------------*/
+
+start FileMenuUI;
+
+StudioDocumentControl = GenDocumentControl {
+	/*
+	 * Document file's token
+	 */
+	documentTokenChars = "'S', 'D', 'A', 'T'";
+	documentTokenID = "MANUFACTURER_ID_GEOWORKS";
+	/*
+	 * Template directory
+	 */
+	templateDir = "Bindery Templates";
+	/*
+	 * Special attributes: allow multiple open files, don't display
+	 * name on primary (this will be handled via the display control)
+	 */
+	dcAttributes = default +multipleOpenFiles;
+	features = default -displayNameOnPrimary;
+	/*
+	 * Text to display in the header area of the primary when no
+	 * document is open.
+	 */
+	noNameText = "No Document";
+	/*
+	 * Pointer to the GenDocumentGroup
+	 */
+	appDC = StudioDocGroup;
+	/*
+	 * List of objects to enable/disable based on whether or not a
+	 * document exists
+	 */
+	enableDisableList = StudioEnableList;
+	/*
+	 * Import and export UI
+	 */
+	importGroup = StudioImportControl;
+	exportGroup = StudioExportControl;
+	/*
+	 * Special strings
+	 */
+	dialogImportText = "Import:\\\rImport text from another word processor"
+			   " to create a new document.";
+	hints = {
+	    ATTR_GEN_CONTROL_REQUIRE_UI {
+		word GDC_SUGGESTED_ADVANCED_FEATURES
+	    },
+	    ATTR_GEN_CONTROL_PROHIBIT_UI {
+		word mask GDCF_SET_EMPTY_DOCUMENT
+	    }
+	}
+}
+
+chunk StudioEnableList = data {
+	UN_OPTR StudioPrintControl
+	UN_OPTR StudioPageSetupDialog
+	UN_OPTR StudioHyperlinkControl
+	UN_OPTR StudioPageNameControl
+	UN_OPTR StudioSearchReplaceControl
+	UN_OPTR StudioSpellControl
+	UN_OPTR ViewTypeSubGroup
+}
+
+StudioImportControl = ImportControl vardataReloc {
+	moniker = "Import Document";
+	attributes = default +notUserInitiatable;
+	importDataClasses = text;
+	importDestination = StudioDocumentControl;
+	importMessage = MSG_GEN_DOCUMENT_CONTROL_OPEN_IMPORT_SELECTED;
+	hints = {
+		ATTR_IMPORT_CONTROL_CANCEL_DESTINATION {
+			UN_OPTR StudioDocumentControl
+		},
+		ATTR_IMPORT_CONTROL_CANCEL_MESSAGE {
+			word MSG_GEN_DOCUMENT_CONTROL_IMPORT_CANCELLED
+		}
+	}
+}
+
+StudioExportControl = ExportControl {
+	moniker = "Export Document";
+	attributes = default +notUserInitiatable;
+	exportDataClasses = text;
+	exportDestination = "TO_APP_MODEL";
+	exportMessage = MSG_GEN_DOCUMENT_EXPORT;
+}
+
+end FileMenuUI;
+
+/* ----------------------------------------------------------------------------
+	 Document Group
+-----------------------------------------------------------------------------*/
+
+/*
+ * The GenDocumentGroup should be put in a resource of its own run by
+ * the application thread.
+ */
+
+start AppDCUI;
+
+StudioDocGroup = StudioDocumentGroup {
+	/*
+	 * Name for untitled documents
+	 */
+#ifdef DO_DBCS
+	defaultName = "Bindery Unt.";
+#else
+	defaultName = "Bindery Untitled";
+#endif
+	/*
+	 * Document protocol
+	 */
+	protocolMajor = "DOCUMENT_PROTOCOL_MAJOR";
+	protocolMinor = "DOCUMENT_PROTOCOL_MINOR";
+	/*
+	 * Document object to duplicate
+	 */
+	genDocument = StudioDocumentTemplate;
+	/*
+	 * Pointer to the GenDocumentControl
+	 */
+	uiDC = StudioDocumentControl;
+	/*
+	 * GenDisplay to automatically duplicate, GenDisplayGroup to attach
+	 * duplicated displays to and GenView to attach documents to
+	 */
+	genDisplayGroup = StudioDisplayGroup;
+	genDisplay = MainDisplay;
+	genView = MainView;
+	/*
+	 * Mark that the file contains objects
+	 */
+	attributes = default +vmFileContainsObjects, +largeContent;
+}
+
+StudioHead = StudioGrObjHead {
+	currentTool = "EditTextGuardianClass";
+}
+
+end AppDCUI;
+
+/* ----------------------------------------------------------------------------
+	 Block to duplicate when creating a document
+-----------------------------------------------------------------------------*/
+
+start DocumentTempUI;
+
+chunk OpenMasterPageArray = data {
+	ChunkArrayHeader <0, size OpenMasterPage, 0, size ChunkArrayHeader>
+}
+
+StudioDocumentTemplate = StudioDocument {
+}
+
+/*
+ * The StudioColumnContentTemplate is duplicated as part of creating a
+ * new document and is the content for the ruler that runs horizontally
+ * across the top of the document.
+ */
+
+MainHorizontalContent = RulerContent {
+	left = 0;
+	top = 0;
+	right = 8192;
+	bottom = "TEXT_RULER_HEIGHT";
+	attr = default -managed;
+	optFlags = default -geometryInvalid, -updatePath;
+	visCompGeoAttrs = default +customManageChildren;
+	contentAttrs = sameHeightAsSubview, largeDocumentModel,
+		      windowCoordinateMouseEvents;
+}
+
+/*
+ * The StudioRowContentTemplate is duplicated as part of creating a
+ * new document and is the content for the ruler that runs vertically
+ * down the left side of the document.
+ */
+
+MainVerticalContent = RulerContent {
+	left = 0;
+	top = 0;
+	right = "VIS_RULER_HEIGHT";
+	bottom = 8192;
+	attr = default -managed;
+	optFlags = default -geometryInvalid, -updatePath;
+	visCompGeoAttrs = default +customManageChildren;
+	contentAttrs = sameWidthAsSubview, largeDocumentModel,
+		       windowCoordinateMouseEvents;
+}
+
+end DocumentTempUI;
+
+/* ----------------------------------------------------------------------------
+	 Block to duplicate when creating a master page
+-----------------------------------------------------------------------------*/
+
+start MasterPageContentUI;
+
+MasterPageContent = StudioMasterPageContent {
+
+	left = 0;
+	top = 0;
+	right = "VIS_RULER_HEIGHT";
+	bottom = 8192;
+	attr = default -managed;
+	visCompGeoAttrs = default +customManageChildren;
+	optFlags = default -geometryInvalid, -updatePath;
+	contentAttrs = sameWidthAsSubview, largeDocumentModel,
+		       windowCoordinateMouseEvents;
+}
+
+MPHorizontalContent = RulerContent {
+	left = 0;
+	top = 0;
+	right = 8192;
+	bottom = "TEXT_RULER_HEIGHT";
+	attr = default -managed;
+	visCompGeoAttrs = default +customManageChildren;
+	optFlags = default -geometryInvalid, -updatePath;
+	contentAttrs = sameHeightAsSubview, largeDocumentModel,
+		      windowCoordinateMouseEvents;
+}
+
+MPVerticalContent = RulerContent {
+	left = 0;
+	top = 0;
+	right = "VIS_RULER_HEIGHT";
+	bottom = 8192;
+	attr = default -managed;
+	visCompGeoAttrs = default +customManageChildren;
+	optFlags = default -geometryInvalid, -updatePath;
+	contentAttrs = largeDocumentModel, windowCoordinateMouseEvents;
+}
+
+end MasterPageContentUI;

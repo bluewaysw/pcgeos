@@ -1,0 +1,349 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+ *
+ * PROJECT:	PC GEOS
+ * FILE:	gViewC.goh
+ * AUTHOR:	Tony Requist: February 12, 1991
+ *
+ * DECLARER:	UI
+ *
+ * DESCRIPTION:
+ *	This file defines GenViewClass
+ *
+ *	$Id: gViewC.goh,v 1.1 97/04/04 15:51:57 newdeal Exp $
+ *
+ ***********************************************************************/
+
+@optimize
+@deflib ui
+
+@include <Objects/genC.goh>
+#include <win.h>
+
+@class GenViewClass, GenClass;
+
+#define GVCD_INDEX(val) 	((byte) (val))
+#define GVCD_RED(val) 		((byte) (val))	/* If doing RGB */
+#define GVCD_FLAGS(val) 	((byte) ((val) >> 8))
+#define GVCD_BLUE_AND_GREEN(val)  ((word) ((val) >> 16))
+
+#define GVCD_BLUE(val) 		((byte) ((val) >> 16))
+#define GVCD_GREEN(val) 	((byte) ((val) >> 24))
+
+typedef WordFlags MakeRectVisibleFlags;
+#define MRVF_ALWAYS_SCROLL		0x0080
+#define MRVF_USE_MARGIN_FROM_TOP_LEFT	0x0040
+
+typedef enum /* word */ {
+    MRVM_0_PERCENT  	= 0,
+    MRVM_25_PERCENT 	= 0xffff/4,
+    MRVM_50_PERCENT 	= 0xffff/2,
+    MRVM_75_PERCENT 	= 0xffff*3/4,
+    MRVM_100_PERCENT	= 0xffff
+} MakeRectVisibleMargin;
+
+typedef ByteEnum ScaleViewType;
+#define SVT_AROUND_UPPER_LEFT 0
+#define SVT_AROUND_CENTER 1
+#define SVT_AROUND_POINT 2
+
+typedef struct {
+    optr	TR_object;
+    ClassStruct	*TR_class;
+} TargetReference;
+
+typedef struct {
+    TargetReference	VTI_target;
+    TargetReference	VTI_content;
+} ViewTargetInfo;
+
+typedef ByteEnum ScrollAction;
+#define SA_NOTHING 0
+#define SA_TO_BEGINNING 1
+#define SA_PAGE_BACK 2
+#define SA_INC_BACK 3
+#define SA_INC_FWD 4
+#define SA_DRAGGING 5
+#define SA_PAGE_FWD 6
+#define SA_TO_END 7
+#define SA_SCROLL 8
+#define SA_SCROLL_INTO 9
+#define SA_INITIAL_POS 10
+#define SA_SCALE 11
+#define SA_PAN 12
+#define SA_DRAG_SCROLL 13
+#define SA_SCROLL_FOR_SIZE_CHANGE 14
+
+typedef ByteFlags ScrollFlags;
+#define SF_VERTICAL		0x80
+#define SF_ABSOLUTE		0x40
+#define SF_DOC_SIZE_CHANGE	0x20
+#define SF_WINDOW_NOT_SUSPENDED	0x10
+#define SF_SCALE_TO_FIT		0x08
+#define SF_SETUP_HAPPENED	0x04
+#define SF_EC_SETUP_CALLED	0x02	/*Internal*/
+
+typedef struct {
+    ScrollAction	TSP_action;
+    ScrollFlags		TSP_flags;
+    optr		TSP_caller;
+    PointDWord		TSP_change;
+    PointDWord		TSP_newOrigin;
+    PointDWord		TSP_oldOrigin;
+    sword		TSP_viewWidth;
+    sword		TSP_viewHeight;
+} TrackScrollingParams;
+
+#define VS_TYPICAL 0x8000
+#define VS_SMALL 0x8001
+#define VS_LARGE 0x8002
+
+
+typedef WordFlags GenViewAttrs;
+#define GVA_CONTROLLED				0x8000
+#define GVA_GENERIC_CONTENTS			0x4000
+#define GVA_TRACK_SCROLLING			0x2000
+#define GVA_DRAG_SCROLLING			0x1000
+#define GVA_NO_WIN_FRAME			0x0800
+#define GVA_SAME_COLOR_AS_PARENT_WIN		0x0400
+#define GVA_VIEW_FOLLOWS_CONTENT_GEOMETRY	0x0200
+#define GVA_WINDOW_COORDINATE_MOUSE_EVENTS	0x0100
+#define GVA_DONT_SEND_PTR_EVENTS		0x0080
+#define GVA_DONT_SEND_KBD_RELEASES		0x0040
+#define GVA_SEND_ALL_KBD_CHARS			0x0020
+#define GVA_FOCUSABLE				0x0010
+#define GVA_SCALE_TO_FIT			0x0008
+#define GVA_ADJUST_FOR_ASPECT_RATIO		0x0004
+
+typedef ByteFlags GenViewDimensionAttrs;
+#define GVDA_SCROLLABLE				0x80
+#define GVDA_SPLITTABLE				0x40
+#define GVDA_TAIL_ORIENTED			0x20
+#define GVDA_DONT_DISPLAY_SCROLLBAR		0x10
+#define GVDA_NO_LARGER_THAN_CONTENT		0x08
+#define GVDA_NO_SMALLER_THAN_CONTENT		0x04
+#define GVDA_SIZE_A_MULTIPLE_OF_INCREMENT	0x02
+#define GVDA_KEEP_ASPECT_RATIO			0x01
+
+
+@message void MSG_GEN_VIEW_GET_ORIGIN(PointDWord *origin = cx:dx);  
+
+@message void MSG_GEN_VIEW_SET_ORIGIN(@stack sdword yOrigin, sdword xOrigin);  
+
+@message void MSG_GEN_VIEW_SCROLL(@stack sdword yOffset, sdword xOffset);  
+
+@message void MSG_GEN_VIEW_MAKE_RECT_VISIBLE(
+    	    	    	    	@stack MakeRectVisibleFlags yFlags,
+    	    	    	    	MakeRectVisibleMargin yMargin,
+				MakeRectVisibleFlags xFlags,
+    	    	    	    	MakeRectVisibleMargin xMargin,
+    	    	    	    	sdword bottom, sdword right,
+    	    	    	    	sdword top, sdword left); 
+
+@message void MSG_GEN_VIEW_SET_SCALE_FACTOR(@stack sdword yOrigin, 
+		sdword xOrigin, ScaleViewType scaleType, 
+		WWFixedAsDWord yScaleFactor,
+		WWFixedAsDWord xScaleFactor);
+
+typedef struct {
+	WWFixedAsDWord GSP_yScaleFactor;
+	WWFixedAsDWord GSP_xScaleFactor;
+} GetScaleParams;
+
+@message void MSG_GEN_VIEW_GET_SCALE_FACTOR(GetScaleParams *retValue
+								= axbpcxdx); 
+
+@message void MSG_GEN_VIEW_SET_CONTENT(optr content = cx:dx);  
+
+@message optr MSG_GEN_VIEW_GET_CONTENT() = cx:dx;   
+
+@message WindowHandle MSG_GEN_VIEW_GET_WINDOW() = cx;  
+
+@message void MSG_GEN_VIEW_GET_VISIBLE_RECT(RectDWord *rect = cx:dx);  
+
+@message void MSG_GEN_VIEW_GET_INCREMENT(PointDWord *increment = cx:dx);  
+
+@message void MSG_GEN_VIEW_SET_INCREMENT(@stack sdword yIncrement,
+							sdword xIncrement);  
+
+@message void MSG_GEN_VIEW_SUSPEND_UPDATE();  
+
+@message void MSG_GEN_VIEW_UNSUSPEND_UPDATE();  
+
+@message void MSG_GEN_VIEW_SET_DOC_BOUNDS(@stack sdword bottom, sdword right,
+						sdword top, sdword left);  
+
+@message void MSG_GEN_VIEW_GET_DOC_BOUNDS(RectDWord *bounds = cx:dx);  
+
+#define MAKE_HORIZ_ATTRS(val) ((byte) (val))
+#define MAKE_VERT_ATTRS(val) ((byte) ((val) >> 8))
+#define MAKE_SET_CLEAR_ATTRS(setAttrs, clrAttrs)	\
+			( (((word) (clrAttrs)) << 8) | (setAttrs))
+
+@message GenViewAttrs MSG_GEN_VIEW_GET_ATTRS() = cx;  
+
+typedef struct {
+    VisUpdateMode   VUMAW_mode;
+    byte    	    VUMAW_unused;
+} VisUpdateModeAsWord;
+
+@message void MSG_GEN_VIEW_SET_ATTRS(
+    	    	    	    	GenViewAttrs attrsToSet = cx,
+				GenViewAttrs attrsToClear = dx,
+    	    	    	    	VisUpdateModeAsWord updateMode = bp);  
+
+@message void MSG_GEN_VIEW_SET_COLOR(byte indexOrRed = cl, ColorFlag flags = ch,
+				     word greenBlue = dx);  
+
+@message dword MSG_GEN_VIEW_GET_COLOR() = dx.cx;  
+
+@message SizeAsDWord MSG_GEN_VIEW_CALC_WIN_SIZE(word width = cx,
+						word height = dx) = dx.cx;  
+
+@message void MSG_GEN_VIEW_SET_PTR_IMAGE(optr pointerDef = cx:dx,
+					 PtrImageLevel level = bp);  /*XXX*/
+
+@message void MSG_GEN_VIEW_UPDATE_CONTENT_TARGET_INFO(ViewTargetInfo
+							*targetInfo = ss:bp);  /*XXX*/
+
+@message void MSG_GEN_VIEW_INITIATE_DRAG_SCROLL();  
+
+typedef struct {
+    GenViewDimensionAttrs   DA_horizAttrs;
+    GenViewDimensionAttrs   DA_verAttrs;
+} DimensionAttrs; 
+
+@message DimensionAttrs MSG_GEN_VIEW_GET_DIMENSION_ATTRS() = cx;   
+
+typedef struct {
+    GenViewDimensionAttrs   DATSC_attrsToSet;
+    GenViewDimensionAttrs   DATSC_attrsToClear;
+} DimensionAttrsToSetClear; 
+
+@message void MSG_GEN_VIEW_SET_DIMENSION_ATTRS(
+			DimensionAttrsToSetClear horizAttrsToSetClear = cx,
+			DimensionAttrsToSetClear vertAttrsToSetClear = dx,
+			VisUpdateModeAsWord updateMode = bp);
+   
+@message void MSG_GEN_VIEW_SCROLL_TOP();   
+@message void MSG_GEN_VIEW_SCROLL_PAGE_UP();
+@message void MSG_GEN_VIEW_SCROLL_UP();  
+@message void MSG_GEN_VIEW_SCROLL_SET_Y_ORIGIN(sdword yOrigin = dx.cx);
+@message void MSG_GEN_VIEW_SCROLL_DOWN();   
+@message void MSG_GEN_VIEW_SCROLL_PAGE_DOWN();
+@message void MSG_GEN_VIEW_SCROLL_BOTTOM();  
+
+#define VERTICAL_VIEW_BASE_MESSAGE  MSG_GEN_VIEW_SCROLL_TOP
+
+@message void MSG_GEN_VIEW_SCROLL_LEFT_EDGE();  
+@message void MSG_GEN_VIEW_SCROLL_PAGE_LEFT();  
+@message void MSG_GEN_VIEW_SCROLL_LEFT();   
+@message void MSG_GEN_VIEW_SCROLL_SET_X_ORIGIN(sdword xOrigin = dx.cx);  
+@message void MSG_GEN_VIEW_SCROLL_RIGHT();  
+@message void MSG_GEN_VIEW_SCROLL_PAGE_RIGHT();
+@message void MSG_GEN_VIEW_SCROLL_RIGHT_EDGE();   
+
+#define HORIZONTAL_VIEW_BASE_MESSAGE  MSG_GEN_VIEW_SCROLL_LEFT_EDGE
+
+@message void MSG_GEN_VIEW_ALLOW_GLOBAL_TRANSFER();   /*XXX*/
+
+@message void MSG_GEN_VIEW_SET_DRAG_BOUNDS(@stack sdword bottom, sdword right,
+					sdword top, sdword left);  
+
+@message void MSG_GEN_VIEW_SETUP_TRACKING_ARGS(TrackScrollingParams *args = cx:dx);   
+
+@message void MSG_GEN_VIEW_TRACKING_COMPLETE(TrackScrollingParams *args = ss:bp);   
+
+@message optr MSG_GEN_VIEW_DETERMINE_VIS_PARENT(optr child = cx:dx) = cx:dx;  
+
+@message void MSG_GEN_VIEW_SEND_TO_LINKS(EventHandle event = bp, optr originator = cx:dx);  
+
+@message void MSG_GEN_VIEW_SEND_TO_VLINK(EventHandle event = bp, optr originator = cx:dx);   
+
+@message void MSG_GEN_VIEW_SEND_TO_HLINK(EventHandle event = bp, optr originator = cx:dx);   
+
+@message void MSG_GEN_VIEW_CALL_WITHOUT_LINKS(EventHandle event = bp, MessageFlags messageFlags = cx);  
+
+@message void MSG_GEN_VIEW_SET_ORIGIN_LOW(@stack sdword yOrigin, sdword xOrigin);
+#define GVSOL_NO_CHANGE		0x8000000
+
+typedef ByteEnum GenViewInkType;
+#define GVIT_PRESSES_ARE_NOT_INK 0
+#define GVIT_INK_WITH_STANDARD_OVERRIDE 1
+#define GVIT_PRESSES_ARE_INK 2
+#define GVIT_QUERY_OUTPUT 3
+@message void MSG_GEN_VIEW_SET_INK_TYPE(GenViewInkType inkType = cl);
+@message void MSG_GEN_VIEW_SET_EXTENDED_INK_TYPE(Boolean createGState, Color inkColor, word brushSize, optr destObj);
+@message void MSG_GEN_VIEW_RESET_EXTENDED_INK_TYPE();
+
+@message void MSG_GEN_VIEW_SEND_NOTIFICATION();
+
+@message void MSG_GEN_VIEW_SCALE_LOW(@stack sdword yOrigin, sdword xOrigin,
+				     ScaleViewType scaleType,
+				     WWFixedAsDWord yScaleFactor,
+				     WWFixedAsDWord xScaleFactor);
+
+@message void MSG_GEN_VIEW_REDRAW_CONTENT();
+
+@message void MSG_GEN_VIEW_SET_CONTROLLED_ATTRS(
+				GenViewControlAttrs controlAttrs = cx,
+				word scaleFactor = dx);
+
+/***/
+
+@vardata void HINT_VIEW_LEAVE_ROOM_FOR_VERT_SCROLLER;
+@vardata void HINT_VIEW_LEAVE_ROOM_FOR_HORIZ_SCROLLER;
+
+typedef struct {
+    optr    IDIP_dest;
+    word    IDIP_brushSize;
+    Color   IDIP_color;
+    byte    IDIP_reserved1;	/* unused */
+    Boolean IDIP_createGState;
+} InkDestinationInfoParams;
+
+@vardata InkDestinationInfoParams ATTR_GEN_VIEW_INK_DESTINATION_INFO;
+
+@vardata XYSize ATTR_GEN_VIEW_PAGE_SIZE;
+
+@vardata void ATTR_GEN_VIEW_SCALE_TO_FIT_BASED_ON_X;
+
+@vardata void ATTR_GEN_VIEW_SCALE_TO_FIT_BOTH_DIMENSIONS;
+
+@vardata void ATTR_GEN_VIEW_DO_NOT_WIN_SCROLL;
+
+@vardata void HINT_VIEW_IMMEDIATE_DRAG_UPDATES;
+@vardata void HINT_VIEW_DELAYED_DRAG_UPDATES;
+
+@vardata void HINT_VIEW_REMOVE_SCROLLERS_WHEN_NOT_SCROLLABLE;
+@vardata void HINT_VIEW_SHOW_SCROLLERS_WHEN_NOT_SCROLLABLE;
+
+@vardata optr HINT_VIEW_SHARES_SPACE_WITH_VIEW_ABOVE;
+@vardata optr HINT_VIEW_SHARES_SPACE_WITH_VIEW_BELOW;
+@vardata optr HINT_VIEW_SHARES_SPACE_WITH_VIEW_TO_LEFT;
+@vardata optr HINT_VIEW_SHARES_SPACE_WITH_VIEW_TO_RIGHT;
+@vardata void ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+@vardata void ATTR_GEN_VIEW_NOTIFY_EVEN_IF_NOT_TARGETED;
+
+/***/
+
+    @instance PointDWFixed GVI_origin = {{0, 0}, {0, 0}};
+    @instance RectDWord GVI_docBounds = {0, 0, 0, 0};
+    @instance PointDWord GVI_increment = {20, 15};
+    @instance PointWWFixed GVI_scaleFactor = {{0, 1}, {0, 1}};
+    @instance ColorQuad GVI_color = {C_WHITE, 0, 0, 0};
+    @instance GenViewAttrs GVI_attrs = (GVA_FOCUSABLE);
+    @instance GenViewDimensionAttrs GVI_horizAttrs = 0;
+    @instance GenViewDimensionAttrs GVI_vertAttrs = 0;
+    @instance GenViewInkType GVI_inkType = GVIT_PRESSES_ARE_NOT_INK;
+    @instance optr GVI_content;
+    @instance optr GVI_horizLink;
+    @instance optr GVI_vertLink;
+
+    @default GI_attrs = @default | GA_TARGETABLE;
+
+    @reloc ATTR_GEN_VIEW_INK_DESTINATION_INFO, word_offsetof(InkDestinationInfoParams, IDIP_dest), optr;
+@endc
+
+@endlib

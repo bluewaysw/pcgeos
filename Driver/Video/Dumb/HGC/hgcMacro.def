@@ -1,0 +1,295 @@
+COMMENT @-----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1988 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		HGC Video Driver
+FILE:		hgcMacro.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	10/88		Initial version
+
+DESCRIPTION:
+	This file contains macros for the HGC Video driver
+	
+	$Id: hgcMacro.def,v 1.1 97/04/18 11:42:35 newdeal Exp $
+
+-------------------------------------------------------------------------------@
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		SetBuffer	segreg, trashReg
+
+DESCRIPTION:	Increment register to the next scan line
+
+PASS:
+	segreg - segment register to set
+	trashReg - register that can be trashed
+
+RETURN:
+	segreg - set
+
+-------------------------------------------------------------------------------@
+
+SetBuffer	macro	segreg, trashReg
+	mov	trashReg,SCREEN_BUFFER
+	mov	segreg,trashReg
+endm
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		SetAltBuffer	segreg, trashReg
+
+DESCRIPTION:	Set a segment register to point to the alternate video buffer
+
+PASS:
+	segreg - segment register to set
+	trashReg - register that can be trashed
+
+RETURN:
+	segreg - set
+
+-------------------------------------------------------------------------------@
+
+SetAltBuffer	macro	segreg, trashReg
+	mov	trashReg,ALT_SCREEN_BUFFER
+	mov	segreg,trashReg
+endm
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		NextScan
+
+DESCRIPTION:	Increment to the next scan line
+
+PASS:
+	dest - register with scan line address
+	adjust - modification (in bytes) to position on next scan
+
+RETURN:
+	reg - updated
+
+-------------------------------------------------------------------------------@
+
+NextScan	macro	dest, adjust
+		local	checkedLastBank
+
+	cmp	dest, SCREEN_BANK_OFFSET*(NUM_SCREEN_BANKS-1)	;on last bank ?
+	jb	checkedLastBank
+	sub	dest, (SCREEN_BANK_OFFSET*NUM_SCREEN_BANKS)-SCREEN_BYTE_WIDTH
+checkedLastBank:
+
+ifnb <&adjust>
+    if ((.TYPE adjust) AND 4)		; if adjust is a constant
+	add	dest, SCREEN_BANK_OFFSET+(adjust)
+    else
+	add	dest, SCREEN_BANK_OFFSET
+	add	dest, (adjust)
+    endif
+else
+	add	dest, SCREEN_BANK_OFFSET
+endif
+
+endm
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		PrevScan
+
+DESCRIPTION:	Decrement to the previous scan line
+
+PASS:
+	dest 	- location with scan line address
+	adjust 	- modification (in bytes) to position on next scan
+
+RETURN:
+	dest 	- updated
+
+-------------------------------------------------------------------------------@
+
+PrevScan	macro	dest, adjust
+		local	checkedFirstBank
+
+	cmp	dest, SCREEN_BANK_OFFSET		;on first bank ?
+	ja	checkedFirstBank
+	add	dest, (SCREEN_BANK_OFFSET*NUM_SCREEN_BANKS)-SCREEN_BYTE_WIDTH
+checkedFirstBank:
+ifnb <&adjust>
+    if ((.TYPE adjust) AND 4)		; if adjust is a constant
+	add	dest, (adjust)-SCREEN_BANK_OFFSET
+    else
+	sub	dest, SCREEN_BANK_OFFSET
+	add	dest, (adjust)
+    endif
+else
+	sub	dest, SCREEN_BANK_OFFSET
+endif
+
+endm
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		StoreNextScanMod
+
+DESCRIPTION:	Store a self modified value for NextScanMod
+
+PASS:
+	dest - destination address
+	reg - register with value to modify or constant
+
+RETURN:
+	reg - destroyed
+
+-------------------------------------------------------------------------------@
+
+StoreNextScanMod	macro	dest, adjust
+
+ifnb <&adjust>
+    if ((.TYPE adjust) AND 4)		; if adjust is a constant
+	mov	dest, SCREEN_BANK_OFFSET+(adjust)
+    else
+	mov	dest, SCREEN_BANK_OFFSET
+	add	dest, (adjust)
+    endif
+else
+	mov	dest, SCREEN_BANK_OFFSET
+endif
+
+endm
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		NextScanMod
+
+DESCRIPTION:	Increment register to the next scan line
+
+PASS:
+	reg - register with scan line address
+	sym - symbol for word to relocate
+
+RETURN:
+	reg - updated
+
+-------------------------------------------------------------------------------@
+
+NextScanMod	macro	reg, sym
+	local	stuff, notLastBank
+
+	cmp	reg,SCREEN_BANK_OFFSET*(NUM_SCREEN_BANKS-1)	;on last bank ?
+	jb	notLastBank
+	sub	reg,(SCREEN_BANK_OFFSET*NUM_SCREEN_BANKS)-SCREEN_BYTE_WIDTH
+notLastBank:
+stuff	label	word
+sym	=	stuff + 2
+	add	reg, 1234h
+endm
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		StorePrevScanMod
+
+DESCRIPTION:	Store a self modified value for PrevScanMod
+		For the MCGA, this is the same as StoreNextScanMod
+
+PASS:
+	dest - destination address
+	reg - register with value to modify
+
+RETURN:
+	reg - destroyed
+
+-------------------------------------------------------------------------------@
+
+StorePrevScanMod	macro	dest, adjust
+
+ifnb <&adjust>
+    if ((.TYPE adjust) AND 4)		; if adjust is a constant
+	mov	dest, (adjust)-SCREEN_BANK_OFFSET
+    else
+	mov	dest, -SCREEN_BANK_OFFSET
+	add	dest, (adjust)
+    endif
+else
+	mov	dest, -SCREEN_BANK_OFFSET
+endif
+
+endm
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		PrevScanMod
+
+DESCRIPTION:	Increment register to the next scan line
+
+PASS:
+	reg - register with scan line address
+	sym - symbol for word to relocate
+
+RETURN:
+	reg - updated
+
+-------------------------------------------------------------------------------@
+
+PrevScanMod	macro	reg, sym
+	local	stuff, notFirstBank
+
+	cmp	reg, SCREEN_BANK_OFFSET			; on first bank ?
+	ja	notFirstBank
+	add	reg, (SCREEN_BANK_OFFSET*NUM_SCREEN_BANKS)-SCREEN_BYTE_WIDTH
+notFirstBank:
+stuff	label	word
+sym	=	stuff + 2
+	add	reg, 1234h
+endm
+
+COMMENT @-----------------------------------------------------------------------
+
+MACRO:		CalcScanLine
+
+DESCRIPTION:	Calculate the beginning scan line position
+
+PASS:
+	reg - register containing line number
+	offsetReg - register containing offset to add to base scan line address
+
+RETURN:
+	reg - address
+	offsetReg - destroyed
+
+-------------------------------------------------------------------------------@
+
+	; result should be: reg = 90L + O + BO
+	;		where:
+	;			L = line number (passed in reg)
+	;			O = offset (passed in offsetReg)
+	;			BO = bank offset
+
+CalcScanLine	macro	reg, offsetReg
+	local	isEven, multOf4
+
+	sar	reg,1			;reg = bank offset, carry = bank #
+	jnc	isEven
+	add	offsetReg,SCREEN_BANK_OFFSET	;offsetReg = O + partial BO
+isEven:
+
+	sar	reg,1			;reg = bank offset, carry = bank #
+	jnc	multOf4
+	add	offsetReg,SCREEN_BANK_OFFSET*2	;offsetReg = O + BO
+multOf4:
+
+	sal	reg,1			;reg = 2L
+	add	offsetReg,reg		;offsetReg = 2L + O + BO
+	sal	reg,1			;reg = 4L
+	sal	reg,1			;reg = 8L
+	add	offsetReg,reg		;offsetReg = 8L + (2L + O + BO)
+					;	= 10L + O + BO
+	sal	reg,1			;reg = 16L
+	add	offsetReg,reg		;offsetReg = 16L + (10L + O + BO)
+					;	= 26L + O + BO
+	sal	reg,1			;reg = 32L
+	sal	reg,1			;reg = 64L
+	add	reg,offsetReg		;reg = 64L + (26L + O + BO)
+					;	= 90L + O + BO
+endm

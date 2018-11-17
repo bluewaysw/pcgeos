@@ -1,0 +1,223 @@
+@include "PicAlbum.goh"
+
+@classdecl PAVerticalDynListClass;
+@classdecl PAVerticalDynListItemClass;
+
+
+@method PAVerticalDynListClass, MSG_SPEC_BUILD {
+
+	DimensionAttrsToSetClear horiz = {GVDA_SCROLLABLE, 0}, vert = {0, 0} ;
+	VisUpdateModeAsWord updmode = {VUM_DELAYED_VIA_APP_QUEUE, 0} ;
+	optr visChild ;
+
+	@callsuper() ;
+
+	visChild = @call oself::MSG_SPEC_GET_SPECIFIC_VIS_OBJECT(0) ;
+  
+	if(visChild) {
+
+		@send ,forceQueue+ visChild::MSG_GEN_VIEW_SET_DIMENSION_ATTRS(
+															horiz, vert, updmode) ;
+  
+		@send  visChild::MSG_GEN_VIEW_SET_INCREMENT(0, 1) ;
+		@send ,forceQueue+ oself::MSG_NEWS_GROUP_INIT_VIEW(visChild) ;
+	}
+}
+
+  
+@method PAVerticalDynListClass, MSG_NEWS_GROUP_INIT_VIEW {
+
+	PointDWord point ;
+	optr scrollerX ;
+	dword data = 308 ;
+  
+	@call visChild::MSG_GEN_VIEW_GET_INCREMENT(&point);  
+	@send ,forceQueue+ visChild::MSG_GEN_VIEW_SET_INCREMENT(point.PD_y, 10) ;
+  
+	scrollerX = @call visChild::MSG_GEN_FIND_CHILD_AT_POSITION(1) ;
+  
+	@call scrollerX::MSG_META_ADD_VAR_DATA(HINT_VALUE_DISPLAYS_RANGE, sizeof(WWFixed), &data) ;
+}
+
+@method PAVerticalDynListClass, MSG_META_CONTENT_VIEW_ORIGIN_CHANGED {
+
+	@callsuper() ;
+  
+	WinSetNullTransform(viewWindow, WIF_DONT_INVALIDATE);
+	WinApplyTranslationDWord(viewWindow, -xOrigin, 0, WIF_INVALIDATE) ;
+}
+
+@method PAVerticalDynListClass, MSG_GEN_DYNAMIC_LIST_GET_ITEM_CLASS {
+  
+	return(&PAVerticalDynListItemClass) ;
+}
+ 
+@method PAVerticalDynListClass, MSG_VIS_RECALC_SIZE {
+      
+	word loopCount, childCount ;
+	dword size ;
+  
+	size = @callsuper() ;
+  
+	width = DWORD_WIDTH(size) ;
+	height = DWORD_HEIGHT(size) ;
+  
+	childCount = @call oself::MSG_GEN_COUNT_CHILDREN() ;
+  
+	loopCount = 0 ;
+	while(loopCount < childCount) {
+ 
+		optr childOptr ;
+  
+		childOptr = @call oself::MSG_GEN_FIND_CHILD_AT_POSITION(loopCount) ;
+
+		if(childOptr) {
+  
+			size = @call childOptr::MSG_VIS_GET_SIZE() ;
+  
+			@call childOptr::MSG_VIS_SET_SIZE(width, DWORD_HEIGHT(size)) ;
+		}
+  
+		loopCount++ ;
+	}
+  
+	return(MAKE_SIZE_DWORD(width, height)) ;
+}
+
+@method PAVerticalDynListClass, MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT {
+
+	optr viewChild;
+	word loopCount, itemCount;
+
+	@callsuper();
+
+   /* adjust doc bounds */
+   viewChild = @call oself::MSG_SPEC_GET_SPECIFIC_VIS_OBJECT(0) ;
+
+   if(viewChild) {
+
+       RectDWord bounds ;
+       word maxWidth = 0 ;
+       optr contentObj ;
+
+       contentObj = @call viewChild::MSG_GEN_VIEW_GET_CONTENT() ;
+
+       if(contentObj) {
+
+           loopCount = 0 ;
+           itemCount = @call oself::MSG_GEN_COUNT_CHILDREN() ;
+           while(loopCount < itemCount) {
+
+               optr childObj = @call oself::MSG_GEN_FIND_CHILD_AT_POSITION(loopCount) ;
+       
+               if(childObj) {
+
+                   dword size ;
+
+                   size = @call childObj::MSG_VIS_GET_SIZE() ;
+               
+                   if(DWORD_WIDTH(size) > maxWidth) {
+                   
+                       maxWidth = DWORD_WIDTH(size) ;
+                   }
+               }
+
+               loopCount++ ;
+           }
+
+           @call viewChild::MSG_GEN_VIEW_GET_DOC_BOUNDS(&bounds) ;
+
+           @call viewChild::MSG_GEN_VIEW_SET_DOC_BOUNDS(
+                               bounds.RD_bottom,
+                               bounds.RD_left + maxWidth,
+                               bounds.RD_top,
+                               bounds.RD_left) ;
+       }
+   }
+}
+  
+@method PAVerticalDynListClass, MSG_META_RESOLVE_VARIANT_SUPERCLASS {
+	
+	ClassStruct *retValue;
+
+	retValue = @callsuper();
+
+	if(retValue) {
+	
+		pself->PAVDLI_resolved = TRUE;
+	}
+
+	return retValue;
+}
+
+@method PAVerticalDynListClass, MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION {
+
+	optr viewChild;
+
+	if(pself->PAVDLI_resolved) {
+
+		@callsuper();
+
+		/* adjust doc bounds */
+		viewChild = @call oself::MSG_SPEC_GET_SPECIFIC_VIS_OBJECT(0) ;
+
+		if(viewChild && (@call viewChild::MSG_META_IS_OBJECT_IN_CLASS(&GenViewClass))) {
+		
+			PointDWord point;
+		
+			@call viewChild::MSG_GEN_VIEW_GET_ORIGIN(&point);
+			@call viewChild::MSG_GEN_VIEW_SET_ORIGIN(point.PD_y, 0);
+		}
+	}
+}
+
+@method PAVerticalDynListItemClass, MSG_VIS_RECALC_SIZE {
+      
+	dword size2 ;
+	dword size = @callsuper() ;
+	WindowHandle win ;
+	GStateHandle gstate ;
+	SizeAsDWord originalSize;
+
+	originalSize = @callsuper();
+	
+
+	win = @call oself::MSG_VIS_QUERY_WINDOW();
+	gstate = GrCreateState(win) ;
+
+	if(gstate) {
+
+		word width2, height2 = DWORD_HEIGHT(size) ;
+ 
+		size2 = @call oself::MSG_GEN_GET_MONIKER_SIZE(0, gstate) ;
+		GrDestroyState(gstate) ;
+
+		width2 = DWORD_WIDTH(size2) + 6;
+
+		if(!(width & 0x8000)) {
+   
+			if(width > width2) {
+
+				width2 = width ;
+			}
+		
+		} else {
+		
+			if(DWORD_WIDTH(originalSize) > width2) {
+			
+				width2 = DWORD_WIDTH(originalSize);
+			}
+		}
+  
+		return(MAKE_SIZE_DWORD(width2, height2)) ;
+	}
+       
+	return(size) ;
+}
+  
+@method PAVerticalDynListItemClass, MSG_GEN_USE_VIS_MONIKER {
+  
+	@callsuper() ;
+
+	@send oself::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID|VOF_IMAGE_INVALID|VOF_WINDOW_INVALID, VUM_NOW) ;
+}

@@ -1,0 +1,1886 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GlobalPC 1998 -- All Rights Reserved
+ *
+ * PROJECT:	File Finder Applications
+ * MODULE:	File Finder
+ * FILE:	FFProcess.goc
+ *
+ * AUTHOR:	edwin: Oct 23, 1998
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      edwin   10/23/98        Initial version
+ *
+ * DESCRIPTION:
+ *	This file contains source code for the FFinder application. This
+ *	application helps users to search for file(s) whose name 
+ *      completely or partially matches the requested name.  By double 
+ *      clicking the search result  entry, the document's creator app is
+ *      launched to open the clicked document.
+ *
+ *	$Id: $
+ *
+ ***********************************************************************/
+@include <stdapp.goh>
+@include <geoMisc.h>
+@include <initfile.h>
+@include "FFinder.goh"
+@include "FFObjects.goh"
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>
+@start ICONMONIKERRESOURCE, data;
+@include "Art/mkrFile.goh"
+@include "Art/mkrFolder.goh"
+@end ICONMONIKERRESOURCE;
+
+
+@classdecl	FilterFileSelectorClass;
+@classdecl      FFResultListClass;
+@classdecl      FFThreadClass;
+@classdecl	FFinderProcessClass, neverSaved;
+@classdecl      FFSearchTextClass;
+
+typedef struct 
+{
+    word RE_pathToken;   /* StandardPath token */
+    word RE_pathSize;    /* size of relative path, i.e. the tail path */
+    word RE_nameSize;    /* size of file name */
+    FileAttrs RE_fileType;
+} ResultEntry;
+
+typedef struct {
+    GeodeToken  *CFTS_token;
+    TCHAR       *CFTS_ext;
+} CFTStruct;
+
+
+word searchResultCnt = 0; /* number of items in the search result list. */
+SearchMode searchMode = SEARCH_END;  /* current mode of search engine.  */
+Boolean stopSearchFlag = FALSE;
+Boolean FFinderUserIntro = FALSE;
+
+void RecursiveSearch
+     (const char *searchText, StandardPath token, const char *path);
+void UpdateUIForSearchStart(void);
+void UpdateUIForSearchEnd(void);
+void InitializeFFSearchResultList(void);
+Boolean IsStringMatched(const unsigned char *fileName, const unsigned char *searchText);
+
+@extern chunk FindStr;
+@extern chunk SearchStr;
+@extern chunk NFoundStr;
+@extern chunk ZeroFoundStr;
+@extern chunk FFOpenErr;
+@extern chunk FFOpenInst;
+@extern chunk FFDocOpenErr;
+
+#ifdef __HIGHC__
+#pragma Code("MAINCODE");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg MAINCODE
+#endif
+
+/*
+ ***************************************************************************
+ *		Code for FFinderProcessClass
+ ***************************************************************************
+ */
+
+ word g_whichListDisplay = WLD_SEARCH;
+
+
+void
+LockStrings(void)
+{
+    MemLock(OptrToHandle(@FindStr));
+}
+
+void
+UnlockStrings(void)
+{
+    MemUnlock(OptrToHandle(@FindStr));
+}
+
+/***********************************************************************
+ *	MSG_GEN_PROCESS_OPEN_APPLICATION for FFinderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:     Initialize the application.
+ *
+ * PARAMETERS:  (AppAttachFlags attachFlags = cx,
+ *		 MemHandle launchBlock = dx,
+ *		 MemHandle extraState = bp)
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/26/98	Initial Revision
+ *
+ ***********************************************************************/
+@method FFinderProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+    /*
+     *  If the user level is intro, reduce some UIs
+     */
+    if (UserGetDefaultUILevel() == UIIL_INTRODUCTORY) {
+	FFinderUserIntro = TRUE;
+	@call FFCurrentPath::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	LockStrings();
+	@send FFinderPrimary::MSG_GEN_REPLACE_VIS_MONIKER_TEXT
+	     (LMemDeref(@FindStr), VUM_NOW);
+	UnlockStrings();
+	@call FFOptionScreen::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	@call FFCUIFileSelector::MSG_GEN_SET_USABLE(VUM_NOW);
+	@call FFinderPrimary::MSG_META_DELETE_VAR_DATA(
+	    HINT_NO_WIDER_THAN_CHILDREN_REQUIRE);
+	@call FFinderPrimary::MSG_META_DELETE_VAR_DATA(
+	    HINT_NO_TALLER_THAN_CHILDREN_REQUIRE);
+    }
+    @callsuper();
+    /*
+     *  Initialize the current path UI object.
+     */
+    @call FileSelector::MSG_FFS_UPDATE_UI_CURRENT_PATH();
+
+    return;
+} /* End of MSG_GEN_PROCESS_OPEN_APPLICATION */
+
+
+void UpdateUIForSearchStart()
+{
+    searchMode = SEARCH_IN_PROGRESS;
+    LockStrings();
+    @call FFStatus::MSG_GEN_REPLACE_VIS_MONIKER_TEXT
+	 (LMemDeref(@SearchStr), VUM_NOW);
+    UnlockStrings();
+    @call FFSearchText::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @call FFOptionScreen::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @call FFSearchTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @call FFStopTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @call FFShowSearchResult::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @call FFMostRecent::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @call FFOpenTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @call FFinderApp::MSG_GEN_APPLICATION_MARK_BUSY();
+}
+void UpdateUIForSearchEnd()
+{
+    TCHAR * complete;
+    MemHandle mh;
+    /* update status */
+    if (!searchResultCnt) {
+	LockStrings();
+	@call FFStatus::MSG_GEN_REPLACE_VIS_MONIKER_TEXT
+	     (LMemDeref(@ZeroFoundStr), VUM_NOW);
+	UnlockStrings();
+    }
+    else {
+	LockStrings();
+	mh = MemAlloc ( ( strlen( LMemDeref( @NFoundStr )) + 6 ) * sizeof( TCHAR ), HF_FIXED, 0 );
+	complete = ( TCHAR * ) MemDeref( mh );	
+	itoa(searchResultCnt, complete);	
+	strcat(complete, LMemDeref(@NFoundStr));
+	UnlockStrings();
+	@call FFStatus::MSG_GEN_REPLACE_VIS_MONIKER_TEXT
+	     (complete, VUM_NOW);
+	MemFree( mh );
+	@call FFOpenTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    }
+    /* update UI */
+    if (@call FFViewSelection::MSG_GEN_ITEM_GROUP_GET_SELECTION() == 0) {
+	@call FFOptionScreen::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@call FFSearchText::MSG_GEN_SET_ENABLED(VUM_NOW);	
+    }
+    
+/*    @call FFSearchTrigger::MSG_GEN_SET_ENABLED(VUM_NOW); */
+    @call FFStopTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @call FFShowSearchResult::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @call FFMostRecent::MSG_GEN_SET_ENABLED(VUM_NOW);
+    searchMode = SEARCH_END;
+    stopSearchFlag = FALSE;
+    @call FFinderApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+}
+
+/***********************************************************************
+ *	MSG_FFP_FIND_FILES for FFinderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:   This is the top message to start searching all files and
+ *             sub-directories that match the typed text in the input ui.
+ *
+ * PARAMETERS: void (void)
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/26/98	Initial Revision
+ *   jfh		3/27/00	automatically pre/append a * on search input
+ *					string if there isn't alreay one there
+ ***********************************************************************/
+@method FFinderProcessClass, MSG_FFP_FIND_FILES
+{
+ char		*searchText, *relativePath;
+ char		inputText[PATH_LENGTH + 1];
+ dword		dhandle;
+ StandardPath	pathToken;
+ MemHandle	mem, mem2;
+ TCHAR *p;
+
+
+    /*
+     *  First, clear any previous search result list.
+     */
+    if ((mem = MemAlloc(PATH_LENGTH+1,
+			HF_DYNAMIC, HAF_STANDARD_NO_ERR)) == NULL)
+	  return;
+    if ((mem2 = MemAlloc(PATH_LENGTH+1,
+			 HF_DYNAMIC, HAF_STANDARD_NO_ERR)) == NULL) {
+	  MemFree(mem);
+	  return;
+	  }
+    searchText = MemLock(mem);
+    relativePath = MemLock(mem2);
+
+    if (searchResultCnt) {
+	  @call FFSearchResult::MSG_FFRL_CLEAN_LIST();
+	  }
+    @call FFSearchResult::MSG_FFRL_CLEAN_SAVED_LIST();
+
+    /*
+     *  Get the typed search text from the ui.
+     */
+    if (@call FFSearchText::MSG_VIS_TEXT_GET_TEXT_SIZE()) {
+	  searchText[0] = 0;
+	  /* pre and append a * if there isn't already one there */
+	  @call FFSearchText::MSG_VIS_TEXT_GET_ALL_PTR(inputText);
+@ifdef PRODUCT_NDO2000
+          searchText = inputText;
+@else
+	  if (inputText[0] != '*') {
+		/* prepend */
+		strcpy(searchText, "*");
+		}
+	  strcat(searchText, inputText);
+	  if (inputText[strlen(inputText) - 1] != '*') {
+          /* append */
+		strcat(searchText, "*");
+		}
+@endif
+	  if (FFinderUserIntro == TRUE) {
+		@call FileSelector::MSG_GEN_PATH_GET(relativePath, PATH_LENGTH);
+		pathToken = @call FileSelector::MSG_GEN_PATH_GET_DISK_HANDLE();
+		}
+	  else {
+		/*
+		 *  Get the standard path token and relative path.
+		 */
+		dhandle = @call FileSelector::
+				 MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(relativePath);
+		pathToken = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(dhandle);
+	  }
+	  /*
+	   * remove the trailing '\.' as it screws up parsing of StandardPaths
+	   */
+	  p = strrchr(relativePath, '\\');
+	  if (p && (p[1] == '.')) {
+	      p[0] = 0;
+	  }
+	  /*
+	   *  Recursively find all matching files and subdirectories
+	   *  in the current directory.
+	   */
+	  RecursiveSearch(searchText, pathToken, relativePath);
+	  } /* end of text in the window if */
+
+    /*
+     *  Update UI.
+     */
+    UpdateUIForSearchEnd();
+
+    MemFree(mem);
+    MemFree(mem2);
+    return;
+} /* End of MSG_FFP_FIND_FILES */
+
+
+/***********************************************************************
+ *	MSG_FFP_DISPLAY_RECENT_OPEN_FILES for FFinderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:   This is the top message to start searching all files and
+ *             sub-directories that match the typed text in the input ui.
+ *
+ * PARAMETERS: void (void)
+ *
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/26/98	Initial Revision
+ *
+ ***********************************************************************/
+@method FFinderProcessClass, MSG_FFP_DISPLAY_RECENT_OPEN_FILES
+{
+    DocumentEntry (*buffer)[NUM_OF_DOCUMENT_ENTRIES];
+    MemHandle mh;
+    int i, start;
+
+    /*
+     *  Get the array of most recently opened documents.
+     */
+    UserGetRecentDocFileName(&mh, &start, &buffer);
+    /*
+     *  List all the non-empty entries.
+     */
+    if (mh && start >= 0 && start < NUM_OF_DOCUMENT_ENTRIES) {
+	i = start;
+	do {
+	    i--;
+	    if (i < 0)
+		i =  NUM_OF_DOCUMENT_ENTRIES-1;
+	    if (strlen((*buffer)[i].DE_name) > 0) {
+		/*
+		 *  It's non-empty, display it.
+		 */
+		if (@call FFSearchResult::MSG_FFRL_ADD_MONIKER
+		     (searchResultCnt, 
+		      0, 
+		      (*buffer)[i].DE_name, 
+		      (*buffer)[i].DE_diskHandle, 
+			 (*buffer)[i].DE_path) != NO_ERROR_RETURNED)
+		    continue;
+		@call FFSearchResult::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS
+		     (searchResultCnt, 1);
+		searchResultCnt++;
+	    }
+	} while (i != start && searchResultCnt < NUM_OF_DOCUMENT_ENTRIES);
+
+	MemFree(mh);
+    }
+    /*
+     *  Update UI.
+     */
+    UpdateUIForSearchEnd();
+
+    return;
+} /* End of MSG_FFP_DISPLAY_RECENT_OPEN_FILES */
+
+
+/***********************************************************************
+ *	MSG_FFP_SET_FILE_SELECTOR for FFinderProcessClass
+ ***********************************************************************
+ * SYNOPSIS:   Set the directory to do search
+ *
+ * PARAMETERS:  void (word selection,
+ *		      word numSelections,
+ *		      byte stateFlags)
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	3/10/99 	Initial Revision
+ *   jfh		3/27/00	reset search trigger
+ ***********************************************************************/
+@method FFinderProcessClass, MSG_FFP_SET_FILE_SELECTOR
+{
+    switch (selection) {
+    case SEARCH_IN_DOCUMENT:
+	@call FileSelector::MSG_GEN_PATH_SET(".", SP_DOCUMENT);
+	break;
+    case SEARCH_IN_ARCHIVE:
+	@call FileSelector::MSG_GEN_PATH_SET("Archive", SP_DOCUMENT);
+	break;
+    case SEARCH_IN_FLOPPY:
+	if (@call FileSelector::MSG_GEN_PATH_SET("a:\\", 0)) {
+	    @send FFWarning::MSG_GEN_INTERACTION_INITIATE();
+	}
+	break;
+    }
+
+    @call FFSearchTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+    return;
+}
+
+
+/*
+ ***************************************************************************
+ *		Code for FilterFileSelectorClass
+ ***************************************************************************
+ */
+
+char openPath[MAX_FILE_DIR_LEN];
+StandardPath openPathToken;
+
+/*
+ *  MSG_VIS_OPEN
+ *  Preserve the path from the previous file selector open session.
+ */
+@method FilterFileSelectorClass, MSG_VIS_OPEN
+{
+    char relativePath[MAX_FILE_DIR_LEN];
+    dword dhandle;
+    word len;
+    /*
+     *  Get the standard path token and relative path.
+     */
+    dhandle = @call self::
+	MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(relativePath);
+    openPathToken = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(dhandle);
+    @callsuper();
+    @call self::MSG_GEN_PATH_SET(relativePath, openPathToken);
+    /*
+     *  Get rid of starting or trailing '\'
+     */
+    len = strlen(relativePath);
+    if (relativePath[0] == '\\') {
+	strcpy (openPath, relativePath+1);
+    }
+    else if (len > 2 && 
+	     relativePath[len-1] == '.' &&
+	     relativePath[len-2] == '\\') {
+	strncpy (openPath, relativePath, len-2);
+    }
+    else 
+	openPath[0] = '\0';
+}
+
+/*  MSG_VIS_CLOSE
+ *
+ *  If File selector has been modified (i.e. a new directory has been
+ *  set), then enable the Search trigger.
+ */
+@method FilterFileSelectorClass, MSG_VIS_CLOSE
+{
+    word len;
+    dword dhandle;
+    StandardPath pathToken;
+    char relativePath[MAX_FILE_DIR_LEN];
+
+    @callsuper();
+
+    len = @call FFSearchText::MSG_VIS_TEXT_GET_TEXT_SIZE();
+    if (len > 0) {
+	dhandle = @call self::
+	    MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(relativePath);
+	pathToken = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(dhandle);
+	len = strlen(relativePath);
+	if (pathToken != openPathToken) {
+	    @send FFSearchTrigger::MSG_GEN_SET_ENABLED
+		 (VUM_DELAYED_VIA_UI_QUEUE);
+	    return;
+	}
+	if (relativePath[0] == '\\' &&
+	    strcmp(relativePath+1, openPath) != 0) {
+	    @send FFSearchTrigger::MSG_GEN_SET_ENABLED
+		 (VUM_DELAYED_VIA_UI_QUEUE);
+	}
+	else if (len > 2 && 
+		 relativePath[len-1] == '.' &&
+		 relativePath[len-2] == '\\' && 
+		 strncmp(relativePath, openPath, len-2) != 0) {
+	    @send FFSearchTrigger::MSG_GEN_SET_ENABLED
+		 (VUM_DELAYED_VIA_UI_QUEUE);
+	}
+    }
+    return;
+}
+
+
+/***********************************************************************
+ *  MSG_FFS_UPDATE_UI_CURRENT_PATH for FilterFileSelectorClass
+ ***********************************************************************
+ *
+ * SYNPOSIS:	The function tells FFCurrentPath to update its current
+ *              path.
+ *
+ * PARAMETERS:  void ()
+ *
+ * STRATEGY:	
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/26/98	Initial Revision
+ *
+ ***********************************************************************/
+@method FilterFileSelectorClass, MSG_FFS_UPDATE_UI_CURRENT_PATH
+{
+    char fullPath[MAX_FILE_DIR_LEN], relativePath[MAX_FILE_DIR_LEN], 
+	*endOfPath;
+    dword dhandle;
+    StandardPath pathToken;
+    word docPtr = 0, len = 0;
+    /*
+     *  Get the standard path token and relative path.
+     */
+    dhandle = @call self::
+	MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(relativePath);
+    pathToken = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(dhandle);
+    endOfPath = fullPath;
+    FileConstructFullPath(&endOfPath, MAX_FILE_DIR_LEN, pathToken, 
+			  relativePath, 
+			  TRUE);
+    endOfPath = strstr(fullPath, "DOCUMENT");
+    if (endOfPath) {
+	/* We are only interested in the path below the DOCUMENT dir */
+	docPtr = endOfPath - fullPath;
+	memcpy(endOfPath, "Document", 8);
+    }
+    len = strlen(fullPath+docPtr);
+    if (len > 33) {
+	/*
+	 *  If the length is more than 45 characters, we may consider
+	 *  truncate the beginning and add "...".
+	 */
+	len = len - 33 - docPtr;
+	fullPath[len] = C_ELLIPSIS;
+    }
+    else
+	len = 0;
+    /*
+     *  Update the current path UI object.
+     */
+    @call FFCurrentPath::MSG_VIS_TEXT_REPLACE_ALL_PTR(fullPath + docPtr + len, 0);
+
+    return;
+} /* End of MSG_FFS_UPDATE_UI_CURRENT_PATH */
+
+/***********************************************************************
+ *                    RecursiveSearch
+ ***********************************************************************
+ *
+ * SYNPOSIS:	The function that find all matching files recursively
+ *              into subdirectories.
+ *
+ * PARAMETERS:  searchText   - text to be found.
+ *	        pathToken    - standard path token
+ *              relativePath - relative path from the standard path dir
+ *
+ * STRATEGY:	
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/26/98	Initial Revision
+ *   jfh		3/27/00	don't search in subdirs if in CUI
+ *   jfh		5/15/00   increased FileEnum files to buffer from
+ *					1 to 50 to speed up the process by greatly
+ *					reducing the number of accls to FileEnum
+ ***********************************************************************/
+void RecursiveSearch(const char *searchText,
+				 StandardPath pathToken,
+				 const char *relativePath)
+{
+FileEnumParams   *FE_params;   /* FileEnum parameters. */
+MemHandle        mem, mem2, FE_buffer;   /* The return block of enum results.*/
+word             FE_numExtra; /* The number of files found beyond
+                                   * what we asked for.               */
+char             *ptr, *subdir;
+Boolean          isMatched;
+word			  numFound, i;
+    /*
+	*  Check if user has clicked STOP searching button.
+	*/
+    if (stopSearchFlag == TRUE)
+	  return;
+    /*
+	*  Allocate memory.
+	*/
+    if ((mem = MemAlloc(PATH_LENGTH+1,
+			HF_DYNAMIC, HAF_STANDARD_NO_ERR)) == NULL)
+	  return;
+    if ((mem2 = MemAlloc(sizeof(FileEnumParams),
+			 HF_DYNAMIC, HAF_STANDARD_NO_ERR)) == NULL) {
+	  MemFree(mem);
+	  return;
+	  }
+    /*
+	*  Set current dir.  Error if return.
+	*/
+    if (FileSetCurrentPath(pathToken, relativePath) == NULL) {
+	  MemFree(mem2);
+	  MemFree(mem);
+	  return;
+	  }
+    /*
+	* Enumerate all types of files in the current directory.
+	*/
+    FE_params = MemLock(mem2);
+    if (FFinderUserIntro)
+	  FE_params->FEP_searchFlags   = FILE_ENUM_ALL_FILE_TYPES;
+    else
+	  FE_params->FEP_searchFlags   = FILE_ENUM_ALL_FILE_TYPES | FESF_DIRS;
+    FE_params->FEP_matchAttrs    = 0;
+    FE_params->FEP_returnAttrs   = (void *)FESRT_NAME_AND_ATTR;
+    FE_params->FEP_returnSize    = MAX_FILE_DIR_LEN;
+    FE_params->FEP_bufSize       = 50;
+    FE_params->FEP_skipCount     = 0;
+    FE_params->FEP_callback      = 0;
+    FE_params->FEP_callbackAttrs = 0;
+    FE_params->FEP_cbData1       = 0;
+    FE_params->FEP_cbData2       = 0;
+    FE_params->FEP_headerSize    = 0;
+    FE_buffer                   = 0;
+    FE_numExtra                 = 1; /* just to start */
+    subdir = (char *)MemLock(mem);
+    while (FE_numExtra) {
+	  numFound = FileEnum(FE_params, &FE_buffer, &FE_numExtra);
+	  for (i = 0; i < numFound; i++) {
+		/*
+		 *  Store and print the file/directory name.
+		 */
+		ptr = MemLock(FE_buffer);
+		ptr += (i * MAX_FILE_DIR_LEN);
+		isMatched = IsStringMatched((ptr+1), (searchText));
+		if (!LocalCmpStringsNoCase((ptr+1), "@ND Directory Information", 0)) {
+		   ; /* do nothing for the link file. */
+		   }
+		else if ((ptr[0] & FA_SUBDIR) && (FFinderUserIntro == TRUE)) {
+		   ; /* do nothing for subdirs in CUI. */
+		   }
+		else if (isMatched) {
+		   /*
+		    *  Found a match.
+		    */
+		   if (@call FFSearchResult::MSG_FFRL_ADD_MONIKER
+				  (searchResultCnt, ptr[0], ptr+1, pathToken, relativePath)
+				   != NO_ERROR_RETURNED)
+			 continue;
+		   @call FFSearchResult::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(searchResultCnt, 1);
+		   searchResultCnt++;
+		   }
+
+		if (ptr[0] & FA_SUBDIR && !(ptr[0] & FA_LINK)) {
+		   /*
+		    *  It's a sub directory.  Recursively search down.
+		    */
+		   strcpy(subdir, relativePath);
+		   strcat(subdir, "\\");
+		   strcat(subdir, ptr+1);
+		   RecursiveSearch(searchText, pathToken, subdir);
+		   /*
+		    *  Set back to the current directory.
+		    */
+		   FileSetCurrentPath(pathToken, relativePath);
+		}
+		FE_params->FEP_skipCount++;
+		/*
+		 *  Check if user has clicked STOP searching button.
+		 */
+		if (stopSearchFlag == TRUE)
+		   break;
+		}  /* end of found a file for loop */
+
+	  if (FE_buffer) {
+	      MemFree(FE_buffer);
+	  }
+    } /* end of while */
+
+    MemFree(mem2);
+    MemFree(mem);
+
+    return;
+} /* End of RecursiveSearch */
+
+
+GStateHandle
+CreateLMemGString (optr *storagePtr)
+{
+    MemHandle		newBlock;
+    ChunkHandle		newChunk;
+    GStateHandle 	gstate;
+
+    newBlock = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(LMemBlockHeader)); 
+    ECCheckMemHandle(newBlock);
+    MemModifyFlags(newBlock, HF_SHARABLE, 0);
+
+    gstate = GrCreateGString(newBlock, GST_CHUNK, &newChunk);
+    ECCheckGStateHandle(gstate);
+
+    *storagePtr = ConstructOptr(newBlock, newChunk);
+ 
+    return(gstate);
+}
+
+/***********************************************************************
+ *		MSG_FFRL_QUERY_MONIKER for FFResultListClass
+ ***********************************************************************
+ * SYNOPSIS:	    Return the requested moniker for item in FFResultList
+ * PARAMETERS:	    void (optr list, word item);
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/27/98   	Initial Revision
+ *   jfh		01/18/00  add global to show path from Document only
+ *                          when recent docs selected
+ ***********************************************************************/
+@method FFResultListClass, MSG_FFRL_QUERY_MONIKER
+{
+    char fullPath[MAX_FILE_DIR_LEN], resolved[MAX_FILE_DIR_LEN], 
+	*endOfPath, safe, *finalPath, *docPath;
+    ResultEntry *entry;
+    word itemSize, zero, cnt, len;
+    GStateHandle gshan, gstate;
+    optr gstring;
+    FileAttrs attr;
+    DiskHandle diskh;
+
+    ObjLockObjBlock(HandleOf(@ListMoniker));
+
+    if (@self->FFRL_monikerChunk &&
+         (cnt = ChunkArrayGetCountHandles(HandleOf(@ListMoniker),
+					@self->FFRL_monikerChunk)) > 0) {
+	EC( if (item >= cnt) FatalError(1); )
+	/*
+	 * Get the search result.  Remember, the first byte is the
+	 * standard path token.  The following bytes are the tail path.
+	 */
+	entry = (ResultEntry *)ChunkArrayElementToPtr
+	    (ConstructOptr(HandleOf(@ListMoniker), @self->FFRL_monikerChunk),
+	     item, &itemSize);
+	/*
+	 *  Construct the full path.
+	 */
+	zero = sizeof(ResultEntry) + entry->RE_pathSize;
+	safe = ((char*)entry)[zero];
+	((char*)entry)[zero] = '\0';
+	endOfPath = fullPath;
+	FileConstructFullPath(&endOfPath, MAX_FILE_DIR_LEN,
+			      entry->RE_pathToken, 
+			      ((char*)entry)+sizeof(ResultEntry), TRUE);
+	((char*)entry)[zero] = safe;
+	strcat(fullPath, "\\");
+	strcat(fullPath, 
+	       ((char*)entry) + sizeof(ResultEntry) + entry->RE_pathSize);
+
+	if (entry->RE_pathToken == SP_TOP || 
+	    entry->RE_pathToken == SP_NOT_STANDARD_PATH) {
+	    endOfPath = resolved;
+	    diskh = FileResolveStandardPath(&endOfPath, MAX_FILE_DIR_LEN, fullPath,
+					 FRSPF_ADD_DRIVE_NAME, &attr);
+	    if (diskh)
+		finalPath = endOfPath = resolved;
+	    else
+		finalPath = endOfPath = fullPath;
+
+	    FileParseStandardPath(0, &endOfPath);
+	}
+	else {
+	    finalPath = fullPath;
+	}
+	
+	/*
+	 *  Now we only show the path below the current path in file
+	 *  selector(if search), or Document, Desktop, or A:(if Recent)
+	 */
+	endOfPath = strstr(finalPath, @self->FFRL_fullPath);
+	if (g_whichListDisplay == WLD_SEARCH) {
+	   if (endOfPath) {
+		 len = strlen(@self->FFRL_fullPath);
+		 }
+	   else if ((len = strlen(finalPath)) > 60) {
+		 /*
+		  *  If the length is more than 45 characters, we may consider
+		  *  truncate the beginning and add "...".
+		  */
+		 len = len - 60;
+		 finalPath[len] = '.';
+		 finalPath[len+1] = '.';
+		 finalPath[len+2] = '.';
+		 }
+	   else {
+		 len = 0;
+		 }
+	   } /* end of WLD_SEARCH */
+	else {  /* we're showing recently opened docs */
+	   if (docPath = strstr(finalPath, "DOCUMENT"))
+		 len = strlen(finalPath) - strlen(docPath) + 8;
+
+	   else if (docPath = strstr(finalPath, "DESKTOP"))
+		 len = strlen(finalPath) - strlen(docPath) + 7;
+
+	   else if (docPath = strstr(finalPath, "A:\\"))
+	      len = strlen(finalPath) - strlen(docPath) + 3;
+
+	   else if ((len = strlen(finalPath)) > 60) {
+		 len = len - 60;
+		 finalPath[len] = '.';
+		 finalPath[len+1] = '.';
+		 finalPath[len+2] = '.';
+		 }
+	   else {
+		 len = 0;
+		 }
+	   } /* end of WLD_RECENT */
+
+@if 0   /* UserCreateIconTextMoniker can't be called from C.  Bummer.  */
+	moniker = UserCreateIconTextMoniker((optr)(finalPath+len+1),
+					    @FileMoniker,
+					    OptrToHandle(oself),
+					    0,
+					    CITMF_TEXT_IS_FPTR | CITMF_CREATE_CHUNK);
+	@call self::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER
+	     (item, 0, 15, 13, sizeof(moniker),
+	      VMDT_VIS_MONIKER, VMST_OPTR, (dword)moniker );
+	LMemFree(moniker);
+
+@else
+	MemLock(OptrToHandle(@FileMoniker));
+        if (entry->RE_fileType & FA_SUBDIR) {
+	    gshan = GrLoadGString(OptrToHandle(@FolderMoniker), GST_CHUNK,
+				  OptrToChunk(@FolderMoniker));
+	} else {
+	    gshan = GrLoadGString(OptrToHandle(@FileMoniker), GST_CHUNK,
+				  OptrToChunk(@FileMoniker));
+	}
+	gstate = CreateLMemGString(&gstring);
+	GrDrawGStringAtCP(gstate, gshan, 0, (word *)0);
+	if (finalPath[len] == '\\')
+	    GrDrawText(gstate, 18, -2, finalPath+len+1, 0);
+	else
+	    GrDrawText(gstate, 18, -2, finalPath+len, 0);
+	GrEndGString(gstate);
+	GrDestroyGString(gstate, 0, GSKT_LEAVE_DATA);
+
+	@call self::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER
+	     (item, 0, 15, 13, sizeof(gstring),
+	      VMDT_GSTRING, VMST_OPTR, (dword)gstring );
+
+	MemFree(HandleOf(gstring));
+	MemFree(gshan);
+	MemUnlock(OptrToHandle(@FileMoniker));
+@endif
+	/*
+	 * Update the moniker in the definitions list.
+	@call self::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, finalPath+len+1);
+	 */
+    }
+
+    MemUnlock(HandleOf(@ListMoniker));
+} /* End of MSG_DM_GET_MEANING_MONIKER.	*/
+
+
+/***********************************************************************
+ *		MSG_FFRL_ADD_MONIKER for FFResultListClass
+ ***********************************************************************
+ * SYNOPSIS:	    Update item in FFResultList
+ * PARAMETERS:	    void (word pos, FileAttrs type, const char *text, 
+ *                        StandardPath token, const char *path)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/27/98   	Initial Revision
+ *   jfh		01/22/00		added calledFrom indicator
+ *
+ ***********************************************************************/
+@method FFResultListClass, MSG_FFRL_ADD_MONIKER
+{
+    char *fullPath, *endOfPath, resolved[MAX_FILE_DIR_LEN];
+    ResultEntry *elt;
+    MemHandle mem;
+    word err = 0;
+    StandardPath pathToken;
+    DiskHandle diskh;
+    FileAttrs attr;
+    Boolean	showRecent = FALSE;
+
+    if ((mem = MemAlloc(PATH_LENGTH+1,
+			HF_DYNAMIC, HAF_STANDARD_NO_ERR)) == NULL)
+	return err;
+    fullPath = MemLock(mem);
+
+    if (!@self->FFRL_monikerChunk) {
+	/*
+	 *  Alloc chunk array if not exist.
+	 */
+	ObjLockObjBlock(HandleOf(@ListMoniker));
+
+	@self->FFRL_monikerChunk = ChunkArrayCreate(HandleOf(@ListMoniker),0,0,0);
+	MemUnlock(HandleOf(@ListMoniker));
+    }
+    /*
+     *  Construct a full path with driver letter.
+     */
+    endOfPath = fullPath;
+    FileConstructFullPath(&endOfPath, MAX_FILE_DIR_LEN, token, path, TRUE);
+    strcat(fullPath, "\\");
+    strcat(fullPath, text);
+
+    /*
+     *  If file dones't exist, don't add the moniker
+     */
+    FileGetAttributes(fullPath);
+    err = ThreadGetError();
+    if (err != NO_ERROR_RETURNED)
+	goto freeBlock;
+
+    /*
+     *  If file is not under user document dir, don't add a moniker.
+     */
+/*    endOfPath = resolved;
+    diskh = FileResolveStandardPath(&endOfPath, MAX_FILE_DIR_LEN, fullPath,
+				    FRSPF_ADD_DRIVE_NAME, &attr);
+    if (diskh)
+	endOfPath = resolved;
+    else
+	endOfPath = fullPath;
+    pathToken = FileParseStandardPath(0, &endOfPath);
+    if (pathToken != SP_DOCUMENT)
+	return -1;  /* return an error code */
+/* the above really needs to be...
+ *    - if called from search then add the moniker
+ *    - if called from recent docs then only add if...
+ *		-- in Document or,
+ *		-- in DESKTOP or,
+ *		-- on drive A.
+ *                                           jfh
+ */
+  if (g_whichListDisplay == WLD_RECENT) {
+    /* is it in Document? get pathToken*/
+    endOfPath = resolved;
+    diskh = FileResolveStandardPath(&endOfPath, MAX_FILE_DIR_LEN, fullPath,
+				    FRSPF_ADD_DRIVE_NAME, &attr);
+    if (diskh)
+	endOfPath = resolved;
+    else
+	endOfPath = fullPath;
+    pathToken = FileParseStandardPath(0, &endOfPath);
+
+    /* is it in doc? */
+    if (pathToken == SP_DOCUMENT) showRecent = TRUE;
+    /* is it in DESKTOP?*/
+    else if (pathToken == SP_TOP) {
+	  /* check for chars DESKTOP */
+	  if (strstr(endOfPath, "DESKTOP"))
+		showRecent = TRUE;
+	  }
+    /* is it on drive A? */
+    else if (pathToken == SP_NOT_STANDARD_PATH) {
+	  /* check for drive A */
+	  if (endOfPath[0] == 'A')
+	     showRecent = TRUE;
+	  }
+
+	if (!showRecent) {
+	   err = -1;    /* return an error code */
+	   goto freeBlock;
+	}
+
+  } /* end of recent docs if */
+
+
+
+
+
+
+    /*
+     *  Display the full path of the file or subdirectory in a moniker.
+     */
+    @call self::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(pos, fullPath);
+    /*
+     *  Store the data(token + tail path) to the chunk array.
+     *  Remember, the first byte is the standard path token.
+     *  the following bytes are the tail path.
+     */
+    ObjLockObjBlock(HandleOf(@ListMoniker));
+
+    elt = ChunkArrayAppendHandles(HandleOf(@ListMoniker),
+				  @self->FFRL_monikerChunk,
+				  sizeof(ResultEntry) + 
+				  strlen(path) + strlen(text) + 1);
+/*    EC( ECCheckBounds( elt ); ) */
+    elt->RE_pathToken = token;
+    elt->RE_pathSize = strlen(path);
+    elt->RE_nameSize = strlen(text);
+    elt->RE_fileType = type;
+    strcpy(((char*)elt)+sizeof(ResultEntry), path);
+    strcpy(((char*)elt)+(sizeof(ResultEntry))+(elt->RE_pathSize), 
+	   text);
+    MemUnlock(HandleOf(@ListMoniker));
+
+freeBlock:
+    MemFree(mem);
+
+    return err;
+} /* End of MSG_FFRL_ADD_MONIKER */
+
+
+/***********************************************************************
+ *		MSG_FFRL_CLEAN_LIST for FFResultListClass
+ ***********************************************************************
+ * SYNOPSIS:	    Clean all search result data 
+ * PARAMETERS:	    void (void)
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/27/98   	Initial Revision
+ *
+ ***********************************************************************/
+@method FFResultListClass, MSG_FFRL_CLEAN_LIST
+{
+    /*
+     *  Remove all list items.
+     */
+    @call self::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS
+	 (GDLP_FIRST, searchResultCnt);
+
+    if (@self->FFRL_monikerChunk) {
+	/*
+	 *  Delete all internal data that stores the list item monikers.
+	 *  Note, we recycle the chunk array.
+	 */
+	ObjLockObjBlock(HandleOf(@ListMoniker));
+
+	ChunkArrayDeleteRange(ConstructOptr(HandleOf(@ListMoniker),
+					    @self->FFRL_monikerChunk),
+			      0, searchResultCnt);
+	MemUnlock(HandleOf(@ListMoniker));
+    }
+    /*
+     *  Reset the list counter.
+     */
+    searchResultCnt = 0;
+    return;
+} /* End of MSG_FFRL_CLEAN_LIST */
+
+
+const char filemgrCat[] = "fileManager";
+const char filenameTokensKey[] = "filenameTokens";
+
+/**************************************************************
+ *      
+ * FUNCTION:        CheckDOSFileType
+ * PASS:            ext - ptr to extension string
+ *                  token - ptr to GeodeToken to return
+ * RETURN:          TRUE if file type supported
+ *                  token - filled in
+ * DESCRIPTION:
+ *         see if a file is a DOS file type we support directly
+ *
+ * REVISION HISTORY:
+ *         Name      Date        Description
+ *         ----      ----        -----------
+ *         gene      2/28/99    Initial Revision
+ ***************************************************************/
+
+TCHAR *
+GetToken(TCHAR *p, GeodeToken *token)
+{
+    word i, id;
+
+    while (*p == ' ' || *p == '\t' || *p == ',') {
+	p++;
+    }
+    /*
+     * if we've reached the end of the section, exit
+     */
+    if (!*p || *p == '\r') {
+	return(NULL);
+    }
+    /*
+     * skip the leading quote
+     */
+    EC_ERROR_IF(*p != '"', 1);
+    p++;
+
+    for (i = 0; i<4; i++) {
+	token->GT_chars[i] = *p;
+	p++;
+    }
+    /*
+     * skip the trailing quote and comma
+     */
+    EC_ERROR_IF(*p != '"', 1);
+    p++;
+    EC_ERROR_IF(*p != ',', 1);
+    p++;
+    /*
+     * get the manufacturer ID
+     */
+    id = 0;
+    while (*p >= '0' && *p <= '9') {
+	id = 10 * id + *p - '0';
+	p++;
+    }
+    token->GT_manufID = id;
+    return(p);
+}
+
+Boolean
+_pascal CheckFileTypeCB(const char *stringSection, word foo, void *enumData)
+{
+    TCHAR *p1;
+    CFTStruct *cfts = enumData;
+
+    /*
+     * find the extension to check against
+     */
+    p1 = strchr(stringSection, '.')+1;
+    if (!LocalCmpStringsNoCase(p1, cfts->CFTS_ext, 3)) {
+	/*
+	 * the extension matches -- get the icon token and the app token
+	 */
+	p1 = strchr(p1, '=')+1;
+	p1 = GetToken(p1, cfts->CFTS_token);  /* icon token */
+	p1 = GetToken(p1, cfts->CFTS_token);  /* app token */
+	if (p1) {
+	    return(TRUE);
+	}
+    }
+    return(FALSE);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        CheckDOSFileType
+ * PASS:            ext - ptr to extension string
+ *                  token - ptr to GeodeToken to return
+ * RETURN:          TRUE if file type supported
+ *                  token - filled in
+ * DESCRIPTION:
+ *         see if a file is a DOS file type we support directly
+ *
+ * REVISION HISTORY:
+ *         Name      Date        Description
+ *         ----      ----        -----------
+ *         gene      2/28/99    Initial Revision
+ ***************************************************************/
+Boolean
+CheckDOSFileType(TCHAR *ext, GeodeToken *token)
+{
+    CFTStruct cfts;
+    cfts.CFTS_token = token;
+    cfts.CFTS_ext = ext;
+    return(InitFileEnumStringSection(filemgrCat, filenameTokensKey,
+				     IFRF_READ_ALL, CheckFileTypeCB, &cfts));
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        OpenDocumentFile
+ * PASS:            
+ *                  
+ * RETURN:          none
+ * DESCRIPTION:
+ *         open a document file
+ *
+ * REVISION HISTORY:
+ *         Name      Date        Description
+ *         ----      ----        -----------
+ *         edwin     10/20/99    Initial Revision
+ *         jfh		 01/22/00    added the search vs recent code
+ ***************************************************************/
+void
+OpenDocumentFile(ResultEntry *entry, Boolean app, 
+		 char *FFRL_fullPath, GeodeToken token)
+{
+    ThreadHandle newThread;
+    MemHandle launchHan;
+    AppLaunchBlock  *launchBlock;
+    StandardPath pathToken;
+    char fullPath[MAX_FILE_DIR_LEN], resolved[MAX_FILE_DIR_LEN], 
+	*endOfPath, *finalPath, safe;
+    FileAttrs attr;
+    word len, zero;
+
+    /*
+     *  Now launch the application.
+     */
+    @call process::MSG_PROCESS_CREATE_EVENT_THREAD(
+	&newThread, (ClassStruct *)&FFThreadClass, 2048);
+
+    ThreadModify(newThread, PRIORITY_UI, TMF_BASE_PRIO);
+    launchHan = MemAlloc(sizeof(AppLaunchBlock),
+			 HF_SWAPABLE | HF_SHARABLE,
+			 HAF_STANDARD_NO_ERR);
+    launchBlock = (AppLaunchBlock *)MemLock(launchHan);
+    if (app)
+	launchBlock->ALB_dataFile[0] = '\0';
+    else
+	strcpy(launchBlock->ALB_dataFile, 
+	       ((char*)entry)+sizeof(ResultEntry)+entry->RE_pathSize);
+
+    zero = sizeof(ResultEntry) + entry->RE_pathSize;
+    safe = ((char*)entry)[zero];
+
+    if (entry->RE_pathToken == SP_TOP ||
+	entry->RE_pathToken == SP_NOT_STANDARD_PATH) {
+
+	endOfPath = fullPath;
+	((char*)entry)[zero] = '\0';
+	FileConstructFullPath(&endOfPath, MAX_FILE_DIR_LEN,
+			      entry->RE_pathToken, 
+			      ((char*)entry)+sizeof(ResultEntry), TRUE);
+	((char*)entry)[zero] = safe;
+	strcat(fullPath, "\\");
+	strcat(fullPath, 
+	       ((char*)entry) + sizeof(ResultEntry) + entry->RE_pathSize);
+	endOfPath = resolved;
+	FileResolveStandardPath(&endOfPath, MAX_FILE_DIR_LEN, 
+				fullPath,
+				FRSPF_ADD_DRIVE_NAME, &attr);
+	finalPath = resolved;
+	pathToken = FileParseStandardPath(0, &finalPath);
+  if (g_whichListDisplay == WLD_SEARCH) {
+  /* don't do this for recent docs */
+	finalPath[0] = '\0';
+	endOfPath = strstr(resolved, FFRL_fullPath);
+	if (endOfPath) {
+	    len = strlen(endOfPath);
+	    strcpy(launchBlock->ALB_path, endOfPath+len);
+	}
+	else
+	    strcpy(launchBlock->ALB_path, "");
+   } /* end of WLD_SEARCH if */
+   else  {
+	 /* chop the file name */
+	 len = strlen(finalPath);
+	 finalPath[len - entry->RE_nameSize] = '\0';
+	 strcpy(launchBlock->ALB_path, finalPath);
+	 }
+    }
+    else { /* it isn't SP_TOP or SP_NOT_STANDARD_PATH */
+	((char*)entry)[zero] = '\0';
+	strcpy(launchBlock->ALB_path, 
+	       ((char*)entry) + sizeof(ResultEntry));
+	((char*)entry)[zero] = safe;
+	pathToken = entry->RE_pathToken;
+    }
+
+
+    
+    launchBlock->ALB_diskHandle = pathToken;
+/*		@call FileSelector::MSG_GEN_PATH_GET_DISK_HANDLE(); */
+    launchBlock->ALB_launchFlags = ALF_OVERRIDE_MULTIPLE_INSTANCE;
+    launchBlock->ALB_appRef.AIR_fileName[0] = '\0';
+    launchBlock->ALB_appRef.AIR_stateFile[0] = '\0';
+    launchBlock->ALB_appRef.AIR_diskHandle = 0;
+    launchBlock->ALB_appRef.AIR_savedDiskData[0] = 0;
+    launchBlock->ALB_appMode = 0;
+    launchBlock->ALB_genParent = 0;
+    launchBlock->ALB_userLoadAckOutput = 0;
+    launchBlock->ALB_userLoadAckMessage = 0;
+    launchBlock->ALB_userLoadAckID = 0;
+    launchBlock->ALB_extraData = 0;
+    @send, forceQueue ConstructOptr(newThread, 0)::
+	MSG_FFT_THREAD_LAUNCH_APPLICATION(token, launchHan);
+}
+
+
+/***********************************************************************
+ *		MSG_FFRL_OPEN_DOCUMENT for FFResultListClass
+ ***********************************************************************
+ * SYNOPSIS:	    Lanch an application to open the clicked file.
+ * PARAMETERS:void (word selection, word numSelections, byte stateFlags)
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/27/98   	Initial Revision
+ *
+ ***********************************************************************/
+@method FFResultListClass, MSG_FFRL_OPEN_DOCUMENT
+{
+    char safe;
+    ResultEntry *entry;
+    word itemSize, zero;
+    GeodeToken       token;
+    FileError   ferror;
+    Boolean     app = FALSE;
+
+    if (searchMode == SEARCH_END && @self->FFRL_monikerChunk) {
+	FilePushDir();
+	/*
+	 * Get the result entry.  Remember, the first byte is the
+	 * standard path token.  The following bytes are the tail path.
+	 */
+	ObjLockObjBlock(HandleOf(@ListMoniker));
+
+	entry = (ResultEntry *)ChunkArrayElementToPtr
+	    (ConstructOptr(HandleOf(@ListMoniker), @self->FFRL_monikerChunk),
+	     selection, &itemSize);
+	/*
+	 *  Set current path to where the file is located.
+	 */
+	zero = sizeof(ResultEntry) + entry->RE_pathSize;
+	safe = ((char*)entry)[zero];
+	((char*)entry)[zero] = '\0';
+	FileSetCurrentPath(entry->RE_pathToken, 
+			   ((char*)entry) + sizeof(ResultEntry));
+	((char*)entry)[zero] = safe;
+	ferror = FileGetPathExtAttributes(((char*)entry) + 
+					  sizeof(ResultEntry) +
+					  entry->RE_pathSize, 
+					  FEA_CREATOR, &token, 
+					  sizeof(GeodeToken));
+
+	if (strncmp(token.GT_chars, "GEOS", 4) == 0) {
+	    /*  It's a geode executable */
+	    ferror = FileGetPathExtAttributes(((char*)entry) + 
+					      sizeof(ResultEntry) +
+					      entry->RE_pathSize, 
+					      FEA_TOKEN, &token, 
+					      sizeof(GeodeToken));
+	    app = TRUE;
+	}
+
+	if (!ferror) {
+	    OpenDocumentFile(entry, app, @self->FFRL_fullPath, token);
+	}
+	else {
+	    /*
+	     *  Let's check for the extension.
+	     */
+	    TCHAR *ext = strrchr(((char*)entry) + sizeof(ResultEntry) +
+				 entry->RE_pathSize, '.')+1;
+	    if (ext && CheckDOSFileType(ext, &token)) {
+		OpenDocumentFile(entry, FALSE, @self->FFRL_fullPath, token);
+	    } else {
+		UserStandardDialogOptr(NULL,
+				       NULL,
+				       NULL,
+				       NULL,
+				       @FFOpenErr,
+				   ( CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET ) |
+				   ( GIT_NOTIFICATION <<
+				     CDBF_INTERACTION_TYPE_OFFSET ) );
+	    }
+	}
+
+	FilePopDir();
+	MemUnlock(HandleOf(@ListMoniker));
+    }
+    return;
+}  /* End of MSG_FFRL_OPEN_DOCUMENT */
+
+
+/***********************************************************************
+ *	MSG_FFRL_OPEN_DOCUMENT_FROM_TRIGGER for FFResultListClass
+ ***********************************************************************
+ * SYNOPSIS:	    Lanch an application to open the clicked file.
+ * PARAMETERS:void (word selection, word numSelections, byte stateFlags)
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/27/98   	Initial Revision
+ *
+ ***********************************************************************/
+@method FFResultListClass, MSG_FFRL_OPEN_DOCUMENT_FROM_TRIGGER
+{
+    word selection = @call self::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    if (selection != GIGS_NONE)
+	@call self::MSG_FFRL_OPEN_DOCUMENT(selection, 1, 0);
+    else {
+	UserStandardDialogOptr(NULL,
+			       NULL,
+			       NULL,
+			       NULL,
+			       @FFOpenInst,
+			   ( CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET ) |
+			   ( GIT_NOTIFICATION <<
+			     CDBF_INTERACTION_TYPE_OFFSET ) );
+    }
+    return;
+}  /* End of MSG_FFRL_OPEN_DOCUMENT */
+
+
+
+/***********************************************************************
+ *		MSG_FFRL_FIND_FILES for FFResultListClass
+ ***********************************************************************
+ * SYNOPSIS:	    Search/Stop trigger is clicked.
+ * PARAMETERS:
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:  We let the UI thread to handle the mouse click.
+ *            We let the process thread to do the search.
+ *            In this way, user can still click STOP trigger(in ui
+ *            thread) to stop the search that is in progress(in the 
+ *            process thread).
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/27/98   	Initial Revision
+ *
+ ***********************************************************************/
+@method FFResultListClass, MSG_FFRL_FIND_FILES
+{
+    if (searchMode == SEARCH_IN_PROGRESS) {
+	/*
+	 *  The process thread is busy doing the search.  Tell the
+	 *  process thread that we want to stop.  The process thread
+	 *  will update the searchMode when stopped..
+	 */
+	stopSearchFlag = TRUE;
+    }
+    else {
+	/*
+	 *  The process thread isn't doing any search.  We tell the
+	 *  process thread that we want to start a search.
+	 *
+	 *  Update UI to indicate a search starts, and update the
+	 *  searchMode.
+	 */
+	UpdateUIForSearchStart();
+	@call FFViewSelection::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0,FALSE);
+	@send process::MSG_FFP_FIND_FILES();
+	InitializeFFSearchResultList();
+	/*
+	 *  The process will update UI and the searchMode when
+	 *  the earch is done.
+	 */
+
+    }
+}  /* End of MSG_FFRL_FIND_FILES */
+
+void InitializeFFSearchResultList(void) {
+    dword dhandle;
+    StandardPath pathToken;
+    char *endOfPath, fullPath[MAX_FILE_DIR_LEN], relativePath[MAX_FILE_DIR_LEN];
+    /*
+     *  Store the current search-in directory.
+     */
+    dhandle = @call FileSelector::
+	MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(relativePath);
+    pathToken = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(dhandle);
+    endOfPath = fullPath;
+    FileConstructFullPath(&endOfPath, MAX_FILE_DIR_LEN, pathToken, 
+			  relativePath, 
+			  TRUE);
+    @call FFSearchResult::MSG_FFRL_STORE_CURRENT_PATH(fullPath);
+    return;
+}
+
+
+/***********************************************************************
+ *	MSG_FFRL_DISPLAY_RECENT_OPEN_FILES for FFResultListClass
+ ***********************************************************************
+ * SYNOPSIS:	    Display the most recently opened documents
+ * PARAMETERS:
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:  Load the file in /privdata/recntDoc.000
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	11/10/98   	Initial Revision
+ *   jfh		01/18/00  add global to show path from Document only
+ *                          when recent docs selected
+ *
+ ***********************************************************************/
+@method FFResultListClass, MSG_FFRL_DISPLAY_RECENT_OPEN_FILES
+{
+    if (@call FFViewSelection::MSG_GEN_ITEM_GROUP_GET_SELECTION() == 0) {
+	/*
+	 *  Show the previously searched result, if any.
+	 */
+	g_whichListDisplay = WLD_SEARCH;
+	@call FFSearchResult::MSG_FFRL_RESTORE_LIST();
+	@call FFOptionScreen::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	@call FFSearchText::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	return;
+    }
+    else if (searchResultCnt) {
+	/*  Show the reently opened files
+	 */
+	@call FFSearchResult::MSG_FFRL_SAVE_LIST();
+	@call FFOptionScreen::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	@call FFSearchText::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    }
+    
+    g_whichListDisplay = WLD_RECENT;
+    InitializeFFSearchResultList();
+
+    if (searchMode == SEARCH_IN_PROGRESS) {
+	/*
+	 *  The process thread is busy doing the search.  Tell the
+	 *  process thread that we want to stop.  The process thread
+	 *  will update the searchMode when stopped..
+	 */
+	stopSearchFlag = TRUE;
+    }
+    else {
+	/*
+	 *  The process thread isn't doing any search.  We tell the
+	 *  process thread that we want to start a search.
+	 *
+	 *  Update UI to indicate a search starts, and update the
+	 *  searchMode.
+	 */
+	UpdateUIForSearchStart();
+	@send process::MSG_FFP_DISPLAY_RECENT_OPEN_FILES();
+	/*
+	 *  The process will update UI and the searchMode when
+	 *  the earch is done.
+	 */
+    }
+}  /* End of MSG_FFRL_DISPLAY_RECENT_OPEN_FILES */
+
+/***********************************************************************
+ *	MSG_FFRL_DISPLAY_RECENT_OPEN_FILES for FFResultListClass
+ ***********************************************************************
+ * SYNOPSIS:	    Display the most recently opened documents
+ * PARAMETERS:      (char *fullPath)
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:  Load the file in /privdata/recntDoc.000
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	11/10/98   	Initial Revision
+ *
+ ***********************************************************************/
+@method FFResultListClass, MSG_FFRL_STORE_CURRENT_PATH
+{
+    strcpy(@self->FFRL_fullPath, fullPath);
+    return;
+}
+
+
+/***********************************************************************
+ *	MSG_FFRL_SAVE_LIST for FFResultListClass
+ ***********************************************************************
+ * SYNOPSIS:	    Save the current search result list.
+ * PARAMETERS:      ()
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:  
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/11/99   	Initial Revision
+ *
+ ***********************************************************************/
+@method FFResultListClass, MSG_FFRL_SAVE_LIST
+{
+    @self->FFRL_storedMonikerChunk = @self->FFRL_monikerChunk;
+    @self->FFRL_storedEntryCount = searchResultCnt;
+    /*
+     *  Reset the list counter.
+     */
+    @self->FFRL_monikerChunk = 0;
+
+    @self->FFRL_storedSearchText = 
+	 @call FFSearchText::MSG_VIS_TEXT_GET_ALL_OPTR
+  	 (ConstructOptr(HandleOf(@ListMoniker), 0));
+
+    @call self::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS
+	 (GDLP_FIRST, searchResultCnt);
+
+    searchResultCnt = 0;
+    return;
+}
+
+/***********************************************************************
+ *	MSG_FFRL_RESTORE_LIST for FFResultListClass
+ ***********************************************************************
+ * SYNOPSIS:	    Restore the old search result list.
+ * PARAMETERS:      ()
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:  
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/11/99   	Initial Revision
+ *
+ ***********************************************************************/
+@method FFResultListClass, MSG_FFRL_RESTORE_LIST
+{
+    /*
+     *  Remove all the items.
+     */
+    @call FFSearchResult::MSG_FFRL_CLEAN_LIST();
+    if (@self->FFRL_monikerChunk) {
+	ObjLockObjBlock(HandleOf(@ListMoniker));
+
+	LMemFree(ConstructOptr(HandleOf(@ListMoniker),
+			       @self->FFRL_monikerChunk));
+	MemUnlock(HandleOf(@ListMoniker));
+    }
+
+    @self->FFRL_monikerChunk = @self->FFRL_storedMonikerChunk;
+    searchResultCnt = @self->FFRL_storedEntryCount;
+    @self->FFRL_storedMonikerChunk = 0;
+    @self->FFRL_storedEntryCount = 0;
+
+    if (@self->FFRL_storedSearchText) {
+	@call FFSearchText::MSG_VIS_TEXT_REPLACE_ALL_OPTR
+	     (ConstructOptr(HandleOf(@ListMoniker), @self->FFRL_storedSearchText),0);
+	ObjLockObjBlock(HandleOf(@ListMoniker));
+
+	LMemFree(ConstructOptr(HandleOf(@ListMoniker),
+			       @self->FFRL_storedSearchText));
+	MemUnlock(HandleOf(@ListMoniker));
+    }
+    @self->FFRL_storedSearchText = 0;
+
+    /*
+     *  Add all list items.
+     */
+    @call FFSearchResult::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS
+	 (GDLP_FIRST, searchResultCnt);
+    return;
+}
+
+
+/***********************************************************************
+ *	MSG_FFRL_CLEAN_SAVED_LIST() for FFResultListClass
+ ***********************************************************************
+ * SYNOPSIS:	    Free any saved search result list (chuck array).
+ * PARAMETERS:      ()
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:  
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/11/99   	Initial Revision
+ *
+ ***********************************************************************/
+@method FFResultListClass, MSG_FFRL_CLEAN_SAVED_LIST
+{
+    ObjLockObjBlock(HandleOf(@ListMoniker));
+
+    if (@self->FFRL_storedMonikerChunk) {
+	LMemFree(ConstructOptr(HandleOf(@ListMoniker),
+			       @self->FFRL_storedMonikerChunk));
+    }
+    if (@self->FFRL_storedSearchText) {
+	LMemFree(ConstructOptr(HandleOf(@ListMoniker),
+			       @self->FFRL_storedSearchText));
+    }
+    MemUnlock(HandleOf(@ListMoniker));
+
+    @self->FFRL_storedMonikerChunk = 0;
+    @self->FFRL_storedEntryCount = 0;
+    @self->FFRL_storedSearchText = 0;
+
+    return;
+}
+
+/***********************************************************************
+ *	MSG_META_TEXT_USER_MODIFIED for FFSearchTextClass
+ ***********************************************************************
+ * SYNOPSIS:	    Turn the search trigger on and off.
+ * PARAMETERS:      
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:  Load the file in /privdata/recntDoc.000
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	11/10/98   	Initial Revision
+ *
+ ***********************************************************************/
+@method FFSearchTextClass, MSG_META_TEXT_USER_MODIFIED
+{
+    char *str;
+
+    @callsuper();
+
+    @call self::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+    str = LMemDerefHandles(OptrToHandle(oself), @self->GTXI_text);
+
+    if(*str) {
+	@send FFSearchTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    } else {
+	@send FFSearchTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    }
+    return;
+}
+
+
+/***********************************************************************
+ *	IsStringMatched
+ ***********************************************************************
+ * SYNOPSIS:	    Do the matching with wildcard and ?.
+ * PARAMETERS:      string - to be matched.
+ *                  pattern - pattern, can contain * and ?
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:  Load the file in /privdata/recntDoc.000
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	3/18/99   	Initial Revision
+ *
+ ***********************************************************************/
+Boolean IsStringMatched(const unsigned char *string, const unsigned char *pattern)
+{
+    Boolean isMatched = FALSE;
+
+    while(1) {
+	/*
+	 *  Base case for this recursive function
+	 */
+	if (string == NULL || string[0] == '\0') {
+	    if (pattern == NULL || pattern[0] == '\0')
+		isMatched = TRUE;
+	    else if (pattern[0] == '*' && pattern[1] == '\0')
+		isMatched = TRUE;
+	    else
+		isMatched = FALSE;
+	    break;
+	}
+
+	if (pattern[0] == '*') {
+	    pattern++;
+	    if (pattern[0] == '\0') {
+		isMatched= TRUE;
+	    }
+	    else {
+		while (1) {
+		    isMatched = IsStringMatched(string, pattern);
+		    if (isMatched == FALSE) {
+			string++;
+			if (string[0] == '\0')
+			    return FALSE;
+		    }
+		    else
+			break;
+		}
+	    }
+	    break;
+	}
+	else if (pattern[0] == '?') {
+	    /*  Check single char */
+	    if (string[0] != '\0') {
+		pattern++;
+		string++;
+	    }
+	    else {
+		isMatched = FALSE;
+		break;
+	    }
+	}
+        /*
+	else if (pattern[0] == '[') {
+	    ;
+	}
+	else if (pattern[0] == '\\') {
+	} */
+	else {
+	    if (toupper(pattern[0]) == toupper(string[0])) {
+		pattern++;
+		string++;
+	    }
+	    else {
+		isMatched = FALSE;
+		break;
+	    }
+	}
+    }
+    return isMatched;
+}
+
+
+/***********************************************************************
+ *	MSG_FFT_THREAD_LAUNCH_APPLICATION for FFThreadClass
+ ***********************************************************************
+ * SYNOPSIS:     Called by MSG_FFRL_OPEN_DOCUMENT, to launch an app.
+ * PARAMETERS:   (GeodeToken geodeToken, MemHandle launchHan)
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	edwin	10/27/98   	Initial Revision
+ *
+ ***********************************************************************/
+#ifdef __HIGHC__
+#pragma Code("FIXEDRESOURCE");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg FIXEDRESOURCE
+#endif
+@method FFThreadClass, MSG_FFT_THREAD_LAUNCH_APPLICATION
+{
+    IACPConnection   iacpConnectionToken;
+    IACPConnectFlags connectionFlags;
+    word             serverCount;
+
+    connectionFlags = IACPCF_FIRST_ONLY | IACPSM_USER_INTERACTIBLE;
+
+    iacpConnectionToken = IACPConnect
+	(&geodeToken, connectionFlags, launchHan, NullOptr, &serverCount);
+
+    if (iacpConnectionToken != IACP_NO_CONNECTION) {
+	IACPShutdown(iacpConnectionToken, NullOptr);
+    }
+    else {
+	/*
+	 *  Somehow we can't launch an application to open the document.
+	 */
+	UserStandardDialogOptr(NULL,
+			       NULL,
+			       NULL,
+			       NULL,
+			       @FFDocOpenErr,
+			   ( CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET ) |
+			   ( GIT_NOTIFICATION <<
+			     CDBF_INTERACTION_TYPE_OFFSET ) );
+    }
+    ThreadDestroy(0, NullOptr, 0);
+
+    return;
+}

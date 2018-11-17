@@ -1,0 +1,181 @@
+/**************************************************************************
+*
+*   Copyright (C) 1999  Breadbox Computer Company
+*                       All Right Reserved
+*
+*   PROJECT:    AEL Test Application
+*   FILE:       AELTest.goh
+*   AUTHOR:     FR, 26th April, 1999
+*
+*   DESCRIPTION:
+*       This is the AEL Test Application main file.
+*
+**************************************************************************/
+
+
+/**************************************************************************
+*   INCLUDES
+**************************************************************************/
+
+@include <StdApp.goh>
+@include <Ansi/stdio.h>
+@include <Ansi/string.h>
+
+
+/**************************************************************************
+*   GLOBAL DEFINITIONS
+**************************************************************************/
+
+/* AEL structures and definitions */
+#define AEL_ITEM_NAME_LENGTH 40
+#define AEL_MAX_ITEMS 20
+#define AEL_FILE_PATH_LENGTH 200
+#define AEL_ADB_SIZE 6000
+#define AEL_AAI_MIME_PARAM_LENGTH 40
+
+/* content types */
+typedef word AELContentType;
+#define AEL_CONTENT_BINARY 0
+#define AEL_CONTENT_GIF 1
+#define AEL_CONTENT_JPG 2
+#define AEL_CONTENT_TEXT_PLAIN 3
+#define AEL_CONTENT_TEXT_HTML 4
+#define AEL_CONTENT_TEXT_RICH 5
+#define AEL_CONTENT_MULTIPART 6
+#define AEL_CONTENT_PARTIAL 7
+/* more types can be added... */
+
+/* encoding methods */
+typedef word AELEncoding;
+#define AEL_ENCODING_NONE 0
+#define AEL_ENCODING_BASE64 1
+#define AEL_ENCODING_UU 2
+#define AEL_ENCODING_QP 3
+/* more methods can be added... */
+
+/* wrappers that can be applied to an attachment item */
+typedef word AELWrapperType;
+
+/* to be used only for UUencoding! */
+#define AEL_WRAPPER_NONE 0
+/* to be always used at all levels for MIME, unless splitting is to be done */
+#define AEL_WRAPPER_MIME 1
+/* applicable only to items with AAI_isFile */
+#define AEL_WRAPPER_SPLIT 2
+/* more wrappers can be added... */
+
+typedef word AELError;
+#define AEL_ERROR_NONE 0
+#define AEL_ERROR_WRAPPER_MISMATCH 1 /* when UU is mixed with MIME */
+#define AEL_ERROR_NO_NEXT_ITEM 2
+#define AEL_ERROR_NULL_PARAMS 3 /* null parameters pointer passed */
+#define AEL_ERROR_TOO_MANY_UU 4 /* more than one item passed for uuencoding */
+#define AEL_ERROR_TOO_MANY_ITEMS 5 /* more than AEL_MAX_ITEMS specified */
+#define AEL_ERROR_INTERNAL 6 /* internal consistency error */
+#define AEL_ERROR_FILE_NOT_FOUND 7
+#define AEL_ERROR_PATH_NOT_FOUND 8
+#define AEL_ERROR_TOO_MANY_OPEN_FILES 9
+#define AEL_ERROR_FILE_ACCESS_DENIED 10
+/* more errors can be added... */
+
+/* the basic memory handle definitions */
+typedef MemHandle AELHandle;
+typedef MemHandle AELDataHandle;
+
+/* a single file attachment is declared here */
+typedef struct
+{
+ /* name of attachment */
+ char AAI_name[AEL_ITEM_NAME_LENGTH];
+ /* path to file to attach, if applicable */
+ char AAI_path[AEL_FILE_PATH_LENGTH];
+ /* flag that tells the AEL if the item will be passed, or should be read */
+ Boolean AAI_isFile;
+ /* content type of attachment item */
+ AELContentType AAI_type;
+ /* encoding method, may be overridden by wrapper */
+ AELEncoding AAI_encoding;
+
+ /* MIME parameters:
+
+    id (MIME ID of the item we are processing)
+
+    (the following apply to AEL_WRAPPER_SPLIT wrapper only)
+    boundary
+    parts (number of parts to split)
+    partsize (size of each part, preferrably under 1K)
+    more???
+  */
+ char AAI_mimeBoundary[AEL_AAI_MIME_PARAM_LENGTH];
+ char AAI_mimeID[AEL_AAI_MIME_PARAM_LENGTH];
+ word AAI_mimeSplitParts;
+ word AAI_mimeSplitPartSize; /* should be 75% of AEL_ADB_SIZE max,
+                                only used for file input! */
+
+ /* define wrapper for this individual attachment item (only one!),
+    AEL_WRAPPER_NONE is not allowed (it only applies to UUencoded data)
+  */
+ AELWrapperType AAI_wrapper;
+} AELAttachmentItem;
+
+/* the entire message to be created by the AEL is specified here */
+typedef struct
+{
+ /* define the wrapper for the entire message.
+    AEL_WRAPPER_SPLIT is not allowed.
+  */
+ AELWrapperType AAP_wrapper;
+
+ /* number of items to be included, 0 for none */
+ word AAP_numItems;
+ /* list of items to include, 0 through AAP_numItems */
+ AELAttachmentItem AAP_items[AEL_MAX_ITEMS];
+ /* boundary to divide all the parts of the message, only used with SPLIT */
+ char AAP_mimeBoundary[AEL_AAI_MIME_PARAM_LENGTH];
+
+} AELAttachmentParameters;
+
+/* the data that the AEL returns is specified here */
+typedef struct
+{
+ /* link to next data block, NULL if no more data available */
+ AELDataHandle ADB_next;
+ /* error status will be specified here */
+ AELError ADB_errorStatus;
+ /* number of '\0' terminated lines in the data block */
+ word ADB_numLines;
+ /* data returned by AEL */
+ char ADB_lines[AEL_ADB_SIZE];
+ /* bytes used*/
+ word ADB_numBytes;
+} AELDataBlock;
+
+typedef struct
+{
+ /* parameters given for this session */
+ AELAttachmentParameters AS_params;
+ /* data blocks already allocated */
+ AELDataHandle AS_freeBlocks;
+ /* error last found */
+ AELError AS_error;
+ /* current attachment item being processed */
+ word AS_current;
+ /* flag to decide if the current session, item, or part has just started */
+ Boolean AS_newItem;
+ Boolean AS_newPart;
+ Boolean AS_newSession;
+ /* current part of item being processed */
+ word AS_currentPart;
+ /* scratch handle */
+ MemHandle AS_scratchHandle;
+} AELSession;
+
+/* routine to initialize the AEL */
+AELHandle _pascal _export AELCreateSession(AELAttachmentParameters *params);
+/* routine to shut down the AEL */
+void _pascal _export  AELDestroySession(AELHandle handle);
+/* main AEL function, which encodes data */
+AELDataHandle _pascal _export AELProcessData(AELHandle handle, char* data, word length,
+                             Boolean endOfItem, Boolean endOfPart);
+
+void  _pascal _export AELRecycleDataBlocks(AELHandle handle, AELDataHandle block);

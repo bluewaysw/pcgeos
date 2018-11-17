@@ -1,0 +1,470 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1990 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Print Spooler
+FILE:		processConstant.def
+
+AUTHOR:		Jim DeFrisco, 15 March 1990
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Jim	3/15/90		Initial revision
+
+
+DESCRIPTION:
+	This file contains the constants and structures particular to the
+	process module of the spooler
+		
+
+	$Id: processConstant.def,v 1.1 97/04/07 11:11:34 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+; -------------------------------------------------------------------------
+;		Constants
+; -------------------------------------------------------------------------
+SPOOL_LINEBUFF_SAFETY_MARGIN	equ	284	; 20pitch x 14" + 4bytes
+						; (linebufferlement bytes)
+
+SPOOL_LINEBUFF_INCREASE		=	SPOOL_LINEBUFF_SAFETY_MARGIN
+
+SPOOL_TYPICAL_LINEBUFF		equ	131	; 4 12 pitch strings.
+
+SPOOL_FILE_BUFFER_SIZE		equ	1024
+SPOOL_PARALLEL_BUFFER_SIZE	equ	1024
+SPOOL_SERIAL_OUTPUT_BUFFER_SIZE	equ	1024
+SPOOL_SERIAL_INPUT_BUFFER_SIZE	equ	128
+
+SPOOL_THREAD_STACK_SIZE	equ	<2048 + size SpoolJobInfo>
+
+SPOOL_SWATH_DATA_SIZE_HIGH	equ	0x0004	; alloc this much for swaths
+SPOOL_SWATH_DATA_SIZE_LOW	equ	0x0000	; = 256K
+
+ERROR_RECOVERY_SLEEP_TIME	equ	90	; #ticks
+
+SPOOL_COMM_TIMEOUT_BASIS	equ	5	; #seconds
+
+SPOOL_LAST_X_POS		equ	0x7fff	; a flag to indicate that 
+						;  we want the xpos to stay
+						;  still
+
+SPOOL_INVALID_JOB_ID		equ	0xffff
+SPOOL_TITLE_JOB_ID		equ	0xfffe
+
+SPOOL_CONTROL_PANEL_RESERVATION	equ	11	; 11K
+
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+;	Spool Printing State Info
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+TiledFlag		etype	byte, 0, 1	; for SpoolPrintState
+PAGE_NOT_TILED		enum	TiledFlag
+PAGE_TILED		enum	TiledFlag
+
+RotatedFlag		etype	byte, 0, 1	; for SpoolPrintState
+PAGE_NOT_ROTATED	enum	RotatedFlag
+PAGE_ROTATED		enum	RotatedFlag
+
+FormFeedFlag		etype	byte, 0, 1	; for SpoolPrintState
+PAGE_NO_FORM_FEED	enum	FormFeedFlag
+PAGE_FORM_FEED		enum	FormFeedFlag
+
+SpoolPrintState		record
+    :2
+    SPS_TIRAMISU_PRINTING:1			; fax printing    
+    SPS_FORM_FEED	FormFeedFlag:1
+    SPS_TILED		TiledFlag:1,
+    SPS_ROTATED		RotatedFlag:1
+    SPS_SMARTS		PrinterSmart:2
+SpoolPrintState		end
+
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+;	Tiramisu Printing
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+TiramisuPrinting	struct
+    TP_libHandle	hptr		; handle of swath library
+    TP_jobToken		word		; token returned by TP_startJob
+    TP_startJob		vfptr		; startJob entry point in swath library
+    TP_endJob		vfptr		; endJob entry point in swath library
+    TP_fetchSwath	vfptr		; fetchSwat entry point in swath lib
+TiramisuPrinting	ends
+
+; -------------------------------------------------------------------------
+;		Structures
+; -------------------------------------------------------------------------
+
+		; This structure is used by all the code that implements the
+		; printing threads.  It is allocated in SpoolerLoop and 
+		; inherited by all the routines that SpoolerLoop calls.
+SpoolJobInfo	struct			; struct to hold info needed by thread
+    SJI_qHan		lptr		; our queue handle
+    SJI_info		JobParameters	; info copied from JobInfo block
+    SJI_fHan		hptr		; spool file handle
+    SJI_fPos		dword		; current position in spool file 
+    SJI_stream		fptr.far	; addr of stream driver strategy rout
+    SJI_sHan		hptr		; handle of stream driver
+    SJI_pDriver		fptr.far	; addr of print driver strategy rout
+    SJI_pdHan		hptr		; handle of print driver
+    SJI_prev_pdHan 	hptr		; handle of print driver for prev job
+    SJI_gstring		hptr.GState	; handle of source gstring
+    SJI_pstate		hptr.PState	; handle of pstate
+    SJI_gstate		hptr.GState	; handle of gstate to draw to
+    SJI_pXres		word		; printer x resolution (dpi)
+    SJI_pYres		word		; printer y resolution (dpi)
+    SJI_pXscale		WWFixed		; printer x scale factor
+    SJI_pYscale		WWFixed		; printer y scale factor
+    SJI_bandW		word		; band width (pixels)
+    SJI_bandH		word		; band height (pixels)
+    SJI_swathH		word		; swath height (pixels)
+    SJI_pageH		dword		; page height (pixels)
+    SJI_curScan		dword		; curr scan line (start of curr swath)
+    SJI_numCopies 	byte		; # copies left (used for uncollated..)
+    SJI_colorFormat 	BMFormat	; color format to use (bits/pixel)
+    SJI_colorCorrection hptr		; color correction table handle
+    SJI_bmWinHan	hptr.Window	; window handle
+    SJI_bmFileHan	word		; bitmap VM file handle
+    SJI_bmHan		hptr.Bitmap	; bitmap handle
+SBCS <    SJI_bmFileName	char 14 dup (?)	; bitmap filename	>
+DBCS <    SJI_bmFileName	wchar 14 dup (?); bitmap filename	>
+    SJI_oldMatrix 	TransMatrix <> 	; array to store old TMatrix elements
+    SJI_defMatrix 	TransMatrix <>	; array to store default TMatrix
+			; the following are some tiling variables
+    SJI_xloopTM 	TransMatrix <> 	; array to store old TMatrix elements
+    SJI_yloopTM 	TransMatrix <> 	; array to store old TMatrix elements
+    SJI_printState	SpoolPrintState	; different flags for printing
+    SJI_xPages		word		; #pieces of paper wide doc is
+    SJI_curxPage	word		; what page we're on going across
+    SJI_yPages		word		; #pieces of paper tall doc is
+    SJI_curyPage	word		; what page we're on going across
+	; these four are set/used by CalcDocOrientation to figure def matrix
+    SJI_printWidth	word		; printable width
+    SJI_printHeight	word		; printable height
+    SJI_docWidth	dword		; printable width
+    SJI_docHeight	dword		; printable height
+
+if _LABELS
+	; this bunch is used only for label printing
+    SJI_labelColX	WWFixed		; translation from one column to next
+    SJI_labelColY	WWFixed		; 
+    SJI_labelRowX	WWFixed		; translation from end of one row to
+    SJI_labelRowY	WWFixed		;   next 
+    SJI_labelfPos	dword		; current label file position 
+    SJI_labelRows	byte		; # rows to do per page
+    SJI_curRow		byte		;  current row-counting variable
+    SJI_labelColumns	byte		; # columns per page
+    SJI_curColumn	byte		;  current column-counting variable
+    SJI_gutterWidth	word		; distance between rows of labels
+    SJI_xScaleFactor	WWFixed		; actual X scale factor for labels
+    SJI_yScaleFactor	WWFixed		; actual Y scale factor for labels
+    SJI_finalScaleFactor WWFixed	; what we're really scaling by
+    SJI_adjustedWidth	WWFixed		; adjusted (by scale factors) doc width
+    SJI_adjustedHeight	WWFixed		; adjusted (by scale factors) doc height
+    SJI_scaledGutter	word		; gutter width scaled by document scale
+endif
+;______________________________________________________________________________
+;
+; These are new fields added by Dave and need to be reviewed later 7-6-92
+;______________________________________________________________________________
+
+    SJI_textXPosition	word		; X position for a style run.
+    SJI_textYPosition	word		; Y position for a style run.
+
+if _PRINTING_DIALOG
+    SJI_prDialogHan	word		; print dialog handle
+    SJI_prDialogAlready	BooleanWord	; displayed PrintDialog before?
+endif
+
+if _DUAL_THREADED_PRINTING
+    SJI_gstate2		hptr.GState	; handle of gstate to draw to
+    SJI_bmWinHan2	hptr.Window	; window handle
+    SJI_bmHan2		hptr.Bitmap	; bitmap handle
+    SJI_xloopTM2	TransMatrix <> 	; array to store old TMatrix elements
+    SJI_yloopTM2	TransMatrix <> 	; array to store old TMatrix elements
+endif
+
+    SJI_tiramisu	TiramisuPrinting ; structure used for fax printing
+
+    even
+SpoolJobInfo	ends
+
+		; some of the fields are only valid for graphics printing
+		; reuse some of them for text printing
+
+SJI_tsHan	equ	<SJI_bmHan>	; handle of TextStrings block
+SJI_tsSeg	equ	<SJI_bmWinHan>	; segment of TextStrings block
+SJI_textTileX	equ	<SJI_swathH>	; current x position for tiling text
+SJI_textTileXright equ	<SJI_pXres>	; right margin of paper
+SJI_textTileY	equ	<SJI_pageH>	; current y position for tiling text
+SJI_lineBuffPtr	equ	<SJI_curScan>	; pointer into output line buffer
+SJI_avgCharWidth equ	<SJI_bandH>	; temp used in MapRoPrinterFont
+
+
+               ; lets define an equate so we can more easily access the
+               ; port parameters in the stack frame
+
+parallelParams 	equ     <curJob.SJI_info.JP_portInfo.PPI_params.PP_parallel>
+fileParams 	equ     <curJob.SJI_info.JP_portInfo.PPI_params.PP_file>
+customParams	equ	<curJob.SJI_info.JP_portInfo.PPI_params.PP_custom>
+
+paperInfo	equ	<curJob.SJI_info.JP_paperSizeInfo>
+docInfo		equ	<curJob.SJI_info.JP_docSizeInfo>
+
+		; This is a local structure used only in CalcDocOrientation
+OrientBits	record
+    :12
+    OB_PDL:1,
+    OB_ROTATE:1,
+    OB_SCALE_TO_FIT:1,
+    :1
+OrientBits	end
+
+		; This is the structure of the job info as stored in the
+		; print queue
+JobInfoStruct	struct
+    JIS_next	lptr.JobInfoStruct	; next job in queue
+    JIS_queue	lptr.QueueInfo		; reference to queue we're in
+    JIS_time	SpoolTimeStruct <>	; time stamp for spool file
+    JIS_jobID	word			; jobID
+    JIS_info	label JobParameters	; as passed via the spool file
+					; must be the last field, as
+					; ...its size is unbounded
+					; it's a label so that we can
+					; ...easily calculate the size
+					; of the entire structure
+JobInfoStruct	ends
+
+
+; The order of this type is important. Consult with CheckForErrors()
+; if the order or number of SpoolInterruptions is altered.
+
+SpoolInterruptions etype byte, 0, 1
+SI_KEEP_GOING	enum	SpoolInterruptions
+SI_PAUSE	enum	SpoolInterruptions	; pause if DB is up (error)
+SI_ABORT	enum	SpoolInterruptions	; abort the current job
+SI_DETACH	enum	SpoolInterruptions	; detaching while printing
+SI_ERROR	enum	SpoolInterruptions	; encountered error
+
+		; This is the structure of a print queue
+QueueInfo	struct
+    QI_next	lptr.QueueInfo		; pointer to next queue
+    QI_thread	hptr			; thread handle for this queue
+SBCS <    QI_device	char MAX_DEVICE_NAME_SIZE dup (?) ; device name	>
+DBCS <    QI_device	wchar MAX_DEVICE_NAME_SIZE dup (?) ;device name	>
+    ; XXX: This field is never used, and contains incorrect data in
+    ; the case where there are multiple printers on a queue.
+
+
+    QI_portInfo	PrintPortInfo <>	; device port info
+    QI_curJob	lptr.JobInfoStruct	; pointer to current job 
+    QI_threadInfo fptr.SpoolJobInfo	; location of SpoolJobInfo for thread
+					;  handling the queue
+    QI_fileHan	hptr			; gstring file handle
+    QI_filePos	dword			; dword file position to cur page
+    QI_curPage	word			; current page number.  
+    QI_error	SpoolInterruptions <>	; something is causing us to stop
+    QI_timeout	word			; *** UNUSED ***
+    QI_maxRetry	byte			; #retries to begin with
+    QI_curRetry	byte			; #retries left before error box
+    QI_resend   PrinterResend	<>	; current timeout count
+    QI_portHan	hptr			; handle for port driver
+    QI_pdHan	hptr			; handle for printer driver
+
+    QI_numPhysPgs word			; number of physical pages that make
+					;  up the job
+    QI_curPhysPg word			; the current physical page
+
+if _DUAL_THREADED_PRINTING
+    QI_printThreadInfo	hptr		; PrintThreadInfo handle
+endif
+QueueInfo	ends
+
+
+		; This is the structure of the block that holds all the
+		; queues and jobs
+PrintQueue	struct
+    PQ_header	LMemBlockHeader <>	; lmem managed block
+    PQ_numQueues word			; number of active queues
+    PQ_numJobs	 word			; total number of jobs in queues
+    PQ_firstQueue lptr.QueueInfo	; pointer to first queue
+PrintQueue	ends
+
+
+if _DUAL_THREADED_PRINTING
+PrintThreadInfoStatus	etype byte, 0, 1
+PTIS_OK		enum	PrintThreadInfoStatus
+PTIS_EXIT	enum	PrintThreadInfoStatus
+
+		; This is the structure of the block that holds synchronization
+		; information for dual threaded printing
+PrintThreadInfo	struct
+    PTI_status		PrintThreadInfoStatus
+    PTI_errorFlags	byte		; error flags from print thread
+    PTI_printSem	hptr		; print semaphore
+    PTI_dataSem		hptr		; data semaphore
+    PTI_bitmap		optr		; bitmap
+    PTI_pstate		hptr		; PState
+    PTI_driverEntry	fptr		; printer driver entry point
+PrintThreadInfo	ends
+endif
+
+		; Text printing structures.  The text printing code builds
+		; out a list of strings that it needs to send to the driver,
+		; sorted in y order.  An LMem block is allocated to hold
+		; the strings, and the whole page is scanned (using DrawString
+		; before any text is sent.  This allows the text strings to
+		; be placed anywhere on the page at any point in the gstring.
+;
+;	The basic structure looks like this:
+;
+;			y positions chunk	string chunks
+;	yArray--------->+--------+------+	+-------+-------+--------+---+
+;			| y pos  | + | +------->| x pos | style | string | +-+->
+;			+--------+-|----+	+-------+-------+--------+---+
+;		     +-------------+
+;		     |	+--------+------+	+-------+-------+--------+---+
+;		     +->| y pos  | + | +------->| x pos | style | string | +-+->
+;			+--------+-|----+	+-------+-------+--------+---+
+;
+;	All of this, of course, is in the same LMem managed block
+;
+;	After all the text strings are retreived from the gstring, and
+;	stored in the format described above, they are output to the 
+; 	printer, one text line at a time.  All the strings at a given y
+;	position are catenated into the TS_lineBuffer, and send down to 
+;	the printer as a continuous stream of characters.  The actual format
+;	of TS_lineBuffer is:
+;
+;	  word	    word	 count bytes
+;	+-------+------------+------------------+-------+------------+---------
+;	| count	| style lptr | string		| count | style lptr | string 
+;	+-------+------------+------------------+-------+------------+---------
+;
+;	The count holds the number of characters in the string.  A count of
+;	zero indicates the end of the strings for that line.  The lptr is
+;	a chunk handle to a StringInfo element, and is used to send down
+;	the appropriate style info for the next string.  These three fields
+;	are repeated until the entire line is built out.
+
+INIT_TEXT_STRINGS_SIZE	equ	2048		; make it big enough (probably)
+
+		; structure for entire block
+;TextStrings	struct
+;    TS_header	LMemBlockHeader <>		; required header part
+;    TS_firstYPos lptr.YPosElement		; chunk of first YPosElement
+;    TS_gsBuffer	lptr			; handle of gstring buffer
+;    TS_lineBuffer lptr				; handle of line buffer
+;TextStrings	ends
+;
+;		; there is a linked list of these chunks per TextStrings block.
+;YPosElement	struct
+;    YPE_next	lptr.YPosElement		; chunk of next YPosElement
+;    YPE_pos	Point <>			; x,y position (points)
+;    YPE_string	lptr.StringInfo			; x pos, style and string
+;YPosElement	ends
+;
+;		; for each of the YPosArray element, there could be a linked
+;		; list of the following structures (there is always at least
+;		; one...)  The string starts at the end of the structure
+;StringInfo	struct
+;    SI_next	lptr.StringInfo			; pointer to next string
+;    SI_xpos	word				; x position of string
+;    SI_style	word				; PrintTextStyle record
+;    SI_font	FontID				; FontID enum
+;    SI_size	word				; point size
+;    SI_slen	word				; character count
+;    SI_spacePad	word			; space padding for this run
+;    SI_trackKern word				; custom character width
+;StringInfo	ends
+;
+;		; this is the structure of each element in the output line
+;		; buffer. It is followed by the string
+;LineBufferElement struct
+;    LBE_count	word				; character count for substring
+;    LBE_style	lptr.StringInfo			; chunk handle to string info
+;LineBufferElement ends
+
+		; enum for errors in opening the printer port
+PortErrors	etype	word, 0, 1
+PE_PORT_NOT_OPENED	enum	PortErrors
+PE_PORT_INIT_ERROR	enum	PortErrors
+
+; Enumerated type for SpoolJobCommon procedure
+;
+SpoolJobAction	etype	word, 0, 2
+SJA_HURRY		enum	SpoolJobAction
+SJA_DELAY		enum	SpoolJobAction
+SJA_PRIORITY		enum	SpoolJobAction
+
+
+; -------------------------------------------------------------------------
+;		Structures and Constants for Printer Control Panel
+; -------------------------------------------------------------------------
+	;to hold name of printer plus "on lpt?" string.
+PRINTER_NAME_PORT_LENGTH = GEODE_MAX_DEVICE_NAME_SIZE+10
+			
+
+	; length of string stuck in between file name and the application
+	; name in the job string
+FILENAME_APPNAME_SEPARATOR_LENGTH = 7
+
+	;to hold string that goes in list of jobs to describe job
+	;hold document name, application name, separator, null terminator
+JOB_STRING_LENGTH = FILE_LONGNAME_LENGTH + FILE_LONGNAME_LENGTH + \
+		FILENAME_APPNAME_SEPARATOR_LENGTH + 1
+
+BasicPrinterInfo	struct
+SBCS <	BPI_nameString	char PRINTER_NAME_PORT_LENGTH dup (?)		>
+DBCS <	BPI_nameString	wchar PRINTER_NAME_PORT_LENGTH dup (?)		>
+	BPI_portInfo	PrintPortInfo	<>
+BasicPrinterInfo	ends
+
+
+SelectedJobInfo		record
+	SJI_PRINTING:1			;selected job is printing
+	SJI_NEXT:1			;selected job is next job to be printed
+	SJI_LAST:1			;selected job is last job to be printed
+	SJI_NONE:1			;no selected job - empty queue
+SelectedJobInfo	end
+
+PrinterControlPanelData	struct
+	PCP_printerList		lptr	;chunk handle of chunk array containing
+					;BasicPrinterInfo elements for each
+					;port connected to a printer
+
+	PCP_numberOfPrinters	word	;number of printers in the printer
+					;list
+
+	PCP_currentPrinter	word	;chunk array element number of 
+					;currently displayed printer 
+
+	PCP_numberOfJobs	word	;number of jobs in genlist of
+					;jobs on current printer queue	
+
+	PCP_selectedJobInfo	SelectedJobInfo	<>
+					;record of useful information about
+					;currently selected job
+	
+PrinterControlPanelData	ends
+
+
+PrinterControlPanelLMemHeader		struct
+	PCPLH_header	LMemBlockHeader		<>
+	PCPLH_data	PrinterControlPanelData	<>
+	align		word
+PrinterControlPanelLMemHeader		ends
+
+; -------------------------------------------------------------------------
+;		Process Macros
+; -------------------------------------------------------------------------
+
+; Get job id from fptr to JobInfoStruct.
+; Job ID is currently the first word of the time
+; A macro just to make sure it can be changed easily
+
+GetJobID	macro	seg, offset,reg
+	mov	reg,{word}seg:[offset].JIS_jobID
+endm

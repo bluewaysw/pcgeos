@@ -1,0 +1,845 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	CoverPage Controller for Tiramisu.
+MODULE:		
+FILE:		coverpg.def
+
+AUTHOR:		Jim Wood, Jul 15, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimw	7/15/94   	Initial revision
+
+
+DESCRIPTION:
+	
+		
+	$Id: coverpg.def,v 1.1 97/04/04 14:20:03 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+SetDef  __CPC
+
+include vm.def
+include	file.def
+include	fax.def
+
+StartLibrary	coverpg
+
+; This is the main merge routine, and must be global.
+global	CPCMergeCoverPage:far
+
+; This allows users of the CPC to allocate a clean, iniitialized block.
+global  CPCGetNewRootBlock:far
+
+CoverPageControlClass	class	GenControlClass
+;-- errors
+
+CPC_COULDNT_CLOSE_SCRAPBOOK		enum	FatalErrors
+; Can't close scrap book for some reason.
+
+CPC_NO_SCRAP_BLOCK			enum	FatalErrors
+; No scrap block information, but it's needed.
+
+CPC_SCRAPBOOK_CORRUPTED			enum 	FatalErrors
+; Error when there's no map block in the scrapbook file.  This means something
+; is way wrong.
+
+CPC_NO_UPDATE_FILE_HANDLE		enum	FatalErrors
+; IF you try to bring up the controller without a valid info block file
+; handle, you're hosed bub.
+
+CPC_NO_UPDATE_BLOCK_HANDLE		enum	FatalErrors
+; No info block handle.  Not much we can do without one.
+
+
+CPC_OPAQUE_TA_SIZE_DOES_NOT_EQUAL_TRANS_ADDR_ELEMENT_SIZE    enum FatalErrors
+
+
+CPC_NO_SCRAP_INFO_BLOCK_HANDLE		enum FatalErrors
+
+CPC_BAD_DISK_SAVE	enum FatalErrors
+
+CPC_HOW_CAN_SP_TEMPLATE_NOT_EXIST? 	enum FatalErrors
+
+
+
+
+;-- constants
+
+CPC_MAX_MSG_PAD_HEIGHT	equ	100
+CPC_MAX_MSG_PAD_WIDTH 	equ	100
+
+;--------------------------------
+;   definition of the SPECIAL colors
+;--------------------------------
+
+; This defines the special color for signalling where the message pad
+; information is to me merged.  Also signals that the next GR_FILL_RECT
+; contains the proper SIZE of the message area.
+
+MSG_PAD_SPECIAL_RED		equ	0
+MSG_PAD_SPECIAL_GREEN		equ	0
+MSG_PAD_SPECIAL_BLUE		equ	170
+
+
+; This defines the special color for signalling either the first or
+; second of the "sandwhich" rectangle pair.  This works like so:
+;
+; When the first (back) rectangle is found, its size is used to create a
+; VisText object the same size.  This lets the object do the porper thing
+; with regards to wrapping.  All GR_DRAW_TEXT_FIELDS between then
+; and the NEXT (front) rectangle are drawn to this VisText object.
+; Then the VisText object draws itself to the gstring that's been clipped
+; to the right size.  Voila.  Text gets wrapped and text items below
+; any merging that takes place get moved down.  
+
+TEXT_FIELD_SPECIAL_RED		equ	170
+TEXT_FIELD_SPECIAL_GREEN	equ	0
+TEXT_FIELD_SPECIAL_BLUE		equ	0
+
+
+; Size of an 8  by 10 1/2 page in document coordinates. (inches * 72)
+; (accounts for printer not being able to print a WHOLE page)
+
+CPC_FAX_SHEET_HEIGHT			equ	756
+CPC_FAX_SHEET_WIDTH			equ	576
+
+; Size of the message pad ink to load.  (all of it)
+
+CPC_MESSAGE_PAD_DOC_WIDTH		equ	0xffff
+CPC_MESSAGE_PAD_DOC_HEIGHT		equ	0xffff
+
+; Initial height and width of the preview view
+
+CPC_PREVIEW_INITIAL_WIDTH		equ	250
+CPC_PREVIEW_INITIAL_HEIGHT		equ	300
+
+; Since Bitmap fonts DON'T SCALE, we set our text object to have the
+; Nimbus-Q font.  We need REAL values for
+; instantiating the text object on the fly in the merge stuff.  These have
+; to match, SO the moral is:  If you change one size or font... change the
+; other, too!
+
+CPC_TEXT_FONT_SIZE_DEFAULT	equ	VTDS_12
+CPC_TEXT_FONT_SIZE		equ	     12
+CPC_TEXT_FONT_DEFAULT		equ 	VTDF_URW_SANS
+CPC_TEXT_FONT			equ 	FID_DTC_URW_SANS
+
+; Character attributes for the msg pad
+
+CPC_MSG_PAD_CHAR_ATTRS	equ	(CPC_TEXT_FONT_SIZE_DEFAULT shl offset VTDCA_SIZE) or (CPC_TEXT_FONT_DEFAULT)
+
+
+; This is a table index count used to initialize the msg pad.
+
+CPC_MSG_PAD_TRIGGER_COUNT		equ	3
+
+; Another table index count 
+
+CPC_NUMBER_OF_INI_KEYS		equ 	3
+CPC_KEY_OFFSET_TABLE_SIZE	equ	CPC_NUMBER_OF_INI_KEYS *2
+
+
+; Black
+
+CPC_BLACK	equ	255
+
+; Compensation for geodraw.  Geodraw puts a 1/8th scale, we need 1/1.  
+
+CPC_SCALE_COMPENSATION	equ	8
+
+; Number of merge codes we use.
+
+CPC_NUMBER_OF_MERGE_CODES	equ	17
+
+;	This is the size of the @char pair, used for merging text
+;	fields.
+
+CPC_ESCAPE_CODE_SIZE		equ	2
+
+
+;	This is the escape code.  It signals that the following char
+; 	represents a merge field of some type.
+
+CPC_ESCAPE_CODE		equ	C_AT_SIGN
+
+
+;	This is the combined size of the structures that accompany
+;	the GR_DRAW_TEXT_FIELD op code as returned by GrGetGStringElement.
+;	It's used to get passed these structures to get at the text
+;	itself.
+;
+;	The complete format as returned is:
+;
+;			OpDrawTextField	: 15 bytes
+;			TFStyleRun	: 26 bytes
+;			--------------------------
+;					  41 bytes
+
+CPC_TEXT_FIELD_OP_SIZE 	equ	41
+
+
+CPC_JUSTIFY_BUFFER_SIZE	equ	100
+
+; This is the size of the initial buffer passed to GeGetGStringElemement when
+; getting a GrDrawTextField element.  It equals the size of
+; QFAX_TEXT_FIELD_OP_SIZE + 80 for one line of text + FAX_NAME__SIZE
+
+CPC_TEXT_FIELD_BUFFER_SIZE	equ	80 + CPC_TEXT_FIELD_OP_SIZE + FAX_NAME_SIZE			
+
+;
+; Here's the size of the buffer used to build the combp strings.  We have to
+; Make it pretty big...
+;
+
+CPC_COMBO_BUFFER_SIZE equ 500
+
+
+; Size of the buffer to use when getting the whole GR_DRAW_TEXT_FIELD element.
+; = 1 line (80 chars) + op code stuff
+
+CPC_TEXT_FIELD_BUILD_BUFFER_SIZE	equ	80  + CPC_TEXT_FIELD_OP_SIZE 
+
+
+
+
+CPCDisableEnableUIType	etype	word	, 0, 2
+	CPCDEUIT_ENABLE		enum	CPCDisableEnableUIType
+	CPCDEUIT_DISABLE	enum	CPCDisableEnableUIType
+
+
+
+
+
+; Definitions of the components of the CPCSourceStringsTable.
+
+ 
+; First BYTE: 
+; The first byte represents offsets into a tabel of routines.
+; Note that all sender info merging uses the same routine, while
+; each receiver info needs a different one
+
+MergeRoutineIndecies	etype	byte, 0, 2
+		MRI_TO_COMBO		enum 	MergeRoutineIndecies
+		MRI_TO_PERSON		enum 	MergeRoutineIndecies
+		MRI_TO_COMPANY		enum 	MergeRoutineIndecies
+		MRI_TO_CC_MAYBE		enum	MergeRoutineIndecies
+		MRI_TO_CC		enum 	MergeRoutineIndecies
+		MRI_TO_SUBJECT		enum 	MergeRoutineIndecies
+		MRI_FROM_ALL		enum 	MergeRoutineIndecies
+		MRI_ESCAPE_CHAR		enum	MergeRoutineIndecies
+		MRI_DATE_AND_TIME	enum	MergeRoutineIndecies
+		MRI_NUM_PAGES		enum	MergeRoutineIndecies
+
+; Second BYTE: 
+
+; Receiver stuff.
+; The first five are set so as to NEVER be confused with real offsets.
+; _WRAP/_NO_WRAP are used to signaly how to build the list:
+;
+; _WRAP :   name1,
+;	    name2,
+;	    name3
+;
+; _NO_WRAP :	names1, name2, name3
+
+TO_PERSON_COMPANY_COMBO equ	-1
+TO_WRAP			equ	-2
+TO_NO_WRAP		equ	-3
+TO_COMPANY		equ	offset	FDB_companyName
+TO_SUBJECT		equ	offset	FTAI_subject
+
+; Sender stuff.  All are offsets to particular fields within the
+; sender info struct.
+
+SenderInfoIndecies	etype	word, 0, 2
+	SII_FROM_PERSON		enum	SenderInfoIndecies
+	SII_FROM_COMPANY	enum	SenderInfoIndecies
+	SII_FROM_VOICE		enum	SenderInfoIndecies
+	SII_FROM_FAX		enum	SenderInfoIndecies	
+	SII_FROM_FAX_ID 	enum	SenderInfoIndecies
+
+
+
+
+;====================================================================
+
+;-------------------------------------------------------
+;	GenItem Idenitifiers for changing message pad input mode. 	
+;-----------------------------------------------------
+;
+; 	These identifiers are used for two things.  First, they're
+;	used to identify which edit mode the message pad is in; either
+;	text or ink.  Second, they're used as offsets into the following
+;	table:
+;
+;	EditObjectMessageTable	word	\
+;		MSG_INK_DELETE_LAST_GESTURE,
+;		MSG_CPC_INK_CLEAR_INK,
+;		MSG_VIS_TEXT_DO_KEY_FUNCTION,
+;		MSG_VIS_TEXT_DELETE_ALL
+;
+;	The identifier's interpretaion as an offset allows
+;	the routine CPCSetEditTools to load the proper
+;	messages for changing the action messages of the delete and
+;	backspace triggers. 
+;
+TextInkMode	etype	word, 0, 4
+		TIM_INK		enum 	TextInkMode
+		TIM_TEXT	enum	TextInkMode
+
+
+
+						;set in block sent to owner
+
+
+; Scrap array struct
+
+ScrapArrayElement	struct
+	SAE_name	FileLongName		;Name of the scrap
+	SAE_handle	word			;vm block handle of the scrap
+ScrapArrayElement	ends
+
+
+
+; Cover page change flags
+
+ChangeFlags	record
+	:4
+	CF_RECEIVER_LIST_CHOICE:1		;List choice has changed
+	CF_COVER_PAGE:1			;Scrapinfo has changed
+	CF_MSG_PAD_INK:1		;Ink info has changed
+	CF_MSG_PAD_TEXT:1		;Text info has chagned
+ChangeFlags	end
+
+
+
+
+;misc flags
+
+CoverPageFlags	record
+	:6
+	CPF_MSG_EXISTS:1		; used to WARN user when changing
+					;msg pad when msg exists.
+	CPF_COVER_PAGE_CHANGED:1	;Second condition to check ^
+CoverPageFlags	end
+
+
+
+;Attribute flags for msg and sandwhich areas
+
+AreaAttrFlags 	record
+	:3
+	AAF_MSG_ATTR_FOUND:1		;set when a msg pad rectangle has been
+					;found, and we should merge the pad
+
+	AAF_MSG_PAD_SEARCH:1		;set while we're looking for
+					;the msg pad
+
+	AAF_SANDWHICH_SEARCH:1		;set when we're looking at sandwhiches
+					;NOT msg rects
+
+	AAF_FOUND_SANDWHICH_COLOR:1	;set when the current area attribute
+					;is sandwhich-colored.
+					;cleared when the current area
+					;attribute is anything else.
+
+	AAF_FOUND_FIRST_SANDWHICH_RECT:1
+					;set when the foloowing three
+					;conditions are met:
+					;1) this bit is currently clear
+					;2) AAF_F_S_COLOR is set, and
+					;3) we've found a fill rect
+	
+
+
+
+AreaAttrFlags 	end
+		
+CPC_DISK_OPAQUE_DATA_SIZE	equ  100
+
+
+if DBCS_PCGEOS
+
+DiskName	type	CPC_DISK_OPAQUE_DATA_SIZE dup (wchar)
+
+else
+
+DiskName	type	CPC_DISK_OPAQUE_DATA_SIZE dup (char)
+
+endif
+
+
+
+; Holds info identifying scrap.
+
+ScrapInfo	struct
+	SI_disk		DiskName	;Disk opaque data
+	SI_diskInfoSize word		; size of the opaque data
+	SI_path		PathName	;Path
+	SI_bookName	FileLongName	;Scrapbook name
+	SI_scrapName	FileLongName	;Scrap name
+ScrapInfo 	ends
+
+
+
+
+; This is the structure passed to the controller by its owner (and received
+; from it) both issued through MSG_META_NOTIFY_WITH_DATA_BLOCK.
+
+CPCDataBlock	struct
+	CPCDB_fileHandle	word		;VM file handle of tree root
+	CPCDB_blockHandle	word		;VM block handle of tree root
+	CPCDB_changeFlags	word		;flags indicating change ->
+CPCDataBlock	ends				;Not set by the owner, passed
+						;back by controller to signal
+						;change
+
+CPC_VM_TREE_NUM_NODES	equ	3
+; VM tree structure.  This is the block accessed with the file and
+; block handles passed in CPCDataBlock with MSG_META_MOTIFY_WITH_DATA_BLOCK
+
+CPCVMTree		struct
+
+;This is the structure that
+	;shows that this is a tree, not a chain.  You must set the VCML_next
+	;field in the VMChainLink part of the structure to VM_CHAIN_TREE
+	;Set the VCMT_offset field to point to CPCVMT_textNull,
+	;as that is the first proper node encountered.  Set
+	;VMCT_count to CPC_VM_TREE_NUM_NODES
+	CPCVMT_tree		VMChainTree	
+ 
+	CPCVMT_scrapInfo	ScrapInfo	;Holds information identifying
+						;current scrap.  Defined above.
+
+
+	;Holds infromation accompanying the trans addr list, like
+	;subject, date and time, and other useful info.
+	CPCVMT_transAddrInfo	FaxTransAddrInfo
+
+
+	CPCVMT_transAddrHeap	word	0	;transaddr list
+	CPCVMT_transAddrArray	word	0
+
+	;needed because each node in a VMTree is represented by a
+	;dword. (this is to allow group and items to be copied
+	;in vm trees) text needs just a handle, so we have to have
+	;NULL field.  Set to null.
+
+	CPCVMT_textNull		word	0
+
+	CPCVMT_textBlockHandle	word	0	;Handle to TEXT TRANSFER ITEM
+						;representing the message pad
+						;text
+
+	CPCVMT_inkDBInfo	DBGroupAndItem  ;Ink group and item for msg
+						;pad ink.
+
+	CPCVMT_senderNull	word	0	;Same as above... HAVE to have
+						; a null word first, to
+						;accomadate VMCopyVMChainTree
+
+	CPCVMT_senderInfoHandle	word	0	;sender info block handle
+	
+CPCVMTree 	ends
+
+
+;--------------------------------
+;	There's no .def file for the scrapbook app: have to copy
+;--------------------------------
+
+ScrapBookIndexHeader    struct
+        SBIH_numScraps  word            ; number of scraps in this scrapbook
+ScrapBookIndexHeader    ends
+
+ScrapBookIndexEntry     struct
+        SBIE_vmBlock    word            ; VM block handle of transfer item
+                                        ;       header of this scrap
+ScrapBookIndexEntry     ends
+
+
+;-----------------------------------------------------------------------------
+;		Messages
+;-----------------------------------------------------------------------------
+
+MSG_CPC_UPDATE_UI				message
+;
+;	Handles the update of the cover page controller UI.
+;	Used instead of MSG_META_NOTIFY_WITH_DATA_BLOCK, so we
+;	can get along without another gcn list.
+;
+;	PASS:		ds:di = CPC instance data
+;			cx    = Block handle of 
+;
+
+
+
+
+
+MSG_CPC_SAVE_MSG_PAD_INFO			message
+;
+;	Copies the text and ink objects (as transfers) to their
+;	respective places in the vm tree.
+;
+;	PASS:		ds:di	= CoverPageControlClass instance data
+;
+
+
+MSG_CPC_RESET_MSG_PAD				message
+;
+;	Loads up the msg pad objects with the last saved versions of text
+;	ink.
+;	
+;	PASS:		ds:di	= CoverPageControlClass instance data 
+;
+
+
+	
+MSG_CPC_BRING_UP_MSG_PAD			message
+;
+;	Loads the ink and text objects if needed and
+;	initiates the msg pad interaction.
+;
+;	PASS:	*ds:si	= CoverPageControlClass object
+;		ds:di	= CoverPageControlClass instance data
+;
+
+
+MSG_CPC_SAVE_COVER_PAGE_DEFAULTS 		message
+;
+;	Saves the cover page info to the .ini.
+;
+;	PASS:		ds:di	= CoverPageControlClass instance data
+;
+
+
+MSG_CPC_SEND_OUT_UPDATE				message
+;
+;	Build a tree and send it to the owner.  We get this
+;	on apply
+;
+;	PASS:	*ds:si	= CoverPageControlClass object
+;		ds:di	= CoverPageControlClass instance data
+;
+
+
+MSG_CPC_SEND_OUT_NO_CHANGE			message
+;
+;	Called when cancel is hit on the contrtoller.
+;	We just clean up after ourselves.
+;
+;	PASS:	*ds:si	= CoverPageControlClass object
+;		ds:di	= CoverPageControlClass instance data
+;
+
+
+MSG_CPC_SET_MSG_PAD_INPUT_MODE			message
+;
+;	Sets the correct object in the msg pad editable
+;	PASS:	ds:si	= CoverPageControlClass instance
+;		cx	= current selection
+;
+
+
+MSG_CPC_REQUEST_ITEM_MONIKER	 		message
+;
+;	The dynamic list calls this routine when it needs the
+;	moniker of an  item in the list. 
+;
+;	PASS:	*ds:si	= controller instnace
+;		ds:di	= controller instance data
+;		bp	= number of item to return
+;		^lcx:dx	= the dynamic list requesting the moniker
+;
+
+
+MSG_CPC_CHANGE_SCRAP				message
+;
+;	Changes the scrap name in instance data.
+;
+;	PASS:	ds:di	= instance data
+;		cx	= selection number
+;
+
+
+MSG_CPC_CHANGE_VISIBLE_SCRAPBOOK		message
+;
+;	Changes the dynamic list to show the scraps of a
+;	newly selected scrapbook.
+;
+;	PASS:	*ds:si	= CoverPageControlClass object
+;		ds:di	= CoverPageControlClass instance data
+;		ds:bx	= CoverPageControlClass object (same as *ds:si)
+;		bp	=  GenFileSelectorEntryFlags
+;		cx	= selection number
+;
+
+
+MSG_CPC_BRING_UP_PREVIEW			message
+;
+;	Does a merge if needed. then initiates the interaction.
+;
+;	PASS:	*ds:si	= CoverPageControlClass 
+;		ds:di	= CoverPageControlClass instance data	
+;
+
+
+MSG_CPC_SET_RECEIVER_LIST_CHOICE		message
+;
+;	Sets instance data with current choice for this.
+;	ds:di	= instance data
+;	cx	= booleans currently selected
+;
+
+
+
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+; Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_UI)
+
+CPCFeatures	record
+	:5
+	CPCF_PAGE_SELECTION:1
+	CPCF_MESSAGE_PAD:1
+	CPCF_PREVIEW:1
+CPCFeatures	end
+
+
+; Toolbox features flags (used with ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI)
+CPCToolboxFeatures	record
+	:5
+	CPCTF_PAGE_SELECTION:1
+	CPCTF_MESSAGE_PAD:1
+	CPCTF_PREVIEW:1
+CPCToolboxFeatures 	end
+
+CPC_DEFAULT_FEATURES 	equ mask CPCF_PAGE_SELECTION \
+			or mask CPCF_MESSAGE_PAD \
+		        or mask CPCF_PREVIEW  
+
+CPC_DEFAULT_TOOLBOX_FEATURES 	equ mask CPCTF_PAGE_SELECTION \
+				or mask CPCTF_MESSAGE_PAD \
+			      	or mask CPCTF_PREVIEW
+
+
+
+;----------------------------------------------------------------------
+;instance variables for the cover page controller
+;-----------------------------------------------------------------------
+
+	CPCI_coverPageFlags		word	;Cover page change flgs
+
+	CPCI_changeFlags		word	;What's changed;
+						;msg or maybe the scrapo info
+	
+	CPCI_scrapInfoHandle		word	;mem heap handle of SI
+	CPCI_lastScrapPosition		word	;for reverting
+	CPCI_receiverListChoice		word	;first or all
+
+	CPCI_passedFileHandle		word	;Vm file of tree
+	CPCI_passedRootHandle		word	;Vm blk handle of tree
+
+
+	CPCI_inkInfo			DBGroupAndItem	;Msg Pad Ink	
+	CPCI_textInfo			word		;Msg Pad text
+
+	CPCI_msgPadHeight		word		;height of current pad
+	CPCI_msgPadWidth		word		;width of current pad
+	
+	CPCI_currentScrapbookName	FileLongName	;name of current Scbook
+	
+	CPCI_scrapListArrayBlockHandle	hptr		;scrap list blk handle
+	CPCI_scrapListArrayOffset	word		; "    "        offset
+	
+CoverPageControlClass	endc
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Scrap List Class
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CPCScrapListClass	class 	GenDynamicListClass	
+	
+CPCScrapListClass	endc
+
+
+
+
+MessagePadTextFlags	record
+
+	:5
+	MPTF_CHANGING_SIZE:1	;set when changing size
+				;no checking if we are
+
+	MPTF_FIRST_WARNING:1	;Set when the user has
+				;been warned about over-input
+
+	MPTF_AT_MAX_HEIGHT:1	;Set when input should be held up because the
+				;msg pad is full.
+
+MessagePadTextFlags 	end
+
+
+CPCMessagePadTextClass class VisTextClass 
+;----------------
+; Instance data
+;---------------
+	CPCMPTI_flags		MessagePadTextFlags
+	CPCMPTI_msgHeight	word
+
+;------------
+; Messages
+;------------
+
+
+MSG_CPC_MSG_PAD_TEXT_SET_MSG_HEIGHT	message
+;
+;	Just set the instance data.
+;
+;	PASS: 	cx = new hieght to set
+;	RETURN: nothing
+
+
+
+MSG_CPC_MSG_PAD_TEXT_GET_LINE_OFFSET	message
+;
+;	Get's the line offset, and/or Checks to see if the line exists.
+;
+;	PASS:	ds:di	= CPCTextClass instance data
+;	dx	line number we can't allow
+;
+;	RETURN:	cx	= line offset
+;		carry set if line DOESN"T EXIST.
+;
+	
+MSG_CPC_MSG_PAD_TEXT_SET_SIZE_FLAG	message
+;
+;	Set the flag saying we're changing size or not.
+;
+;	PASS:	ds:di	= CPCMessagePadTextClass instance data
+;		bp	= TRUE to set, FALSE to clear
+;
+
+CPCMessagePadTextClass	endc
+
+
+
+CPCMergeTextClass	class	VisTextClass
+
+
+MSG_CPC_MERGE_TEXT_SET_VALID		message
+;
+;	VOV_GEMOETRY_INVALID bit.  Must do this so
+;	MSG_VIS_NOTIFY_GEOMETRY_VALID will work.  That's needed
+;	in order to build out the text obj's LINE information,
+;	used in	MSG_VIS_DRAW.  whew.
+;
+;	PASS:	ds:di	= CPCMessagePadTextClass instance data
+;
+
+CPCMergeTextClass	endc
+
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Message Pad Ink Class
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+ifdef	PEN_BASED
+CPCMessagePadInkClass	class	InkClass
+
+
+
+MSG_CPCMP_INK_SET_NOT_DIRTY		message
+;
+; Sets the ink object not dirty.
+; PASS/RETURN	: nothing
+;
+
+MSG_CPCMP_INK_SET_DIRTY			message
+;
+; Sets the ink object dirty
+; PASS/RETURN 	: nothing
+;
+
+
+MSG_CPCMP_INK_CHECK_DIRTY		message
+;
+;	PASS 	: nothing
+;	RETURN	: carry set if dirty.
+;
+
+
+MSG_CPCMP_INK_CLEAR_INK		message
+;
+;	Clears all ink from the message pad
+;
+;	PASS:	*ds:si	= CPCInkClass object
+;		ds:di	= CPCInkClass instance data
+;
+
+
+
+CPCMessagePadInkClass	endc
+endif
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Message Pad Content Class
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CPCMessagePadContentClass class  VisContentClass
+
+MSG_CPC_MSG_PAD_REDRAW_INK		message
+;
+;	Redraw ink object.
+;
+;	PASS: 	ds:si 	= content instance
+
+CPCMessagePadContentClass	endc
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; Preview Content Class
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+CPCPreviewContentClass	class	VisContentClass
+
+	CPCPCI_gString	word		;current gstring to draw on VisDraw
+	
+MSG_CPC_PREVIEW_CONTENT_SET_GSTRING	message
+;
+;	Set the gstring handle instance data.
+;
+;	PASS:	ds:di	= CPCPreviewContentClass instance data
+;		cx	= gstring handle
+;	
+
+
+CPCPreviewContentClass	endc
+
+
+CPCMessageViewClass	class	GenViewClass
+CPCMessageViewClass	endc	
+
+
+
+
+EndLibrary	coverpg
+
+
+	

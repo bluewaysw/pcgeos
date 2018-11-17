@@ -1,0 +1,77 @@
+#!/bin/sh -
+##############################################################################
+#
+# 	Copyright (c) Berkeley Softworks 1989 -- All Rights Reserved
+#
+# PROJECT:	PC GEOS
+# MODULE:	Tools/scripts -- ?
+# FILE: 	countcycles
+# AUTHOR: 	Tony
+#
+#	$Id: countcycles,v 1.2 90/10/01 10:14:49 tony Exp $
+#
+###############################################################################
+#
+#	Usage: countcycles <file>
+#
+#set -x
+#
+#trap "rm -f /tmp/checkme.1 /tmp/checkme.2" 0 1 2 3 15
+#
+sed -n -e 's/\([0-9][0-9]*\) cycles total/\1/p' $1 > /tmp/checkme.1
+#
+#	For indented output
+#
+#sed -n -e 's/ *\([0-9][0-9]*\) cycles for \([^ ]*\).*$/\2 \1/p' $1 \
+#	| sort >> /tmp/checkme.1
+#
+#	For (level) output
+#
+sed -n -e 's/(\([0-9][0-9]*\)) \([0-9][0-9]*\) cycles for \([^ ]*\).*$/\3 \2/p' $1 \
+	| sort >> /tmp/checkme.1
+
+echo >> /tmp/checkme.1
+
+awk '
+    {skip = 0}
+total == 0 {
+    total = $1
+    skip = 1
+}
+skip == 0 && prev == "" {
+    reps = 1
+    subtotal = $2
+    prev = $1
+    skip = 1
+    fl = ($2 / 10) * 10
+    sumofsquares = fl * fl
+}
+skip == 0 && $1 == prev {
+    reps = reps + 1
+    subtotal = subtotal + $2
+    fl = ($2 / 10) * 10
+    sumofsquares = sumofsquares + ( fl * fl )
+    skip = 1
+}
+skip == 0 {
+    if (reps == 1) {
+	sdev = 0
+    } else {
+	sdevtop = (reps * sumofsquares) - (subtotal * subtotal)
+	sdevbottom = reps * (reps - 1)
+	sdev = sqrt((sdevtop / sdevbottom))
+	# printf "reps = %d, sumofsquares = %d, subtotal = %d\n", reps, sumofsquares, subtotal
+	# printf "sdevtop = %f, sdevbottom = %f, sdev = %.2f\n", sdevtop, sdevbottom, sdev
+    }
+    printf "%.2f%%, %d to <%s>, total %d, mean %.1f, sdev %.2f\n", \
+		(subtotal/total)*100, reps, prev, subtotal, subtotal/reps, sdev
+    reps = 1
+    subtotal = $2
+    prev = $1
+    skip = 1
+    fl = ($2 / 10) * 10
+    sumofsquares = fl * fl
+}
+' /tmp/checkme.1 | sort -n -r > /tmp/checkme.2
+
+cat /tmp/checkme.2

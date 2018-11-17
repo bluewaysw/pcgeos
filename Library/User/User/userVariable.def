@@ -1,0 +1,219 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1988 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		UserInterface/User
+FILE:		userVariable.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	2/89		Initial version
+
+DESCRIPTION:
+	This file contains variables for the User module.
+
+	$Id: userVariable.def,v 1.1 97/04/07 11:46:09 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+idata	segment
+
+
+;------------------------------------------------------------------------------
+; 		Transfer variables (idata)
+;------------------------------------------------------------------------------
+
+timeOutValue	word		; time to wait for 1st header to xfer
+remoteTransferSem	Semaphore	<1,0>
+
+;Semaphore that calling thread blocks on while waiting for the queue to get
+; data.
+
+transferSem	Semaphore	<1,0>
+	; semaphore for access to transfer variables
+
+remoteTransferTimeoutSem	Semaphore<0,0>
+
+;------------------------------------------------------------------------------
+;		Sound variables (idata)
+;------------------------------------------------------------------------------
+
+;
+;	Semaphore used for exclusive access to soundDriver variables
+;
+soundDriverSem 	Semaphore<1,>
+
+
+
+;
+;	Bit mask of StandardSoundTypes to be audible
+;
+soundMask	word	SOUND_MASK_ALL
+
+;------------------------------------------------------------------------------
+;		UserConfirmFieldChange
+;------------------------------------------------------------------------------
+
+fieldChangeBroadcastSem		Semaphore <1,0>
+fieldChangeConfirmSem		Semaphore <1,0>
+fieldChangeOK			byte	TRUE
+
+idata	ends
+
+
+udata	segment
+
+floatingKbdEnabled	BooleanByte
+;If non-zero, the floating kbd will be enabled, even if a kbd is present.
+
+receivedData		BooleanByte
+; If non-zero, we have received data over the port, so the connection is still
+; valid.
+
+abortClipboardTransfer	BooleanByte
+; If non-zero, there was some sort of sequencing error, so abort the
+; connection.
+
+waitingForClipboardItemHeader	word
+; If non-zero, we are waiting for a ClipboardItemHeader to arrive. This is
+; denoted by the ID word of the data being START_PACKET
+
+remoteTransferQueue		hptr
+;Handle of queue that holds blocks of data that have been received during
+; a clipboard transfer
+
+uiTransferVMFile	hptr
+	; VM file handle of UI's transfer file
+
+quickTransferItem	TransferItemInstance
+	; VM block handle of current quick transfer item
+
+normalTransferItem	TransferItemInstance
+	; VM block handle of current normal transfer item
+
+undoTransferItem	TransferItemInstance
+	; VM block handle of current undo transfer item
+
+transferFreeListBuffer	hptr
+	; mem block handle of transfer free list buffer
+
+transferFreeListBufSize	word
+	; size of transfer free list buffer
+
+;------------------------------------------------------------------------------
+;		UI Process variables (udata)
+;------------------------------------------------------------------------------
+
+uiFlags			UIFlags	; Flags for UI state
+
+uiAckID			word	; Holds ID sent in MSG_META_DETACH to UI process
+uiAckOD			optr	; Holds Ack OD sent in MSG_META_DETACH to UI proc
+
+stateFileHandle		word	; VM file handle of UI state file
+
+
+;------------------------------------------------------------------------------
+;		Global preferences (udata)
+;------------------------------------------------------------------------------
+
+uiButtonFlags		UIButtonFlags
+				; Current UIButtonFlags from input map block.
+				; Consists of global preferences for operation
+				; of mouse, UI -- includes UIBF_CLICK_TO_TYPE,
+				; etc.
+
+uiInputMapHandle	hptr	; Handle of current input map block
+
+uiOverstrikeMode	byte	; Flag (let's waste space) for overstrike mode.
+				; -1 = overstrikeModeOn
+
+uiNoActivationDialog	byte	; Flag (let's waste space) for overstrike mode.
+				; -1 = no activation dialogs in transparent mode
+
+uiKbdAcceleratorMode	byte	; Flag (let's waste space) for kbd accelerator
+				;	mode.
+				; -1 = kbdAccelerator mode on
+
+
+
+uiInterfaceLevel		UIInterfaceLevel
+				; Stores current user level, which is used
+				; to drive default values for a number of 
+				; settings both in the environment & within
+				; apps
+
+uiDefaultLaunchLevel		UIInterfaceLevel
+				; Default level to launch apps at and to
+				; introduce new concepts at
+
+uiInterfaceOptions		UIInterfaceOptions
+				; Various interface options that apps need
+				; to get to
+
+uiLaunchModel			UILaunchModel
+				; Application launch mode
+
+uiLaunchOptions			UILaunchOptions
+				; Application launch options
+
+;------------------------------------------------------------------------------
+;		Driver/Library/Object references (udata)
+;------------------------------------------------------------------------------
+
+uiThread		hptr	; Holds thread handle of UI process
+				; (The one that runs UI objects)
+
+uiSystemObj		optr	; Holds the OD of the one GenSystem object
+uiFlowObj		optr	; Holds the OD of the one Flow object
+
+uiSpecUILibrary		hptr	; Handle of specific UI library we load
+
+		
+soundDriver		hptr	; Holds handle of sound driver
+soundDriverEntry	fptr.far ; Holds ptr to sound driver strategy routine
+
+;------------------------------------------------------------------------------
+;               DisplayScheme variables (udata)
+;------------------------------------------------------------------------------
+
+; For systems with one display type, or one UI moniker font/size,
+; these variable can store that information for quick access by the generic UI
+;
+uiDisplayType         		DisplayType
+uiDefaultMonikerFont  		FontID
+uiDefaultMonikerPointSize	word
+
+
+if	(AUTO_BUSY)
+uiStack	sptr (?)				; Will hold segment of UI's
+						; stack, for busy timer stuff
+endif
+spoolerHandle	hptr	(?)			;Handle of the spooler process
+mailboxHandle	hptr	(?)			;Handle of the mailbox process
+
+hwrHandle	hptr	(?)			;Handle of the hwr library
+
+;------------------------------------------------------------------------------
+;		Password variables (idata)
+;------------------------------------------------------------------------------
+
+passwordActive	BooleanByte
+
+;------------------------------------------------------------------------------
+;		Help variables (udata)
+;------------------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+;		UserConfirmFieldChange
+;------------------------------------------------------------------------------
+
+fieldChangeConfirmCount		word	0
+fieldChangeAckOD		optr
+fieldChangeAckMsg		word
+
+udata	ends
+
+
+

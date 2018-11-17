@@ -1,0 +1,174 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT:	Test Applications
+ * MODULE:	Base64
+ * FILE:		base64.goc
+ * AUTHOR:	jfh  1/04
+ *
+ * DESCRIPTION:
+ *
+ *              decode a base64 encoded string
+ *
+ *
+ *
+ *
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+#include <ansi/string.h>
+#include <ansi/stdlib.h>
+@include <bbxmlib.goh>
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+
+@class	TestProcessClass, GenProcessClass ;
+	@message void MSG_TEST_DECODE();
+	@message void MSG_TEST_ENCODE();
+@endc
+
+@classdecl	TestProcessClass, neverSaved ;
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+@start	AppResource;
+
+@object GenApplicationClass TestApp = {
+	 GI_visMoniker = list { @TestTextMoniker }
+    GI_comp = @TestPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @TestPrimary;
+}
+
+@visMoniker TestTextMoniker = "Base-64";
+
+@end	AppResource
+
+@start	Interface;
+
+@object GenPrimaryClass TestPrimary  = {
+	 GI_comp = @EntryWindow, @DecodedWindow, @NumWindow, @Triggers;
+	 HINT_SIZE_WINDOW_AS_DESIRED;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass EntryWindow = {
+	 GI_visMoniker = "Enter String:";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_destination = process;
+	 GTXI_applyMsg = MSG_TEST_DECODE;
+	 HINT_PLACE_MONIKER_ABOVE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_TEXT_WHITE_WASH_COLOR;
+}
+
+@object GenTextClass DecodedWindow = {
+	 GI_visMoniker = "Decoded/Encoded:";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 HINT_PLACE_MONIKER_ABOVE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	 HINT_TEXT_WHITE_WASH_COLOR;
+}
+
+@object GenTextClass NumWindow = {
+	 GI_visMoniker = "Bytes decoded/encoded:";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 HINT_PLACE_MONIKER_ABOVE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	 HINT_TEXT_WHITE_WASH_COLOR;
+}
+
+@object GenInteractionClass Triggers = {
+	GI_comp = @DecodeTrigger, @EncodeTrigger;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+@object GenTriggerClass DecodeTrigger = {
+	GI_visMoniker = "Decode it";
+	GTI_actionMsg = MSG_TEST_DECODE;
+	GTI_destination = process;
+}
+
+@object GenTriggerClass EncodeTrigger = {
+	GI_visMoniker = "Encode it";
+	GTI_actionMsg = MSG_TEST_ENCODE;
+	GTI_destination = process;
+}
+@end Interface
+
+/*
+ ***************************************************************************
+ *		Code for TestProcessClass
+ ***************************************************************************
+ */
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_TEST_DECODE for TestProcessClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method TestProcessClass, MSG_TEST_DECODE
+{
+ char		string[100], decoded[100], num[15];
+ word		numDecoded;
+
+
+	if (@call EntryWindow::MSG_VIS_TEXT_GET_ALL_PTR(string)) {
+
+		numDecoded = MailB64DecodePtr((byte*)string, 100, (byte*)decoded, 100);
+		decoded[numDecoded] = 0;
+		@call DecodedWindow::MSG_VIS_TEXT_REPLACE_ALL_PTR(decoded, 0);
+
+		UtilHex32ToAscii(num, (dword)numDecoded, UHTAF_NULL_TERMINATE);
+		@call NumWindow::MSG_VIS_TEXT_REPLACE_ALL_PTR(num, 0);
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_TEST_ENCODE for TestProcessClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method TestProcessClass, MSG_TEST_ENCODE
+{
+ char		string[100], encoded[100], num[15];
+ word		len, numEncoded;   
+
+	len = @call EntryWindow::MSG_VIS_TEXT_GET_ALL_PTR(string);
+	if (len) {
+
+		numEncoded = MailB64EncodePtr((byte*)string, len, (byte*)encoded);
+		encoded[numDecoded] = 0;
+		@call DecodedWindow::MSG_VIS_TEXT_REPLACE_ALL_PTR(encoded, 0);
+
+		UtilHex32ToAscii(num, (dword)numEncoded, UHTAF_NULL_TERMINATE);
+		@call NumWindow::MSG_VIS_TEXT_REPLACE_ALL_PTR(num, 0);
+		}
+
+}
+
+

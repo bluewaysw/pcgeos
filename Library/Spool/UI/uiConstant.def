@@ -1,0 +1,556 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Spool
+FILE:		uiConstant.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	11/89		Initial version
+
+DESCRIPTION:
+	This file contains constants for the UI module
+
+	$Id: uiConstant.def,v 1.1 97/04/07 11:10:34 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+;------------------------------------------------------------------------------
+; UI Template constants
+;------------------------------------------------------------------------------
+PrintCtrlParamType etype word, 1
+
+PCPT_PRINT_CTRL		enum PrintCtrlParamType
+; Used for OD's which need to be set to the print control object itself.
+
+
+
+;------------------------------------------------------------------------------
+; Other class defintions
+;------------------------------------------------------------------------------
+
+SpoolSummonsPrinterInfo	record
+	:1
+	SSPI_INITIALIZED:1		; has the information been loaded ??
+	SSPI_VALID:1			; is this printer valid or not ??
+	SSPI_CAPABLE_TO_FILE:1		; can the printer print to a file ??
+	SSPI_PRINT_TO_FILE:1		; is this printer going to a file ??
+	SSPI_DEF_PRINT_TO_FILE:1	; default to print to file ??
+	SSPI_UI_IN_DIALOG_BOX:1		; UI elements in main dialog box ??
+	SSPI_UI_IN_OPTIONS_BOX:1	; UI elements in options dialog box ??
+SpoolSummonsPrinterInfo	end
+
+SpoolSummonsFlags	record
+	:2
+	SSF_HAVE_FILE_NAME:1		; set once we've asked for the file
+					;  name when printing to file. reset
+					;  when print-to-file turned off.
+					;  ensures we only ask when the user
+					;  actually enables print-to-file
+	SSF_PRINTING_TO_LABELS:1	; so we can disable collate button
+	SSF_RELOAD_PRINTER_LIST:1	; the printer list needs to be re-read
+	SSF_UPDATE_MONIKERS:1		; update the case-dependent monikers
+	SSF_RESETTING_PAPER_SIZE:1	; in the middle or resetting the size
+	SSF_PRINTING_TO_FILE:1		; we're printing to a file
+SpoolSummonsFlags	end
+
+FREE_DRIVER_IMMEDIATELY	equ	-1	; left in SSI_cachedDriver to indicate
+					; that drivers should be freed instead
+					; of cached, as the SpoolSummons
+					; object is being destroyd.
+
+SpoolSummonsClass	class	GenInteractionClass, master
+
+
+
+;------------------------------------------------------------------------------
+; External messages
+;------------------------------------------------------------------------------
+
+MSG_SPOOL_SUMMONS_INITIALIZE_UI_LEVEL				message
+;
+; Initialize the UI level for the print dialog
+;
+; Pass:		Nothing
+; Returns:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_SPOOL_SUMMONS_CLEAN_UP					message
+;
+; Remove any memory or allocated objects prior to being destroyed
+;
+; Pass:		Nothing
+; Returns:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_SPOOL_SUMMONS_SET_DEFAULT_PRINTER				message
+;
+; Sets the application default printer. If new printers are installed or
+; removed, then this default will be used.
+;
+; Pass:		CX	= Printer number
+; Returns:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_SPOOL_SUMMONS_GET_PRINTER_STRINGS				message
+;
+; Allocate & return a copy of the block holding the names of the
+; installed printer drivers.
+;
+; Pass:		Nothing
+; Returns:	CX	= Length of buffer
+;		DX	= Handle of block holding stringd
+;		BP	= Currently selected printer
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_SPOOL_SUMMONS_SET_PAGE_RANGE				message
+;
+; Set the range of pages that are in a document
+;
+; Pass:		CX	= First page #
+;		DX	= Last page #
+; Returns:	Nothing
+;		AX, BP - destroyed
+;
+
+MSG_SPOOL_SUMMONS_GET_PAGE_RANGE				message
+;
+; Returns the range of pages in a document
+;
+; Pass:		Nothing
+; Returns:	CX	= First page #
+;		DX	= Last page #
+;		Nothing - destroyed
+;
+
+MSG_SPOOL_SUMMONS_SET_USER_PAGE_RANGE				message
+;
+; Sets the range of pages that should initially be selected
+;
+; Pass:		CX	= First page #
+;		DX	= Last page #
+; Returns:	Nothing
+;		AX, BP - destroyed
+;
+
+MSG_SPOOL_SUMMONS_GET_USER_PAGE_RANGE				message
+;
+; Gets the range of pages that are currently selected
+;
+; Pass:		Nothing
+; Returns:	CX	= First page #
+;		DX	= Last page # 
+;		Nothing - destroyed
+;
+
+MSG_SPOOL_SUMMONS_SET_PRINT_ATTRS				message
+;
+; Set the PrintControlAttrs
+;
+; Pass:		CX	= PrintControlAttrs
+; Returns:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_SPOOL_SUMMONS_GET_PRINT_MODE				message
+;
+; Get the print mode selected by the user.
+;
+; Pass:		Nothing
+; Returns:	CL	= Printer Mode
+;		AX, CH, DX, BP - destroyed
+;
+
+MSG_SPOOL_SUMMONS_GET_PRINT_INFO				message
+;
+; Get some information for a pending print operation
+;
+; Pass:		Nothing
+; Returns: 	CL	= PrinterMode
+;		CH	= SpoolOptions
+;		DL	= Number of retries
+;		DH	= Number of copies
+;		BP	= Timeout value (seconds)
+;		AX - destroyed
+;
+
+MSG_SPOOL_SUMMONS_GET_PAPER_SIZE_INFO				message
+;
+; Get the paper size selected by the user.
+;
+; Pass:		DX:BP	= PageSizeReport buffer
+; Returns:	DX:BP	= PageSizeReport filled
+;		AX, CX - destroyed
+;
+
+MSG_SPOOL_SUMMONS_PRINTING_TO_FILE				message
+;
+; Determine if we are printing to a file or not
+;
+; Pass:		Nothing
+; Returns:	AX	= 0 (print to device) or 1 (print to file)
+;		Nothing - destroyed
+;
+
+MSG_SPOOL_SUMMONS_GET_PRINTER_OPTIONS				message
+;
+; Get the options displayed by the printer driver
+;
+; Pass:		CX	= JobParameters block handle
+; Returns:	AX	= Zero for succcess, non-zero for error
+;		Nothing - destroyed
+;
+
+MSG_SPOOL_SUMMONS_GET_PRINTER_MARGINS				message
+;
+; Get the margins enforced by the printer driver
+;
+; Pass:		Nothing
+; Returns:	AX	= Left margin
+;		CX	= Top margin
+;		DX	= Right margin
+;		BP	= Bottom margin
+;		Carry	= Set if error
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_SPOOL_SUMMONS_PREPEND_APPEND_PAGE				message
+;
+; Prepend or append a page onto the current print job
+;
+; Pass:		CX	= PrintEscCode
+;		DX	= GString handle to draw to
+; Returns:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+
+;------------------------------------------------------------------------------
+; Internal messages
+;------------------------------------------------------------------------------
+
+MSG_SPOOL_SUMMONS_REQUEST_PRINTER_MONIKER			message
+;
+; Request a moniker for an entry in the GenDynamicList holding the
+; names of printers. Will respond with a messaage to the passed OD.
+;
+; Pass:		CX:DX	= OD of GenDynamicList
+;		BP	= Item #
+; Returns:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_SPOOL_SUMMONS_PRINTER_SELECTED				message
+;
+; Respond to selection of a printer by the user
+;
+; Pass:		CX	= Printer number (0 -> n-1)
+; Returns:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_SPOOL_SUMMONS_RESET_PRINTER					message
+;
+; Reset the selected printer to the previous selection, as a printer
+; was chosen that could not be loaded for some reaon.
+;
+; Pass:		Nothing
+; Returns:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_SPOOL_SUMMONS_SET_PAGE_FROM					message
+;
+; The user has selected a new "from" page. Update UI as needed
+;
+; Pass:		DX	= Page #
+; Returns:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_SPOOL_SUMMONS_SET_PAGE_TO					message
+;
+; The user has selected a new "to" page. Update UI as needed.
+;
+; Pass:		DX	= Page #
+; Returns:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_SPOOL_SUMMONS_SET_PAGE_EXCL					message
+;
+; Set the "All" or "From - To" exclusive for the range of pages to be
+; printer. Update UI as needed.
+;
+; Pass:		CX	= 0 (All) or 1 (Selected)
+; Returns:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_SPOOL_SUMMONS_SET_OUTPUT_TYPE				message
+;
+; Set the output type (graphics or text). Update UI as needed.
+;
+; Pass:		CX	= 0 (graphics) or 1 (text)
+; Returns:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_SPOOL_SUMMONS_SET_NUM_COPIES				message
+;
+; Set the number of copies to be printed
+;
+; Pass:		DX	= Number of copies
+; Returns:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_SPOOL_SUMMONS_SET_COLLATE_MODE				message
+;
+; Set the coolate mode on or off
+;
+; Pass:		CX	= 0 or mask SO_COLLATE
+; Returns:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_SPOOL_SUMMONS_SET_PAGE_ORDER_OPTIONS			message
+;
+; Set the page order options selected by the user
+;
+; Pass:		CX	= SpoolOptions to be set
+; Returns:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_SPOOL_SUMMONS_SET_TIMEOUT					message
+;
+; Set the timeout value to be used by the printer driver
+;
+; Pass:		DX	= Timeout value in seconds
+; Returns:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_SPOOL_SUMMONS_SET_RETRY					message
+;
+; Set the macximum number of retries to be attempted by the
+; printer driver
+;
+; Pass:		DX	= Maximum # of retries
+; Returns:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_SPOOL_SUMMONS_SET_PRINT_TO_FILE				message
+;
+; Set to clear/set the printing to a file (in lieu of the output device)
+;
+; Pass:		CL	= 0 (to output device) or 1 (to file)
+; Returns:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_SPOOL_SUMMONS_LOAD_OPTIONS					message
+;
+; Load the options from the .INI file for the current printer
+;
+; Pass:		Nothing
+; Returns:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_SPOOL_SUMMONS_SAVE_OPTIONS					message
+;
+; Save the options selected by the user in the Print->Options dialog
+; box to the .INI file
+;
+; Pass:		Nothing
+; Returns:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_SPOOL_SUMMONS_REMOTE_ERROR					message
+;
+; Display an error string to the user. If an error message requires a
+; printer name to be substituted, the current printer will be used.
+;
+; Pass:		CX	= PrintControlErrors
+;		BP	= Message to send to myself upon completion
+; Returns:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+
+;------------------------------------------------------------------------------
+; Post 2.0 messages
+;------------------------------------------------------------------------------
+
+MSG_SPOOL_SUMMONS_SET_DRIVER_TYPE				message
+;
+; Set the driver type for what is displayed in the Print dialog box
+;
+; Pass:		CL	= PrinterDriverType
+; Returns:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_SPOOL_SUMMONS_GET_DRIVER_TYPE				message
+;
+; Get the driver type for what is displayed in the Print dialog box
+;
+; Pass:		Nothing
+; Returns:	CL	= PrinterDriverType
+;		Nothing - destroyed
+;
+
+MSG_SPOOL_SUMMONS_FREE_UI_BLOCK_AND_DRIVER			message
+;
+; Frees the duplicated UI from a printer driver, and then frees the
+; driver itself. This message is sent out after the various queues
+; have been flushed of all events destined for the block to be freed,
+; so don't send this message directly. Instead, call the utility
+; SpoolFreeDriverAndUIBlock
+;
+; Pass:		CX:DX	= OD of object in duplicated block
+;		BP	= Handle of printer driver from whence the
+;			  the UI was duplicated
+; Returns:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+MSG_SPOOL_SUMMONS_INITIALIZE					message
+;
+; Message queued to self on VIS_OPEN, to set up the UI for the box properly.
+; Must be queued to prevent nested-update problems.
+;
+; Pass:		Nothing
+; Returns:	Nothing
+;		AX, CX, DX, BP - destroyed
+;
+
+;------------------------------------------------------------------------------
+; Instance data
+;------------------------------------------------------------------------------
+	SSI_flags		SpoolSummonsFlags
+	SSI_pageExcl		word		; the current page exclusive
+	SSI_firstPage		word		; first page
+	SSI_lastPage		word		; last page
+	SSI_firstUserPage	word		; first user page
+	SSI_lastUserPage	word		; last user page
+	SSI_numPrinters		word		; number of printers on system
+	SSI_numValidPrinters	word		; number of usable printers
+	SSI_printDataHan	hptr		; block with printer categories
+	SSI_printDataLen	word		; length of the printer strings
+	SSI_sysDefPrinter	word		; the system's default printer
+	SSI_appDefPrinter	word		; application's default printer
+	SSI_currentPrinter	word		; current printer number
+	SSI_printInfoChunk	lptr		; handle of specific print info
+	SSI_cachedDriver	hptr		; handle of cached print driver
+	SSI_printerUIState	hptr.JobParameters ; temporary printer UI state
+
+	SSI_printAttrs		PrintControlAttrs
+	SSI_printerAttrs	PrinterOutputModes
+	SSI_printerInfo		SpoolSummonsPrinterInfo
+
+	SSI_timeout		word		; timeout time (in seconds)
+	SSI_retries		byte		; maximum number of retries
+	SSI_numCopies		byte		; number of copies (up to 255)
+	SSI_spoolOptions	SpoolOptions	; spool options
+
+	SSI_backupPrinter	word		; previous printer number
+	SSI_backupTimeout	word		; previous timeout value
+	SSI_backupRetries	byte		; previous retries value
+	SSI_backupFlags		SpoolSummonsFlags
+	;
+	; New for post 2.0
+	;
+	SSI_driverType		PrinterDriverType
+	SSI_driverAttrs		PrintControlAttrs
+SpoolSummonsClass	endc
+
+
+SpoolChangeClass	class	GenInteractionClass
+SpoolChangeClass	endc
+
+SizeVerifyDialogClass	class	GenInteractionClass
+SizeVerifyDialogClass	endc
+
+
+;------------------------------------------------------------------------------
+; Various record definitions
+;------------------------------------------------------------------------------
+
+PrintDeviceOutputType	record
+	:6
+	PDOT_PRINTER:1				; print to printer
+	PDOT_FILE:1				; print to file
+PrintDeviceOutputType	end
+
+; The order of the bit field is important here, as the display strings
+; are concatenated starting from the lowest bit.
+
+SpoolErrorType	record
+	SET_unused:4,				; unused: must be zero!
+	SET_portName:1,				; display the port name strings
+	SET_printerName:1,			; display the printer name str
+	SET_appName:1,				; display the app name strings
+	SET_spoolFile:1				; display the spool file names
+SpoolErrorType	end
+
+PrintControlErrors	etype	word, 0, 4
+PCERR_EXTERNAL		enum	PrintControlErrors	; external error message
+PCERR_NO_PRINTERS	enum	PrintControlErrors	; no printer available
+PCERR_ALL_BAD_PRINTERS	enum	PrintControlErrors	; all printers are bad
+PCERR_DRIVER_NOT_FOUND	enum	PrintControlErrors	; couldn't load driver
+PCERR_PRINTER_NOT_KNOWN	enum	PrintControlErrors	; unknown printer
+PCERR_INIT_FILE_DEVICE	enum	PrintControlErrors	; missing device name
+PCERR_INIT_FILE_DRIVER	enum	PrintControlErrors	; missing driver name
+PCERR_NO_MODE_AVAIL	enum	PrintControlErrors	; no usable print modes
+PCERR_FAIL_FILE_CREATE	enum	PrintControlErrors	; couldn't create file
+PCERR_DISK_FULL		enum	PrintControlErrors	; disk filled up...
+PCERR_DOC_WONT_FIT	enum	PrintControlErrors	; document too big
+
+ErrorArgumentType	etype	word, 1
+EAT_DRIVER_NAME 	enum	ErrorArgumentType
+EAT_PRINTER_NAME 	enum	ErrorArgumentType
+EAT_DEVICE_FIELD 	enum	ErrorArgumentType
+EAT_DRIVER_FIELD 	enum	ErrorArgumentType
+
+DefaultType		etype	word
+DT_PAPER		enum	DefaultType
+DT_TIMEOUT		enum	DefaultType
+
+READY_TO_RELEASE_JOB	 equ	mask PSF_RECEIVED_COMPLETED or \
+				mask PSF_RECEIVED_NAME or \
+				mask PSF_VERIFIED
+
+
+
+;------------------------------------------------------------------------------
+; Various structure definitions
+;------------------------------------------------------------------------------
+
+; This structure is built out for every printer the user has installed.
+; It is built once upon PrintControl visualization, and again each time
+; the .INI file is written to.
+;
+PrinterInfoStruct	struct
+    PIS_POM		PrinterOutputModes	; output modes avail
+    PIS_info		SpoolSummonsPrinterInfo	; additional information
+    PIS_error		PrintControlErrors	; printer load error
+    PIS_driverType	PrinterDriverType	; printer, fax, etc..
+    PIS_maxWidth	word			; maximum width of paper
+    PIS_timeout		word			; timeout value (min)
+    PIS_mainUI		optr			; OD of duplicated UI
+    PIS_optionsUI 	optr			; OD of duplicated UI
+    PIS_driverHandle	hptr			; loaded driver handle
+PrinterInfoStruct	ends
+

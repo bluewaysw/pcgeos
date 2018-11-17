@@ -1,0 +1,1462 @@
+/*
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+ */
+
+/***************************************************************************
+ *  FILE:  FL_LOCAL.GOC
+ ***************************************************************************/
+
+@include <stdapp.goh>
+@include <Ansi\string.h>
+@include <Ansi\stdio.h>
+@include <geoMisc.h>
+@include <Objects\filelist.goh>
+@include "internal.goh"
+
+/*---------------------------------------------------------------------------
+
+    Definition of a path:
+    ------------------------------
+    A directory path is somewhat a harder concept here.  In this code, a
+    path is intended to be an abstract definition of some folder within
+    folder location.  Here is another way to definite it:
+
+    PATH = [VOLUME]?
+              +
+           [ROOT]?
+              +
+           [[FOLDER] | [UP]]*
+              +
+           [FILTER]?
+
+    []? means one or zero
+    []* means any number of these (including zero)
+
+    VOLUME   = Name of current drive.  Typically C for C:, D for D: etc.
+    ROOT     = Specifies that the path starts from the base of the volume
+    FOLDER   = Subdirectory from the collective location defined to the left
+    FILTER   = Specification of the files to be identified in the list.
+               (Using stnadard * and ? symbols).  Since a filter is so
+               special, it is handled differently.
+    UP       = Directive to remove one folder in the subfolder list
+               (typically not stored, just used as a directive when combining
+               two paths)
+
+
+    Combing paths occurs as follows:
+    --------------------------------
+    If the old volume and the new volume are different, just throw out the
+    old one and put in the new volume.
+
+    If the new path has a root declaration, throw out all the folders in the
+    old path and start with fresh with a 'root' specifier.
+
+    Folders in the new path are just appended to the end of the old path.  If
+    Up directives are mixed in, folders are removed from the end one by one
+    per Up directive.
+
+    The new filter always replaces the old filter (and deletes if there is
+    no new filter).
+
+
+    Path as it applies to GenFileListClass:
+    ---------------------------------------
+    The GenFileListClass stores one path.  It represents the collective
+    location of the current view.  It is used to construct a string that
+    represents the same thing.  The class also provides methods that parse
+    a string into the path format.  A subclass can be used to override the
+    parsing method for a different algorithm (say for a different filing
+    system).
+
+ ---------------------------------------------------------------------------*/
+
+typedef struct {
+    ChunkArrayHeader DPH_meta ;
+
+    ChunkHandle DPH_volume ;
+    ChunkHandle DPH_filter ;
+    word        DPH_flags ;
+        #define     DIR_PATH_HEADER_IS_ROOT   0x8000
+} DirPathHeader ;
+
+typedef ChunkHandle DirPathElement ;
+
+@extern object FileListUIPath ;
+
+/*-------------------------------------------------------------------------
+ | Routine:  DirPathCreate
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Create a structure to hold a parsed path.
+ |
+ | Outputs:
+ |     DirPathHandle           -- The created empty parsed path
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+DirPathHandle DirPathCreate(void)
+{
+    MemHandle mem ;
+    ChunkHandle array ;
+    DirPathHeader *p_header ;
+
+    mem = MemAllocLMem(LMEM_TYPE_GENERAL, 0) ;
+    MemLock(mem) ;
+    array = ChunkArrayCreate(
+                mem, 
+                sizeof(DirPathElement), 
+                sizeof(DirPathHeader), 
+                OCF_DIRTY) ;
+    p_header = LMemDerefHandles(mem, array) ;
+    p_header->DPH_volume = NullHandle ;
+    p_header->DPH_filter = NullHandle ;
+    MemUnlock(mem) ;
+
+    return ConstructOptr(mem, array) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  DirPathDestroy
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Destroy a previously created parse path and any associated data
+ |
+ | Inputs:
+ |     DirPathHandle           -- path
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void DirPathDestroy(DirPathHandle path)
+{
+    if (path)
+        MemFree(OptrToHandle(path)) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  DirPathGetVolume
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Return a handle to volume string.
+ |
+ | Inputs:
+ |     DirPathHandle           -- path
+ |
+ | Outputs:
+ |     optr                       -- Handle to null terminated string.
+ |                                   NullHandle if none.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+optr DirPathGetVolume(DirPathHandle path)
+{
+    DirPathHeader *p_header ;
+    optr volume ;
+
+    MemLock(OptrToHandle(path)) ;
+    p_header = LMemDeref(path) ;
+    if (p_header->DPH_volume)
+        volume = ConstructOptr(OptrToHandle(path), p_header->DPH_volume) ;
+    else
+        volume = NullHandle ;
+    MemUnlock(OptrToHandle(path)) ;
+
+    return volume ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  DirPathSetVolume
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Change the volume of a path using a string allocated by 
+ |     DirPathAllocSubString.
+ |
+ | Inputs:
+ |     DirPathHandle           -- path
+ |     ChunkHandle string         -- Handle returned by 
+ |                                   DirPathAllocSubString
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void DirPathSetVolume(DirPathHandle path, ChunkHandle string)
+{
+    DirPathHeader *p_header ;
+
+    MemLock(OptrToHandle(path)) ;
+    p_header = LMemDeref(path) ;
+    if (p_header->DPH_volume)
+        LMemFreeHandles((OptrToHandle(path)), p_header->DPH_volume) ;
+    p_header->DPH_volume = string ;
+    MemUnlock(OptrToHandle(path)) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  DirPathGetFilter
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Return a handle to filter string.
+ |
+ | Inputs:
+ |     DirPathHandle           -- path
+ |
+ | Outputs:
+ |     optr                       -- Handle to null terminated string.
+ |                                   NullHandle if none.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+optr DirPathGetFilter(DirPathHandle path)
+{
+    DirPathHeader *p_header ;
+    optr filter ;
+
+    MemLock(OptrToHandle(path)) ;
+    p_header = LMemDeref(path) ;
+    if (p_header->DPH_filter)
+        filter = ConstructOptr(OptrToHandle(path), p_header->DPH_filter) ;
+    else
+        filter = NullHandle ;
+    MemUnlock(OptrToHandle(path)) ;
+
+    return filter ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  DirPathSetFilter
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Change the filter of a path using a string allocated by 
+ |     DirPathAllocSubString.
+ |
+ | Inputs:
+ |     DirPathHandle           -- path
+ |     ChunkHandle string         -- Handle returned by 
+ |                                   DirPathAllocSubString
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void DirPathSetFilter(DirPathHandle path, ChunkHandle string)
+{
+    DirPathHeader *p_header ;
+
+    MemLock(OptrToHandle(path)) ;
+    p_header = LMemDeref(path) ;
+    if (p_header->DPH_filter)
+        LMemFreeHandles((OptrToHandle(path)), p_header->DPH_filter) ;
+    p_header->DPH_filter = string ;
+    MemUnlock(OptrToHandle(path)) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  DirPathGetFlags
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Return the flags on a path.
+ |
+ | Inputs:
+ |     DirPathHandle           -- path
+ |
+ | Outputs:
+ |     word                       -- path flags
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+word DirPathGetFlags(DirPathHandle path)
+{
+    DirPathHeader *p_header ;
+    word flags ;
+
+    MemLock(OptrToHandle(path)) ;
+    p_header = LMemDeref(path) ;
+    flags = p_header->DPH_flags ;
+    MemUnlock(OptrToHandle(path)) ;
+
+    return flags ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  DirPathSetFlags
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Set the flags on a path.
+ |
+ | Inputs:
+ |     word                       -- path flags
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void DirPathSetFlags(DirPathHandle path, word flags)
+{
+    DirPathHeader *p_header ;
+
+    MemLock(OptrToHandle(path)) ;
+    p_header = LMemDeref(path) ;
+    p_header->DPH_flags = flags ;
+    MemUnlock(OptrToHandle(path)) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  DirPathGetNthFolder
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Locate and return the handle to the Nth folder entry in the
+ |     folder list.
+ |
+ | Inputs:
+ |     DirPathHandle           -- path
+ |     word n                     -- Nth entry to find (0 is first)
+ |
+ | Outputs:
+ |     optr                       -- Handle to null terminated string.
+ |                                   NullHandle if none.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+optr DirPathGetNthFolder(DirPathHandle path, word n)
+{
+    DirPathElement *p_folder ;
+    optr folder = NullHandle ;
+
+    MemLock(OptrToHandle(path)) ;
+    p_folder = ChunkArrayElementToPtr(path, n, NULL) ;
+    if (*p_folder)
+        folder = ConstructOptr(OptrToHandle(path), *p_folder) ;
+    MemUnlock(OptrToHandle(path)) ;
+
+    return folder ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  DirPathGetNumFolders
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Return the number of folders in the path.
+ |
+ | Inputs:
+ |     DirPathHandle           -- path
+ |
+ | Outputs:
+ |     word                       -- Number of folder entries
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+word DirPathGetNumFolders(DirPathHandle path)
+{
+    word num ;
+
+    MemLock(OptrToHandle(path)) ;
+    num = ChunkArrayGetCount(path) ;
+    MemUnlock(OptrToHandle(path)) ;
+
+    return num ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  DirPathAppendFolder
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Add another folder to the end of the parsed path.
+ |
+ | Inputs:
+ |     DirPathHandle           -- path
+ |     ChunkHandle string         -- String allocated by 
+ |                                   DirPathAllocSubString
+ |
+ | Outputs:
+ |     word                       -- Index to the new folder
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+word DirPathAppendFolder(DirPathHandle path, ChunkHandle string)
+{
+    word index ;
+    DirPathElement *p_folder ;
+
+    MemLock(OptrToHandle(path)) ;
+    p_folder = ChunkArrayAppend(path, 1) ;
+    *p_folder = string ;
+    index = ChunkArrayGetCount(path) ;
+    MemUnlock(OptrToHandle(path)) ;
+
+    return index ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  DirPathDeleteFolder
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Destroy a folder in the list by its index.
+ |
+ | Inputs:
+ |     DirPathHandle           -- path
+ |     word index                 -- Index to folder item
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void DirPathDeleteFolder(DirPathHandle path, word index)
+{
+    DirPathElement *p_folder ;
+
+    MemLock(OptrToHandle(path)) ;
+    p_folder = ChunkArrayElementToPtr(path, index, NULL) ;
+    if (p_folder)  {
+        LMemFreeHandles(OptrToHandle(path), *p_folder) ;
+        ChunkArrayDelete(path, p_folder) ;
+    }
+    MemUnlock(OptrToHandle(path)) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  DirPathAllocSubString
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Create a string in the path to be used by the other DirPath routines
+ |
+ | Inputs:
+ |     DirPathHandle           -- path
+ |     char *p_string             -- Pointer to the string
+ |     word len                   -- Length of string, or 0 if null
+ |                                   terminated.
+ |
+ | Outputs:
+ |     ChunkHandle                -- Handle to string inside of DirPath
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+ChunkHandle DirPathAllocSubString(
+                DirPathHandle path, 
+                char *p_string, 
+                word len)
+{
+    MemHandle mem ;
+    ChunkHandle chunk = NullHandle ;
+    char *p_substring ;
+
+    mem = OptrToHandle(path) ;
+    MemLock(mem) ;
+
+    if (!len)
+        len = 1+strlen(p_string) ;
+
+    if (len)  {
+        /* Mem is assumed to be locked */
+        chunk = LMemAlloc(mem, len) ;
+        p_substring = LMemDerefHandles(mem, chunk) ;
+        memcpy(p_substring, p_string, len) ;
+        p_substring[len-1] = '\0' ;
+    }
+
+    MemUnlock(mem) ;
+
+    return chunk ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  DirPathAllocSubString
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Create a string in the path to be used by the other DirPath 
+ |     routines, but pass in an optr to a string elsewhere.
+ |
+ | Inputs:
+ |     DirPathHandle           -- path
+ |     optr string                -- String elsewhere (LMem chunk)
+ |
+ | Outputs:
+ |     ChunkHandle                -- Handle to string inside of DirPath
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+ChunkHandle DirPathAllocSubStringOptr(
+                DirPathHandle path, 
+                optr string)
+{
+    ChunkHandle chunk = NullHandle ;
+
+    if (string)  {
+        MemLock(OptrToHandle(string)) ;        
+        chunk = DirPathAllocSubString(
+                    path, 
+                    LMemDeref(string), 
+                    1+strlen(LMemDeref(string))) ;
+        MemUnlock(OptrToHandle(string)) ;
+    }
+
+    return chunk ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  DirPathReset
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Clear out all the folders and maybe clear out the volume.
+ |
+ | Inputs:
+ |     DirPathHandle           -- path
+ |     Boolean clearVolume        -- TRUE to clear out Volume
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void DirPathReset(
+         DirPathHandle path, 
+         Boolean clearVolume)
+{
+    if (clearVolume)
+        DirPathSetVolume(path, NullHandle) ;
+    while (DirPathGetNumFolders(path))
+        DirPathDeleteFolder(path, 0) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  DirPathRemoveLastFolder
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Get rid of the last folder in the list (usually used to go 'up'
+ |     a directory tree).
+ |
+ | Inputs:
+ |     DirPathHandle           -- path
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void DirPathRemoveLastFolder(DirPathHandle path)
+{
+    word num ;
+
+    num = DirPathGetNumFolders(path) ;
+    if (num)  
+        DirPathDeleteFolder(path, num-1) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  DirPathDuplicate
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Create a complete copy of a given parsed path
+ |
+ | Inputs:
+ |     DirPathHandle           -- path
+ |
+ | Outputs:
+ |     DirPathHandle           -- copied path
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+DirPathHandle DirPathDuplicate(DirPathHandle path)
+{
+    DirPathHandle newPath ;
+    word num, i ;
+
+    newPath = DirPathCreate() ;
+    if (path)  {
+        /* Because I want everything to be clean, don't just duplicate */
+        /* the block, but actually pull over each part */
+        DirPathSetVolume(
+            newPath, 
+            DirPathAllocSubStringOptr(
+                newPath, 
+                DirPathGetVolume(path))) ;
+        DirPathSetFilter(
+            newPath, 
+            DirPathAllocSubStringOptr(
+                newPath,
+                DirPathGetFilter(path))) ;
+        DirPathSetFlags(newPath, DirPathGetFlags(path)) ;
+        num = DirPathGetNumFolders(path) ;
+        for (i=0; i<num; i++)
+            DirPathAppendFolder(
+                newPath, 
+                DirPathAllocSubStringOptr(
+                    newPath,
+                    DirPathGetNthFolder(path, i))) ;
+    }
+
+    return newPath ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  DirPathApplyPath
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Apply a path onto another path (relative) and maybe overwrite the
+ |     existing filter.
+ |
+ | Inputs:
+ |     DirPathHandle path      -- path to be applied upon
+ |     DirPathHandle appliedPath -- Path to go to
+ |     Boolean overwriteFilter    -- TRUE if you want to lose the old
+ |                                   filter.
+ |
+ | Outputs:
+ |     DirPathHandle           -- New path (same as input path)
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+DirPathHandle DirPathApplyPath(
+                     DirPathHandle path, 
+                     DirPathHandle appliedPath,
+                     Boolean overwriteFilter)
+{
+    word num, i ;
+
+    /* If we have a volume, clear out the target path */
+    if (DirPathGetVolume(appliedPath))  {
+        DirPathReset(path, TRUE) ;
+        DirPathSetFlags(
+            path, 
+            DirPathGetFlags(path) & (~DIR_PATH_HEADER_IS_ROOT)) ;
+        DirPathSetVolume(
+            path, 
+            DirPathAllocSubStringOptr(
+                path, 
+                DirPathGetVolume(appliedPath))) ;
+    }
+
+    if (DirPathGetFlags(appliedPath) & DIR_PATH_HEADER_IS_ROOT)  {
+        DirPathReset(path, FALSE) ;
+        DirPathSetFlags(
+            path,
+            DirPathGetFlags(path) | DIR_PATH_HEADER_IS_ROOT) ;
+    }
+
+    if ((overwriteFilter) || (DirPathGetFilter(appliedPath)))  {
+        DirPathSetFilter(
+            path,
+            DirPathAllocSubStringOptr(
+                path,
+                DirPathGetFilter(appliedPath))) ;
+    }
+
+    num = DirPathGetNumFolders(appliedPath) ;
+    for (i=0; i<num; i++)  {
+        DirPathAppendFolder(
+            path,
+            DirPathAllocSubStringOptr(
+                path,
+                DirPathGetNthFolder(appliedPath, i))) ;
+    }
+    return path ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  DirPathStandardParse
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Given a string and some guides of what characters to use, break
+ |     down the string into the following pieces:
+ |     [VOLUME] : \ [FOLDER] \ [FOLDER] \ ... \ [FOLDER] \ [FILTER]
+ |     A parsed path of some type is always returned.
+ |
+ | Inputs:
+ |     char *p_path               -- String to parse
+ |     char parseVolume           -- Volume divider (usually ':')
+ |     char parseDivider          -- folder divider (usually '\')
+ |     char parseRoot             -- root divider (usually '\')
+ |
+ | Outputs:
+ |     DirPathHandle           -- Parsed path
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+DirPathHandle DirPathStandardParse(
+                     char *p_path, 
+                     char parseVolume, 
+                     char parseDivider, 
+                     char parseRoot)
+{
+    DirPathHandle path ;
+    char *p ;
+
+    /* Create a block with a chunk array */
+    path = DirPathCreate() ;
+
+    /* Now parse the path into pieces */
+    /* Search for a colon to delinitate a volume name */
+    p = p_path ;
+    while (*p)  {
+        /* We have found a volume specifier */
+        /* Copy it into a string and put in the command */
+        if (*p == parseVolume)  {
+            DirPathSetVolume(
+                path,
+                DirPathAllocSubString(path, p_path, 1+p-p_path)) ;
+            p_path = p+1 ;
+        }
+
+        /* If we found a back slash before the colon, */
+        /* then there is no volume name */
+        if (*p == parseDivider)
+            break ;
+
+        p++ ;
+    }
+
+    /* Now that we have determined the volume and moved past */
+    /* it (if any), do we have a root specifier? */
+    if (p_path[0] == parseRoot)  {
+        /* yes, we do.  MOve past it and record */
+        p_path++ ;
+
+        DirPathSetFlags(
+            path,
+            DirPathGetFlags(path) | DIR_PATH_HEADER_IS_ROOT) ;
+    }
+
+    /* Now we go into the more complex loop of determining */
+    /* folders, filenames, and up directives. */
+    if (*p_path)  {
+        /* Determine if this substring has a divider character */
+        p = p_path ;
+        while (1)  {
+            if ((*p == parseDivider) || (*p == '\0')) {
+                if (p != p_path)  {
+                    /* Found a subdirectory! */
+                    DirPathAppendFolder(
+                        path,
+                        DirPathAllocSubString(path, p_path, 1+p-p_path)) ;
+
+                    /* On to the next section */
+                    p_path = p+1 ;
+                }
+            }
+            if (!(*p))
+                break ;
+            p++ ;
+        }
+    }
+
+    return path ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  DirPathCompareFolder
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Compares a string with a folder in a path.  Case sensitive.
+ |
+ | Inputs:
+ |     DirPathHandle path      -- path
+ |     word index                 -- Folder entry in path
+ |     char *p_string             -- String to compare (null term)
+ |
+ | Outputs:
+ |     Boolean                    -- TRUE if match, else FALSE
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+Boolean DirPathCompareFolder(
+            DirPathHandle path, 
+            word index, 
+            char *p_string)
+{
+    optr string ;
+    Boolean isSame = FALSE ;
+
+    string = DirPathGetNthFolder(path, index) ;
+    if (string)  {
+        MemLock(OptrToHandle(string)) ;
+        if (strcmp(p_string, LMemDeref(string)) == 0)
+            isSame = TRUE ;
+        MemUnlock(OptrToHandle(string)) ;
+    }
+
+    return isSame ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  DirPathStandardCondense
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Condensing gets rid of any 'up' specifiers in a path.  Therefore,
+ |     a DOS path of:
+ |     ..\SOMEDIR1\SOMDIR3\..\SOMEDIR2
+ |  
+ |     will become:
+ |     ..\SOMEDIR1\SOMDIR2
+ |
+ |     Condensers at the beginning are kept.
+ |
+ | Inputs:
+ |     DirPathHandle path      -- path
+ |     char *p_condenser          -- Usually pointer to ".."
+ |     char *p_ignore             -- Items to get rid of.  Usually, "."
+ |     Boolean allowStartingCondensers -- TRUE if you allow ../[path], or
+ |                                        FALSE to cut to /[path]
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void DirPathStandardCondense(
+         DirPathHandle path, 
+         char *p_condenser, 
+         char *p_ignore,
+         Boolean allowStartingCondensers)
+{
+    word i ;
+    word numPreviousFolders = 0 ;
+
+    for (i=0; i<DirPathGetNumFolders(path); )  {
+        if (DirPathCompareFolder(path, i, p_condenser))  {
+            if (numPreviousFolders)  {
+                /* Delete the condenser and previous */
+                DirPathDeleteFolder(path, i) ;
+                DirPathDeleteFolder(path, i-1) ;
+
+                /* One less previous folder and we need */
+                /* to go back there */
+                numPreviousFolders-- ;
+                i-- ;
+            } else {
+                /* Do nothing, just keep the condenser */
+                if (allowStartingCondensers)  {
+                    i++ ;
+                } else {
+                    DirPathDeleteFolder(path, i) ;
+                }
+            }
+        } else if (DirPathCompareFolder(path, i, p_ignore))  {
+            DirPathDeleteFolder(path, i) ;
+        } else {
+            /* Not condenser.  Note that we have one more */
+            numPreviousFolders++ ;
+            i++ ;
+        }
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  DirPathMakeRoot
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Force a path to start from the root.
+ |
+ | Inputs:
+ |     DirPathHandle path      -- path
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/13/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void DirPathMakeRoot(DirPathHandle path)
+{
+    DirPathSetFlags(
+        path,
+        DirPathGetFlags(path) | DIR_PATH_HEADER_IS_ROOT) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  IAppendStringWithLimit                        * INTERNAL *
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Add a string to the end of another string with a limit.  If past
+ |     the limit, fail and report.
+ |
+ | Inputs:
+ |     char *p_path               -- String to append to
+ |     word limit                 -- Limit of that string
+ |     optr string                -- String to append with
+ |
+ | Outputs:
+ |     Boolean                    -- TRUE if append was ok, else FALSE
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+Boolean IAppendStringWithLimit(char *p_path, word limit, optr string)
+{
+    word len1, len2 ;
+    char *p_string ;
+    Boolean didAppend = FALSE ;
+
+    MemLock(OptrToHandle(string)) ;
+    p_string = LMemDeref(string) ;
+    len1 = strlen(p_path) ;
+    len2 = strlen(p_string) ;
+    if ((len1 + len2) < limit)  {
+        strcpy(p_path+len1, p_string) ;
+        didAppend = TRUE ;
+    }
+    MemUnlock(OptrToHandle(string)) ;
+
+    return didAppend ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  IAppendCharWithLimit                          * INTERNAL *
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Add a single character to a string checking for a limit.
+ |
+ | Inputs:
+ |     char *p_path               -- String to append to
+ |     word limit                 -- Limit of that string
+ |     char c                     -- character to append with
+ |
+ | Outputs:
+ |     Boolean                    -- TRUE if append was ok, else FALSE
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+Boolean IAppendCharWithLimit(char *p_path, word limit, char c)
+{
+    word len ;
+
+    len = strlen(p_path) ;
+    if (len < limit)  {
+        p_path[len] = c ;
+        p_path[len+1] = '\0' ;
+        return TRUE ;
+    }
+
+    return FALSE ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  DirPathConstructString
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Create a single string out of the path given the parameters.
+ |     This is mainly created for DOS path strings.
+ |
+ |     Creates:
+ |     [VOLUME] : \ [FOLDER] \ ... \ [FOLDER] \ [FILTER]
+ |
+ | Inputs:
+ |     DirPathHandle path      -- Path to string
+ |     char *p_path               -- String to path to create
+ |     word limit                 -- Limit on size of that path
+ |     char parseVolume           -- Volume parse character (usually ':')
+ |     char parseDivider          -- Divider character (usually '\')
+ |     char parseRoot             -- Root character (usally '\')
+ |     Boolean addVolume          -- TRUE if you want volume
+ |     Boolean addFilter          -- TRUE if you want filter
+ |
+ | Outputs:
+ |     Boolean                    -- TRUE if limit not hit, else FALSE
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+Boolean DirPathConstructString(
+         DirPathHandle path,
+         char *p_path,
+         word limit,
+         char parseVolume, 
+         char parseDivider, 
+         char parseRoot,
+         Boolean addVolume,
+         Boolean addFilter)
+{
+    optr string ;
+    word i ;
+    word num ;
+    Boolean havePreviousFolder = FALSE ;
+
+    *p_path = 0 ;
+
+    /* Add a volume specifier */
+    if ((addVolume) && ((string = DirPathGetVolume(path)) != NullHandle))  {
+        if (!IAppendStringWithLimit(p_path, limit, string))
+            return FALSE ;
+        if (parseVolume)  
+            if (!IAppendCharWithLimit(p_path, limit, parseVolume))
+                return FALSE ;
+    }
+
+    /* Put in a root divider */
+    if ((parseRoot) && (DirPathGetFlags(path) & DIR_PATH_HEADER_IS_ROOT))  {
+        if (!IAppendCharWithLimit(p_path, limit, parseRoot))
+            return FALSE ;
+    }
+
+    /* Append the folder items */
+    num = DirPathGetNumFolders(path) ;
+    for (i=0; i<num; i++)  {
+        if ((havePreviousFolder) && (parseDivider))  {
+            if (!IAppendCharWithLimit(p_path, limit, parseDivider))
+                return FALSE ;
+            havePreviousFolder = FALSE ;
+        }
+        if (!IAppendStringWithLimit(
+                p_path, 
+                limit, 
+                DirPathGetNthFolder(path, i)))
+            return FALSE ;
+        havePreviousFolder = TRUE ;
+    }
+
+    /* Finally, tag on the filter if its needed */
+    if (addFilter)  {
+        string = DirPathGetFilter(path) ;
+        if (string)   {
+            if ((havePreviousFolder) && (parseDivider))  {
+                if (!IAppendCharWithLimit(p_path, limit, parseDivider))
+                    return FALSE ;
+            }
+            if (!IAppendStringWithLimit(
+                    p_path, 
+                    limit, 
+                    string))
+                return FALSE ;
+        }
+    }
+
+    return TRUE ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_PARSE_PATH
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Given a string, parse it down and return a path handle for this
+ |     type of file list.
+ |
+ | Inputs:
+ |     char *p_path               -- Path to parse
+ |
+ | Outputs:
+ |     DirPathHandle           -- Path that was parsed.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_PARSE_PATH
+/* (
+                                      char *p_path) ;
+*/
+{
+    DirPathHandle path ;
+    word num ;
+    Boolean isFilter ;
+    optr string ;
+
+    path = DirPathStandardParse(
+               p_path,
+               pself->GFLI_parseVolume,
+               pself->GFLI_parseDivider,
+               pself->GFLI_parseRoot) ;
+
+    /* If we have a filter at the end of our folder list, we need to */
+    /* move it to the filter spot. */
+    num = DirPathGetNumFolders(path) ;
+    if (num)  {
+        string = DirPathGetNthFolder(path, num) ;
+
+        /* Let a subclass determine what is a filter and what is not */
+        isFilter = @call oself::MSG_GEN_FILE_LIST_IS_STRING_FILTER(string) ;
+        if (isFilter)  {
+            DirPathSetFilter(
+                path, 
+                DirPathAllocSubStringOptr(
+                    path,
+                    string)) ;
+            DirPathRemoveLastFolder(path) ;
+        }
+    }
+
+    return path ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_APPLY_PARSED_PATH
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Given a parsed path, apply it to the current path in the file
+ |     list.  
+ |
+ | Inputs:
+ |     DirPathHandle path      -- Path to apply
+ |     Boolean overrideFilter     -- TRUE if given path should be the
+ |                                   filter that is used, else FALSE
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_APPLY_PARSED_PATH
+{
+    DirPathHandle newPath ;
+
+    newPath = DirPathDuplicate(pself->GFLI_parsedPath) ;
+
+    DirPathApplyPath(
+        newPath, 
+        path,
+        overrideFilter) ;
+
+    @call oself::MSG_GEN_FILE_LIST_CONDENSE_PATH(newPath) ;
+    @call oself::MSG_META_SUSPEND() ;
+    @send ,forceQueue oself::MSG_GEN_FILE_LIST_VALIDATE_PATH(newPath) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_CONSTRUCT_PATH_STRING
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Create a string out of the parsed path stored in the file list.
+ |     (in the format expected for the file list)
+ |
+ | Inputs:
+ |     char *p_path               -- Place to store constructed string
+ |     word maxPathSize           -- Limit on given p_path.
+ |     Boolean addVolume          -- TRUE if volume should be included
+ |     Boolean addFilter          -- TRUE if filter should be appended
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_CONSTRUCT_PATH_STRING
+{
+    DirPathConstructString(
+        pself->GFLI_parsedPath,
+        p_path,
+        maxPathSize,
+        pself->GFLI_parseVolume,
+        pself->GFLI_parseDivider,
+        pself->GFLI_parseRoot,
+        addVolume,
+        addFilter) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_IS_STRING_FILTER
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Checks a string to see if it is a filter for this file list.
+ |     Usually intercepted in sub-classes with new filter types.
+ |
+ | Inputs:
+ |     optr string                -- String to check.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_IS_STRING_FILTER
+/*                        optr string */
+{
+    char *p ;
+    Boolean isFilter = FALSE ;
+
+    /* We'll just do a simple test.  If we have the character '*' or '?' in */
+    /* the string, then we have a filter */
+    MemLock(OptrToHandle(string)) ;
+    p = LMemDeref(string) ;
+    while (*p)  {
+        if ((*p == '*') || (*p == '?'))  {
+            isFilter = TRUE ;
+            break ;
+        }
+        p++ ;
+    }
+
+    MemUnlock(OptrToHandle(string)) ;
+
+    return isFilter ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_CONDENSE_PATH
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Go through the path in the file list and get rid of all 'up' path
+ |     references to 'condense' the path.
+ |     Usually subclassed by file lists with different file path setups.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_CONDENSE_PATH
+{
+    /* Go through and find all the double dots in the path and condense it */
+    DirPathStandardCondense(path, "..", ".", FALSE) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_VALIDATE_PATH
+ *-------------------------------------------------------------------------
+ | Description:
+ |    This method is given a parsed path.  The method's job is to check
+ |    that the path is correct and if so, call ACCEPT_DENY or DENY_PATH.
+ |    Either one MUST be called.
+ |    This method is usally handled by the sub-class.
+ |    The current default is always to accept.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_VALIDATE_PATH
+{
+    T_volumeID volume ;
+    ChunkHandle volumeName ;
+    TCHAR *p_volume ;
+
+    MemLock(OptrToHandle(path)) ;
+    volumeName = DirPathGetVolume(path) ;
+    p_volume = LMemDerefHandles(OptrToHandle(path), volumeName) ;
+    volume = @call oself::MSG_GEN_FILE_LIST_MAP_VOLUME_NAME(p_volume) ;
+    MemUnlock(OptrToHandle(path)) ;
+
+    /* Always assume it is good in the default case */
+    @send ,forceQueue oself::MSG_GEN_FILE_LIST_ACCEPT_PATH(path, volume) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_ACCEPT_PATH
+ *-------------------------------------------------------------------------
+ | Description:
+ |    A parsed path has been created, applied, validated, and now
+ |    accepted.  We are now ready to destroy the old path, keep this path,
+ |    and reload to the new file list.
+ |
+ | Inputs:
+ |    DirPathHandle path       -- Path being accepted
+ |    T_volumeID volume           -- Volume to use
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_ACCEPT_PATH
+{
+    char buffer[512] ;
+    if (pself->GFLI_parsedPath)
+        DirPathDestroy(pself->GFLI_parsedPath) ;
+    pself->GFLI_parsedPath = path ;
+    if (volume != VOLUME_ID_BAD)  {
+        pself->GFLI_volume = volume ;
+        @call oself::MSG_GEN_FILE_LIST_SELECT_VOLUME(volume) ;
+    }
+    if (DirPathGetNumFolders(path) == 0)  {
+        @call oself::MSG_GEN_FILE_LIST_SET_ENABLED_PARTS(
+                  0, 
+                  GEN_FILE_LIST_PART_UP_TRIGGER) ;
+    } else {
+        @call oself::MSG_GEN_FILE_LIST_SET_ENABLED_PARTS(
+                  GEN_FILE_LIST_PART_UP_TRIGGER,
+                  0) ;
+    }
+    if (ObjVarFindData(oself, HINT_GEN_FILE_LIST_ALWAYS_SHOW_FULL_PATH))  {
+        @call oself::MSG_GEN_FILE_LIST_GET_PATH(buffer, sizeof(buffer)) ;
+        @call @CHILD(FileListUIPath)::MSG_VIS_TEXT_REPLACE_ALL_PTR(buffer, 0) ;
+    } else {
+        @call @CHILD(FileListUIPath)::MSG_VIS_TEXT_DELETE_ALL() ;
+    }
+    @call oself::MSG_GEN_FILE_LIST_RELOAD() ;
+    @call oself::MSG_META_UNSUSPEND() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_DENY_PATH
+ *-------------------------------------------------------------------------
+ | Description:
+ |    The path has been declared 'bad' and needs to be denied.
+ |    Destroy the path as the default action.
+ |
+ | Inputs:
+ |    DirPathHandle path       -- Path being denyed
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/08/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_DENY_PATH
+{
+    /* TBD:  Error message? */
+    DirPathDestroy(path) ;
+    @call oself::MSG_GEN_FILE_LIST_SELECT_VOLUME(pself->GFLI_volume) ;
+    @call oself::MSG_META_UNSUSPEND() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_SET_PATH
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Declare the path to make the UI object to show.  This will cause
+ |     the list to clear out and display the new location.  If the path
+ |     is the same as last, nothing will happen.
+ |
+ | Inputs:
+ |     DiskHandle disk            -- Optional drive specifier.  Pass 0
+ |                                   for none.
+ |     TCHAR *p_path              -- Full path specifier.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/01/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_SET_PATH
+{
+    DirPathHandle path ;
+
+    path = @call oself::MSG_GEN_FILE_LIST_PARSE_PATH(p_path) ;
+    @call oself::MSG_GEN_FILE_LIST_APPLY_PARSED_PATH(path, TRUE) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_GET_PATH
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Get the current path being used.
+ |
+ | Inputs:
+ |     TCHAR *p_path              -- Place to store path, pass NULL for
+ |                                   no retrieval
+ |     word maxPathSize           -- Maximum bytes to store
+ |
+ | Outputs:
+ |     DiskHandle                 -- Returned disk handle
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/01/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_GET_PATH
+{
+    /* Retrieve the path (if desired) */
+    if ((p_path) && (maxPathSize) && (pself->GFLI_parsedPath))  {
+        @call oself::MSG_GEN_FILE_LIST_CONSTRUCT_PATH_STRING(
+            p_path, 
+            maxPathSize-1,
+            FALSE,
+            FALSE) ;
+    } else {
+        *p_path = '\0' ;
+    }
+
+    /* Return the disk handle currently used */
+    return pself->GFLI_volume ;
+}
+
+/***************************************************************************
+ *  END OF FILE:  FL_PATH.goc
+ ***************************************************************************/
+

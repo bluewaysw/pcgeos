@@ -1,0 +1,2273 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GlobalPC 1998 -- All Rights Reserved
+ *
+ * PROJECT:	Internet Dial-up & Configure  Applications
+ * MODULE:	
+ * FILE:	
+ *
+ * AUTHOR:	mzhu: Nov 23, 1998
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      mzhu    11/23/98        Initial version
+ *
+ * DESCRIPTION:
+ *
+ *	$Id: $
+ *
+ ***********************************************************************/
+#include <product.h>
+@include <stdapp.goh>
+@include <system.h>
+@include <gcnlist.goh>
+#include <geoworks.h>
+@include <geoMisc.h>
+@include <socket.goh>
+#include <sockmisc.h>
+@include "IDialup.goh"
+@include "IDialUI.goh"
+#include "IDialppp.h"
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>
+#include <Ansi/stdio.h>
+#include <Internal/ppp.h>
+#include <Internal/socketDr.h>
+#include <sockmisc.h>
+@include <accpnt.goh>
+#include <initfile.h>
+#include <sem.h>
+#include <Internal/geodeStr.h>
+
+#define HIDDEN_INTERNET_ACCPNT 1
+#define NAME_LEN 30
+
+@classdecl	IDialupProcessClass, neverSaved;
+@classdecl	IDialupIPTextClass;
+@extern method IDialupProcessClass, MSG_IDP_TIMER_HANDLE;
+
+TimerHandle timerHandle ;
+word timerId ;
+dword startTime;
+PPPStatus pppStatus;
+
+//unsigned int tHours, tMinutes, tSeconds;
+unsigned int idleTime, idleTimeout, delayTimeout;
+
+MemHandle connectionHandle;
+ChunkHandle connectionChunk;
+ChunkHandle iAppChunk;
+
+word connectionNum = 0;
+word currentAccpnt=0;
+word defaultAccpnt=0;
+
+word tempAccpnt = 0;
+#define TEMPORARY_KEY "temp"
+
+static SemaphoreHandle wait;
+static Boolean creatingConnection = FALSE;
+
+Boolean iAppRunning = FALSE;
+
+// This is used to indicate that the connect message was sent to us
+// and that we are currently attempting to connect.  Because the
+// notification from the PPP driver can take some time, we don't want
+// a field change to happen between the time the user presses CONNECT
+// and the time the ppp driver responds.
+Boolean connectSent = FALSE;
+Boolean disconnectRequested = FALSE;
+
+Boolean bStealthLIAFlag = FALSE;
+
+/*#ifndef PRODUCT_NDO2000 */
+Boolean editDialOptionsChanged;
+/*#endif */
+
+Boolean G_registered = FALSE ;
+
+extern Boolean sendFieldChangeConfirm;
+
+extern Boolean _pascal IDialupConnect (void);
+extern Boolean _pascal IDialupDisconnect (void);
+extern word GetBaudRate(void);
+extern void RegisterToPPP(void);
+extern void UnregisterToPPP(void);
+extern Boolean IAppRunning(void);
+extern void SendPing(void);
+void IDialupEnsureDefaultConnection(void);
+
+/*
+ ***************************************************************************
+ *		Code for IDialupProcessClass
+ ***************************************************************************
+ */
+/***********************************************************************
+ *	MSG_GEN_PROCESS_OPEN_APPLICATION for IDialupProcessClass
+ ***********************************************************************
+ * SYNOPSIS:     Initialize the application.
+ *
+ * PARAMETERS:  (AppAttachFlags attachFlags = cx,
+ *		 MemHandle launchBlock = dx,
+ *		 MemHandle extraState = bp)
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/23/98	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+    AppLaunchBlock *ab;
+    MemHandle mh;
+    word size, i;
+    TCHAR *ptr, *names;
+    char *p;
+    Boolean bShowDetails = FALSE; /* this must match the object default */
+
+    pppStatus = PPP_STATUS_CLOSED;
+
+    GCNListAdd(@IDialupApp, MANUFACTURER_ID_GEOWORKS, GCNSLT_PPP_STATUS_NOTIFICATIONS);
+    GCNListAdd(ConstructOptr(GeodeGetProcessHandle(), NullChunk),
+	       MANUFACTURER_ID_GEOWORKS,
+	       GCNSLT_APPLICATION);
+    GCNListAdd(@IDialupApp, MANUFACTURER_ID_GEOWORKS,
+	       GCNSLT_INSTANT_SUSPEND_RESUME_NOTIFICATIONS);
+    GCNListAdd(@IDialupApp, MANUFACTURER_ID_GEOWORKS, GCNSLT_FIELD_CHANGE_NOTIFICATIONS);
+
+  /* Register for a connection */
+  if (!G_registered)  {
+      LoadPPPDriver();
+
+      RegisterToPPP();
+	  G_registered = TRUE ;
+  }
+
+    @call self::MSG_IDP_INITIALIZE_CONNECTION();
+
+    // Hack to delete the temporary access point created by signup, just in case
+    // signup crashes and fails to clean up after itself. (dhunter 1/13/2000)
+    if (tempAccpnt)
+    {
+        AccessPointDestroyEntryDirect(tempAccpnt);
+        tempAccpnt = 0;
+        AccessPointCommit();
+
+        // Reload the accpnt list.
+        @call self::MSG_IDP_INITIALIZE_CONNECTION();
+    }
+
+    // Ensure that there is only one default access point.  We do this because
+    // Welcome can add a new default without un-defaulting the old one.  The 
+    // last one discovered (the one set by MSG_IDP_INITIALIZE_CONNECTION) is the 
+    // desired default.
+    IDialupEnsureDefaultConnection();
+
+    @callsuper();
+
+    if(launchBlock)
+      {
+	ab = MemLock(launchBlock);
+	wait = ab->ALB_extraData;
+	if(wait)
+	  {
+	    // we should connect from here
+	    // if there is only one Connection setting, use it to connect
+	    // otherwise, we need to ask user to choose one (or use the default one
+	    // if there is one marked default
+	    @call self::MSG_IDP_SELECT_ACCPNT();
+	  }
+	MemUnlock(launchBlock);
+      }
+
+    if(!wait)
+      @call IDialupPrimary::MSG_GEN_DISPLAY_SET_NOT_MINIMIZED();
+
+    // read the Timeout
+    if(InitFileReadInteger(IDIAL_CATEGORY, IDLE_TIMEOUT_KEY, &idleTimeout))
+       {
+	 idleTimeout = DEFAULT_IDLE_TIME;
+       }
+
+    if(InitFileReadInteger(IDIAL_CATEGORY, DELAY_TIMEOUT_KEY, &delayTimeout))
+       {
+	 delayTimeout = DEFAULT_DELAY_TIME;
+       }
+
+    if(delayTimeout > idleTimeout)
+      {
+	delayTimeout = idleTimeout;
+      }
+
+    // read the list of applications that will use socket/ppp
+    if(!InitFileReadStringBlock(IDIAL_CATEGORY, INET_APPLS_KEY, &mh, 0, &size))
+      {
+	if(size)
+	  {
+	    if(!connectionHandle)
+	      {
+		connectionHandle = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(LMemBlockHeader));
+	      }
+
+	    MemLock(connectionHandle);
+	    iAppChunk = ChunkArrayCreate(connectionHandle, 0, sizeof(ChunkArrayHeader), 0);
+
+	    names = MemLock(mh);
+	    ptr = 0;
+	    for(i=0; i<size; i++, names++)
+	      {
+		if(!isalnum(*names) && *names != '.')
+		  {
+		    *names = 0;
+		    if(ptr)
+		      {
+			p = ChunkArrayAppendHandles(connectionHandle, iAppChunk, names-ptr+1);
+@ifdef DO_DBCS
+			while(*ptr) *p++ = *ptr++; *p = C_NULL;
+@else
+			strcpy(p, ptr);
+@endif
+			ptr = 0;
+		      }
+		  }
+		else 
+		  {
+		    if(!ptr) ptr = names;
+		  }
+	      }
+
+	    // Make sure we get the last one in there as well. --JimG
+	    if ( names > ptr )
+	      {
+		p = ChunkArrayAppendHandles(connectionHandle, iAppChunk,
+					    names-ptr+1);
+@ifdef DO_DBCS
+		while(*ptr) *p++ = *ptr++; *p = C_NULL;
+@else
+		strcpy( p, ptr );
+@endif
+	      }
+
+	    MemUnlock(connectionHandle);
+	  }
+	MemFree(mh);
+      }
+
+    // See if any of our iApp applications are running.
+    //  (NB: Must have the chunk array set up first.. duh.)
+    iAppRunning = IAppRunning();
+
+    /* Retrieve and apply the setting for Show Details. */
+    InitFileReadBoolean(IDIAL_CATEGORY, SHOW_DETAILS_KEY, &bShowDetails);
+    if (bShowDetails)		/* the default is to hide details */
+    {
+	/* Check the boolean. */
+	@send IDShowDetailsGroup::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(1, 0);
+	/* Elicit a MSG_IDA_SHOW_DETAILS. */
+	@send IDShowDetailsGroup::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_MODIFIED_STATE(1, 0);
+	@send IDShowDetailsGroup::MSG_GEN_APPLY();
+    }
+
+    return;
+} /* End of MSG_GEN_PROCESS_OPEN_APPLICATION */
+
+
+/***********************************************************************
+ *	MSG_IDP_SELECT_ACCPNT for IDialupProcessClass
+ ***********************************************************************
+ * SYNOPSIS:     
+ *
+ * PARAMETERS:  
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/23/98	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupProcessClass, MSG_IDP_SELECT_ACCPNT
+{
+//  TCHAR *str;
+
+  if(connectionNum == 1)
+    {
+      // just one Connection, so connect it
+      AccessPointSetActivePoint(currentAccpnt, APT_INTERNET);
+      AccessPointCommit();
+      ThreadVSem(wait);
+      @call IDialupApp::MSG_IDA_VIEW_INFO();
+    }
+  else if(defaultAccpnt)
+    {
+      // there is one default Connection, use it
+      currentAccpnt = defaultAccpnt;
+      AccessPointSetActivePoint(currentAccpnt, APT_INTERNET);
+      AccessPointCommit();
+      ThreadVSem(wait);
+      @call IDialupApp::MSG_IDA_VIEW_INFO();
+    }
+  else if(connectionNum == 0)
+    {
+      ThreadVSem(wait);
+
+      /*
+       * This is now all done by the PPP_STATUS_CLOSED handler in
+       * META_NOTIFY
+       *
+      MemLock(OptrToHandle(@noConnectionStr));
+      str = LMemDeref(@noConnectionStr);
+
+      @call IDialupApp::MSG_GEN_APPLICATION_DO_STANDARD_DIALOG(
+			0,
+			0,
+    	    	    	0,
+    	    	    	0,
+			0,
+			0,
+	        	str,
+			(CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) | 
+			(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+
+      MemUnlock(OptrToHandle(@noConnectionStr));
+
+      @call IDialupPrimary::MSG_GEN_DISPLAY_SET_NOT_MINIMIZED();
+      @call IDialupApp::MSG_GEN_APPLICATION_BRING_WINDOW_TO_TOP(@IDialupPrimary);
+      */
+    }
+  else
+    {
+      word *id, datalen;
+
+      MemLock(connectionHandle);
+  
+      id = ChunkArrayElementToPtrHandles(connectionHandle, connectionChunk, 0, &datalen);
+      AccessPointSetActivePoint(*id, APT_INTERNET);
+      currentAccpnt = *id;
+      AccessPointCommit();
+      MemUnlock(connectionHandle);
+
+      ThreadVSem(wait);
+
+      // otherwise, we need to ask the user to choose one
+      /*
+      @call IDConnectionMenu::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+      @call IDConnectButton::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+      @call IDContinueButton::MSG_GEN_SET_USABLE(VUM_NOW);
+      @call IDialupPrimary::MSG_GEN_DISPLAY_SET_NOT_MINIMIZED();
+      @call IDialupApp::MSG_GEN_APPLICATION_BRING_WINDOW_TO_TOP(@IDialupPrimary);
+      */
+
+      @call IDialupApp::MSG_IDA_VIEW_INFO();
+    }
+}
+
+/***********************************************************************
+ *	MSG_IDP_SELECT_CONTINUE for IDialupProcessClass
+ ***********************************************************************
+ * SYNOPSIS:     
+ *
+ * PARAMETERS:  
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/23/98	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupProcessClass, MSG_IDP_SELECT_CONTINUE
+{
+  AccessPointSetActivePoint(currentAccpnt, APT_INTERNET);
+  AccessPointCommit();
+
+  @call IDialupPrimary::MSG_GEN_DISPLAY_SET_MINIMIZED();
+
+  @send IDConnectionMenu::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+  @send IDContinueButton::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+  @send IDConnectButton::MSG_GEN_SET_USABLE(VUM_NOW);
+
+  ThreadVSem(wait);
+}
+
+
+/***********************************************************************
+ *		MSG_GEN_PROCESS_CLOSE_APPLICATION for IDialupProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Tell the ppp we quit.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	MZ	12/4/98   	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+  Boolean bShowDetails;
+
+    /* disconnect */
+    if (pppStatus != PPP_STATUS_CLOSED) {
+	@call process::MSG_IDP_DISCONNECT();
+    }
+
+  if(connectionHandle) MemFree(connectionHandle);
+  connectionHandle = connectionChunk = 0;
+
+  GCNListRemove(@IDialupApp, MANUFACTURER_ID_GEOWORKS, GCNSLT_PPP_STATUS_NOTIFICATIONS);
+  GCNListRemove(ConstructOptr(GeodeGetProcessHandle(), NullChunk),
+	       MANUFACTURER_ID_GEOWORKS,
+	       GCNSLT_APPLICATION);
+  GCNListRemove(@IDialupApp, MANUFACTURER_ID_GEOWORKS,
+	       GCNSLT_INSTANT_SUSPEND_RESUME_NOTIFICATIONS);
+  GCNListRemove(@IDialupApp, MANUFACTURER_ID_GEOWORKS, GCNSLT_FIELD_CHANGE_NOTIFICATIONS);
+
+  if (G_registered)  {
+	  UnregisterToPPP();
+
+	  UnloadPPPDriver();
+	  G_registered = FALSE ;
+  }
+  /* Save the setting for Show Details. */
+  bShowDetails = @call IDShowDetailsGroup::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS()
+      & 0x0001;
+  InitFileWriteBoolean(IDIAL_CATEGORY, SHOW_DETAILS_KEY, bShowDetails);
+  InitFileCommit();
+
+  @callsuper();
+
+  return 0;
+}
+
+
+/***********************************************************************
+ *		MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE for IDialupProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    No state file.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc	4/7/99   	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupProcessClass, MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE
+{
+  return 0;
+}
+
+/***********************************************************************
+ *	MSG_IDP_NEW_NUMBERS for IDialupProcessClass
+ ***********************************************************************
+ * SYNOPSIS:     Get new local numbers.
+ *
+ * PARAMETERS:  
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc	12/5/00         Initial Revision
+ *
+ ***********************************************************************/
+/*@method IDialupProcessClass, MSG_IDP_NEW_NUMBERS
+{
+    MemHandle launchBlk;
+    IACPConnection iacpConnectionToken;
+    word serverCount;
+    GeodeToken welcomeToken = {'G', 'P', 'C', 's', 0};
+
+    InitFileWriteBoolean("welcome", "changePop", TRUE);
+    launchBlk = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
+    iacpConnectionToken = IACPConnect(&welcomeToken,
+				      IACPCF_FIRST_ONLY |
+				      IACPSM_USER_INTERACTIBLE,
+				      launchBlk, NullOptr, &serverCount);
+    if (iacpConnectionToken != IACP_NO_CONNECTION) {
+	IACPShutdown(iacpConnectionToken, NullOptr);
+    }
+    @call process::MSG_IDP_DISCONNECT();
+    @send, forceQueue IDialupApp::MSG_META_QUIT();
+}
+
+/***********************************************************************
+ *	MSG_IDP_EDIT_CONNECTION for IDialupProcessClass
+ ***********************************************************************
+ * SYNOPSIS:     Edit the current Connectino setting.
+ *
+ * PARAMETERS:  
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	  Get the current settings from the .ini and fill in
+ *               the appropriate fields
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/23/98	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupProcessClass, MSG_IDP_EDIT_CONNECTION
+{
+  word datalen;
+  TCHAR name[MAX_TEXT_LEN], *str;
+  word dialOptionsProp;
+  word dialOptions = DEFAULT_DIAL_OPTIONS;
+  word type ;
+
+  datalen = MAX_TEXT_LEN*sizeof(TCHAR);
+  memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
+  if(!AccessPointGetStringPropertyBufferDirect(currentAccpnt, 
+					 (char*)APSP_PHONE, name, &datalen))
+	 {
+      @call IDEditPhoneNumber::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, datalen);
+    }
+
+  if(!AccessPointGetIntegerPropertyDirect(currentAccpnt,
+					  (char*)APSP_LOCAL_DIALING_OPTIONS,
+					  &dialOptionsProp))
+  {
+		if (dialOptionsProp & APLDO_OMIT_ONE_FOR_LONG_DISTANCE)
+	  dialOptions &= ~IDEDO_ONE_FOR_LD;
+		if (dialOptionsProp & APLDO_ALWAYS_ADD_AREA_CODE)
+	  dialOptions |= IDEDO_AREA_CODE;
+  }
+  @call IDEditDialingOptionsGroup::
+		MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(dialOptions, 0);
+
+  datalen = MAX_TEXT_LEN*sizeof(TCHAR);
+  memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
+  if(!AccessPointGetStringPropertyBufferDirect(currentAccpnt, 
+					 (char*)APSP_USER, name, &datalen))
+    {
+      @call IDEditUserName::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, datalen);
+    }
+
+  datalen = MAX_TEXT_LEN*sizeof(TCHAR);
+  memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
+  if(!AccessPointGetStringPropertyBufferDirect(currentAccpnt, 
+					 (char*)APSP_SECRET, name, &datalen))
+  {
+      @call IDEditPassword::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, datalen);
+  }
+  else
+  {
+      @call IDEditPassword::MSG_VIS_TEXT_DELETE_ALL();
+  }
+
+  datalen = MAX_TEXT_LEN*sizeof(TCHAR);
+  memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
+  if(!AccessPointGetStringPropertyBufferDirect(currentAccpnt, 
+					 (char*)APSP_NAME, name, &datalen))
+    {
+      @call IDEditConnectionName::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, datalen);
+    }
+
+/*#if _NDO2000 */
+  datalen = MAX_TEXT_LEN*sizeof(TCHAR);
+  memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
+  if(!AccessPointGetStringPropertyBufferDirect(currentAccpnt, 
+					 (char*)APSP_ADDRESS, name, &datalen))
+    {
+      @call IDEditIP::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, datalen);
+    } else {
+      @call IDEditIP::MSG_VIS_TEXT_DELETE_ALL();
+    }
+  datalen = MAX_TEXT_LEN*sizeof(TCHAR);
+  memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
+  if(!AccessPointGetStringPropertyBufferDirect(currentAccpnt, 
+					 (char*)APSP_GATEWAY, name, &datalen))
+    {
+      @call IDEditGateway::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, datalen);
+    } else {
+      @call IDEditGateway::MSG_VIS_TEXT_DELETE_ALL();
+    }
+  datalen = MAX_TEXT_LEN*sizeof(TCHAR);
+  memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
+  if(!AccessPointGetStringPropertyBufferDirect(currentAccpnt, 
+					 (char*)APSP_MASK, name, &datalen))
+    {
+      @call IDEditMask::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, datalen);
+    } else {
+      @call IDEditMask::MSG_VIS_TEXT_DELETE_ALL();
+    }
+/*#endif */
+
+  datalen = MAX_TEXT_LEN*sizeof(TCHAR);
+  memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
+  if(!AccessPointGetStringPropertyBufferDirect(currentAccpnt, 
+					 (char*)APSP_DNS1, name, &datalen))
+    {
+      @call IDEditDNS1::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, datalen);
+    } else {
+      @call IDEditDNS1::MSG_VIS_TEXT_DELETE_ALL();
+    }
+  datalen = MAX_TEXT_LEN*sizeof(TCHAR);
+  memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
+  if(!AccessPointGetStringPropertyBufferDirect(currentAccpnt, 
+					 (char*)APSP_DNS2, name, &datalen))
+    {
+      @call IDEditDNS2::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, datalen);
+    } else {
+      @call IDEditDNS2::MSG_VIS_TEXT_DELETE_ALL();
+    }
+
+  MemLock(OptrToHandle(@modifyConnectionStr));
+  str = LMemDeref(@modifyConnectionStr);
+  @call IDEditGroup::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(str, VUM_DELAYED_VIA_UI_QUEUE);
+
+  str = LMemDeref(@changeStr);
+  @call IDEditOkButton::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(str, VUM_DELAYED_VIA_UI_QUEUE);
+
+  str = LMemDeref(@noChangeStr);
+  @call IDEditCancelButton::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(str, VUM_NOW);
+
+  MemUnlock(OptrToHandle(@modifyConnectionStr));
+
+  @call IDEditConnectionName::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+  @call IDEditPhoneNumber::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+/*#ifndef PRODUCT_NDO2000 */
+  editDialOptionsChanged = FALSE;
+/*#endif  */
+  @call IDEditUserName::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+/*@if defined(PRODUCT_NDO2000) */
+  @call IDEditIP::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+  @call IDEditGateway::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+  @call IDEditMask::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+/*@endif */
+  @call IDEditDNS1::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+  @call IDEditDNS2::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+
+  creatingConnection = FALSE;
+
+  if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", &type))
+	  type = 0 ;
+  @call IDEditConnectionType::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(type, FALSE) ;
+  @call oself::MSG_IDP_EDIT_TYPE_UPDATE() ;
+
+  // This message is force-queued to allow the process thread to flush out
+  // all of the MSG_META_TEXT_EMPTY_STATUS_CHANGED messages that might have 
+  // been queued by all of the above MSG_VIS_TEXT_REPLACE/DELETE calls.
+  // -Dave 1/14/2000
+  @send, forceQueue self::MSG_IDP_EDIT_CONNECTION_FINISH();
+}
+
+/***********************************************************************
+ *	MSG_IDP_EDIT_CONNECTION_FINISH for IDialupProcessClass
+ ***********************************************************************
+ * SYNOPSIS:     Finish setting up the edit dialog for Connection modify.
+ *
+ * PARAMETERS:  
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dhunter 1/14/2000   Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupProcessClass, MSG_IDP_EDIT_CONNECTION_FINISH
+{
+  @call IDEditOkButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+  @send IDEditGroup::MSG_GEN_INTERACTION_INITIATE();
+}
+
+Boolean CheckValidIPAddress(MemHandle mh)
+{
+    word    pCount, nCount, wasPCount, i;
+    TCHAR    *buffer, nBuffer[UHTA_NULL_TERM_BUFFER_SIZE];
+    Boolean isBadIP, wasP;
+    dword   URLNum;
+
+    if ( mh )
+    {
+        buffer = MemLock( mh );
+
+        /* Let empty IP be valid since fields can be empty */
+        if ( *buffer == '\0' )
+            isBadIP = FALSE;
+        else
+        {
+            pCount = 0;
+            nCount = 0;
+            nBuffer[0] = 0;
+            wasPCount = 0;
+            isBadIP = FALSE;
+            wasP = TRUE;
+            for (i = 0; i < strlen(buffer); i++)
+            {
+                if ((buffer[i] >= '0') && (buffer[i] <= '9'))
+                {
+                    if (nCount > 2)
+                    {
+                        isBadIP = TRUE;
+                	    break;
+                    }
+                    nBuffer[nCount] = buffer[i];
+                    nCount++;
+                    if (wasP) wasPCount++;
+                    wasP = FALSE;
+                }
+                else if ((buffer[i] == '.') && (!wasP))
+                {
+                    pCount++;
+                    if (pCount > 3)
+                    {
+                        isBadIP = TRUE;
+                        break;
+                    }
+                    /* ok lets check the number... */
+                    nBuffer[nCount] = 0;
+                    UtilAsciiToHex32(nBuffer, &URLNum);
+                    if (URLNum > 255)
+                    {
+                        isBadIP = TRUE;
+                        break;
+                    }
+                    nCount = 0;
+                    nBuffer[0] = 0;
+                    wasP = TRUE;
+                }
+                else
+                {
+                    isBadIP = TRUE;
+                    break;
+                }
+            } /* end of step thru buffer for loop */
+            /* and check the last number... */
+            nBuffer[nCount] = 0;
+            UtilAsciiToHex32(nBuffer, &URLNum);
+            if (URLNum > 255)
+                isBadIP = TRUE;
+
+            isBadIP = isBadIP || (wasPCount != 4);
+        }
+
+        MemUnlock( mh );
+    }
+    return !isBadIP;
+}
+
+
+/***********************************************************************
+ *		GetLocalDialingOptions
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get the current state of the dialing options booleans
+ *		and return the equivalent AccessPointLocalDialingOptions.
+ *
+ * CALLED BY:	MSG_IDP_EDIT_OK
+ *
+ * RETURN:	AccessPointLocalDialingOptions
+ *
+ * SIDE EFFECTS:none
+ *	
+ * STRATEGY:    Get the state of IDEditDialingOptionsGroup
+ *		Convert the state to the return value type
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dhunter	5/17/00   	Initial Revision
+ *
+ ***********************************************************************/
+AccessPointLocalDialingOptions GetLocalDialingOptions (void)
+{
+    word dialOptions;
+    word dialOptionsProp = 0;
+
+    dialOptions = @call IDEditDialingOptionsGroup::
+	MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    if (!(dialOptions & IDEDO_ONE_FOR_LD))
+	dialOptionsProp |= APLDO_OMIT_ONE_FOR_LONG_DISTANCE;
+    if (dialOptions & IDEDO_AREA_CODE)
+	dialOptionsProp |= APLDO_ALWAYS_ADD_AREA_CODE;
+    return dialOptionsProp;
+}	/* End of GetLocalDialingOptions.	*/
+
+/***********************************************************************
+ *	MSG_IDP_EDIT_OK for IDialupProcessClass
+ ***********************************************************************
+ * SYNOPSIS:     Edit the current Connection setting.
+ *
+ * PARAMETERS:  
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/23/98	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupProcessClass, MSG_IDP_EDIT_OK
+{
+  MemHandle mh;
+  MemHandle hanDNS1, hanDNS2;
+  word sel;
+  optr item;
+  TCHAR *str;
+  Boolean dns1Valid, dns2Valid;
+  word type = @call IDEditConnectionType::MSG_GEN_ITEM_GROUP_GET_SELECTION() ;
+
+  // Before we can commit the changes to or addition of this Connection, we
+  // need to validate the IP addresses entered in the DNS fields.
+  //
+  hanDNS1 = @call IDEditDNS1::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+  hanDNS2 = @call IDEditDNS2::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+
+  dns1Valid = CheckValidIPAddress( hanDNS1 );
+  dns2Valid = CheckValidIPAddress( hanDNS2 );
+
+  if ( !dns1Valid || !dns2Valid )
+  {
+      MemLock( OptrToHandle( @invalidDNS1Str ) );
+      str = LMemDeref( (dns1Valid) ? @invalidDNS2Str : @invalidDNS1Str );
+
+      // Small hack: this will send a grab focus message to
+      // the field that had the error.  It has to be done after
+      // the dialog box goes down or else the focus is changed 
+      // by the invalidation of the edit dialog.  The message
+      // normally sent by doStandardDialog passes one argument (in cx)
+      // which we don't care about and grab focus takes no args so
+      // this is OK.
+
+      @call IDialupApp::MSG_GEN_APPLICATION_DO_STANDARD_DIALOG(
+	  MSG_META_GRAB_FOCUS_EXCL, 
+	  (dns1Valid ? @IDEditDNS2 : @IDEditDNS1), 0, 
+	  (char *)0, (char *)0, (char *)0,
+	  str,
+	  (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+	  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) |
+	  CDBF_SYSTEM_MODAL);
+      MemUnlock( OptrToHandle( @invalidDNS1Str ) );
+
+      MemFree( hanDNS1 );
+      MemFree( hanDNS2 );
+      return;
+  }
+
+/*#ifndef PRODUCT_NDO2000  */
+  /* If the user has modified the phone number or the local dialing
+   * options, put up a dialog showing the full number as it will be
+   * dialed by the modem, and ask them to verify it before proceeding.
+   */
+  if ((@call IDEditPhoneNumber::MSG_GEN_TEXT_IS_MODIFIED()
+      || editDialOptionsChanged) && (type == 0))
+  {
+      MemHandle phoneHan, phoneWithOptionsHan;
+
+      /* Get the current phone number. */
+      phoneHan = @call IDEditPhoneNumber::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+      if (phoneHan != NullHandle)
+      {
+	  /* Generate the full phone number with dialing options applied. */
+	  phoneWithOptionsHan = GetPhoneStringWithOptions(phoneHan, 
+	      GetLocalDialingOptions());
+	  if (phoneWithOptionsHan != NullHandle)
+	  {
+	      TCHAR *phoneStr = MemLock(phoneWithOptionsHan);
+	      if (phoneStr[0] != '\0')
+		  phoneStr ++;	/* always skip the T/P character */
+	      @call IDVPNumberGlyph::
+		  MSG_GEN_REPLACE_VIS_MONIKER_TEXT(phoneStr, VUM_NOW);
+	      MemFree(phoneWithOptionsHan);
+	  }
+	  if (UserDoDialog(@IDVerifyPhoneGroup) == IC_NO)
+	  {
+	      /* The user wishes to change the number.  Have the phone
+	       * field grab the focus and allow the user to continue
+	       * editing.
+	       */
+	      @send IDEditPhoneNumber::MSG_META_GRAB_FOCUS_EXCL();
+	      return;
+	  }
+      }
+  }
+/*#endif */
+
+  /* If the password field is blank, ask the user to verify that they
+   * indeed have no password. */
+  if ((@call IDEditPassword::MSG_VIS_TEXT_GET_TEXT_SIZE() == 0) && (type == 0))
+  {
+	 /*  if (*/UserStandardDialogOptr(NULL, NULL, NullOptr,
+	 NullOptr,
+	 @verifyBlankPwdStr,
+			  ((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+			  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+ /*     {
+	  @send IDEditPassword::MSG_META_GRAB_FOCUS_EXCL();
+	  return;
+      }  */
+  }
+
+  if(creatingConnection)
+    {
+      // create a new accesspoint
+      /* jfh - there is no method for this msg !?!? */
+		@call IDialupApp::MSG_IDA_SAVE_CURRENT_PASSWORD();
+      currentAccpnt = AccessPointCreateEntry(1, APT_INTERNET);
+      // Indicate that this access point should use the dialing
+      // options.
+      AccessPointSetIntegerPropertyDirect(currentAccpnt,
+		(char*)APSP_USE_DIALING_OPTIONS, 1);
+    }
+
+  mh = @call IDEditUserName::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+  if(mh)
+    {
+      str = MemLock(mh);
+      if(strlen(str))
+	{
+	  AccessPointSetStringPropertyDirect(currentAccpnt, (char*)APSP_USER, 
+				   str);
+	}
+      MemFree(mh);
+    }
+
+  mh = @call IDEditPassword::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+  if(mh)
+    {
+      str = MemLock(mh);
+      if (strlen(str))
+        {
+			 AccessPointSetStringPropertyDirect(currentAccpnt, (char*)APSP_SECRET,
+					str);
+			 AccessPointDestroyPropertyDirect(currentAccpnt, (char*)APSP_PROMPT_SECRET);
+	}
+	else
+	{
+	  AccessPointDestroyPropertyDirect(currentAccpnt, (char*)APSP_SECRET);
+	  /* this makes the accpt lib ask for a pword at logon */
+	  AccessPointSetIntegerPropertyDirect(currentAccpnt, (char*)APSP_PROMPT_SECRET,
+					1);
+	}
+
+      MemFree(mh);
+    }
+
+  mh = @call IDEditPhoneNumber::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+  if(mh)
+    {
+      str = MemLock(mh);
+      if(strlen(str))
+	{
+	  AccessPointSetStringPropertyDirect(currentAccpnt, (char*)APSP_PHONE, 
+				   str);
+	}
+      MemFree(mh);
+    }
+  
+  AccessPointSetIntegerPropertyDirect(currentAccpnt, (char*)APSP_LOCAL_DIALING_OPTIONS,
+				      GetLocalDialingOptions());
+
+/*#if _NDO2000 */
+  mh = @call IDEditIP::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+  if(mh)
+    {
+      str = MemLock(mh);
+      if(strlen(str))
+	{
+	  AccessPointSetStringPropertyDirect(currentAccpnt, 
+                                             (char*)APSP_ADDRESS, str);
+	}
+      MemFree(mh);
+    }
+
+  mh = @call IDEditGateway::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+  if(mh)
+    {
+      str = MemLock(mh);
+      if(strlen(str))
+	{
+	  AccessPointSetStringPropertyDirect(currentAccpnt, 
+                                             (char*)APSP_GATEWAY, str);
+	}
+      MemFree(mh);
+    }
+
+  mh = @call IDEditMask::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+  if(mh)
+    {
+      str = MemLock(mh);
+      if(strlen(str))
+	{
+	  AccessPointSetStringPropertyDirect(currentAccpnt, 
+                                             (char*)APSP_MASK, str);
+	}
+      MemFree(mh);
+    }
+/*#endif */
+
+  mh = hanDNS1;
+  if(mh)
+    {
+      str = MemLock(mh);
+      if(strlen(str))
+	{
+	  AccessPointSetStringPropertyDirect(currentAccpnt, (char*)APSP_DNS1, 
+				   str);
+	}
+	else
+	{
+	    AccessPointDestroyPropertyDirect(currentAccpnt, (char*)APSP_DNS1);
+	}
+      MemFree(mh);
+      hanDNS1 = NULL;
+    }
+
+  mh = hanDNS2;
+  if(mh)
+    {
+      str = MemLock(mh);
+      if(strlen(str))
+	{
+	  AccessPointSetStringPropertyDirect(currentAccpnt, (char*)APSP_DNS2, 
+				   str);
+	}
+	else
+	{
+	    AccessPointDestroyPropertyDirect(currentAccpnt, (char*)APSP_DNS2);
+	}
+      MemFree(mh);
+      hanDNS2 = NULL;
+    }
+
+  mh = @call IDEditConnectionName::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+  if(mh)
+    {
+      str = MemLock(mh);
+      if(strlen(str))
+	{
+	  AccessPointSetStringPropertyDirect(currentAccpnt, (char*)APSP_NAME, 
+				   str);
+	  // change the name in the connection list
+	  sel = @call IDConnectionList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	  item = @call IDConnectionList::MSG_GEN_ITEM_GROUP_GET_ITEM_OPTR(sel);
+	  @call item::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(str, VUM_NOW);
+	}
+      MemFree(mh);
+    }
+
+  AccessPointSetIntegerPropertyDirect(currentAccpnt, "netType", type);
+
+  AccessPointCommit();
+
+  if(creatingConnection)
+    {
+      creatingConnection = FALSE;
+      @call self::MSG_IDP_INITIALIZE_CONNECTION();
+    } 
+  else
+    {
+      // change the current connection display
+      @call self::MSG_IDP_CONNECTION_SET_CURRENT();
+    }
+
+  // We no longer automatically do this via GI_attrs since we may not
+  // want to bring down the dialog if the DNS entry is invalid.
+  @send IDEditGroup::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(
+      IC_INTERACTION_COMPLETE);
+}
+
+/***********************************************************************
+ *	MSG_IDP_CREATE_CONNECTION for IDialupProcessClass
+ ***********************************************************************
+ * SYNOPSIS:     Create a new current connection setting.
+ *
+ * PARAMETERS:  
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/23/98	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupProcessClass, MSG_IDP_CREATE_CONNECTION
+{
+  TCHAR *str;
+
+  @call IDEditPhoneNumber::MSG_VIS_TEXT_DELETE_ALL();
+
+  @call IDEditDialingOptionsGroup::
+      MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(DEFAULT_DIAL_OPTIONS, 0);
+
+  @call IDEditUserName::MSG_VIS_TEXT_DELETE_ALL();
+
+  @call IDEditPassword::MSG_VIS_TEXT_DELETE_ALL();
+
+  @call IDEditConnectionName::MSG_VIS_TEXT_DELETE_ALL();
+
+/*#if _NDO2000 */
+  @call IDEditIP::MSG_VIS_TEXT_DELETE_ALL();
+
+  @call IDEditMask::MSG_VIS_TEXT_DELETE_ALL();
+
+  @call IDEditGateway::MSG_VIS_TEXT_DELETE_ALL();
+/*#endif */
+  
+  @call IDEditDNS1::MSG_VIS_TEXT_DELETE_ALL();
+
+  @call IDEditDNS2::MSG_VIS_TEXT_DELETE_ALL();
+
+  MemLock(OptrToHandle(@addConnectionStr));
+
+  str = LMemDeref(@addConnectionStr);
+  @call IDEditGroup::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(str, VUM_DELAYED_VIA_UI_QUEUE);
+
+  str = LMemDeref(@addStr);
+  @call IDEditOkButton::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(str, VUM_DELAYED_VIA_UI_QUEUE);
+  @call IDEditOkButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+
+  str = LMemDeref(@cancelStr);
+  @call IDEditCancelButton::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(str, VUM_NOW);
+
+  MemUnlock(OptrToHandle(@addConnectionStr));
+
+  @send IDEditGroup::MSG_GEN_INTERACTION_INITIATE();
+
+  @send IDEditConnectionName::MSG_META_GRAB_FOCUS_EXCL();
+  @send IDEditConnectionName::MSG_META_GRAB_TARGET_EXCL();
+
+  creatingConnection = TRUE;
+}
+
+/***********************************************************************
+ *	MSG_IDP_DELETE_CONNECTION for IDialupProcessClass
+ ***********************************************************************
+ * SYNOPSIS:     Delete the current connection setting.
+ *
+ * PARAMETERS:  
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/23/98	Initial Revision
+ *
+ ***********************************************************************/
+#define min(x, y) (x)>(y)?(y):(x)
+@method IDialupProcessClass, MSG_IDP_DELETE_CONNECTION
+{
+  TCHAR tstr[100], name[NAME_LEN];
+  TCHAR *tptr;
+  word datalen = NAME_LEN;
+
+  if(AccessPointGetStringPropertyBufferDirect(currentAccpnt, (char*)APSP_NAME, name, &datalen))
+    AccessPointGetStringPropertyBufferDirect(currentAccpnt, (char*)APSP_PHONE, name, &datalen);
+
+  MemLock(OptrToHandle(@deleteStr1));
+  tptr = LMemDeref(@deleteStr1);
+  strcpy(tstr, tptr);
+  strncat(tstr, name, min((80 - strlen(tstr)), datalen));
+  tptr = LMemDeref(@deleteStr2);
+  strcat(tstr, tptr);
+
+  MemUnlock(OptrToHandle(@deleteStr1));
+
+  @call IDialupApp::MSG_GEN_APPLICATION_DO_STANDARD_DIALOG(
+			MSG_IDP_DELETE_CONFIRM,
+			oself,
+    	    	    	0,
+    	    	    	0,
+			0,
+			0,
+	        	tstr,
+			(CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) | 
+			(GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET));
+}
+
+
+/***********************************************************************
+ *	MSG_IDP_DELETE_CONNECTION for IDialupProcessClass
+ ***********************************************************************
+ * SYNOPSIS:     Delete the current connection setting.
+ *
+ * PARAMETERS:  
+ *               InteractionCommand response = cx
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/23/98	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupProcessClass, MSG_IDP_DELETE_CONFIRM
+{
+  if(response == IC_YES)
+    {
+      AccessPointDestroyEntryDirect(currentAccpnt);
+      AccessPointCommit();
+
+      // reset the current accesspoint
+      currentAccpnt = 0;
+      @send self::MSG_IDP_INITIALIZE_CONNECTION();
+    }
+}
+
+/***********************************************************************
+ *		MSG_IDP_INITIALIZE_CONNECTION
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Initialize UI and Connection settings.
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	12/03/98   	Initial Revision
+ *	
+ ***********************************************************************/
+@method IDialupProcessClass, MSG_IDP_INITIALIZE_CONNECTION
+{
+  word *id, datalen, i, defaultItem=0;
+  word tmpAccpnt=0, tmpItem=0;
+
+  if(connectionHandle)
+    {
+		if(connectionChunk)
+			{
+			MemLock(connectionHandle);
+			ChunkArrayZeroHandles(connectionHandle, connectionChunk);
+			MemUnlock(connectionHandle);
+			}
+    }
+  else
+    {
+      connectionHandle = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(LMemBlockHeader));
+    }
+
+  MemLock(connectionHandle);
+  connectionChunk = AccessPointGetEntries(connectionHandle, 0, APT_INTERNET);
+
+  currentAccpnt = 0;
+  defaultAccpnt = 0;
+
+  if(connectionChunk)
+		{
+		connectionNum = ChunkArrayGetCountHandles(connectionHandle, connectionChunk);
+		if(!connectionNum)
+			{
+			// the ini file wrong
+			EC(EC_ERROR(-1);)
+			}
+		else
+			{
+			word *hidden;
+
+			// the accesspoint0001 is protected from being used, and its APT_INTERNET
+			for(i=0; i<connectionNum; i++)
+				{
+				id = ChunkArrayElementToPtrHandles(connectionHandle, connectionChunk, i, &datalen);
+
+				if(*id == HIDDEN_INTERNET_ACCPNT)
+					{
+					hidden = id;
+					continue;
+					}
+				if(!currentAccpnt)
+					{
+					tmpAccpnt = *id;
+					tmpItem = i;
+					}
+				else if(currentAccpnt == *id)
+					{
+					tmpItem = i;
+					}
+
+				if(!AccessPointGetIntegerPropertyDirect(*id, DEFAULT_KEY, &datalen)
+																	&& datalen != 0)
+					{
+					defaultAccpnt = *id;
+					defaultItem = i;
+					}
+
+			// Hack to flag for deletion the temporary access point created by signup,
+			// just in case signup crashes and fails to clean up after itself.
+			// The actual removal occurs in MSG_GEN_PROCESS_OPEN_APPLICATION.
+			// (dhunter 1/13/2000)
+				if (!AccessPointGetIntegerPropertyDirect(*id, TEMPORARY_KEY, &datalen)
+																	&& datalen == 1)
+					tempAccpnt = *id;
+				}
+
+			if(hidden)
+				{
+				ChunkArrayDeleteHandle(connectionChunk, hidden);
+				}
+			else
+				{
+				// the ini file wrong
+				EC(EC_ERROR(-1);)
+				}
+			}
+		}
+	 else
+		{
+		MemUnlock(connectionHandle);
+		EC(EC_ERROR(-1);)
+		return;
+		}
+
+  connectionNum = ChunkArrayGetCountHandles(connectionHandle, connectionChunk);
+
+  MemUnlock(connectionHandle);
+
+  @call IDConnectionList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(connectionNum);
+
+  if(connectionNum)
+    {
+      @call IDModifyConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+      @call IDDeleteConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+/*#if _NDO2000
+/*#else
+      @call IDNewNumbers::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+/*#endif */
+		@call IDConnectButton::MSG_GEN_SET_ENABLED(VUM_NOW);
+	 }
+  else
+    {
+      @call IDModifyConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+      @call IDDeleteConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+/*#if _NDO2000
+/*#else
+      @call IDNewNumbers::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+/*#endif */
+      @call IDConnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }
+
+  if(!currentAccpnt)
+    {
+	 if(defaultAccpnt)
+		{
+		currentAccpnt = defaultAccpnt;
+		@send IDConnectionList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(defaultItem, 0);
+		}
+	 else if(tmpAccpnt)
+		{
+		currentAccpnt = tmpAccpnt;
+		@send IDConnectionList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(tmpItem, 0);
+		}
+	 }
+  else
+    {
+	 @send IDConnectionList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(tmpItem, 0);
+    }
+
+
+	/* if there is only 1 access point then let's make it the default
+	  access point automagically...  jfh 2/19/02 */
+	if ((connectionNum == 1) && !defaultAccpnt) {
+		@call IDConnectionDefaultBoxGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(1, TRUE);
+		@call self::MSG_IDP_SET_DEFAULT_CONNECTION();
+		}
+
+  AccessPointSetActivePoint(defaultAccpnt, APT_INTERNET);
+  AccessPointCommit();
+  @send self::MSG_IDP_CONNECTION_SET_CURRENT();
+}
+
+/***********************************************************************
+ *	MSG_IDP_CONNECTION_SET_CURRENT for IDialupProcessClass
+ ***********************************************************************
+ * SYNOPSIS:     Edit the current CONNECTION setting.
+ *
+ * PARAMETERS:   void (optr list, word item)
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/23/98	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupProcessClass, MSG_IDP_CONNECTION_SET_CURRENT
+{
+  word datalen;
+  TCHAR name[MAX_TEXT_LEN];
+  MemHandle mh;
+
+  if(!AccessPointGetIntegerPropertyDirect(currentAccpnt, DEFAULT_KEY, &datalen) 
+     && datalen != 0) 
+    {
+      @call IDConnectionDefaultBoxGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE
+	 (1, TRUE);
+    }
+  else
+    {
+      @call IDConnectionDefaultBoxGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE
+	 (1, FALSE);
+    }
+
+  datalen = MAX_TEXT_LEN*sizeof(TCHAR);
+  memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
+  @send IDConnectionUserName::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+  if(!AccessPointGetStringPropertyBufferDirect(currentAccpnt, 
+					 (char*)APSP_USER, name, &datalen))
+    {
+      @call IDConnectionUserName::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, datalen);
+    }
+  else
+    {
+      @call IDConnectionUserName::MSG_VIS_TEXT_DELETE_ALL();
+    }
+  @send IDConnectionUserName::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID, VUM_NOW);
+  @send IDConnectionUserName::MSG_GEN_SET_USABLE(VUM_NOW);
+
+  if(connectionNum) {
+      @call IDConnectButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+      @call IDConnectionDefaultBoxGroup::MSG_GEN_SET_ENABLED(VUM_NOW);
+  } else {
+      @call IDConnectionDefaultBoxGroup::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+      @call IDConnectionDefaultBoxGroup::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+  }
+
+  AccessPointSetActivePoint(currentAccpnt, APT_INTERNET);
+  /*
+  if(AccessPointGetIntegerPropertyDirect(currentAccpnt, "hours", &tHours))
+    tHours = 0;
+  if(AccessPointGetIntegerPropertyDirect(currentAccpnt, "minutes", &tMinutes))
+    tMinutes = 0;
+  if(AccessPointGetIntegerPropertyDirect(currentAccpnt, "seconds", &tSeconds))
+    tSeconds = 0;
+  */
+
+  datalen = MAX_TEXT_LEN;
+  memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
+  mh = NULL;
+  @send IDConnectionPhoneNumber::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+  if ( AccessPointGetPhoneStringWithOptions( currentAccpnt, &mh, &datalen ) )
+  {
+      TCHAR *str;
+      str = MemLock( mh );
+      if ( str )
+      {
+	  if ( *str == 'T' || *str == 'P' )
+	      ++str;
+      }
+      @call IDConnectionPhoneNumber::MSG_VIS_TEXT_REPLACE_ALL_PTR(str, 0 /*NULL term*/);
+      MemUnlock( mh );
+      MemFree( mh );
+  }
+
+  else if( !AccessPointGetStringPropertyBufferDirect(currentAccpnt, 
+					 (char*)APSP_PHONE, name, &datalen) )
+  {
+      @call IDConnectionPhoneNumber::MSG_VIS_TEXT_REPLACE_ALL_PTR(name, datalen);
+  }
+  else
+  {
+      @call IDConnectionPhoneNumber::MSG_VIS_TEXT_DELETE_ALL();
+  }
+  @send IDConnectionPhoneNumber::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID, VUM_NOW);
+  @send IDConnectionPhoneNumber::MSG_GEN_SET_USABLE(VUM_NOW);
+}
+
+/***********************************************************************
+ *	IDialupEnsureDefaultConnection
+ ***********************************************************************
+ * SYNOPSIS:     Ensure that only defaultAccpnt is flagged as the 
+ *               default.
+ *
+ * PARAMETERS:  
+ *
+ * SIDE EFFECTS: Resets the default flag for all other access points.
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dhunter	2/25/2000	Extracted from MSG_IDP_SET_DEFAULT_CONNECTION
+ *
+ ***********************************************************************/
+void IDialupEnsureDefaultConnection(void)
+{
+  word i, datalen, *id;
+
+  MemLock(connectionHandle);
+
+  for(i=0; i<connectionNum; i++)
+  {
+    id = ChunkArrayElementToPtrHandles(connectionHandle, connectionChunk, i, &datalen);
+    if(*id != defaultAccpnt)
+    {
+	AccessPointSetIntegerPropertyDirect(*id, DEFAULT_KEY, 0);
+    }
+  }
+  MemUnlock(connectionHandle);
+}
+
+/***********************************************************************
+ *	MSG_IDP_SET_DEFAULT_CONNECTION for IDialupProcessClass
+ ***********************************************************************
+ * SYNOPSIS:     Create a new current connection setting.
+ *
+ * PARAMETERS:  
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/23/98	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupProcessClass, MSG_IDP_SET_DEFAULT_CONNECTION
+{
+  if(@call IDConnectionDefaultBoxGroup::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS())
+    {
+      AccessPointSetIntegerPropertyDirect(currentAccpnt, DEFAULT_KEY, 1);
+      defaultAccpnt = currentAccpnt;
+
+      IDialupEnsureDefaultConnection();
+    }
+  else
+    {
+      AccessPointSetIntegerPropertyDirect(currentAccpnt, DEFAULT_KEY, 0);
+      defaultAccpnt = 0;
+    }
+
+  AccessPointSetActivePoint(defaultAccpnt, APT_INTERNET);
+  AccessPointCommit();
+}
+
+/***********************************************************************
+ *	IDialupUpdateEditOKButton
+ ***********************************************************************
+ * SYNOPSIS:    Set the enabled status of the IDEditOkButton to reflect
+ *              the validity of the contents of the edit dialog controls.
+ *
+ * PARAMETERS:  none
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *  dhunter 1/14/2000   Moved to common routine called by MSG_META_TEXT...
+ *	mzhu	11/23/98	Initial Revision
+ *
+ ***********************************************************************/
+void IDialupUpdateEditOKButton(void)
+{
+    Boolean name, phone, user;
+
+	word type = @call IDEditConnectionType::MSG_GEN_ITEM_GROUP_GET_SELECTION() ;
+
+    /* Enable the OK button only if we have an Connection name, number and a
+     * user name.
+     */
+	name = ((@call IDEditConnectionName::MSG_VIS_TEXT_GET_TEXT_SIZE()) > 0) ?
+	    TRUE : FALSE;
+	if (type == 0)  {
+		phone = ((@call IDEditPhoneNumber::MSG_VIS_TEXT_GET_TEXT_SIZE()) > 0) ?
+			TRUE : FALSE;
+		user = ((@call IDEditUserName::MSG_VIS_TEXT_GET_TEXT_SIZE()) > 0) ?
+			TRUE : FALSE;
+	} else {
+		phone = TRUE ;
+		user = TRUE ;
+	}
+
+	if ( name && phone && user )
+	    @send IDEditOkButton::MSG_GEN_SET_ENABLED(
+		VUM_DELAYED_VIA_UI_QUEUE);
+	else
+	    @send IDEditOkButton::MSG_GEN_SET_NOT_ENABLED(
+		VUM_DELAYED_VIA_UI_QUEUE);
+}
+
+/***********************************************************************
+ *	MSG_META_TEXT_EMPTY_STATUS_CHANGED for IDialupProcessClass
+ ***********************************************************************
+ * SYNOPSIS:     
+ *
+ * PARAMETERS:  optr object = cx:dx, 
+		Boolean hasTextFlag = bp
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/23/98	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupProcessClass, MSG_META_TEXT_EMPTY_STATUS_CHANGED
+{
+    if ( object == @IDEditConnectionName || object == @IDEditPhoneNumber ||
+	      object == @IDEditUserName || object == @IDEditPassword)
+        IDialupUpdateEditOKButton();
+}
+
+/***********************************************************************
+ *	MSG_META_TEXT_USER_MODIFIED for IDialupProcessClass
+ ***********************************************************************
+ * SYNOPSIS:    
+ *
+ * PARAMETERS:  optr obj = cx:dx
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dhunter 1/14/2000   Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupProcessClass, MSG_META_TEXT_USER_MODIFIED
+{
+    if (!creatingConnection && (obj == @IDEditConnectionName
+      || obj == @IDEditPhoneNumber || obj == @IDEditUserName
+      || obj == @IDEditPassword
+/*@if defined(PRODUCT_NDO2000) */
+      || obj == @IDEditIP || obj == @IDEditGateway
+      || obj == @IDEditMask
+/*@endif*/
+      || obj == @IDEditDNS1 || obj == @IDEditDNS2))
+        IDialupUpdateEditOKButton();
+}
+
+
+/***********************************************************************
+ *		MSG_IDP_EDIT_DIALING_OPTIONS_CHANGED for IDialupProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Sent as the apply message of IDEditDialingOptions
+ *                  to update the enabled state of IDEditOkButton.
+ *
+ * PARAMETERS:	    none of interest
+ *
+ * STRATEGY:        Set the changed flag for later
+ *                  Call our common validation routine
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dhunter	5/17/00   	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupProcessClass, MSG_IDP_EDIT_DIALING_OPTIONS_CHANGED
+{
+/*#ifndef PRODUCT_NDO2000 */
+	 editDialOptionsChanged = TRUE;
+/*#endif  */
+    IDialupUpdateEditOKButton();
+}	/* End of MSG_IDP_EDIT_OPTIONS_CHANGED.	*/
+
+
+/***********************************************************************
+ *	MSG_IDP_DIALING_OPTIONS for IDialupProcessClass
+ ***********************************************************************
+ * SYNOPSIS:     Open the dialing options dialog.
+ *
+ * PARAMETERS:  
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	JimG	9/7/99		Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupProcessClass, MSG_IDP_DIALING_OPTIONS
+{
+    AccessPointDialingOptions options;
+/*@if defined(PRODUCT_NDO2000)
+    Boolean lqm;
+
+    if (InitFileReadBoolean("ppp", "lqm", &lqm)) lqm = TRUE;
+    @call IDDOMiscOptionsGroup::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(
+	(lqm ? 1 : 0), 0);
+/*@endif  */
+
+    AccessPointGetDialingOptions( &options );
+
+    /* Must do call's here since fptr is on stack. */
+    @call IDDOAreaCode::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+	options.APDO_areaCode, 0 /* Null terminated */ );
+
+    @call IDDOOutsideLine::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+	options.APDO_outsideLine, 0 /* Null terminated */ );
+
+    @call IDDOCallWaiting::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+	options.APDO_callWaiting, 0 /* Null terminated */ );
+
+    @call IDDODialTypeGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+	options.APDO_dialMethod, 0 /* DETERMINATE! */ );
+
+    @call IDDODialtoneGroup::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(
+	(options.APDO_waitForDialtone ? 1 : 0), 0 /* DETERMINATE! */ );
+
+    @send IDDialingOptionsDialog::MSG_GEN_INTERACTION_INITIATE();
+}
+
+
+/***********************************************************************
+ *	MSG_IDP_DIALING_OPTIONS_CHANGE for IDialupProcessClass
+ ***********************************************************************
+ * SYNOPSIS:     Set the dialing options in accpnt and close the dlg.
+ *
+ * PARAMETERS:  
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	JimG	9/7/99		Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupProcessClass, MSG_IDP_DIALING_OPTIONS_CHANGE
+{
+    AccessPointDialingOptions options;
+    MemHandle mh;
+    word nAreaCodeLen;
+/*@if defined(PRODUCT_NDO2000)
+    Boolean lqm;
+/*@endif */
+
+    if ((nAreaCodeLen = @call IDDOAreaCode::MSG_VIS_TEXT_GET_TEXT_SIZE()) > 0
+      && nAreaCodeLen != 3)
+    {
+	/* Put up an error message and return focus to area code entry */
+	MemLock( OptrToHandle( @invalidAreaCodeStr ) );
+	@call IDialupApp::MSG_GEN_APPLICATION_DO_STANDARD_DIALOG(
+	    MSG_META_GRAB_FOCUS_EXCL, @IDDOAreaCode,
+	    0, 0, 0, 0,
+	    LMemDeref( @invalidAreaCodeStr ),
+	    (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+	    (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) |
+	    CDBF_SYSTEM_MODAL );
+	MemUnlock( OptrToHandle( @invalidAreaCodeStr ) );
+    }
+    else
+    {
+	/*
+	 * All of these strings in the option structure have length of
+	 * APDO_..._LEN + 1 for the null terminator.  Since strncpy() will
+	 * not place a null terminator at the end of a string that is
+	 * exactly n chars long, be sure to provide a terminator, just in case.
+	 */
+	mh = @call IDDOAreaCode::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+	strncpy( options.APDO_areaCode, MemLock( mh ), APDO_AREA_CODE_LEN );
+	MemUnlock( mh );
+	options.APDO_areaCode[APDO_AREA_CODE_LEN] = '\0';
+
+	mh = @call IDDOCallWaiting::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+	strncpy( options.APDO_callWaiting, MemLock( mh ),
+		 APDO_CALL_WAITING_LEN );
+	MemUnlock( mh );
+	options.APDO_callWaiting[APDO_CALL_WAITING_LEN] = '\0';
+
+	mh = @call IDDOOutsideLine::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+	strncpy( options.APDO_outsideLine, MemLock( mh ),
+		 APDO_OUTSIDE_LINE_LEN );
+	MemUnlock( mh );
+	options.APDO_outsideLine[APDO_OUTSIDE_LINE_LEN] = '\0';
+
+	options.APDO_dialMethod = @call IDDODialTypeGroup::
+	    MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+	options.APDO_tenDigit = FALSE;	/* set locally on each accpnt */
+
+	options.APDO_waitForDialtone = (@call IDDODialtoneGroup::
+	    MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() == 1) ? TRUE : FALSE;
+
+	AccessPointSetDialingOptions( &options );
+
+/*@if defined(PRODUCT_NDO2000)
+	lqm = (@call IDDOMiscOptionsGroup::
+	    MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() == 1) ? TRUE : FALSE;
+        InitFileWriteBoolean("ppp", "lqm", lqm);
+/*@endif */
+
+	@send IDDialingOptionsDialog::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(
+	    IC_INTERACTION_COMPLETE);
+
+	/* Update the UI since the number is shown with dialer options. */
+	@send self::MSG_IDP_CONNECTION_SET_CURRENT();
+    }
+}
+
+/***********************************************************************
+ *	MSG_IDP_CONNECT for IDialupProcessClass
+ ***********************************************************************
+ * SYNOPSIS:     open the ppp connection.
+ *
+ * PARAMETERS:  
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/23/98	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupProcessClass, MSG_IDP_CONNECT
+{
+	word netType = 0 ;
+	char buffer[80] ;
+	word size ;
+	Boolean changed = FALSE ;
+
+  connectSent = TRUE;
+  disconnectRequested = FALSE;
+
+  /* Unregister if we are not connected */
+  if (G_registered)  {
+	  UnregisterToPPP();
+
+	  UnloadPPPDriver();
+	  G_registered = FALSE ;
+  }
+
+  AccessPointSetActivePoint(currentAccpnt, APT_INTERNET);
+  AccessPointCommit();
+
+  if (AccessPointGetIntegerPropertyDirect(currentAccpnt, "netType", &netType))
+	  netType = 0 ;
+  InitFileReadStringBuffer("tcpip", "link", buffer, sizeof(buffer)-1, &size) ;
+  buffer[size] = '\0' ;
+  if (netType)  {
+	  NEC(char *link = "ODI Ethernet Driver" ; )
+	  EC(char *link = "EC ODI Ethernet Driver" ; )
+	  if ((strlen(buffer)) && (strcmp(link, buffer)!=0))
+		  changed = TRUE ;
+	  InitFileWriteString("tcpip", "link", link) ;
+	  InitFileWriteString("tcpip", "linkDomain", "EtherODI") ;
+      InitFileDeleteEntry("tcpip", "linkPermname") ;
+  } else {
+	  NEC(char *ppplink = "PPP Driver" ; )
+	  EC(char *ppplink = "EC PPP Driver" ; )
+	  if ((strlen(buffer)) && (strcmp(ppplink, buffer)!=0))
+		  changed = TRUE ;
+	  InitFileWriteString("tcpip", "link", ppplink) ;
+	  InitFileWriteString("tcpip", "linkDomain", "PPP") ;
+      InitFileWriteString("tcpip", "linkPermname", "ppp") ;
+  }
+
+  if (changed)  {
+      UserStandardDialogOptr(
+        0,
+        0,
+        0,
+        0,
+        @mustRestart,
+        (CDT_ERROR<<CDBF_DIALOG_TYPE_OFFSET)|(GIT_NOTIFICATION<<CDBF_INTERACTION_TYPE_OFFSET)) ;
+      SysShutdown(SST_RESTART) ;
+  } else {
+      @call IDConnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+      @call IDDisconnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+      @call IDInfoGroup::MSG_IDI_RESET();		/* Make sure stats are 0'd */
+      @call IDialupApp::MSG_IDA_VIEW_INFO();
+
+      /* Register for a connection */
+      if (!G_registered)  {
+          LoadPPPDriver();
+
+          RegisterToPPP();
+	      G_registered = TRUE ;
+      }
+
+  
+      if(!IDialupConnect())
+        {
+          /* something wrong, should notify the user */
+          if ( !disconnectRequested )
+	      EC(EC_WARNING(-1);)
+
+          /*
+           * If connectSent wasn't cleared, we never got to PPP_STATUS_OPENING,
+           * so take care of that and restore the connection view.  Otherwise,
+           * PPP_STATUS_CLOSED will eventually do all this for us.
+           */
+          if (connectSent)
+          {
+	      connectSent = FALSE;
+	      disconnectRequested = FALSE;
+
+	      @call IDialupApp::MSG_IDA_VIEW_CONNECTION();
+          }
+        }
+    }
+}
+
+
+/***********************************************************************
+ *	MSG_IDP_DISCONNECT for IDialupProcessClass
+ ***********************************************************************
+ * SYNOPSIS:     stop the ppp connection.
+ *		 This is not sent directly from the UI anymore, but
+ *		 may be routed here by the App object.
+ *
+ * PARAMETERS:  
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/23/98	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupProcessClass, MSG_IDP_DISCONNECT
+{
+    /*
+     * This message is sent to us from the App object's
+     * MSG_IDA_DISCONNECT handler.  All UI and timer stuff may have been
+     * done by the app object; but we cannot be sure so do it again, just
+     * to be safe.
+     */
+    connectSent = FALSE;
+
+    // Note: Do NOT set disconnectRequested to TRUE here because that
+    // should ONLY be set when the USER requested a disconnect via the
+    // UI.  Since the UI sends a msg to the app object, let it set this
+    // value.  Otherwise, we may lose messages to the user.
+    //
+    // disconnectRequested = TRUE;
+    @call IDDisconnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+    if(timerHandle)
+    {
+	TimerStop(timerHandle, timerId) ;
+	timerHandle = 0 ;
+        timerId = 0;
+    }
+
+    // If we are opening or dialing, this will force the modem to stop
+    if(!IDialupDisconnect())
+    {
+	EC_WARNING(-1);
+    }
+}
+
+
+/***********************************************************************
+ *	MSG_IDP_STAY_CONNECTED for IDialupProcessClass
+ ***********************************************************************
+ * SYNOPSIS:     keep connection after timeout; if CUI, lower app to
+ *		 bottom
+ *
+ * PARAMETERS:  
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	04/19/99	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupProcessClass, MSG_IDP_STAY_CONNECTED
+{
+    SendPing();
+    @send IDIdleNotifyDialog::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    @send IDialupPrimary::MSG_GEN_DISPLAY_SET_MINIMIZED();
+}
+
+
+/***********************************************************************
+ *	MSG_IDP_IDLE_DISCONNECTED for IDialupProcessClass
+ ***********************************************************************
+ * SYNOPSIS:     disconnect after timeout
+ *
+ * PARAMETERS:  
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	04/19/99	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupProcessClass, MSG_IDP_IDLE_DISCONNECT
+{
+    disconnectRequested = TRUE;	/* causes notify handler to send quit */
+    @send process::MSG_IDP_DISCONNECT();
+}
+
+
+/********************************************************************
+ *              MSG_NOTIFY_APP_STARTED
+ ********************************************************************
+ * SYNOPSIS:     Get notified when the any application starts
+ * PARAMETERS:   MemHandle appStarted (process handle to new app)
+ * RETURNS:      
+ * SIDE EFFECTS: none
+ * STRATEGY:     
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      JimG  9/13/99          Initial Version
+ *******************************************************************/
+@method IDialupProcessClass, MSG_NOTIFY_APP_STARTED
+{
+    Boolean iAppWasRunning = iAppRunning;
+    
+    // We used to use the passed core block to see if that particular
+    // app was an iApp, but then realized that this message can get
+    // QUEUED if the process thread is, say, making the connection.
+    // When this message was finally handled, the application could have
+    // been closed, the block handle could be free, and MemLock would
+    // crash. -Dave 1/14/2000
+
+    // Simply check to see if an iApp is running and flag that state.
+    iAppRunning = IAppRunning();
+
+    // If no iApps were running and now at least one is, dismiss the
+    // "last internet app" dialog, since it's no longer valid.
+    
+    if (!iAppWasRunning && iAppRunning)
+    {
+        if((@call IDLIANotifyDialog::MSG_VIS_GET_ATTRS()) & VA_REALIZED )
+    	    @send IDLIANotifyDialog::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+    }
+}
+
+/********************************************************************
+ *              MSG_NOTIFY_APP_EXITED
+ ********************************************************************
+ * SYNOPSIS:     Get notified when the caller application quits
+ * PARAMETERS:   MemHandle appExited (FREE'd process handle to dead app)
+ * RETURNS:      
+ * SIDE EFFECTS: none
+ * STRATEGY:     
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      mzhu  1/28/99          Initial Version
+ *******************************************************************/
+@method IDialupProcessClass, MSG_NOTIFY_APP_EXITED 
+{
+  TCHAR name[NAME_LEN];
+  word datalen = NAME_LEN;
+  Boolean iAppWasRunning = iAppRunning;
+
+  if(AccessPointGetStringPropertyBufferDirect(currentAccpnt, (char*)APSP_NAME, name, &datalen))
+    AccessPointGetStringPropertyBufferDirect(currentAccpnt, (char*)APSP_PHONE, name, &datalen);
+
+  iAppRunning = IAppRunning();
+
+  // If an iApp was running and there are now no longer any iApp's running,
+  // then put up the dialing asking the user if s/he wants to bail.
+  //   (oh, yeah, if the connection is OPEN, that is.)
+  if(pppStatus == PPP_STATUS_OPEN && iAppWasRunning && !iAppRunning)
+    {
+      // Reset the idle time to now to disconnect after the delay timeout.
+  	  idleTime = (TimerGetCount() - startTime) / 60;
+
+      if (UserGetDefaultUILevel() != UIIL_INTRODUCTORY)
+      {
+	  /* In the AUI, raise the dialog. */
+
+	  // Dismiss the idle notify dialog before raising the last internet app
+	  // dialog. -dhunter 1/14/2000
+	  if((@call IDIdleNotifyDialog::MSG_VIS_GET_ATTRS()) & VA_REALIZED )
+          {
+	      @send IDIdleNotifyDialog::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+              @send IDIdleNotifyDialog::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+          }
+	  
+	  MemLock(OptrToHandle(@lastIAppStr));
+	  
+	  @call IDLIANotifyText::MSG_VIS_TEXT_REPLACE_ALL_PTR(LMemDeref(@lastIAppStr), 0);
+	  @call IDLIANotifyText::MSG_VIS_TEXT_APPEND_PTR(_TEXT("\""), 0);
+	  @call IDLIANotifyText::MSG_VIS_TEXT_APPEND_PTR(name, datalen);
+	  @call IDLIANotifyText::MSG_VIS_TEXT_APPEND_PTR(_TEXT("\""), 0);
+	  @call IDLIANotifyText::MSG_VIS_TEXT_APPEND_PTR(_TEXT("?"), 0);
+	  
+	  MemUnlock(OptrToHandle(@lastIAppStr));
+      
+	  @call IDLIANotifyDialog::MSG_GEN_INTERACTION_INITIATE();
+	  @call IDLIANotifyDialog::MSG_GEN_BRING_TO_TOP();
+	  @call IDialupApp::MSG_GEN_BRING_TO_TOP();
+      }
+      else
+      {
+	  /* In the CUI, don't raise the dialog.  Instead, set a flag so we can
+	     stealthily disconnect after the delay timeout. */
+	  bStealthLIAFlag = TRUE;
+      }
+    }
+}
+
+
+/********************************************************************
+ *              MSG_META_KBD_CHAR
+ ********************************************************************
+ * SYNOPSIS:     For the IPTextClass, only allow a valid IP address
+ *		 to be entered.  Can be incomplete, but any characters
+ *		 entered must consitute a valid IP address.
+ * PARAMETERS:   
+ * RETURNS:      
+ * SIDE EFFECTS: none
+ * STRATEGY:     
+ * REVISION HISTORY:
+ *      Name   Date             Description
+ *      ----   ----             -----------
+ *      JimG  8/24/99          Initial Version
+ *******************************************************************/
+@method IDialupIPTextClass, MSG_META_KBD_CHAR
+{
+    byte cset = ((character & 0xff00) >> 8);
+    byte chval = character & 0xff;
+    Boolean passUp = FALSE;
+
+    if ( cset == CS_BSW )
+    {
+@ifdef DO_DBCS  /* checking cset=CS_BSW still works for DBCS */
+	if (chval == '.' || (chval >= C_DIGIT_ZERO && chval <= C_DIGIT_NINE))
+@else
+	if (chval == '.' || (chval >= C_ZERO && chval <= C_NINE))
+@endif
+	        passUp = TRUE;
+    }
+
+    else
+	passUp = TRUE;
+
+    if ( passUp )
+	@callsuper();
+
+    /* If we can't pass up to super, then sound an error for keydown. */
+    else if ( flags & CF_FIRST_PRESS )
+	UserStandardSound( SST_NO_INPUT );
+}
+
+/***********************************************************************
+ *	MSG_IDP_FIELD_CHANGE_CONFIRM for IDialupProcessClass
+ ***********************************************************************
+ * SYNOPSIS:     Handle result of standard dialog to confirm field change.
+ *
+ * PARAMETERS:  
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	JimG	08/26/99	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupProcessClass, MSG_IDP_FIELD_CHANGE_CONFIRM
+{
+    // User wants to close down the connection and allow the field change.
+    // So set the flag so that the field change complete will be sent
+    // once the connection is closed and force the disconnect.
+    //
+    if ( response == IC_YES )
+    {
+	sendFieldChangeConfirm = TRUE;
+	@send IDialupPrimary::MSG_GEN_DISPLAY_SET_NOT_MINIMIZED();
+	@call process::MSG_IDP_DISCONNECT();
+    }
+
+    // Otherwise, blow off the field change.
+    //
+    else
+	UserConfirmFieldChange( CFCT_CONFIRM_COMPLETE, (word)FALSE );
+}
+
+@method IDialupProcessClass, MSG_IDP_EDIT_TYPE_MODIFIED
+{
+	@call oself::MSG_IDP_EDIT_TYPE_UPDATE() ;
+}
+
+@method IDialupProcessClass, MSG_IDP_EDIT_TYPE_UPDATE
+{
+	/* TBD */
+	word type = @call IDEditConnectionType::MSG_GEN_ITEM_GROUP_GET_SELECTION() ;
+	if (type)  {
+		@call IDEditUserName::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+		@call IDEditPassword::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+		@call IDEditPhoneNumber::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+		@call IDEditDialingOptionsGroup::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+		@call IDEditUserName::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+		@call IDEditPassword::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+		@call IDEditPhoneNumber::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+		@call IDEditDialingOptionsGroup::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+	} else {
+		@call IDEditUserName::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+		@call IDEditPassword::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+		@call IDEditPhoneNumber::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+		@call IDEditDialingOptionsGroup::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+		@call IDEditUserName::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+		@call IDEditPassword::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+		@call IDEditPhoneNumber::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+		@call IDEditDialingOptionsGroup::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+	}
+    IDialupUpdateEditOKButton();
+}
+

@@ -1,0 +1,683 @@
+/********************************************************************
+ *
+ *	Copyright (c) Geoworks 1991-96 -- All Rights Reserved.
+ *
+ * PROJECT:	  Sample Applications
+ * MODULE:	  MyEmail
+ * FILE:	  myemail.goc
+ *
+ * AUTHOR:	  Ian Porteous: October 27, 1998
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	10/27/98  ian	    Initial version
+ *
+ * DESCRIPTION:
+ *	This file implements a Email World-type application for GEOS.
+ *	It is processed by GOC, compiled by your favorite C compiler,
+ *	and linked by Glue to produce a runnable .geo file.
+ *
+ * RCS STAMP:
+ *	$Id: email.goc,v 1.1 97/04/04 16:36:02 newdeal Exp $
+ *
+ *******************************************************************/
+
+/********************************************************************
+ *		Include files
+ *******************************************************************/
+@include <stdapp.goh>
+@include <socket.goh>
+@include <Objects/vTextC.goh>
+@include <Objects/vLTextC.goh>
+@include <Objects/Text/tCtrlC.goh>
+@include <mailhub.goh>
+@include <mailsmtp.goh>
+@include <mailpop3.goh>
+
+#include <Ansi/string.h>
+#include <sockmisc.h>
+
+/********************************************************************
+ *		Constants
+ *******************************************************************/
+#define EMAIL_DOCUMENT_WIDTH 600
+#define EMAIL_DOCUMENT_HEIGHT 200
+#define MAX_ADDRESS_SIZE 32
+#define CR 0xd
+#define LF 0xa
+char CRLF[] = {CR,LF,0};
+char tcpDomain[] = "TCPIP";
+char smtpAddress[] = "smtp.globalpc.com";
+Socket testSocket = NULL;
+char ipa[] = "192.168.8.1";
+/* char ipa[] = "192.168.8.20"; */
+
+MailMessage msg;
+OUTBOX ob;
+
+typedef struct {
+    SocketAddress ISA_saStruct;
+    TcpAccPntExtendedAddress ISA_addressBuffer;
+    byte ISA_raddressBuffer[MAX_ADDRESS_SIZE];
+} InitSocketAddress;
+
+typedef struct {
+    SocketAddress MSA_saStruct;
+    TcpOnlyExtendedAddress MSA_address;
+    byte MSA_addressBuffer[MAX_ADDRESS_SIZE];
+} MailSocketAddress;
+
+InitSocketAddress initAddress;
+MailSocketAddress mailAddress;
+
+/********************************************************************
+ *		Class Definitions
+ *******************************************************************/
+
+    /*
+     * Here we define "EmailProcessClass" as a subclass of the
+     * system provided "GenProcessClass". As this application is
+     * launched, an instance of this class will be created, and will
+     * handle all application-related events (messages). The application
+     * thread will be responsible for running this object, meaning that
+     * whenever this object handles a message, we will be executing
+     * in the application thread.
+     *
+     * You will find no object in this file declared to be of this class.
+     * Instead, it is specified as the class for the application thread
+     * in "myemail.gp".
+     */
+@class EmailProcessClass, GenProcessClass;
+
+    /* Define messages for this class here. Most commonly, UI objects
+     * will send these messages to the application thread when they've
+     * been activated by the user. */
+@message void MSG_EMAILP_OPEN_SOCKET();
+@message void MSG_EMAILP_SEND_MSG();
+@message void MSG_EMAILP_CLOSE_SOCKET();
+@message void MSG_EMAILP_GET_MAIL();
+
+
+
+@endc;   /* end of class definition */
+
+
+@class EmailTextClass, VisLargeTextClass;
+@endc;
+
+@class EmailContentClass, GenContentClass;
+@endc;
+
+/********************************************************************
+ *		Class Declarations
+ *******************************************************************/
+    /*
+     * Each object class requires a "class record" be stored in fixed
+     * memory for it. The class record is used by the GEOS message
+     * system for the delivery of messages sent to an object of the class.
+     * The class record needs to be defined in the file where the objects
+     * of that class are defined. The @classdecl GOC directive tells GOC
+     * to create the class record here.
+     *
+     * The neverSaved flag is necessary because ProcessClass objects are
+     * hybrid objects. It tells the system that no object of this class
+     * will ever be loaded from or stored to a file.
+     */
+@classdecl EmailProcessClass, neverSaved;
+@classdecl EmailTextClass;
+@classdecl EmailContentClass;
+
+/********************************************************************
+ *		UI Object Resources
+ *******************************************************************/
+
+/*
+ *		Application Object
+ *
+ * The very top-level generic object of an application MUST be a
+ * GenApplication object. The myemail.gp file contains "appobj"
+ * statement which indicates that this "EmailApp" object is in fact
+ * the top-level UI object.
+ *
+ * This object should be in its own resource, as it is all that need
+ * be in memory when the application is iconified. As such, its
+ * resource should be as small as possible.
+ */
+@start AppResource;
+
+@object GenApplicationClass EmailApp = {
+    /*
+     * While the application object isn't shown on the screen, it
+     * has a list of VisMonikers for three purposes:
+     *	1) the GenPrimary (see below) inherits the moniker when
+     *	   it comes up on screen.
+     *	2) when GeoManager needs to display an icon for the application,
+     *	   and there's none for it in the Token Database, it launches
+     *	   the app and sends a message to the application object to
+     *	   install its list of monikers in the token database under
+     *     the application's token.
+     *	3) when the GenPrimary is minimized, it uses the most appropriate
+     *	   graphical moniker from this list for the application's icon.
+     *	   if there's an abbreviated-text moniker in the list, that's used
+     *	   as the icon title. else any regular-text moniker is used.
+     */
+    GI_visMoniker = list { @EmailTextMoniker };
+
+    /*
+     * The GenApplication object has at least one child:
+     * the main application window.
+     */
+    GI_comp = @EmailPrimary;
+
+    /*
+     * The main window should appear on-screen when the application
+     * is launched, so place it on the GAGCNLT_WINDOWS GCN list.
+     * This causes the application object to bring it on-screen at
+     * the appropriate time.
+     */
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) =
+        @EmailPrimary;
+
+}
+
+@visMoniker EmailTextMoniker = "Email App";
+
+@end AppResource;
+
+/*
+ * This resource is for miscellaneous UI objects.
+ */
+@start Interface;
+
+/*
+ *		Primary window
+ *
+ * Every application has at least one GenPrimary object.
+ * This object serves as the main window of the application.
+ * Inside this window, various UI components, such as menus
+ * or lists, can be placed.
+ */
+@object GenPrimaryClass EmailPrimary  = {
+    /*
+     * This window has one child: the GenView object (see below).
+     */
+    GI_comp = @FileMenu, @OpenSocketTrigger, @CloseSocketTrigger, 
+    @EmailTextView, @SendMailTrigger, @GetMailTrigger;
+    /*
+     * The window may not be iconified.
+     */
+    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+}
+
+@object GenInteractionClass FileMenu = {
+    GII_visibility = GIV_POPUP;
+}    
+
+@object GenTriggerClass OpenSocketTrigger = {
+    GI_visMoniker = 'O', "Open Socket";
+    GTI_actionMsg = MSG_EMAILP_OPEN_SOCKET;
+    GTI_destination = process;
+}
+
+@object GenTriggerClass CloseSocketTrigger = {
+    GI_visMoniker = 'C', "Close Socket";
+    GTI_actionMsg = MSG_EMAILP_CLOSE_SOCKET;
+    GTI_destination = process;
+}
+
+@object GenTriggerClass SendMailTrigger = {
+    GI_visMoniker = 'S', "Send Mail";
+    GTI_actionMsg = MSG_EMAILP_SEND_MSG;
+    GTI_destination = process;
+}
+
+@object GenTriggerClass GetMailTrigger = {
+    GI_visMoniker = 'G', "Get Mail";
+    GTI_actionMsg = MSG_EMAILP_GET_MAIL;
+    GTI_destination = process;
+}
+
+  /*
+   * These objects are the heart of the sample application:
+   *   the view, content and large text object.
+   *
+   * Items of note in the view:
+   *
+   *  GVA_WINDOW_COORDINATE_MOUSE_EVENTS
+   *    Allows the view to send mouse events in window coordinates
+   *    as opposed to in view document coordinates.  The VisContent
+   *    then deals with these coordinates with in 32-bit coordinate
+   *    mode (which must be used with VisLargeText).
+   */
+@object GenViewClass EmailTextView = {
+    GVI_vertAttrs  = @default | GVDA_SCROLLABLE;
+    GVI_attrs = @default | GVA_DRAG_SCROLLING
+	    	    	 | GVA_WINDOW_COORDINATE_MOUSE_EVENTS
+			 | GVA_DONT_SEND_KBD_RELEASES
+                         | GVA_FOCUSABLE;
+    GVI_content = @EmailContent;
+    ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_DEFAULT_FOCUS;
+}
+
+  /*
+   * Items of note in the content:
+   *
+   * VCNA_LARGE_DOCUMENT_MODEL:
+   * VCNA_WINDOW_COORDINATE_MOUSE_EVENTS
+   *    VisLargeText requires using the large coordinate model,
+   *    meaning that 32-bit coordinates are passed for mouse events.
+   *    Bounds are larger than the graphics space under this model,
+   *    so the 16-bit. Visible bounds of this object are meaningless.
+   */
+@object EmailContentClass EmailContent = {
+    GCI_genView = @EmailTextView;
+    GCI_attrs = @default | VCNA_LARGE_DOCUMENT_MODEL
+	    	    	 | VCNA_WINDOW_COORDINATE_MOUSE_EVENTS
+		    	 | VCNA_SAME_WIDTH_AS_VIEW;
+}
+
+@object EmailTextClass EmailText = {
+      /* The state bits determine various aspects of the VisText.
+       * To allow full user interaction with this text object, it
+       * is set to be both editable and selectable.  To allow the
+       * Controller objects to work with the text object, it is
+       * set to be targetable, too.  A message to grab the target
+       * for the Text object can be sent from
+       * MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT. */
+    VTI_state = @default | VTS_EDITABLE
+                         | VTS_SELECTABLE
+		         | VTS_TARGETABLE;
+    VTI_output = process;
+    VTI_charAttrRuns = ( ( VTDS_9 << VTDCA_SIZE_OFFSET ) ||
+                         ( VTDF_BERKELEY << VTDCA_FONT_OFFSET ) );
+
+    VLTI_displayMode = VLTDM_DRAFT_WITH_STYLES;
+    VLTI_attrs = VLTA_EXACT_HEIGHT;
+    ATTR_VIS_TEXT_DO_NOT_NOTIFY_CONTENT;
+    VLTI_regionArray = @EmailTextRegionArray;
+}
+
+@chunk ChunkArrayHeader EmailTextRegionArray = {
+    0,
+    sizeof( VisLargeTextRegionArrayElement ),
+    0,
+    sizeof( ChunkArrayHeader )
+};
+
+@end Interface;
+
+/********************************************************************
+ *		Function Definitions
+ *******************************************************************/
+
+
+
+/********************************************************************
+ *		Code for EmailProcessClass
+ *******************************************************************/
+
+/********************************************************************
+ *              MSG_META_EXPOSED
+ ********************************************************************
+ * SYNOPSIS:	 Redraw the recently-exposed portion of the View.
+ * PARAMETERS:	 WindowHandle win
+ * RETURNS:      void
+ * SIDE EFFECTS: The invalid region of the window is cleared out.
+ * STRATEGY:	 This message is sent by the windowing system when a
+ *	    	 portion of the GenView has become invalid, either
+ *	    	 because a window that was obscuring it has been moved,
+ *	    	 or because some called GrInvalRect.
+ *	    	 We redraw the entire document, after telling the
+ *		 graphics system we're drawing to the invalid portion
+ *		 of the window.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	4/91		Initial Revision
+ *******************************************************************/
+@method EmailProcessClass, MSG_META_EXPOSED
+{
+    GStateHandle gstate;
+
+    /*
+     * Get a default graphics state that we can use while drawing.
+     */
+    gstate = GrCreateState( win );
+    /*
+     * Start a window update. This tells the windowing system
+     * that we are in the process of drawing to the invalid portion
+     * of this window. GrBeginUpdate/GrEndUpdate are necessary only
+     * when handling MSG_META_EXPOSED. For drawing at other times,
+     * all you need do is create a graphics state and draw through it.
+     */
+    GrBeginUpdate( gstate );
+
+    /*
+     * Draw the pattern into the window (pass the GState). Breaking
+     * the exposure and general drawing into two routines allows the
+     * display to be updated by other routines without having to
+     * invalidate the window.
+     */
+
+    /*
+     * Now indicate that we are done drawing to the invalid area
+     * and free the gstate.
+     */
+    GrEndUpdate( gstate );
+    GrDestroyState( gstate );
+} /* MSG_META_EXPOSED */
+
+
+
+/********************************************************************
+ *              MSG_EMAILP_OPEN_SOCKET
+ ********************************************************************
+ * SYNOPSIS:	 Open the socket
+ * PARAMETERS:	 
+ * RETURNS:      void
+ * SIDE EFFECTS: 
+ * STRATEGY:	 
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *******************************************************************/
+@method EmailProcessClass, MSG_EMAILP_OPEN_SOCKET
+{
+
+    MediumAndUnit medium;
+    SocketError status;
+    char data[] = "HELO";
+    Socket sock;
+    SocketPort port;
+
+    initAddress.ISA_saStruct.SA_port.SP_port = 7;
+    initAddress.ISA_saStruct.SA_port.SP_manuf = MANUFACTURER_ID_SOCKET_16BIT_PORT;
+    initAddress.ISA_saStruct.SA_domainSize = sizeof(tcpDomain) - 1;
+    initAddress.ISA_saStruct.SA_domain = tcpDomain;
+    initAddress.ISA_saStruct.SA_addressSize = sizeof(TcpAccPntResolvedAddress);
+    
+    initAddress.ISA_addressBuffer.TAPEA_linkSize = 3;
+    initAddress.ISA_addressBuffer.TAPEA_linkType = LT_ID;
+    initAddress.ISA_addressBuffer.TAPEA_accPntID = 1;
+
+    status = SocketOpenDomainMedium(&(initAddress.ISA_saStruct), 3600);
+    if (status == SE_NORMAL) {
+	SocketGetAddressMedium(&(initAddress.ISA_saStruct), &medium);
+
+    }
+
+} /* MSG_EMAILP_OPEN_SOCKET */
+
+
+/***********************************************************************
+ *		MSG_EMAILP_SEND_MSG for EmailProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    This method contains sample code for how to 
+ *                  send a message.
+ *
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	12/03/98   	Initial Revision
+ *
+ ***********************************************************************/
+@method EmailProcessClass, MSG_EMAILP_SEND_MSG
+{
+    MemHandle obox;
+    MailError ret;
+    char msgFileName[] = "message.txt";
+
+    ret = MailoutOpen("smtp.globalpc.com",OUTB_PROTOCOL_ESMTP,
+		      "tuser",&obox, 1);
+    /* bufferHandle = @call EmailText::MSG_VIS_TEXT_GET_ALL_BLOCK(0); */
+    if (!ret) {
+	MailMessageInit(&msg);
+	ret = MailoutLoadHeader(&msg,msgFileName);
+	if (!ret) {
+	    MailoutSendMail(obox, &msg);
+	    MailoutClose(obox);
+	}
+    }
+}
+
+
+/***********************************************************************
+ *		MSG_EMAILP_GET_MAIL for EmailProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Sample code that downloads all the messages for 
+ *                  an account and appends them to the text field
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	12/03/98   	Initial Revision
+ *
+ ***********************************************************************/
+@method EmailProcessClass, MSG_EMAILP_GET_MAIL
+{
+
+    MemHandle box;
+    MailError ret;
+    int count, i, msize;
+    char *data;
+
+    ret = MailinOpen("smtp.globalpc.com",IB_PROTOCOL_POP3, "tuser", 
+		      "foobar","mail\\uone",&box, 1);
+
+    if (ret == ME_NONE) {
+
+	ret = MailinGetMessageCount(box,&count);
+
+	for (i = 0; i< count; ++i) {
+	    MailMessageInit(&msg);
+	    MailinGetMessageSize(box, i, &msize);
+	    if (msize == 0) {
+		break;
+	    }
+	    MailinGetMessage(box,i,&msg);
+	    MemLock(msg.MM_storageBlock);
+	    data = LMemDerefHandles(msg.MM_storageBlock, msg.MM_fileName);
+	    @call EmailText::MSG_VIS_TEXT_APPEND_PTR(data, 0 );
+	    @call EmailText::MSG_VIS_TEXT_APPEND_PTR("\r", 0 );
+/*	    MessageDelete(box,&msg); */
+	    MailMessageClose(&msg);
+	}
+    }
+}
+
+/********************************************************************
+ *              MSG_EMAILP_CLOSE_SOCKET
+ ********************************************************************
+ * SYNOPSIS:	 Close the socket
+ * PARAMETERS:	 
+ * RETURNS:      void
+ * SIDE EFFECTS: 
+ * STRATEGY:	 
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *******************************************************************/
+@method EmailProcessClass, MSG_EMAILP_CLOSE_SOCKET
+{
+
+    if (testSocket != NULL ) {
+    };
+
+} /* MSG_EMAILP_CLOSE_SOCKET */
+
+
+#define TEXT_APPEND_ITERATIONS 4
+/********************************************************************
+ *              MSG_META_CONTENT_VIEW_OPENING
+ ********************************************************************
+ * SYNOPSIS:     We use MSG_META_CONTENT_VIEW_OPENING as a convenient
+ *               place to initialize some things.
+ * CALLED BY:
+ * PARAMETERS:   optr view
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     First call the superclass. Then setup the content
+ *               object (ourself) so we don't use the geometry
+ *               manager (which will control the size of the content).
+ *               Add the large text object to ourselves and then
+ *               make it "large" by adding a VM file and creating
+ *               the "large" data structures.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *
+ *******************************************************************/
+@method EmailContentClass, MSG_META_CONTENT_VIEW_OPENING
+{
+      /*
+       * vself   - Pointer to our instance data.
+       * fileHan - Handle of the temporary file for the text
+       *           object to use to store the "large" data.
+       * i       - Used in a for loop.
+       */
+    VMFileHandle         fileHan;
+    VisContentInstance * vself;
+
+    @callsuper();
+
+      /*
+       * Set up the geometry for the content so that the
+       * geometry manager is not used.
+       */
+    vself = ObjDerefVis( oself );
+    vself->VI_attrs &= ~VA_MANAGED;
+    vself->VI_optFlags &= ~( VOF_GEOMETRY_INVALID | VOF_GEO_UPDATE_PATH );
+    vself->VCI_geoAttrs |= VCGA_CUSTOM_MANAGE_CHILDREN;
+
+      /*
+       * Add the text object as a child of the content.
+       * This must be done dynamically because the text
+       * object is a visual child, not a generic one.
+       */
+    @call EmailContent::MSG_VIS_ADD_CHILD( @EmailText, CCO_FIRST );
+
+      /*
+       * Set up the text object to be large.
+       */
+    fileHan = ClipboardGetClipboardFile();
+    @call EmailText::MSG_VIS_TEXT_SET_VM_FILE( fileHan );
+    @call EmailText::MSG_VIS_LARGE_TEXT_CREATE_DATA_STRUCTURES();
+    @call EmailText::MSG_VIS_NOTIFY_GEOMETRY_VALID();
+
+      /*
+       * Add some text to the text object, to show that it is
+       * a large object.
+       */
+    @call EmailText::MSG_META_SUSPEND();
+    @call EmailText::MSG_VIS_TEXT_APPEND_PTR("from: ian@globalpc.com\r", 0 );
+    @call EmailText::MSG_VIS_TEXT_APPEND_PTR("to: porteous@globalpc.com\r", 0 );
+    @call EmailText::MSG_VIS_TEXT_APPEND_PTR("X-Mail-Tools-Attachment: C:\\DOCUMENT\\PERSONAL\\PHOTO\\foo.txt\r\r",0);
+    @call EmailText::MSG_VIS_TEXT_APPEND_PTR("Hello World\r", 0 );
+
+    @call EmailText::MSG_META_UNSUSPEND();
+} /* MSG_META_CONTENT_VIEW_OPENING */
+
+
+
+
+/********************************************************************
+ *              MSG_META_CONTENT_VIEW_CLOSING
+ ********************************************************************
+ * SYNOPSIS:     We use MSG_META_CONTENT_VIEW_CLOSING as a convenient
+ *               place to clean up after ourselves.
+ * CALLED BY:
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     First call the superclass, then free the extra
+ *               "large" data structures of the text object. Then
+ *               clear out the VM file used to store the data.
+ *               Wrap up by removing the text object from the
+ *               content.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      tony    1/19/94         Initial version
+ *******************************************************************/
+@method EmailContentClass, MSG_META_CONTENT_VIEW_CLOSING
+{
+
+    @callsuper();
+
+      /*
+       * Free the large text data structures and make the
+       * text object small again. Then remove it from ourselves.
+       */
+    @call EmailText::MSG_VIS_TEXT_FREE_ALL_STORAGE( TRUE );
+    @call EmailText::MSG_VIS_TEXT_SET_VM_FILE( NullHandle );
+    @call self::MSG_VIS_REMOVE_CHILD( @EmailText, CCO_FIRST );
+} /* MSG_META_CONTENT_VIEW_CLOSING */
+
+
+
+/********************************************************************
+ *              MSG_VIS_FREE_ALL_STORAGE
+ ********************************************************************
+ * SYNOPSIS:     We must intercept FREE_STORAGE to do a little more
+ *               work so that the text object is left in the correct
+ *               state.
+ * CALLED BY:
+ * PARAMETERS:   Boolean removeElementArrays
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     First call the superclass. Then resize the text
+ *               region array to its default size, and reset the
+ *               values to their defaults. Finally, make ourselves
+ *               small again and mark our geometry invalid so we'll
+ *               be redrawn when the time comes.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      tony    1/19/94         Initial version      
+ *******************************************************************/
+@method EmailTextClass, MSG_VIS_TEXT_FREE_ALL_STORAGE
+{
+      /*
+       * cahp  - Pointer to the text region array.
+       * vself - Pointer to our instance data.
+       */
+    ChunkArrayHeader *     cahp;
+    VisLargeTextInstance * vself;
+
+    @callsuper();
+
+      /*
+       * Resize the text region array back to its default size.
+       * Then reset the values back to the default.
+       */
+    LMemReAlloc( @EmailTextRegionArray, sizeof( ChunkArrayHeader ) );
+    cahp = LMemDeref( @EmailTextRegionArray );
+    cahp->CAH_count = 0;
+    cahp->CAH_elementSize = sizeof( VisLargeTextRegionArrayElement );
+    cahp->CAH_curOffset = 0;
+    cahp->CAH_offset = sizeof( ChunkArrayHeader );
+
+      /*
+       * Make ourselves not large and mark our geometry invalid.
+       */
+    vself = ObjDerefVis( oself );
+    vself->VTI_storageFlags &= ~VTSF_LARGE;
+    vself->VI_optFlags |= VOF_GEOMETRY_INVALID;
+} /* MSG_VIS_TEXT_FREE_ALL_STORAGE */
+

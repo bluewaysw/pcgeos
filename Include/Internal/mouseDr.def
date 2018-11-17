@@ -1,0 +1,330 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+FILE:		mouseDr.def
+
+DECLARER:	Mouse drivers
+
+DESCRIPTION:
+	This file defines mouse driver structures and routines.
+
+	$Id: mouseDr.def,v 1.1 97/04/04 14:13:12 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__MOUSEDR
+UseLib	hwr.def
+
+include	driver.def
+
+StartDriver mouse
+
+ifndef HARDWARE_TYPE
+HARDWARE_TYPE	equ	<PC>		; Choices include:
+						;	PC
+						;	ZOOMER (XIP only)
+						;	BULLET (XIP only)
+endif
+
+;
+; Protocol number for this interface. Adjust the final numbers, below, if the
+; interface is changed.
+;
+MOUSE_PROTO_MAJOR equ DRIVER_PROTO_MAJOR+1
+MOUSE_PROTO_MINOR equ DRIVER_PROTO_MINOR+2
+
+MouseDriverInfoFlags	record
+	MDIF_KEYBOARD_ONLY:1
+	; Set if mouse driver is actually a keybard-driven mouse driver, i.e.
+	; the user doesn't have a real mouse.  Used by the UI to choose the
+	; default for keyboard only operation if the .ini file doesn't have a
+	; preference.
+
+	:15
+MouseDriverInfoFlags	end
+
+;
+; Our version of a driver info struct, encompassing extended info for the
+; driver, and mouse-specific information.
+;
+MouseDriverInfoStruct	struct
+    MDIS_common		DriverExtendedInfoStruct	<
+	<
+		0,				; DIS_strategy
+		mask DA_HAS_EXTENDED_INFO,	; DIS_driverAttributes
+		DRIVER_TYPE_INPUT		; DIS_driverType
+	>,
+	0					; DEIS_resource
+    >
+    MDIS_numButtons	word	?		; Number of buttons on the mouse
+						;  May be filled in after
+						;  DRE_SET_DEVICE
+    MDIS_xRes		word	?		; Points per inch of the points
+    MDIS_yRes		word	?		;  collected by the digitizer.
+						; Mouse drivers have this word
+						;  set to 0.
+    MDIS_flags		MouseDriverInfoFlags 0	; Misc flags about mouse
+MouseDriverInfoStruct	ends
+
+
+;	Mouse driver calls
+
+MouseFunction 		etype protominor word, DriverExtendedFunction, 2
+
+DR_MOUSE_SET_RATE 	enum MouseFunction
+;	PASS: 		cx = reports/second
+;	RETURN: 	cx = actual rate set.
+;	DESTROYS:	di, ax
+
+DR_MOUSE_GET_RATES 	enum MouseFunction
+;	PASS:		Nothing
+;	RETURN:		es:di = table of available rates (bytes)
+;			cx = length of table
+;	DESTROYS:	nothing
+;
+;	If CX is 0 on return, it means the report rate cannot
+;	be altered.
+;
+
+DR_MOUSE_SET_ACCELERATION	enum MouseFunction
+; 	PASS:		cx = threshold (pixel movement in 1/30th of a second)
+; 			dx = multiplier to use once threshold is met
+; 	RETURN: 	Nothing
+;	DESTROYS:	Nothing
+;
+DR_MOUSE_GET_ACCELERATION	enum MouseFunction
+;	PASS:		Nothing
+; 	RETURN:		cx = threshold (pixel movement in 1/30th of a second)
+; 			dx = multiplier being used
+;	DESTROYS:	Nothing
+
+MouseCombineMode	etype	byte
+MCM_COMBINE		enum	MouseCombineMode
+MCM_NO_COMBINE		enum	MouseCombineMode
+MCM_COMBINE_COLINEAR_ONLY enum	MouseCombineMode
+
+DR_MOUSE_SET_COMBINE_MODE	enum MouseFunction
+;	DESCRIPTION:	Set the mode for combining mouse events
+;	PASS:		cl = MouseCombineMode
+; 	RETURN:		none
+;	DESTROYS:	Nothing
+
+DR_MOUSE_GET_COMBINE_MODE	enum MouseFunction
+;	DESCRIPTION:	Get the mode for combining mouse events
+;	PASS:		none
+; 	RETURN:		cl = MouseCombineMode
+;	DESTROYS:	Nothing
+
+
+MAX_NUM_CALIBRATION_POINTS	equ	9
+
+DR_MOUSE_GET_CALIBRATION_POINTS				enum MouseFunction
+;	DESCRIPTION:	Get the calibration points
+;	PASS:		dx:si = buffer to fill with points (must be of size
+;				to hold MAX_NUM_CALIBRATION_POINTS)
+;	RETURN:		dx:si = buffer filled with points
+;			cx    = number of calibration points
+;	DESTROYS:	Nothing
+;	NOTES:		Probably places the device into RAW mode
+
+DR_MOUSE_SET_CALIBRATION_POINTS				enum MouseFunction
+;	DESCRIPTION:	Set the calibration points - the device coordinates
+;			returned by the mouse driver that correspond to the
+;			raw (un-calibrated) calibration points.
+;	PASS:		dx:si = buffer filled with raw calibration points
+;			cx    = number of calibration points
+;				to hold MAX_NUM_CALIBRATION_POINTS)
+;	RETURN:		none
+;	DESTROYS:	Nothing
+;	NOTES:		Probably removes device from RAW mode
+
+DR_MOUSE_GET_RAW_COORDINATE				enum MouseFunction
+;	DESCRIPTION:	Return the current calibrated & non-calibrated
+;			mouse position
+;	PASS:		none
+;	RETURN:		(ax,bx)	= raw (uncalibrated) coordinate
+;			(cx,dx)	= adjusted (calibrated) coordinate
+;			carry	= clear
+;				- or -
+;			carry	= set (no point returned)
+;
+;	NOTES:		This function is intended to be used when calibrating
+;			a mouse. The data returned in (ax, bx) should be
+;			compared against the calibration point, while the
+;			data returned in (cx, dx) is what should be returned
+;			in DR_MOUSE_SET_CALIBRATION_POINTS if the previous
+;			comparison was successful.
+
+DR_MOUSE_CHANGE_OUTPUT					enum MouseFunction
+;
+;	Desc:	changes where the mouse driver sends its raw events
+;		equivalent of DR_KBD_CHANGE_OUTPUT
+;
+;	Pass:	bx	= handle to queue where to send to
+;		ax	= MouseHardIconOutputType ( BULLET only)
+;
+;	Return:	bx	= previuos queue
+;		cx	= previous MouseHardIconOutputType (BULLET only)
+;
+
+
+
+DR_MOUSE_START_CALIBRATION				enum MouseFunction
+;
+;	Desc:	Inform the mouse driver we are beginning the calibration
+;		process. (And thus, to disable Hard Icons)
+;
+;	Pass:	nothing
+;	Return:	nothing
+;
+
+DR_MOUSE_STOP_CALIBRATION				enum MouseFunction
+;
+;	Desc:	Inform the mouse driver we have finished the calibration
+;		process. (And if continueSetup = false, to re-enable
+;		Hard Icons)
+;
+;	Pass:	nothing
+;	Return:	nothing
+;
+
+;------------------------------------------------------------------------------
+;
+;			     ESCAPE CODES
+;
+;------------------------------------------------------------------------------
+MouseEscape	etype	word, 0x8100, 1
+
+DR_MOUSE_ESC_SET_MOUSE_COORD_BUFFER	enum	MouseEscape
+;
+;	Desc:	Set the circular buffer for storing mouse coordinates.
+;		Called by the InkInputMonitor when it wants to get digitizer
+;		coordinates. The mouse/digitizer driver will initialize
+;		the circular buffer before using it.
+;
+;	Pass:	cx	= segment of fixed circular buffer
+;			  (MouseCoordsCircularBufferStruct)
+;	Return:	carry - set if error (function not supported)
+;	Destroyed:	di
+;
+
+DR_MOUSE_ESC_REMOVE_MOUSE_COORD_BUFFER	enum	MouseEscape
+;
+;	Desc:	Remove the circular buffer for storing mouse
+;		coordinates. The caller is responsible for freeing
+;		the fixed buffer.
+;	Pass:	nothing
+;	Return:	carry - set if error (function not supported)
+;	Destroyed:	di
+;
+
+;
+; Circular buffer for digitizer coordinates. This buffer is shared between
+; the digitizer driver and the InkInputMonitor and is used to pass the 
+; absolute digitizer coordinates to the InkInputMonitor.
+;
+MouseCoordsCircularBufferStruct	struct
+	MCCBS_nextRead	nptr.InkPoint
+	; The offset of the next item in the circular buffer which the
+	; InkInputMonitor is to read. This is updated by the InkInputMonitor 
+	; and read by the digitizer driver to make sure it doesn't overwrite
+	; items the InkInputMonitor has not read.
+
+	MCCBS_nextWritten	nptr.InkPoint
+	; The offset of the next item to be written in the circular buffer.
+	; The digitizer driver keeps track of this.
+
+	MCCBS_count	word
+	; The number of items in the circular buffer which have not been
+	; "passed" to the InkInputMonitor. The digitizer driver keeps track
+	; of this.
+
+MAX_MOUSE_COORDS	equ	256
+
+	MCCBS_data	InkPoint	MAX_MOUSE_COORDS + 1	dup (<>)
+	; Buffer for points.  It never fills up completely.  When
+	; MAX_MOUSE_COORDS items are filled, it is considered full.
+	; (We could keep a separate buffer-full flag instead, but then it's
+	; troublesome synchronizing both the flag and MCCBS_nextRead between
+	; the IM thread and the mouse driver interrupt code.)
+	;
+	; The mouse driver guarantees that a stroke passed to InkInputMonitor
+	; does not start with an InkPoint whose IXC_TERMINATE_STROKE is set,
+	; unless part of the same stroke has already been passed earlier.
+	; (This can happen if the pen is already touching the digitizer when
+	; the circular buffer is register, and then the pen leaves the
+	; digitizer immediately.  In this case the mouse driver just won't
+	; record the pen-up InkPoint in the buffer.)
+
+MouseCoordsCircularBufferStruct	ends
+
+DR_MOUSE_ESC_SCREEN_COORDS_TO_MOUSE_COORDS	enum	MouseEscape
+;
+;	Desc:	Convert screen co-ordinates back to mouse co-ordinates.
+;		Useful for clipping points in digitizer co-ordinate buffer
+;		within a certain screen area.
+;	Pass:	ax	= 1st x co-ordinate (usually left)
+;		bx	= 1st y co-ordinate (usually top)
+;		cx	= 2nd x co-ordinate (usually right)
+;		dx	= 2nd y co-ordinate (usually bottom)
+;	Return:	carry - set if error (function not supported)
+;		ax	= 1st x mouse co-ordinate
+;		bx	= 1st y mouse co-ordinate
+;		cx	= 2nd x mouse co-ordinate
+;		dx	= 2nd y mouse co-ordinate
+;	Destroyed:	di
+;
+
+
+
+;
+; Extra word stored for each possible device supported by the driver.
+;
+MouseExtendedInfo	record
+    MEI_SERIAL:1,		; Set if device is a serial mouse and needs
+				;  a COM port on which to operate
+    MEI_GENERIC:1,		; Set if mouse is the generic mouse that
+				;  requires a DOS-level driver.
+    MEI_IRQ:4,			; Mouse needs to be told at what interrupt
+				;  level it's operating (mouse systems
+				;  "bus" mouse). This field contains the
+				;  factory-default level
+    MEI_CALIBRATE:1		; Mouse can be calibrated within PC/GEOS
+    :9
+MouseExtendedInfo	end
+
+;------------------------------------------------------------------------------
+;
+; Strings used by all mouse drivers in the .ini file. These constants should
+; be used by anyone setting parameters for the driver, rather than using the
+; strings directly. Acceleration stays in the [input] category, as it might
+; apply to other devices (like joysticks) as well.
+;
+; [mouse]
+; ; name of device driver is to support (from extended info table)
+; device = <string>
+; ; serial port to use, if serial mouse
+; port = <n>
+; ; IRQ of the device, if device needs it (MEI_IRQ set in MouseExtendedInfo)
+; irq = <n>
+; ; geode to load
+; driver = <string>
+;
+;------------------------------------------------------------------------------
+
+MOUSE_CATEGORY	equ	<'mouse'>
+MOUSE_DEVICE	equ	<'device'>
+MOUSE_PORT	equ	<'port'>
+MOUSE_IRQ	equ	<'irq'>
+MOUSE_DRIVER	equ	<'driver'>
+
+MOUSE_ICON_CX	   equ	<'manuf'>
+MOUSE_ICON_DX	   equ	<'type'>
+MOUSE_ICON_BP	   equ	<'change'>
+
+MOUSE_ACCEL_THRESH	equ	2	; Clock ticks within which motion
+					;  must occur for it to be accelerated.
+
+EndDriver	mouse

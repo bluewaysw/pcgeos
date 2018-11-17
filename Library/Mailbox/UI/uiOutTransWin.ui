@@ -1,0 +1,200 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1995 -- All Rights Reserved
+ *
+ * PROJECT:	  
+ * MODULE:	  
+ * FILE:	  uiOutTransWin.ui
+ *
+ * AUTHOR:  	  Allen Yuen, Jan  3, 1995
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AY	1/ 3/95   	Initial version
+ *
+ * DESCRIPTION:
+ *	This file contains the UI templates for the outbox transmission
+ *	window bound notification dialog boxes.
+ *
+ * 	$Id: uiOutTransWin.ui,v 1.1 97/04/05 01:19:19 newdeal Exp $
+ *
+ ***********************************************************************/
+
+#if	! _OUTBOX_SEND_WITHOUT_QUERY
+
+start OutWinOpenUI, notDetachable;
+
+OutWinOpenRoot = OutboxSendableConfirmation {
+	genStates = default -usable;
+	visibility = dialog;
+	type = multipleResponse;
+	attributes = notUserInitiatable;
+	children = OutWinOpenGlyph, OutWinOpenMessage, OutWinOpenText,
+		   OutWinOpenSendNow, OutWinOpenSendLater;
+	msgGlyph = OutWinOpenMessage;
+	notifyText = OutWinOpenText;
+	textHasTwoMarkers = BB_FALSE;
+	nowTrigger = OutWinOpenSendNow;
+	laterTrigger = OutWinOpenSendLater;
+	useIdleTimeout = BB_TRUE;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		ATTR_GEN_WINDOW_CUSTOM_PARENT {
+			hptr	0	; use screen as parent
+		},
+		ATTR_GEN_WINDOW_CUSTOM_LAYER_PRIORITY {
+			; keep on top. dont set win prio, though, as we want
+			; it to not interfere with control panels, etc.
+			LayerPriority	LAYER_PRIO_ON_TOP
+		}
+	}
+
+}
+
+OutWinOpenGlyph = GenGlyph {
+	moniker = "You scheduled this message to be sent now:";
+}
+
+OutWinOpenMessage = MessageGlyph {
+	/* moniker set before box put up */
+}
+
+OutWinOpenText = GenText {
+	genAttributes = default +readOnly;
+	text = "Would you like to \\1 it now or later?";
+		localize "the \1 character is replaced by the appropriate verb for the transport medium (e.g. 'fax' or 'mail')";
+}
+
+OutWinOpenSendNow = GenTrigger {
+	moniker = 'N', "\\1 Now";
+		localize "the \1 character is replaced by the appropriate verb for the transport medium (e.g. 'fax' or 'mail')";
+	action = MSG_MSND_SEND_MESSAGE_NOW, OutWinOpenRoot;
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		HINT_DEFAULT_DEFAULT_ACTION
+	}
+}
+
+OutWinOpenSendLater = GenTrigger {
+	moniker = 'L', "\\1 Later";
+		localize "the \1 character is replaced by the appropriate verb for the transport medium (e.g. 'fax' or 'mail')";
+	action = MSG_MSND_SEND_MESSAGE_LATER, OutWinOpenRoot;
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+end OutWinOpenUI;
+
+start OutWinCloseUI, notDetachable;
+
+OutWinCloseRoot = OutboxSendableConfirmation {
+	genStates = default -usable;
+	visibility = dialog;
+	type = multipleResponse;
+	attributes = notUserInitiatable;
+	children = OutWinCloseGlyph, OutWinCloseMessage, OutWinCloseSendNow,
+		   OutWinCloseSendLater, OutWinCloseDeleteMessage,
+		   OutWinCloseLaterBox;
+	msgGlyph = OutWinCloseMessage;
+	nowTrigger = OutWinCloseSendNow;
+	laterTrigger = OutWinCloseSendLater;
+	delayHour = OutWinCloseLaterHour;
+	delayMinute = OutWinCloseLaterMinute;
+	useIdleTimeout = BB_TRUE;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		ATTR_GEN_WINDOW_CUSTOM_PARENT {
+			hptr	0	; use screen as parent
+		},
+		ATTR_GEN_WINDOW_CUSTOM_LAYER_PRIORITY {
+			; keep on top. dont set win prio, though, as we want
+			; it to not interfere with control panels, etc.
+			LayerPriority	LAYER_PRIO_ON_TOP
+		}
+
+	}
+
+}
+
+OutWinCloseGlyph = GenGlyph {
+	moniker = "The following message has reached its deadline and must now be sent or deleted:";
+}
+
+OutWinCloseMessage = MessageGlyph {
+	/* moniker set before box put up */
+}
+
+OutWinCloseSendNow = GenTrigger {
+	moniker = 'N', "\\1 Now";
+		localize "the \1 character is replaced by the appropriate verb for the transport medium (e.g. 'fax' or 'mail')";
+	action = MSG_MSND_SEND_MESSAGE_NOW, OutWinCloseRoot;
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		HINT_DEFAULT_DEFAULT_ACTION
+	}
+}
+
+OutWinCloseSendLater = GenTrigger {
+	moniker = 'L', "\\1 Later";
+		localize "the \1 character is replaced by the appropriate verb for the transport medium (e.g. 'fax' or 'mail')";
+	action = MSG_GEN_INTERACTION_INITIATE, OutWinCloseLaterBox;
+	hints = {
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+OutWinCloseDeleteMessage = GenTrigger {
+	moniker = 'D', "Delete";
+	action = MSG_MSND_DELETE_MESSAGE, OutWinCloseRoot;
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+OutWinCloseLaterBox = GenInteraction {
+	visibility = dialog;
+	type = command;
+	attributes = notUserInitiatable, modal;
+	children = OutWinCloseLaterGlyph, OutWinCloseLaterTime,
+		   OutWinCloseLaterOK;
+}
+
+OutWinCloseLaterGlyph = GenGlyph {
+	moniker = "How much later?";
+}
+
+OutWinCloseLaterTime = GenInteraction {
+	children = OutWinCloseLaterHour, OutWinCloseLaterMinute;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+
+OutWinCloseLaterHour = GenValue {
+	moniker = "Hours:";
+	maximum = "(254-23-1) - 1"; /* imposed by UtilGetFutureFileDateTime */
+}
+
+OutWinCloseLaterMinute = GenValue {
+	moniker = "Minutes:";
+	maximum = "60 - 1";
+}
+
+OutWinCloseLaterOK = GenTrigger {
+	moniker = "OK";
+	action = MSG_MSND_SEND_MESSAGE_LATER, OutWinCloseRoot;
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+end OutWinCloseUI;
+
+#endif	/* ! _OUTBOX_SEND_WITHOUT_QUERY */

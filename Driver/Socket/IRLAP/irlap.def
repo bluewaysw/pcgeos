@@ -1,0 +1,755 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1994 -- All Rights Reserved
+
+PROJECT:	shr -- serial/IR driver
+MODULE:		device driver
+FILE:		Irlap.def
+
+AUTHOR:		Cody Kwok, Mar 14, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CK	3/14/94   	Initial revision
+	Chung	10/24/95	Updates to match version 1.0 of IrLAP spec.
+				Compile-time constant to remove Socket 
+				interface.
+
+DESCRIPTION:
+	Protocol specific data types and structs for the IRLAP driver.
+	Adapted from IRLAP spec ch 4 and 5.
+
+	$Id: irlap.def,v 1.1 97/04/18 11:56:52 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+
+
+;------------------------------------------------------------------------------
+;			Compilation flags
+;
+; _SOCKET_INTERFACE			If TRUE, include IrLAP interface to
+;					the Socket Library. 
+;				
+; _EXTENDED_SYSTEMS_9680		If TRUE, include code to use Extended
+;					Systems JetEye ESI-9680 dongle.	
+;------------------------------------------------------------------------------
+
+
+
+_SOCKET_INTERFACE	= 1
+
+
+
+
+_EXTENDED_SYSTEMS_9680	= -1
+
+;------------------------------------------------------------------------------
+;  FULL_EXECUTE_IN_PLACE : Indicates that Irlmp is going to
+;       be used in a system where all geodes (or most, at any rate)
+;       are to be executed out of ROM.  
+;------------------------------------------------------------------------------
+ifndef FULL_EXECUTE_IN_PLACE
+        FULL_EXECUTE_IN_PLACE           equ     FALSE
+endif
+;------------------------------------------------------------------------------
+;  The .GP file only understands defined/not defined;
+;  it can not deal with expression evaluation.
+;  Thus, for the TRUE/FALSE conditionals, we define
+;  GP symbols that _only_ get defined when the
+;  condition is true.
+;-----------------------------------------------------------------------------
+if      FULL_EXECUTE_IN_PLACE
+        GP_FULL_EXECUTE_IN_PLACE        equ     TRUE
+endif
+
+if FULL_EXECUTE_IN_PLACE
+include Internal/xip.def
+endif
+
+;------------------------------------------------------------------------------
+; 		Constants used in Irlap-Socket interface
+;------------------------------------------------------------------------------
+IRLAP_ADDRESS_LEN		equ  16	; length of address string
+
+IRLAP_CONN_FAILURE_THRESHOLD	equ  2	; how many times to attempt to
+					; reconnect while in SockeLib Level
+					; LINK connection
+
+IRLAP_ADDRESS_NOT_SELECTED	equ -1	; the user pressed cancel button in
+					; address dialog
+
+IRLAP_CONNECTION_FAILURE_THRESHOLD equ 2; if 2 IRLAP connection attempt
+					; fails, Socket link connection also
+					; fails
+IRLAP_DISCOVERY_FAILURE_THRESHOLD equ 2;
+;------------------------------------------------------------------------------
+;			Irlap-shr constants
+;------------------------------------------------------------------------------
+;; Perform-Random-Backoff
+MAX_RANDOM_BACKOFF		equ	20
+MIN_RANDOM_BACKOFF		equ	5
+
+;; packet delimiters
+IRLAP_BOF                       equ 0xc0	; beginning of frame
+IRLAP_EOF                       equ 0xc1	; end of frame
+
+;; Transparency
+IRLAP_CONTROL_ESCAPE            equ 0x7d        ; escape for transparency
+IRLAP_ESCAPE_COMPLEMENT         equ 0x20	; transparency complement
+
+IRLAP_PPP_INIT_FCS              equ 0xffff	; init FCS value
+IRLAP_PPP_GOOD_FCS              equ 0xf0b8	
+CHECKSUM_STARTING_DX_VALUE      equ 0xfe00
+
+;; special addresses in the A field
+IRLAP_NULL_CONNECTION_ADDR      equ 0x00
+IRLAP_BROADCAST_CONNECTION_ADDR equ 0xfe	; indicairltes a broadcast
+						; ( 0xf7 shifted left by 1 )
+
+;; special device addresses  
+IRLAP_NULL_DEV_ADDR             equ 0x00000000
+IRLAP_BROADCAST_DEV_ADDR        equ 0xffffffff
+
+;; error condition of some request not being fulfilled,  but not all
+;; of them are fatal. 
+
+IRLAP_UNABLE_TO_CREATE_THREAD            enum	FatalErrors
+IRLAP_NON_ZERO_FLUSH_SEM                 enum	FatalErrors
+; The output stream was marked as being empty more than once.
+IRLAP_SHORT_SERIAL_WRITE                 enum	FatalErrors
+; DR_STREAM_WRITE in the serial driver did not write all the bytes passed.
+
+IRLAP_MEDIA_BUSY                         enum	Warnings
+IRLAP_UNSUPPORTED_FUNCTION               enum	Warnings
+IRLAP_PACKET_TOO_LARGE                   enum	Warnings
+IRLAP_PACKET_TOO_SMALL			 enum	Warnings
+IRLAP_CRC_CORRUPT_PACKET                 enum	Warnings
+IRLAP_MEM_ALLOC_ERROR                    enum	Warnings
+IRLAP_NULL_MEM_HANDLE                    enum	Warnings
+IRLAP_CONTROL_FORMAT_INCORRECT           enum	Warnings
+IRLAP_STREAM_CLOSING                     enum	Warnings
+IRLAP_MISDELIVERY                        enum	Warnings
+IRLAP_CONTROL_NOT_INFO                   enum	Warnings
+IRLAP_PACKET_ABORTED                     enum	Warnings
+IRLAP_DO_NOTHING			 enum	Warnings
+IRLAP_RECEIVED_UNSUPPORTED_DISCOVERY_FRAME enum Warnings
+
+IRLAP_NOT_SINGLE_ADDRESS		 enum	Warnings
+; The addresses passed to IrlapAddressControlClass does not contain exactly
+; one address.  Currently IrlapAddressControlClass can only handle a single
+; address.
+
+IRLAP_PENDING_EVENTS_ON_DETACH		enum	Warnings
+
+IrlapDisconnectReason		etype	word
+IRLAP_DISCONNECT_NO_RESPONSE	enum	IrlapDisconnectReason
+
+IRLAP_FRAME_ABORT	     equ 0x7dc1
+IRLAP_LAST_TIME_SLOT	     equ 0xff
+
+;------------------------------------------------------------------------------
+;			Addresses & Negotiation Parameters
+;------------------------------------------------------------------------------
+
+IRLAP_GEOS_ADDRESS_SIZE		equ	16
+IRLAP_DEFAULT_IFRAME_SIZE	equ	128
+IRLAP_DEFAULT_F_TIMER_VALUE	equ	30		; 500 msec
+
+IrlapDevAddr		type	dword
+IrlapConnectionAddr	record
+  ICA_ADDR:7
+  ICA_CR:1
+IrlapConnectionAddr	end
+
+IrlapParamIdField	record
+	IPI_TYPE:1	; type: negotitation type, see 6.6.3
+	IPI_ID:7	; 7 bit #indicating id
+IrlapParamId		end
+
+;; param id's: ID + type
+IrlapParamIdVal 	etype	byte
+IRLAP_BAUD_RATE		enum	IrlapParamIdVal, 			0x01
+IRLAP_MAX_TURN_AROUND	enum	IrlapParamIdVal,      mask IPI_TYPE  or 0x02
+IRLAP_DATA_SIZE		enum	IrlapParamIdVal,      mask IPI_TYPE  or 0x03
+IRLAP_WINDOW_SIZE	enum	IrlapParamIdVal,      mask IPI_TYPE  or 0x04
+IRLAP_NUM_BOF		enum	IrlapParamIdVal,      mask IPI_TYPE  or 0x05
+IRLAP_MIN_TURN_AROUND	enum	IrlapParamIdVal,      mask IPI_TYPE  or 0x06
+IRLAP_LINK_DISCONNECT	enum	IrlapParamIdVal, 			0x08
+
+IrlapParam	struct
+	IP_id		IrlapParamIdVal
+	IP_len		byte	; equ 1 for current
+	IP_val		byte	; all are bytes for current
+IrlapParam	ends
+
+IRLAP_NUM_NEGOTIATION_PARAMS	equ	7
+IrlapNegotiationParams	type	IRLAP_NUM_NEGOTIATION_PARAMS dup (IrlapParam)
+
+;------------------------------------------------------------------------------
+;			    Packet headers
+;------------------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+;			  Common Components
+;------------------------------------------------------------------------------
+;; msb declared first 
+
+IrlapAddressField	record
+	IAF_ADDRESS:7	; real address
+	IAF_CRBIT:1	; 1 equ command, 0 equ response frame
+IrlapAddressField	end
+IrlapChecksum		type	word
+
+IrlapCommonHeader	struct
+	ICH_addressField	IrlapAddressField
+	ICH_controlField	byte
+IrlapCommonHeader	ends
+
+;------------------------------------------------------------------------------
+;			U (unnumbered) format
+;------------------------------------------------------------------------------
+
+;;
+;; Convention: all caps abbrev are treated as if it's a word, e.g.
+;; SNRM (set normal response mode) is worded Snrm in the name.
+;;
+
+;; U commands and response.  The first 2 and 5th 0 bits are
+;; meaningless, only used to patch byte
+
+IrlapUnnumberedCommand	etype	byte
+IUC_SNRM_CMD  enum	IrlapUnnumberedCommand,   10000011b
+IUC_DISC_CMD  enum	IrlapUnnumberedCommand,   01000011b   ; no I field
+IUC_UI_CMD    enum	IrlapUnnumberedCommand,   00000011b
+IUC_XID_CMD   enum	IrlapUnnumberedCommand,   00101111b
+IUC_TEST_CMD  enum	IrlapUnnumberedCommand,   11100011b
+IUC_XCHG      enum      IrlapUnnumberedCommand,   01001111b   ; no I field
+IUC_DXCHG     enum	IrlapUnnumberedCommand,   11001111b   ; no I field
+
+IrlapUnnumberedResponse	etype	byte
+IUR_RNRM_RSP  enum	IrlapUnnumberedResponse,  10000011b
+IUR_UA_RSP    enum	IrlapUnnumberedResponse,  01100011b
+IUR_FRMR_RSP  enum	IrlapUnnumberedResponse,  10000111b
+IUR_DM_RSP    enum	IrlapUnnumberedResponse,  00001111b   ; no I field
+IUR_RD_RSP    enum	IrlapUnnumberedResponse,  01000011b   ; no I field
+IUR_UI_RSP    enum	IrlapUnnumberedResponse,  00000011b
+IUR_XID_RSP   enum	IrlapUnnumberedResponse,  10101111b
+IUR_TEST_RSP  enum	IrlapUnnumberedResponse,  11100011b
+IUR_RXCHG     enum	IrlapUnnumberedResponse,  11001111b   ; no I field
+
+;; C field
+IRLAP_UNNUMBERED_CONTROL_HEADER equ 11b
+IrlapUnnumberedControlField	record
+	IUCF_COMMAND2:3		; command encoding part 2
+	IUCF_PFBIT:1		; poll/final bit
+	IUCF_COMMAND1:2		; command encoding part 1
+	IUCF_CONTROL_HDR:2
+IrlapUnnumberedControlField	end
+
+;; TODO: define a macro that checks if the source addr is 00 or 0xFF
+;;  as a part of EC.
+
+;;
+;; XID Frames
+;;
+
+IRLAP_LAST_DISCOVERY_XID_SLOT	equ 0xff
+
+IrlapXidFormatIdentifier	etype	byte
+IXFI_NEGOTIATION	enum IrlapXidFormatIdentifier, 0x02
+IXFI_HIGHER_LAYER_INFO	enum IrlapXidFormatIdentifier, 0x02
+IXFI_INFOBITMAP		enum IrlapXidFormatIdentifier, 0x01
+IXFI_DISCOVERY_XID	enum IrlapXidFormatIdentifier, 0x01
+
+IrlapXidGroupIdentifier	etype	byte
+IXGI_NEGOTIATION_PARAMS	enum IrlapXidGroupIdentifier, 0x01
+IXGI_HIGHER_LAYER_DATA	enum IrlapXidGroupIdentifier, 0xff
+
+IrlapXidGroupLength	type	word
+	
+IrlapXidDiscoveryFormat 	record
+	:5=0			; reserved and should be set to 0
+	IXDF_GEN_NEW_DEV_ADDR:1	; when set in command frame equ all dev w/in
+				; the dest dev addr found in this
+				; frame should generate a new addr.
+				; When set in response frame equ node
+				; has generated a new addr.
+	IXDF_NUM_SLOTS IrlapUserTimeSlot:2
+				; time slots to allocate
+IrlapXidDiscoveryFormat 	end
+
+;; "and" with this to clear the last 4 bits
+IRLAP_DISCOVERY_XID_CLEAR_MASK equ 00001111b
+
+IrlapDiscoveryXidFrame		struct
+	IDXF_formatID		byte
+	IDXF_srcDevAddr		IrlapDevAddr
+	IDXF_destDevAddr	IrlapDevAddr
+	IDXF_xidFlags		IrlapXidDiscoveryFormat
+	IDXF_slotNumber		byte
+	IDXF_version		byte
+IDXF_VERSION_1_0		equ	0
+	IDXF_discoveryInfo	DiscoveryInfo
+IrlapDiscoveryXidFrame		ends
+
+;;
+;;   TODO: make an EC that checks the :4 is empty
+;;
+
+;; both of these have the full 7 params
+IrlapSnrmFrame		struct
+ 	ISF_srcDevAddr         IrlapDevAddr	; source device address
+ 	ISF_destDevAddr        IrlapDevAddr	; destination device address
+	ISF_connAddr           IrlapConnectionAddr
+	ISF_negotiationParams  IrlapNegotiationParams
+IrlapSnrmFrame		ends
+
+; ----------------------------------------------------------------------
+;
+; We use different format for SNRM frame if the client is socket library
+;
+; ----------------------------------------------------------------------
+if _SOCKET_INTERFACE
+IrlapUserAddress	TYPE	IRLAP_ADDRESS_LEN dup (char)
+IrlapSocketSnrmFrame	struct
+	ISSF_snrm	IrlapSnrmFrame		; normal snrm part
+	ISSF_flags	IrlapConnectionFlags	;
+	ISSF_addr	IrlapUserAddress	; contains the address of
+						; sender side
+IrlapSocketSnrmFrame	ends
+endif ;_SOCKET_INTERFACE
+
+;; This UA type is a response to the SNRM frame
+IrlapUaSnrmFrame		struct
+	IUSF_srcDevAddr        IrlapDevAddr
+	IUSF_destDevAddr       IrlapDevAddr
+	IUSF_negotiationParams IrlapNegotiationParams
+IrlapUaSnrmFrame		ends
+
+;; common UA frame has no negotiation params
+IrlapUaFrame		struct
+	IUF_srcDevAddr         IrlapDevAddr
+	IUF_destDevAddr        IrlapDevAddr
+IrlapUaFrame		ends
+
+
+;; FRMR frame
+FrmrExplanation	record
+  FE_ZERO:4		; must be 0000
+  FE_Z:1		; 1= invlaid Nr count
+  FE_Y:1		; 1= I field exceeded maximum
+  FE_X:1		; 1= there was I field when it was not supposed
+  FE_W:1		; 1= undefined or unimplemented control field
+FrmrExplanation end
+
+FrmrCounts	record
+  FC_NR:3		; current expected Nr (= Vs)
+  FC_CR:1		; 0= rejected frame was command, 1= was response
+  FC_NS:3		; current expected Ns (= Vr)
+  FC_ZERO:1		; must be 0
+FrmrCounts	end
+
+;; I field of FRMR frame
+IrlapFrmrFrame		struct
+	IFF_rejFrame	byte			; rejected control frame
+	IFF_counts	FrmrCounts		; rejected Ns, Nr, etc.
+	IFF_explanation	FrmrExplanation		; rejected reason
+IrlapFrmrFrame		end
+
+IrlapTestFrame		struct
+	ITF_sourceAddr	IrlapDevAddr
+	ITF_destAddr	IrlapDevAddr
+	ITF_data	label byte
+IrlapTestFrame		ends
+
+;------------------------------------------------------------------------------
+;			S (supervisory) format
+;------------------------------------------------------------------------------
+
+IRLAP_SUPERVISORY_CONTROL_HEADER equ 10b
+;; C fieldyes
+
+IrlapSupervisoryCommand		etype	byte
+ISC_RR_CMD 	enum IrlapSupervisoryCommand,  00000001b ; receive ready
+ISC_RNR_CMD 	enum IrlapSupervisoryCommand,  00000101b ; recv not ready
+ISC_REJ_CMD 	enum IrlapSupervisoryCommand,  00001001b ; reject
+ISC_SREJ_CMD 	enum IrlapSupervisoryCommand,  00001101b ; select repeat
+
+IrlapSupervisoryResponse	etype	byte
+ISR_RR_RSP 	enum IrlapSupervisoryResponse, 00000001b ; receive ready 
+ISR_RNR_RSP 	enum IrlapSupervisoryResponse, 00000101b ; recv not ready
+ISR_REJ_RSP 	enum IrlapSupervisoryResponse, 00001001b ; reject        
+ISR_SREJ_RSP 	enum IrlapSupervisoryResponse, 00001101b ; select repeat 
+
+IrlapSupControlField	record
+	ISCF_NR:3		; command encoding part 2
+	ISCF_PFBIT:1		; poll/final bit
+	ISCF_COMMAND_RESPONSE:2	; command / reponse type of
+				; IrlapSupervisoryCommand
+	ISCF_CONTROL_HDR:2
+IrlapSupControlField	end
+
+;------------------------------------------------------------------------------
+;			I (information) format
+;------------------------------------------------------------------------------
+
+IRLAP_INFO_CONTROL_HEADER equ 0b
+
+;; C field
+IrlapInfoControlField	record
+	IICF_NR:3		; command encoding part 2
+	IICF_PFBIT:1		; poll/final bit
+	IICF_NS:3		; command encoding part 1
+	IICF_CONTROL_HDR:1
+IrlapInfoControlField	end
+
+;
+; Increment used to increment Vr, Vs
+;
+IrlapVsIncrement	equ 00000010b
+IrlapNsIncrement	equ 00000010b
+IrlapVrIncrement	equ 00100000b
+IrlapNrIncrement	equ 00100000b
+
+;
+; Increment and mask to traverse Irlap sender window
+;
+IrlapWindowIndexInc	equ 00010000b	; window size = 16
+IrlapWindowIndexRange	equ 01110000b	; 8 windows of size 16
+
+IrlapControlField	union
+	ICF_Iformat	IrlapInfoControlField
+	ICF_Sformat	IrlapSupControlField
+	ICF_Uformat	IrlapUnnumberedControlField
+IrlapControlField	ends
+	
+;------------------------------------------------------------------------------
+;		       Internal Constants
+;------------------------------------------------------------------------------
+
+IRLAP_HUGELMEM_TIMEOUT		equ	4*60	; 4 seconds
+IRLAP_SERIAL_SEM_TIMEOUT	equ	2*60	; 2 seconds
+
+IrlapTimeSlot		type	byte
+
+IRLAP_DISCOVERY_SLOT_TIMEOUT    equ 	3	;72ms slot times, which is
+						;  12ms above the 60ms allowed
+						;  by the spec.  However, this
+						;  is the best we can do.
+IRLAP_DISCOVERY_SLOT_TIMEOUT_EC equ 	IRLAP_DISCOVERY_SLOT_TIMEOUT
+
+IRLAP_CHECK_BUSY_INTERVAL  equ 500	; listen for 500ms to see if
+					; anything is active on the media
+IRLAP_CHECK_BUSY_TICKS equ 1+(IRLAP_CHECK_BUSY_INTERVAL*60/1000) 
+
+IRLAP_TIMER_TIMEOUT  equ 500
+
+IRLAP_CONTENTION_TIMEOUT_TICKS equ (IRLAP_TIMER_TIMEOUT*60/1000)
+; Stop using different values for EC
+; IRLAP_CONTENTION_TIMEOUT_TICKS_EC equ (IRLAP_CONTENTION_TIMEOUT_TICKS*8)
+IRLAP_CONTENTION_TIMEOUT_TICKS_EC equ IRLAP_CONTENTION_TIMEOUT_TICKS
+
+IRLAP_NORMAL_FTIMER_TIMEOUT     equ     30      ; 500 ms
+
+IRLAP_NDM_TEST_FRAME_SIZE	equ	388	; 400 (= max capacity at 9600)
+						;- 12 (= 11 BOFs and 1 EOF )
+
+;
+; It doesn't seem that these are used!
+;	-Chung 11/17/95
+IRLAP_LINK_TURNAROUND_TIME equ 500
+IRLAP_LINK_TURNAROUND_TICKS equ (IRLAP_LINK_TURNAROUND_TIME*60/1000)
+IRLAP_LINK_TURNAROUND_TICKS_EC equ (IRLAP_LINK_TURNAROUND_TICKS*8)
+.assert (IRLAP_LINK_TURNAROUND_TICKS eq 30)
+
+;
+; Sniff open
+;
+IRLAP_SENSE_SNIFF_TIMEOUT_TICKS	equ	20		; 1/3 second
+IRLAP_SLEEP_TIMEOUT_TICKS	equ	120		; 2 seconds
+
+;;
+;; special addresses used for discovery
+;;
+;; IrlapNullDevAddr	equ 0x00	; obsolete
+;; IrlapBroadcastAddr	equ 0x7f	; obsolete
+;;
+
+IrlapServiceType		etype	word, 0
+	IST_discovery    enum	IrlapServiceType
+	IST_data         enum	IrlapServiceType
+;
+; Irlap Machine states
+;	
+;; machine state 
+IrlapMachineState	etype	word, 0, 1
+IMS_NDM                  enum	IrlapMachineState	;
+IMS_QUERY                enum	IrlapMachineState	;
+IMS_REPLY                enum	IrlapMachineState	;
+IMS_CONN                 enum	IrlapMachineState	; ISS_irlapConnProgress
+IMS_SETUP                enum	IrlapMachineState	; ISS_irlapConnProgress
+
+IMS_XMIT_P               enum	IrlapMachineState	; ISS_irlapConnProgress
+IMS_RECV_P               enum	IrlapMachineState	; ISS_irlapConnProgress
+IMS_RESET_WAIT_P         enum	IrlapMachineState	; ISS_irlapConnProgress
+IMS_RESET_CHECK_P        enum	IrlapMachineState	; ISS_irlapConnProgress
+IMS_RESET_P              enum	IrlapMachineState	; ISS_irlapConnProgress
+IMS_BUSY_P               enum	IrlapMachineState	; ISS_irlapConnProgress
+IMS_BUSY_WAIT_P          enum	IrlapMachineState	; ISS_irlapConnProgress
+IMS_PCLOSE               enum	IrlapMachineState	; ISS_irlapConnProgress
+
+IMS_XCHG_P		 enum	IrlapMachineState
+IMS_XWAIT_P		 enum	IrlapMachineState
+
+IMS_XMIT_S               enum	IrlapMachineState	; ISS_irlapConnProgress
+IMS_RECV_S               enum	IrlapMachineState	; ISS_irlapConnProgress
+IMS_ERROR_S	         enum	IrlapMachineState	; ISS_irlapConnProgress
+IMS_RESET_CHECK_S        enum	IrlapMachineState	; ISS_irlapConnProgress
+IMS_RESET_S              enum	IrlapMachineState	; ISS_irlapConnProgress
+IMS_BUSY_S               enum	IrlapMachineState	; ISS_irlapConnProgress
+IMS_BUSY_WAIT_S          enum	IrlapMachineState	; ISS_irlapConnProgress
+IMS_SCLOSE               enum	IrlapMachineState	; ISS_irlapConnProgress
+
+IMS_RXWAIT_S		 enum	IrlapMachineState
+IMS_XWAIT_S		 enum	IrlapMachineState
+
+IMS_POUT                 enum	IrlapMachineState
+IMS_SNIFF                enum	IrlapMachineState
+IMS_SLEEP                enum	IrlapMachineState
+IMS_SCONN                enum	IrlapMachineState
+IMS_SSETUP               enum	IrlapMachineState
+;
+; Outside IrLAP state machine
+;
+IMS_FLUSH_DATA		 enum	IrlapMachineState
+
+IRLAP_MAX_WINDOWS	equ 8	
+
+;; External events are receipts of (valid) packets 
+;; These are made so that the lsb is 0
+IrlapExternalEvent	etype	byte
+IEE_RECV_RSP	enum	IrlapExternalEvent, 00000000b ; lsb = CR bit = 0
+IEE_RECV_CMD	enum	IrlapExternalEvent, 00000001b ; lsb = CR bit = 1
+	; reponse collision is not taken into consideration in our
+	;  implementation, so no event of it is provided.
+
+;; local events are events caused by local link and upper layers,
+;; including such events as user requests/reponse,  timer expirations and
+;; work load (busy)
+	
+;; And local + external events are instances of this type
+IrlapEventID		record
+	IEI_LOCAL:1		; is the event local or external?
+	IEI_SEQINVALID:1	; for S & I frames:sequence of the frame valid?
+	:5
+	IEI_BITCR:1		; CR bit if external events
+IrlapEventID		end
+
+;; These are made so that the lsb is 1 
+IrlapLocalEvent		etype	byte
+ILE_REQUEST	enum	IrlapLocalEvent, 0 or mask IEI_LOCAL
+ILE_RESPONSE	enum	IrlapLocalEvent, 1 or mask IEI_LOCAL
+ILE_LOCAL_BUSY	enum	IrlapLocalEvent, 2 or mask IEI_LOCAL
+ILE_TIME_EXPIRE	enum	IrlapLocalEvent, 3 or mask IEI_LOCAL
+ILE_CONTROL	enum	IrlapLocalEvent, 4 or mask IEI_LOCAL
+					; events that are not in spec, but
+					; necesarry to control this driver
+
+;; we do nothing with Response-Collision,  so we don't define such an event
+;; we don't detect Discovery-Abort either.
+
+;
+; Note that STATION EXCHANGE request is part of IrlapLocalBusyVector record.
+; (curse Cody!)
+;
+IrlapRequestVector	record
+	IRV_DATA:1
+	IRV_RESET:1
+	IRV_CONNECT:1
+	IRV_DISCONNECT:1
+	IRV_DISCOVERY:1
+	IRV_SNIFF:1
+	IRV_UNIT_DATA:1
+	IRV_STATUS:1
+IrlapRequestVector	end
+
+IrlapResponseVector	record
+	IRSV_RESET:1
+	IRSV_CONNECT:1
+	IRSV_DISCOVERY:1
+	IRSV_STOP_FLUSH:1
+	IRSV_SXCHG:1		; station exchange response
+	:3
+IrlapResponseVector	end
+
+IrlapLocalBusyVector	record
+	ILBV_DETECTED:1		; detected = 1,  cleared = 0
+	ILBV_CLEARED:1
+	ILBV_SXCHG_REQ:1	; station exchange request!!!!
+	:5			; ( we don't have room for it in IRV_ )
+IrlapLocalBusyVector	end
+
+IrlapTimerExpiredVector	record
+	ITEV_P:1	; p timer for primary, wd timer for secondary
+	ITEV_F:1
+	ITEV_WD:1
+	ITEV_SLOT:1
+	ITEV_QUERY:1
+	ITEV_SENSE:1
+	ITEV_SNIFF:1
+	ITEV_SLEEP:1
+IrlapTimerExpiredVector	end
+
+;------------------------------------------------------------------------------
+;			Implementation specific
+;------------------------------------------------------------------------------
+
+;
+; Control messages that don't belong to IRLAP station, but to particular driver
+; implementation or socket interface.  The order of enumerations in this
+; etype is the order of handlers in DriverControlTable(irlapTables.def).
+;
+; (never to change etype increment -- maps directly to the handler)
+;
+IrlapDriverControl	etype	byte, 0, 2
+
+	IDC_DETACH		enum	IrlapDriverControl
+	;
+	; Sent by IrlapDeleteStation to kill event thread
+	; Pass:		nothing
+	; Return:	nothing
+	;
+
+if _SOCKET_INTERFACE
+
+	IDC_ADDRESS_SELECTED	enum	IrlapDriverControl
+	;
+	; Sent by IrlapAddressDialog to pass the address selected by the user
+	; Pass:		IS_selectedAddr = selected address index
+	; Return:	nothing
+	;
+endif
+
+	IDC_ABORT_SNIFF		enum	IrlapDriverControl
+	;
+	; Normal request to restore a sniffing station to NDM
+	; Pass:		nothing
+	; Return:	nothing
+	;
+
+	IDC_START_FLUSH_DATA_REQUESTS	enum	IrlapDriverControl
+	;
+	; Start flushing all the data request events in event queue
+	; Pass:		nothing
+	; Return:	nothing
+	;
+
+	IDC_CHECK_STORED_EVENTS	enum	IrlapDriverControl
+	;
+	; Do nothing but checking stored events
+	; Pass:		nothing
+	; Pass:		nothing
+	;
+
+; ==========================================================================
+;
+; SOCKET I/O
+;
+; ==========================================================================
+
+;
+; Etypes
+;
+IrlapAddressDialogType		etype	word, 0, 2
+
+	IADT_CONNECTION		enum	IrlapAddressDialogType
+	;
+	; This address dialog was brought up by a connection procedure
+	;
+	IADT_DATAGRAM		enum	IrlapAddressDialogType
+	;
+	; This addres dialog was brought up by SendDatagram procedure
+	;
+
+;
+; Irlap UI definitions ( the whole thing is just for address dialog )
+;
+IrlapAddressDialogClass	class	GenInteractionClass
+
+	MSG_IRLAP_SET_DIALOG_INFO	message
+	;
+	; Sent by IRLAP, to set the necessary information to communicate with
+	; IRLAP station.
+	; Pass:		cx	= irlap station segment
+	;		dx	= IrlapAddressDialogType
+	; Return:	nothing
+	;
+
+	MSG_IRLAP_SET_ORIGINAL_ADDRESS	message
+	;
+	; Sent by IRLAP, to set the original address display in address dialog
+	;
+	; Pass:		cxdx	= fptr to the address
+	; Return:	nothing
+	;
+
+	MSG_IRLAP_SET_ADDRESS		message
+	; 
+	; Sent by genDynamicList within this dialog.
+	; Set the address selection to be the index passed
+	; Pass:		cx = index of address
+	; Return:	nothing
+	;
+
+	MSG_IRLAP_GET_ADDRESS_STR	message
+	; 
+	; Sent by genDynamicList within this dialog.
+	; Call Irlap routines to find out what the address string is,
+	; and send MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT to set item moniker.
+	; Pass:		bp = item index
+	; Return:	nothing
+	;
+
+	MSG_IRLAP_DO_DISCOVERY		message
+	;
+	; Sent by DiscoveryButton.  Do discovery again.
+	; Pass:		nothing
+	; Return:	nothing
+	;
+
+	IADI_client		word	; irlap client handle
+	IADI_irlapStation	word	; station segment
+	IADI_discoveryLogs	hptr	; discoveryLog block
+	IADI_selection		word	; index to address selected
+
+IrlapAddressDialogClass endc
+
+ife	NO_PREFERENCES_APPLICATION
+IrlapPreferenceControlClass	class	PrefControlClass
+IrlapPreferenceControlClass	endc
+endif
+
+;
+; Process class
+;
+IrlapProcessClass	class	GenProcessClass
+	MSG_IRLAP_DETACH			message
+IrlapProcessClass	endc
+
+;
+; Class structures
+;
+IrlapClassStructures	segment resource
+	IrlapProcessClass	mask	CLASSF_NEVER_SAVED
+	IrlapAddressDialogClass
+ife	NO_PREFERENCES_APPLICATION
+	IrlapPreferenceControlClass
+endif
+IrlapClassStructures	ends

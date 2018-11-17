@@ -1,0 +1,1651 @@
+###############################################################################
+#
+# $Id: geode.db,v 1.12 96/03/18 16:31:25 stevey Exp $
+#
+# USAGE:
+# -----
+#
+# The basic idea of this file is to map keywords (like "kernel",
+# "gadgets", "ui") to lists of info about the corresponding file.  
+# There's a Perl library called "geode.pl" that handles accessing
+# it.
+#
+# To illustrate how it works, it's easiest to use an example:
+#
+# kernel geos:
+#        name($ec)=geosec.geo
+#        name=geos.geo
+#        basePath=Library/Kernel
+#	 # This one is weird.  PC XIP has to be XIP.  It's all very confused.
+#	 productPath($product eq "jedi" && $hw)=JediXIP
+#	 productPath($product eq "jedi" && $xip)=XIP
+#	 productPath($product eq "jedi")=JEDI
+#        destPath=system
+#
+# The first line is the list of keywords that will get you to this
+# information.  The line must start in column 0.  In this example,
+# either "kernel" or "geos" get you to this chunk of info (the routine
+# you pass it to is called geode_LoadInfo).
+#
+# Next come a list of variables that will be set (in Perl) after loading
+# the information.
+#
+# What the database engine does is run through each line, and *possibly*
+# set each variable it encounters on the left side of the = sign.  It
+# sets the variable to the right-hand side of the = sign IF:
+#
+# 1) the variable hasn't already been set
+# 2) the condition, if any, inside the ()'s evaluates to true
+#
+# The condition in case #2 can be any arbitrary Perl expression (except
+# it can't contain parentheses at this point in time).
+#
+# After the database engine has run thru all of the lines in the kernel
+# entry, the variables you see there will have been set in Perl, so
+# that you can find the file and do stuff with it.  
+#
+# In this example, after loading this info, your Perl script would see 
+# the following (if you had just asked for the non-EC non-product-specific
+# version):
+#
+#	$name		"geos.geo"
+#	$basePath	"Library/Kernel"
+#	$productPath	""
+#	$destPath	"system"
+#
+# See below for explanations of how to interpret these variables.
+#
+# STANDARD VARIABLES:
+# ------------------
+#
+#	name:
+#		Space-separated list of files (usually there'll be just one
+#		file, though, such as geos.geo).  Note that they all have 
+#		to be in the same directory.  Examples: 
+#
+#		   kernel:		 
+#			name($ec)=geosec.geo
+#			name=geos.geo
+#
+#		   jediFonts:
+#			name=Mono.fnt jsys.fnt blah.fnt foo.fnt
+#
+#	basePath:
+#		For geodes, this should be something like Library/User
+#		or Appl/Games/Foobar --- i.e. the location of the source
+#		code and Installed .geo/.sym for the geode.  For other
+#		sorts of files that don't exist off of 
+#		/staff/pcgeos/<branch>/Installed, you can use a full
+#		path (i.e. starts with a "/"), and 
+#		/staff/pcgeos/<branch>/Installed will NOT be prepended.
+#
+#	productPath:
+#		This will be appended to basePath in order to find
+#		the file.  E.g. productPath($xip)=XIP or 
+#		productPath($JEDI && $hw)=JediXIP.
+#
+#	destPath:
+#		Where the file should be sent down to.  E.g. for apps,
+#		something like world or world/games or world/other.  
+#		You can use a standard path like $SP_APPLICATION.
+#
+# SPECIAL VARIABLES:
+# -----------------
+#
+# When special variables are assigned to, they take some special action.
+# The variable is not set.  That is, the syntax makes it look like a
+# normal assignment, but it's not.  Sorry.
+#
+#	inherit:
+#		This is similar to #include in C.  The line containing
+#		the inherit is essentially replaced with all the lines
+#		in the inherited section.  You can have multiple inherits
+#		in the same section, and you can have them be conditional,
+#		just like normal variables.  E.g.
+#
+#	           foo:
+#			basePath=Blah/Blah
+#			destPath=system/mouse
+#
+#		   bar:
+#			inherit=foo
+#			name($ec)=barmouseec.geo
+#			name=barmouse.geo
+#
+#		is equivalent to:
+#
+#		   ...
+#
+#		   bar:
+#			basePath=Blah/Blah	# from inherit
+#			destPath=system/mouse 	# from inherit
+#			name($ec)=barmouseec.geo
+#			name=barmouse.geo
+#
+###############################################################################
+
+###############################################################################
+#
+# DEFAULT VARIABLES
+#
+# These are always read before (preDefaults) and after (postDefaults)
+# after *any* keyword has its info loaded.  So far, there's nothing too
+# useful here.  But someday there may be more useful stuff.
+#
+
+# Read before anything else.
+preDefaults:
+	SP_TOP=
+	SP_APPLICATION=world
+	SP_SYSTEM=system
+	SP_SYS_APPLICATION=sysappl
+	SP_MOUSE_DRIVERS=$SP_SYSTEM/mouse
+	SP_PRINTER_DRIVERS=$SP_SYSTEM/printer
+	SP_FILE_SYSTEM_DRIVERS=$SP_SYSTEM/fs
+	SP_VIDEO_DRIVERS=$SP_SYSTEM/video
+	SP_SWAP_DRIVERS=$SP_SYSTEM/swap
+	SP_KEYBOARD_DRIVERS=$SP_SYSTEM/kbd
+	SP_FONT_DRIVERS=$SP_SYSTEM/font
+	SP_IMPORT_EXPORT_DRIVERS=$SP_SYSTEM/impex
+	SP_TASK_SWITCH_DRIVERS=$SP_SYSTEM/task
+	SP_POWER_DRIVERS=$SP_SYSTEM/power
+
+# Read after everything else.
+postDefaults:
+	destPath=$SP_APPLICATION
+
+###############################################################################
+#
+# PRODUCT VARIABLES
+#
+# You basically want to "load" these before loading the info for the
+# various geodes & files you want to ship.  For example, for the
+# EC version of the Jedi demo would you would want to load
+# "ecOn" and "jediDemoProduct".  You should pass these in
+# a space-separated list to geode_LoadInfo.  E.g:
+#
+# &geode_LoadInfo("ecOn jediDemoProduct", "kernel"); # EC, Jedi PC kernel
+# &geode_LoadInfo("", "kernel"); # vanilla, non-EC PC kernel
+#
+# Standard product variables:
+#
+# 	ec		- set this to 1 if if you want EC software (duh)
+#	hw		- set this to 1 for the ROM version of the software
+#	xip		- set this if 1 for XIP'd software
+#	product		- set this to your product name (i.e. "jedi")
+#
+
+ecOn:
+	ec=1
+
+jediGFSProduct:
+	hw=1
+	product=jedi
+
+jediDemoProduct:
+	product=jedi
+
+jediSDKTargetProduct:
+	jediSDKTarget=1
+
+jediHardware:
+	hw=1
+	product=jedi
+	xip=1
+
+#
+# Obiwan is derived from Jedi, so it makes sense to start with the
+# product being JEDI for now.  Eventually we may decide to make 
+# OBIWAN directories, in which case the script would have to change.
+#
+obiDemoProduct:
+	product=jedi
+	obi=1
+
+###############################################################################
+#
+# EVERYTHING ELSE
+#
+# Everything past this point is actually useful info, as opposed to
+# annoying bureaucratic shme.
+#
+
+###############################################################################
+#
+#  APPLICATIONS
+#
+#  Keep this in alphabetical order.  It makes entering new entries easier,
+#  although it has no effect on the search algorithm or anything.
+#
+
+
+alarm:
+        name($ec)=alarmec.geo
+        name=alarm.geo
+        basePath=Appl/Jedi/Alarm
+	productPath($xip)=XIP
+        destPath=world
+
+backrst backrest:
+        name($ec)=backrstec.geo
+        name=backrst.geo
+        basePath=Appl/FApps/SApps/Backrest
+        destPath=world/sysapps
+
+banner:
+        name($ec)=bannerec.geo
+        name=banner.geo
+        basePath=Appl/Banner
+        destPath=world/utilitie.000
+
+bigcalc:
+        name($ec)=bigcalcec.geo
+        name=bigcalc.geo
+        basePath=Appl/BigCalc
+        destPath=world/desk_acc.000
+
+geocalc geocalcOnly:
+        name($ec)=geocalcec.geo
+        name=geocalc.geo
+        basePath=Appl/GeoCalc
+	productPath($product eq "jedi" && $xip)=JediXIP
+	productPath($product eq "jedi")=JEDI
+        destPath=world
+
+geodex:
+	name($ec)=geodexec.geo
+        name=geodex.geo
+        basePath=Appl/GeoDex
+        destPath=world/desk_acc.000
+
+gtelnet:
+        name($ec)=gtelnetec.geo
+        name=gtelnet.geo
+        basePath=Appl/Socket/GTelnet
+        destPath=world
+
+cal calendar geoplanner:
+        name($ec)=geoplanec.geo
+        name=geoplan.geo
+        basePath=Appl/Calendar
+        destPath=world/desk_acc.000
+
+clock:
+        name($ec)=clockec.geo
+        name=clock.geo
+        basePath=Appl/Clock
+        destPath=world/utilitie.000
+
+contax:
+        name($ec)=contaxec.geo
+        name=contax.geo
+        basePath=Appl/FApps/SApps/Contax
+        destPath=world/sysapps
+
+cword:
+        name($ec)=cwordec.geo
+        name=cword.geo
+        basePath=Appl/Games/Cword
+        destPath=world/games
+
+faxrec:
+        name($ec)=faxreceiveec.geo
+        name=faxreceive.geo
+        basePath=Appl/Fax/Faxreceive
+        destPath=world
+
+faxview:
+	name($ec)=faxviewec.geo
+	name=faxview.geo
+	basePath=Appl/Fax/Faxview
+	destPath=world
+
+homescreen:
+        name($ec)=homescreenec.geo
+        name=homescreen.geo
+        basePath=Appl/Jedi/HomeScreen
+	productPath($hw)=JediXIP
+	productPath($xip)=XIP
+        destPath=system/sysappl
+
+hpcalc:
+        name($ec)=hpcalcec.geo
+        name=hpcalc.geo
+        basePath=Appl/Jedi/HPCalc
+        destPath=world
+
+japp:
+        name($ec)=jappec.geo
+        name=japp.geo
+        basePath=Appl/Jedi/JApp
+        destPath=system/sysappl
+
+japptbk:
+        name($ec)=apptbkec.geo
+        name=apptbk.geo
+        basePath=Appl/Jedi/Apptbk
+        destPath=world
+
+jdemo:
+        name($ec)=jdemoec.geo
+        name=jdemo.geo
+        basePath=Appl/Jedi/JDemo
+        destPath=world
+
+jdm:
+        name($ec)=dmec.geo
+        name=dm.geo
+        basePath=Appl/Jedi/DM
+        destPath=world
+
+jedistart:
+        name($ec)=jstartupec.geo
+        name=jstartup.geo
+        basePath=Appl/Startup/JStartup
+	productPath($hw)=JediXIP
+	productPath($xip)=XIP
+        destPath=system/sysappl
+
+jfinance:
+        name($ec)=financee.geo
+        name=finance.geo
+        basePath=Appl/Jedi/Finance
+        destPath=world
+
+jnotepad:
+        name($ec)=notepade.geo
+        name=notepad.geo
+        basePath=Appl/Jedi/Notepad
+        destPath=world
+
+jphone:
+        name($ec)=phoneec.geo
+        name=phone.geo
+        basePath=Appl/Jedi/Phone
+        destPath=world
+
+jpref:
+        name($ec)=jprefec.geo
+        name=jpref.geo
+        basePath=Appl/Jedi/JPref
+	productPath($hw)=JediXIP
+	productPath($xip)=XIP
+        destPath=world
+
+jworld:
+        name($ec)=worldtimeec.geo
+        name=worldtime.geo
+        basePath=Appl/Jedi/WorldTime
+	productPath($product eq "jedi" && $xip)=Borland
+        destPath=world
+
+
+launcher:
+        name($ec)=launcherec.geo
+        name=launcher.geo
+        basePath=Appl/Launcher
+        destPath=privdata
+
+mlurker:
+        name($ec)=mlurkerec.geo
+        name=mlurker.geo
+        basePath=Appl/Fax/MLurker
+        destPath=system/sysappl
+
+pyramid:
+        name($ec)=pyramidec.geo
+        name=pyramid.geo
+        basePath=Appl/Games/Pyramid
+        destPath=world/games
+
+reader:
+        name($ec)=readerec.geo
+        name=reader.geo
+        basePath=Appl/Reader
+	productPath($product eq "jedi")=JEDI
+        destPath=world
+
+respinstall:
+        name($ec)=installec.geo
+        name=install.geo
+        basePath=Appl/FApps/SApps/Install
+        destPath=world/sysapps
+
+resptransfer:
+        name($ec)=transfrec.geo
+        name=transfr.geo
+        basePath=Appl/FApps/SApps/Transfer
+        destPath=world/sysapps
+
+scrndmp:
+        name($ec)=screendumpec.geo
+        name=screendump.geo
+        basePath=Appl/Jedi/ScreenDump
+	productPath($xip)=XIP
+        destPath=system/sysappl
+
+sol soli solitaire:
+        name($ec)=soliec.geo
+        name=soli.geo
+        basePath=Appl/Games/Solitaire
+	productPath($product eq "jedi" && $xip)=JediXIP
+	productPath($product eq "jedi")=JEDI
+	destPath($product eq "jedi")=world
+        destPath=world/games
+
+sokoban:
+        name($ec)=sokobanec.geo
+        name=sokoban.geo
+        basePath=Appl/Games/Sokoban
+        destPath=world/games
+
+taipei:
+        name($ec)=taipeiec.geo
+        name=taipei.geo
+        basePath=Appl/Games/Taipei
+        destPath=world/games
+
+
+transfer:
+	name($ec)=transec.geo
+	name=trans.geo
+	productPath($hw)=JediXIP
+	productPath($xip)=XIP
+	basePath=Appl/Jedi/Transfer
+	destPath=$SP_APPLICATION
+
+writeOnly:
+        name($ec)=writeec.geo
+        name=write.geo
+        basePath=Appl/GeoWrite
+        destPath=world
+
+
+###############################################################################
+#
+#  LIBRARIES
+#
+#  Keep this in alphabetical order.  It makes entering new entries easier,
+#  although it has no effect on the search algorithm or anything.
+#
+
+accpnt:
+        name($ec)=accpntec.geo
+        name=accpnt.geo
+        basePath=Library/AccPnt
+        destPath=system
+
+ansic:
+        name($ec)=ansicec.geo
+        name=ansic.geo
+        basePath=Library/AnsiC
+	productPath($xip)=XIP
+        destPath=system
+
+bitmap:
+        name($ec)=bitmapec.geo
+        name=bitmap.geo
+        basePath=Library/Bitmap
+        destPath=system
+
+borlandc:
+        name($ec)=borlandcec.geo
+        name=borlandc.geo
+        basePath=Library/Math/Compiler/BorlandC
+	productPath($xip)=XIP
+        destPath=system
+
+
+
+cardid:
+        name($ec)=cardidec.geo
+        name=cardid.geo
+        basePath=Library/CardID
+        destPath=system
+
+cards card:
+	name($ec)=cardsec.geo
+	name=cards.geo
+	basePath=Library/Cards
+	productPath($product eq "jedi" && $xip)=JediXIP
+	productPath($product eq "jedi")=JEDI
+	destPath=$SP_SYSTEM
+
+cell:
+        name($ec)=cellec.geo
+        name=cell.geo
+        basePath=Library/Cell
+	productPath($xip)=XIP
+        destPath=system
+
+chart:
+        name($ec)=chartec.geo
+        name=chart.geo
+        basePath=Library/Chart
+        destPath=system
+
+color:
+        name($ec)=colorec.geo
+        name=color.geo
+        basePath=Library/Color
+#	productPath($product eq "jedi" && $xip)=JediXIP
+#	productPath($product eq "jedi")=JEDI
+        destPath=system
+
+compresslib:
+        name($ec)=compressec.geo
+        name=compress.geo
+        basePath=Library/Compress
+        destPath=system
+
+config:
+        name($ec)=configec.geo
+        name=config.geo
+        basePath=Library/Config
+        destPath=system
+
+connect:
+	name($ec)=connectec.geo
+	name=connect.geo
+	basePath=Library/Connect
+	destPath=system
+
+
+convert:
+        name($ec)=convertec.geo
+        name=convert.geo
+        basePath=Library/Convert
+        destPath=system
+
+conview:
+        name($ec)=conviewec.geo
+        name=conview.geo
+        basePath=Library/ConView
+	productPath($product eq "jedi" && $xip)=JediXIP
+	productPath($product eq "jedi")=JEDI
+        destPath=system
+
+dhcp:
+	name($ec)=dhcpec.geo
+	name=dhcp.geo
+	basePath=Library/DHCP
+	destPath=system
+
+faxctrl:
+        name($ec)=faxctrlec.geo
+        name=faxctrl.geo
+        basePath=Library/Fax/Ctrl
+        destPath=system
+
+faxfile:
+        name($ec)=faxfileec.geo
+        name=faxfile.geo
+        basePath=Library/Fax/File
+        destPath=system
+
+gadgets:
+	name($ec)=gadgetsec.geo
+	name=gadgets.geo
+	productPath($xip)=XIP
+	basePath=Library/Extensions/Gadgets
+	destPath=$SP_SYSTEM
+
+game:
+        name($ec)=gameec.geo
+        name=game.geo
+        basePath=Library/Game
+        destPath=system
+
+grobj:
+        name($ec)=grobjec.geo
+        name=grobj.geo
+        basePath=Library/GrObj
+        destPath=system
+
+hpmlib:
+        name($ec)=hpmlibec.geo
+        name=hpmlib.geo
+        basePath=Library/Jedi/HPMLib
+        destPath=system
+
+hwr:
+        name($ec)=palmec.geo
+        name=palm.geo
+        basePath=Library/HWR/Palm
+        destPath=system
+
+hwrdata:
+        name=palmhwr.dat
+        basePath=Library/HWR/Palm/Data
+        destPath=privdata/hwr
+
+impex:
+        name($ec)=impexec.geo
+        name=impex.geo
+        basePath=Library/Impex
+        destPath=system
+
+int8087:
+        name($ec)=int8087ec.geo
+        name=int8087.geo
+        basePath=Library/CoProcessor/Int8087
+        destPath=system
+
+intx87:
+        name($ec)=intx87ec.geo
+        name=intx87.geo
+        basePath=Library/CoProcessor/Intx87
+        destPath=system
+
+irlap:
+        name($ec)=irlapec.geo
+        name=irlap.geo
+        basePath=Driver/Socket/IRLAP
+        destPath=system/socket
+
+irlmp:
+        name($ec)=irlmpec.geo
+        name=irlmp.geo
+        basePath=Library/Irlmp
+        destPath=system
+
+irport:
+        name($ec)=irportec.geo
+        name=irport.geo
+        basePath=Driver/Stream/IRPort
+        destPath=system
+
+jdb:
+        name($ec)=dbec.geo
+        name=db.geo
+        basePath=Library/Jedi/DB
+        destPath=system
+
+jerror jerr:
+        name($ec)=jerrorec.geo
+        name=jerror.geo
+        basePath=Library/Jedi/JError
+        destPath=system
+
+jedidemo:
+        name($ec)=jedidemoec.geo
+        name=jedidemo.geo
+        basePath=Library/Jedi/JediDemo
+        destPath=system
+
+jedit:
+        name($ec)=jeditec.geo
+        name=jedit.geo
+        basePath=Library/Jedi/JEdit
+        destPath=system
+
+jlib:
+        name($ec)=jlibec.geo
+        name=jlib.geo
+        basePath=Library/Jedi/JLib
+        destPath=system
+
+jmotif:
+        name($ec)=jmotifec.geo
+        name=jmotif.geo
+        basePath=Library/SpecUI/JMotif
+	productPath($xip)=XIP
+        destPath=system
+
+jnotes:
+        name($ec)=notesec.geo
+        name=notes.geo
+        basePath=Library/Jedi/Notes
+        destPath=system
+
+jotter:
+        name($ec)=jotterec.geo
+        name=jotter.geo
+        basePath=Library/Jedi/JediUI/Jotter
+        destPath=system
+
+jtable:
+        name($ec)=jtableec.geo
+        name=jtable.geo
+        basePath=Library/Jedi/JTable
+	productPath($xip)=XIP
+        destPath=system
+
+jutils:
+        name($ec)=jutilsec.geo
+        name=jutils.geo
+        basePath=Library/Jedi/JUtils
+	productPath($xip)=XIP
+        destPath=system
+
+jwtime:
+        name($ec)=jwtimeec.geo
+        name=jwtime.geo
+        basePath=Library/Jedi/JWTime
+	productPath($product eq "jedi" && $xip)=JediXIP
+        destPath=system
+
+kbd:
+	name($product eq "jedi" && $hw)=jkbd.geo
+        name=kbd.geo
+        basePath($product eq "jedi" && $hw)=Driver/Keyboard/Jedi
+        basePath=Driver/Keyboard
+        destPath=system/kbd
+
+key:
+        name($ec)=keyec.geo
+        name=key.geo
+        basePath=Library/HWR/Key
+	productPath($product eq "jedi" && $xip)=JediXIP
+	productPath($product eq "jedi")=JEDI
+        destPath=system
+
+mailbox:
+        name($ec)=mailboxec.geo
+        name=mailbox.geo
+        basePath=Library/Mailbox
+	productPath($xip)=XIP
+        destPath=system
+
+math mathOnly:
+        name($ec)=mathec.geo
+        name=math.geo
+        basePath=Library/Math
+	productPath($product eq "jedi" && $xip)=JediXIP
+	productPath($xip)=XIP
+        destPath=system
+
+motif:
+        name($ec)=motifec.geo
+        name=motif.geo
+        basePath=Library/SpecUI/Motif
+	productPath($xip)=XIP
+        destPath=system
+
+mtable:
+        name($ec)=mtableec.geo
+        name=mtable.geo
+        basePath=Library/Extensions/MTable
+	productPath($product eq "jedi" && $xip)=JEDI
+        destPath=system
+
+netutils:
+	name($ec)=netutilsec.geo
+	name=netutils.geo
+	basePath=Library/NetUtils
+	destPath=system
+
+nimbus:
+        name($ec)=nimbusec.geo
+        name=nimbus.geo
+        basePath=Driver/Font/Nimbus
+        destPath=system/font
+
+obidemo:
+        name($ec)=obidemoec.geo
+        name=obidemo.geo
+        basePath=Library/Jedi/ObiDemo
+        destPath=system
+p3:
+        name($ec)=palmec.geo
+        name=palm.geo
+        basePath=Library/HWR/PalmP3
+	productPath($xip)=XIP
+        destPath=system
+
+parallel parallelOnly:
+        name($ec)=parallelec.geo
+        name=parallel.geo
+        basePath=Driver/Stream/Parallel
+        destPath=system
+
+parse:
+        name($ec)=parseec.geo
+        name=parse.geo
+        basePath=Library/Parse
+	productPath($xip)=XIP
+        destPath=system
+
+pccomlib:
+        name($ec)=pccomec.geo
+        name=pccom.geo
+        basePath=Library/PCCom
+	productPath($xip)=XIP
+        destPath=system
+
+pcmcia:
+        name($ec)=pcmciaec.geo
+        name=pcmcia.geo
+        basePath=Library/PCMCIA
+	productPath($product eq "jedi" && $xip)=JediXIP
+	productPath($product eq "jedi")=JEDI
+        destPath=system
+
+pen:
+        name($ec)=penec.geo
+        name=pen.geo
+        basePath=Library/Pen
+	productPath($xip)=XIP
+        destPath=system
+
+resolver:
+	name($ec)=resolverec.geo
+	name=resolver.geo
+	basePath=Library/Resolver
+	destPath=system
+
+rtcm:
+        name($ec)=rtcmec.geo
+        name=rtcm.geo
+        basePath=Library/RTCM
+	productPath($xip)=XIP
+        destPath=system
+
+ruler:
+        name($ec)=rulerec.geo
+        name=ruler.geo
+        basePath=Library/Ruler
+	productPath($xip)=XIP
+        destPath=system
+
+serial serialOnly:
+        name($ec)=serialec.geo
+        name=serial.geo
+        basePath=Driver/Stream/Serial
+	productPath($product eq "jedi" && $xip)=JediXIP
+        destPath=system
+
+shell:
+        name($ec)=shellec.geo
+        name=shell.geo
+        basePath=Library/Shell
+        destPath=system
+
+
+socketlib:
+	name($ec)=socketec.geo
+	name=socket.geo
+	basePath=Library/Socket
+	destPath=system
+
+sound:
+        name($ec)=soundec.geo
+        name=sound.geo
+        basePath=Library/Sound
+	productPath($xip)=XIP
+        destPath=system
+
+spell:
+        name($ec)=spellec.geo
+        name=spell.geo
+        basePath=Library/Spell
+        destPath=system
+
+spline:
+        name($ec)=splineec.geo
+        name=spline.geo
+        basePath=Library/Spline
+        destPath=system
+
+spool:
+        name($ec)=spoolec.geo
+        name=spool.geo
+        basePath=Library/Spool
+	productPath($product eq "jedi" && $xip)=JediXIP
+	productPath($product eq "jedi")=JEDI
+        destPath=system
+
+ssheet:
+        name($ec)=ssheetec.geo
+        name=ssheet.geo
+	productPath($product eq "jedi" && $xip)=JediXIP
+	productPath($product eq "jedi")=JEDI
+        basePath=Library/Spreadsheet
+        destPath=system
+
+ssmeta:
+        name($ec)=ssmetaec.geo
+        name=ssmeta.geo
+        basePath=Library/SSMeta
+	productPath($xip)=XIP
+        destPath=system
+
+stream:
+        name($ec)=streamec.geo
+        name=stream.geo
+        basePath=Driver/Stream
+        destPath=system
+
+streamc:
+        name($ec)=streamcec.geo
+        name=streamc.geo
+        basePath=Library/StreamC
+        destPath=system
+
+styles:
+        name($ec)=stylesec.geo
+        name=styles.geo
+        basePath=Library/Styles
+	productPath($xip)=XIP
+        destPath=system
+
+stylus:
+        name($ec)=stylusec.geo
+        name=stylus.geo
+        basePath=Library/SpecUI/Stylus
+        destPath=system
+
+swap:
+        name($ec)=swapec.geo
+        name=swap.geo
+        basePath=Library/Swap
+        destPath=system
+
+table:
+        name($ec)=tableec.geo
+        name=table.geo
+        basePath=Library/Extensions/Table
+	productPath($xip)=XIP
+        destPath=system
+
+telnet:
+        name($ec)=telnetec.geo
+        name=telnet.geo
+        basePath=Library/Telnet
+        destPath=system
+
+termgeo termOnly:
+        name($ec)=termec.geo
+        name=term.geo
+        basePath=Appl/Term
+        destPath=world/utilitie.000
+
+tetris:
+        name($ec)=tetrisec.geo
+        name=tetris.geo
+        basePath=Appl/Games/Tetris
+        destPath=world/games
+
+text:
+        name($ec)=textec.geo
+        name=text.geo
+        basePath=Library/Text
+	productPath($product eq "jedi" && $xip)=JediXIP
+	productPath($product eq "jedi")=JEDI
+        destPath=system
+
+toc:
+        name($ec)=configec.geo
+        name=config.geo
+        basePath=Library/Config/TOCONLY
+        destPath=system
+
+
+ui:
+	name($ec)=uiec.geo
+	name=ui.geo
+	productPath($product eq "jedi" && $xip)=JediXIP
+	productPath($product eq "jedi")=JEDI
+	basePath=Library/User
+	destPath=$SP_SYSTEM
+
+wav:
+        name($ec)=wavec.geo
+        name=wav.geo
+        basePath=Library/Wav
+        destPath=system
+
+
+###############################################################################
+#
+#  DRIVERS
+#
+#  Keep this in alphabetical order.  It makes entering new entries easier,
+#  although it has no effect on the search algorithm or anything.
+#
+
+absgen:
+        name($ec)=absgenec.geo
+        name=absgen.geo
+        basePath=Driver/Mouse/AbsGen
+        destPath=system/mouse
+
+cdrom:
+        name($ec)=cdromec.geo
+        name=cdrom.geo
+        basePath=Driver/IFS/DOS/CDROM
+        destPath=system/fs
+
+cidfs:
+        name($ec)=cidfsec.geo
+        name=cidfs.geo
+        basePath=Driver/PCMCIA/CID/CIDFS
+        destPath=system/pcmcia
+
+cidser:
+        name($ec)=cidserec.geo
+        name=cidser.geo
+        basePath=Driver/PCMCIA/CID/CIDSer
+        destPath=system/pcmcia
+
+class1in:
+        name($ec)=class1inec.geo
+        name=class1in.geo
+        basePath=Driver/Fax/Input/Class1In
+        destPath=system/fax
+
+class2in:
+        name($ec)=class2inec.geo
+        name=class2in.geo
+        basePath=Driver/Fax/Input/Class2In
+        destPath=system/fax
+
+class1out:
+        name($ec)=class1outec.geo
+        name=class1out.geo
+        basePath=Driver/Fax/Output/Class1Out
+        destPath=system/fax
+
+class2out:
+        name($ec)=class2outec.geo
+        name=class2out.geo
+        basePath=Driver/Fax/Output/Class2Out
+        destPath=system/fax
+
+disk diskOnly:
+        name($ec)=diskec.geo
+        name=disk.geo
+        basePath=Driver/Swap/Disk
+        destPath=system/swap
+
+dri:
+        name($ec)=driec.geo
+        name=dri.geo
+        basePath=Driver/IFS/DOS/DRI
+        destPath=system/fs
+
+emm emmOnly ems emsOnly:
+        name($ec)=emmec.geo
+        name=emm.geo
+        basePath=Driver/Swap/EMS/EMM
+        destPath=system/swap
+
+extmem extmemOnly:
+        name($ec)=extmemec.geo
+        name=extmem.geo
+        basePath=Driver/Swap/ExtMem
+        destPath=system/swap
+
+
+
+faxprint:
+        name($ec)=faxprintec.geo
+        name=faxprint.geo
+        basePath=Driver/Printer/Fax/FaxPrint
+        destPath=system/printer
+
+faxsendtd:
+	name($ec)=faxsendtdec.geo
+	name=faxsendtd.geo
+	basePath=Driver/Mailbox/Transport/FaxsendTD
+	destPath=system/mbtrans
+
+filedd:
+	name($ec)=fileddec.geo
+	name=filedd.geo
+	basePath=Driver/Mailbox/Data/FileDD
+	destPath=system/mbdata
+
+filestr:
+        name($ec)=filestrec.geo
+        name=filestr.geo
+        basePath=Driver/Stream/Filestr
+        destPath=system
+
+genmouse:
+        name($ec)=genmouseec.geo
+        name=genmouse.geo
+        basePath=Driver/Mouse/GenMouse
+        destPath=system/mouse
+
+jcanon48:
+        name($ec)=canon48jec.geo
+        name=canon48j.geo
+        basePath=Driver/Printer/DotMatrix/Canon48/JEDI
+        destPath=system/printer
+
+jdeskjet:
+        name($ec)=deskjetjec.geo
+        name=deskjetj.geo
+        basePath=Driver/Printer/HP/Deskjet/JEDI
+        destPath=system/printer
+
+jepson24:
+        name($ec)=epson24jec.geo
+        name=epson24j.geo
+        basePath=Driver/Printer/DotMatrix/Epson24/JEDI
+        destPath=system/printer
+
+jpcl4:
+        name($ec)=pcl4jec.geo
+        name=pcl4j.geo
+        basePath=Driver/Printer/HP/Pcl4/JEDI
+        destPath=system/printer
+
+jpropx24:
+        name($ec)=propx24jec.geo
+        name=propx24j.geo
+        basePath=Driver/Printer/DotMatrix/Propx24/JEDI
+        destPath=system/printer
+
+jvideo:
+        name($ec)=jvideoec.geo
+        name=jvideo.geo
+        basePath=Driver/Video/Dumb/Jedi
+        destPath=system/video
+
+kbmouse:
+        name($ec)=kbmouseec.geo
+        name=kbmouse.geo
+        basePath=Driver/Mouse/KBMouse
+        destPath=system/mouse
+
+kernel:
+        name($ec)=geosec.geo
+        name=geos.geo
+        basePath=Library/Kernel
+	# This one is weird.  PC XIP has to be XIP.  It's all very confused.
+	productPath($product eq "jedi" && $hw)=JediXIP
+	productPath($product eq "jedi" && $xip)=XIP
+	productPath($product eq "jedi" && $obi)=
+	productPath($product eq "jedi")=JEDI
+        destPath=system
+
+logibus:
+        name($ec)=logibusec.geo
+        name=logibus.geo
+        basePath=Driver/Mouse/LogiBus
+        destPath=system/mouse
+
+logiser:
+        name($ec)=logiserec.geo
+        name=logiser.geo
+        basePath=Driver/Mouse/LogiSer
+        destPath=system/mouse
+
+lstrings:
+        name=geos.str
+        basePath=Loader
+	destPath=
+
+mcga:
+        name($ec)=mcgaec.geo
+        name=mcga.geo
+        basePath=Driver/Video/Dumb/MCGA
+        destPath=system/video
+
+megafile:
+        name($ec)=megafileec.geo
+        name=megafile.geo
+        basePath=Driver/IFS/GEOS/MegaFile
+	productPath($product eq "jedi" && $hw)=JediXIP
+	productPath($xip)=XIP
+        destPath=system/fs
+
+modem:
+	name($ec)=modemec.geo
+	name=modem.geo
+	basePath=Driver/Modem
+	destPath=system
+
+ms3:
+        name($ec)=ms3ec.geo
+        name=ms3.geo
+        basePath=Driver/IFS/DOS/MS3
+        destPath=system/fs
+
+ms4:
+        name($ec)=ms4ec.geo
+        name=ms4.geo
+        basePath=Driver/IFS/DOS/MS4
+	productPath($xip)=XIP
+        destPath=system/fs
+
+msbus:
+        name($ec)=msbusec.geo
+        name=msbus.geo
+        basePath=Driver/Mouse/MSBus
+        destPath=system/mouse
+
+msnet:
+        name($ec)=msnetec.geo
+        name=msnet.geo
+        basePath=Driver/IFS/DOS/MSNet
+        destPath=system/fs
+
+msser:
+        name($ec)=msserec.geo
+        name=msser.geo
+        basePath=Driver/Mouse/MSSer
+        destPath=system/mouse
+
+msys:
+        name($ec)=msysec.geo
+        name=msys.geo
+        basePath=Driver/Mouse/MSys
+        destPath=system/mouse
+
+net:
+        name($ec)=netec.geo
+        name=net.geo
+        basePath=Library/Net
+        destPath=system
+
+netware:
+        name($ec)=netwareec.geo
+        name=netware.geo
+        basePath=Driver/IFS/DOS/NetWare
+	productPath($xip)=XIP
+        destPath=system/fs
+
+nonts:
+        name($ec)=nontsec.geo
+        name=nonts.geo
+        basePath=Driver/Task/NonTS
+        destPath=system/task
+
+nopower:
+        name($ec)=nopowerec.geo
+        name=nopower.geo
+        basePath=Driver/Power/NoPower
+        destPath=system/power
+
+nppcm:
+        name($ec)=nppcmec.geo
+        name=nppcm.geo
+        basePath=Driver/Power/NoPowerPCMCIA
+        destPath=system/power
+
+os2:
+        name($ec)=os2ec.geo
+        name=os2.geo
+        basePath=Driver/IFS/DOS/OS2
+        destPath=system/fs
+
+pppOnly:
+	name($ec)=pppec.geo
+	name=ppp.geo
+	basePath=Driver/Socket/PPP
+	destPath=system/socket
+
+ps2:
+        name($ec)=ps2ec.geo
+        name=ps2.geo
+        basePath=Driver/Mouse/PS2
+        destPath=system/mouse
+
+rfsd:
+        name($ec)=rfsdec.geo
+        name=rfsd.geo
+        basePath=Driver/IFS/RFSD
+        destPath=system/fs
+
+slip:
+        name($ec)=slipec.geo
+        name=slip.geo
+        basePath=Driver/Socket/SLIP
+        destPath=system/socket
+
+spooltd:
+	name($ec)=spooltdec.geo
+	name=spooltd.geo
+	basePath=Driver/Mailbox/Transport/SpoolTD
+	destPath=system/mbtrans
+
+sockettd:
+	name($ec)=sockettdec.geo
+	name=sockettd.geo
+	basePath=Driver/Mailbox/Transport/SocketTD
+	destPath=system/mbtrans
+
+sockrecv:
+	name($ec)=sockrecvec.geo
+	name=sockrecv.geo
+	basePath=Driver/Mailbox/Transport/SockRecv
+	destPath=system/mbtrans
+
+standard:
+        name($ec)=standardec.geo
+        name=standard.geo
+        basePath=Driver/Sound/Standard
+	productPath($product eq "jedi" && $hw)=JEDI
+        destPath=system/sound
+
+tcpipDriver:
+	name($ec)=tcpipec.geo
+	name=tcpip.geo
+	basePath=Driver/Socket/TCPIP
+	destPath=system/socket
+
+vidmem:
+        name($ec)=vidmemec.geo
+        name=vidmem.geo
+        basePath=Driver/Video/Dumb/VidMem
+        destPath=system/video
+
+vmtree:
+	name($ec)=vmtreeec.geo
+	name=vmtree.geo
+	basePath=Driver/Mailbox/Data/VMTree
+	destPath=system/mbdata
+
+xms xmsOnly:
+        name($ec)=xmsec.geo
+        name=xms.geo
+        basePath=Driver/Swap/XMS
+        destPath=system/swap
+
+zoomfs:
+        name($ec)=zoomfsec.geo
+        name=zoomfs.geo
+        basePath=Driver/IFS/GEOS/ZoomFS
+        destPath=system/fs
+
+zoomtd:
+	name($ec)=zoomtdec.geo
+	name=zoomtd.geo
+	basePath=Driver/Mailbox/Transport/ZoomTD
+	destPath=system/mbtrans
+
+###############################################################################
+#
+#  OTHER
+#
+#  This section contains fonts, INI files, binary data files, etc.
+#
+
+termMacros:
+	name=bswCompu.mac bswGenie.mac compu.mac cory.mac genie.mac
+	basePath=Appl/Term/Macros
+	destPath=userdata/commacro
+
+termTermcaps:
+	name=ansi.tc ibm3101.tc newy50.tc tty.tc tvi950.tc vt100.tc vt52.tc wyse50.tc
+	basePath=Appl/Term/Termcap
+	destPath=userdata/termcap
+
+zoomdeck zdeck:
+	name=zoomdeck.vm
+	basePath=Appl/Art/Decks/ZoomDeck
+	destPath=userdata/deck
+
+swat:
+        name=swat.exe
+        basePath=/staff/pcgeos/Tools/swat/Stub/LowMem
+        destPath=
+
+com43:
+        name=com43.com
+        basePath=/staff/pcgeos/Tools/com43
+        destPath=
+
+pccom:
+        name=pccom.com
+        basePath=/staff/pcgeos/Tools/com43
+        destPath=
+
+loader:
+	name($ec)=loaderec.exe
+        name=loader.exe
+	basePath($product eq "jedi" && $hw)=Loader/JediXIP
+	basePath($product eq "jedi" && $obi)=Loader/JediVGA
+        basePath=Loader/VGA
+        destPath=
+
+
+jediHelp:
+	name=help.000
+	basePath=ProductFiles/Jedi/userdata/help
+	destPath=userdata/help
+
+jediTokenDB:
+	name=token_da.000
+	basePath=ProductFiles/Jedi/privdata
+	# Sadly, the PC Demo sticks the token_da.000 in privdata, but we
+	# want the GFS to have it in the top level.
+	destPath($hw)=
+	destPath=privdata
+
+jediNetINI:
+	name($ec)=netec.ini
+	name=net.ini
+	basePath($hw)=ProductFiles/Jedi
+	basePath=ProductFiles/JediPC/DEMO
+	destPath=
+
+jediFonts:
+	name=Bison.fnt led.fnt jsys.fnt calendar.fnt notepad.fnt Mono.fnt Sans.fnt
+	basePath=ProductFiles/Jedi/userdata/font
+	destPath=userdata/font
+
+#
+# Jedi default documents
+#
+jdoc:
+	basePath=ProductFiles/Jedi/document
+	destPath=document
+
+jDocCd:
+	name=compact_.gdb
+	inherit=jdoc
+
+jDocExpense:
+	name=expense_.000
+	inherit=jdoc
+
+jDocJotter:
+	name=jotter.000
+	inherit=jdoc
+
+jDocMDB:
+	name=master.mdb
+	inherit=jdoc
+
+jDocNotepad:
+	name=notepad.ndb
+	inherit=jdoc
+
+jDocPhone:
+	name=phone.pdb
+	inherit=jdoc
+
+jDocWTRom:
+	name=wtromdb.000
+	inherit=jdoc
+
+jDocFinance:
+	name=finance.fdb
+	inherit=jdoc
+
+jDocBookReader:
+	name=book_rea.000
+	inherit=jdoc
+	destPath=document
+
+jediBookTutorial:
+	name=tutorial.000
+	basePath=ProductFiles/Jedi/userdata/books
+	destPath=userdata/books
+
+#
+# Hacked stuff for the Jedi SDK, which has to have the old streamc (which
+# actually shipped) in a separate place from the new streamc that we
+# want developers to use.
+#
+oldStreamC:
+	name=streamc.geo streamc.sym streamcec.geo streamcec.sym
+	basePath=/staff/pcgeos/ReleaseJedi/Installed/Library/StreamC
+	destPath=Library/StreamC/Old
+oldStreamCH:
+	name=streamC.h
+	basePath=/staff/pcgeos/ReleaseJedi/CInclude
+	destPath=Library/StreamC/Old
+
+jediWorldDirname:
+	name=@dirname.000
+	basePath=ProductFiles/Jedi/world
+	destPath=world
+
+jediGeosINI:
+	name($ec)=geosec.ini
+	name=geos.ini
+	basePath($jediSDKTarget)=ProductFiles/JediPC/ini/sdk
+	basePath=ProductFiles/JediPC/DEMO
+	destPath=
+
+jediSBat:
+	name=s.bat ss.bat
+	basePath=ProductFiles/JediPC/debug
+	destPath=
+
+# This is only useful for making SDKs.  destPath is assumed to be a
+# path under something like C:\PCGEOS.
+borlandRTL:
+	name=borland.obj
+	basePath=/staff/pcgeos/Installed/Library/BorlandRTL
+	destPath=Include/ldf
+
+#############################################################################
+##
+##  Obiwan-specific stuff.
+##
+#############################################################################
+pgrapi:
+	name($ec)=pgrapiec.geo
+	name=pgrapi.geo
+	basePath=Appl/Jedi/RRunner
+	destPath=system
+
+skytel2:
+	name($ec)=skytel2ec.geo
+	name=skytel2.geo
+	basePath=Appl/Jedi/RRunner
+	destPath=world
+
+skytelHelp:
+	name=skytel_2.000
+	basePath=ProductFiles/Obi/geos/userdata/help
+	destPath=userdata/help
+
+clipngo:
+	name($ec)=clipgoec.geo
+	name=clipgo.geo
+	basePath=Appl/Jedi/ClipNGo
+	destPath=world
+
+obipq:
+	name($ec)=pqec.geo
+	name=pq.geo
+	basePath=Appl/Jedi/PQ
+	destPath=world
+
+obiFonts:
+	name=Bison.fnt led.fnt calendar.fnt Mono.fnt Sans.fnt
+	basePath=ProductFiles/Obi/geos/userdata/font
+	destPath=userdata/font
+
+#
+# Obiwan default documents
+#
+obidoc:
+	basePath=ProductFiles/Obi/geos/document
+	destPath=document
+
+obiDocCd:
+	name=compact_.gdb
+	inherit=obidoc
+
+obiDocExpense:
+	name=expense_.000
+	inherit=obidoc
+
+obiDocJotter:
+	name=jotter.000
+	inherit=obidoc
+
+obiDocMDB:
+	name=master.mdb
+	inherit=obidoc
+
+obiDocNotepad:
+	name=notepad.ndb
+	inherit=obidoc
+
+obiDocPhone:
+	name=phone.pdb
+	inherit=obidoc
+
+obiDocWTRom:
+	name=wtromdb.000
+	inherit=obidoc
+
+obiDocFinance:
+	name=finance.fdb
+	inherit=obidoc
+
+obiDocBookReader:
+	name=book_rea.000
+	inherit=obidoc
+	destPath=document
+
+obiBookTutorial:
+	name=tutorial.000
+	basePath=ProductFiles/Obi/geos/userdata/books
+	destPath=userdata/books
+
+#
+# PC emulator stuff
+#
+
+obiGeosINI:
+	name($ec)=geosec.ini
+	name=geos.ini
+	basePath($hw)=ProductFiles/Obi/ini/rom
+	basePath($obiSDKTarget)=ProductFiles/Obi/ini/dist
+	basePath=ProductFiles/Obi/ini/pc
+	destPath=
+
+obiNetINI:
+	name($ec)=netec.ini
+	name=net.ini
+	basePath($hw)=ProductFiles/Obi/ini/rom
+	basePath($obiSDKTarget)=ProductFiles/Obi/ini/dist
+	basePath=ProductFiles/Obi/ini/pc
+	destPath=
+
+obiDebug:
+	name($ec)=s.bat ss.bat geosec.bat
+	name=s.bat ss.bat geos.bat
+	basePath($ec)=ProductFiles/Obi/debugec
+	basePath=ProductFiles/Obi/debug
+	destPath=
+
+obiTools:
+	name($ec)=obiec.bat obisv.bat
+	name=obi.bat obisv.bat
+	basePath=ProductFiles/Obi/tools
+	destPath=..
+
+obiTokenDB:
+	name=token_da.000
+	basePath=ProductFiles/Obi/geos/privdata
+	# Sadly, the PC Demo sticks the token_da.000 in privdata, but we
+	# want the GFS to have it in the top level.
+	destPath($hw)=
+	destPath=privdata
+
+obiHelp:
+	name=help.000
+	basePath=ProductFiles/Obi/geos/userdata/help
+	destPath=userdata/help
+

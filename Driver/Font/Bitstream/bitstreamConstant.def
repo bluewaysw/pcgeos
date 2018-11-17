@@ -1,0 +1,400 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1993 -- All Rights Reserved
+
+PROJECT:	GEOS Bitstream Font Driver
+MODULE:		
+FILE:		bitstreamConstant.def
+
+AUTHOR:		Brian Chin
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	brianc	9/30/93		Initial version
+
+DESCRIPTION:
+	This file contains all of the constant and type definitions
+	for the GEOS portion of the Bitstream Font Driver.
+
+	$Id: bitstreamConstant.def,v 1.1 97/04/18 11:45:12 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Fatal Errors
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+if	ERROR_CHECK
+
+RECURSIVE_CALL_TO_FONT_DRIVER                           enum FatalErrors
+; The Bitstream driver is non-reentrant, so only one thread can be in the
+; driver at a time.  This may indicate a bug in the Font Manager.
+
+FONT_BAD_CHAR_FLAG					enum FatalErrors
+; Characters in fonts are marked as either missing or not built.  Font
+; drivers should only be called for characters that are not built, and
+; should not be called for a character that is already built.
+; This may indicate either a bug in the video driver, or a memory-trashing
+; bug somewhere in the system that has spewed on a font block.
+
+FONT_BAD_ROUTINE					enum FatalErrors
+; A bad function passed to the Speedo font driver.  The function passed in
+; DI must be in the FontFunctions enumerated type.
+
+FONT_CHAR_TOO_BIG					enum FatalErrors
+; The graphics system was passed a pointsize that was too large for the
+; Speedo font driver to render.  What pointsize did you pass to GrSetFont()
+; or set in your text object?  The maximum pointsize currently supported
+; is MAX_POINT_SIZE (792 points).
+
+FONT_OVERDOSE						enum FatalErrors
+; The Speedo code has gone off the deep end, and was attempting to
+; write outside its bitmap block.
+
+RECURSIVE_FONT_DRIVER_CALL				enum FatalErrors
+; The Speedo font driver is *not* reentrant!  Only one thread can be in the
+; driver at a time.  This may indicate a bug in the Font Manager.
+ 
+CANNOT_USE_DOUBLE_BYTE_CHARS_IN_THIS_VERSION		enum FatalErrors
+; Font driver functions take 16-bit characters.  Currently, however, only
+; the 8-bit PC/GEOS character set is supported.
+
+BITSTREAM_CANNOT_FIND_FONT_INFO				enum FatalErrors
+; The Bitstream font driver has been called with a font that does not exist!
+; This may indicate a bug in either the Font Manager or the video driver.
+
+SPEEDO_CACHE_FILE_TOO_BIG				enum FatalErrors
+; The Speedo font driver is trying to use a file as the Speedo Font
+; Installer created cache data file which is greater than 64Kbytes in size.
+; This means somebody has trashed the cache data file name in the
+; SpeedoOutlineEntry for this font as this file can't be that big.
+
+SPEEDO_XLAT_DEFAULT_CHAR_NOT_EXIST			enum FatalErrors
+; The requested Bitstream Speedo font does *not* contain a representation
+; for the default PC/GEOS character!  This most likely means that the font
+; data file is corrupt.
+
+SPEEDO_INVALID_CUSTOMER_NUMBER				enum FatalErrors
+; The selected Bitstream Speedo font is *not* encrypted with the
+; standard encryption keys!  It is therefore useless to use with PC/GEOS.
+; This may indicate a corrupted font data file.
+
+SPEEDO_SET_SPECS_FAILED					enum FatalErrors
+; The call to set the Speedo font character generation specifications
+; failed.  This could mean that the font data file has been corrupted, is
+; not in a Speedo supported format, not enough font data file header data
+; was loaded, the character specifications were invalid, a bad character
+; generation mode was requested, rule information, or clipping, or
+; squeezing was requested but isn't supported, or the requested
+; specifications can't be fulfilled by the requested output module.
+
+BITSTREAM_INTERNAL_ERROR				enum FatalErrors
+
+BITSTREAM_CHAR_DATA_NOT_AVAIL				enum Warnings
+
+BITSTREAM_FIND_FONT_INFO_FAILURE			enum Warnings
+
+BITSTREAM_CHAR_SET_NOT_FOUND				enum Warnings
+; The assumed first character in the character set was not valid.
+
+endif
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		rndwwbf7
+
+DESCRIPTION:	Round a WWFixed value to a WBFixed w/7 bits instead of 8.
+
+ARGUMENTS:
+	source - A WWFixed value to round
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+rndwwbf7	macro	source
+	local	round, done, drf, dri, regargs
+
+regargs	= 0
+_CheckDWordOneArg	<source>, <rndwwnf>
+_ParseDWordArg		<source>, drf, dri, regargs, <rndwwbf>
+
+	cmp	drf, 0x0100
+	jb	done
+	add	drf, 0x0200
+	adc	dri, 0
+done:
+	andnf	drf, 0xfe00
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Constant Definitions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;
+; stack space necessary for Bitstream C code to operate
+;
+if PROC_TRUETYPE
+FONT_C_CODE_STACK_SPACE	= 1800		; over 60K of code, too!
+else
+if PROC_TYPE1
+FONT_C_CODE_STACK_SPACE	= 2000
+else
+FONT_C_CODE_STACK_SPACE	= 1000
+endif
+endif
+
+;
+; Use regions for characters above this:
+;
+MAX_BITMAP_SIZE		= 125
+SCRIPT_SAFETY_SIZE	= 10
+
+;
+; default number of points per line when generating character region
+;
+UNUSED_PER_LINE		= 4
+
+;
+; bit mask representing all of the text styles that cause the width scaling
+; factor to be adjusted when the driver must 'fake' one of them (because
+; there is no outline for the given style).
+;
+WIDTH_STYLES = (mask TS_BOLD or \
+		mask TS_SUBSCRIPT or \
+		mask TS_SUPERSCRIPT)
+
+;
+; bit mask representing all of the text styles that necessitate the
+; adjustment of the transformation matrix.
+;
+TRANSFORM_STYLES = (mask TS_BOLD or \
+			mask TS_ITALIC or \
+			mask TS_SUBSCRIPT or \
+			mask TS_SUPERSCRIPT)
+
+;
+; Font Style Scale Adjustment Factors
+;	These values are used to modify the scaling factors of the
+;	horizontal and/or vertical components.
+;
+SCRIPT_FACTOR_INT	=	0		; Sub-/Super-script = 1/2
+SCRIPT_FACTOR_FRAC	=	0x8000
+
+SUBSCRIPT_OFFSET_INT	=	0		; Descent offset.
+SUBSCRIPT_OFFSET_FRAC	=	0x1a00
+
+SUPERSCRIPT_OFFSET_INT	=	0		; Ascent offset.
+SUPERSCRIPT_OFFSET_FRAC	=	0x6000
+
+BOLD_FACTOR_INT		=	0x0001		; Bold-erizer = X 1.10.
+BOLD_FACTOR_FRAC	=	0x2000
+
+ITALIC_FACTOR_INT	=	0		; Italic-izers = 12 deg. 
+ITALIC_FACTOR_FRAC	=	0x366A		; Forward, use tan(12).
+NEG_ITALIC_FACTOR_INT	=	0xffff		; Backward, use -tan(12).
+NEG_ITALIC_FACTOR_FRAC	=	0xC996
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Bitstream global variables structure
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+long	equ	<dword>
+
+band_tag	struct
+        band_max	word
+        band_min	word		; t_short
+        band_array_offset	word		; t_short
+        band_floor	word		; t_short
+        band_ceiling	word		; t_short
+band_tag	ends
+
+BG_speedoEntry	struct
+	fileIndex	word		; t_short?
+	charID		word
+BG_speedoEntry	ends
+
+set_width_tag	struct
+        x	long                  
+        y	long
+set_width_tag	ends
+
+tcb_tag	struct
+        xxmult	word		; t_short      
+        xymult	word		; t_short
+        xoffset	long
+        yxmult	word		; t_short
+        yymult	word		; t_short
+        yoffset	long
+        xppo	word		; t_short
+        yppo	word		; t_short
+        xpos	word		; t_short
+        ypos	word		; t_short
+        xtype	word
+        ytype	word
+        xmode	word
+        ymode	word
+        mirror	word		; t_short
+tcb_tag	ends
+
+specs_tag	struct
+	st_pfont		fptr.buff_tag
+        st_xxmult		long
+        st_xymult		long
+        st_xoffset		long
+        st_yxmult		long
+        st_yymult		long
+        st_yoffset		long
+        flags		dword
+        out_info	fptr.word		; t_short
+specs_tag	ends
+
+kern_tag	struct
+        tkorg		fptr.byte
+        pkorg		fptr.byte
+        no_tracks	word		; t_short 
+        no_pairs	word		; t_short
+kern_tag	ends
+
+point_tag	struct
+	pt_x	word		; t_short
+	pt_y	word		; t_short
+point_tag	ends
+
+buff_tag	struct
+	BT_origin	fptr.byte
+	BT_no_bytes	dword
+buff_tag	ends
+
+constr_tag 	struct
+        org	fptr.byte
+        font_id	word
+        ct_xppo	word		; t_short
+        ct_yppo	word		; t_short
+        font_id_valid	byte
+        data_valid	byte
+        active	byte
+constr_tag 	ends
+
+MAX_CTRL_ZONES = 256
+MAX_INT_ZONES = 256
+MAX_CONSTR = 750
+
+ProcessorSpeedo	struct
+            kern	kern_tag
+            Psw		point_tag
+            cb_offset	word		; t_short
+            P0		point_tag
+            x_orus	word		; t_short
+            y_orus	word		; t_short
+            x_pix	word		; t_short 
+            y_pix	word		; t_short
+            x_int	byte
+            y_int	byte
+            key32	word
+            key4	byte
+            key6	byte
+            key7	byte
+            key8	byte
+            font	buff_tag
+	    pfont	fptr.buff_tag
+            font_buff_size	long
+	    pchar_dir	fptr.byte
+            first_char_idx	word		; t_short
+            no_chars_avail	word		; t_short
+            depth_adj	word		; t_short     
+            thresh	word		; t_short
+            font_org	fptr.byte
+            hdr2_org	fptr.byte
+            Y_edge_org	byte
+            Y_int_org	byte
+            orus	word MAX_CTRL_ZONES dup (?)		; t_short
+            spix	word MAX_CTRL_ZONES dup (?)		; t_short
+            mult	word MAX_INT_ZONES dup (?)		; t_short
+            ps_offset	long MAX_INT_ZONES dup (?)
+            no_X_orus	word		; t_short
+            no_Y_orus	word		; t_short
+            Y_constr_org	word
+            constr	constr_tag
+            c_act	byte MAX_CONSTR dup (?)
+            c_pix	word MAX_CONSTR dup (?)		; t_short
+            squeezing_compound	byte
+ProcessorSpeedo	ends
+
+ProcessorUnion	union
+	speedo	ProcessorSpeedo
+ProcessorUnion	ends
+
+MAX_SPEEDO_FONT_CHARS = 640
+MAX_INTERCEPTS = 1000
+
+BitstreamGlobals	struct
+    processor_type	BitstreamFontProcessor          
+    gCharProtocol	BitstreamFontProtocol
+    gDestProtocol	word
+    gMustTranslate	byte
+    gCurrentSymbolSet	word 256 dup (?)		; t_short
+    numChars		word               
+    gSortedBCIDList	BG_speedoEntry MAX_SPEEDO_FONT_CHARS dup (?)
+    UserPtr		fptr.word		; t_short
+    y_band		band_tag              
+    set_width		set_width_tag
+    first_pass		byte
+    extents_running	byte
+    x0_spxl		word		; t_short       
+    y0_spxl		word		; t_short
+    y_pxl		word		; t_short  
+    car			word MAX_INTERCEPTS dup (?)		; t_short
+    cdr			word MAX_INTERCEPTS dup (?)		; t_short
+    bmap_xmin		word		; t_short
+    bmap_xmax		word		; t_short
+    bmap_ymin		word		; t_short
+    bmap_ymax		word		; t_short
+    no_y_lists		word		; t_short
+    first_offset	word		; t_short
+    next_offset		word		; t_short
+    intercept_oflo	byte
+    xmin		word		; t_short
+    xmax		word		; t_short
+    ymin		word		; t_short
+    ymax		word		; t_short
+    no_x_lists		word		; t_short
+    x_band		band_tag              
+    x_scan_active	byte
+    orus_per_em		word		; t_short
+    metric_resolution	word		; t_short
+    tcb0		tcb_tag
+    specs_valid		byte
+    curves_out		byte
+    output_mode		word		; t_short
+    normal		byte
+    multshift		word		; t_short
+    pixshift		word		; t_short
+    poshift		word		; t_short
+    mpshift		word		; t_short
+    multrnd		long 
+    pixfix		word		; t_short
+    pixrnd		word		; t_short
+    mprnd		long  
+    onepix		word		; t_short
+    init_out		fptr
+    begin_char		fptr
+    begin_sub_char	fptr
+    begin_contour	fptr
+    curve		fptr
+    line		fptr
+    end_contour		fptr
+    end_sub_char	fptr
+    end_char		fptr
+    specs		specs_tag
+    pspecs		fptr.specs_tag
+    tcb			tcb_tag
+    rnd_xmin		long
+    clip_xmax		long
+    clip_ymax		long
+    clip_xmin		long
+    clip_ymin		long
+    processor		ProcessorUnion
+BitstreamGlobals	ends

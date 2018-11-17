@@ -1,0 +1,290 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC/GEOS	
+MODULE:		DMA Driver specification
+FILE:		DMADrv.def
+
+AUTHOR:		Todd Stumpf, Oct 13, 1992
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	TS	10/13/92		Initial revision
+
+
+DESCRIPTION:
+	This is the driver specification for DMA.  All DMA drivers
+	should provide at least this functionality.	
+
+	The DMA services provided by PC/GEOS are designed to given
+	the same interface provided by running in a real mode
+	environment.  Thus, an application which requires or
+	desires to use DMA should be prepared to deal with
+	a little ugliness.
+
+	The propper way for an application to begin a DMA transfer
+		under PC/GEOS is as follows:
+
+	
+		1) Request the Channel
+		2) Disable the Channel
+		3) Program the Channel
+		4) Program the DMA device
+		5) Enable the Channel
+		6) Complete the DMA transfer
+		7) Release the Channel
+
+	$Id: DMADrv.def,v 1.1 97/04/04 14:16:18 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__DMADRVR
+
+include	driver.def
+
+StartDriver	DMA
+
+DMA_PROTO_MAJOR		equ		DRIVER_PROTO_MAJOR+1
+DMA_PROTO_MINOR		equ		DRIVER_PROTO_MINOR+0
+
+DMADriverFunction	etype word, DriverFunction, 2
+
+;		These are the first four functions which must be supported
+;	DR_INIT			0
+;	DR_EXIT			2
+;	DR_SUSPEND		4
+;	DR_UNSUSPEND		6
+
+DR_REQUEST_CHANNEL	enum DMADriverFunction
+;	PASS:
+;		dl	-> mask of channels requested
+;		INTERRUPTS_OFF
+;	RETURN:
+;		dl	<- mask of unavailable channels.
+;	DESTROY:
+;		nothing
+;	DESCRIPTION:  This command ensures that mutual exclusion is
+;		ensured on DMA channels.  This command should always be
+;		executed before an application attempts a DMA transfer.
+;		Failure to do so could cause your own and someone elses
+;		DMA transfer to be destroyed.
+;		      The request is either totally granted or totally
+;		refused.  Thus if dl is non-zero, NO CHANNELS were
+;		granted!
+;
+
+DR_RELEASE_CHANNEL	enum DMADriverFunction
+;	PASS:
+;		dl	-> mask of channels to release
+;		INTERRUPTS_OFF
+;	RETURN:
+;		nothing
+;	DESTROY:
+;		nothing
+;	DESCRIPTION:  This command should be issued once the application
+;		has finished with the channel.  This will allow another
+;		application to use the channel.  It is not necessary for
+;		for the application to release the channel after every
+;		buffer has been translated, but it is advised.
+;
+
+DR_DISABLE_DMA_REQUESTS		enum DMADriverFunction
+;	PASS:
+;		dl	-> mask of channels to stop
+;		INTERRUPTS_OFF
+;	RETURN:
+;		nothing
+;	DESTROY:
+;		nothing
+;
+;	DESCRIPTION:  This command will stop the specified channels
+;		by masking out requests for each channel.  For
+;		single transfers.  Requests will still be generated
+;		by the DMA device, but they will not be aknowledged
+;		by the chip.
+;
+
+DR_ENABLE_DMA_REQUESTS		enum DMADriverFunction
+;	PASS:
+;		dl	-> mask of channels to re-start
+;		INTERRUPTS_OFF
+;	RETURN:
+;		nothing
+;	DESTROY:
+;		nothing
+;
+;	DESCRIPTION:  This command re-enables requests for the given
+;		channels.  If a channel has not been previously
+;		disabled, this will have no affect.  This command
+;		must be given after a START command before the
+;		DMA controller chip will begin to aknowledge 
+;		requests from the DMA device.
+;
+
+DR_CHECK_TC_REACHED		enum DMADriverFunction
+;	PASS:
+;		dl	-> channel for job
+;		INTERRUPTS_OFF
+;	RETURN:
+;		cx	<- 0 if TC reached,
+;			   non zero if still in progress
+;	DESTROY:
+;		nothing
+;
+;	DESCRIPTION:  This command checks the channel to see if it
+;		has reached the Terminal Count (TC) of the transfer.
+;		The terminal count indicates that the job is complete.
+;		This service is provided for devices which do not
+;		have built in transfer complete notification methods.
+;
+
+DR_START_DMA_TRANSFER		enum DMADriverFunction
+;	PASS:
+;		bx:si	-> buffer containing data to be DMA'ed
+;		cx	-> # of (bytes/words) in buffer
+;		dl	-> channel for transfer
+;		dh	-> ModeRegisterMask for transfer
+;		INTERRUPTS_OFF
+;	RETURN:
+;		cx	<- # of (bytes/words) read
+;	DESTROY:
+;		nothing
+;
+;	DESCRIPTION:  This command will execute a DMA transfer as
+;		specified by the ModeRegisterMask.  That is, the DMA chip
+;		will be programmed with the specified mask.  The transfer
+;		will not actually begin until the channel is re-enabled
+;		and the DMA device begins requesting transfers.
+;		      DMA requests for the channel should be disabled
+;		before this command is issued as this command will
+;		not disable the channel.  Thus, if a DMA request
+;		reaches the chip while it is being re-programmed for
+;		this transfer "bad" things could happen...
+;
+
+DR_STOP_DMA_TRANSFER		enum DMADriverFunction
+;	PASS:
+;		dl	-> channel of transfer
+;		INTERRUPTS_OFF
+;	RETURN:
+;		cx	<- # of (bytes/words) left to process
+;	DESTROY:
+;		nothing
+;
+;	DESCRIPTION:  This command halts a DMA in progress.  At least,
+;		it halts the DMA chip.  It does so by masking out the
+;		request for the channel.  Then, it reads the word
+;		count and address so it can return them.  It is up
+;		to the calling application to halt the DMA device
+;		itself.
+;
+
+
+	;
+	;  There are four modes for DMA transfers:
+	;    Single Transfer:  Each DREQ causes a single
+	;   	transfer of info (one byte).  If the DREQ
+	; 	is asserted for longer than it takes to
+	;	transfer on byte, the DMA chip will return
+	;	the bus to the CPU for one cycle, then
+	;	transfer one more byte.
+	;    Block Transfer: Each DREQ causes the entire
+	;	block to be transfered.  While doing so,
+	;	the BUS is occupied.  <don't use this!>
+	;    Demand Transfer: While the DREQ is asserted,
+	;	the chip will transfer data.  Once the
+	;	DREQ is not asserted, the bus goes back
+	;	to the CPU.  If the DREQ is once again
+	;	asserted, the transfer starts where it
+	;	left off.
+	;    Cascade Transfer: Allows cascading of
+	;	multiple chips (like on the AT). 
+	;	<Don't use this!>
+DMATransferMode			etype	byte, 0, 1
+DMATM_DEMAND_TRANSFER		enum	DMATransferMode
+DMATM_SINGLE_TRANSFER		enum	DMATransferMode
+DMATM_BLOCK_TRANSFER		enum	DMATransferMode
+DMATM_CASCADE_TRANSFER		enum	DMATransferMode
+
+DMATransferDirection		etype	byte, 0, 1
+DMATD_VERIFY			enum	DMATransferDirection
+DMATD_WRITE			enum	DMATransferDirection
+DMATD_READ			enum	DMATransferDirection
+
+ModeRegisterMask	record
+	MRM_mode	DMATransferMode:2
+	MRM_decrement	:1
+	MRM_autoInit	:1
+	MRM_rw		DMATransferDirection:2
+	:2
+ModeRegisterMask	end
+
+MaskRegisterMask	record
+	:5
+	MRM_disable	:1
+	MRM_channel	:2
+MaskRegisterMask	end
+
+;-----------------------------------------------------------------------------
+;		HARDWARE SPECIFICATIONS
+;-----------------------------------------------------------------------------
+
+CHANNEL_ZERO_OFFSET	equ	00h
+CHANNEL_ZERO_COUNT	equ	01h
+CHANNEL_ZERO_PAGE	equ	087h
+
+CHANNEL_ONE_OFFSET	equ	02h
+CHANNEL_ONE_COUNT	equ	03h
+CHANNEL_ONE_PAGE	equ	083h
+
+CHANNEL_TWO_OFFSET	equ	04h
+CHANNEL_TWO_COUNT	equ	05h
+CHANNEL_TWO_PAGE	equ	081h
+
+CHANNEL_THREE_OFFSET	equ	06h
+CHANNEL_THREE_COUNT	equ	07h
+CHANNEL_THREE_PAGE	equ	082h
+
+	;
+	;  DMA channels 4,5,6 and 7 are only available
+	;	on an AT
+CHANNEL_FOUR_OFFSET	equ	0c0h	; used to cascade PC chip.  Don't use.
+CHANNEL_FOUR_COUNT	equ	0c2h	; used to cascade PC chip.  Don't use.
+CHANNEL_FOUR_PAGE	equ	08fh	; used to cascade PC chip.  Don't use.
+
+CHANNEL_FIVE_OFFSET	equ	0c4h
+CHANNEL_FIVE_COUNT	equ	0c6h
+CHANNEL_FIVE_PAGE	equ	08bh
+
+CHANNEL_SIX_OFFSET	equ	0c8h
+CHANNEL_SIX_COUNT	equ	0cah
+CHANNEL_SIX_PAGE	equ	089h
+
+CHANNEL_SEVEN_OFFSET	equ	0cch
+CHANNEL_SEVEN_COUNT	equ	0ceh
+CHANNEL_SEVEN_PAGE	equ	08ah
+
+	;
+	; DMA Command Word Ports
+	;
+PC_CONTROLLER_COMMAND	equ	08h
+PC_SINGLE_REQUEST	equ	09h
+PC_SINGLE_REQUEST_MASK	equ	0ah
+PC_CHANNEL_MODE		equ	0bh
+PC_CLEAR_FLIP_FLOP	equ	0ch
+PC_MASTER_CLEAR		equ	0dh
+PC_CLEAR_MASK		equ	0eh
+PC_ALL_REQUEST_MASK	equ	0fh
+
+AT_CONTROLLER_COMMAND	equ	0d0h
+AT_SINGLE_REQUEST	equ	0d2h
+AT_SINGLE_REQUEST_MASK	equ	0d4h
+AT_CHANNEL_MODE		equ	0d6h
+AT_CLEAR_FLIP_FLOP	equ	0d8h
+AT_MASTER_CLEAR		equ	0dah
+AT_CLEAR_MASK		equ	0dch
+AT_ALL_REQUEST_MASK	equ	0deh
+
+EndDriver	DMA

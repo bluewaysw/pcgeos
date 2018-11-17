@@ -1,0 +1,770 @@
+/********************************************************
+ *                                                      *
+ *      "BSW CD"                                        *
+ *                                                      *
+ *      Autor:          Jens-M. Groá + Dirk Lausecker   *
+ *      erstellt am:    22.11.1996                      *
+ *                                                      *
+ *      History:                                        *
+ *      --------                                        *
+ *      22.11.96        V0.1    -Startversion           *
+ *      28.11.96        V0.3    -Sourcecodesplittung    *
+ *	Dez. 96		V0.4	-Preview Version	*
+ *      12/05/03		jfh - remove Ger ifdefs and make
+ *									fully localizable + some cleanup
+ *									(I couldn't resist)
+ *      12/08/03		redo the graphics to remove text
+ *      12/10/03		redo the help file
+ *
+ *
+ ********************************************************/
+
+@define __UI_UIMAIN_GOC
+
+@include <stdapp.goh>
+@include <Ui\define.goh>
+
+#include <gstring.h>
+
+@include <UI\uimain.goh>
+@include <UI\uimax.goh>         /* MaxGroup */
+@include <Main\process.goh>
+#include <Main\display.h>
+
+#include <bbxcd.h>              /* selbsterstellte Datenstrukt.*/
+
+@extern chunk MaxEjectHelp;
+@extern chunk MaxStopHelp;
+@extern chunk MaxRewHelp;
+@extern chunk MaxPlayHelp;
+@extern chunk MaxFwdHelp;
+
+
+/*
+ ***************************************************************************
+ *              UI Objects
+ ***************************************************************************
+ */
+
+@classdecl BCApplicationClass;
+
+@classdecl BCPrimaryClass;
+
+/*
+ *              Application Object
+ */
+
+@start  AppResource ;
+
+@object BCApplicationClass BApp = {
+	 GI_visMoniker = list {@BswCdTextMoniker, @CDPlayLCMoniker, @CDPlayTCMoniker}
+	 GI_comp = @BCPrimary/*, @InfoBox*/;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @BCPrimary;
+    ATTR_GEN_HELP_FILE = "CDPlayHelp";
+}
+
+@visMoniker BswCdTextMoniker = "CD Player";
+
+@end    AppResource;
+
+/*
+ *      APPLMONIKER
+ */
+
+@start APPLMONIKERRESOURCE, data;
+@include <Art/appmkr.goh>
+@end APPLMONIKERRESOURCE;
+
+/*
+ *      MODUSMONIKER
+ */
+
+@start MODUSMONIKERRESOURCE, data;
+@include <Art/modemkr.goh>
+@end MODUSMONIKERRESOURCE;
+
+/*
+ *      Primary-Turn-MONIKER
+ */
+
+@start PRTURNMONIKERRESOURCE, data;
+@include <Art/prtrnmkr.goh>  
+@end PRTURNMONIKERRESOURCE;
+
+/*
+ *	MIN-TRIGGER-MONIKER
+ */
+
+@start MINMONIKERRESOURCE, data;
+@include <Art/minmkr.goh>
+@end MINMONIKERRESOURCE;
+
+/*******************************************
+ *
+ *              Primary Object
+ *
+ *******************************************/
+
+@start  Interface;              /* this resource is for misc UI objects */
+
+@object BCPrimaryClass BCPrimary  = {
+    GI_visMoniker = "CD Player";
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+	 GI_comp = @ModusTrigger, @TestTrigger, @InfoBox;
+    ATTR_GEN_DISPLAY_NOT_MAXIMIZABLE;
+    HINT_PRIMARY_NO_FILE_MENU;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_NO_WIDER_THAN_CHILDREN_REQUIRE;
+    HINT_DISPLAY_NOT_RESIZABLE;
+    ATTR_GEN_HELP_CONTEXT = "TOC";
+}
+
+/******************************
+ *      TestTrigger
+ ******************************/
+
+@object GenTriggerClass TestTrigger = {
+    GI_visMoniker = "Delete Database (debug)";
+    GTI_actionMsg = MSG_BCD_TRIG_TEST;
+    GTI_destination = process;
+    GI_states = @default & ~GS_USABLE;
+}
+
+
+/****************
+ * ModusTrigger *	MIN / MAX
+ ****************/
+@object GenTriggerClass ModusTrigger = {
+	 GI_visMoniker = list{@MaxMoniker};
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GTI_actionMsg = MSG_BCD_SET_MODE_MAX;
+    GTI_destination = process;
+    GI_kbdAccelerator = ctrl 'm';
+	ATTR_GEN_FOCUS_HELP = @GoToMinHelp;
+	 HINT_SEEK_TITLE_BAR_LEFT;
+}
+@chunk char GoToMaxHelp[] = "Switch to the Standard Control Panel";
+@chunk char GoToMinHelp[] = "Switch to the Compact Control Panel";
+
+/*
+ ************************************************************************
+ *                      nur die n”tigsten Elemente werden angezeigt
+ * StandardGroup        (StandDisplayGroup:Track, Zeit ;
+ *                       TriggerGroup     : Eject, Stop, Rew, Play, Fwd)
+ ************************************************************************
+ */
+
+@object GenInteractionClass StandardGroup = {
+    GI_states = @default & ~GS_USABLE;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GII_type = GIT_ORGANIZATIONAL;
+    GII_visibility = GIV_SUB_GROUP;
+    GI_comp = @CDStatusGroup,@MinControlGroup;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+//    ATTR_GEN_HELP_CONTEXT = "MIN-Modus";
+}
+
+/*****************
+ * CDStatusGroup *
+ *****************/
+
+@object GenInteractionClass CDStatusGroup = {
+    GI_comp = @CDMinStatusGlyph,@CDMinTurnGlyph;
+    GII_type = GIT_ORGANIZATIONAL;
+    GII_visibility = GIV_SUB_GROUP;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_DRAW_IN_BOX;
+}
+
+/********************
+ * CDMinStatusGlyph *	Statusanzeige STOP,PLAY,PAUSE,DISC
+ ********************/
+
+@object GenGlyphClass CDMinStatusGlyph = {
+    GI_visMoniker = "OK";
+}
+
+/******************
+ * CDMinTurnGlyph *	animiertes Icon fr Statusanzeige
+ ******************/
+
+@object GenGlyphClass CDMinTurnGlyph = {
+    GI_visMoniker = list{@PrTurn1Moniker};
+}
+
+/*******************
+ * MinControlGroup *	Trackanzeige, Trigger
+ *******************/
+
+@object GenInteractionClass MinControlGroup = {
+    GI_comp = @TimeGroup,@TriggerGroup;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GII_type = GIT_ORGANIZATIONAL;
+    GII_visibility = GIV_SUB_GROUP;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_DRAW_IN_BOX;
+}
+
+/*************
+ * TimeGroup *		Trackanz. + Lautst„rke
+ *************/
+
+@object GenInteractionClass TimeGroup = {
+    GI_comp = @TimeTrigger,@VolumeValue;
+    GII_type = GIT_ORGANIZATIONAL;
+    GII_visibility = GIV_SUB_GROUP;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+}
+
+/***************
+ * TimeTrigger *
+ ***************/
+
+@object GenTriggerClass TimeTrigger = {
+	GI_visMoniker = "00 / 00:00";
+	GTI_actionMsg = MSG_CHANGE_DISPLAY_MODE;
+	GTI_destination = process;
+	HINT_NO_BORDERS_ON_MONIKERS;
+}
+
+/***************
+ * VolumeValue *
+ ***************/
+
+@object GenValueClass VolumeValue = {
+	GI_visMoniker = "Vol"; 	/* Beschriftung */
+	GVLI_value = MakeWWFixed(8.0);
+	GVLI_minimum = MakeWWFixed(0.0);
+	GVLI_maximum = MakeWWFixed(255.0);
+	GVLI_increment = MakeWWFixed(16.0);
+	GVLI_applyMsg = MSG_BCD_SET_VOLUME;
+	GVLI_destination = process;
+}
+
+/****************
+ * TriggerGroup *
+ ****************/
+
+@object GenInteractionClass TriggerGroup = {
+    GI_comp = @EjectTrigger,@StopTrigger,@RewTrigger,@PlayTrigger,@FwdTrigger;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GII_type = GIT_ORGANIZATIONAL;
+    GII_visibility = GIV_SUB_GROUP;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+}
+
+/*
+ * Triggers
+ */
+
+@object GenTriggerClass EjectTrigger = {
+	 GI_visMoniker = list {@MinEjectMoniker};
+    GI_kbdAccelerator = @specificUI F4;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GTI_actionMsg = MSG_BCD_TRIG_EJECT;
+    GTI_destination = process;
+	ATTR_GEN_FOCUS_HELP = @MaxEjectHelp;
+}
+
+@object GenTriggerClass StopTrigger = {
+	 GI_visMoniker = list {@MinStopMoniker};
+    GI_kbdAccelerator = @specificUI F5;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GTI_actionMsg = MSG_BCD_TRIG_STOP;
+    GTI_destination = process;
+//    ATTR_GEN_TRIGGER_CUSTOM_DOUBLE_PRESS = MSG_META_SAVE_OPTIONS;
+	ATTR_GEN_FOCUS_HELP = @MaxStopHelp;
+}
+
+@object GenTriggerClass RewTrigger = {
+	 GI_visMoniker = list {@MinRewMoniker};
+    GI_kbdAccelerator = @specificUI F6;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GTI_actionMsg = MSG_BCD_TRIG_REW;
+    GTI_destination = process;
+	ATTR_GEN_FOCUS_HELP = @MaxRewHelp;
+}
+
+@object GenTriggerClass PlayTrigger = {
+	 GI_visMoniker = list {@MinPlayMoniker};
+    GI_kbdAccelerator = @specificUI F7;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GTI_actionMsg = MSG_BCD_TRIG_PLAY;
+    GTI_destination = process;
+	ATTR_GEN_FOCUS_HELP = @MaxPlayHelp;
+}
+
+@object GenTriggerClass FwdTrigger = {
+	 GI_visMoniker = list {@MinFwdMoniker};
+    GI_kbdAccelerator = @specificUI F8;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GTI_actionMsg = MSG_BCD_TRIG_FWD;
+    GTI_destination = process;
+	ATTR_GEN_FOCUS_HELP = @MaxFwdHelp;
+}
+
+/***********
+ * InfoBox *
+ ***********/
+
+@object GenInteractionClass InfoBox = {
+    GI_visMoniker = 'I',"Info";
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH;
+	 GI_kbdAccelerator = alt shift 'i';
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_NOTIFICATION;
+    GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+    GI_comp = @InfoGrafik,@InfoText1,@InfoText2,@InfoText4;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+//    ATTR_GEN_HELP_CONTEXT = "SpecialThanks";
+}
+
+@object GenGlyphClass InfoGrafik = {
+    GI_visMoniker = list{@PrTurn1Moniker};
+}
+
+@object GenGlyphClass InfoText1 = {
+    GI_visMoniker = "CD Player";
+}
+
+@object GenGlyphClass InfoText2 = {
+	GI_visMoniker = "CD Player for Geos";
+}
+
+@object GenGlyphClass InfoText4 = {
+	GI_visMoniker = "Written by J.-M. Gross & D. Lausecker";
+}
+
+@end Interface;
+
+
+/************************************************
+
+	MSG_BC_PRIM_SET_POS_MIN
+
+	Funktion:	MIN-Position einnehmen
+
+	IN:     -
+
+	OUT:    -
+
+	Aufruf durch :  -
+
+ ************************************************/
+
+@method BCPrimaryClass, MSG_BC_PRIM_SET_POS_MIN
+{
+	XYValueAsDWord	XY;
+
+	if (save) {
+	  // save MAX position
+	  XY=@call oself::MSG_VIS_GET_POSITION();
+	  pself->maxXY.P_x = DWORD_X(XY);
+	  pself->maxXY.P_y = DWORD_Y(XY);
+	};
+	// move window to saved MIN position
+	@call oself::MSG_VIS_SET_POSITION(pself->minXY.P_x,pself->minXY.P_y);
+        if (! @call oself::MSG_GEN_DISPLAY_GET_MINIMIZED())
+          @call oself::MSG_GEN_SET_WIN_POSITION(WPT_AT_RATIO,pself->minXY.P_x+1,pself->minXY.P_y+1);
+	@call oself::MSG_GEN_RESET_TO_INITIAL_SIZE(VUM_MANUAL);	// shrink to minimum size
+        if (! @call oself::MSG_GEN_DISPLAY_GET_MINIMIZED())
+  	  @call oself::MSG_VIS_MOVE_RESIZE_WIN();
+}
+
+/************************************************
+
+	MSG_BC_PRIM_SET_POS_MAX
+
+	Funktion:	MAX-Pos.
+
+	IN:     flag	save (aktl. Pos. speichern)
+
+	OUT:    -
+
+	Aufruf durch :  -
+
+ ************************************************/
+
+@method BCPrimaryClass, MSG_BC_PRIM_SET_POS_MAX
+{
+	XYValueAsDWord	XY;
+
+	if (save) {
+	// save MIN position
+	  XY = @call oself::MSG_VIS_GET_POSITION();
+	  pself->minXY.P_x = DWORD_X(XY);
+	  pself->minXY.P_y = DWORD_Y(XY);
+	}
+	// move to saved MAX position
+	@call oself::MSG_VIS_SET_POSITION(pself->maxXY.P_x,pself->maxXY.P_y);
+        if (! @call oself::MSG_GEN_DISPLAY_GET_MINIMIZED()) {
+          @call oself::MSG_GEN_SET_WIN_POSITION(WPT_AT_RATIO,pself->maxXY.P_x+1,pself->maxXY.P_y+1);
+ 	  @call oself::MSG_VIS_MOVE_RESIZE_WIN();
+        }
+
+}
+
+/************************************************
+
+	MSG_BC_PRIM_GET_MIN
+
+	Funktion:	min. Pos. zurck
+
+	IN:     -
+
+	OUT:    -
+
+	Aufruf durch :  -
+
+ ************************************************/
+
+@method BCPrimaryClass, MSG_BC_PRIM_GET_MIN
+{
+	XYValueAsDWord	XY;
+
+	if(primaryModus==PRIM_MIN)
+	{
+	    XY = @call oself::MSG_VIS_GET_POSITION();
+	    pself->minXY.P_x = DWORD_X(XY);
+	    pself->minXY.P_y = DWORD_Y(XY);
+	};
+
+	return(pself->minXY);
+}
+
+/************************************************
+
+	MSG_BC_PRIM_GET_MAX
+
+	Funktion:	max. Pos. zurck
+
+	IN:     -
+
+	OUT:    -
+
+	Aufruf durch :  -
+
+ ************************************************/
+
+@method BCPrimaryClass, MSG_BC_PRIM_GET_MAX
+{
+	XYValueAsDWord	XY;
+
+	if(primaryModus==PRIM_MAX)
+	{
+	    XY = @call oself::MSG_VIS_GET_POSITION();
+	    pself->maxXY.P_x = DWORD_X(XY);
+	    pself->maxXY.P_y = DWORD_Y(XY);
+	};
+
+	return(pself->maxXY);
+}
+
+/************************************************
+
+	MSG_BC_PRIM_SET_MIN
+
+	Funktion:	min. Pos. setzen
+
+	IN:     Point	xy
+
+	OUT:    -
+
+	Aufruf durch :  -
+
+ ************************************************/
+
+@method BCPrimaryClass, MSG_BC_PRIM_SET_MIN
+{
+
+	pself->minXY.P_x = xy.P_x;
+	pself->minXY.P_y = xy.P_y;
+}
+
+
+/************************************************
+
+	MSG_BC_PRIM_SET_MAX
+
+	Funktion:	max. Pos. setzen
+
+	IN:     Point	xy
+
+	OUT:    -
+
+	Aufruf durch :  -
+
+ ************************************************/
+
+@method BCPrimaryClass, MSG_BC_PRIM_SET_MAX
+{
+
+	pself->maxXY.P_x = xy.P_x;
+	pself->maxXY.P_y = xy.P_y;
+}
+
+/*************************************************
+
+	MSG_GEN_DISPLAY_SET_MINIMIZED
+
+	Funktion: TextMoniker austauschen, bevor
+        minimized-Position erreicht wird.
+
+	IN:
+
+	OUT:
+
+	Aufruf durch :  Geos
+
+
+ *************************************************/
+
+
+@method BCPrimaryClass , MSG_GEN_DISPLAY_SET_MINIMIZED
+{
+    @callsuper();
+	 @call InfoBox::MSG_GEN_SET_NOT_USABLE(VUM_NOW); // disable info box
+    //
+    // wenn ShowTrackTime sofort ausgefhrt wird, wird beim Deminimieren
+    // das MAX-Fenster oder offene Menpunkte an die falsche Pos. gesetzt !
+    // Deshalb wird eine Verz”gerung per Variable trackTimeCount benutzt
+    // die durch TimerEvent ausgewertet wird.
+    //  0 = inaktiv
+    //  1 = ShowTrackTime
+    // >1 = dekrementieren
+    trackTimeCount = 5;
+}
+
+/*************************************************
+
+	MSG_GEN_DISPLAY_SET_NOT_MINIMIZED
+
+	Funktion: TextMoniker austauschen, bevor
+        Primary wieder aufgebaut wird.
+
+	IN:
+
+	OUT:
+
+	Aufruf durch :  Geos
+
+
+ *************************************************/
+
+@method BCPrimaryClass , MSG_GEN_DISPLAY_SET_NOT_MINIMIZED
+{
+	 @call oself::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@BswCdTextMoniker,VUM_NOW);
+	 @callsuper();
+	 @send InfoBox::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);  // enable info box
+    trackTimeCount = 5;
+}
+
+/***************************************
+
+	MSG_BC_PRIM_SET_DRIVES_MAX
+
+ checkt Anzahl Laufwerke und stellt
+ Drive-Untermenu darauf ein.
+
+ IN:	-
+ OUT:	driveMax
+
+ ***************************************/
+@method BCPrimaryClass , MSG_BC_PRIM_SET_DRIVES_MAX
+{
+  byte	i;
+  optr	object;
+
+  for(i=0 ; i<MAX_DRIVES ; i++) {
+    // Objectpointer ermitteln
+    switch (i){
+      case 0: object = @DIGDrive1 ; break;
+      case 1: object = @DIGDrive2 ; break;
+      case 2: object = @DIGDrive3 ; break;
+      case 3: object = @DIGDrive4 ; break;
+      case 4: object = @DIGDrive5 ; break;
+      case 5: object = @DIGDrive6 ; break;
+      case 6: object = @DIGDrive7 ; break;
+      case 7: object = @DIGDrive8 ; break;
+    }
+    if( i < driveMax)
+      @send object::MSG_GEN_SET_USABLE(VUM_NOW);
+    else
+      @send object::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+  }
+}
+
+/***************************************
+
+	MSG_BC_PRIM_SET_FIRST_AID
+
+ „ndert Textinhalt von MaxFirstAidGlyph
+
+ IN:	word	number (Stringnummer)
+
+ ***************************************/
+
+@method BCPrimaryClass , MSG_BC_PRIM_SET_FIRST_AID
+{
+  switch(number) {
+    case 0 : @call MaxFirstAidGlyph::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@FAMoniker0,VUM_NOW);break;
+    case 1 : @call MaxFirstAidGlyph::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@FAMoniker1,VUM_NOW);break;
+    case 2 : @call MaxFirstAidGlyph::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@FAMoniker2,VUM_NOW);break;
+    case 3 : @call MaxFirstAidGlyph::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@FAMoniker3,VUM_NOW);break;
+    case 4 : @call MaxFirstAidGlyph::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@FAMoniker4,VUM_NOW);break;
+    case 5 : @call MaxFirstAidGlyph::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@FAMoniker5,VUM_NOW);break;
+    case 6 : @call MaxFirstAidGlyph::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@FAMoniker6,VUM_NOW);break;
+    case 7 : @call MaxFirstAidGlyph::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@FAMoniker7,VUM_NOW);break;
+  };
+}
+
+/*************************************************
+
+	MSG_BCAPP_TIMER_EVENT
+
+        Function: send MSG_BC_TIMER_EVENT to the
+        process thread or mark application busy if
+        last event has not been handled (and the
+        process thread is blocked)
+        Ensures that the 'hourglass' appears if the
+        application is stuck in the process thread
+        while waiting for return from a DOS driver
+        call. (BApp has its own thread that is
+        still running)
+
+	IN:
+
+	OUT:
+
+	Source :  TIMER_EVENT_CONTINUAL
+                  (every 1/8 second)
+
+
+ *************************************************/
+
+@method BCApplicationClass , MSG_BCAPP_TIMER_EVENT
+{
+   static flag isBusyMarked;
+   if (busyFlag&&!isBusyMarked) {
+     @call BApp::MSG_GEN_APPLICATION_MARK_BUSY();
+     isBusyMarked = TRUE;
+   }
+   if (!busyFlag && isBusyMarked) {
+     @call BApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+     isBusyMarked = 0;
+   }
+   if (!busyFlag&&!isBusyMarked) {
+     busyFlag =TRUE;
+   }
+   @send, forceQueue, checkDuplicate process::MSG_BC_TIMER_EVENT();
+};
+
+
+/*************************************************
+
+	MSG_BCAPP_REPLACE_VIS_TEXT_MONIKER
+
+        Function: overwrite actual text visMoniker
+                  in minimized mode text window or
+                  resize/center and replace moniker
+                  if it does not fit into current
+                  window.
+
+	IN:       const char * text (text to be written)
+
+	OUT:      -
+
+	Source :  ShowTrackTime()
+                  (about every second)
+
+  Application must ensure that no other child has been
+  added to the application Object after minimizing.
+  (such as an information window that has opened while
+  the application is still minimized)
+
+ *************************************************/
+
+
+@method BCApplicationClass , MSG_BCAPP_REPLACE_VIS_TEXT_MONIKER
+{
+  WindowHandle win;
+  byte         active;
+  optr         iconptr,textptr;
+  GStateHandle gstate;
+  Rectangle    screenSize;
+  SizeAsDWord  textFieldSize,textFieldPosition,iconSize,iconPosition;
+  word         centerPosition, textWidth;
+  if ( @call BCPrimary::MSG_GEN_DISPLAY_GET_MINIMIZED() ) {
+    // get left and right screen border
+    @call @visParent::MSG_VIS_GET_BOUNDS(&screenSize);
+    // test if application is currently active
+    active=FALSE;
+    @call @visParent::MSG_META_GET_FOCUS_EXCL(&textptr);
+    if (textptr==oself)
+      active = TRUE;
+    // get minimized icon object (for centering if needed)
+    iconptr = @call oself::MSG_VIS_FIND_CHILD_AT_POSITION(0);
+    // calculate horizontal center position of application icon
+    if (iconptr) { // ensure that icon still exists
+      iconSize= @call iconptr::MSG_VIS_GET_SIZE();
+      centerPosition = DWORD_WIDTH(iconSize)/2;
+      iconPosition= @call iconptr::MSG_VIS_GET_POSITION();
+      centerPosition += DWORD_X(iconPosition);
+    }
+    // get minimized text object
+    textptr = @call oself::MSG_VIS_FIND_CHILD_AT_POSITION(1);
+    // ensure that text window object still exists
+    if (textptr) {
+      win = @call textptr::MSG_VIS_QUERY_WINDOW();
+      gstate = GrCreateState(win);
+      textFieldSize = @call textptr::MSG_VIS_GET_SIZE();
+      textFieldPosition= @call textptr::MSG_VIS_GET_POSITION();
+      textWidth= GrTextWidth(gstate,text,0) ;
+      if ( ((DWORD_WIDTH(textFieldSize)- 4) < textWidth )
+         ||((DWORD_WIDTH(textFieldSize)-10) > textWidth ) ) {
+        // resize window by replacing VisMoniker if too small or much
+        // too large; calculate, limit and cange left textfield bounds
+        if ((int)(centerPosition-(textWidth/2+4))<screenSize.R_left)
+          centerPosition = 1;
+        else if ((centerPosition+(textWidth/2+4))>screenSize.R_right)
+            centerPosition = screenSize.R_right-4-textWidth;
+        else
+            centerPosition = centerPosition - 4 - textWidth/2;
+        @call textptr::MSG_VIS_SET_POSITION(centerPosition,DWORD_Y(textFieldPosition));
+        @call BCPrimary::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(text,VUM_NOW);
+      } else {
+        // just draw into the window
+        if (active) {
+          GrSetAreaColor(gstate,CF_INDEX,C_BLACK,0,0);
+          GrSetTextColor(gstate,CF_INDEX,C_WHITE,0,0);
+        } else {
+          GrSetAreaColor(gstate,CF_INDEX,C_WHITE,0,0);
+          GrSetTextColor(gstate,CF_INDEX,C_BLACK,0,0);
+        }
+        GrFillRect (gstate, 3, 3, DWORD_WIDTH(textFieldSize)-3, DWORD_HEIGHT(textFieldSize)-3);
+        GrDrawText(gstate,2,2,text,0);
+      }
+      GrDestroyState(gstate);
+    }
+  }
+}
+

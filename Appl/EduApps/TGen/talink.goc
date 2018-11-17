@@ -1,0 +1,872 @@
+/***************************************************************************
+ *  FILE:           talink.goc
+ *  PROJECT:        Breadbox Test Generator
+ *  DESCRIPTION:    This file has methods for putting grades into TA
+ *
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *      Include files
+ ***************************************************************************
+ */
+
+@include "tgen.goh"
+@include "externs.goh"
+
+@classdecl	TGenDocumentGroupClass;
+
+/*
+ ***************************************************************************
+ *      Code for putting grades into TAide
+ ***************************************************************************
+ */
+
+/* file scope globals */
+word	g_gradePd, g_stu, g_elem;
+VMBlockHandle  g_stuDBHan, g_stuNameIndex;
+
+/***********************************************************************
+ *
+ * FUNCTION:	CalcTypeAvg
+ *
+ * CALLED BY:	MSG_TGEN_DOCUMENT_SAVE_GRADE_TO_TA
+ *
+ *
+ * STRATEGY:	pulled right from TAide
+ *
+ *
+ ***********************************************************************/
+WWFixedAsDWord CalcTypeAvg (word numElements,
+			   FileHandle fileHandle,
+			   word curGradePd,
+			   char* gTypeString,
+			   ChunkHandle gradeElemChunkArray,
+			   byte* grades)
+{
+ VMBlockHandle		vmbh;
+ MemHandle		mh;
+ word			count, i, numPropWeights;
+ byte			matches[MAX_ELEMENTS];
+ WWFixedAsDWord	weights[MAX_ELEMENTS];
+ WWFixedAsDWord	avg, totalWeight;
+ GradeElementStruct*    element;
+
+
+	vmbh = VMFind(fileHandle, NullHandle, GRADE_ELEM_1 + curGradePd);
+	VMLock(fileHandle, vmbh, &mh);
+	/* grab all the grades of this type
+		for the selected student */
+	/* now cycle thru the elements to find a match */
+    count = 0;
+    numPropWeights = 0;
+    for (i = 0; i < numElements; i++) {
+      /* get the info */
+      element = ChunkArrayElementToPtrHandles(
+                    mh,
+				gradeElemChunkArray,
+                    i,
+                    0);
+      if (!strcmp(gTypeString, element->GES_type)) {
+        /* found a match - add it if there is a valid grade AND
+         * if the element has a weight. */
+        if ((grades[i] != NO_GRADE) && (element->GES_weight)) {
+           /* put it into temp store */
+           matches[count] = grades[i];
+			  if (element->GES_weight == EQUAL_WEIGHT) numPropWeights++;
+           weights[count] = MakeWWFixed(element->GES_weight);
+           count++;
+           }
+        }
+      } /* end of cycle thru for */
+    VMUnlock(mh);
+    /* now that we have all the selected type's grades and
+    * weights in the two arrays we just do the math
+    */
+    if (count) {
+      /* a weighted average */
+      /* total the weights */
+      totalWeight = MakeWWFixed(0);
+      for (i = 0; i < count; i++)  {
+        if (IntegerOf(weights[i]) != EQUAL_WEIGHT)
+           totalWeight += weights[i];
+        }
+      /* if total != 100 then normalize to 100 */
+      if ((totalWeight != 100) || (numPropWeights)){
+        for (i = 0; i < count; i++)  {
+           /* if no weights are proportional */
+           if (!numPropWeights)
+		   weights[i] = GrUDivWWFixed(
+		          GrMulWWFixed(weights[i], MakeWWFixed(100)), totalWeight);
+           /* if all weights are proportional */
+           else if (numPropWeights == count) {
+             weights[i] = GrUDivWWFixed(MakeWWFixed(100), MakeWWFixed(count));
+             }
+           /* if some weights are proportional */
+           else {
+             if (IntegerOf(weights[i]) == EQUAL_WEIGHT)
+                weights[i] = GrUDivWWFixed((MakeWWFixed(100) - totalWeight),
+                                     MakeWWFixed(numPropWeights));
+             /* else the weight is OK */
+             }
+           }
+        } /* end of normalize if */
+      /* and get the weighted avg */
+      avg = MakeWWFixed(0);
+      for (i = 0; i < count; i++)  {
+	   avg += GrUDivWWFixed(
+		 GrMulWWFixed(MakeWWFixed(matches[i]), weights[i]), MakeWWFixed(100));
+        }
+
+      } /* end of do the math if */
+    else avg = NO_SUMMARY; /* nothing to calculate */
+
+    return(avg);
+
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	CalcGPFinal
+ *
+ * CALLED BY:  MSG_TGEN_DOCUMENT_SAVE_GRADE_TO_TA
+ *
+ *
+ * STRATEGY:	pulled right from TAide
+ *
+ *
+ ***********************************************************************/
+WWFixedAsDWord CalcGPFinal (word numTypes,
+			   FileHandle fileHandle,
+			   word curGradePd,
+			   ChunkHandle gradeTypesChunkArray,
+			   dword* gradeSum)
+{
+ VMBlockHandle		vmbh;
+ MemHandle		mh;
+ word			count, i;
+ WWFixedAsDWord 	sums[MAX_GRADE_TYPES];
+ WWFixedAsDWord	weights[MAX_GRADE_TYPES];
+ WWFixedAsDWord	avg, totalWeight;
+ GradeTypeStruct*   type;
+
+
+    /* recalculate the final for that grade period */
+    count = 0;
+    vmbh = VMFind(fileHandle, NullHandle, GRADE_TYPES);
+    VMLock(fileHandle, vmbh, &mh);
+    /* get the type grades */
+    for (i = 0; i < numTypes; i++) {
+	 if (gradeSum[i] != NO_SUMMARY) {
+	   sums[count] = gradeSum[i];
+	   /* and its corresponding weight */
+	   type = ChunkArrayElementToPtrHandles(
+			 mh,
+			 gradeTypesChunkArray,
+			 i,
+			 0);
+	   weights[count] = MakeWWFixed(type->GTS_weight[curGradePd]);
+	   count++;
+	   }
+	 }
+    VMUnlock(mh);
+
+    /* calculate the final */
+	   /* a weighted average */
+    /* total the weights */
+    totalWeight = MakeWWFixed(0);
+    for (i = 0; i < count; i++)  {
+	 totalWeight += weights[i];
+	 }
+    if (totalWeight != 0) {
+      /* if total != 100 then normalize to 100 */
+      if (totalWeight != MakeWWFixed(100)) {
+        for (i = 0; i < count; i++)  {
+		 weights[i] = GrUDivWWFixed(
+		         GrMulWWFixed(weights[i], MakeWWFixed(100)), totalWeight);
+           }
+        } /* end of normalize if */
+      /* and get the weighted avg */
+	 avg = MakeWWFixed(0);
+	 for (i = 0; i < count; i++)  {
+	   avg += GrUDivWWFixed(
+				GrMulWWFixed(sums[i], weights[i]), MakeWWFixed(100));
+	   }
+      } /* end of != 0 if */
+    else avg = MakeWWFixed(0);
+
+    return (avg);
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	StudentsCallBack
+ *
+ * CALLED BY:	MSG_TGEN_DOCUMENT_SAVE_GRADE_TO_TA
+ *
+ *
+ * STRATEGY:	pulled right from TAide
+ *
+ *
+ ***********************************************************************/
+sword _pascal StudentsCallback (MemHandle m1,
+						  MemHandle m2,
+						  word valueForCallback )
+{
+void			*e1, *e2;
+BasicDBFieldID	fieldID;
+word			size1, size2;
+char *		string1;
+char *		string2;
+char			longNameString1[NAME_SIZE * 3];
+char			longNameString2[NAME_SIZE * 3];
+dword		num1, num2;
+
+
+    e1 = MemDeref(m1);
+    e2 = MemDeref(m2);
+
+    /* which sort are we doing? */
+    if (valueForCallback == VFC_NAME) {
+	  /* get the first rec name info */
+	  fieldID = BasicDBGetFieldIDPtr( e1, BDBFHE_CATEGORY, STU_L_NAME, 1 );
+	  size1 = BasicDBGetPtrToFieldData( e1, fieldID, &string1 );
+	  string1[size1] = 0;
+	  strcpy(longNameString1, string1);
+	  fieldID = BasicDBGetFieldIDPtr( e1, BDBFHE_CATEGORY, STU_F_NAME, 1 );
+	  size1 = BasicDBGetPtrToFieldData( e1, fieldID, &string1 );
+	  string1[size1] = 0;
+	  strcat(longNameString1, string1);
+	  fieldID = BasicDBGetFieldIDPtr( e1, BDBFHE_CATEGORY, STU_M_NAME, 1 );
+	  size1 = BasicDBGetPtrToFieldData( e1, fieldID, &string1 );
+	  string1[size1] = 0;
+	  strcat(longNameString1, string1);
+
+	  /* and the second rec name info */
+	  fieldID = BasicDBGetFieldIDPtr( e2, BDBFHE_CATEGORY, STU_L_NAME, 1 );
+	  size1 = BasicDBGetPtrToFieldData( e2, fieldID, &string1 );
+	  string1[size1] = 0;
+	  strcpy(longNameString2, string1);
+	  fieldID = BasicDBGetFieldIDPtr( e2, BDBFHE_CATEGORY, STU_F_NAME, 1 );
+	  size1 = BasicDBGetPtrToFieldData( e2, fieldID, &string1 );
+	  string1[size1] = 0;
+	  strcat(longNameString2, string1);
+	  fieldID = BasicDBGetFieldIDPtr( e2, BDBFHE_CATEGORY, STU_M_NAME, 1 );
+	  size1 = BasicDBGetPtrToFieldData( e2, fieldID, &string1 );
+	  string1[size1] = 0;
+	  strcat(longNameString2, string1);
+
+	  size1 = strlen(longNameString1);
+	  size2 = strlen(longNameString2);
+
+	  return LocalCmpStringsNoSpaceCase(longNameString1, longNameString2,
+				( size1 < size2) ? size1 : size2 );
+	  } /* end of name sort if */
+    else {  /* it's a number sort */
+	  /* get the first rec number info */
+	  fieldID = BasicDBGetFieldIDPtr( e1, BDBFHE_CATEGORY, STU_NUMBER, 1 );
+	  size1 = BasicDBGetPtrToFieldData( e1, fieldID, &string1);
+	  string1[size1] = 0;
+	  UtilAsciiToHex32(string1, &num1);
+
+	  fieldID = BasicDBGetFieldIDPtr( e2, BDBFHE_CATEGORY, STU_NUMBER, 1 );
+	  size2 = BasicDBGetPtrToFieldData( e2, fieldID, &string2);
+	  string2[size2] = 0;
+	  UtilAsciiToHex32(string2, &num2);
+
+	  if (num1 > num2) return (1);
+	  else if (num1 < num2) return (-1);
+	  else return (0);
+
+	  }
+	  
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_TGEN_DOCUMENT_OPEN_TAFILE_SEL for TGenDocumentClass
+ *
+ *
+ * DESCRIPTION:	Opens grade test file selection dialog box
+ *
+ *
+ ***********************************************************************/
+@extern method TGenDocumentClass, MSG_TGEN_DOCUMENT_OPEN_TAFILE_SEL
+{
+
+
+	@send TAFileSel::MSG_GEN_PATH_SET(".", SP_DOCUMENT);
+
+	/* Open the dialog box */
+	@call SelTAFileDBox::MSG_GEN_INTERACTION_INITIATE();
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	(GEN_FILE_SELECTOR_NOTIFICATION_MSG)
+ *                              MSG_TGEN_DOCUMENT_TAFILE_SELECTOR_ACTION
+ *                 for TGenDocumentClass
+ *             (word entryNum, word entryFlags)
+ * DESCRIPTION:	 
+ *
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method TGenDocumentClass, MSG_TGEN_DOCUMENT_TAFILE_SELECTOR_ACTION
+{
+
+	/* was it a double click? */
+	if (GFS_GET_ENTRY_FLAGS(entryFlags) & GFSEF_OPEN) {
+		if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE)
+			@send, forceQueue oself::MSG_TGEN_DOCUMENT_OPEN_TAFILE();
+		}
+
+	else  {  /* if not dbl click see if we're on a file */
+		if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE)
+			@send SelTAFile::MSG_GEN_SET_ENABLED(VUM_NOW);
+		else
+			@send SelTAFile::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_TGEN_DOCUMENT_OPEN_TAFILE for TGenDocumentClass
+ *
+ *
+ * DESCRIPTION:	Opens TA file to select student & grade element dialog box
+ *
+ *
+ ***********************************************************************/
+@extern method TGenDocumentClass, MSG_TGEN_DOCUMENT_OPEN_TAFILE
+{
+ char		taName[FILE_LONGNAME_BUFFER_SIZE];
+ char		taPath[PATH_BUFFER_SIZE], scoreStr[10];
+ dword		selFlags, numStu;
+ DiskHandle		taDiskhandle;
+ TAVMMapStruct        *TAMapPtr;
+ MemHandle      mh;
+ VMBlockHandle      vmbh;
+ word				numElem, numPds, i;
+ ChunkHandle     gradeElemChunkArray;
+ optr			grPds[6] =	{@TAGP1, @TAGP2, @TAGP3, @TAGP4, @TAGP5, @TAGP6};
+
+
+	/* open the selected test */
+	selFlags = @call TAFileSel::MSG_GEN_FILE_SELECTOR_GET_SELECTION(taName);
+	/* check to see if it's a file - redundant if dbl clicked */
+	if (GFS_GET_ENTRY_TYPE(selFlags) != GFSET_FILE)  {
+		return;
+		}
+	/* get the file's path and disk handle */
+	@call TAFileSel::MSG_GEN_PATH_GET(taPath, PATH_BUFFER_SIZE);
+	taDiskhandle = @call TAFileSel::MSG_GEN_PATH_GET_DISK_HANDLE();
+	/* save our TGen file directory */
+	FilePushDir();
+	/* and set the test file dir  - FileSel doesn't do this */
+	FileSetCurrentPath(taDiskhandle, taPath);
+
+	g_taFileHandle = VMOpen(taName, 0, VMO_OPEN, 0);
+	if (!g_taFileHandle) { 
+		if (ThreadGetError() == VM_SHARING_DENIED) {
+			/* the TA file is write protected */
+			NotifyDBox(0, @TAWPOpenErrMsg);
+			}
+		else  NotifyDBox(0, @TAOpenErrMsg);
+		FilePopDir();
+		return;
+		}
+
+	g_gradePd = 0;
+	/* get our VMmap block */
+	vmbh = VMGetMapBlock(g_taFileHandle);
+	TAMapPtr = VMLock(g_taFileHandle, vmbh, &mh);
+	/* ok - we can grab the info */
+	numStu = TAMapPtr->TAVMMS_numStudents;
+	numPds = TAMapPtr->TAVMMS_numGradePds;
+	gradeElemChunkArray = TAMapPtr->TAVMMS_gradeElemChunkArray[g_gradePd];
+	g_stuDBHan = TAMapPtr->TAVMMS_StuDBHan;
+	g_stuNameIndex = TAMapPtr->TAVMMS_stuNameIndex;
+	VMUnlock(mh);
+
+	/* show the correct grade periods */
+	for (i = 0; i < numPds; i++) {
+		@send grPds[i]::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+	for (i = numPds; i < MAX_GRADE_PDS; i++) {
+		@send grPds[i]::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+
+	/* init the names list */
+	@send TANameDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numStu);
+
+	/* get the grade element array & init the dlist */
+	vmbh = VMFind(g_taFileHandle, NullHandle, GRADE_ELEM_1);
+	VMLock(g_taFileHandle, vmbh ,&mh);
+	numElem = ChunkArrayGetCountHandles(
+		  mh, gradeElemChunkArray);
+	VMUnlock(mh);
+	@send TAGradeElementDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numElem);
+
+	/* more initialization */
+	g_stu = GIGS_NONE;
+	g_elem = GIGS_NONE;
+	@send TASave::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	@call GIScore::MSG_VIS_TEXT_GET_ALL_PTR(scoreStr);
+	@call TATestGrade::MSG_VIS_TEXT_REPLACE_ALL_PTR(scoreStr, 0);
+	MemLock(OptrToHandle(@NoneText));
+	@call TAFileGrade::MSG_VIS_TEXT_REPLACE_ALL_PTR(LMemDeref(@NoneText), 0);
+	MemUnlock(OptrToHandle(@NoneText));
+	@send TAGradePdGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(1, FALSE);
+
+	/* Open the dialog box */
+	@call TAFileDBox::MSG_GEN_INTERACTION_INITIATE();
+
+   /* close the filesel dbox */
+	@send SelTAFileDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: (GEN_ITEM_GROUP_APPLY_MSG) MSG_TGEN_DOCUMENT_TAGP_APPLY
+ *								for TGenDocumentClass
+ *
+ * PARAMETERS:  void (word selection, numSelections, flags)
+ *
+ * DESCRIPTION: sets the grade period
+ *
+ ***********************************************************************/
+@extern method TGenDocumentClass, MSG_TGEN_DOCUMENT_TAGP_APPLY
+{
+ TAVMMapStruct        *TAMapPtr;
+ MemHandle      mh;
+ VMBlockHandle      vmbh;
+ word				numElem;
+ ChunkHandle     gradeElemChunkArray;
+
+
+	g_gradePd = selection - 1;
+
+	/* get our VMmap block */
+	vmbh = VMGetMapBlock(g_taFileHandle);
+	TAMapPtr = VMLock(g_taFileHandle, vmbh, &mh);
+	/* ok - we can grab the info */
+	gradeElemChunkArray = TAMapPtr->TAVMMS_gradeElemChunkArray[g_gradePd];
+	VMUnlock(mh);
+
+	/* get the grade element array & init the dlist */
+	vmbh = VMFind(g_taFileHandle, NullHandle, GRADE_ELEM_1 + g_gradePd);
+	VMLock(g_taFileHandle, vmbh ,&mh);
+	numElem = ChunkArrayGetCountHandles(
+		  mh, gradeElemChunkArray);
+	VMUnlock(mh);
+	@send TAGradeElementDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numElem);
+
+	MemLock(OptrToHandle(@NoneText));
+	@call TAFileGrade::MSG_VIS_TEXT_REPLACE_ALL_PTR(LMemDeref(@NoneText), 0);
+	MemUnlock(OptrToHandle(@NoneText));
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_TGEN_DOCUMENT_TAGRELEM_DLIST_MONIKER_QUERY for TGenDocumentClass
+ *
+ * DESCRIPTION:	Queries for monikers for grade element list.
+ *
+ * PARAMETERS:  void (optr list, word item)
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method TGenDocumentClass, MSG_TGEN_DOCUMENT_TAGRELEM_DLIST_MONIKER_QUERY
+{
+ ChunkHandle     gradeElemChunkArray;
+ TAVMMapStruct        *TAMapPtr;
+ MemHandle      mh, mem;
+ VMBlockHandle      vmbh;
+ GradeElementStruct*    element;
+ ChunkHandle		chunk;
+ GStateHandle		gstate;
+ word			width, numChars, eWidth;
+ char			string[GRADE_DESCRIPT], dStr[DATE_SIZE], tStr[NAME_SIZE];
+
+
+	/* get our VMmap block */
+	vmbh = VMGetMapBlock(g_taFileHandle);
+	TAMapPtr = VMLock(g_taFileHandle, vmbh, &mh);
+	/* ok - we can grab the info */
+	gradeElemChunkArray = TAMapPtr->TAVMMS_gradeElemChunkArray[g_gradePd];
+	VMUnlock(mh);
+
+	/* set the ellipsis width depending on font size */
+	if (g_sysPointSize == 10) eWidth = 8;
+	else if (g_sysPointSize == 12) eWidth = 10;
+	else  eWidth = 12;
+
+	/* get the list */
+	vmbh = VMFind(g_taFileHandle, NullHandle, GRADE_ELEM_1 + g_gradePd);
+	/* get the requested item */
+	VMLock(g_taFileHandle, vmbh ,&mh);
+	element = ChunkArrayElementToPtrHandles(
+			mh, gradeElemChunkArray, item, 0);
+	strcpy(tStr, element->GES_type);
+	strcpy(string, element->GES_description);
+	strcpy(dStr, element->GES_date);
+	VMUnlock(mh);
+
+	mem = MemAllocLMem(LMEM_TYPE_GSTRING, 0);
+	gstate = GrCreateGString(mem, GST_CHUNK, &chunk);
+	/* it looks like I need to set the font & pointsize to make GrTextWidth
+	 * work properly */
+	GrSetFont(gstate, g_fontID, MakeWWFixed(g_sysPointSize));
+	/* type */
+	GrDrawText(gstate, 2, 0, tStr, 0);
+	/* description */
+	width = GrTextWidth(gstate, string, strlen(string));
+	if(width > (150 - eWidth))  {
+		/* truncate text and add ellipsis */
+		while (width > (150 - eWidth)) {
+			numChars = strlen(string);
+			string[numChars - 1] = 0;
+			width = GrTextWidth(gstate, string, strlen(string));
+			}
+		strcat(string, "...");
+		}
+	GrDrawText(gstate, 105, 0, string, 0);
+	/* date */
+	GrDrawText(gstate, 260, 0, dStr, 0);
+	GrEndGString(gstate);
+
+	/* and tell the DList */
+	@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(
+				  item,
+				  0,
+				  g_sysPointSize + 4,	/* height */
+				  300,				/* width */
+				  0,
+				  VMDT_GSTRING,
+				  VMST_OPTR,
+				  ConstructOptr(mem, chunk)) ;
+
+	/* and 86 the gstate and mem */
+	GrDestroyGString(gstate, gstate, GSKT_KILL_DATA) ;
+	MemFree(mem) ;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_TGEN_DOCUMENT_TAGRELEM_DLIST_STATUS for TGenDocumentClass
+ *               (GEN_ITEM_GROUP_STATUS_MSG)
+ *
+ * DESCRIPTION:	checks the selection, checks with the other list, and
+ * 					gets set to show any existing grade
+ *
+ * PARAMETERS:  void (word numSelections, word selection, byte stateFlags)
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method TGenDocumentClass, MSG_TGEN_DOCUMENT_TAGRELEM_DLIST_STATUS
+{
+
+	g_elem = selection;
+//	if (selection != GIGS_NONE) {
+//		g_stu = @call TANameDList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+//		if (g_stu != GIGS_NONE) {
+			@send oself::MSG_TGEN_DOCUMENT_SHOW_EXISTING_GRADE();
+//			}
+//		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_TGEN_DOCUMENT_TANAME_DLIST_MONIKER_QUERY for TGenDocumentClass
+ *
+ * DESCRIPTION:	Queries for monikers for stu name list.
+ *
+ * PARAMETERS:  void (optr list, word item)
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method TGenDocumentClass, MSG_TGEN_DOCUMENT_TANAME_DLIST_MONIKER_QUERY
+{
+// TAVMMapStruct        *TAMapPtr;
+ MemHandle      mh;
+// VMBlockHandle      vmbh;
+ BasicDBFieldID	fieldID;
+ word					size;
+ char					fullName[NAME_SIZE*3+5], nameStr[NAME_SIZE];
+
+
+	/* get our VMmap block */
+/*	vmbh = VMGetMapBlock(g_taFileHandle);
+	TAMapPtr = VMLock(g_taFileHandle, vmbh, &mh);
+
+	/* ok - we can grab the info */
+/*	g_stuDBHan = TAMapPtr->TAVMMS_StuDBHan;
+	g_stuNameIndex = TAMapPtr->TAVMMS_stuNameIndex;
+
+
+	VMUnlock(mh);
+*/
+
+	/* get the student record */
+	BasicDBGetRecordByIndex(g_taFileHandle, g_stuDBHan, g_stuNameIndex, item, &mh);
+
+	fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, STU_L_NAME, 1);
+	size = BasicDBGetFieldData(mh, fieldID, fullName, NAME_SIZE);
+	fullName[size] = 0;
+	fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, STU_F_NAME, 1);
+	size = BasicDBGetFieldData(mh, fieldID, nameStr, NAME_SIZE);
+	nameStr[size] = 0;
+	strcat(fullName, ", ");
+	strcat(fullName, nameStr);
+	fieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY, STU_M_NAME, 1);
+	size = BasicDBGetFieldData(mh, fieldID, nameStr, NAME_SIZE);
+	if (size) {
+		nameStr[1] = 0;  /* just use initial */
+		strcat(fullName, " ");
+		strcat(fullName, nameStr);
+		strcat(fullName, ".");
+		}
+
+	BasicDBDiscardRecord(mh);
+
+	/* and tell the DList */
+	@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, fullName) ;
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_TGEN_DOCUMENT_TANAME_DLIST_STATUS for TGenDocumentClass
+ *               (GEN_ITEM_GROUP_STATUS_MSG)
+ *
+ * DESCRIPTION:	checks the selection, checks with the other list, and
+ * 					gets set to show any existing grade
+ *
+ * PARAMETERS:  void (word numSelections, word selection, byte stateFlags)
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method TGenDocumentClass, MSG_TGEN_DOCUMENT_TANAME_DLIST_STATUS
+{
+
+	g_stu = selection;
+//	if (selection != GIGS_NONE) {
+//		g_elem = @call TAGradeElementDList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+//		if (g_elem != GIGS_NONE) {
+			@send oself::MSG_TGEN_DOCUMENT_SHOW_EXISTING_GRADE();
+//			}
+//		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_TGEN_DOCUMENT_SHOW_EXISTING_GRADE for TGenDocumentClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ * PARAMETERS:
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method TGenDocumentClass, MSG_TGEN_DOCUMENT_SHOW_EXISTING_GRADE
+{
+ char           string[13];
+ BasicDBFieldID gradeFieldID;
+ MemHandle      mh;
+ byte           grades[MAX_ELEMENTS];
+
+
+	if ((g_stu == GIGS_NONE) || (g_elem == GIGS_NONE)) {
+		/* gray out TA button */
+		@send TASave::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		MemLock(OptrToHandle(@NoneText));
+		strcpy(string, LMemDeref(@NoneText));
+		MemUnlock(OptrToHandle(@NoneText));
+		}
+
+	else {
+		@send TASave::MSG_GEN_SET_ENABLED(VUM_NOW);
+		/* get the student record & grade array*/
+		BasicDBGetRecordByIndex(g_taFileHandle, g_stuDBHan, g_stuNameIndex, g_stu, &mh);
+		gradeFieldID = BasicDBGetFieldID(mh, BDBFHE_CATEGORY,
+														  STU_GRADES_1 + g_gradePd, 1);
+		BasicDBGetFieldData(mh, gradeFieldID, grades, MAX_ELEMENTS);
+		BasicDBDiscardRecord(mh);
+
+		/* and show any current grade */
+		if (grades[g_elem] == NO_GRADE) {
+			MemLock(OptrToHandle(@NoneText));
+			strcpy(string, LMemDeref(@NoneText));
+			MemUnlock(OptrToHandle(@NoneText));
+			}
+		else
+			UtilHex32ToAscii(string, (dword)(grades[g_elem]), UHTAF_NULL_TERMINATE);
+		}
+
+	@call TAFileGrade::MSG_VIS_TEXT_REPLACE_ALL_PTR(string, 0);
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_TGEN_DOCUMENT_SAVE_GRADE_TO_TA for TGenDocumentClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ * PARAMETERS:
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method TGenDocumentClass, MSG_TGEN_DOCUMENT_SAVE_GRADE_TO_TA
+{
+ VMBlockHandle      vmbh;
+ TAVMMapStruct        *TAMapPtr;
+ char           string[5], gTypeString[NAME_SIZE];
+ BasicDBFieldID gradeFieldID, sumFieldID;
+ MemHandle      dbmh, mh;
+ BasicDBError       error;
+ byte           grades[MAX_ELEMENTS];
+ dword          grade;
+ WWFixedAsDWord avg;
+ dword          gradeSum[MAX_GRADE_TYPES];
+ word           length, numElements, typeNum;
+ word           i, numTypes;
+ GradeTypeStruct*   type;
+ GradeElementStruct*    element;
+ ChunkHandle     gradeElemChunkArray;
+ ChunkHandle     gradeTypesChunkArray;
+
+
+	/* get the grade */
+	length = @call TATestGrade::MSG_VIS_TEXT_GET_ALL_PTR(string);
+
+	/* get the student record */
+	BasicDBGetRecordByIndex(g_taFileHandle, g_stuDBHan, g_stuNameIndex, g_stu, &dbmh);
+	gradeFieldID = BasicDBGetFieldID(dbmh, BDBFHE_CATEGORY,
+														  STU_GRADES_1 + g_gradePd, 1);
+	BasicDBGetFieldData(dbmh, gradeFieldID, grades, MAX_ELEMENTS);
+	sumFieldID = BasicDBGetFieldID(dbmh, BDBFHE_CATEGORY,
+													  STU_GRADE_SUM_1 + g_gradePd, 1);
+	BasicDBGetFieldData(dbmh, sumFieldID, gradeSum, (MAX_GRADE_TYPES * sizeof(dword)));
+
+	/* convert the grade string */
+	if (length) {
+		if (string[0] == ' ') grade = NO_GRADE;
+		else UtilAsciiToHex32(string, &grade);
+		}
+	else grade = NO_GRADE;
+
+	/* and put it into the array & database */
+	grades[g_elem] = (byte) grade;
+	error = BasicDBSetFieldData(dbmh, gradeFieldID, grades, MAX_ELEMENTS);
+   /* DO SOMETHING HERE */
+
+	/* get our VMmap block */
+	vmbh = VMGetMapBlock(g_taFileHandle);
+	TAMapPtr = VMLock(g_taFileHandle, vmbh, &mh);
+	/* ok - we can grab the info */
+	gradeElemChunkArray = TAMapPtr->TAVMMS_gradeElemChunkArray[g_gradePd];
+	numElements = TAMapPtr->TAVMMS_numElements[g_gradePd];
+	numTypes = TAMapPtr->TAVMMS_numTypes;
+	gradeTypesChunkArray = TAMapPtr->TAVMMS_gradeTypesChunkArray;
+	VMUnlock(mh);
+
+	/* update the effected type's average */
+	/* first see what grade type the element is */
+	vmbh = VMFind(g_taFileHandle, NullHandle, GRADE_ELEM_1 + g_gradePd);
+	VMLock(g_taFileHandle, vmbh, &mh);
+	element = ChunkArrayElementToPtrHandles(
+						  mh, gradeElemChunkArray,
+						  g_elem, 0);
+	strcpy(gTypeString, element->GES_type);
+	VMUnlock(mh);
+
+	/* recalc the given type's avg */
+	avg = CalcTypeAvg (numElements, g_taFileHandle, g_gradePd,
+				gTypeString, gradeElemChunkArray, grades);
+
+	/* now store that avg in the proper array element */
+	vmbh = VMFind(g_taFileHandle, NullHandle, GRADE_TYPES);
+	VMLock(g_taFileHandle, vmbh, &mh);
+	for (i = 0; i < numTypes; i++)  {
+		type = ChunkArrayElementToPtrHandles(mh, gradeTypesChunkArray, i, 0);
+		if (!strcmp(gTypeString, type->GTS_type)) {
+			/* found it */
+			typeNum = i;
+			i = numTypes;
+			}
+		}
+	VMUnlock(mh);
+
+	/* and put it into the array */
+	gradeSum[typeNum] = avg;
+
+	/* now recalculate the final for that grade period */
+	avg = CalcGPFinal (numTypes, g_taFileHandle, g_gradePd,
+									gradeTypesChunkArray, gradeSum);
+
+	/* and put the final into the array */
+	if (avg) gradeSum[numTypes] = avg;
+	else gradeSum[numTypes] = NO_SUMMARY;
+
+
+	/* set the new summary data */
+	error = BasicDBSetFieldData(dbmh, sumFieldID, gradeSum,
+													(MAX_GRADE_TYPES * sizeof(dword)));
+	/* and store the record */
+	error = BasicDBSaveRecord(g_taFileHandle, g_stuDBHan,
+							  dbmh, StudentsCallback, 0);
+
+	/* and save this stuff */
+	VMSave(g_taFileHandle);
+
+	/* close the dbox */
+	@send TAFileDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_TGEN_DOCUMENT_SAVE_GRADE_TO_TA for TGenDocumentGroupClass
+ *
+ *
+ * DESCRIPTION:	We don't want GenDocGroup messing with the UI based
+ *                on this TA file.
+ *
+ * PARAMETERS:		FileHandle 	file
+ *
+ *
+ *
+ ***********************************************************************/
+@method TGenDocumentGroupClass, MSG_GEN_DOCUMENT_GROUP_MARK_DIRTY_BY_FILE
+{
+
+	if(file != g_taFileHandle)
+		@callsuper();
+
+}
+
+

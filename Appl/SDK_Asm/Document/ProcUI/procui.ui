@@ -1,0 +1,182 @@
+/*
+ * Project:	PC/GEOS
+ * Module:	ProcUI (Sample PC/GEOS application)
+ * File:	procui.ui
+ *
+ * Author:	Tony Requist
+ *
+ *	This file contains the user Interface description for this
+ * application. This file is written in a language called ESPIRE, which is
+ * compiled by the UIC compiler. See Spec/User/uic.doc for info.
+ *
+ * IMPORTANT NOTE:
+ *	This sample application is primarily intended to demonstrate a
+ *	model for handling documents.  Basic parts of a PC/GEOS application
+ *	are not documented heavily here.  See the "Hello" sample application
+ *	for more detailed documentation on the standard parts of a PC/GEOS
+ *	application.
+ *
+ * RCS STAMP:
+ *	$Id: procui.ui,v 1.1 97/04/04 16:33:04 newdeal Exp $
+ *
+ */
+
+/* ----------------------------------------------------------------------------
+	Include files
+-----------------------------------------------------------------------------*/
+
+#include "generic.uih"
+
+/* ----------------------------------------------------------------------------
+	Application Object
+-----------------------------------------------------------------------------*/
+
+start	AppResource;
+
+PUIApp = GenApplication {
+	children = PUIPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = PUIPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) =
+		PUIDocumentControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) =
+		PUIDocumentControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+		PUIDocumentControl;
+	moniker = list {
+		PUITextMoniker
+	}
+	hints = {
+		ATTR_GEN_INIT_FILE_CATEGORY {
+		char	"procui", 0
+		}
+	}
+}
+
+visMoniker PUITextMoniker = "ProcUI Sample Application";
+
+end	AppResource;
+
+/* ----------------------------------------------------------------------------
+	 Primary window.
+-----------------------------------------------------------------------------*/
+
+/*
+ * The GenDocumentControl must be a child of the primary, and must be
+ * on the active list.
+ */
+
+start	Interface;		/* this resource is for misc UI objects */
+
+PUIPrimary = GenPrimary {
+	children = PUIFileMenu, PUIValueX, PUIValueY;
+	hints = { ATTR_GEN_DISPLAY_NOT_MINIMIZABLE, HINT_SIZE_WINDOW_AS_DESIRED }
+}
+
+PUIFileMenu = GenInteraction {
+	children = PUIDocumentControl;
+	visibility = popup;
+	hints = { ATTR_GEN_INTERACTION_GROUP_TYPE { GenInteractionGroupType GIGT_FILE_MENU } }
+}
+
+/* ----------------------------------------------------------------------------
+	 UI Document Control
+-----------------------------------------------------------------------------*/
+
+/*
+ * The GenDocumentControl should be put in the same resource as the
+ * GenPrimary (for efficiency).  The GenDocumentControl will build the
+ * file menu.
+ */
+
+PUIDocumentControl = GenDocumentControl {
+	/*
+	 * Document file's token
+	 */
+	documentTokenChars = "'S', 'A', 'M', 'P'";
+	documentTokenID = "MANUFACTURER_ID_GEOWORKS";
+	/*
+	 * Creator's file's token
+	 */
+	/*
+	 * Text to display in the header area of the primary when no
+	 * document is open.
+	 */
+	noNameText = "No Document";
+	/*
+	 * Template directory
+	 */
+	templateDir = "SAMPLE";
+	/*
+	 * Pointer to the GenDocumentGroup
+	 */
+	appDC = PUIDocumentGroup;
+	/*
+	 * List of objects to enable/disable based on whether or not a
+	 * document exists
+	 */
+	enableDisableList = PUIUIEnableList;
+}
+
+chunk PUIUIEnableList = data {
+	UN_OPTR	PUIValueX
+	UN_OPTR	PUIValueY
+}
+
+end Interface;
+
+/* ----------------------------------------------------------------------------
+	 Document Group
+-----------------------------------------------------------------------------*/
+
+/*
+ * The GenDocumentGroup should be put in a resource of its own run by
+ * the application thread.
+ */
+
+start DocumentUI;
+
+PUIDocumentGroup = GenDocumentGroup {
+	/*
+	 * Name for untitled documents
+	 */
+	defaultName = "PUI Untitled";
+	/*
+	 * Document protocol
+	 */
+	protocolMajor = "DOCUMENT_PROTOCOL_MAJOR";
+	protocolMinor = "DOCUMENT_PROTOCOL_MINOR";
+	/*
+	 * Object to send notification messages to (send them to the process)
+	 */
+	output = process;
+	/*
+	 * Pointer to the GenDocumentControl
+	 */
+	uiDC = PUIDocumentControl;
+}
+
+end DocumentUI;
+
+/*-----------------------------------------------------------------------------
+	UI objects to display the document
+-----------------------------------------------------------------------------*/
+
+start Interface;
+
+PUIValueX = GenValue vardataReloc {
+	genStates = default -enabled;
+	minimum = 0;
+	maximum = "DOCUMENT_WIDTH-1";
+	applyMsg = MSG_PUI_PROCESS_X_CHANGE;
+	destination = process;
+}
+
+PUIValueY = GenValue vardataReloc {
+	genStates = default -enabled;
+	minimum = 0;
+	maximum = "DOCUMENT_HEIGHT-1";
+	applyMsg = MSG_PUI_PROCESS_Y_CHANGE;
+	destination = process;
+}
+
+end Interface;

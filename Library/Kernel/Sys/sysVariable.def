@@ -1,0 +1,247 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Kernel System Functions -- Variables
+FILE:		sysVariable.def
+
+AUTHOR:		Adam de Boor, Apr  6, 1989
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	4/ 6/89		Initial revision
+
+
+DESCRIPTION:
+	Variables for Sys module
+
+	$Id: sysVariable.def,v 1.1 97/04/05 01:15:04 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+idata	segment
+
+;
+; Configuration information
+;
+sysConfig	SysConfigFlags	<>
+sysProcessorType SysProcessorType
+sysMachineType	SysMachineType
+
+if	ERROR_CHECK
+
+sysECLevel	ErrorCheckingFlags	DEFAULT_EC
+sysECBlock	hptr
+sysECChecksum	word	0
+
+endif
+
+; Name of file that is marks whether we crashed last time (how morbid)
+; NOTE: it is used directly with int 21h, so it should remain SBCS.
+sysSemaphoreFile	char	'GEOS_ACT.IVE',0
+
+; hardware-interrupt interceptors to avoid death in TSRs
+; Our drivers override these things, but the SysEnterInterrupt protects
+; already-resident device drivers from context switching
+
+SysInterruptHandler	macro	n
+
+Irq&n&Intercept		proc	far
+if	VERIFY_INTERRUPT_REGS
+		call	SysEnterInterruptSaveRegs
+else
+		call	SysEnterInterrupt
+endif
+		pushf
+
+if	CATCH_MISSED_COM1_INTERRUPTS
+		push	ax
+		mov	ax, cs:[curStats].SS_interrupts
+		mov	cs:[IrqCountStart&n], ax
+		pop	ax
+endif
+
+if	n eq FIRST_IRQ_INTERCEPT_LEVEL
+Irq&n&OldVector	label	near
+endif
+		call	SysEmptyRoutine		; Overwritten by old vector
+
+if	CATCH_MISSED_COM1_INTERRUPTS
+		push	ax
+		mov	ax, cs:[curStats].SS_interrupts
+		mov	cs:[IrqCountEnd&n], ax
+		pushf
+		pop	ax
+		mov	cs:[IrqFlags&n], ax
+		pop	ax
+		call	LookForMissedCom1Interrupt
+endif
+
+if	VERIFY_INTERRUPT_REGS
+		call	SysExitInterruptVerifyRegs
+else
+		call	SysExitInterrupt
+endif
+		iret
+Irq&n&Intercept		endp
+
+Irq&n&DosVector	fptr				; handler in DOS level
+
+	ForceRef	Irq&n&Intercept
+	ForceRef	Irq&n&DosVector
+
+			endm
+
+; Declare enough interceptors to handle both interrupt controllers. no need to
+; intercept the timer, however, so start with level 1
+
+if	HARDWARE_INT_CONTROL_8259
+
+FIRST_IRQ_INTERCEPT_LEVEL	equ	1
+LAST_IRQ_INTERCEPT_LEVEL	equ	15
+LAST_IRQ_INTERCEPT_LEVEL_ONE_IC	equ	7
+FIRST_IRQ_INTERCEPT		equ	Irq1Intercept
+IRQ_INTERCEPT_SIZE		equ	Irq2Intercept-Irq1Intercept
+IRQ_INTERCEPT_OLD_VECTOR_OFFSET	equ	Irq1OldVector-Irq1Intercept+1
+IRQ_INTERCEPT_DOS_VECTOR_OFFSET	equ	Irq1DosVector-Irq1Intercept
+
+else
+
+	;----------------------------------------------------------------
+	;	CUSTOM INTERRUPT CONTROLLER CHIP
+	;
+
+
+endif
+
+lastIntercept	word		; Last IRQ intercepted...
+
+__n	= FIRST_IRQ_INTERCEPT_LEVEL
+rept	(LAST_IRQ_INTERCEPT_LEVEL-FIRST_IRQ_INTERCEPT_LEVEL)+1
+	SysInterruptHandler	%__n
+__n	= __n + 1
+endm
+
+; Add special handler for Zoomer IRQ0 (Pen Digitizer Timer), as we can't
+; intercept IRQ1 (we'd loop endlessly).
+
+
+if	CATCH_MISSED_COM1_INTERRUPTS
+
+SysDorf		macro	n
+IrqCountStart&n		sword	-1
+IrqCountEnd&n		sword	-1
+IrqFlags&n		CPUFlags
+endm
+
+__n	= FIRST_IRQ_INTERCEPT_LEVEL
+rept	(LAST_IRQ_INTERCEPT_LEVEL-FIRST_IRQ_INTERCEPT_LEVEL)+1
+	SysDorf	%__n
+__n	= __n + 1
+endm
+
+endif
+
+
+idata	ends
+
+;---
+
+udata	segment
+
+;
+; For system statistics
+;
+		even
+lastStats	SysStats	<>
+curStats	SysStats	<>
+
+udata	ends
+
+;------------------------------------------------------------------------------
+;		Initialized variables
+;------------------------------------------------------------------------------
+
+idata	segment
+
+errorSem	Semaphore	<1,0>
+
+errorFlags	SysNotifyFlags	<>
+errorReturn	SysNotifyFlags	<>
+
+errorShutdownMode	SysShutdownType	SST_CLEAN_FORCED
+
+biosLock	ThreadLock <>	;MS-DOS lock. Grabbed before actual
+				; entry to DOS or BIOS
+biosStack	sptr		;Stack segment of thread that owns dosLock.
+
+public	biosLock	; for EndGeos (XXX)
+
+shutdownConfirmSem	Semaphore	; Semaphore to gain the exclusive right
+					;  to ask the user if s/he's out of
+					;  her/his mind.
+shutdownBroadcastSem	Semaphore	; Semaphore to gain the exclusive right
+					;  to broadcast a shutdown notice over
+					;  the GCNSLT_SHUTDOWN_CONTROL list
+shutdownOK		byte	TRUE
+
+disableAPOCount		word	0
+
+;------------------------------------------------------------------------------
+;			Subsystem Notification
+;------------------------------------------------------------------------------
+sysNotificationTable	SubsystemNotificationElement SysSubsystemType/9 dup(<>)
+
+idata	ends
+
+
+;------------------------------------------------------------------------------
+;		Uninitialized variables
+;------------------------------------------------------------------------------
+
+udata	segment
+
+shutdownConfirmCount	word	0
+
+shutdownAckOD		optr
+shutdownAckMsg		word
+
+
+;
+; Data for tracking the non-swappable windows and gstates we open (one per
+; screen).
+;
+nextScreen	word	0		; Index into following arrays of first
+					;  free slot.
+actualRoots	hptr.Window	MAX_SCREENS dup(0)	; Actual root windows
+							;  on each screen
+errorWins	hptr.Window	MAX_SCREENS dup(0)	; Windows we've opened
+errorStates	hptr.GState	MAX_SCREENS dup(0)	; GStates for same
+errorStratOffs	word		MAX_SCREENS dup(0)	; Strategy routines of
+errorStratSegs	word		MAX_SCREENS dup(0)	;  drivers for screens
+
+if	USE_MOUSE_TO_REPLY_TO_SYS_ERROR_BOX
+errorMouseQueue	hptr
+else
+errorKbdQueue	hptr			; disembodied event queue to receive
+					;  MSG_IM_KBD_SCAN while the SysNotify
+					;  box is up.
+endif
+errorComplete	byte	0		; set non-zero when error box answered
+
+curWin		hptr.Window
+curState	hptr.GState
+curDriver	hptr
+curStrat	fptr.far
+curRoot		hptr
+
+if TRACK_INTERRUPT_COUNT and ERROR_CHECK
+intCountStack	dword
+intCountType	IntCountType
+intCountData	word
+endif
+
+
+udata	ends

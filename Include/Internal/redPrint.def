@@ -1,0 +1,182 @@
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Berkeley Softworks 1993 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Common Redwood printing constants
+FILE:		redPrint.def
+
+AUTHOR:		Dave Durran
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Dave	9/93		Initial revision
+
+
+DESCRIPTION:
+	This file contains constants and structure definitions used by the
+	canon 64-pin printer driver and spooler
+
+	$Id: redPrint.def,v 1.1 97/04/04 14:13:50 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;Redwood prototype constant for 4 chip prototype.
+;REDWOOD_PROTOTYPE	=	1
+
+;Final prototype constant for final hardware.    Pass "-DFINAL_REDWOOD_PRODUCT=
+;FALSE" when making to make for the Dave hardware.
+
+ifndef	FINAL_REDWOOD_PRODUCT
+   FINAL_REDWOOD_PRODUCT	=	TRUE
+endif
+
+
+;Enums for the return values for the print driver calls in redwood.
+
+PrintDriverReturn	etype	word, 0, 2
+
+PDR_NO_RETURN		enum	PrintDriverReturn
+PDR_WAIT_FOR_PAPER	enum    PrintDriverReturn
+PDR_PAPER_JAM_OR_EMPTY	enum    PrintDriverReturn
+
+;print job lock enum.
+
+PrintJobSemaphore	etype	byte, 0, 1
+	PJS_unlocked	enum	PrintJobSemaphore	;OK to move paper.
+	PJS_locked	enum	PrintJobSemaphore	;not OK to move paper
+
+;Flag to pass to PrintGetErrors to save the Last PES or update with the read
+;PES.
+
+PrintJobLPESUpdate	etype   byte, 0, 1
+	PJLP_noupdate	enum	PrintJobLPESUpdate	;do not update LPES
+	PJLP_update	enum	PrintJobLPESUpdate	;update LPES
+
+;paper error status bits
+
+PErrorBits	record
+	PER_RES:2,
+	PER_ASF:1,
+	PER_PAUSE:1,
+	PER_LAST_PES:1
+	PER_JAM:1,
+	PER_MPE:1,
+	PER_PES:1
+PErrorBits	end
+
+RedStatusBuffer	struc
+	RSB_length		byte	?	;length of the following packet
+	RSB_ID			byte	?	;status ID of the packet.
+	RSB_parameters		byte 10 dup (?)	;actual data
+RedStatusBuffer	ends
+
+;PState variables used for the Redwood print system. These replace unused 
+;locations in the ASCII translation table.
+
+PS_redwoodSpecific	equ	PS_asciiTrans	;use the translation table area
+
+RedwoodSpecific	struc
+	RS_gateArrayBase	word	?	;Base I/O address of redwood 
+						;gate array hardware.
+	RS_outputBuffer		word	?	;segment address of the 
+						;output buffer for DMA
+	RS_watchDogCount	word	?	;counter to make sure we dont
+						;loop forever checking status.
+	RS_bandNumber		word	?	;number of the band we just
+						;printed
+	RS_xOffset		word	?	;x offset to get to the left
+						;edge of the paper loaded.
+	RS_yOffset		word	?	;y offset to get to the start
+						;of the next graphic swath
+						;in scanlines (1/360")
+	RS_returnCode		PrintDriverReturn ;Code passed out of the print
+						;driver for the spooler error
+						;handling logic.
+	RS_initialPass		byte	?	;flag to mark the first print
+						;pass of the DMA code.
+	RS_direction		byte	?	;flag to hold the direction
+						;for draft bi-dir printing.
+	RS_jobSem		PrintJobSemaphore ;status of a print job -
+						;whether to honor keystroke
+						;paper positioning commands.
+	RS_savedErrorStatus	PErrorBits	;holds the last error
+						;states read.
+	RS_status		RedStatusBuffer	;status holding.
+RedwoodSpecific	ends
+
+;constants used to define graphics print resolution, and band geometry.
+PRINTHEAD_HEIGHT	=	64	;number of scanlines high for head
+LIVE_PRINT_HEIGHT	=	62	;number of lines high we can use
+BAND_OVERLAP_AMOUNT	=	2 	;number of scanlines to overlap
+					;on each pass.
+GRAPHICS_FEED_HEIGHT	=	(LIVE_PRINT_HEIGHT - BAND_OVERLAP_AMOUNT)
+					;number of scanlines to feed/band
+
+HI_RES_X_RES		=	360	;number of dots / inch in X.
+HI_RES_Y_RES		=	360	;number of scanlines / inch.
+LO_RES_X_RES		=	90	;number of dots / inch in X.
+LO_RES_Y_RES		=	360	;number of scanlines / inch.
+;These following 3 constants are defined to make the spooler calls work.
+;They are not used anywhere in the Redwood print driver any more.
+HI_RES_BAND_HEIGHT	=	PRINTHEAD_HEIGHT	
+HI_RES_BUFF_HEIGHT	=	PRINTHEAD_HEIGHT
+HI_RES_INTERLEAVE_FACTOR =	1	;number of interleaves/ band.
+LO_RES_BAND_HEIGHT	=	PRINTHEAD_HEIGHT	
+LO_RES_BUFF_HEIGHT	=	PRINTHEAD_HEIGHT
+LO_RES_INTERLEAVE_FACTOR =	1	;number of interleaves/ band.
+
+
+;Maximum paper width in points....
+PR_MAX_PAPER_WIDTH	=	684	;9.5 in.
+
+;Margin values, in points.
+PR_MARGIN_TRACTOR       =       18      ;tractor feed top and bottom margins.
+PR_MARGIN_LEFT          =       18      ;all paths left margin.
+PR_MARGIN_RIGHT         =       18      ;all paths right margin.
+PR_MARGIN_TOP           =       9       ;cut sheet top margin.
+PR_MARGIN_BOTTOM        =       48      ;cut sheet bottom margin.
+
+ifdef	REDWOOD_PROTOTYPE
+;SCAT Configiuration registers.
+SCAT_ICR_INDEX	equ	022h
+SCAT_ICR_DATA	equ	023h
+;SCAT_ICR_SHADOW_RAM1	equ	04ah
+SCAT_ICR_SHADOW_RAM1	equ	068h
+endif
+
+;Buffer segment start location.
+ifdef   REDWOOD_PROTOTYPE
+PR_OUTPUT_BUFFER_START_SEG	equ	0d000h
+else
+;Real machine address:	
+ifdef 	FINAL_REDWOOD_PRODUCT
+PR_OUTPUT_BUFFER_START_SEG	equ	094bch	;Final prototype -- must change
+						;  Kernel/File/fileConstant.def
+else
+PR_OUTPUT_BUFFER_START_SEG	equ	099ach	;Dave's current prototype
+endif
+endif
+
+;------------------------------------------------------------------------
+;	Spooler swath geometry constants
+;------------------------------------------------------------------------
+PRINTER_NUMBER_OF_BANDS equ     5
+PRINTER_SWATH_HEIGHT    equ (PRINTER_NUMBER_OF_BANDS * GRAPHICS_FEED_HEIGHT)
+
+
+;------------------------------------------------------------------------
+;	error equates for the unused enums in redwood.
+;------------------------------------------------------------------------
+
+PERROR_CHECK_ACTION_2	equ	PERROR_WARMUP
+PERROR_INSERT_ACTION_3	equ	PERROR_SERVICE
+PERROR_INSERT_ACTION_4	equ	PERROR_PAPER_MISFEED
+PERROR_CHECK_ACTION_5	equ	PERROR_NO_PRINTER
+PERROR_INSERT_ACTION_6	equ	PERROR_NO_TONER
+PERROR_CHECK_ACTION_7	equ	PERROR_NO_PAPER
+PERROR_INSERT_ACTION_8	equ	PERROR_OFF_LINE
+PERROR_JAMMED_START	equ	PERROR_SERIAL_ERR
+PERROR_JAMMED_END	equ	PERROR_PARALLEL_ERR

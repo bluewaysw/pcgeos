@@ -1,0 +1,121 @@
+/***********************************************************************
+ *
+ *	Copyright (c) New Deal 1999 -- All Rights Reserved
+ *
+ * PROJECT:	  Mail
+ * MODULE:	  Mail
+ * FILE:	  mainPrimary.goc
+ *
+ * AUTHOR:  	  Gene Anderson: 1/7/99
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	1/7/99    gene	    Initial version
+ *
+ * DESCRIPTION:
+ *	MailPrimary2Class for the Mail application
+ *
+ * 	$Id$
+ *
+ ***********************************************************************/
+
+@include "mail.goh"
+@include "class.goh"
+@include "global.goh"
+@include "dex.goh"
+
+@classdecl MailPrimary2Class;
+
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_GEN_DISPLAY_CLOSE
+* PASS:            none
+* RETURN:          none
+* DESCRIPTION:     don't let display close exit the app
+*
+* REVISION HISTORY:
+*         Name      Date        Description
+*         ----      ----        -----------
+*         gene      1/7/99     Initial Revision
+***************************************************************/
+
+@method MailPrimary2Class, MSG_GEN_DISPLAY_CLOSE
+{
+    /*
+     * lower ourselves so other mail windows come to top
+     */
+    @call oself::MSG_GEN_LOWER_TO_BOTTOM();
+    /*
+     * just make ourselves not usable
+     */
+    @call oself::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+}
+
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_MAIL_PRIMARY_OPEN
+* PASS:            none
+* RETURN:          none
+* DESCRIPTION:     open the primary and bring it to the front
+*
+* REVISION HISTORY:
+*         Name      Date        Description
+*         ----      ----        -----------
+*         gene      1/7/99     Initial Revision
+***************************************************************/
+
+@method MailPrimary2Class, MSG_MAIL_PRIMARY_OPEN
+{
+    @call oself::MSG_GEN_SET_USABLE(VUM_NOW);
+    @call oself::MSG_GEN_BRING_TO_TOP();
+}
+
+/*
+ * BlackBorderClass
+ */
+
+@classdecl BlackBorderClass;
+
+@method BlackBorderClass, MSG_VIS_DRAW
+{
+    Rectangle ourBounds, childBounds;
+    optr child;
+
+    if (UserGetDefaultUILevel() == UIIL_INTRODUCTORY) {
+	child = @call self::MSG_GEN_FIND_CHILD_AT_POSITION(0);
+	if (child) {
+	    @call child::MSG_VIS_GET_BOUNDS(&childBounds);
+	    @call self::MSG_VIS_GET_BOUNDS(&ourBounds);
+	    if (ourBounds.R_right > 640 && ourBounds.R_bottom > 480) {
+		GrSetAreaColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+		/* top */
+		GrFillRect(gstate, ourBounds.R_left,
+			   ourBounds.R_top,
+			   ourBounds.R_right,
+			   childBounds.R_top);
+		/* bottom */
+		GrFillRect(gstate, ourBounds.R_left,
+			   childBounds.R_bottom,
+			   ourBounds.R_right,
+			   ourBounds.R_bottom);
+		/* left */
+		GrFillRect(gstate, ourBounds.R_left,
+			   ourBounds.R_top,
+			   childBounds.R_left,
+			   ourBounds.R_bottom);
+		/* right */
+		GrFillRect(gstate, childBounds.R_right,
+			   ourBounds.R_top,
+			   ourBounds.R_right,
+			   ourBounds.R_bottom);
+	    }
+	}
+    }
+    /* let superclass draw children */
+    @callsuper();
+}

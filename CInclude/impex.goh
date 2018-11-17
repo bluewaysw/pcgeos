@@ -1,0 +1,1538 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		impex.goh
+
+AUTHOR:		Maryann Simmons, Jul 29, 1992
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	MS	7/29/92   	Initial version.
+
+DESCRIPTION:
+	C Include file for the impex library.
+
+	$Id: impex.goh,v 1.1 97/04/04 15:57:01 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@optimize
+@deflib  impex
+
+#include <ieCommon.h>
+@include <Objects/gFSelC.goh>
+#include <xlatLib.h>
+
+ /*----------------------------------------------------------------------------
+  *		General Information
+  *----------------------------------------------------------------------------
+  *
+  * For an application to fully support importing and exporting, it will need
+  * to have an instance each of ImportControlClass & ExportControlClass. The
+  * documentation for each of these classes resides under the declaration of
+  * that class.
+  */
+
+ /*----------------------------------------------------------------------------
+  *		ImportExportClass declaration
+  *----------------------------------------------------------------------------
+
+  *
+  * GenApplication GCN lists to be placed on:
+  *	GAGCNLT_SELF_LOAD_OPTIONS
+  */
+
+@class ImportExportClass, GenControlClass, master, variant;
+/*			uses	GenControlClass */
+
+/*-----------------------------------
+ *	Description
+ *-----------------------------------
+
+ * This is an internal class used as a parent class for the Import & Export
+ * Class objects. No application nor library will ever want to use an object
+ * of this class, so don't do it!
+ */
+/*-----------------------------------
+ *	External messages
+ *----------------------------------*/
+
+/*-----------------------------------
+ *	Internal messages
+ *----------------------------------*/
+@message void MSG_IMPORT_EXPORT_SELECT_FORMAT( int formatNumber = cx, \
+					       MemHandle formatInfo = dx, \
+					       Boolean noIdeaChoice = bp );
+/*
+ * Notify the import or export controller that a format has been selected
+ * by the user.
+ *
+ * Context:	Utility message sent out when the user selects a format
+ *		in a displayed list.
+ * Source:	FormatList object
+ * Destination:	ImportExportClass object
+ * Interception:Generally should not be intercepted.
+ *
+ * Pass:	formatNumber = Selected format # (item in list)
+ *		formatInfo   = FormatInfo block handle
+ *		noIdeaChoice = TRUE if No Idea is there, FALSE otherwise
+ *
+ * Return:	Nothing
+ *	
+ */
+
+@message void MSG_IMPORT_EXPORT_SELECT_FILE( GenFileSelectorEntryFlags  \
+						entryFlags = bp );
+/*
+ * Sent to notify us that the user has selected a file for import
+ *
+ * Context:	Sent when user clicks on a file (or any other entry
+ *		in the GenFileSelector).
+ * Source:	GenFileSelectorClass object
+ * Destination:	ImportExportClass object
+ * Interception:Generally should not be intercepted.
+ *
+ * Pass:	entryFlags = GenFileSelectorEntryFlags
+ *
+ * Return:	Nothing
+ *		
+ */
+
+@message void MSG_IMPORT_EXPORT_SHOW_ERROR( char *string = cx:dx, \
+					    ChunkHandle errStrHandle = bp );
+/*
+ * Display an error dialog box to notify the user of a "bad thing"
+ *
+ * Context:	Utility message sent out when an error is determined. The
+ *		dialog will not block the execution thread, so there is
+ *		no feedback from the user in response to these messages.
+ * Source:	Anyone
+ * Destination: ImportExportClass object
+ * Interception:Generally should not be intercepted.
+ *
+ * Pass:	string	= Optional argument string (NULL-terminated)
+ *		errStrHandle = ChunkHandle of error string (in String resource)
+ *
+ * Return:	Nothing
+ *	
+ */
+
+@message void MSG_IMPORT_EXPORT_FILE_SELECTION_INFO( ImpexFileSelectionData \
+							*fileSelInfo = dx:bp );
+/*
+ * Sent whenever a selection is made in the file selector
+ *
+ * Context:	Utility message sent solely for the purpose of subclassing
+ *		the ImportExportControl inside a translation library.
+ *		Whenever a selection is made by the user in the file selector
+ *		located in the Import or Export dialog boxes, this message is
+ *		sent by the Import/ExportControlClass to itself.
+ * Source:	ImportControlClass or ExportControlClass object
+ * Destination:	Method for a sub-class of ImportExportClass in a
+ *		translation library.
+ * Interception: Generally intercepted by a translation library, which,
+ *		when called to provide its Import or Export UI, has
+ *		returned a ClassStruct which is a sub-class of GenControl.
+ *		This ClassStruct has been stored as the superclass for
+ *		the ImportExportClass, thereby allowing a translation
+ *		library to get this message without actually having
+ *		an object of class ImportExportClass. Upon intercepting
+ *		this message, a translation library might open the
+ *		currently selected file, if any, and enable/disable
+ *		format options based on the data in the file. Please see
+ *		the documentation for TR_GET_IMPORT_UI & TR_GET_EXPORT_UI.
+ *		There is no need to pass this message on to your superclass.
+ *
+ * Pass:	fileSelInfo	= ImpexFileSelectionData
+ *
+ * Return:	Nothing
+ *	
+ */
+
+@message void MSG_IMPORT_EXPORT_FREE_LIBRARY( GeodeHandle libraryHandle = cx );
+/*
+ * Perform a GeodeFreeLibrary on the passed library handle
+ *
+ * Context:	Utility message sent to avoid repeated loading of common
+ *		libraries as user switches between formats.
+ * Source:	Anyone
+ * Destination:	ImportExportClass object
+ * Interception: Should not be intercepted
+ *
+ * Pass:	libraryHandle	= Handle of library
+ *
+ * Return:	Nothing
+ */
+
+@message void MSG_IMPORT_EXPORT_FREE_LIBRARY_AND_FORMAT_UI( GeodeHandle \
+							libraryHandle = cx );
+/*
+ * Perform a GeodeFreeLibrary on the passed library handle and remove any
+ * format UI.  (For ALLOW_FLOPPY_BASED_LIBS)
+ *
+ * Pass:	libraryHandle	= Handle of library
+ * Return:	nothing
+ */
+
+@protominor ImpexOpCompleted;
+
+@message void MSG_IMPORT_EXPORT_OPERATION_COMPLETED(Boolean success = cx);
+/*
+ * Simple notification if an import/export operation was completed.
+ * Intercept at will - no need to call superclass as this is just
+ * for external use for things like "batch" import/export.
+ *
+ * Pass:	success	= Boolean (TRUE if successful, FALSE if not)
+ *
+ * Return:	nothing
+ */
+
+@protoreset
+
+/*--------------------------------------
+ * 	Constants & Structures
+ *--------------------------------------*/
+
+/*
+ * ImpexDataClasses allow an application to select which kinds of data
+ * it will support. More than one kind of data can be selected.
+ *
+ * If you add any new data classes, you must add a structure to the
+ * array defined in Impex/UI/uiImpexFormatListLow.asm under "tokenTable".
+ */
+typedef WordFlags ImpexDataClasses;
+#define	IDC_TEXT	0x8000
+#define	IDC_GRAPHICS    0x4000
+#define	IDC_SPREADSHEET 0x2000
+#define	IDC_FONT 	0x1000
+      
+#define NUMBER_IMPEX_DATA_CLASSES   4
+
+/*
+ *   The tokens expected for the various types of translation library:
+ */
+
+#define XLAT_TOKEN_TEXT_12 	( 'T' | ('L' << 8) )
+#define XLAT_TOKEN_TEXT_34	( 'T' | ('X' << 8) )
+
+#define XLAT_TOKEN_GRAPHICS_12	( 'T' | ('L' << 8) )
+#define XLAT_TOKEN_GRAPHICS_34	( 'G' | ('R' << 8) )
+
+#define XLAT_TOKEN_SPREADSHEET_12	( 'T' | ('L' << 8) )
+#define XLAT_TOKEN_SPREADSHEET_34	( 'S' | ('S' << 8) )
+
+#define XLAT_TOKEN_FONT_12	( 'T' | ('L' << 8) )
+#define XLAT_TOKEN_FONT_34	( 'F' | ('N' << 8) )
+
+/*
+ *   Structure passed with MSG_IMPORT_EXPORT_FILE_SELECTION_INFO:
+ */
+ 
+typedef  struct	{
+    FileLongName		IFSD_selection;
+    PathName			IFSD_path;
+    word			IFSD_disk;
+    GenFileSelectorEntryFlags	IFSD_type;
+} ImpexFileSelectionData;
+
+
+/*-----------------------------------
+ *	Instance Data
+ *---------------------------------*/
+@default ImportExport = GenControlClass; 
+@default GII_attrs = GIA_MODAL;
+@default GII_type = GIT_COMMAND;
+@default GII_visibility = GIV_DIALOG; 
+@default GI_states = (GS_USABLE|GS_ENABLED);
+
+/*-----------------------------------
+ *	Variable Instance Data
+ *---------------------------------*/
+
+typedef struct {
+    optr	TIED_formatUI;		/* OD of duplicated format UI */
+    Handle	TIED_formatLibrary;	/* handle of library for above */
+} TempImportExportData;
+
+@vardata TempImportExportData TEMP_IMPORT_EXPORT_DATA;
+
+
+/*-----------------------------------
+ *	Attrs
+ *-----------------------------------*/
+
+@vardata void ATTR_IMPORT_EXPORT_TRANSPARENT_MODE;
+
+@protominor ImpexOpCompleted;
+
+@vardata void ATTR_IMPORT_EXPORT_HIDE_ERRORS;
+/*
+ * Used when the Import/ExportControl is not to show any error messages.
+ */
+@protoreset
+
+
+/*-----------------------------------
+ *	Hints
+ *-----------------------------------*/
+
+@endc
+
+
+/*-----------------------------------------------------------------------------
+ *		ImportClass declaration
+ *-----------------------------------------------------------------------------
+
+ *
+ * GenApplication GCN lists to be placed on:
+ *	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+@class ImportControlClass, ImportExportClass;
+
+/*-----------------------------------
+ *	How importing works
+ *-----------------------------------*/
+
+/*-----------------------------------
+ *    	Constants & Structures
+ *-----------------------------------*/
+
+typedef WordFlags ImportControlAttrs;
+#define ICA_IGNORE_INPUT	0x8000	/* ignore input while import occurs */
+#define ICA_NON_DOCUMENT_IMPORT 0x4000  /* doesn't import as a document     */
+ 
+
+/*
+ *   Features flags (used with ATTR_GEN_CONTROL_REQUIRE/PROHIBIT_UI)
+ */
+typedef ByteFlags ImportControlFeatures;
+#define IMPORTCF_PREVIEW_TRIGGER 0x0020	/* not currently used 		*/
+#define	IMPORTCF_IMPORT_TRIGGER	0x0010	/* import trigger 		*/
+#define IMPORTCF_FORMAT_OPTIONS	0x0008	/* import format UI parent,
+					 *  under which is placed any
+					 *  UI specific to the
+					 *  currently selected format	*/
+#define IMPORTCF_FILE_MASK	0x0004	/* import file mask 		*/
+#define IMPORTCF_BASIC		0x0002	/* import file selector,
+					 *  import format list, and
+					 *  import app UI parent, under
+					 *  which is placed any UI
+					 *  specific to the app 	*/
+#define IMPORTCF_GLYPH		0x0001	/* glyph at top of import
+					 *  dialog box			*/
+
+#define IMPORTC_DEFAULT_FEATURES (IMPORTCF_GLYPH | \
+				  IMPORTCF_BASIC | \
+				  IMPORTCF_FILE_MASK | \
+				  IMPORTCF_FORMAT_OPTIONS | \
+				  IMPORTCF_IMPORT_TRIGGER)
+
+/*
+ *    Toolbox features flags used with 
+ *    ATTR_GEN_CONTROL_REQUIRE/PROHIBIT_TOOLBOX_UI
+ */
+typedef	ByteFlags ImportControlToolboxFeatures;
+#define IMPORTCTF_DIALOG_BOX	0x01
+
+
+
+#define IMPORTC_DEFAULT_TOOLBOX_FEATURES	IMPORTCTF_DIALOG_BOX
+
+/*-----------------------------------
+ *	External messages
+ *-----------------------------------*/
+
+@message void MSG_IMPORT_CONTROL_SET_DATA_CLASSES( ImpexDataClasses \
+							 dataClasses = cx );
+/*
+ * Sets the data classes for which import is possible. The names of
+ * the file formats which belong to these data classes will be displayed
+ * to the user in the Import dialog box. If the message is sent while
+ * the Import dialog box is visible to the user, the list of formats
+ * will be re-built.
+ *
+ * Context:	Utility message sent to change the formats the user can
+ *		choose from
+ * Source:	Anyone
+ * Destination:	ImportControlClass object
+ * Interception:Generally should not be intercepted.
+ *
+ * Pass:	dataClasses = ImpexDataClasses
+ *
+ * Return:	Nothing
+ *	
+ */
+
+@message ImpexDataClasses MSG_IMPORT_CONTROL_GET_DATA_CLASSES() = cx;
+/*
+ * Gets the data classes for which import is currently possible.
+ *
+ * Context:	Utility message sent to find state of the object
+ * Source:	Anyone
+ * Destination:	ImportControlClass object
+ * Interception:Generally should not be intercepted.
+ *
+ * Pass:	Nothing
+ *
+ * Return:	ImpexDataClasses
+ *		
+ */
+
+@message void MSG_IMPORT_CONTROL_SET_ACTION( optr destOD = cx:dx, \
+					     word ICImsg = bp );
+/*
+ * Sets the message to be sent upon beginning an import and the
+ * destination to send it to.
+ *
+ * Context:	Utility message sent to change the recipient of notification
+ *		that an import has been requested by the user.
+ * Source:	Anyone
+ * Destination:	ImportControlClass object
+ * Interception:Generally should not be intercepted.
+ *
+ * Pass:	destOD	= Destination OD
+ *		ICImsg	= Message
+ *			 (see parameter documentation for ICI_message below)
+ *
+ * Return:	Nothing
+ *	
+ */
+
+@message void MSG_IMPORT_CONTROL_SET_MSG( word ECImsg = cx );
+/*
+ * Sets the message to be sent when an import is initiated.
+ *
+ * Context:	Utility message sent to change the recipient of
+ *		notification that an import has be requested by
+ *		the user.
+ * Source:	Anyone
+ * Destination:	ImportControlClass object
+ * Interception:Generally should not be intercepted.
+ *
+ * Pass:	ECImsg	= Message
+ *			 (see parameter documentation for ECI_message below)
+ *
+ * Return:	Nothing
+ * 
+ */
+
+typedef struct {
+    word	message;
+    word    	unused;
+    optr	destOD;
+} ImpexAction;
+
+@message void MSG_IMPORT_CONTROL_GET_ACTION(
+    	    	    	    	ImpexAction *retValue = bpaxdxcx);
+/*
+ * Gets the destination OD & message for import notification
+ *
+ * Context:	Utility message for finding out where notification
+ *  	    	of beginning import is sent and what message is used.
+ * Source:	Anyone
+ * Destination:	ImportControlClass object
+ * Interception:Generally should not be intercepted.
+ *
+ * Pass:	pointer to ImpexAction structure (empty)
+ *
+ * Return:	pointer to ImpexAction structure (filled)
+ *		
+ */
+
+@message void MSG_IMPORT_CONTROL_SET_ATTRS( ImportControlAttrs attrs = cx );
+/*
+ * Sets the attributes for an ImportControl object.
+ *
+ * Context:	Utility message sent to change the attributes for this object
+ * Source:	Anyone
+ * Destination:	ImportControlClass object
+ * Interception:Generally should not be intercepted.
+ *
+ * Pass:	attrs = ImportControlAttrs
+ *
+ * Return:	Nothing
+ *
+ */
+
+@message ImportControlAttrs MSG_IMPORT_CONTROL_GET_ATTRS() = cx;
+/*
+ * Gets the attributes for an ImportControl object.
+ *
+ * Context:	Utility message sent to find state of the object
+ * Source:	Anyone
+ * Destination:	ImportControlClass object
+ * Interception:Generally should not be intercepted.
+ *
+ * Pass:	Nothing
+ *
+ * Return:	ImportControlAttrs
+ *	
+ */
+
+@message word MSG_IMPORT_CONTROL_GET_FILE_SELECTOR_OFFSET(
+				ImportControlFeatures features = dx ) = cx;
+/*
+ * Get the offset of the import file selector
+ *
+ * Context:	The controller needs to know the import file selector offset.
+ * Source:	ImportControlClass object
+ * Destination:	ImportControlClass object
+ * Interception:Should be intercepted by app if app has turned off the
+ *		IMPORTCF_BASIC feature. Need not be passed to superclass.
+ *
+ * Pass:	ImportControlFeatures bitmask
+ *
+ * Return:	offset of import file selector
+ *
+ */
+
+@message word MSG_IMPORT_CONTROL_GET_FORMAT_LIST_OFFSET(
+				ImportControlFeatures features = dx ) = cx;
+/*
+ * Get the offset of the import format list
+ *
+ * Context:	The controller needs to know the import format list offset.
+ * Source:	ImportControlClass object
+ * Destination:	ImportControlClass object
+ * Interception:Should be intercepted by app if app has turned off the
+ *		IMPORTCF_BASIC feature. Need not be passed to superclass.
+ *
+ * Pass:	ImportControlFeatures bitmask
+ *
+ * Return:	offset of import format list
+ *
+ */
+
+@message word MSG_IMPORT_CONTROL_GET_FILE_MASK_OFFSET(
+				ImportControlFeatures features = dx ) = cx;
+/*
+ * Get the offset of the import file mask
+ *
+ * Context:	The controller needs to know the import file mask offset.
+ * Source:	ImportControlClass object
+ * Destination:	ImportControlClass object
+ * Interception:May be intercepted by app if app has turned off the
+ *		IMPORTCF_FILE_MASK feature. Need not be passed to superclass.
+ *
+ * Pass:	ImportControlFeatures bitmask
+ *
+ * Return:	offset of import file mask
+ *
+ */
+
+@message word MSG_IMPORT_CONTROL_GET_FORMAT_UI_PARENT_OFFSET(
+				ImportControlFeatures features = dx ) = cx;
+/*
+ * Get the offset of the import format UI parent
+ *
+ * Context:	The controller needs to know the offset of the
+ *		import format UI parent object.
+ * Source:	ImportControlClass object
+ * Destination:	ImportControlClass object
+ * Interception:May be intercepted by app if app has turned off the
+ *		IMPORTCF_FORMAT_OPTIONS feature. Need not be passed to
+ *		superclass.
+ *
+ * Pass:	ImportControlFeatures bitmask
+ *
+ * Return:	offset of import format UI parent
+ *
+ */
+
+@message word MSG_IMPORT_CONTROL_GET_APP_UI_PARENT_OFFSET(
+				ImportControlFeatures features = dx ) = cx;
+/*
+ * Get the offset of the import app UI parent
+ *
+ * Context:	The controller needs to know the offset of the
+ *		import app UI parent object.
+ * Source:	ImportControlClass object
+ * Destination:	ImportControlClass object
+ * Interception:May be intercepted by app if app has turned off the
+ *		IMPORTCF_BASIC feature. Need not be passed to superclass.
+ *
+ * Pass:	ImportControlFeatures bitmask
+ *
+ * Return:	offset of import app UI parent
+ *
+ */
+
+@message word MSG_IMPORT_CONTROL_GET_IMPORT_TRIGGER_OFFSET(
+				ImportControlFeatures features = dx ) = cx;
+/*
+ * Get the offset of the import trigger.
+ *
+ * Context:	The controller needs to know the import trigger offset.
+ * Source:	ImportControlClass object
+ * Destination:	ImportControlClass object
+ * Interception:Should be intercepted by app if app has turned off the
+ *		IMPORTCF_IMPORT_TRIGGER feature. Need not be passed to
+ *		superclass.
+ *
+ * Pass:	ImportControlFeatures bitmask
+ *
+ * Return:	offset of import trigger	
+ *
+ */
+
+@message void MSG_IMPORT_CONTROL_IMPORT_COMPLETE( ImpexTranslationParams \
+						 _far *itParams = ss:bp );
+/*
+ * Sent by the application when it has completed the import.
+ *
+ * Context:	Sent after an application has obtained all the data it
+ *		requires from the transfer format passed to it in the
+ *		ImpexTranslationParams struct sent out on import.
+ * Source:	Anyone
+ * Destination:	ImportControlClass object
+ * Interception:Generally should not be intercepted.
+ *
+ * Pass:	itParams	= pointer to ImpexTranslationParams 
+ *					(structure passed to app earlier)
+ * Return:	Nothing
+ *
+ */
+
+/*-----------------------------------
+ *    Internal messages
+ *----------------------------------- */
+
+@message void  MSG_IMPORT_CONTROL_SET_FILE_MASK();
+/*
+ *   Set the file mask string (eg. "*.FOO") to be used by the FileSelector
+ *   in displaying file names to the user.
+ *
+ * Context:	Sent when the user hits return after editing the file
+ *    		specification string, or when a new format is selected.
+ * Source:	Text object of self
+ * Destination:	ImportControlClass object
+ * Interception:Generally should not be intercepted.
+ *
+ * Pass:	Nothing
+ *
+ * Return:	Nothing
+ *  
+ */
+
+@message void MSG_IMPORT_CONTROL_IMPORT();
+/*
+ *    Initiate an import with the selected file.
+ *
+ * Context:	The user has clicked on the "Import" trigger
+ * Source:	Import trigger
+ * Destination:	ImportControlClass object
+ * Interception:Generally should not be intercepted.
+ *
+ * Pass:	Nothing
+ *
+ * Return:	Nothing
+ * 
+ */
+
+@message void MSG_IMPORT_CONTROL_CANCEL();
+/*
+ *    Cancel the import.
+ *
+ * Context:	The user has clicked on the "Cancel" trigger
+ * Source:	Aforementioned GenTrigger
+ * Destination:	ImportControlClass object
+ * Interception:Generally should not be intercepted.
+ *
+ * Pass:	Nothing
+ *
+ * Return:	Nothing
+ *    
+ */
+
+@message void MSG_IMPORT_CONTROL_CONTINUE_IMPORT();
+/*
+ * Redwood-only, called after all necessary files have been saved or closed,
+ * to do the real meat of the import work.
+ *
+ * Pass:	nothing
+ * Return:	nothing
+ *
+ */
+
+@message void MSG_IMPORT_CONTROL_NEW_LIBRARY_DISK();
+/*
+ * For ALLOW_FLOPPY_BASED_LIBS.
+ *
+ * Pass:	nothing
+ * Return:	nothing
+ *
+ */
+
+@message ChunkHandle MSG_IMPORT_CONTROL_GET_FORMAT_GROUP_OFFSET();
+/*
+ * For ALLOW_FLOPPY_BASED_LIBS.
+ *
+ * Pass:	nothing
+ * Return:	chunk handle of FormatGroup
+ *
+ */
+
+@message ChunkHandle MSG_IMPORT_CONTROL_GET_FILE_SELECT_GROUP_OFFSET();
+/*
+ * For ALLOW_FLOPPY_BASED_LIBS.
+ *
+ * Pass:	nothing
+ * Return:	chunk handle of FileSelectGroup
+ *
+ */
+
+@message void MSG_IMPORT_CONTROL_INSERT_LIBRARY_DISK_RESPONSE(
+						InteractionCommand ic = cx);
+/*
+ * For ALLOW_FLOPPY_BASED_LIBS.
+ *
+ * Pass:	InteractionCommand
+ * Return:	nothing
+ *
+ */
+
+@message optr MSG_IMPORT_CONTROL_GET_FILE_SELECTOR() = cx:dx;
+/*
+ * Returns the optr of the file selector, if built out.
+ *
+ * Pass:	nothing
+ * Return:	GenFileSelector, or NullOptr if not built
+ */
+
+@protominor ImpexOpCompleted;
+
+@message Boolean MSG_IMPORT_CONTROL_AUTO_DETECT_FILE_FORMAT() = carry;
+
+/*
+ * EXTERNAL MESSAGE
+ * Tries to auto-detect the format of the file currently selected for import.
+ *
+ * Pass:	nothing
+ * Return:	TRUE if unable to auto-detect format, otherwise FALSE.
+ *
+ * Side Effects:Sets format selector to "No idea".
+ */
+
+@protoreset
+
+/*-----------------------------------
+ *    Instance Data
+ *-----------------------------------*/
+
+@instance ImportControlAttrs ICI_attrs;      /*attributes for the object*/
+@instance ImpexDataClasses   ICI_dataClasses;/*data type avail for import*/
+@instance optr		     ICI_destination;/*destination for import msg*/
+@instance word		     ICI_message;    /* message sent for import */
+		/*
+ 		 *    	Synopsis:	Perform the import of the passed data
+ 		 *
+ 		 *    	Pass:		ImpexTranslationParams
+ 		 *
+ 		 *    	Returns:	Nothing
+		 */
+
+/*-----------------------------------
+ *    Variable Instance Data
+ *-----------------------------------*/
+
+/*-----------------------------------
+ *    	Attrs
+ *-----------------------------------*/
+
+
+/*
+ *    Attribute to allow applications to add their own UI to the Import DB.
+ *    The generic tree whose optr is stored here must *not* be set USABLE.
+ *    Use this in lieu of ATTR_GEN_CONTROL_APP_UI.
+ */
+@vardata optr ATTR_IMPORT_CONTROL_APP_UI;
+@reloc ATTR_IMPORT_CONTROL_APP_UI, 0, optr;
+
+@vardata optr ATTR_IMPORT_CONTROL_CANCEL_DESTINATION;
+@reloc ATTR_IMPORT_CONTROL_CANCEL_DESTINATION, 0, optr;
+@vardata word ATTR_IMPORT_CONTROL_CANCEL_MESSAGE;
+
+/*-----------------------------------
+ *    	Hints
+ *-----------------------------------*/
+
+@endc
+
+
+
+/*-----------------------------------------------------------------------------
+ *    	ExportClass declaration
+ *-----------------------------------------------------------------------------
+
+ *
+ *    GCN	GenApplication lists to be placed on:
+ *    	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+@class	ExportControlClass, ImportExportClass;
+
+/*-----------------------------------
+ *    How exporting works
+ *-----------------------------------*/
+
+/*-----------------------------------
+ *	Constants
+ *-----------------------------------*/
+
+typedef WordFlags ExportControlAttrs;
+#define ECA_IGNORE_INPUT	0x8000	/* ignore input while export occurs */
+    
+/*
+ *   Features flags (used with ATTR_GEN_CONTROL_REQUIRE/PROHIBIT_UI)
+ */
+typedef ByteFlags ExportControlFeatures;
+#define EXPORTCF_EXPORT_TRIGGER	0x0008	/* export trigger 		*/
+#define EXPORTCF_FORMAT_OPTIONS	0x0004	/* export format UI parent,
+					 *  under which is placed any
+					 *  UI specific to the
+					 *  currently selected format	*/
+#define EXPORTCF_BASIC		0x0002	/* export file selector,
+					 *  export format list,
+					 *  export file name, and
+					 *  export app UI parent, under
+					 *  which is placed any UI
+					 *  specific to the app 	*/
+#define EXPORTCF_GLYPH		0x0001	/* glyph at the top of the
+					   export dialog box		*/
+
+#define EXPORTC_DEFAULT_FEATURES (EXPORTCF_GLYPH | \
+				  EXPORTCF_BASIC | \
+				  EXPORTCF_FORMAT_OPTIONS | \
+				  EXPORTCF_EXPORT_TRIGGER)
+
+/*
+ *   Toolbox features flags used with ATTR_GEN_CONTROL_REQUIRE/PROHIBIT_TOOLBOX_UI
+ */
+typedef ByteFlags ExportControlToolboxFeatures;
+#define EXPORTCTF_DIALOG_BOX	0x01
+
+
+
+#define EXPORTC_DEFAULT_TOOLBOX_FEATURES 	EXPORTCTF_DIALOG_BOX
+
+
+/*-----------------------------------
+ *    External messages
+ *-----------------------------------*/
+
+@message void MSG_EXPORT_CONTROL_SET_DATA_CLASSES(ImpexDataClasses \
+							dataClass = cx );
+/*
+ * Sets the data classes for which export is possible. The names of
+ * the file formats which belong to these data classes will be displayed
+ * to the user in the Export dialog box. If the message is sent while
+ * the Export dialog box is visible to the user, the list of formats
+ * will be re-built.
+ *
+ * Context:	Utility message sent to change the formats the user can
+ *    		choose from.
+ * Source:	Anyone
+ * Destination:	ExportControlClass object
+ * Interception:Generally should not be intercepted.
+ *
+ * Pass:	dataClass = ImpexDataClasses
+ *
+ * Return:	Nothing
+ *   
+ *
+ */
+@message  ImpexDataClasses MSG_EXPORT_CONTROL_GET_DATA_CLASSES() = cx;
+/*
+ * Gets the data classes for which export is currently possible.
+ *
+ * Context:	Utility message sent to find state of the object
+ * Source:	Anyone
+ * Destination:	ExportControlClass object
+ * Interception:Generally should not be intercepted.
+ *
+ * Pass:	Nothing
+ *
+ * Return:	ImpexDataClasses
+ *   
+ */
+
+@message void MSG_EXPORT_CONTROL_SET_ACTION( optr destOD = cx:dx, \
+					     word ECImsg = bp );
+/*
+ * Sets the message to be sent upon beginning an export and the
+ * destination to send it to.
+ *
+ * Context:	Utility message sent to change the recipient of
+ *		notification that an export has be requested by
+ *		the user.
+ * Source:	Anyone
+ * Destination:	ExportControlClass object
+ * Interception:Generally should not be intercepted.
+ *
+ * Pass:	dest = Destination OD
+ *    		ECImsg	= Message
+ *			 (    see parameter documention for ECI_message below)
+ *
+ * Return:	Nothing
+ * 
+ */
+
+@message void MSG_EXPORT_CONTROL_SET_MSG( word ECImsg = cx );
+/*
+ * Sets the message to be sent when an export is initiated.
+ *
+ * Context:	Utility message sent to change the recipient of
+ *		notification that an export has been requested by
+ *		the user.
+ * Source:	Anyone
+ * Destination:	ExportControlClass object
+ * Interception:Generally should not be intercepted.
+ *
+ * Pass:	ECImsg	= Message
+ *			 (    see parameter documention for ECI_message below)
+ *
+ * Return:	Nothing
+ * 
+ */
+
+@message void MSG_EXPORT_CONTROL_GET_ACTION(
+    	    	    	    	ImpexAction *retValue = bpaxdxcx );
+/*
+ * Gets the destination OD & message for export notification.
+ *
+ * Context:	Utility message for finding out where notification
+ *  	    	of beginning export is sent and what message is used.
+ * Source:	Anyone
+ * Destination:	ExportControlClass object
+ * Interception:Generally should not be intercepted.
+ *
+ * Pass:	pointer to ImpexAction structure (empty)
+ * 
+ * Return:	pointer to ImpexAction structure (filled)
+ *
+ */
+
+@message void MSG_EXPORT_CONTROL_SET_ATTRS( ExportControlAttrs attrs = cx );
+/*
+ * Sets the attributes for an ExportControl object.
+ *
+ * Context:	Utility message sent to change the attributes for this object
+ * Source:	Anyone
+ * Destination:	ExportControlClass object
+ * Interception:Generally should not be intercepted.
+ *
+ * Pass:	attrs = ExportControlAttrs
+ *
+ * Return:	Nothing
+ *	
+ */
+
+@message ExportControlAttrs MSG_EXPORT_CONTROL_GET_ATTRS() = cx ;
+/*
+ * Gets the attributes for an ExportControl object.
+ *
+ * Context:	Utility message sent to find state of the object
+ * Source:	Anyone
+ * Destination:	ExportControlClass object
+ * Interception:Generally should not be intercepted.
+ *
+ * Pass:	Nothing
+ *
+ * Return:	ExportControlAttrs
+ *	
+ */
+
+@message word MSG_EXPORT_CONTROL_GET_FILE_SELECTOR_OFFSET(
+				ExportControlFeatures features = dx ) = cx;
+/*
+ * Get the offset of the export file selector
+ *
+ * Context:	The controller needs to know the export file selector offset.
+ * Source:	ExportControlClass object
+ * Destination:	ExportControlClass object
+ * Interception:Should be intercepted by app if app has turned off the
+ *		EXPORTCF_BASIC feature
+ *
+ * Pass:	ExportControlFeatures bitmask
+ *
+ * Return:	offset of export file selector
+ *
+ */
+
+@message word MSG_EXPORT_CONTROL_GET_FORMAT_LIST_OFFSET(
+				ExportControlFeatures features = dx ) = cx;
+/*
+ * Get the offset of the export format list
+ *
+ * Context:	The controller needs to know the export format list offset.
+ * Source:	ExportControlClass object
+ * Destination:	ExportControlClass object
+ * Interception:Should be intercepted by app if app has turned off the
+ *		EXPORTCF_BASIC feature
+ *
+ * Pass:	ExportControlFeatures bitmask
+ *
+ * Return:	offset of export format list
+ *
+ */
+
+@message word MSG_EXPORT_CONTROL_GET_FILE_NAME_OFFSET( 
+				ExportControlFeatures features = dx ) = cx;
+/*
+ * Get the offset of the export file name
+ *
+ * Context:	The controller needs to know the export file name offset.
+ * Source:	ExportControlClass object
+ * Destination:	ExportControlClass object
+ * Interception:Should be intercepted by app if app has turned off the
+ *		EXPORTCF_BASIC feature
+ *
+ * Pass:	ExportControlFeatures bitmask
+ *
+ * Return:	offset of export file name
+ *
+ */
+
+@message word MSG_EXPORT_CONTROL_GET_FORMAT_UI_PARENT_OFFSET(
+				ExportControlFeatures features = dx ) = cx;
+/*
+ * Get the offset of the export format UI parent
+ *
+ * Context:	The controller needs to know the offset of the
+ *		export format UI parent object.
+ * Source:	ExportControlClass object
+ * Destination:	ExportControlClass object
+ * Interception:May be intercepted by app if app has turned off the
+ *		EXPORTCF_FORMAT_OPTIONS feature
+ *
+ * Pass:	ExportControlFeatures bitmask
+ *
+ * Return:	offset of export format UI parent
+ *
+ */
+
+@message word MSG_EXPORT_CONTROL_GET_APP_UI_PARENT_OFFSET(
+				ExportControlFeatures features = dx ) = cx;
+/*
+ * Get the offset of the export app UI parent
+ *
+ * Context:	The controller needs to know the offset of the
+ *		export app UI parent object.
+ * Source:	ExportControlClass object
+ * Destination:	ExportControlClass object
+ * Interception:May be intercepted by app if app has turned off the
+ *		EXPORTCF_BASIC feature
+ *
+ * Pass:	ExportControlFeatures bitmask
+ *
+ * Return:	offset of export app UI parent
+ *
+ */
+
+@message word MSG_EXPORT_CONTROL_GET_EXPORT_TRIGGER_OFFSET(
+				ExportControlFeatures features = dx ) = cx;
+/*
+ * Get the offset of the export trigger.
+ *
+ * Context:	The controller needs to know the export trigger offset.
+ * Source:	ExportControlClass object
+ * Destination:	ExportControlClass object
+ * Interception:Should be intercepted by app if app has turned off the
+ *		EXPORTCF_EXPORT_TRIGGER feature
+ *
+ * Pass:	ExportControlFeatures bitmask
+ *
+ * Return:	offset of export trigger	
+ *
+ */
+
+@message void MSG_EXPORT_CONTROL_EXPORT_COMPLETE(ImpexTranslationParams \
+						 _far *itParams = ss:bp );
+/*
+ * Sent by the application when it has completed the export.
+ *
+ * Context:	Sent after an application has created the transfer format
+ *		to be exported to another data format.
+ * Source:	Anyone
+ * Destination:	ExportControlClass object
+ * Interception:Generally should not be intercepted.
+ *
+ * Pass:	itParams= pointer to ImpexTranslationParams
+ *
+ *
+ * Return:	Nothing
+ *   
+ */
+
+
+/*-----------------------------------
+ *	Internal messages
+ *-----------------------------------*/
+
+@message void MSG_EXPORT_CONTROL_EXPORT();
+/*
+ *  Initiate an export into the selected file.
+ *
+ * Context:	The user has clicked on the "Export" trigger
+ * Source:	Export trigger
+ * Destination:	ExportControlClass object
+ * Interception:Generally should not be intercepted.
+ *
+ * Pass:	Nothing
+ *
+ * Return:	Nothing
+ *
+ */
+
+@message void MSG_EXPORT_CONTROL_NEW_LIBRARY_DISK();
+/*
+ * For ALLOW_FLOPPY_BASED_LIBS.
+ *
+ * Pass:	nothing
+ * Return:	nothing
+ *
+ */
+
+@message void MSG_EXPORT_CONTROL_CANCEL();
+/*
+ * For ALLOW_FLOPPY_BASED_LIBS.
+ *
+ * Pass:	nothing
+ * Return:	nothing
+ *
+ */
+
+@message ChunkHandle MSG_EXPORT_CONTROL_GET_FORMAT_GROUP_OFFSET();
+/*
+ * For ALLOW_FLOPPY_BASED_LIBS.
+ *
+ * Pass:	nothing
+ * Return:	chunk handle of FormatGroup
+ *
+ */
+
+@message ChunkHandle MSG_EXPORT_CONTROL_GET_FILE_SELECT_GROUP_OFFSET();
+/*
+ * For ALLOW_FLOPPY_BASED_LIBS.
+ *
+ * Pass:	nothing
+ * Return:	chunk handle of FileSelectGroup
+ *
+ */
+
+@message void MSG_EXPORT_CONTROL_INSERT_LIBRARY_DISK_RESPONSE(
+						InteractionCommand ic = cx);
+/*
+ * For ALLOW_FLOPPY_BASED_LIBS.
+ *
+ * Pass:	InteractionCommand
+ * Return:	nothing
+ *
+ */
+
+/*-----------------------------------
+ *	Instance Data
+ *-----------------------------------*/
+
+@instance ExportControlAttrs   ECI_attrs;	/* attributes for the object */
+@instance ImpexDataClasses     ECI_dataClasses; /* data type avail for import*/
+@instance optr   	       ECI_destination;	/* dest for import message */
+@instance word                 ECI_message;      /* message sent for import */
+	/*
+ 	 * Synopsis:	Perform the export of the current data.
+ 	 *
+ 	 * Pass:	on stack, ImpexTranslationParams
+         *
+         * Returns:	xferFormat = VMChain containing transfer format
+         *			    = 0:0 if error
+         */	
+
+/*-----------------------------------
+ *	Variable Instance Data
+ *-----------------------------------*/
+
+/*-----------------------------------
+ *	Attrs
+ *-----------------------------------*/
+
+
+/*
+ * Attribute to allow applications to add their own UI to the Export DB.
+ * The generic tree whose optr is stored here nust *not* be set USABLE.
+ * Use this in lieu of ATTR_GEN_CONTROL_APP_UI.
+ */
+@vardata optr ATTR_EXPORT_CONTROL_APP_UI;
+/*@reloc ATTR_EXPORT_CONTROL_APP_UI, 0, optr;*/
+
+/*-----------------------------------
+ *	Hints
+ *-----------------------------------*/
+
+/*
+ * Internal: Temporary storage for ImpexThreadInfo handle
+ *	     (For ALLOW_FLOPPY_BASED_LIBS)
+ */
+@vardata MemHandle TEMP_EXPORT_CONTROL_IMPEX_THREAD_INFO;
+
+@endc
+
+
+/*-----------------------------------------------------------------------------
+ *		ImpexMapControlClass declaration
+ *-----------------------------------------------------------------------------
+
+ *
+ * GenApplication GCN lists to be placed on:
+ *	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+@class ImpexMapControlClass, GenControlClass;
+
+/*-----------------------------------------------------------------------------
+ *		Methods
+ *---------------------------------------------------------------------------*/
+
+/*-----------------------------------------------------------------------------
+ *		Internal methods
+ *---------------------------------------------------------------------------*/
+@message void MSG_IMC_UNMAP();
+/*
+ * Remove a mapped entry from the map list 
+ *
+ * Context:	The user has clicked on the "UnMap" trigger
+ * Source:	UnMap trigger
+ * Destination:	ImpexMapControlClass object
+ * Interception: Generally should not be intercepted.
+ *
+ * Pass:	Nothing
+ *
+ * Return:	Nothing
+ */
+
+@message void MSG_IMC_MAP_ENTRY();
+/*
+ * Maps the currently selected source entry to 
+ * the currently selected destination entry
+ *
+ * Context:	The user has clicked on the "Map" trigger
+ * Source:	Map trigger
+ * Destination:	ImpexMapControlClass object
+ * Interception: Generally should not be intercepted.
+ *
+ * Pass:	Nothing
+ *
+ * Return:	Nothing
+ */
+
+@message void MSG_IMC_REQUEST_SOURCE_MONIKER( word id = bp );
+/*
+ * Get the moniker for the source map list
+ *
+ * Context:	Sent when you initialize the source map list	
+ * Source:	ImpexMapSourceList
+ * Destination:	ImpexMapControlClass object
+ * Interception: Generally should not be intercepted.
+ *
+ * Pass:	id = identifier of source map list
+ *
+ * Return:	Nothing
+ */
+
+@message void MSG_IMC_REQUEST_DEST_MONIKER( word id = bp );
+/*
+ * Get the moniker for the destination map list
+ *
+ * Context:	Sent when you initialize the destination map list	
+ * Source:	ImpexMapDestList
+ * Destination:	ImpexMapControlClass object
+ * Interception: Generally should not be intercepted.
+ *
+ * Pass:	id = identifier of destination map list
+ *
+ * Return:	Nothing
+ */
+
+@message void MSG_IMC_REQUEST_MAP_MONIKER( word id = bp );
+/*
+ * Get the moniker for the map list
+ *
+ * Context:	Sent when you click on the "Map" button.	
+ * Source:	ImpexMapMapList
+ * Destination:	ImpexMapControlClass object
+ * Interception: Generally should not be intercepted.
+ *
+ * Pass:	id = identifier of map list
+ *
+ * Return:	Nothing
+ */
+
+@message void MSG_IMC_MAP_DONE();
+/*
+ * Put up a warning dialog box if no fields have been mapped  
+ *
+ * Context:	Sent when you click on "Done" trigger
+ * Source:	Done trigger
+ * Destination:	ImpexMapControlClass object
+ * Interception: Generally should not be intercepted.
+ *
+ * Pass:	Nothing
+ *
+ * Return:	Nothing
+ */
+
+@message void MSG_IMC_MAP_CANCEL();
+/*
+ * Deletes the map list block and re-init the map list 
+ *
+ * Context:	The user has clicked on the "Cancel" trigger
+ * Source:	Cancel trigger
+ * Destination:	ImpexMapControlClass object
+ * Interception: Generally should not be intercepted.
+ *
+ * Pass:	Nothing
+ *
+ * Return:	Nothing
+ */
+
+@message MemHandle MSG_IMC_MAP_GET_MAP_DATA();
+/*
+ * Return handle of map list block 
+ *
+ * Context:	Import/export is about to commence.
+ * Source:	Database Translation Library
+ * Destination:	ImpexMapControlClass object
+ * Interception: Generally should not be intercepted.
+ *
+ * Pass:	Nothing
+ *
+ * Return:	handle of map list block
+ */
+
+/*-----------------------------------------------------------------------------
+ *		Hints
+ *---------------------------------------------------------------------------*/
+
+/*-----------------------------------------------------------------------------
+ *		Constants & Structures
+ *---------------------------------------------------------------------------*/
+
+#define SOURCE 	0	
+#define DESTINATION 	1
+
+/* Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+ * ATTR_GEN_CONTROL_PROHIBIT_UI)
+ */
+typedef ByteFlags IMCFeatures;
+#define IMCF_MAP	0x01
+
+
+#define IMC_DEFAULT_FEATURES   IMCF_MAP
+
+#define IMC_DEFAULT_TOOLBOX_FEATURES  0
+
+#define IMC_MAP_MONIKER_SIZE 	1024	
+
+typedef ByteFlags ImpexMapFlags;
+#define IMF_IMPORT	0x80
+#define IMF_EXPORT	0x40
+
+typedef ByteEnum DefaultFieldNameUsage;
+#define DFNU_FIELD 	0      /* use "Field   " */
+#define DFNU_COLUMN	1      /* use "Column  " */
+#define DFNU_FIXED	2      /* use pre-defined field names  */
+
+typedef struct {
+    LMemBlockHeader		IMFIH_base;
+    word			IMFIH_fieldChunk;
+    word			IMFIH_numFields;
+    DefaultFieldNameUsage	IMFIH_flag;		
+} ImpexMapFileInfoHeader;
+
+typedef struct {
+    LMemBlockHeader	MLBH_base;
+    word		MLBH_numDestFields;
+    word		MLBH_chunk1;
+} MapListBlockHeader;
+
+typedef struct {
+    word	CML_source;
+    word	CML_dest;
+} ChunkMapList;
+
+/*-----------------------------------------------------------------------------
+ *		Instance Data
+ *---------------------------------------------------------------------------*/
+
+@instance word 		IMCI_dataBlock1;
+@instance word 		IMCI_dataBlock2;
+@instance word 		IMCI_childBlock;
+@instance word 		IMCI_mapListBlock;
+@instance ImpexMapFlags IMCI_flags;
+
+@endc
+
+
+/*-----------------------------------------------------------------------------
+ *		Impex routines called by translation libraries
+ *---------------------------------------------------------------------------*/
+
+#define IMPEX_TEMP_VM_FILE 	0xffff
+#define IMPEX_TEMP_NATIVE_FILE 	0x0000
+
+/*
+ * All Impex routines callable from a translation library written in C
+ * return a value of type TransErrorInfo to the library.
+ *
+ * The following macros, defined in xlatLib.h, operate on values of
+ * type TransErrorInfo:
+ *
+ * TRANS_ERROR_IS_NONE(val)
+ * TRANS_ERROR_IS_CUSTOM(val)
+ * GET_TRANS_ERROR(val)
+ * GET_CUSTOM_MSG_HANDLE(val)
+ */
+
+extern TransErrorInfo
+    _pascal ImpexCreateTempFile(char *buffer, word fileType, FileHandle *file);
+/*
+ * Utility routine to create and open a unique temporary file to be used by
+ * a translation library for import or export.
+ *
+ * Pass:	buffer	   = pointer to file name buffer
+ *		fileType   = IMPEX_TEMP_VM_FILE or IMPEX_TEMP_NATIVE_FILE
+ *		file	   = pointer to new file handle
+ *
+ * Return:	TransErrorInfo
+ *			returnValue.transError = 0 if no error;
+ *			returnValue.customMsgHandle =
+ *				memory handle of error text if
+ *				returnValue.transError = TE_CUSTOM
+ *		buffer	   = file name buffer filled
+ *		file	   = new file handle (filled)
+ *
+ */
+
+extern TransErrorInfo
+    _pascal ImpexDeleteTempFile(const char *buffer, FileHandle tempfile,
+				word fileType);
+/*
+ * Utility routine to close and delete a temporary file that was created by
+ * calling ImpexCreateTempFile.
+ *
+ * Pass:	buffer	   = file name buffer
+ *		tempfile   = file handle of open tempfile
+ *		fileType   = IMPEX_TEMP_VM_FILE or IMPEX_TEMP_NATIVE_FILE
+ *
+ * Return:	TransErrorInfo
+ *			returnValue.transError = 0 if no error;
+ *			returnValue.customMsgHandle =
+ *				memory handle of error text if
+ *				returnValue.transError = TE_CUSTOM
+ */
+
+
+extern TransErrorInfo
+    _pascal ImpexImportFromMetafile(Handle xlatLib, word routine,
+				    VMFileHandle xferFile, FileHandle metafile,
+				    dword *xferFormat, word arg1, word arg2);
+/*
+ * Convert a metafile to a transfer format by calling an intermediate
+ * metafile conversion library. This is to be used by translation libraries
+ * that use an intermediate metafile format.
+ *
+ * Pass:        xlatLib    = handle of metafile translation library to use
+ *		routine	   = routine number of library routine to call
+ *		xferFile   = handle of VM file to hold transfer format
+ *		metafile   = handle of the metafile (open for read)
+ *		arg1, arg2 = additional data for metafile library as needed
+ *		xferFormat = pointer to VM chain which will hold
+ *			     transfer format
+ *
+ * Return:	TransErrorInfo
+ *			returnValue.transError = 0 if no error;
+ *			returnValue.customMsgHandle =
+ *				memory handle of error text if
+ *				returnValue.transError = TE_CUSTOM
+ *		xferFormat = pointer to VM chain containing transfer format
+ *
+ */
+
+extern TransErrorInfo
+    _pascal ImpexExportToMetafile(Handle xlatLib, word routine,
+				  VMFileHandle xferFile, FileHandle metafile,
+				  dword xferFormat, word arg1, word arg2);
+/*
+ * Convert a transfer format to a metafile by calling an intermediate
+ * metafile conversion library. This is to be used by translation libraries
+ * that use an intermediate metafile format.
+ *
+ * Pass:        xlatLib	   = handle of metafile translation library to use
+ *		routine	   = entry point number of library routine to call
+ *		xferFile   = VM file handle of transfer format 
+ *		metafile   = handle of the metafile (open for read/write)
+ *		xferFormat = VM chain containing transfer format
+ *		arg1, arg2 = additional data for metafile library as needed
+ *
+ * Return:	TransErrorInfo
+ *			returnValue.transError = 0 if no error;
+ *			returnValue.customMsgHandle =
+ *				memory handle of error text if
+ *				returnValue.transError = TE_CUSTOM
+ *
+ */
+
+extern Boolean
+    _pascal ImpexUpdateImportExportStatus(const char *msgStr, word percent);
+
+/*
+ * Apprise the user of the status of an import or export. This routine should
+ * only be called by translation libraries, and can be called at any time
+ * during the import/export process. If a translation library chooses not
+ * to call this function, the default import/export message will be displayed.
+ *
+ * Pass:	msgStr	= pointer to tring to display to user
+ *			  (NULL string to not display a new string)
+ *		percent	= Percentage completed so far (0->100)
+ *			  (-1 to not display any percentage)
+ * 
+ * Return:	Boolean	= TRUE to continue import/export
+ *				- or -
+ *			= FALSE to discontinue import/export ASAP
+ */
+
+/*-----------------------------------------------------------------------------
+ *		Impex routines called by applications
+ *---------------------------------------------------------------------------*/
+
+extern void
+    _pascal ImpexImportExportCompleted(ImpexTranslationParams *itParams);
+/*
+ * A utility routine called by an application to send back notification to
+ * an ImportControl or ExportControl object that the import or
+ * export operation has been completed. For import, an application will
+ * simply pass back a pointer to the passed ImpexTranslationParams. For export,
+ * the application must complete the GTP_transferVMChain field, and then
+ * pass the structure.
+ *
+ *    	Pass:		itParams = ImpexTranslationParams
+ *
+ *    	Return:		Nothing
+ *
+ */
+
+
+#ifdef __HIGHC__
+
+pragma Alias(ImpexCreateTempFile,     "IMPEXCREATETEMPFILE");
+pragma Alias(ImpexDeleteTempFile,     "IMPEXDELETETEMPFILE");
+pragma Alias(ImpexImportFromMetafile, "IMPEXIMPORTFROMMETAFILE");
+pragma Alias(ImpexExportToMetafile,   "IMPEXEXPORTTOMETAFILE");
+pragma Alias(ImpexUpdateImportExportStatus, "IMPEXUPDATEIMPORTEXPORTSTATUS");
+pragma Alias(ImpexImportExportCompleted, "IMPEXIMPORTEXPORTCOMPLETED");
+
+#endif
+
+
+@endlib

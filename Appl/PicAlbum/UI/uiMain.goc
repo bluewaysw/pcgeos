@@ -1,0 +1,1342 @@
+/**************************************************************************
+ *
+ * PROJECT:	Picture Album
+ * FILE:		uimain.goc
+ * AUTHOR:	John F. Howard    10/03
+ *
+ * DESCRIPTION:
+ *		This is based on the PicAlbum code first written by Falk for the GPC
+ *
+ * WHATS NEW:
+ *		10/06/03		Remove unused GenDoc & Control stuff amd MSG_META_DOC stuff
+ *    10/07/03		Remove main & thumbnail screens and associated stuff
+ *    10/24/03		Add user settable port & speed
+ *    11/19/03		Changed Picture to Photo throughout
+ *    11/24/03		Cleaned up copy to dialog box
+ *
+ *
+ *
+ *************************************************************************/
+
+@include "PicAlbum.goh"
+@include <Objects/gViewCC.goh>
+
+
+@start MonikerResource2, data;
+
+//@visMoniker PABackTextMoniker = "Back";
+@include "Art/PIC003-8.goh"
+
+@visMoniker PAViewTextMoniker = "View";
+@include "Art/PIC010-8.goh"
+
+@visMoniker PANotesTextMoniker = "Notes";
+@include "Art/PIC011-8.goh"
+
+@visMoniker PAShuffleLeftTextMoniker = "Shuffle Left";
+@include "Art/PIC012-8.goh"
+
+@end MonikerResource2;
+
+@start MonikerResource3, data;
+
+@visMoniker PAShuffleRightTextMoniker = "Shuffle Right";
+@include "Art/PIC013-8.goh"
+
+@visMoniker PADigitalCameraTextMoniker = "Digital Camera";
+@include "Art/PIC005-8.goh"
+
+@visMoniker PAFloppyDriveTextMoniker = "Floppy Drive";
+@include "Art/PIC006-8.goh"
+
+@end MonikerResource3;
+
+@start MonikerResource4, data;
+
+@visMoniker PADocumentsTextMoniker = "Documents";
+@include "Art/PIC007-8.goh"
+
+//@visMoniker PAAlbumsTextMoniker = "Albums";
+//@include "Art/PIC008-8.goh"
+
+@visMoniker PAPrintTextMoniker = "Print";
+@include "Art/A128-8.goh"
+
+@end MonikerResource4;
+
+@start MonikerResource5, data;
+@include "Art/PIC014-8.goh"
+@include "Art/PIC015-8.goh"
+
+@visMoniker PAPictureTextMoniker = "Album";
+//@include "Art/patool.goh"
+
+@end MonikerResource5;
+
+@start TokenResource, data;
+@include "Art/PIC00018.goh"
+@include "Art/PIC00028.goh"
+@end TokenResource;
+
+
+/**************************************************************************
+*
+**************************************************************************/
+
+@start AppResource;
+
+@object GenApplicationClass PAApp = {
+	GI_comp = @PAPrimary;
+	GI_visMoniker = list {@MonikerPIC00018,
+								@MonikerPIC00028,
+								@PATextMoniker};
+	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = @PAPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST) =
+											@PAViewViewMenuViewControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) =
+											@PAViewViewMenuViewControl,
+											@PAViewPrintControl;
+	ATTR_GEN_APPLICATION_PRINT_CONTROL = @PAViewPrintControl;
+}
+
+@visMoniker PATextMoniker = "Photo Album";
+
+@end AppResource;
+
+
+/**************************************************************************
+*
+**************************************************************************/
+
+@start Interface;
+
+@object GenPrimaryClass PAPrimary = {
+	GI_comp = @PAAlbumScreen, @PAAlbumMenuBar,
+		@PAViewScreen, @PAViewMenuBar,
+		@PACreateNewAlbumDialog,
+		@PARenameAlbumDialog,
+		@PASlideShowOptionsDialog,
+		@PASlideShowDialog,
+		@PAGetPicturesDialog,
+		@PACopyPicturesDialog,
+		@PAAddNotesDialog,
+		@PACameraProgressDialog,
+		@PACopyProgressDialog;
+
+	HINT_PRIMARY_FULL_SCREEN;
+	ATTR_GEN_HELP_CONTEXT = "TOC";
+	HINT_PRIMARY_NO_FILE_MENU;
+}
+
+@end Interface;
+
+
+/**************************************************************************
+*
+**************************************************************************/
+
+@start AlbumScreenResource;
+
+@object GenInteractionClass PAAlbumScreen = {
+	GI_comp = @PAAlbumScreenLeftGroup, @PAAlbumScreenRightGroup;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass PAAlbumScreenLeftGroup = {
+	GI_comp = @PAAlbumTopGroup;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass PAAlbumTopGroup = {
+	GI_comp = @PAAlbumCreateTrigger, @PAAlbumList;
+	HINT_DRAW_IN_BOX;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTriggerClass PAAlbumCreateTrigger = {
+	GI_visMoniker = "Create New";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_CREATE_ALBUM;
+	ATTR_GEN_FOCUS_HELP = @PAAlbumCreateTriggerHelp;
+}
+@chunk TCHAR PAAlbumCreateTriggerHelp = "Create a new album";
+
+@object PAVerticalDynListClass PAAlbumList = {
+	GIGI_destination = process;
+	GIGI_applyMsg = MSG_PA_APPLY_ALBUM_LIST;
+	GDLI_queryMsg = MSG_PA_QUERY_ALBUM_LIST;
+	HINT_MINIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 20, 0, 0};
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass PAAlbumScreenRightGroup = {
+	GI_comp = @PAAlbumToolBar, @PAAlbumPictureList, @PAAlbumNaviBar;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	HINT_DRAW_IN_BOX;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass PAAlbumToolBar = {
+	GI_comp = @PAAlbumToolBarLeftGroup, @PAAlbumGetPicturesTrigger;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass PAAlbumToolBarLeftGroup = {
+	GI_comp = @PAAlbumViewTrigger, @PAAlbumNotesTrigger;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_MINIMIZE_CHILD_SPACING;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass PAAlbumViewTrigger =  {
+	GI_visMoniker = list {@PAViewTextMoniker, @MonikerPIC010_8};
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_VIEW_PICTURE_FROM_ALBUM;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {0, 5};
+	ATTR_GEN_FOCUS_HELP = @PAAlbumViewTriggerHelp;
+}
+@chunk TCHAR PAAlbumViewTriggerHelp = "View photo at full size";
+
+@object GenTriggerClass PAAlbumNotesTrigger =  {
+	GI_visMoniker = list {@PANotesTextMoniker, @MonikerPIC011_8};
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_ADD_NOTES;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {0, 5};
+	ATTR_GEN_FOCUS_HELP = @PAAlbumNotesTriggerHelp;
+}
+@chunk TCHAR PAAlbumNotesTriggerHelp = "View photo at full size";
+
+@object GenTriggerClass PAAlbumGetPicturesTrigger = {
+	GI_visMoniker = "Get Photos";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_OPEN_GET_PICTURES;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	ATTR_GEN_FOCUS_HELP = @PAAlbumGetPicturesTriggerHelp;
+}
+@chunk TCHAR PAAlbumGetPicturesTriggerHelp = "Select a location to get photos from";
+
+@object GenViewClass PAAlbumPictureList = {
+	GVI_attrs = @default | GVA_SAME_COLOR_AS_PARENT_WIN;
+	GVI_vertAttrs = @default | GVDA_SCROLLABLE;
+	GVI_content = @PAAlbumViewContent;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass PAAlbumNaviBar = {
+	GI_comp = @PAAlbumNaviButtonGroup;
+	HINT_CUSTOM_CHILD_SPACING = SST_PIXELS | 20;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass PAAlbumNaviButtonGroup = {
+	GI_comp =@PAAlbumNaviForwardTrigger, @PAAlbumNaviBackwardTrigger;
+	HINT_MINIMIZE_CHILD_SPACING;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTriggerClass PAAlbumNaviForwardTrigger = {
+	GI_visMoniker = list {@PAShuffleLeftTextMoniker, @MonikerPIC012_8};
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_SHUFFLE_LEFT;
+	HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {0, 5};
+	ATTR_GEN_FOCUS_HELP = @PAAlbumNaviForwardTriggerHelp;
+}
+@chunk TCHAR PAAlbumNaviForwardTriggerHelp = "Move photo up one slot";
+
+@object GenTriggerClass PAAlbumNaviBackwardTrigger = {
+	GI_visMoniker = list {@PAShuffleRightTextMoniker, @MonikerPIC013_8};
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_SHUFFLE_RIGHT;
+	HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {ITMF_POSITION_ICON_RIGHT_OF_TEXT, 5};
+	ATTR_GEN_FOCUS_HELP = @PAAlbumNaviBackwardTriggerHelp;
+}
+@chunk TCHAR PAAlbumNaviBackwardTriggerHelp = "Move photo down one slot";
+
+@object GenInteractionClass PAAlbumMenuBar = {
+	GI_comp = @PAAlbumFileMenu, @PAAlbumEditMenu,
+					@PAAlbumViewMenu, @PAAlbumSettingsMenu;
+}
+
+@object GenInteractionClass PAAlbumFileMenu = {
+	GI_comp = @PAAlbumMenuCreateGroup;
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_FILE_MENU;
+}
+
+@object GenInteractionClass PAAlbumMenuCreateGroup = {
+	GI_comp = @PAAlbumMenuCreateNewTigger;
+	GII_visibility = GIV_SUB_GROUP;
+}
+
+@object GenTriggerClass PAAlbumMenuCreateNewTigger = {
+	GI_visMoniker = "Create New Album";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_CREATE_ALBUM;
+}
+
+@object GenInteractionClass PAAlbumEditMenu = {
+	GI_comp = @PAAlbumEditGetPicsTrigger, @PAAlbumEditGroup,
+		  		@PAAlbumDeleteTrigger, @PAAlbumRenameTrigger;
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_EDIT_MENU;
+}
+
+@object GenTriggerClass PAAlbumEditGetPicsTrigger = {
+	GI_visMoniker = 'G', "Get Photos";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_OPEN_GET_PICTURES;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenInteractionClass PAAlbumEditGroup = {
+	GI_comp = @PAAlbumEditCopyTrigger, @PAAlbumEditAddNotesTrigger,
+				@PAAlbumEditDeleteTrigger, @PAAlbumEditMovePictureGroup;
+	GII_visibility = GIV_SUB_GROUP;
+}
+
+@object GenTriggerClass PAAlbumEditCopyTrigger = {
+	GI_visMoniker = 'C', "Copy Photo to";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_COPY_PICS_FROM_ALBUM;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass PAAlbumEditAddNotesTrigger = {
+	GI_visMoniker = 'N', "Add Notes";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_ADD_NOTES;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass PAAlbumEditDeleteTrigger = {
+	GI_visMoniker = 'D', "Delete";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_DELETE_PICTURE;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenInteractionClass PAAlbumEditMovePictureGroup = {
+	GI_visMoniker = 'S', "Shuffle Photo";
+	GI_comp = @PAAlbumEditMoveFrontTrigger, @PAAlbumEditMoveForwardTrigger,
+				@PAAlbumEditMoveBackTrigger, @PAAlbumEditMoveEndTrigger;
+	GII_visibility = GIV_POPUP;
+}
+
+@object GenTriggerClass PAAlbumEditMoveFrontTrigger = {
+	GI_visMoniker = 'S', "Shuffle to Front";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_MOVE_TO_FRONT;
+}
+
+@object GenTriggerClass PAAlbumEditMoveForwardTrigger = {
+	GI_visMoniker = 'R', "Shuffle Right";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_SHUFFLE_RIGHT;
+}
+
+@object GenTriggerClass PAAlbumEditMoveBackTrigger = {
+	GI_visMoniker = 'L', "Shuffle Left";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_SHUFFLE_LEFT;
+}
+
+@object GenTriggerClass PAAlbumEditMoveEndTrigger = {
+	GI_visMoniker = 'E', "Shuffle to End";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_MOVE_TO_END;
+}
+
+@object GenTriggerClass PAAlbumDeleteTrigger = {
+	GI_visMoniker = 'A', "Delete Album";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_DELETE_ALBUM;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass PAAlbumRenameTrigger = {
+	GI_visMoniker = 'A', "Rename Album";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_RENAME_ALBUM;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenInteractionClass PAAlbumViewMenu  = {
+	GI_comp = @PAAlbumViewFullSizeGroup, @PAAlbumViewSlideShowTrigger;
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_VIEW_MENU;
+}
+
+@object GenInteractionClass PAAlbumViewFullSizeGroup = {
+	GI_comp = @PAAlbumViewFullSizeTrigger;
+	GII_visibility = GIV_SUB_GROUP;
+}
+
+@object GenTriggerClass PAAlbumViewFullSizeTrigger = {
+	GI_visMoniker = 'V', "View Full-sized";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_VIEW_PICTURE_FROM_ALBUM;
+}
+
+@object GenTriggerClass PAAlbumViewSlideShowTrigger = {
+	GI_visMoniker = 'S', "Slide Show";
+	GTI_destination = PASlideShowOptionsDialog;
+	GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenInteractionClass PAAlbumSettingsMenu  = {
+	GI_visMoniker = 'S', "Settings";
+	GI_comp = @PAASPortSettingsDBox;
+	GII_visibility = GIV_POPUP;
+}
+
+@object GenInteractionClass PAASPortSettingsDBox  = {
+	GI_visMoniker = "Port Settings";
+	GI_comp = @PortSettingsInstrs, @PortSettingsPortGroup,
+	          @PortSettingsSpeedGroup;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_NOTIFICATION;
+}
+
+@object GenGlyphClass PortSettingsInstrs = {
+	GI_visMoniker = "Select the camera port and speed.";
+}
+
+@object GenItemGroupClass PortSettingsPortGroup = {
+	GI_visMoniker = "Port";
+	GI_comp = @Com1, @Com2, @Com3, @Com4;
+	GIGI_selection = SERIAL_COM1;
+}
+@object GenItemClass Com1 = {
+	GI_visMoniker = "COM1";
+	GII_identifier = SERIAL_COM1;
+}
+@object GenItemClass Com2 = {
+	GI_visMoniker = "COM2";
+	GII_identifier = SERIAL_COM2;
+}
+@object GenItemClass Com3 = {
+	GI_visMoniker = "COM3";
+	GII_identifier = SERIAL_COM3;
+}
+@object GenItemClass Com4 = {
+	GI_visMoniker = "COM4";
+	GII_identifier = SERIAL_COM4;
+}
+
+@object GenItemGroupClass PortSettingsSpeedGroup = {
+	GI_visMoniker = "Speed";
+	GI_comp = @Speed1, @Speed2, @Speed3, @Speed4, @Speed5;
+	GIGI_selection = 5;
+}
+@object GenItemClass Speed1 = {
+	GI_visMoniker = "9,600";
+	GII_identifier = 1;
+}
+@object GenItemClass Speed2 = {
+	GI_visMoniker = "19,200";
+	GII_identifier = 2;
+}
+@object GenItemClass Speed3 = {
+	GI_visMoniker = "38,400";
+	GII_identifier = 3;
+}
+@object GenItemClass Speed4 = {
+	GI_visMoniker = "57,600";
+	GII_identifier = 4;
+}
+@object GenItemClass Speed5 = {
+	GI_visMoniker = "115,200";
+	GII_identifier = 5;
+}
+
+@end AlbumScreenResource;
+
+@start AlbumViewResource;
+
+@object PAThumbnailListClass PAAlbumViewContent = {
+	PATLI_horizSpace = 4;
+	PATLI_thumbHorizBorder = 2;
+	PATLI_thumbVertBorder = 3;
+	PATLI_thumbWidth = 84;
+	PATLI_thumbHeight = 84;
+	PATLI_vertSpace = 10;
+	PATLI_attrs = PATLA_SHOW_DESC_TEXT | PATLA_TEMP_CACHE;
+	PATLI_vertBorder = 10;
+	PATLI_destination = process;
+	PATLI_selectionMsg = MSG_PA_ALBUM_ITEM_SELECTION;
+}
+
+@end AlbumViewResource;
+
+
+
+/**************************************************************************
+*
+**************************************************************************/
+
+@start ViewScreenResource;
+
+@object GenInteractionClass PAViewScreen = {
+	GI_comp = @PAViewToolBar, @PAViewView;
+	GI_states = @default & ~GS_USABLE;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass PAViewToolBar = {
+	GI_comp = @PAViewToolsGroup, /*@PAViewBackTrigger, */@PAViewPicturesTrigger;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY;
+}
+
+@object GenInteractionClass PAViewToolsGroup = {
+	GI_comp = @PAViewViewTools, @PAViewPrintTools, @PAViewCopyPicTrigger;
+	HINT_TOOLBOX;
+//	HINT_CUSTOM_CHILD_SPACING = SST_PIXELS | 2;
+}
+
+/*@object GenInteractionClass PAViewToolsGroup = {
+	GI_comp = ;
+	HINT_TOOLBOX;
+	HINT_CUSTOM_CHILD_SPACING = SST_PIXELS | 2;
+	HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+} */
+
+@object GenToolGroupClass PAViewViewTools = {
+	GTGI_controller = @PAViewViewMenuViewControl;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenTriggerClass PAViewPrintTools = {
+	GI_visMoniker = list {@PAPrintTextMoniker, @MonikerA128_8};
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_INITIATE_PRINT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {0, 5};
+	HINT_CENTER_MONIKER;
+	ATTR_GEN_FOCUS_HELP = @PAViewPrintToolsHelp;
+}
+@chunk TCHAR PAViewPrintToolsHelp = "Print selected photo";
+
+@object GenTriggerClass PAViewCopyPicTrigger = {
+	GI_visMoniker = "Copy Photo";
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination  = process;
+	GTI_actionMsg = MSG_PA_COPY_PICS_FROM_VIEW;
+	ATTR_GEN_FOCUS_HELP = @PAViewCopyPicTriggerHelp;
+	HINT_CENTER_MONIKER;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+@chunk TCHAR PAViewCopyPicTriggerHelp = "Copy photo to a location";
+
+/*@object GenTriggerClass PAViewBackTrigger = {
+	GI_visMoniker = list {@MonikerPIC003_8, @PABackTextMoniker};
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_VIEW_BACK;
+	HINT_CENTER_MONIKER;
+	HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {0, 4};
+	ATTR_GEN_FOCUS_HELP = @PAViewBackTriggerHelp;
+}
+@chunk TCHAR PAViewBackTriggerHelp = "Go back to previous screen";
+*/
+@object GenTriggerClass PAViewPicturesTrigger = {
+	GI_visMoniker = list { /*@PAToolMoniker*/@MonikerPIC003_8, @PAPictureTextMoniker };
+//	GI_states = @default & ~GS_USABLE;
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_VIEW_BACK;
+	HINT_CENTER_MONIKER;
+	HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {0, 4};
+	ATTR_GEN_FOCUS_HELP = @PAViewPicturesTriggerHelp;
+}
+@chunk TCHAR PAViewPicturesTriggerHelp = "Go to Photo Album";
+
+@object GenViewClass PAViewView = {
+	GI_attrs = @default | GA_TARGETABLE;
+	GVI_horizAttrs = @default | GVDA_SCROLLABLE;
+	GVI_vertAttrs = @default | GVDA_SCROLLABLE;
+	GVI_attrs = @default | GVA_SAME_COLOR_AS_PARENT_WIN | GVA_CONTROLLED;
+	GVI_content = process;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_VIEW_REMOVE_SCROLLERS_WHEN_NOT_SCROLLABLE;
+	HINT_DEFAULT_TARGET;
+}
+
+@object GenInteractionClass PAViewMenuBar = {
+	GI_comp = @PAViewFileMenu, @PAViewEditMenu, @PAViewViewMenu;
+}
+
+@object GenInteractionClass PAViewFileMenu = {
+	GI_comp = @PAViewPrintControl;
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_FILE_MENU;
+}
+
+@object GenInteractionClass PAViewEditMenu = {
+	GI_comp = @PAViewMenuRotateGroup, @PAViewMenuFlipGroup;
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_EDIT_MENU;
+}
+
+@object GenInteractionClass PAViewMenuRotateGroup = {
+	GI_comp = @PAViewMenuRotate90Trigger, @PAViewMenuRotate180Trigger,
+				@PAViewMenuRotate270Trigger;
+	GII_visibility = GIV_SUB_GROUP;
+}
+
+@object GenInteractionClass PAViewMenuFlipGroup = {
+	GI_comp = @PAViewMenuFlipLeftRightTrigger, @PAViewMenuFlipTopBottomTrigger;
+	GII_visibility = GIV_SUB_GROUP;
+}
+
+@object GenTriggerClass PAViewMenuRotate90Trigger = {
+	GI_visMoniker = 'C', "Rotate 90¡ Clockwise";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_ROTATE_90_CLOCKWISE;
+}
+
+@object GenTriggerClass PAViewMenuRotate180Trigger = {
+	GI_visMoniker = 'R', "Rotate 180¡";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_ROTATE_180;
+}
+
+@object GenTriggerClass PAViewMenuRotate270Trigger = {
+	GI_visMoniker = 'w', "Rotate 90¡ Counterclockwise";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_ROTATE_90_COUNTERCLOCKWISE;
+}
+
+@object GenTriggerClass PAViewMenuFlipLeftRightTrigger = {
+	GI_visMoniker = 'L', "Flip Left to Right";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_FLIP_LEFT_RIGHT;
+}
+
+@object GenTriggerClass PAViewMenuFlipTopBottomTrigger = {
+	GI_visMoniker = 'T', "Flip Top to Bottom";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_FLIP_TOP_BOTTOM;
+}
+
+@object GenInteractionClass PAViewViewMenu = {
+	GI_comp = @PAViewViewMenuViewControl;
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_VIEW_MENU;
+}
+
+@object GenViewControlClass PAViewViewMenuViewControl = {
+	GII_visibility = GIV_SUB_GROUP;
+	ATTR_GEN_CONTROL_PROHIBIT_UI = ~(GVCF_MAIN_100 |
+												GVCF_ZOOM_IN |
+												GVCF_ZOOM_OUT |
+												GVCF_MAIN_SCALE_TO_FIT);
+	ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI = GVC_DEFAULT_TOOLBOX_FEATURES |
+														GVCTF_SCALE_TO_FIT;
+}
+
+@object PrintControlClass PAViewPrintControl = {
+	GI_states = @default | GS_ENABLED;
+	PCI_output = process;
+	PCI_docNameOutput = process;
+	PCI_attrs = @default & ~(PCA_PAGE_CONTROLS | PCA_VERIFY_PRINT);
+	PCI_startUserPage = 1;
+	PCI_endUserPage = 1;
+	PCI_docSizeInfo = {(15/(2 * 72)), (19/(2 * 72)), 0, {0, 0, 0, 0}};
+	ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI = PRINTC_DEFAULT_TOOLBOX_FEATURES;
+	ATTR_PRINT_CONTROL_APP_UI = @PrintSizeOptionGroup;
+	ATTR_GEN_CONTROL_DO_NOT_USE_LIBRARY_NAME_FOR_HELP;
+}
+
+@end ViewScreenResource;
+
+/**************************************************************************
+*
+**************************************************************************/
+
+@start PrintSizeOptionsResource;
+
+@object GenInteractionClass PrintSizeOptionGroup = {
+	GI_visMoniker = "Size Options";
+	GI_comp = @PrintSizeGroupTitle, @PrintSizeGroup,
+				@PrintSizeAspectRatio;
+	GI_states = @default & ~GS_USABLE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_DRAW_IN_BOX;
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_CENTER_MONIKER;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenGlyphClass PrintSizeGroupTitle = {
+	GI_visMoniker = "Printed Size of the Photo:";
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass PrintSizeGroup = {
+	GI_comp = @PrintWidthValue, @PrintWidthGlyph,
+				@PrintHeightValue, @PrintHeightGlyph;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_CENTER_CHILDREN_VERTICALLY;
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_PLACE_MONIKER_TO_LEFT;
+}
+
+@object GenValueClass PrintWidthValue = {
+	GVLI_displayFormat = GVDF_DECIMAL;
+	GVLI_value = MakeWWFixed(3);
+	GVLI_minimum = MakeWWFixed(1);
+	GVLI_maximum = MakeWWFixed(100);
+	GVLI_destination = process;
+	ATTR_GEN_VALUE_STATUS_MSG = {MSG_PA_PRINT_SIZE_WIDTH_STATUS};
+}
+
+@object GenGlyphClass PrintWidthGlyph = {
+	GI_visMoniker = "inches wide by";
+}
+
+@object GenValueClass PrintHeightValue = {
+	GVLI_displayFormat = GVDF_DECIMAL;
+	GVLI_value = MakeWWFixed(3);
+	GVLI_minimum = MakeWWFixed(1);
+	GVLI_maximum = MakeWWFixed(100);
+	GVLI_destination = process;
+	ATTR_GEN_VALUE_STATUS_MSG = {MSG_PA_PRINT_SIZE_HEIGHT_STATUS};
+}
+
+@object GenGlyphClass PrintHeightGlyph = {
+	GI_visMoniker = "inches tall";
+}
+
+@object GenBooleanGroupClass PrintSizeAspectRatio = {
+	GI_comp = @PrintSizeAspectBoolean;
+	GBGI_selectedBooleans = 1;
+	GBGI_destination = process;
+	ATTR_GEN_BOOLEAN_GROUP_STATUS_MSG = {MSG_PA_PRINT_SIZE_ASPECT_STATUS};
+}
+
+@object GenBooleanClass PrintSizeAspectBoolean = {
+	GI_visMoniker = "Keep proportions";
+	GBI_identifier = 1;
+}
+
+@end PrintSizeOptionsResource;
+
+
+/**************************************************************************
+*
+**************************************************************************/
+
+@start DialogResource;
+
+@object GenInteractionClass PACreateNewAlbumDialog = {
+	GI_visMoniker = "Create New Album";
+	GI_comp = @PACreateNewAlbumGlyph, @PACreateNewAlbumText,
+				@PACreateNewTrigger, @PACreateNewBackTrigger;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_PROPERTIES;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE |
+							GIA_MODAL | GIA_INITIATED_VIA_USER_DO_DIALOG;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	ATTR_GEN_HELP_CONTEXT = "dbCreate";
+}
+
+@object GenGlyphClass PACreateNewAlbumGlyph = {
+	GI_visMoniker = "Enter a name for the new photo album:";
+}
+
+@object GenTextClass PACreateNewAlbumText = {
+	GTXI_maxLength = 32;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	ATTR_GEN_TEXT_LEGAL_FILENAMES;
+}
+
+@object GenTriggerClass PACreateNewTrigger = {
+	GI_visMoniker = "Create New";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_APPLY;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass PACreateNewBackTrigger = {
+	GI_visMoniker = "Cancel";
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_DISMISS;
+	HINT_SEEK_REPLY_BAR;
+}
+
+/* ******************************************************** */
+@object GenInteractionClass PARenameAlbumDialog = {
+	GI_visMoniker = "Rename Album";
+	GI_comp = @PARenameAlbumGlyph, @PARenameAlbumText,
+				@PARenameTrigger, @PARenameBackTrigger;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_PROPERTIES;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE | GIA_MODAL |
+								GIA_INITIATED_VIA_USER_DO_DIALOG;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	ATTR_GEN_HELP_CONTEXT = "dbRename";
+}
+
+@object GenGlyphClass PARenameAlbumGlyph = {
+	GI_visMoniker = "Enter a new name for the album:";
+}
+
+@object GenTextClass PARenameAlbumText = {
+	GTXI_maxLength = 32;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	ATTR_GEN_TEXT_LEGAL_FILENAMES;
+}
+
+@object GenTriggerClass PARenameTrigger = {
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	GI_visMoniker = "Rename";
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_APPLY;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass PARenameBackTrigger = {
+	GI_visMoniker = "Cancel";
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_DISMISS;
+	HINT_SEEK_REPLY_BAR;
+}
+
+/* ******************************************************** */
+@object GenInteractionClass PASlideShowOptionsDialog = {
+	GI_visMoniker = "Slide Show";
+	GI_comp = @PASlideShowOptionsTopText, @PASlideShowOptionsMainGroup,
+				@PASlideShowOptionsBottomGroup, @PASlideShowOptionsApplyTigger,
+				@PASlideShowOptionsBackTigger;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_COMMAND;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	ATTR_GEN_HELP_CONTEXT = "dbSlide";
+}
+
+@object GenTextClass PASlideShowOptionsTopText = {
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text = "A slide show will display all photos in the selected album one-by-one.";
+	ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 45, 0, 0};
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass PASlideShowOptionsMainGroup = {
+	GI_comp = @PASlideShowAdvanceGroup;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_DRAW_IN_BOX;
+}
+
+@object GenInteractionClass PASlideShowAdvanceGroup = {
+	GI_comp = @PASlideShowManualGroup, @PASlideShowAutoGroup;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_CUSTOM_CHILD_SPACING = {20};
+}
+
+@object GenInteractionClass PASlideShowManualGroup = {
+	GI_comp = @PASlideShowManualItemGroup, @PASlideShowManualText;
+}
+
+@object GenItemGroupClass PASlideShowManualItemGroup = {
+	GI_comp = @PASlideShowManualOption;
+	GIGI_behaviorType = GIGBT_EXCLUSIVE_NONE;
+	GIGI_selection = 1;
+	GIGI_destination = process;
+	ATTR_GEN_ITEM_GROUP_STATUS_MSG = {MSG_PA_SLIDE_SHOW_MANUAL_STATUS};
+}
+
+@object GenItemClass PASlideShowManualOption = {
+	GII_identifier = 1;
+	GI_visMoniker = "Advance manually";
+}
+
+@object GenGlyphClass PASlideShowManualText = {
+	GI_visMoniker = "      (click on photo to move)";
+}
+
+@object GenInteractionClass PASlideShowAutoGroup = {
+	GI_comp = @PASlideShowAutoItemGroup, @PASlideShowAutoTextGroup;
+}
+
+@object GenItemGroupClass PASlideShowAutoItemGroup = {
+	GI_comp = @PASlideShowAutoOption;
+	GIGI_behaviorType = GIGBT_EXCLUSIVE_NONE;
+	GIGI_selection = GIGS_NONE;
+	GIGI_destination = process;
+	ATTR_GEN_ITEM_GROUP_STATUS_MSG = {MSG_PA_SLIDE_SHOW_AUTO_STATUS};
+}
+
+@object GenItemClass PASlideShowAutoOption = {
+	GII_identifier = 1;
+	GI_visMoniker = "Advance automatically";
+}
+
+@object GenInteractionClass PASlideShowAutoTextGroup = {
+	GI_comp = @PASlideShowTimeText1, @PASlideShowTimeEntry,
+				@PASlideShowTimeText2;
+	GI_states = @default & ~GS_ENABLED;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenGlyphClass PASlideShowTimeText1 = {
+	GI_visMoniker = "      Show photo for";
+}
+
+@object GenValueClass PASlideShowTimeEntry = {
+	GVLI_value = MakeWWFixed(10);
+	GVLI_minimum = MakeWWFixed(1);
+	GVLI_maximum = MakeWWFixed(999);
+}
+
+@object GenGlyphClass PASlideShowTimeText2 = {
+	GI_visMoniker = "seconds.";
+}
+
+@object GenBooleanGroupClass PASlideShowOptionsBottomGroup = {
+	GI_comp = @PASlideShowOptionsBottomBoolean,
+				@PASlideShowOptionsBottomBoolean2;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+}
+
+@object GenBooleanClass PASlideShowOptionsBottomBoolean = {
+	GI_visMoniker = "Loop slide show";
+	GBI_identifier = 1;
+}
+
+@object GenBooleanClass PASlideShowOptionsBottomBoolean2 = {
+	GI_visMoniker = "Display notes as caption";
+	GBI_identifier = 2;
+}
+
+@object GenTriggerClass PASlideShowOptionsApplyTigger = {
+	GI_visMoniker = "Start Show";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_START_SLIDE_SHOW;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_APPLY;
+	HINT_SEEK_REPLY_BAR;
+	HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass PASlideShowOptionsBackTigger = {
+	GI_visMoniker = "Cancel";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_DISMISS;
+	HINT_SEEK_REPLY_BAR;
+}
+
+/* ******************************************************** */
+@object PASlideShowDialogClass PASlideShowDialog = {
+	GI_visMoniker = "[Album Name] - [Image Name]";
+	GI_comp = @PASlideShowViewContainer,
+				@PASlideShowViewText, @PASlideShowTriggerGroup;
+	GI_attrs = @default | GA_NOTIFY_VISIBILITY;
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+//	PACII_rgbColor = {0, 0, 0};
+	ATTR_GEN_HELP_CONTEXT = "dbSlideShow";
+	HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD = {
+							SWSS_RATIO | PCT_100, SWSS_RATIO | PCT_100};
+	HINT_NOT_MOVABLE;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	HINT_CENTER_CHILDREN_VERTICALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	ATTR_GEN_VISIBILITY_MESSAGE = MSG_PA_SLIDE_VISIBILITY_NOTIFICATION;
+}
+
+@object GenInteractionClass PASlideShowViewContainer = {
+	GI_comp = @PASlideShowView;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	HINT_CENTER_CHILDREN_VERTICALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenViewClass PASlideShowView = {
+	GVI_attrs = (@default | GVA_SCALE_TO_FIT |
+					GVA_NO_WIN_FRAME) &~ GVA_FOCUSABLE;
+	GI_attrs = @default &~ GA_TARGETABLE;
+	GVI_horizAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT;
+	GVI_vertAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT | GVDA_KEEP_ASPECT_RATIO;
+	GVI_color = {C_BLACK, 0, 0, 0};
+	GVI_content = process;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	ATTR_GEN_VIEW_SCALE_TO_FIT_BASED_ON_X;
+}
+
+@object GenTextClass PASlideShowViewText = {
+	GI_attrs = @default | GA_READ_ONLY;
+	ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	HINT_INITIAL_SIZE = {SST_PIXELS | 10, SST_LINES_OF_TEXT | 0, 0};
+	HINT_TEXT_WASH_COLOR = {C_BLACK, CF_INDEX, 0, 0};
+}
+
+@object GenInteractionClass PASlideShowTriggerGroup = {
+	GI_comp = @PASlideShowPrevTrigger, @PASlideShowNextTrigger;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+	HINT_CUSTOM_CHILD_SPACING = SST_PIXELS | 2;
+	HINT_SEEK_TITLE_BAR_RIGHT;
+}
+
+@object GenTriggerClass PASlideShowPrevTrigger = {
+	GI_visMoniker = list {@MonikerPIC014_8};
+	GI_kbdAccelerator = @specificUI LEFT;
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_PREV_SLIDE;
+	HINT_CENTER_MONIKER;
+}
+
+@object GenTriggerClass PASlideShowNextTrigger = {
+	GI_visMoniker = list {@MonikerPIC015_8};
+	GI_kbdAccelerator = @specificUI RIGHT;
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_NEXT_SLIDE_TRIGGER;
+	HINT_CENTER_MONIKER;
+}
+
+/* ******************************************************** */
+@object GenInteractionClass PAGetPicturesDialog = {
+	GI_visMoniker = "Get Photos";
+	GI_comp = @PAGetPicturesFromPrompt, @PAGetPicturesToolbar,
+				@PAGetPicturesFileSel, @PAGetPicturesSeparator,
+				@PAGetPicturesWhichView,
+				@PAGetPicturesApply, @PAGetPicturesCancel;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_PROPERTIES;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+	HINT_INTERACTION_FAST_RESPONSE_PROPERTIES;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	ATTR_GEN_HELP_CONTEXT = "dbGetPics";
+}
+
+@object GenGlyphClass PAGetPicturesFromPrompt = {
+	GI_visMoniker = "Select where you want to get photos from:";
+	HINT_CENTER_MONIKER;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass PAGetPicturesToolbar = {
+	GI_comp = @PAGetPicturesPathPopup, @PAGetPicturesDocButton,
+				 @PAGetPicturesDrivePopup, @PAGetPicturesCameraButton;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object PAPathPopupClass PAGetPicturesPathPopup = {
+	GFSI_attrs = FSA_HAS_CHANGE_DIRECTORY_LIST;
+	GFSI_fileCriteria = FSFC_DIRS;
+	PAPPI_type = MSG_PA_GET_PICTURES_PATH_CHANGED;
+	ATTR_GEN_PATH_DATA = {SP_DOCUMENT, "."};
+}
+
+@object GenTriggerClass PAGetPicturesDocButton = {
+	GI_visMoniker = "Go to Document";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_GET_PICTURES_FROM_DOCUMENT;
+	HINT_ALIGN_TOP_EDGE_WITH_OBJECT = @PAGetPicturesToolbar;
+}
+
+@object PADrivePopupClass PAGetPicturesDrivePopup = {
+	GFSI_attrs = FSA_HAS_CHANGE_DRIVE_LIST;
+	GFSI_fileCriteria = FSFC_DIRS;
+	PADPI_type = MSG_PA_GET_PICTURES_PATH_CHANGED;
+	ATTR_GEN_PATH_DATA = {SP_DOCUMENT, "."};
+}
+
+@object GenTriggerClass PAGetPicturesCameraButton = {
+	GI_visMoniker = list {@PADigitalCameraTextMoniker,
+								@MonikerPIC005_8};
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_GET_PICTURES_FROM_CAMERA;
+	HINT_CENTER_MONIKER;
+	HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {0, 5};
+	HINT_ALIGN_TOP_EDGE_WITH_OBJECT = @PAGetPicturesToolbar;
+}
+
+@object GenFileSelectorClass PAGetPicturesFileSel = {
+	GFSI_attrs = FSA_HAS_FILE_LIST | FSA_ALLOW_CHANGE_DIRS;
+	GFSI_fileCriteria = FSFC_DIRS;
+	GFSI_destination = process;
+	GFSI_notificationMsg = MSG_PA_GET_PICTURES_PATH_CHANGED;
+	HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 4;
+	ATTR_GEN_PATH_DATA = {SP_DOCUMENT, "."};
+}
+
+@object GenGlyphClass PAGetPicturesSeparator = {
+	HINT_GLYPH_SEPARATOR;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenViewClass PAGetPicturesWhichView = {
+	GI_visMoniker = "Select the photos you want to copy:";
+	GVI_vertAttrs = @default | GVDA_SCROLLABLE;
+	GVI_attrs = @default | GVA_SAME_COLOR_AS_PARENT_WIN;
+	GVI_content = @PAGetPicturesViewContent;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_FIXED_SIZE = {0, SST_LINES_OF_TEXT | 6, 0};
+	HINT_MINIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 47, 0, 0};
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_CENTER_MONIKER;
+}
+
+@object GenTriggerClass PAGetPicturesApply = {
+	GI_visMoniker = "Copy to Album";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_GET_PICTURES_APPLY;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_APPLY;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass PAGetPicturesCancel = {
+	GI_visMoniker = "Don't Copy";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_DISMISS;
+	HINT_SEEK_REPLY_BAR;
+}
+
+/* ******************************************************** */
+@object GenInteractionClass PACopyPicturesDialog = {
+	GI_visMoniker = "Copy Photos";
+	GI_comp = @PACopyPicturesToPrompt, @PACopyPicturesToToolbar,
+				@PACopyPicturesWhichView, @PACopyPicturesDestPath,
+				@PACopyPicturesApply, @PACopyPicturesCancel;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_PROPERTIES;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+//	HINT_CUSTOM_CHILD_SPACING = SST_PIXELS | 10;
+	HINT_INTERACTION_FAST_RESPONSE_PROPERTIES;
+	ATTR_GEN_HELP_CONTEXT = "dbCopyPics";
+}
+
+@object GenGlyphClass PACopyPicturesToPrompt = {
+	GI_visMoniker = "Select where you want the photo(s) copied to:";
+	HINT_CENTER_MONIKER;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass PACopyPicturesToToolbar = {
+	GI_comp = @PACopyPicturesToPathPopup, @PACopyPicturesToDocButton,
+				 @PACopyPicturesToDrivePopup, @PACopyPicturesToAlbumButton;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object PAPathPopupClass PACopyPicturesToPathPopup = {
+	GFSI_attrs = FSA_HAS_CHANGE_DIRECTORY_LIST;
+	GFSI_fileCriteria = FSFC_DIRS;
+	PAPPI_type = MSG_PA_COPY_PICTURES_DEST_PATH;
+	ATTR_GEN_PATH_DATA = {SP_DOCUMENT, "."};
+}
+
+@object GenTriggerClass PACopyPicturesToDocButton = {
+	GI_visMoniker = "Go to Document";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_COPY_TO_DOCUMENT;
+	HINT_ALIGN_TOP_EDGE_WITH_OBJECT = @PACopyPicturesToToolbar;
+}
+
+@object PADrivePopupClass PACopyPicturesToDrivePopup = {
+	GFSI_attrs = FSA_HAS_CHANGE_DRIVE_LIST;
+	GFSI_fileCriteria = FSFC_DIRS;
+	PADPI_type = MSG_PA_COPY_PICTURES_DEST_PATH;
+	ATTR_GEN_PATH_DATA = {SP_DOCUMENT, "."};
+}
+
+@object GenTriggerClass PACopyPicturesToAlbumButton = {
+	GI_visMoniker = "Albums";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_COPY_TO_ALBUM;
+	HINT_CENTER_MONIKER;
+	HINT_ALIGN_TOP_EDGE_WITH_OBJECT = @PACopyPicturesToToolbar;
+}
+
+@object GenDynamicListClass PACopyPicturesWhichView = {
+	GI_states = @default & ~GS_USABLE;
+	GIGI_destination = process;
+	GDLI_queryMsg = MSG_PA_QUERY_ALBUM_LIST;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_FIXED_SIZE = {0, SST_LINES_OF_TEXT | 5, 5};
+	HINT_MINIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 32, 0, 0};
+	HINT_ITEM_GROUP_SCROLLABLE;
+}
+
+@object GenFileSelectorClass PACopyPicturesDestPath = {
+	GFSI_attrs = FSA_HAS_FILE_LIST | FSA_ALLOW_CHANGE_DIRS;
+	GFSI_fileCriteria = FSFC_DIRS;
+	GFSI_notificationMsg = MSG_PA_COPY_PICTURES_DEST_PATH;
+	GFSI_destination = process;
+	HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 5;
+	ATTR_GEN_PATH_DATA = {SP_DOCUMENT, "."};
+}
+
+@object GenTriggerClass PACopyPicturesApply = {
+	GI_visMoniker = "Copy";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_COPY_PICTURES_APPLY;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_APPLY;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass PACopyPicturesCancel = {
+	GI_visMoniker = "Don't Copy";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_DISMISS;
+	HINT_SEEK_REPLY_BAR;
+}
+
+/* ******************************************************** */
+@object GenInteractionClass PAAddNotesDialog = {
+	GI_visMoniker = "Add Notes";
+	GI_comp = @PAAddNotesConstants, @PAAddNotesNotes,
+				@PAAddNotesApply, @PAAddNotesCancel;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_PROPERTIES;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_CUSTOM_CHILD_SPACING = SST_PIXELS | 10;
+	ATTR_GEN_HELP_CONTEXT = "dbNotes";
+}
+
+@object GenInteractionClass PAAddNotesConstants = {
+	GI_comp = @PAAddNotesFilename, @PAAddNotesSize;
+	HINT_CENTER_CHILDREN_ON_MONIKERS;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTextClass PAAddNotesFilename = {
+	GI_visMoniker = "File name:";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text = "DEMOLOGO.JPG";
+	ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 32, 0, 0};
+	HINT_INITIAL_SIZE = {0, SST_LINES_OF_TEXT | 1, 0};
+}
+
+@object GenTextClass PAAddNotesSize = {
+	GI_visMoniker = "Size:";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_text = "640 x 480";
+	ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 32, 0, 0};
+	HINT_INITIAL_SIZE = {0, SST_LINES_OF_TEXT | 1, 0};
+}
+
+@object GenTextClass PAAddNotesNotes = {
+	GI_visMoniker = "Additional Notes:";
+	GTXI_attrs = @default | GTA_INIT_SCROLLING;
+	GTXI_maxLength = PA_PICTURES_NOTES_TEXT_LEN;
+	HINT_MINIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 32, SST_LINES_OF_TEXT | 3, 0};
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_TEXT_WHITE_WASH_COLOR;
+}
+
+@object GenTriggerClass PAAddNotesApply = {
+	GI_visMoniker = "Save";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PA_ADD_NOTES_APPLY;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_APPLY;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass PAAddNotesCancel = {
+	GI_visMoniker = "Don't Save";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_DISMISS;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@end DialogResource;
+
+@start GetPicturesViewResource;
+
+@object PAThumbnailListClass PAGetPicturesViewContent = {
+	PATLI_destination = process;
+	PATLI_selectionMsg = MSG_PA_GET_PICTURES_SELECTION_CHANGED;
+	PATLI_attrs = PATLA_TEMP_CACHE;
+	PATLI_multiSelect = TRUE;
+}
+
+@end GetPicturesViewResource;
+
+
+/**************************************************************************
+*
+**************************************************************************/
+
+@start CameraProgressResource;
+
+@object PACameraProgressClass PACameraProgressDialog = {
+	GI_visMoniker = "Camera Connection";
+	GI_comp = @PACameraProgressStatus, @PACameraWaitText,
+				@PACameraProgressStop;
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+	GII_type = GIT_PROGRESS;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	HINT_CUSTOM_CHILD_SPACING = SST_LINES_OF_TEXT | 1;
+}
+
+@object GenGlyphClass PACameraProgressStatus = {
+	GI_visMoniker = "Downloading photo 0 of 0...";
+}
+
+@object GenGlyphClass PACameraWaitText = {
+	GI_visMoniker = "Please Wait!";
+}
+
+@object GenTriggerClass PACameraProgressStop = {
+	GTI_destination = @PACameraProgressDialog;
+	GTI_actionMsg = MSG_PA_CAMERA_PROGRESS_STOP;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_STOP;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@end CameraProgressResource;
+
+@start CopyProgressResource;
+
+@object GenInteractionClass PACopyProgressDialog = {
+	GI_comp = @PACopyProgressText;
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+}
+
+@object GenGlyphClass PACopyProgressText = {
+	GI_visMoniker = "Copying photos...";
+}
+
+@end CopyProgressResource;
+
+
+/**************************************************************************
+*
+**************************************************************************/

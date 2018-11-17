@@ -1,0 +1,116 @@
+##############################################################################
+#
+#	Copyright (c) Geoworks 1994 -- All Rights Reserved
+#
+# PROJECT:	Circle lab
+# FILE:		README
+#
+# AUTHOR:	David Litwin, Dec 15, 1994
+#
+#	This describes the Circle assembly training lab
+# 
+#
+#	$Id: README,v 1.4.3.1 97/03/29 09:36:15 canavese Exp $
+#
+##############################################################################
+
+
+		Info for the Circle lab
+		-----------------------
+
+	The Circle lab consists of three parts:
+
+
+	Part I:
+	-------
+	This part is to implement a circle drawing routine to replace a
+call to GrDrawEllipse.  This is done in the message handler CircleVisDraw.
+	This routine should only use the integer parts of the instance
+data's orgin and radius, and calls to GrDrawPoint.  Some algorithms for
+circle drawing are given below (after part III).
+	Part I only deals with assembly and so doesn't require knowledge
+of object messaging, although does require knowledge of object instance
+data (for fetching an object's own instance data to draw the circle).  The
+main purpose of Part I is as an introduction to writing and debuging
+assembly code without needing to have information about object messaging.
+
+
+
+	Part II:
+	--------
+	This part implements resizing the circle.  This is done in the
+routine CircleSetNewSizeAndPosition.
+	What is required is code to call to the UI gadgets to get the new
+position and radius, then cause the circle to redraw itself in its new
+size.
+	Part II deals mainly with object messaging, and the file circle.ui
+should be looked at for the names of the UI gadgets to interact with.  The
+main purpose of Part II is to introduce object messaging.
+
+
+
+	Part III:
+	---------
+	This part implements a circle drawing routine based on the WWFixed
+values in instance data.
+	What is required is to reimplement Part I using WWFixed values
+instead of simple integers.  This increases the complexity quite a bit and
+should force the use of local variables as there aren't enough registers
+to implement this routine without some sort of memory storage (pushing and
+popping in this case could work but would be messier than local
+variables).
+	Part III deals with more complex assembly (structures, local
+variables, more complicated library calls).  Look in:
+	/s/p/Library/Kernel/geos.gp for WWFixed math routines that are
+provided as part of the graphics system.  The purpose of Part III is to
+introuduce local variables, more complex assembly and dealings with
+structures and supporting library routines.
+
+
+
+	Circle Drawing Algorithms
+	-------------------------
+
+	These are taken from interview questions (I didn't include all the 
+versions I've heard of).  Clearly some don't translate well to assembly
+(for instance in a.1 sqr, and b.1 arctan), so I recommend a.2.
+
+	Draw a circle given a center point, a radius and a point plotting
+routine.  Make sure your solution draws a continuous pixel line (no gaps).
+
+	Solutions: (starting from optimal to reasonably acceptable)
+
+	a.) Draw one eighth of the circle and mirror it.
+
+		1.) for (x = 0; x <= y; x++) {
+			y = sqr(r^2 - x^2)     /* circle equation */
+			Plot(x +centerX, y +centerY)
+			/* mirror plot commands here */
+		    }
+
+		2.) x = 0, y = r
+		    while (x <= y) {
+			Plot(x +centerX, y +centerY)
+			/* mirror plot commands here */
+			Compute the distance to the center of the circle of
+			    the three pixels to the: right, bottom and
+			    diagonal (right/bottom) of the x,y pixel.
+			Set x,y to the one closest to the distance r.
+		    }
+
+
+	b.) Radial solutions:
+	There are a few solutions that draw the circle by using Sin/Cos with
+	some incrementing theta.  With all of these the ammount to which
+	you mirror their calculations (theta from: 0-45, 0-90, 0-180,
+	0-360) will optimize your solution more or less.  How you
+	calculate what to varry theta by should be considered as well.
+
+		1.) Calculate the mimimum change to theta needed to ensure
+			no pixel gaps by using arctan(1/r).
+		    Use this as an increment to theta, calculating x,y
+			pairs. 
+
+		2.) Choose an arbitrary increment to theta and use linear
+		interpolation to draw line segments between any gaps.
+

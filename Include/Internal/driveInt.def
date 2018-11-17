@@ -1,0 +1,102 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1990 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Kernel Interface Definition -- Drive-internal functions
+FILE:		driveInt.def
+
+AUTHOR:		Adam de Boor, Apr 25, 1990
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	4/25/90		Initial revision
+
+
+DESCRIPTION:
+	Definitions of functions that are "internal" to the kernel's Drive
+	module. In other words, they are exported by the kernel but you'd
+	better be damn sure what you're doing before trying to use them.
+		
+	$Id: driveInt.def,v 1.1 97/04/04 14:15:59 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__DRIVEINT
+
+include geos.def
+include drive.def
+include Internal/semInt.def
+include	lmem.def
+
+StartKernel
+
+; Synchronization for drive access
+global	DriveLockExcl:appfar
+global 	DriveUnlockExcl:appfar
+
+; Drive-descriptor location
+global	DriveLocateByNumber:far
+global	DriveLocateByName:far
+
+; DSE_private chunk allocated for a drive with DES_ALIAS set.
+DriveAliasDesc struct
+    DAD_disk	nptr.DiskDesc	; The disk on which the target path resides.
+    DAD_path	label char	; Null-terminated absolute path to use when
+				;  this drive is selected.
+DriveAliasDesc	ends
+
+;
+; Structure describing a drive known to the system.
+; 
+DriveStatusEntry	struct
+    DSE_next		nptr.DriveStatusEntry
+    DSE_number		byte		; Drive number
+    DSE_defaultMedia	MediaType	; Default media
+    DSE_status		DriveExtendedStatus; Various status flags
+    DSE_fsd		nptr.FSDriver	; Descriptor for driver that runs the
+					;  drive.
+
+    ; Synchronization stuff.
+
+    DSE_exclusive	Semaphore	; Semaphore for exclusive access to the
+    					; drive
+    DSE_shareCount	word		; # of shared locks
+    DSE_shareSem	Semaphore	; Semaphore controlling access to
+					;  DSE_shareCount
+    DSE_diskLock	ThreadLock	; Lock for disk currently in the drive.
+					;  Different from other thread locks
+					;  in that the ML_owner field holds
+					;  a DiskDesc offset, not a thread
+					;  handle.
+    DSE_lockSem		Semaphore	; Semaphore controlling entry to the
+					;  DR_FS_DISK_LOCK function of the
+					;  drive's IFS driver. Only one thread
+					;  at a time is allowed to try and
+					;  lock a disk down.
+					;
+					;  12/27/00 ayuen: This is now changed
+					;  such that multiple threads can call
+					;  DR_FS_DISK_LOCK at the same time,
+					;  and it's up to the IFS driver to
+					;  decide whether or not, or when, to
+					;  enforce mutual-exclusion within its
+					;  routine.   (See DiskLockCommon.)
+
+    DSE_lastAccess	word		; Low word of systemCounter when
+					;  drive last unlocked.
+    DSE_lastDisk	nptr.DiskDesc	; Disk last validated in the drive.
+
+    DSE_private		nptr.byte	; Pointer to optional data allocated
+					;  by the FSD.
+if DBCS_PCGEOS
+    DSE_name		label wchar	; Start of asciiz drive name
+else
+    DSE_name		label char	; Start of asciiz drive name
+endif
+DriveStatusEntry	ends
+
+DRIVE_DEFAULT_MIN_CHANGE_TIME	equ	3 * 60 / 2	; 1.5 seconds
+
+EndKernel

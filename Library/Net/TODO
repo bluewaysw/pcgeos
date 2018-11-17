@@ -1,0 +1,170 @@
+
+			PC/GEOS Net Library
+			      TODO LIST
+
+Revision:	$Id: TODO,v 1.1.28.1 97/03/29 04:57:35 canavese Exp $
+-------------------------------------------------------------------------------
+
+	- get rid of table of semaphores... allocate them on the heap instead.
+
+Misc. Items
+-----------
+	- Display moniker inside GenInteraction
+
+	- when click Ok, how do I give message to be sent?
+
+	- prevent text object from being editable
+
+	- should check the AppLaunch flags, to see if we are run in
+		engine mode. Don't do shit if so.
+
+	- nuke GCN notification: we are now told explicitly about
+	returning from a task switch.
+
+System and Personal Messages
+----------------------------
+	- add support to catch personal messages
+
+Semaphores
+----------
+	- use handle-table-based semaphores rather than a table
+
+	OLD 12X CONCERNS:
+	- I have a semaphore within a block that I create on the global
+	heap. I make sure that the block is locked before I P or V the
+	semaphore. Is it ok to have a semaphore in a block like that?
+
+	- To avoid the locking/unlocking problems, could I allocate a handle
+	and place the semaphore in the handle data area?
+	(or could I use the handle that I already have? -- is a memory handle)
+
+Startup
+-------
+	- Graphical Install should try to load the Net library. If successful,
+	it adds this:
+
+			[ui]
+			execonstartup = {
+				EC Welcome
+				Net Library
+			}
+
+	to the user's geos.ini file. (If an execonstartup key already
+	exists, then just add "Net Library" to it.
+
+	- For this to work, the Net Library must be an appl.
+	- Net Library should exit if it cannot load a network driver.
+
+Shutdown/Exiting
+----------------
+	Ask Adam about shutdown/exit handling:
+	- has some global memory blocks which contain state
+		- want to initialize properly
+		- want to save when shutting down
+		- want to get them when restarting
+		- want to kill them when exited.
+		(at least one block- keeps track of open sockets and
+		 connections. I don't really need to store the HECBs to state)
+
+	- when I shutdown, I may have a number of threads blocked on
+	semaphores in my HugeECB structures. Do I have to wake up
+	these threads for the system to exit properly?
+
+------------------------------------------------------------------------------
+BUGS
+	- With DR-DOS 6.0, if a console message arrives during a shutdown,
+		you can hear the beep, but the screen is blank, and the
+		system hangs. (We may need to detect a shutdown earlier
+		in the sequence of things.)
+
+------------------------------------------------------------------------------
+Questions for Adam:
+	- How should net library find network driver? Key in .ini file,
+		or load each driver and see which succeeds?
+
+	- When should the Net Library be loading the NetWare driver? Here are
+		some options:	LCT_NEW_CLIENT (on first client)
+				METHOD_UI_OPEN_APPLICATION
+				METHOD_ATTACH
+
+	- The NetWare Driver will fail if IPX or NetWare is not around.
+	I haven't decided yet if this means that the Net Library should exit.
+	If I decide that it should exit, how do I force it to exit?
+
+	- can I detect a shutdown early on? Want to have the NetWare shell
+		start to display console messages, because I can't bring
+		up my dialog box during the shutdown.
+
+	- what if user presses Ctrl-Alt-Del?
+
+	- we tell NetWare to close a socket if our DOS application
+		dies. (Kernel? Swat? Com43?). What happens during a bad
+		exit, such as a crash, or Ctrl-Alt-Del?
+
+-------------------------------------------------------------------------------
+
+Messaging Facilities
+--------------------
+	- THINK ABOUT connecting to Don's IAC facility
+
+	- can only send message to an application's process object,
+		using the TokenID to find it. Will deliver to multiple apps.
+
+	- pass the a "document" protocol number, not the protocol
+		of the library!
+
+	- is Queuing HugeECBs for departure necessary? Should I just
+	immediately chop up each HECB into ECBs, and send them right away?
+
+		1) they might pile up on IPX/SPX, and we would be
+		left with lots of locked blocks on our heap until the
+		congestion clears.
+
+		2) might be good to send them all at once: IPX/SPX might
+		be able to ship them faster than if we hand-fed each block.
+
+	- contact Novell about getting a GeoWorks static socket address.
+
+	- what if you want to broadcast not to a type of application,
+	but just broadcast a type of data? Could we establish some
+	16-bit value, and an application could "subscribe" to this,
+	listening for any broadcasts in that area?
+
+	Wide Variety of Destination Objects
+	-----------------------------------
+	- geode permanent names, or TokenIDs? GeodeFind uses a permanent name.
+	- specific system-level objects: system, field, etc.
+	- specific app-level objects: process, genapp, etc.
+
+	"CALL" type messages across SPX
+	-------------------------------
+	- figure out how we will establish connections
+	- create thread on the fly to deliver
+	- handle return arguments:
+		registers and stuff from ObjMessage
+		if stack data, assume same size as what was sent
+
+		(The rest of the work here is a lot like sending a HugeECB.
+		We need to build a HugeECB with heap data if necessary,
+		address it, put it in the departure queue, etc.)
+
+	- need to be able to receive HugeECB at sender node, unblock caller,
+	have him grab arguments from block and nuke it.
+
+	- may have to add fields to get ax and carry flag back properly
+
+	- check for master/slave status when sending CALL message
+
+	LARGE blocks of data
+	--------------------
+	- for SPX only, of course
+	- need to chop up HugeECB into smaller pieces, send in sequence -
+		can we just dump them all into SPX at once?
+	- need to build partial HugeECB at destination node
+
+-------------------------------------------------------------------------------
+Notes:
+	- the conditionals are now defined in the net.asm file, so they
+	don't affect the .ui file. May need to define them in local.mk again.
+
+-------------------------------------------------------------------------------

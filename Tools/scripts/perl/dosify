@@ -1,0 +1,188 @@
+#!/usr/public/perl
+##############################################################################
+#
+# 	Copyright (c) Geoworks 1995 -- All Rights Reserved
+#	Geoworks Confidential
+#
+# PROJECT:	PC GEOS
+# MODULE:	Tools/scripts/perl/dosify -- dosify filenames
+# FILE: 	dosify
+# AUTHOR: 	Jon Witort (installed by cbh 1/20/95)
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	cbh	1/20/95		Initial Revision
+#
+# DESCRIPTION:
+#	Changes filenames under the current working directory to be unique 
+#	8.3 names, so they can be zipped, etc.
+#
+#	$Id: dosify,v 1.8 96/08/13 14:03:48 canavese Exp $
+#
+###############################################################################
+
+$_=`pwd`;
+if ( m|/pcgeos/[A-Z]| || m|/staff/pcgeos| ) {
+    print "Please do not run dosify in the source tree.  You will make people unhappy.\n";
+    exit -1;
+}
+
+open(DIRS, "find . -type d -print |") || die "Couldn't run find: $!\n";
+
+FILE:
+while (<DIRS>) {
+
+        ($Parent, $Child) = /([\.\/]*.*)\/([^\/]+)$/;
+        chop $Child;
+
+        if ($Child eq "") {
+                next FILE;
+        }
+
+        #
+        #  Downcase Parent and Child into parent and child
+        #
+        ($parent = $Parent) =~ tr/A-Z/a-z/;
+        ($child = $Child) =~ tr/A-Z/a-z/;
+
+        @parentparts = split('/', $parent);
+
+        #
+        #  Shorten each piece to 8 characters
+        #
+        foreach $dir (@parentparts) {
+                $dir = substr($dir, 0, 8);
+        }
+
+        $parent = join('/', @parentparts);
+
+        $olddir = $parent."/".$Child;
+        $newdir = join('/', @parentparts)."/".substr($child, 0, 8);
+
+        #
+        # spew code to cd to the directory, mkmf, pmake depend, and pmake
+        #
+
+        unless ($newdir eq $olddir) {
+                if (-d $newdir) {
+                        print "$newdir exists, so can't rename $olddir\n";
+                } else {
+			#
+			# If we directly rename "Foo" to "foo" on a Novell
+			# drive, we'll end up with "foo0" (how clever of them)
+			#
+                        rename("$olddir","dosify.tmp");
+                        rename("dosify.tmp","$newdir");
+                }
+        }
+}
+
+
+open(FILES, "find . -type f -print |") || die "Couldn't run find: $!\n";
+
+while (<FILES>) {
+
+        #
+        #  Slice the line into directory and file
+        #
+        ($parent, $Child) = /([\.\/]*.*)\/([^\/]+)$/;
+        chop $Child;
+
+        if ($Child eq "") {
+                next FILE;
+        }
+
+        #
+        #  Downcase Parent and Child into parent and child
+        #
+        ($child = $Child) =~ tr/A-Z/a-z/;
+
+	#
+	#  Assume we'll be dealing with a non-ec file.
+	#
+	$substChar = "n";
+
+        #
+        # If the filename is <something>.<whatever>, then we stuff it
+        # into the 8.3 format like <somethin>.<wha> Any intermediate periods
+        # are ignored, so that a.b.c.d will turn into a.d
+        #
+        if ($child =~ /([^\.]+).*\.([^\.]+)$/) {
+
+		$namepreflen = length($1);
+                $newname = substr($1,0,8).".".substr($2,0,3);
+
+                if ($namepreflen > 8) {
+			#
+			# Get the ending for the original name, we'll need it.
+			#
+			$ending = substr($1,$namepreflen-2,$namepreflen);
+			#
+			# If this is EC, then we need the non-ec name
+			#
+			$nonecName = substr($1,0,$namepreflen-2).".".substr($2,0,3);
+			#
+			# Now force to 8 characters long.
+			#
+			$namepreflen = 8;
+
+			#
+			# If truncating, and this seems to be an EC geode,
+			# let's slap an 'e' on the end right now to avoid
+			# overlaps with the non-ec version.  (12/19/95 cbh)
+			#
+			if ("$ending" eq "ec") {
+				if (-e "$parent/$nonecName" || -e "$parent/$newname") {
+                        		substr($newname, $namepreflen - 1, 1) = "e";
+				}
+			}
+		} 
+         } else {
+                #
+                # If there are no '.'s in the name, we'll just take the first
+                # eleven letters and make that our 8.3
+                #
+                if (length($child) > 8) {
+			$namepreflen = 8;
+                        $newname = substr($child,0,8).".".substr($child,8,3);
+                } else {
+			$namepreflen = length($child);
+                        $newname = $child;
+                }
+        }
+
+        #
+        # spew code to cd to the directory, mkmf, pmake depend, and pmake
+        #
+
+        unless ("$parent/$newname" eq "$parent/$Child") {
+
+                #
+                # Need to worry about collisions here.    
+		#
+		# If there is one, substitute an 'n', as this is likely not 
+		# an EC geode (we've already tried to add an 'e' when trucating
+		# an ec geode).   12/19/95 cbh
+                #
+                if (-e "$parent/$newname") {
+                        print "Conflict with '$parent/$newname'... ";
+                        substr($newname, $namepreflen - 1, 1) = "a";
+	                print "trying $newname\n";
+	                $i = "0";
+	                while (-e "$parent/$newname") {
+	                        print "Conflict with '$parent/$newname'... ";
+       		                substr($newname, $namepreflen - 1, 1) = $i++;
+	                        print "trying $newname\n";
+	                }
+		}
+
+		#
+		# If we directly rename "Foo" to "foo" on a Novell
+		# drive, we'll end up with "foo0" (how clever of them)
+		#
+                rename("$parent/$Child","$parent/dosify.tmp");
+                rename("$parent/dosify.tmp","$parent/$newname");
+        }
+}
+

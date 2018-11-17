@@ -1,0 +1,618 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Include
+FILE:		calendar.def
+
+AUTHOR:		Don Reeves, February 25, 1990
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Don	2/25/90		Initial revision
+
+DESCRIPTION:
+	Defines the external methods (and internal private methods) that
+	can be used by other applications to access the calendar's data.
+		
+	$Id: calendar.def,v 1.1 97/04/04 14:25:39 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__CALENDAR
+
+CalendarClass	class  GenProcessClass
+	
+MSG_CALENDAR_REQUEST_SEARCH					message
+;
+; Synopis:	Used by the rolodex to request a search through the
+;	        Calendar's events for the passed string
+;
+; Pass:		CX	= Length of text
+;		DX	= Block handle containing text
+; Returns:	Nothing
+; Destroys:	AX, CX, DX, BP
+
+MSG_CALENDAR_DELETE_EVENTS_BEFORE_DATE				message
+;
+; Synopsis:	Delete all normal calendar events before the passed date
+;
+; Pass:		dx	= cutoff year
+;		ch	= cutoff month
+;		cl	= cutoff day
+;
+; Returns:	Nothing
+; Destroys:	Nothing
+;
+
+;
+; Errors Calendar APIs return
+;
+CalendarEventError		etype	word
+CEE_NORMAL			enum	CalendarEventError
+CEE_GENERAL_ERROR		enum	CalendarEventError
+CEE_INTERNAL_ERROR		enum	CalendarEventError
+CEE_NOT_ENOUGH_MEMORY		enum	CalendarEventError
+CEE_NOT_ENOUGH_DISKSPACE	enum	CalendarEventError
+CEE_EVENT_NOT_FOUND		enum	CalendarEventError
+CEE_EVENT_TEXT_TOO_LONG		enum	CalendarEventError
+CEE_INVALID_DATE		enum	CalendarEventError
+CEE_INVALID_TIME		enum	CalendarEventError
+CEE_INVALID_TODO_ITEM_STATUS	enum	CalendarEventError
+CEE_INVALID_RESERVE_WHOLE_DAY	enum	CalendarEventError
+CEE_INVALID_ALARM		enum	CalendarEventError
+CEE_INVALID_EVENT_TYPE		enum	CalendarEventError
+CEE_START_DATE_LATER_THAN_END_DATE \
+				enum	CalendarEventError
+CEE_START_TIME_LATER_THAN_END_TIME \
+				enum	CalendarEventError
+CEE_MISSING_END_TIME_WHEN_START_TIME_AND_END_DATE_ARE_SET \
+				enum	CalendarEventError
+CEE_EVENT_NOT_SUPPORTED		enum	CalendarEventError
+CEE_INVALID_TIME_RANGE		enum	CalendarEventError	
+; The time range specified is invalid: end date/time is earlier than start
+; date/time.
+
+CEE_ACCESS_DENIED		enum	CalendarEventError
+; The requested event is in use and your access is denied.
+
+;----------------------------------------------------------------------------
+;			Pre-event Alarm Information
+;----------------------------------------------------------------------------
+
+;
+; This says how long before the event the user should be notified of its
+; impending arrival.
+;
+CalendarAlarmIntervalType	etype	byte
+CAIT_MINUTES			enum	CalendarAlarmIntervalType
+CAIT_HOURS			enum	CalendarAlarmIntervalType
+CAIT_DAYS			enum	CalendarAlarmIntervalType
+
+;
+; Description of alarm
+;
+CalendarAlarmStruct	record
+	CAS_TYPE CalendarAlarmIntervalType:2
+	CAS_HAS_ALARM:1				; set if there is alarm
+	CAS_INTERVAL:13				; data according to CAS_TYPE
+CalendarAlarmStruct	end
+
+;----------------------------------------------------------------------------
+;			Calendar Repeat Events
+;----------------------------------------------------------------------------
+
+; These things tell the recipient how the event is supposed to be repeated.
+; It should cover all the bases. 
+;
+CalendarEventRepeatDuration       etype   byte
+CERD_FOREVER                      enum    CalendarEventRepeatDuration
+; no additional data
+
+CERD_UNTIL                        enum    CalendarEventRepeatDuration
+; Repeat end date
+
+CERD_LENGTH                       enum    CalendarEventRepeatDuration
+; CalendarEventRepeatLength
+
+;
+; Unit of event repeat frequency
+;
+CalendarEventRepeatLengthUnitType etype byte
+CERLUT_DAY			  enum	CalendarEventRepeatLengthUnitType
+CERLUT_WEEK			  enum	CalendarEventRepeatLengthUnitType
+CERLUT_MONTH			  enum	CalendarEventRepeatLengthUnitType
+CERLUT_YEAR			  enum	CalendarEventRepeatLengthUnitType
+
+;
+; How long to repeat. How many years, months, weeks and days...
+;
+CalendarEventRepeatLength	record
+	CERL_COUNT:14		; number of those units, *including* the
+				;  initial event day. thus an event repeating
+				;  every day for 3 days set for 12/15 would
+				;  have the event 12/15, 12/16, and 12/17
+	CERL_UNIT CalendarEventRepeatLengthUnitType:2
+CalendarEventRepeatLength	end
+
+;
+; Either the event lasts for a period of time and repeats
+;
+CalendarEventRepeatDurationData	union
+	CERDD_until	FileDate		; Repeat until when
+	CERDD_length	CalendarEventRepeatLength; Repeat for how long
+CalendarEventRepeatDurationData	ends
+
+;
+; Which day of the week to repeat the event
+;
+CalendarEventRepeatWeekday	etype	byte
+CERW_SUNDAY			enum	CalendarEventRepeatWeekday
+CERW_MONDAY			enum	CalendarEventRepeatWeekday
+CERW_TUESDAY			enum	CalendarEventRepeatWeekday
+CERW_WEDNESDAY			enum	CalendarEventRepeatWeekday
+CERW_THURSDAY			enum	CalendarEventRepeatWeekday
+CERW_FRIDAY			enum	CalendarEventRepeatWeekday
+CERW_SATURDAY			enum	CalendarEventRepeatWeekday
+
+;
+; How frequent the event should be repeated
+;
+CalendarEventRepeatIntervalType	etype	byte
+CERIT_DAILY			enum	CalendarEventRepeatIntervalType
+CERIT_WEEKLY			enum	CalendarEventRepeatIntervalType
+CERIT_MONTHLY_WEEKDAY		enum	CalendarEventRepeatIntervalType
+CERIT_MONTHLY_DATE		enum	CalendarEventRepeatIntervalType
+CERIT_YEARLY_WEEKDAY		enum	CalendarEventRepeatIntervalType
+CERIT_YEARLY_DATE		enum	CalendarEventRepeatIntervalType
+
+;
+; Detailed description of event repetition
+;
+CalendarEventRepeatInterval	record
+	CERI_WEEK:3
+	CERI_COUNT:7
+	; number of units between events.
+    
+	CERI_DAY	CalendarEventRepeatWeekday:3
+	; for CERIT_MONTHLY_WEEKDAY or CERIT_MONTHLY_DATE or
+	; CERIT_YEARLY_WEEKDAY (month for that last is the same as the
+	; event; data indicates which weekday of which week within the
+	; month the event should repeat) 
+    
+	CERI_TYPE	CalendarEventRepeatIntervalType:3
+CalendarEventRepeatInterval	end
+
+;
+; Guidelines to specify repeat event info
+; ========================================
+;
+; For DAILY:
+;       CERI_WEEK = unused
+;       CERI_DAY = unused
+;       CERI_COUNT = number of days between repeats (usually 1)
+; 
+; For WEEKLY:
+;       CERI_WEEK = unused
+;       CERI_DAY = which day of week to repeat
+;       CERI_COUNT = number of weeks between repeats (usually 1)
+;
+; For BI-WEEKLY:
+;       CERI_WEEK = unused
+;       CERI_DAY = which day of week to repeat
+;       CERI_COUNT = number of weeks between repeats (2 in this case)
+;
+; For MONTHLY_WEEKDAY event (like the first Thursday of each month):
+;       CERI_WEEK = which week in month 
+;       CERI_DAY = which day of week
+;       CERI_COUNT = number of months between repeats (usually 1)
+; 
+; For MONTH_DATE event (like the 15th of each month is pay day!):
+;       CERI_WEEK = unused
+;       CERI_DAY = unused
+;       CERI_COUNT = number of months between repeats (the date is
+;               taken from the appointment info itself, not the repeat info)
+; 
+; For YEARLY_WEEKDAY event (like the first Thursday of November):
+;       CERI_WEEK = which week in month
+;       CERI_DAY = which day of week
+;       CERI_COUNT = number of years between repeats (month is taken from
+;               the appointment info itself, not the repeat info)
+; 
+; For YEARLY_DATE event (like birthdays):
+;       CERI_WEEK = unused
+;       CERI_DAY = unused
+;       CERI_COUNT = number of years between repeats (month and day are
+;               taken from the appointment info itself, not the repeat info)
+;
+
+;
+; The final thing: more fine details of repeat events
+;
+CalendarEventRepeatInfo	struct
+	CERI_interval		CalendarEventRepeatInterval
+	; how long between events?
+
+	CERI_duration		CalendarEventRepeatDuration
+	; how long shall we keep this up?
+
+	CERI_durationData	CalendarEventRepeatDurationData
+	; more details of duration
+
+	CERI_numExceptions	word
+	; number of exception dates
+
+	CERI_exceptions		label	FileDate
+	; array of dates on which event is *not* to take place
+CalendarEventRepeatInfo	ends
+
+;----------------------------------------------------------------------------
+;			Calendar Events
+;----------------------------------------------------------------------------
+
+CALENDAR_MAX_EVENT_TEXT_LENGTH	equ	255	; max event text length
+
+CALENDAR_MAX_RESERVE_WHOLE_DAYS equ     999
+
+; 
+; value in FDAT_date if the event is a to-do list item
+;
+; When creating to-do item, pass CEPS_start.FDAT_date = CAL_NO_DATE, and
+; CEPS_start.FDAT_time to be CalendarToDoItemStatus
+;
+CAL_NO_DATE                     equ     (-1)
+
+; 
+; value in FDAT_time if the event is not for a specific time of the day
+;
+; When creating to-do item for a day, pass CEPS_start.FDAT_time =
+; CAL_NO_TIME.
+;
+CAL_NO_TIME                     equ     (-1)
+
+;
+; When creating to-do item, pass CEPS_start.FDAT_date = CAL_NO_DATE, and
+; CEPS_start.FDAT_time to be one of the following:
+;
+; This is the status describing the status of the to-do item.
+;
+CalendarToDoItemStatus	etype	word, 101h
+CTDIS_HIGH_PRIORITY	enum	CalendarToDoItemStatus
+CTDIS_NORMAL_PRIORITY	enum	CalendarToDoItemStatus
+CTDIS_COMPLETED		enum	CalendarToDoItemStatus
+
+;
+; Event description formats
+;
+; It is used to describe what type of information is the event data. Note
+; that only CEDT_GEOS_TEXT is currently supported.
+;
+CalendarEventDescType	etype	byte
+CEDT_GEOS_TEXT		enum	CalendarEventDescType
+; Description is a null-terminated, single-byte text string in the GEOS
+; character set.
+    
+CEDT_UNICODE	        enum	CalendarEventDescType
+; Description is a null-terminated, double-byte text string in the Unicode
+; character set.
+    
+CEDT_INK		enum	CalendarEventDescType
+; Description is digital ink. Number of points can be determined from
+; the dataLength field.
+
+;
+; Calendar event used to pass to the API
+;
+CalendarEventParamStruct	struct
+	CEPS_startDateTime	FileDateAndTime
+	; Event start date and time
+ 
+	CEPS_endDateTime	FileDateAndTime
+	; Event end date and time
+
+	CEPS_reserveWholeDay	word		0
+	; Number of whole day to reserve the event. The max is
+	; MAX_RESERVE_WHOLE_DAY. 0 if not applicable. 
+	;
+	;   If this field is non-zero, the end date specified in
+	;   CEPS_reserveWholeDay is ignored.
+	;
+	;   If CEPS_startDateTime does not have time specified, it is assumed
+	;   the start time is 00:00.
+	;
+	;   If CEPS_endDateTime does not have time specified, it is assumed
+	;   the end time is 23:59
+
+	CEPS_alarm		CalendarAlarmStruct
+	; Alarm associated with the event
+
+	CEPS_eventType		CalendarEventDescType		CEDT_GEOS_TEXT
+	; Type of data of the event
+
+	CEPS_repeatInfo		fptr.CalendarEventRepeatInfo
+	; Repeat event info. 0 if the event is not repeating
+
+	CEPS_dataLength		word
+	; The number of bytes of the data in CEPS_data. If CEPS_eventType is
+	; CEDT_GEOS_TEXT, CEPS_dataLength does not include NULL.
+
+	CEPS_data		fptr.char
+	; The event data. If the CEPS_eventType is CEDT_GEOS_TEXT, the text
+	; passed in from this field must be null-terminated.
+CalendarEventParamStruct	ends
+
+;
+; Structure of calendar event data that is returned from Calendar API
+;
+CalendarReturnedEventStruct	struct
+	CRES_eventID		dword
+	; event unique ID
+
+	CRES_startDateTime	FileDateAndTime
+	; Event start date and time
+ 
+	CRES_endDateTime	FileDateAndTime
+	; Event end date and time
+
+	CRES_reserveWholeDay	word		0
+	; Number of whole day to reserve the event. The max is
+	; MAX_RESERVE_WHOLE_DAY. 0 if not applicable. 
+	;
+	;   If this field is non-zero, the end date specified in
+	;   CRES_reserveWholeDay is ignored.
+	;
+	;   If CRES_startDateTime does not have time specified, it is assumed
+	;   the start time is 00:00.
+	;
+	;   If CRES_endDateTime does not have time specified, it is assumed
+	;   the end time is 23:59
+
+	CRES_alarm		CalendarAlarmStruct
+	; Alarm associated with the event
+
+	CRES_eventType		CalendarEventDescType		CEDT_GEOS_TEXT
+	; Type of data of the event
+
+	CRES_repeatInfo		nptr.CalendarEventRepeatInfo
+	; Offset in this block that points to CalendarEventRepeatInfo repeat
+	; event info. 0 if the event is not repeating 
+
+	CRES_dataLength		word
+	; The number of bytes of the data in CRES_data. If CRES_eventType is
+	; CEDT_GEOS_TEXT, CRES_dataLength does not include NULL.
+
+	CRES_data		label	byte
+	; The event data. If the CRES_eventType is CEDT_GEOS_TEXT, the text
+	; passed in from this field must be null-terminated.
+CalendarReturnedEventStruct	ends
+
+;
+; The parameter passed to add an event to calendar database via
+; MSG_CALENDAR_ADD_EVENT.
+;
+; *Note* This struct is only defined in assembly as C version will have
+; parameters passed on stack. The order of this struct should be reverse of
+; the order of parameters passed of the C message counter-part.
+;
+CalendarAddEventParams		struct
+	CAEP_callbackMsg	word
+	CAEP_callbackObj	optr		; zero if no callback
+	CAEP_param		fptr.CalendarEventParamStruct
+CalendarAddEventParams		ends
+
+MSG_CALENDAR_ADD_EVENT						message
+;
+; SYNOPSIS:	Add a calendar event
+;
+; 		** Message supported in Communicator products after
+;		Feb 1997 **
+;
+; Pass:		ss:bp	= CalendarAddEventParams on stack
+; Return:	nothing from this message.
+;
+;		The results of the operation are returned via the callback
+;		message passed in. The parameters to callback are:
+;
+;		if there is error,
+;			cx	= CalendarEventError
+;		if there is no error,
+;			cx	= CEE_NORMAL
+;			dx:bp	= CalendarEventID
+; Destroyed:	nothing
+;
+
+;
+; The parameter passed to modify an event to calendar database via
+; MSG_CALENDAR_MODIFY_EVENT_BY_ID.
+;
+; *Note* This struct is only defined in assembly as C version will have
+; parameters passed on stack. The order of this struct should be reverse of
+; the order of parameters passed of the C message counter-part.
+;
+CalendarModifyEventParams	struct
+	CMEP_callbackMsg	word
+	CMEP_callbackObj	optr		; zero if no callback
+	CMEP_eventID		dword		; event ID of event to modify
+	CMEP_param		fptr.CalendarEventParamStruct
+CalendarModifyEventParams	ends
+
+MSG_CALENDAR_MODIFY_EVENT_BY_ID					message
+;
+; SYNOPSIS:	Modify a calendar event by event ID
+;
+; 		** Message supported in Communicator products after
+;		Feb 1997 **
+;
+; Pass:		ss:bp	= CalendarModifyEventParams on stack
+; Return:	nothing from this message.
+;
+;		The results of the operation are returned via the callback
+;		message passed in. The parameters to callback are:
+;
+;		if there is error,
+;			cx	= CalendarEventError
+;		if there is no error,
+;			cx	= CEE_NORMAL
+; Destroyed:	nothing
+;
+
+;
+; The parameter to pass to retrieve an event by ID.
+;
+; *Note* This struct is only defined in assembly as C version will have
+; parameters passed on stack. The order of this struct should be reverse of
+; the order of parameters passed of the C message counter-part.
+;
+CalendarGetEventByIDParams	struct
+	CGEBIDP_callbackMsg	word
+	CGEBIDP_callbackObj	optr		; zero if no callback
+	CGEBIDP_owner		hptr		; owner of the returned block
+	CGEBIDP_eventID		dword		; unique event ID
+CalendarGetEventByIDParams	ends
+
+MSG_CALENDAR_GET_EVENT_BY_ID	message
+;
+; SYNOPSIS:	Get a calendar event's data by event ID
+;
+;		** Message supported in Communicator products after
+;		Feb 1997 **
+;
+; Pass:		ss:bp	= CalendarAccessEventByIDParams
+;			(CGEBIDP_callbackMsg cannot be zero)
+; Return:	nothing from this message
+;
+;		The results of the operation are returned via the callback
+;		message passed in. The parameters to callback are:
+;
+;		if there is error,
+;			cx	= CalendarEventError
+;		if there is no error,
+;			cx	= CEE_NORMAL
+;			^hdx	= Unlocked block of
+;				CalendarReturnedEventStruct 
+; Destroyed:	nothing
+;
+
+;
+; The parameter to pass to access an event by ID.
+;
+; *Note* This struct is only defined in assembly as C version will have
+; parameters passed on stack. The order of this struct should be reverse of
+; the order of parameters passed of the C message counter-part.
+;
+CalendarAccessEventByIDParams	struct
+	CAEBIDP_callbackMsg	word
+	CAEBIDP_callbackObj	optr		; zero if no callback
+	CAEBIDP_eventID		dword		; unique event ID
+CalendarAccessEventByIDParams	ends
+
+MSG_CALENDAR_DELETE_EVENT_BY_ID					message
+;
+; SYNOPSIS:	Delete a calendar event by event ID
+;
+;		** Message supported in Communicator products after
+;		Feb 1997 **
+;
+; Pass:		ss:bp	= CalendarAccessEventByIDParams
+; Return:	nothing from this message
+;
+;		The results of the operation are returned via the callback
+;		message passed in. The parameters to callback are:
+;
+;		if there is error,
+;			cx	= CalendarEventError
+;		if there is no error,
+;			cx	= CEE_NORMAL
+; Destroyed:	nothing
+;
+
+;
+; The parameter to pass to check if event exists in a period of time
+;
+; *Note* This struct is only defined in assembly as C version will have
+; parameters passed on stack. The order of this struct should be reverse of
+; the order of parameters passed of the C message counter-part.
+;
+CalendarCheckEventExistParams	struct
+	CCEEP_callbackMsg	word
+	CCEEP_callbackObj	optr	
+	CCEEP_endDateTime	FileDateAndTime	; End date and time.
+	CCEEP_startDateTime	FileDateAndTime	; Start date and time.
+CalendarCheckEventExistParams	ends
+
+MSG_CALENDAR_CHECK_IF_EVENT_EXISTS				message
+;
+; SYNOPSIS:	Check if there is any event exists within a period of time 
+;
+;		** Message supported in Communicator products after
+;		Feb 1997 **
+;
+; Pass:		ss:bp	= CalendarCheckEventExistParams
+; Return:	nothing from this message
+;
+;		The results of the operation are returned via the callback
+;		message passed in. The parameters to callback are:
+;
+;		if there is error,
+;			cx	= CalendarEventError
+;		if there is event overlapping the search range, 
+;			cx	= CEE_NORMAL
+;		if there is no event overlapping the search range,
+;			cx	= CEE_EVENT_NOT_FOUND
+; Destroyed:	nothing
+;
+
+MSG_CALENDAR_GET_NEXT_EVENT_ID					message
+;
+; Synopsis:	Get the unique event ID that is to be assigned to the
+;		next new event.
+;
+; 		** Message supported in Communicator products after
+;		Feb 1997 **
+;
+; Pass:		^lcx:dx	= recipient object,
+;			  pass cx == 0 if none
+;		bp	= message which the calendar app would call on
+;			  the recipient object with.
+;			prototype of reply message:
+;			cx:dx	= next event ID
+; Returns:	cx:dx	= next event ID
+;		If file is not valid, INVALID_EVENT_ID is returned.
+; Destroys:	ax, bp
+;
+
+MSG_CALENDAR_SET_NEXT_EVENT_ID					message
+;
+; Synopsis:	Set the unique event ID that is to be assigned to the
+;		next new event. If the argument is smaller than the
+;		current value, the value will NOT be changed.
+;
+;		The minimum value is FIRST_EVENT_ID (00020001h).
+;
+; 		** Message supported in Communicator products after
+;		Feb 1997 **
+;
+; Pass:		cx:dx	= next event ID
+; Returns:	Nothing
+; Destroys:	Nothing
+;
+
+CalendarClass	endc
+
+CALENDAR_TOKEN	equ	<<<'PLNR'>,MANUFACTURER_ID_GEOWORKS>>
+
+; Default Responder Calendar file name.  This is needed here
+; because other Responder apps will use the name.
+;
+CALENDAR_DEFAULT_DIR	equ <"CALENDAR", 0>
+CALENDAR_DEFAULT_FILE	equ <"CALENDAR\\Calendar", 0>
+
+CALENDAR_PASSWD_INIT_CATEGORY		equ "Calendar"
+CALENDAR_PASSWD_INIT_KEY		equ "password"
+
+FIRST_EVENT_ID		equ	00020001h	; first unique id to
+						; be used
+INVALID_EVENT_ID	equ	(FIRST_EVENT_ID-1); invalid dummy id
+

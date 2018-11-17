@@ -1,0 +1,279 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	GeoDex
+MODULE:		Misc		
+FILE:		miscLettersDraw.asm
+
+AUTHOR:		Ted H. Kim, March 9, 1992
+
+ROUTINES:
+	Name			Description
+	----			-----------
+ 	LettersCompDraw		Draw method for composite gadget
+	LettersDraw		Draw method for letter class gadget
+	DrawLetterTabs		Draws new letters onto letter tabs bitmap
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ted	3/92		Initial revision
+	jfh	11/30/04	port to GOC
+
+DESCRIPTION:
+	Contains message handlers for MSG_VIS_DRAW. 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*LettersCode segment resource */
+
+@include "cdex.goh"
+@include "misc\consts.goh"
+@include "art\midbtmp.goh"
+@include "art\botbtmp.goh"
+@include "art\topbtmp.goh"
+
+
+@extern chunk Set1Char1;
+@extern chunk Set1Char2;
+@extern chunk Set1Char3;
+@extern chunk Set1Char4;
+@extern chunk Set1Char5;
+@extern chunk Set1Char6;
+@extern chunk Set1Char7;
+@extern chunk Set1Char8;
+@extern chunk Set1Char9;
+@extern chunk Set1Char10;
+@extern chunk Set1Char11;
+@extern chunk Set1Char12;
+@extern chunk Set1Char13;
+@extern chunk Set1Char14;
+@extern chunk Set1Char15;
+@extern chunk Set1Char16;
+@extern chunk Set1Char17;
+@extern chunk Set1Char18;
+@extern chunk Set1Char19;
+@extern chunk Set1Char20;
+@extern chunk Set1Char21;
+@extern chunk Set1Char22;
+@extern chunk Set1Char23;
+@extern chunk Set1Char24;
+@extern chunk Set1Char25;
+@extern chunk Set1Char26;
+@extern chunk Set1Char27;
+@extern chunk Set1Char28;
+@extern chunk Set1Char29;
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		LettersCompDraw
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw routine for composite gadget.	
+
+CALLED BY:	UI (= MSG_VIS_DRAW)
+
+PASS:		ds:si - instance data
+		bp - gState handle
+		cx - draw flags
+GOC:		(drawFlags, gstate)
+
+RETURN:		nothing
+
+PSEUDO CODE/STRATEGY:
+	Set the attributes
+	Get the bounds of gadget
+	Draw the framed rectangle
+	Draw its children
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Ted	10/3/89		Initial version
+	Ted	2/6/90		Uses bitmaps
+	jfh	11/29/04	port to GOC
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@extern method	LettersCompClass, MSG_VIS_DRAW
+{
+Rectangle	rect;
+
+
+	@call oself::MSG_VIS_GET_BOUNDS(&rect);
+
+	/* first draw the background for the card entry area. */
+//	XXX GrSetLineMask(gstate, SDM_100);
+	GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+
+	GrDrawRect(gstate, rect.R_left + 1,
+							 rect.R_top + COLOR_TOP_POS_ADJUST_BACKGRND_RECT,
+							 rect.R_right - COLOR_RIGHT_POS_ADJUST_BACKGRND_RECT,
+							 rect.R_top + COLOR_TOP_POS_ADJUST_BACKGRND_RECT +
+											  COLOR_BOTTOM_POS_ADJUST_BACKGRND_RECT);
+
+//	XXX GrSetAreaMask(gstate, SDM_100);
+	GrSetAreaColor(gstate, CF_INDEX, C_WHITE, 0, 0);
+	GrFillRect(gstate, rect.R_left + 2,
+							 rect.R_top + COLOR_TOP_POS_ADJUST_BACKGRND_RECT,
+							 rect.R_right - COLOR_RIGHT_POS_ADJUST_BACKGRND_RECT,
+							 rect.R_top + COLOR_TOP_POS_ADJUST_BACKGRND_RECT +
+											  COLOR_BOTTOM_POS_ADJUST_BACKGRND_RECT);
+
+	/* draw the right side of card view that shows the thickness of
+		record entries */
+	MemLock(HandleOf(@MidSectBitmap));
+	GrDrawBitmap(gstate, rect.R_left + 1 + COLOR_LEFT_POS_ADJUST_MIDDLE_BITMAP,
+								rect.R_top + COLOR_TOP_POS_ADJUST_MIDDLE_BITMAP,
+								LMemDeref(@MidSectBitmap), 0) ;
+	MemUnlock(HandleOf(@MidSectBitmap));
+
+	/* now draw the bottom part of card view */
+	MemLock(HandleOf(@BottomBitmap));
+	GrDrawBitmap(gstate, rect.R_left + 1,
+								rect.R_top + COLOR_TOP_POS_ADJUST_BOTTOM_BITMAP,
+								LMemDeref(@BottomBitmap), 0) ;
+	MemUnlock(HandleOf(@BottomBitmap));
+
+	/* call its super class */
+	@callsuper();
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		LettersDraw
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw routine for letters class.
+
+CALLED BY:	UI (= MSG_VIS_DRAW)
+
+PASS:		ds:si - instance data
+		es - segment of LettersClass
+		ax - The method
+		cx - DrawFlag (with DF_EXPOSED)
+		bp - gstate to use
+GOC:		(drawFlags, gstate)
+
+RETURN:		nothing
+
+PSEUDO CODE/STRATEGY:
+	Draw the bounding boxes for letter buttons
+	Display characters for letter buttons
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Ted	10/3/89		Initial version
+	jfh	11/29/04	port to GOC
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@extern method	LettersClass, MSG_VIS_DRAW
+{
+Rectangle	rect;
+
+
+	@call oself::MSG_VIS_GET_BOUNDS(&rect);
+
+	/* draw the bitmap for letter tabs */
+	MemLock(HandleOf(@TopBitmap));
+	GrDrawBitmap(gstate, rect.R_left + 1, rect.R_top, LMemDeref(@TopBitmap), 0);
+	MemUnlock(HandleOf(@TopBitmap));
+
+	/* draw letters into tabs */
+	@call oself::MSG_DRAW_LETTER_TABS(C_RED, TRUE, gstate);
+
+	/* is there an inverted char? */
+	if (pself->LI_flag & LIF_INVERTED)  {
+		/* invert the letter tab */
+		@call oself::MSG_LETTERS_INVERT(
+								g_gmb.GMB_numMainTab, pself->LI_letter, gstate);
+		}
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_DRAW_LETTER_TABS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Draw new set of characters onto the letter tab bitmap.
+
+CALLED BY:	UI(=MSG_DRAW_LETTER_TABS), LettersButtonCalc
+
+PASS:		dl - curCharSet
+		dh - ColorIndex
+		cx - flag for GState
+			if cx = 0, create a new GState
+			if cx = 1, di is the handle of GState
+		di - handle of GState if cx is not zero
+		es - dgroup
+GOC:  byte textColorIndex
+		Boolean haveGState
+		GStateHandle gstate
+
+RETURN:		nothing
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ted	7/92		Initial version
+	jfh	11/30/04	port to GOC
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@extern method	LettersClass, MSG_DRAW_LETTER_TABS
+{
+GStateHandle		ltrGState;
+RGBColorAsDWord	saveColor;
+optr	letter[MAX_NUM_OF_LETTER_TABS] = {@Set1Char1, @Set1Char2, @Set1Char3,
+				@Set1Char4, @Set1Char5, @Set1Char6, @Set1Char7, @Set1Char8,
+				@Set1Char9, @Set1Char10, @Set1Char11, @Set1Char12, @Set1Char13,
+				@Set1Char14, @Set1Char15, @Set1Char16, @Set1Char17, @Set1Char18,
+				@Set1Char19, @Set1Char20, @Set1Char21, @Set1Char22, @Set1Char23,
+				@Set1Char24, @Set1Char25, @Set1Char26, @Set1Char27, @Set1Char28,
+				@Set1Char29};
+word		i, xPos, yPos;
+Rectangle	rect;
+
+
+	/* do we need to create a new gstate? */
+	if (!haveGState) ltrGState = @call oself::MSG_VIS_VUP_CREATE_GSTATE();
+	else ltrGState = gstate;
+
+	/* change the text color */
+	saveColor = GrGetTextColor(ltrGState);
+	GrSetTextColor(ltrGState, CF_INDEX, textColorIndex, 0, 0);
+
+	/* draw the letters - set the initial position */
+	@call oself::MSG_VIS_GET_BOUNDS(&rect);
+	yPos = rect.R_bottom - FIRST_ROW_Y_POSITION_ADJUST;
+	xPos = rect.R_left + FIRST_ROW_X_POSITION_ADJUST;
+
+	/* now change the font and point size */
+	GrSetFont(ltrGState, GEODEX_DISPLAY_FONT, MakeWWFixed(LETTER_TAB_FONT_SIZE));
+
+	MemLock (OptrToHandle(letter[0]));
+	for (i = 0; i < MAX_NUM_OF_LETTER_TABS; i++)  {
+		GrDrawText(ltrGState, xPos, yPos, LMemDeref(letter[i]), 0);
+		/* if this is the last character of row 1, adjust x, y position values */
+		if (i == DLTI_ROW_TWO) {
+			xPos = rect.R_left + SECOND_ROW_X_POSITION_ADJUST;
+			yPos -= SECOND_ROW_Y_POSITION_ADJUST;
+			}
+		/* if this is the last character of row 2, adjust x, y position values */
+		else if (i == DLTI_ROW_THREE) {
+			xPos = rect.R_left + THIRD_ROW_X_POSITION_ADJUST;
+			yPos -= SECOND_ROW_Y_POSITION_ADJUST;
+			}
+		/* just update the xPos */
+		else xPos += NEXT_COLUMN_INCREMENT;
+		} /* end of letters for */
+	MemUnlock (OptrToHandle(letter[0]));
+
+	/* restore the text color */
+	GrSetTextColor(ltrGState, CF_INDEX, RGB_INDEX(saveColor), 0, 0);
+
+	/* did we create a new gstate? if so, destroy it */
+	if (!haveGState) GrDestroyState(ltrGState);
+
+}
+
+

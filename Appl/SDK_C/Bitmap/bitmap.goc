@@ -1,0 +1,464 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1996 -- All Rights Reserved
+ *
+ * PROJECT:	  GEOS
+ * MODULE:	  Bitmap (Sample GEOS application)
+ * FILE:	  bitmap.goc
+ *
+ * AUTHOR:	  Ed Ballot: July 15 1996
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	7/15/96	  EB	    Initial version
+ *
+ * DESCRIPTION:
+ *	This sample application shows how to dynamically create a bitmap
+ * storage area and draw information to that bitmap.  The bitmap storage
+ * area is referenced by a GState, so any GrDraw..() command can be
+ * used to add data to the bitmap.  This application also shows
+ * how to draw the dynamically created bitmap to the display area.
+ *
+ * Note that GrCreateBitmap requires a vmfile because it creates a
+ * huge bitmap, which stores the bitmap data in a huge array.
+ *
+ * Details:
+ * MSG_BITMAP_DRAW_TO_DYNAMIC_BITMAP contains the code that draws
+ * information into the dynamically created bitmap.  Specifically,
+ * it copies a static bitmap (doggyBMP) to the dynamically created
+ * bitmap and then adds lines to the top, left, right and bottom
+ * sides of the bitmap.
+ *
+ * MSG_VIS_DRAW of the @Doggy object actually draws the dynamically
+ * created bitmap to the object's gstate.
+ *
+ *	$Id: bitmap.goc,v 1.1 97/04/04 16:41:26 newdeal Exp $
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files  &  Constants
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+#include <gstring.h>	/* needed for gstring moniker manipulations */
+#include <graphics.h>
+
+
+#define DOGGY_WIDTH 100
+#define DOGGY_HEIGHT 100
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+@class	BitmapProcessClass, GenProcessClass;
+    @message void MSG_BITMAP_DRAW_TO_DYNAMIC_BITMAP();
+@endc;
+@classdecl	BitmapProcessClass, neverSaved;
+
+
+@class  DoggyClass, VisClass;
+    @message void MSG_DOGGY_SET_HUGE_BITMAP_INFO(VMFileHandle vmf,
+						 VMBlockHandle vmb,
+						 GStateHandle gst);
+    @message void MSG_DOGGY_GET_HUGE_BITMAP_INFO(VMFileHandle *vmf,
+						 VMBlockHandle *vmb,
+						 GStateHandle *gst);
+
+    @instance VMFileHandle DI_vmFile = NullHandle;
+    @instance VMBlockHandle DI_vmBitmapBlock = NullHandle;
+    @instance GStateHandle DI_gstateBitmap = NullHandle;
+@endc;
+@classdecl	DoggyClass;
+
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+/*
+ *		Application Object
+ */
+@start	AppResource;
+
+@object GenApplicationClass BitmapApp = {
+    GI_visMoniker = list { @BitmapTextMoniker }
+    GI_comp = @BitmapPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @BitmapPrimary;
+}
+
+@visMoniker BitmapTextMoniker = "Bitmap Sample";
+
+@end	AppResource;
+
+
+/*
+ *		Primary window
+ */
+@start	Interface;
+
+@object GenPrimaryClass BitmapPrimary  = {
+    GI_comp = @DoggyView, @StartTrigger;
+}
+
+@object GenViewClass DoggyView = {
+    GVI_horizAttrs = @default | GVDA_SCROLLABLE | GVDA_NO_LARGER_THAN_CONTENT;
+    GVI_vertAttrs  = @default | GVDA_SCROLLABLE | GVDA_NO_LARGER_THAN_CONTENT;
+    GVI_docBounds = {0, 0, DOGGY_WIDTH, DOGGY_HEIGHT};
+    GVI_content = @DoggyContent;
+
+    ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+}
+
+@object VisContentClass DoggyContent = {
+    VCNI_view = @DoggyView;
+    VCNI_attrs = (@default) | VCNA_SAME_WIDTH_AS_VIEW
+                            | VCNA_SAME_HEIGHT_AS_VIEW;
+    VCI_comp = @Doggy;
+}
+
+@object DoggyClass Doggy = {
+    /*
+     * Make this fixed size otherwise it won't have any geometry because
+     * the GenGlyph has no gstring statically associated with it.
+     */
+    VI_bounds = {0,0, DOGGY_WIDTH, DOGGY_HEIGHT};
+}
+
+@object GenTriggerClass StartTrigger = {
+    GI_visMoniker = 'S', "Start";
+    GTI_actionMsg = MSG_BITMAP_DRAW_TO_DYNAMIC_BITMAP;
+    GTI_destination = process;
+
+    HINT_SEEK_MENU_BAR;
+    HINT_SEEK_SLOT = (0);
+}
+
+@end Interface;
+
+
+@start DoggyBitmap, data;
+
+/*
+ * This typedef is only used to allow the static data to be declared.
+ * Since the bitmap data always follows the Bitmap structure, variables
+ * in the methods will point to a Bitmap structure rather than a DoggyBmp.
+ * This also reduces warnings because bitmap routines will use a pointer
+ * to a Bitmap structure, not a DoggyBmp structure.
+ */
+typedef struct {
+    Bitmap bitmapHeader;
+    unsigned char bitmapData[110];
+} DoggyBmp;
+
+/*
+ * This statically defined bitmap was created with IconEditor.  It will
+ * be copied to the dynamically created bitmap.
+ */
+@chunk DoggyBmp doggyBmp = {
+		{32,22,BMC_PACKBITS,BMF_MONO},
+		{0xfd, 0x00,
+		0x03, 0x00, 0xc0, 0x00, 0x00,
+		0x03, 0x02, 0x40, 0x00, 0x00,
+		0x03, 0x01, 0x40, 0x00, 0x00,
+		0x03, 0x01, 0xc0, 0x00, 0x00,
+		0x03, 0x0f, 0x20, 0x00, 0x00,
+		0x03, 0x73, 0x20, 0x00, 0x06,
+		0x03, 0x60, 0x30, 0x00, 0x08,
+		0x03, 0x40, 0xc8, 0x00, 0x10,
+		0x03, 0x47, 0x07, 0xff, 0xe0,
+		0x03, 0x38, 0x04, 0x00, 0x20,
+		0x03, 0x00, 0x04, 0x00, 0x20,
+		0x03, 0x00, 0x04, 0x00, 0x20,
+		0x03, 0x00, 0x04, 0x00, 0x20,
+		0x03, 0x00, 0x07, 0xff, 0xe0,
+		0x03, 0x00, 0x05, 0x00, 0xa0,
+		0x03, 0x00, 0x05, 0x00, 0xa0,
+		0x03, 0x00, 0x05, 0x00, 0xa0,
+		0x03, 0x00, 0x05, 0x00, 0xa0,
+		0x03, 0x00, 0x05, 0x00, 0xa0,
+		0x03, 0x00, 0x05, 0x00, 0xa0,
+		0xfd, 0x00}};
+
+@end DoggyBitmap;
+
+
+/*
+ ***************************************************************************
+ *		Code for BitmapProcessClass
+ ***************************************************************************
+ */
+/***********************************************************************
+ *		MSG_GEN_PROCESS_OPEN_APPLICATION for BitmapProcessClass
+ ***********************************************************************
+ * SYNOPSIS:       Create a vmfile for the bitmap and then create the bitmap
+ * PARAMETERS:     void (AppAttachFlags attachFlags,
+ *			 MemHandle launchBlock,
+ *			 MemHandle extraState)
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:       @callsuper to do the standard open stuff.
+ *                 Open a vmfile that the bitmap will use.
+ *                 Create the dynamic bitmap with GrCreateBitmap.
+ *                 Finally store away the bitmap's gstate and 
+ *                 vmfile info so it can be referenced later.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EB	7/96		Initial Revision
+ *
+ ***********************************************************************/
+@method BitmapProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+    VMFileHandle vmfBitmap;
+    VMBlockHandle vmbBitmap;
+    GStateHandle gsBitmap;
+
+    @callsuper();
+
+	 /*
+	  * First open the file that will contain the bitmap info.
+	  * Create/Truncate it so that we always start fresh.
+	  */
+    FilePushDir();
+    FileSetStandardPath(SP_DOCUMENT);
+    vmfBitmap = VMOpen("Doggy Bitmap",
+                       VMAF_FORCE_READ_WRITE,
+                       VMO_CREATE_TRUNCATE,
+                       0);
+    FilePopDir();
+
+	 /*
+	  * Create the dynamic bitmap.  In this case, it will be a monochrome
+	  * (BMF_MONO) bitmap.
+	  */
+    vmbBitmap = GrCreateBitmap(BMF_MONO,
+                               DOGGY_WIDTH, DOGGY_HEIGHT,
+                               vmfBitmap,
+                               0,
+                               &gsBitmap);
+
+	 /*
+	  * Store the bitmap's gstring handle and VMBlock handle (and also the
+	  * vmfile's handle) as we will need them to draw to the bitmap.
+	  */
+    @send Doggy::MSG_DOGGY_SET_HUGE_BITMAP_INFO(vmfBitmap,
+                                                vmbBitmap,
+                                                gsBitmap);
+
+}
+
+
+
+
+/***********************************************************************
+ *		MSG_GEN_PROCESS_CLOSE_APPLICATION for BitmapProcessClass
+ ***********************************************************************
+ * SYNOPSIS:       Close the vmfile and destroy the bitmap
+ * PARAMETERS:     MemHandle (void)
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:       Destroy the dynamically created bitmap.  Use BMD_KILL_DATA
+ *                 which frees up all blocks associated with the bitmap.
+ *                 Close the bitmap's vmfile.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EB	7/96		Initial Revision
+ *
+ ***********************************************************************/
+@method BitmapProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+    VMFileHandle vmfBitmap;
+    VMBlockHandle vmbBitmap;
+    GStateHandle gsBitmap;
+
+    @call Doggy::MSG_DOGGY_GET_HUGE_BITMAP_INFO(&vmfBitmap,
+                                                &vmbBitmap,
+                                                &gsBitmap);
+
+	 /*
+	  * Utterly destroy the bitmap since we are closing the app down
+	  */
+    GrDestroyBitmap(gsBitmap, BMD_KILL_DATA);
+
+	 /*
+	  * don't want to leave any opened files when we're gone...
+	  */
+    VMClose(vmfBitmap, 0);
+
+    return @callsuper();
+}
+
+
+
+
+
+/***********************************************************************
+ *		MSG_BITMAP_DRAW_TO_DYNAMIC_BITMAP for BitmapProcessClass
+ ***********************************************************************
+ * SYNOPSIS:       Add some stuff to the dynamic bitmap
+ * PARAMETERS:     void (void)
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:       Draw a statically defined bitmap to the dynamic
+ *                 bitmap.  Then draw some straight lines, too.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EB	7/96		Initial Revision
+ *
+ ***********************************************************************/
+@method BitmapProcessClass, MSG_BITMAP_DRAW_TO_DYNAMIC_BITMAP
+{
+    VMFileHandle vmfBitmap;
+    VMBlockHandle vmbBitmap;
+    GStateHandle gsBitmap;
+    Bitmap *ptrDoggyBmp;
+
+    @call Doggy::MSG_DOGGY_GET_HUGE_BITMAP_INFO(&vmfBitmap,
+                                                &vmbBitmap,
+                                                &gsBitmap);
+
+	 /*
+	  * Copy the static bitmap (doggyBmp) to the dynamic one by
+	  * drawing the static bitmap to the dynamic bitmap's gstate.
+	  * Note that we offset it by 5 in the x and y directions so
+	  * that it isn't too far in the upper left corner.
+	  */
+    MemLock(OptrToHandle(@doggyBmp));
+    ptrDoggyBmp = LMemDeref(@doggyBmp);
+
+    GrDrawBitmap(gsBitmap, 5, 5, ptrDoggyBmp, 0);
+
+    MemUnlock(OptrToHandle(@doggyBmp));
+
+	 /*
+	  * Now add lines to top, bottom, left and right sides of the
+	  * DoggyClass (GenGlyphClass).
+	  */
+    GrDrawHLine(gsBitmap, 0, 0, (DOGGY_WIDTH-1));
+    GrDrawHLine(gsBitmap, 0, (DOGGY_HEIGHT-1), (DOGGY_WIDTH-1));
+    GrDrawVLine(gsBitmap, 0, 0, (DOGGY_HEIGHT-1));
+    GrDrawVLine(gsBitmap, (DOGGY_WIDTH-1), 0, (DOGGY_HEIGHT-1));
+
+	 /*
+	  * Finally tell @Doggy it needs to draw itself.  This will result
+	  * in a MSG_VIS_DRAW being sent.  In the MSG_VIS_DRAW, we draw
+	  * the dynamic bitmap to the display area.
+	  */
+    @send Doggy::MSG_VIS_INVALIDATE();
+}
+
+
+
+
+/*
+ ***************************************************************************
+ *		Code for DoggyClass
+ ***************************************************************************
+ */
+/***********************************************************************
+ *		MSG_VIS_DRAW for DoggyClass
+ ***********************************************************************
+ * SYNOPSIS:       If there's any bitmap info to draw, draw it
+ * PARAMETERS:	   void (DrawFlags drawFlags, GStateHandle gstate)
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:       Make sure that pself is pointing to the object's
+ *                 Generic instance data because we are directly
+ *                 referencing the bitmap's vmfile handle and VMBlock
+ *                 handle from the instance data.
+ *                 Draw the dynamic bitmap to the display's gstate.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EB	7/96		Initial Revision
+ *
+ ***********************************************************************/
+@method DoggyClass, MSG_VIS_DRAW
+{
+    Rectangle visBounds;
+
+    pself = ObjDerefVis(oself);
+    if (pself->DI_vmFile)
+    {
+	  /*
+	   * Get the bounds because we want to draw within the
+	   * bounds of this object
+	   */
+        @call oself::MSG_VIS_GET_BOUNDS(&visBounds);
+
+        GrDrawHugeBitmap(gstate,
+                         visBounds.R_left,
+                         visBounds.R_top,
+                         pself->DI_vmFile,
+                         pself->DI_vmBitmapBlock);
+    }
+}
+
+
+
+/***********************************************************************
+ *		MSG_DOGGY_SET_HUGE_BITMAP_INFO for DoggyClass
+ ***********************************************************************
+ * SYNOPSIS:       Store the bitmap's gstate, vmfile and vmblock.
+ * PARAMETERS:	   void (VMFileHandle vmf,
+ *                       VMBlockHandle vmb
+ *                       GStateHandle gst);
+ * SIDE EFFECTS:   none
+ *
+ * STRATEGY:       Store the bitmap's gstate, vmfile and vmblock.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EB	7/96		Initial Revision
+ *
+ ***********************************************************************/
+@method DoggyClass, MSG_DOGGY_SET_HUGE_BITMAP_INFO
+{
+    pself->DI_vmFile = vmf;
+    pself->DI_vmBitmapBlock = vmb;
+    pself->DI_gstateBitmap = gst;
+}
+
+
+
+/***********************************************************************
+ *		MSG_DOGGY_GET_HUGE_BITMAP_INFO for DoggyClass
+ ***********************************************************************
+ * SYNOPSIS:       Get the bitmap's gstate, vmfile and vmblock.
+ * PARAMETERS:	   void (VMFileHandle *vmf,
+ *                       VMBlockHandle *vmb);
+ *                       GStateHandle *gst);
+ * SIDE EFFECTS:   none
+ *
+ * STRATEGY:       Copy the bitmap's gstate, vmfile and vmblock info
+ *                 from the instance data.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	EB	7/96		Initial Revision
+ *
+ ***********************************************************************/
+@method DoggyClass, MSG_DOGGY_GET_HUGE_BITMAP_INFO
+{
+    *vmf = pself->DI_vmFile;
+    *vmb = pself->DI_vmBitmapBlock;
+    *gst = pself->DI_gstateBitmap;
+}
+

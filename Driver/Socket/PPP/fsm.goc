@@ -1,0 +1,1284 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1995 -- All Rights Reserved
+ *
+ *			GEOWORKS CONFIDENTIAL
+ *
+ * PROJECT:	  Socket
+ * MODULE:	  PPP Driver
+ * FILE:	  fsm.goc
+ *
+ * AUTHOR:  	  Jennifer Wu: May  3, 1995
+ *
+ * ROUTINES:
+ *	Name	  	    Description
+ *	----	  	    -----------
+ * 	fsm_event_name	    Get the name for an event for logging
+ *	fsm_state_name	    Get the name for a state for logging
+ * 	fsm_packet_name	    Get the name for a type of packet for logging
+ *	fsm_protocol_name   Get the name of a protocol for logging
+ *
+ *	fsm_init    	    
+ *	fsm_lowerup
+ *	fsm_lowerdown
+ *	fsm_open
+ *	fsm_close
+ *	fsm_sdata
+ *	e   	    	    If logging, log an error in the FSM table
+ *	fsm_timeout 	    Process FSM timer expiration
+ *	fsm_stop_timer
+ *	fsm_start_timer
+ *	s0...s3r,...str...  Actions for the FSM table
+ *	fsm_event   	    Determine what to do based on the event
+ *	    	    	    and current state of the FSM.
+ *	fsm_input   	    Process an input packet.
+ *
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	5/ 3/95	  jwu	    Initial version
+ *
+ * DESCRIPTION:
+ *	
+ * 	$Id: fsm.goc,v 1.15 98/06/03 19:02:31 jwu Exp $
+ *
+ ***********************************************************************/
+
+#include <ppp.h>
+@include <pppLog.goh>
+
+
+#ifdef __HIGHC__
+#pragma Code("FSMCODE");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg FSMCODE
+#endif
+
+
+/*----------------------------------------------------
+ * 	Finite State Machine Events
+ -------------------------------------------------- */
+# define	UP			0
+# define	DOWN			1
+# define	OPEN			2
+# define	CLOSE			3
+# define	TO_PLUS			4
+# define	TO_MINUS		5
+# define	RCR_PLUS		6
+# define	RCR_MINUS		7
+# define	RCA			8
+# define	RCN			9
+# define	RTR			10
+# define	RTA			11
+# define	RUC			12
+# define	RXJ_PLUS		13
+# define	RXJ_MINUS		14
+# define	RXR			15
+
+# define    	NUM_EVENTS  	    	16
+
+/*-----------------------------------------------------------------------
+ * 	    Logging code for FSM
+ ----------------------------------------------------------------------*/
+
+@ifdef LOGGING_ENABLED
+
+char _near *event_name[] =
+    {
+    (char _near *)"Up", (char _near *)"Down", (char _near *)"Open", 
+    (char _near *)"Close", (char _near *)"TO+", (char _near *)"TO-", 
+    (char _near *)"RCR+", (char _near *)"RCR-", (char _near *)"RCA", 
+    (char _near *)"RCN", (char _near *)"RTR", (char _near *)"RTA", 
+    (char _near *)"RUC", (char _near *)"RXJ+", (char _near *)"RXJ-", 
+    (char _near *)"RXR"
+    };
+
+char _near *state_name[] =
+    {
+    (char _near *)"Initial (0)", (char _near *)"Starting (1)", 
+    (char _near *)"Closed (2)", (char _near *)"Stopped (3)",
+    (char _near *)"Closing (4)", (char _near *)"Stopping (5)", 
+    (char _near *)"Req-Sent (6)", (char _near *)"Ack-Rcvd (7)",
+    (char _near *)"Ack-Sent (8)", (char _near *)"Opened (9)"
+    };
+
+char _near *packet_name[] =
+    {
+    (char _near *)"packet-type=0x0", (char _near *)"Configure-Request", 
+    (char _near *)"Configure-Ack", (char _near *)"Configure-Nak", 
+    (char _near *)"Configure-Reject", (char _near *)"Terminate-Request",
+    (char _near *)"Terminate-Ack", (char _near *)"Code-Reject", 
+    (char _near *)"Protocol-Reject", (char _near *)"Echo-Request",
+    (char _near *)"Echo-Reply", (char _near *)"Discard-Request",
+    (char _near *)"packet-type=0xc", (char _near *)"packet-type=0xd",
+    (char _near *)"Reset-Request", (char _near *)"Reset-Ack"
+    };
+
+char eventName[SHORT_STR_LEN], stateName[SHORT_STR_LEN], 
+    packetName[SHORT_STR_LEN], protoName[SHORT_STR_LEN];
+
+char *fsm_event_name (int ev)
+{
+    if (ev >= UP && ev <= RXR)
+	return ((char _far *)event_name[ev]);
+    else {
+	sprintf(eventName, "event=%d", ev);
+	return (eventName);
+    }
+}
+
+char *fsm_state_name (int state)
+{
+    if (state >= INITIAL && state <= OPENED)
+	return ((char _far *)state_name[state]);
+    else {
+	sprintf (stateName, "state=%d", state);
+	return (stateName);
+    }
+}
+
+char *fsm_packet_name (unsigned char packet_type)
+{
+    if (packet_type >= CONFIGURE_REQUEST && packet_type <= RESET_ACK)
+	return ((char _far *)packet_name[packet_type]);
+    else {
+	sprintf (packetName, "packet-type=%xh", packet_type);
+	return (packetName);
+    }
+}
+  
+char *fsm_protocol_name (unsigned short protocol)
+{
+    switch (protocol) 
+	{
+	case LCP:   return ("LCP");
+	case IPCP:  return ("IPCP");
+	case PAP:   return ("PAP");
+	case CHAP:  return ("CHAP");
+	case CCP:   return ("CCP");
+	case COMPRESS: 	return ("COMPRESS");
+	    	
+	default:    sprintf(protoName, "Protocol=%xh", protocol);
+	    	    return (protoName);
+	}
+}
+
+@endif /* LOGGING_ENABLED */
+
+
+
+/*------------------------------------------------------------------------
+ * 	    Forward declarations
+ ------------------------------------------------------------------------*/
+void fsm_event();
+void ser (fsm *f);
+
+
+/***********************************************************************
+ *				fsm_init
+ ***********************************************************************
+ * SYNOPSIS:   	Initialize the Finite State Machine.
+ * CALLED BY:	lcp_init 
+ * 	    	ipcp_init
+ * RETURN:	nothing
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 3/95		Initial Revision
+ *
+ ***********************************************************************/
+void fsm_init (fsm* f)
+{
+    f -> state = INITIAL;
+    f -> flags = 0;
+    f -> id = 0;
+    f -> timer = 0;
+
+    f -> new_id = TRUE;	    	/* start with new ID */
+
+}
+
+
+/***********************************************************************
+ *				fsm_lowerup
+ ***********************************************************************
+ * SYNOPSIS:	    Handle the UP event.
+ * CALLED BY:	    ipcp_lowerup
+ *	    	    lcp_lowerup
+ * RETURN:	    nothing
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 3/95		Initial Revision
+ *
+ ***********************************************************************/
+void fsm_lowerup (fsm *f)
+{
+    fsm_event(f, UP);
+}
+
+
+
+/***********************************************************************
+ *				fsm_lowerdown
+ ***********************************************************************
+ * SYNOPSIS:	Handle DOWN event.
+ * CALLED BY:	ipcp_lowerdown
+ *	    	ipcp_protrej
+ *	    	lcp_lowerdown
+ * RETURN:	nothing
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 3/95		Initial Revision
+ *
+ ***********************************************************************/
+void fsm_lowerdown (fsm *f)
+{
+    if (f -> state >= CLOSED)
+	fsm_event(f, DOWN);
+
+    if (f -> callbacks -> closed) 
+	ProcCallFixedOrMovable_pascal(f, f -> callbacks -> closed);
+}
+
+
+/***********************************************************************
+ *				fsm_open
+ ***********************************************************************
+ * SYNOPSIS:	Handle administrative open event.
+ * CALLED BY:	lcp_open 
+ * 	    	ipcp_open
+ *		ccp_open
+ * RETURN:	nothing
+ *
+ * STRATEGY:	Reset the configuration information then handle the
+ * 	    	FSM transition.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 3/95		Initial Revision
+ *
+ ***********************************************************************/
+void fsm_open (fsm *f)
+{
+    ProcCallFixedOrMovable_pascal(f, f -> callbacks -> resetci);
+    fsm_event(f, OPEN);
+}
+
+
+/***********************************************************************
+ *				fsm_close
+ ***********************************************************************
+ * SYNOPSIS:	Handle the administrative close event.
+ * CALLED BY:	lcp_close
+ *
+ * RETURN:	nothing
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 3/95		Initial Revision
+ *
+ ***********************************************************************/
+void fsm_close (fsm *f)
+{
+    fsm_event(f, CLOSE);
+}
+
+#ifdef __HIGHC__
+#pragma Code("PPPCODE");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg PPPCODE
+#endif
+
+
+/***********************************************************************
+ *				fsm_sdata
+ ***********************************************************************
+ * SYNOPSIS:	Add PPP header and send data.
+ * CALLED BY:	str 	    = Send Terminate Request
+ *	    	sta 	    = Send Terminate Ack
+ *	    	scj 	    = Send Configure Reject
+ *	    	lcp_sprotrej
+ *	    	lqm_send_echo
+ * RETURN:	nothing
+ *
+ * STRATEGY:	If no buffer is passed in, allocate one and copy the
+ *	    	data to it.  Else, add the header to the front of the
+ * 	    	data in the buffer.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 3/95		Initial Revision
+ *
+ ***********************************************************************/
+void fsm_sdata (fsm *f, byte code, byte id, unsigned char *data, PACKET *p, int datalen)
+/*fsm *f;*/	    	    	/* old-style function declaration needed here */
+/*byte code;
+byte id;
+unsigned char *data;
+PACKET *p;
+int datalen;*/
+{
+    int len = HEADERLEN + datalen;
+    unsigned char *ptr;
+
+    /* 
+     * If a buffer has not been provided, allocate one and copy the
+     * data into it.  Otherwise, adjust the provided buffer to 
+     * include space for the PPP header in the data.
+     */
+    if (p == 0) {
+	p = PACKET_ALLOC(len);
+	if (p == 0) 	    /* no memory, oh well... */
+	    return;
+	if (datalen) 
+	    memcpy(PACKET_DATA(p) + HEADERLEN, data, datalen);
+    } 
+    else {
+	p -> MH_dataOffset -= HEADERLEN;
+	p -> MH_dataSize += HEADERLEN;
+    }
+
+    ptr = PACKET_DATA(p);
+
+    PUTCHAR(code, ptr);
+    PUTCHAR(id, ptr);
+    PUTSHORT(len, ptr);
+
+@ifdef LOGGING_ENABLED
+    /*
+     * Log LCP echo requests, echo replies and discard requests.
+     */
+    if (f -> protocol == LCP && 
+	(code == ECHO_REQUEST || code == ECHO_REPLY || 
+	 code == DISCARD_REQUEST)) {
+	LOG2(LOG_LQMSGS, (@sendingLogString,
+			 fsm_protocol_name(f -> protocol),
+			 fsm_packet_name(code),
+			 id, fsm_state_name(f -> old_state)));
+    }
+    else {
+	/*
+ 	 * Log negotiation packet.
+	 */
+	LOG2(LOG_NEG, (@sendingLogString,
+		      fsm_protocol_name(f -> protocol),
+		      fsm_packet_name(code), 
+		      id, fsm_state_name(f -> old_state)));
+    }
+@endif	/* LOGGING_ENABLED */
+
+    PPPSendPacket(f -> unit, p, f -> protocol);
+}
+
+#ifdef __HIGHC__
+#pragma Code("FSMCODE");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg FSMCODE
+#endif
+
+
+/***********************************************************************
+ *				e
+ ***********************************************************************
+ * SYNOPSIS:	Handle error in state transition table.
+ * CALLED BY:	fsm_event using the FSM table
+ * RETURN:	nothing
+ * STRATEGY:	If logging enabled, log the error.  
+ *	    	Need this to be defined even if all it does is log 
+ *	    	because it is an entry in the FSM table.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 3/95		Initial Revision
+ *
+ ***********************************************************************/
+static void _near e (fsm *f)
+{
+@ifdef LOGGING_ENABLED
+    LOG2(LOG_NEG, (@stateErrorLogString, fsm_protocol_name(f -> protocol),
+		  fsm_event_name(event), fsm_state_name(f -> old_state)));
+@endif /* LOGGING_ENABLED */
+}
+
+
+/***********************************************************************
+ *				fsm_timeout
+ ***********************************************************************
+ * SYNOPSIS:	Process the expiration of the restart timer.
+ * CALLED BY:	PPPHandleTimeout when a FSM timer expires
+ * RETURN:  	nothing	
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 3/95		Initial Revision
+ *	jwu 	11/18/96    	Add backoff timer
+ *
+ ***********************************************************************/
+void fsm_timeout (fsm *f)
+{
+    if (f -> retransmits > 0) {
+
+	if (f -> backoff)
+	    f -> backoff++;
+
+	fsm_event(f, TO_PLUS);
+    }
+    else {
+	if (!link_error)
+	    link_error = SDE_CONNECTION_TIMEOUT;
+	fsm_event(f, TO_MINUS);
+    }
+}
+
+
+/***********************************************************************
+ *				fsm_stop_timer
+ ***********************************************************************
+ * SYNOPSIS:	Stop the FSM timer.
+ * CALLED BY:	s0, s1, s2, s3, s9
+ * RETURN:	nothing
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 3/95		Initial Revision
+ *	jwu 	11/18/96    	Add backoff timer
+ *
+ ***********************************************************************/
+void fsm_stop_timer (fsm *f)
+{
+    f -> timer = f -> backoff = 0;
+}
+
+
+/***********************************************************************
+ *				fsm_start_timer
+ ***********************************************************************
+ * SYNOPSIS:	Start the FSM timer.
+ * CALLED BY:	str, zrc, scr
+ * RETURN:	nothing
+ * STRATEGY:	Set the timer to the timeout period.  
+ *
+ *              Delayed backoff timer starts at a single default
+ *                timeout period for first step, and then increases
+ *                it by another default timeout period for each 
+ *                subsequent retransmission.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 3/95		Initial Revision
+ *	jwu 	11/18/96    	Added backoff timer
+ *
+ ***********************************************************************/
+void fsm_start_timer (fsm *f)
+{
+#if DELAYED_BACKOFF_TIMER
+    /*
+     * backoff counter starts at 1.  
+     */
+    if (f -> backoff > MIN_RX_BEFORE_BACKOFF) 
+	f -> timer = f -> timeouttime * 
+             (f -> backoff - MIN_RX_BEFORE_BACKOFF);
+#else
+    if (f -> backoff)
+	f -> timer = f -> timeouttime * f -> backoff;
+#endif /* BACKOFF_TIMER */
+
+    else 
+	f -> timer = f -> timeouttime;
+
+}	
+
+
+/***********************************************************************
+ *	       s0, s1, ... s9, s3r, ... str ... sca ...
+ ***********************************************************************
+ * SYNOPSIS:	All these weird named routines correspond to entries in
+ * 	    	the FSM table and are named according to the RFC names.
+ * CALLED BY:	fsm_event using the FSM table
+ * RETURN:	nothing
+ *
+ * NOTE:    	All routines have been changed to be near routines so 
+ *	    	they can be called without ProcCallFixedOrMovable.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 3/95		Initial Revision
+ *
+ ***********************************************************************/
+
+static void _near s0 (fsm *f) { fsm_stop_timer(f);  f -> state = 0; }
+static void _near s1 (fsm *f) { fsm_stop_timer(f);  f -> state = 1; }
+static void _near s2 (fsm *f) { fsm_stop_timer(f);  f -> state = 2; }
+static void _near s3 (fsm *f) { fsm_stop_timer(f);  f -> state = 3; }
+static void _near s4 (fsm *f) { f -> state = 4; }
+static void _near s5 (fsm *f) { f -> state = 5; }
+static void _near s6 (fsm *f) { f -> state = 6; }
+static void _near s7 (fsm *f) { f -> state = 7; }
+static void _near s8 (fsm *f) { f -> state = 8; }
+static void _near s9 (fsm *f) { fsm_stop_timer(f);  f -> state = 9; }
+
+static void _near s3r (fsm *f)
+{
+    s3(f);
+@ifdef LOGGING_ENABLED
+    LOG2(LOG_NEG, (@badRestartLogString, fsm_event_name(event), 
+		   fsm_state_name(f -> old_state)));
+@endif /* LOGGING_ENABLED */
+}
+
+static void _near s5r (fsm *f)
+{
+    s5(f);
+@ifdef LOGGING_ENABLED
+    LOG2(LOG_NEG, (@badRestartLogString, fsm_event_name(event), 
+		   fsm_state_name(f -> old_state)));
+@endif /* LOGGING_ENABLED */
+}
+
+static void _near s9r (fsm *f)
+{
+    s9(f);
+@ifdef LOGGING_ENABLED
+    LOG2(LOG_NEG, (@badRestartLogString, fsm_event_name(event), 
+		   fsm_state_name(f -> old_state)));
+@endif /* LOGGING_ENABLED */
+}
+
+/* 
+ * Send terminate request.
+ */
+static void _near str (fsm *f)
+{
+    fsm_sdata(f, TERMINATE_REQUEST, f -> reqid = ++f -> id, 
+	      (unsigned char *)NULL, (PACKET *)NULL, 0);
+    --f -> retransmits;
+    fsm_start_timer(f);
+}
+
+/*
+ * Send terminate ack.
+ */
+static void _near sta (fsm *f)
+{
+    fsm_sdata(f, TERMINATE_ACK, fsm_id, (unsigned char *)NULL, 
+	      (PACKET *)NULL, 0);
+}
+
+/*
+ * Initialize restart counter for terminate requests.
+ * No backoff timers for terminate requests. 
+ */
+static void _near ircterm (fsm *f)
+{
+    f -> retransmits = f -> max_terminate;
+    f -> backoff = 0;	    	    
+}
+
+/*
+ * Initialize restart counter for configure requests.
+ * Use backoff timeout behaviour for retransmissions.
+ */
+static void _near ircconf (fsm *f)
+{
+    f -> retransmits = f -> max_configure;
+    f -> backoff = 1;	    	    
+}
+
+/*
+ * Zero restart counter & backoff.
+ */
+static void _near zrc (fsm *f)
+{
+    f -> retransmits = f -> backoff = 0;
+    fsm_start_timer(f);
+}
+
+/*
+ * Send configure request.
+ */
+static void _near scr (fsm *f)
+{
+    int len = HEADERLEN;
+    PACKET *p;
+    unsigned char *ptr;
+
+    /*
+     * Determine the size of the configuration info then allocate a 
+     * buffer for the configure request.
+     */
+    len += ProcCallFixedOrMovable_pascal(f, f -> callbacks -> cilen);
+    
+    p = PACKET_ALLOC(len);
+    if (p) {
+	ptr = PACKET_DATA(p);
+	PUTCHAR(CONFIGURE_REQUEST, ptr);
+
+	if (f -> new_id) {
+	    PUTCHAR(f -> reqid = ++f -> id, ptr);
+	    f -> new_id = FALSE;
+	}
+	else {
+	    EC_ERROR_IF(f -> reqid != f -> id, -1);
+	    PUTCHAR(f -> reqid, ptr);
+	}
+
+	PUTSHORT(len, ptr);
+
+	/*
+	 * Have the protocol add their configuration info to the buffer.
+	 */
+	ProcCallFixedOrMovable_pascal(f, ptr, f -> callbacks -> addci);
+@ifdef LOGGING_ENABLED
+	LOG2(LOG_NEG, (@sendingLogString, fsm_protocol_name(f -> protocol),
+		      fsm_packet_name(CONFIGURE_REQUEST),
+		      f -> reqid, fsm_state_name(f -> old_state)));
+@endif /* LOGGING_ENABLED */
+	/*
+	 * Send the configure request.  The retransmit counter has to be
+	 * decremented with each request sent, including the first.
+	 */
+	PPPSendPacket(f -> unit, p, f -> protocol);
+	--f -> retransmits;
+    }
+
+    /*
+     * Start retransmit timer.
+     */
+    fsm_start_timer(f);
+}    
+
+/*
+ * Send configure ack.
+ */
+static void _near sca (fsm *f)
+{
+    f -> tx_naks = 0;
+
+@ifdef LOGGING_ENABLED
+    if (fsm_reply_code != CONFIGURE_ACK) {
+	LOG2(LOG_NEG, (@stateError2LogString, "sca", 
+		       fsm_event_name(event), 
+		       fsm_state_name(f -> old_state), 
+		       fsm_packet_name(fsm_reply_code)));
+    }
+@endif /* LOGGING_ENABLED */
+
+    /*
+     * Get packet holding configure ack data and fill in PPP header.
+     * The packet and information about it are global variables.
+     */
+    fsm_ptr = PACKET_DATA (fsm_packet);
+    PUTCHAR(fsm_reply_code, fsm_ptr);
+    PUTCHAR(fsm_id, fsm_ptr);
+    fsm_len += HEADERLEN;
+    PUTSHORT(fsm_len, fsm_ptr);
+
+@ifdef LOGGING_ENABLED
+    LOG2(LOG_NEG, (@sendingLogString, fsm_protocol_name(f -> protocol),
+		  fsm_packet_name(fsm_reply_code),
+		  fsm_id, fsm_state_name(f -> old_state)));
+@endif /* LOGGING_ENABLED */
+
+    PPPSendPacket(f -> unit, fsm_packet, f -> protocol);
+}
+ 
+/*
+ * Send configure nak.
+ */
+static void _near scn (fsm *f)
+{
+
+@ifdef LOGGING_ENABLED
+    if (fsm_reply_code != CONFIGURE_NAK &&
+	fsm_reply_code != CONFIGURE_REJECT) {
+	LOG2(LOG_NEG, (@stateError2LogString, "scn", 
+		       fsm_event_name(event), 
+		       fsm_state_name(f -> old_state), 
+		       fsm_packet_name(fsm_reply_code)));
+    }
+@endif /* LOGGING_ENABLED */
+
+    /*
+     * Get packet holding configure nak data and fill in PPP header.
+     * The packet and information about it are global variables.
+     */
+    fsm_ptr = PACKET_DATA(fsm_packet);
+    PUTCHAR(fsm_reply_code, fsm_ptr);
+    PUTCHAR(fsm_id, fsm_ptr);
+    fsm_len += HEADERLEN;
+    PUTSHORT(fsm_len, fsm_ptr);
+    
+    /*
+     * Update dataSize in packet buffer as acceptable options may
+     * not be included in Nak, making for a shorter packet.
+     */
+    fsm_packet -> MH_dataSize = fsm_len;
+
+@ifdef LOGGING_ENABLED
+    LOG2(LOG_NEG, (@sendingLogString, 
+		  fsm_protocol_name(f -> protocol),
+		  fsm_packet_name(fsm_reply_code),
+		  fsm_id, fsm_state_name(f -> old_state)));
+@endif /* LOGGING_ENABLED */
+
+    PPPSendPacket(f -> unit, fsm_packet, f -> protocol);
+
+    /*
+     * Update count of naks transmitted.
+     */
+    if (fsm_reply_code == CONFIGURE_NAK)
+	++f -> tx_naks;
+}
+
+/*
+ * Send configure reject.
+ */
+static void _near scj (fsm *f)
+{
+    /*
+     * Simply send the packet back with a PPP header prepended.
+     */
+    fsm_sdata(f, CODE_REJECT, ++f -> id, PACKET_DATA(fsm_packet), fsm_packet,
+	      fsm_len + HEADERLEN > cf_mru ? cf_mru : fsm_len + HEADERLEN);
+}
+
+/*
+ * This layer up.
+ */
+static void _near tlu (fsm *f)
+{
+    ProcCallFixedOrMovable_pascal(f, f -> callbacks -> up);
+}
+
+/* 
+ * This layer down.
+ */
+static void _near tld (fsm *f)
+{
+    ProcCallFixedOrMovable_pascal(f, f -> callbacks -> down);
+}
+
+/*
+ * This layer started.  Initialize PPP.  This will be taken care of 
+ * when a client registers with TCP.
+ */
+static void _near tls (fsm *f) { }
+
+/*
+ * This layer finished.
+ */
+static void _near tlf (fsm *f)
+{
+    if (f -> callbacks -> closed)
+	ProcCallFixedOrMovable_pascal(f, f -> callbacks -> closed);
+}
+
+static void _near str4 (fsm *f) { s4(f); str(f); }
+static void _near str5 (fsm *f) { s5(f); str(f); }
+static void _near scr6 (fsm *f) { s6(f); scr(f); }
+
+static void _near scr6x (fsm *f)
+{
+    s6(f); scr(f);
+@ifdef LOGGING_ENABLED
+    LOG2(LOG_NEG, (@crossedLogString, fsm_event_name(event), 
+		   fsm_state_name(f -> old_state)));
+@endif /* LOGGING_ENABLED */
+}
+
+static void _near scr8 (fsm *f) { s8(f); scr(f); }
+
+static void _near scn6 (fsm *f) { s6(f); scn(f); }
+static void _near scn7 (fsm *f) { s7(f); scn(f); }
+
+static void _near irc7 (fsm *f) { s7(f); ircconf(f); }
+static void _near ircstr4 (fsm *f) { s4(f); ircterm(f); str(f); }
+static void _near ircscr6 (fsm *f) { s6(f); ircconf(f); scr(f); }
+static void _near ircscr8 (fsm *f) { s8(f); ircconf(f); scr(f); }
+static void _near ircscrscn6 (fsm *f) { s6(f); ircconf(f); scr(f); scn(f); }
+static void _near ircscrsca8 (fsm *f) { s8(f); ircconf(f); scr(f); sca(f); }
+static void _near irctlu9 (fsm *f) { s9(f); ircconf(f); tlu(f); }
+
+static void _near tls1 (fsm *f) { s1(f); tls(f); }
+static void _near tld1 (fsm *f) { s1(f); tld(f); }
+static void _near tldircstr4 (fsm *f) { s4(f); tld(f); ircterm(f); str(f); }
+
+/*
+ * This layer down, send congifure request, go to state 6.
+ */
+static void _near tldscr6x (fsm *f)
+{
+    /*
+     * When reusing IDs, it is possible to be in the OPEN state 
+     * when a valid configure-ack is received.  E.g. rexmit 
+     * config-request, ack for first request is processed, 
+     * go to OPEN state, then ack for 2nd request is received. 
+     * When this happens, just log the occurrence.
+     */
+
+@ifdef LOGGING_ENABLED
+    LOG2(LOG_NEG, (@crossedLogString, 
+		   fsm_event_name(event), 
+		   fsm_state_name(f -> old_state)));
+@endif /* LOGGING_ENABLED */
+}
+
+static void _near tldscrsca8 (fsm *f) { s8(f); tld(f); scr(f); sca(f); }
+static void _near tldscrscn6 (fsm *f) { s6(f); tld(f); scr(f); scn(f); }
+static void _near tldircstr5 (fsm *f) { s5(f); tld(f); ircterm(f); str(f); }
+static void _near tldstazrc5 (fsm *f) { s5(f); tld(f); sta(f); zrc(f); }
+
+static void _near tldscr6 (fsm *f) { s6(f); tld(f); scr(f); }
+
+static void _near tlf0 (fsm *f) { s0(f); tlf(f); }
+static void _near tlf2 (fsm *f) { s2(f); tlf(f); }
+static void _near tlf3 (fsm *f) { s3(f); tlf(f); }
+static void _near tlf3p (fsm *f) { s3(f); tlf(f); } 
+      /* passive option not implemented 
+       * NOTE: this means if the peer fails to respond to Configure-Request
+       * packets, then the implementation MAY wait passively for the peer 
+       * to send a Configure-Request.  This is only useful if implementation 
+       * is unable to start up in passive mode, but it may cause the link 
+       * to stay up unnecessarily. */
+
+static void _near sta2 (fsm *f) { s2(f); sta(f); }
+static void _near sta3 (fsm *f) { s3(f); sta(f); }
+static void _near sta4 (fsm *f) { s4(f); sta(f); }
+static void _near sta5 (fsm *f) { s5(f); sta(f); }
+static void _near sta6 (fsm *f) { s6(f); sta(f); }
+
+static void _near sca8 (fsm *f) { s8(f); sca(f); }
+static void _near scatlu9 (fsm *f) { s9(f); sca(f); tlu(f); }
+
+static void _near scj2 (fsm *f) { s2(f); scj(f); }
+static void _near scj3 (fsm *f) { s3(f); scj(f); }
+static void _near scj4 (fsm *f) { s4(f); scj(f); }
+static void _near scj5 (fsm *f) { s5(f); scj(f); }
+static void _near scj6 (fsm *f) { s6(f); scj(f); }
+static void _near scj7 (fsm *f) { s7(f); scj(f); }
+static void _near scj8 (fsm *f) { s8(f); scj(f); }
+static void _near scj9 (fsm *f) { s9(f); scj(f); }
+
+static void _near ser9 (fsm *f) { s9(f); ser(f); }
+
+#ifdef __HIGHC__
+#pragma Code("PPPCODE");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg PPPCODE
+#endif
+
+/*
+ * Send echo reply.
+ */
+void ser (fsm *f)
+{
+    if (fsm_reply_code)
+	{
+	    /* 
+	     * Add PPP header to packet.  The packet and information
+	     * about it are global variables.
+	     */
+	    fsm_ptr = PACKET_DATA(fsm_packet);
+	    PUTCHAR(fsm_reply_code, fsm_ptr);
+	    PUTCHAR(fsm_id, fsm_ptr);
+	    fsm_len += HEADERLEN;
+	    PUTSHORT(fsm_len, fsm_ptr);
+	    
+@ifdef LOGGING_ENABLED
+	    LOG2(LOG_LQMSGS, (@sendingLogString,
+			     fsm_protocol_name(f -> protocol),
+			     fsm_packet_name(fsm_reply_code),
+			     fsm_id, fsm_state_name(f -> old_state)));
+@endif /* LOGGING_ENABLED */
+
+	    if (fsm_len > cf_mru)
+		fsm_packet -> MH_dataSize = cf_mru;
+
+	    PPPSendPacket(f -> unit, fsm_packet, f -> protocol);
+	}
+}
+
+static void _near ser_near (fsm *f)
+{
+    if (f -> state == OPENED)
+    {
+	/* Inline: s9(f); */
+	/*    Inline: fsm_stop_timer(f); */
+	f -> timer = f -> backoff = 0;
+	/*    End-inline */
+	f -> state = 9;
+	/* End-inline */
+	ser(f);
+    }
+    else
+	fsm_event(f, RXR);
+}
+
+@start Table, data;
+/* ---------------------------------------------------------------------------
+ *
+ * 	    	    Finite State Machine Table
+ *
+ *	The finite state machine table is extra wide so entries will line
+ *	up when the window is wide enough.  Routines in array are near so
+ *	we don't have to worry about using ProcCallFixedOrMovable and vfptrs.
+ *
+ --------------------------------------------------------------------------- */
+@chunk void _near (*fsm_array[][NUM_STATES])() = {
+/*           0       1        2        3           4       5        6        7        8        9          */
+/*           Initial Starting Closed   Stopped     Closing Stopping Req-Sent Ack-Rcvd Ack-Sent Opened     */
+
+/* Up    */{ s2,     ircscr6, e,       e,          e,      e,       e,       e,       e,       e          },
+/* Down  */{ e,      e,       s0,      tls1,       s0,     s1,      s1,      s1,      s1,      tld1       },
+/* Open  */{ tls1,   s1,      ircscr6, s3r,        s5r,    s5r,     s6,      s7,      s8,      s9r        },
+/* Close */{ s0,     tlf0,    s2,      s2,         s4,     s4,      ircstr4, ircstr4, ircstr4, tldircstr4 },
+
+/* TO+   */{ e,      e,       e,       e,          str4,   str5,    scr6,    scr6,    scr8,    e          },
+/* TO-   */{ e,      e,       e,       e,          tlf2,   tlf3,    tlf3p,   tlf3p,   tlf3p,   e          },
+
+/* RCR+  */{ e,      e,       sta2,    ircscrsca8, s4,     s5,      sca8,    scatlu9, sca8,    tldscrsca8 },
+/* RCR-  */{ e,      e,       sta2,    ircscrscn6, s4,     s5,      scn6,    scn7,    scn6,    tldscrscn6 },
+/* RCA   */{ e,      e,       sta2,    sta3,       s4,     s5,      irc7,    scr6x,   irctlu9, tldscr6x   },
+/* RCN   */{ e,      e,       sta2,    sta3,       s4,     s5,      ircscr6, scr6x,   ircscr8, tldscr6x   },
+
+/* RTR   */{ e,      e,       sta2,    sta3,       sta4,   sta5,    sta6,    sta6,    sta6,    tldstazrc5 },
+/* RTA   */{ e,      e,       s2,      s3,         tlf2,   tlf3,    s6,      s6,      s8,      tldscr6    },
+
+/* RUC   */{ e,      e,       scj2,    scj3,       scj4,   scj5,    scj6,    scj7,    scj8,    scj9       },
+/* RXJ+  */{ e,      e,       s2,      s3,         s4,     s5,      s6,      s6,      s8,      s9         },
+/* RXJ-  */{ e,      e,       tlf2,    tlf3,       tlf2,   tlf3,    tlf3,    tlf3,    tlf3,    tldircstr5 },
+
+/* RXR   */{ e,      e,       s2,      s3,         s4,     s5,      s6,      s7,      s8,      ser9       }
+
+/*           Initial Starting Closed   Stopped     Closing Stopping Req-Sent Ack-Rcvd Ack-Sent Opened     */
+/*           0       1        2        3           4       5        6        7        8        9          */
+    };							  
+
+@end Table;
+
+#ifdef __HIGHC__
+#pragma Code("FSMCODE");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg FSMCODE
+#endif
+
+
+/***********************************************************************
+ *				fsm_event
+ ***********************************************************************
+ * SYNOPSIS:	Look up the function to call in the FSM table based 
+ *	    	on the current state and the event and call it.
+ * CALLED BY:	GLOBAL (whereever the event occurred)
+ * RETURN:	nothing
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 3/95		Initial Revision
+ *
+ ***********************************************************************/
+void fsm_event (fsm *f, 
+		int ev)
+{
+    NearCallback** table; 	   
+
+@ifdef LOGGING_ENABLED
+    event = ev;
+    f -> old_state = f -> state;
+    LOG2(LOG_MISC, (@eventLogString,
+		   fsm_protocol_name(f -> protocol),
+		   fsm_event_name(ev),
+		   fsm_state_name(f -> state)));
+@endif /* LOGGING_ENABLED */
+
+
+    MemLock(OptrToHandle(@fsm_array));
+    table = (NearCallback **)LMemDeref(@fsm_array); 
+
+#ifdef __HIGHC__
+    (*table[ev * NUM_STATES + f -> state])(f);
+#endif
+#ifdef __BORLANDC__
+    /* BorlandC doesn't recognize that the table has near pointers */
+    (byte *)table += (ev * NUM_STATES + f->state) * 2;
+    (*table)(f);
+#endif
+
+    MemUnlock(OptrToHandle(@fsm_array));
+}
+
+#ifdef __HIGHC__
+#pragma Code("PPPCODE");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg PPPCODE
+#endif
+
+
+/***********************************************************************
+ *				fsm_input
+ ***********************************************************************
+ * SYNOPSIS:	Receive a packet.
+ * CALLED BY:	lcp_input, ipcp_input
+ * RETURN:	non-zero if packet is important (clears idle_time)
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 3/95		Initial Revision
+ *
+ ***********************************************************************/
+byte fsm_input (fsm *f, PACKET *p, int len)
+{
+    byte important = 1;
+    int oldState;
+
+    fsm_packet = p;
+    fsm_ptr = PACKET_DATA(fsm_packet);
+
+    /*
+     * If packet is too short, drop it.
+     */
+    if (len < HEADERLEN) {
+@ifdef LOGGING_ENABLED
+	LOG2(LOG_NEG, (@shortHdrLogString, fsm_protocol_name(f -> protocol)));
+@endif /* LOGGING_ENABLED */
+	goto freepacket;
+    }
+
+    GETCHAR(fsm_code, fsm_ptr);
+    GETCHAR(fsm_id, fsm_ptr);
+    GETSHORT(fsm_len, fsm_ptr);
+
+    /*
+     * If the length contained in the packet is less than the minimum
+     * PPP header length, then drop packet.
+     */
+    if (fsm_len < HEADERLEN) {
+@ifdef LOGGING_ENABLED
+	LOG2(LOG_NEG, (@shortLenLogString, fsm_protocol_name(f -> protocol),
+		      fsm_packet_name(fsm_code)));
+@endif /* LOGGING_ENABLED */
+	goto freepacket;
+    }
+
+    /* 
+     * Subtract PPP header from length.  If the length is greater than
+     * the size of the buffer, drop packet.
+     */
+    fsm_len -= HEADERLEN;
+    if (fsm_len > len) {
+@ifdef LOGGING_ENABLED
+	LOG2(LOG_NEG, (@mismatchedLenLogString,
+		      fsm_protocol_name(f -> protocol),
+		      fsm_packet_name(fsm_code)));
+@endif /* LOGGING_ENABLED */
+	goto freepacket;
+    }
+
+@ifdef LOGGING_ENABLED
+    if (f -> protocol == LCP &&
+	(fsm_code == ECHO_REQUEST || fsm_code == ECHO_REPLY ||
+	 fsm_code == DISCARD_REQUEST)) {
+	LOG2(LOG_LQMSGS, (@recvedLogString,
+			 fsm_protocol_name(f -> protocol),
+			 fsm_packet_name(fsm_code),
+			 fsm_id,
+			 fsm_state_name(f -> state)));
+    }
+    else {
+	LOG2(LOG_NEG, (@recvedLogString,
+		      fsm_protocol_name(f -> protocol),
+		      fsm_packet_name(fsm_code),
+		      fsm_id,
+		      fsm_state_name(f -> state)));
+    }
+@endif /* LOGGING_ENABLED */    
+
+    /*
+     * Make sure code is supported by protocol.
+     */
+    if (fsm_code >= 32 || (((unsigned long)1 << fsm_code) & f -> code_mask) == 0)
+	fsm_event(f, RUC);  	    /* Unsupported or otherwise invalid code */
+    else
+	switch (fsm_code)
+	    {
+	    case CONFIGURE_REQUEST:
+		fsm_reply_code = 
+		    ProcCallFixedOrMovable_pascal(f, fsm_ptr, &fsm_len, 
+						  f -> callbacks -> reqci);
+
+		if (fsm_reply_code)
+		    if (fsm_reply_code == CONFIGURE_ACK)
+			fsm_event(f, RCR_PLUS);
+		    else {
+			oldState = f->state;
+			fsm_event(f, RCR_MINUS);
+			/* fix bug with leaked packets, this is based on
+			   empirical data, and not on an observed design flaw
+			   flaw of the FSM states and behaviors (i.e. it is a
+			   hack) */
+			if ((oldState == 2) || (oldState == 4)) {
+				PACKET_FREE(p);
+			}
+		    }
+		else
+		    important = 0;
+
+		return important;
+
+	    case CONFIGURE_ACK:
+		if (fsm_id == f -> reqid &&
+		    (int)ProcCallFixedOrMovable_pascal(f, fsm_ptr, fsm_len,
+						  f -> callbacks -> ackci)) {
+		    fsm_event(f, RCA);
+		}
+
+		f -> rx_naks = 0;
+		f -> new_id = TRUE;
+		break;
+
+	    case CONFIGURE_NAK:
+		if (fsm_id == f -> reqid) {
+		    ProcCallFixedOrMovable_pascal(f, fsm_ptr, fsm_len,
+						  f -> callbacks -> nakci);
+		    fsm_event(f, RCN);
+		    ++f -> rx_naks;
+		}
+		f -> new_id = TRUE;
+		break;
+
+	    case CONFIGURE_REJECT:
+		if (fsm_id == f -> reqid) {
+		    ProcCallFixedOrMovable_pascal(f, fsm_ptr, fsm_len,
+						  f -> callbacks -> rejci);
+		    fsm_event(f, RCN);
+		    ++f -> rx_naks;
+		}
+		f -> new_id = TRUE;
+		break;
+
+	    case TERMINATE_REQUEST:
+		if (!link_error)
+		    link_error = SDE_CONNECTION_RESET_BY_PEER;
+		fsm_event(f, RTR);
+		break;
+
+	    case TERMINATE_ACK:
+		if (fsm_id == f -> reqid)
+		    fsm_event(f, RTA);
+		break;
+
+	    case CODE_REJECT:
+		if (fsm_len)
+		    fsm_event(f, RXJ_MINUS);
+		else
+		    fsm_event(f, RXJ_PLUS);
+		break;
+
+	    case PROTOCOL_REJECT:
+		if (f -> protocol != LCP) {
+@ifdef LOGGING_ENABLED
+		    LOG2(LOG_NEG, (@protoRej2LogString,
+				   fsm_protocol_name(f -> protocol)));
+@endif /* LOGGING_ENABLED */
+		    fsm_event(f, RXJ_MINUS);
+		}
+		else 
+		    if (fsm_len >= 2) {
+			unsigned short prot;
+			
+			GETSHORT(prot, fsm_ptr);
+			demuxprotrej(f -> unit, prot);
+			fsm_event(f, prot == LCP ? RXJ_MINUS : RXJ_PLUS);
+		    }
+		break;
+			
+	    case ECHO_REQUEST:
+@ifdef LOGGING_ENABLED
+		if (f -> state != OPENED)
+		    LOG2(LOG_MSGS, (@echoReqLogString));
+@endif /* LOGGING_ENABLED */
+		if (f -> callbacks -> echorequest) 
+		    fsm_reply_code = ProcCallFixedOrMovable_pascal(f, fsm_ptr, 
+							      fsm_id, fsm_len,
+						  f -> callbacks -> echorequest);
+
+		if (fsm_reply_code == ECHO_REPLY) {
+		    ser_near(f);
+		    return (0);
+		}
+		else {
+		    important = 0;
+		    break;
+		}
+
+	    case ECHO_REPLY:
+@ifdef LOGGING_ENABLED
+		if (f -> state != OPENED || fsm_id != f -> id)
+		    LOG2(LOG_MSGS, (@echoReplyLogString));
+@endif /* LOGGING_ENABLED */
+		if (f -> callbacks -> echoreply) 
+		    ProcCallFixedOrMovable_pascal(f, fsm_ptr, fsm_id, fsm_len,
+						  f -> callbacks -> echoreply);
+		fsm_reply_code = 0;
+		ser_near(f);
+		important = 0;
+		break;
+
+	    case DISCARD_REQUEST:
+@ifdef LOGGING_ENABLED
+		if (f -> state != OPENED)
+		    LOG2(LOG_MSGS, (@discardReqLogString));
+@endif /* LOGGING_ENABLED */
+		fsm_reply_code = 0;
+		ser_near(f);
+		important = 0;
+		break;
+
+#ifdef USE_CCP
+ 	    case RESET_REQUEST:
+		if (f -> state == OPENED &&
+		    f -> callbacks -> resetrequest) 
+		    ProcCallFixedOrMovable_pascal(f, fsm_ptr, fsm_id, fsm_len,
+					       f -> callbacks -> resetrequest);
+		important = 0;
+		return (0);
+
+	    case RESET_ACK:
+@ifdef LOGGING_ENABLED
+		if (f -> state != OPENED || fsm_id != f -> id)
+		    LOG2(LOG_MSGS, (@resetackLogString));
+@endif /* LOGGING_ENABLED */
+		if (f -> state == OPENED && fsm_id == f -> id &&
+		    f -> callbacks -> resetack) 
+		    ProcCallFixedOrMovable_pascal(f, fsm_ptr, fsm_id, fsm_len,
+						  f -> callbacks -> resetack);
+		important = 0;
+		break;
+#endif /* USE_CCP */
+	    default:
+		fsm_event(f, RUC);
+		break;
+	    }
+freepacket:
+    PACKET_FREE(p);
+    return (important);
+}

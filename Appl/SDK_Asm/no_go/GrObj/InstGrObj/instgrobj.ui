@@ -1,0 +1,230 @@
+/*
+ * Project:	PC/GEOS
+ * Module:	InstGrObj (Sample PC/GEOS application)
+ * File:	instgrobj.ui
+ *
+ * Author:	Steve Scholl
+ *
+ *	This file contains the user Interface description for this
+ * application. This file is written in a language called ESPIRE, which is
+ * compiled by the UIC compiler. See Spec/User/uic.doc for info.
+ *
+ * IMPORTANT NOTE:
+ *	This sample application is primarily intended to demonstrate a
+ *	model for using the graphic object library. Basic parts of a 
+ *	PC/GEOS application are not documented heavily here.  
+ *	See the "Hello" sample application
+ *	for more detailed documentation on the standard parts of a PC/GEOS
+ *	application.
+ *
+ * RCS STAMP:
+ *	$Id: instgrobj.ui,v 1.1 97/04/04 16:35:10 newdeal Exp $
+ *
+ */
+
+/* ----------------------------------------------------------------------------
+	Include files
+-----------------------------------------------------------------------------*/
+
+#include "generic.uih"
+#include "grobj.uih"
+
+/* ----------------------------------------------------------------------------
+	Application Object
+-----------------------------------------------------------------------------*/
+
+start	AppResource;
+
+IGApp = GenApplication {
+	children = IGPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = IGPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) =
+			IGDocumentControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) =
+			IGDocumentControl, IGDisplayControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+			IGDocumentControl, IGDisplayControl;
+	moniker = list {
+		IGTextMoniker
+	}
+	hints = {
+		ATTR_GEN_INIT_FILE_CATEGORY {
+		char	"igrobj", 0
+		}
+	}
+}
+
+visMoniker IGTextMoniker = "InstGrObj Sample Application";
+
+end	AppResource;
+
+/* ----------------------------------------------------------------------------
+	 Primary window.
+-----------------------------------------------------------------------------*/
+
+/*
+ * The GenDocumentControl must be a child of the primary, and must be
+ * on the active list.
+ */
+
+start	Interface;		/* this resource is for misc UI objects */
+
+IGPrimary = GenPrimary {
+	children = FileMenu, WindowMenu, IGDisplayGroup;
+	hints = { ATTR_GEN_DISPLAY_NOT_MINIMIZABLE, HINT_SIZE_WINDOW_AS_DESIRED }
+}
+
+FileMenu = GenInteraction {
+	children = IGDocumentControl;
+	visibility = popup;
+	hints = { ATTR_GEN_INTERACTION_GROUP_TYPE { GenInteractionGroupType GIGT_FILE_MENU } }
+}
+
+WindowMenu = GenInteraction {
+	children = IGDisplayControl;
+	visibility = popup;
+	hints = { ATTR_GEN_INTERACTION_GROUP_TYPE { GenInteractionGroupType GIGT_WINDOW_MENU } }
+}
+
+IGDisplayControl = GenDisplayControl {
+}
+
+
+/* ----------------------------------------------------------------------------
+	 UI Document Control
+-----------------------------------------------------------------------------*/
+
+/*
+ * The GenDocumentControl should be put in the same resource as the
+ * GenPrimary (for efficiency).  The GenDocumentControl will build the
+ * file menu.
+ */
+
+IGDocumentControl = GenDocumentControl {
+	/*
+	 * Document file's token
+	 */
+	documentTokenChars = "'S', 'A', 'M', 'P'";
+	documentTokenID = "MANUFACTURER_ID_GEOWORKS";
+	/*
+	 * Text to display in the header area of the primary when no
+	 * document is open.
+	 */
+	noNameText = "No Document";
+	/*
+	 * Template directory
+	 */
+	templateDir = "SAMPLE";
+	/*
+	 * Special attributes: allow multiple open files, don't display
+	 * name on primary (this will be handled via the display control)
+	 */
+	dcAttributes = default +multipleOpenFiles;
+	features = default -displayNameOnPrimary;
+	/*
+	 * Pointer to the GenDocumentGroup
+	 */
+	appDC = IGDocumentGroup;
+}
+
+end Interface;
+
+/* ----------------------------------------------------------------------------
+	 Document Group
+-----------------------------------------------------------------------------*/
+
+/*
+ * The GenDocumentGroup should be put in a resource of its own run by
+ * the application thread.
+ */
+
+start DocumentUI;
+
+IGDocumentGroup = GenDocumentGroup {
+	/*
+	 * Name for untitled documents
+	 */
+	defaultName = "IG Untitled";
+	/*
+	 * Class for document objects
+	 */
+	documentClass = "IGDocumentClass";
+	/*
+	 * GenDisplay to automatically duplicate, GenDisplayGroup to attach
+	 * duplicated displays to and GenView to attach documents to
+	 */
+	genDisplayGroup = IGDisplayGroup;
+	genDisplay = IGDisplay;
+	genView = IGView;
+	/*
+	 * Document protocol
+	 */
+	protocolMajor = "DOCUMENT_PROTOCOL_MAJOR";
+	protocolMinor = "DOCUMENT_PROTOCOL_MINOR";
+	/*
+	 * Pointer to the GenDocumentControl
+	 */
+	uiDC = IGDocumentControl;
+
+	attributes = default +vmFileContainsObjects;
+}
+
+end DocumentUI;
+
+/*-----------------------------------------------------------------------------
+	GenDisplayGroup object
+-----------------------------------------------------------------------------*/
+
+start Interface;
+
+IGDisplayGroup = GenDisplayGroup {
+	/*
+	 * Tell the display control to put the name of the target display
+	 * in the long term moniker of the primary
+	 */
+
+	hints = {
+		HINT_DEFAULT_FOCUS, HINT_DEFAULT_TARGET,
+		HINT_INITIAL_SIZE {
+			SpecWidth <SST_PCT_OF_FIELD_WIDTH, PCT_70>,
+			SpecHeight <SST_PCT_OF_FIELD_HEIGHT, PCT_55>,
+			0
+		}
+	}
+}
+
+end Interface;
+
+/*-----------------------------------------------------------------------------
+	Block to duplicate for each document
+-----------------------------------------------------------------------------*/
+
+start DisplayUI;
+
+IGDisplay = GenDisplay {
+	/*
+	 * The display starts not usable since it is not in the generic tree.
+	 * It will be set usable after being added to the display control.
+	 */
+	genStates = default -usable;
+	children = IGView;
+	hints = { ATTR_GEN_DISPLAY_NOT_MINIMIZABLE }
+}
+
+IGView = GenView {
+	docRight = "DOCUMENT_WIDTH";
+	docBottom = "DOCUMENT_HEIGHT";
+	horizAttributes = default +scrollable;
+	vertAttributes = default +scrollable;
+}
+
+end DisplayUI;
+
+start	Head;
+
+IGrObjHead = GrObjHead {
+	currentTool = RectClass;
+	initFloaterData = 0;
+}
+
+end	Head;

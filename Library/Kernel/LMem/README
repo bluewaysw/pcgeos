@@ -1,0 +1,113 @@
+Who knows, we may want this under RCS control some day.
+	$Id: README,v 1.1.38.1 97/03/29 03:56:12 canavese Exp $
+
+
+	Last Changes		Made By		Changes
+	------------		-------		-------
+	11/30/90		John		Initial Revision
+
+This file provides a general overview, from high altitude, of the structure of
+the LMem module of the Kernel.
+
+*******************************************************************************
+			  LMEM LAYOUT
+*******************************************************************************
+
+lmemConstants.def
+	Constants used in the lmem code. Not much here, most of the
+	interesting constants (and structure definitions) are in
+	localmem.def in /staff/pcgeos/Include.
+
+lmemManager.asm
+	Manager file. It just includes the source files.
+
+lmemChunkArray.asm
+	Code for manipulating an array of structures contained in a single
+	chunk. Actually the code that implements this stuff is in KLib.
+	This file just contains routines which shuffle registers and then
+	call into KLib.
+
+lmemErrorCheck.asm
+	Error checking code. And lots of it.
+
+lmemTemp.asm
+	Code for allocating and freeing temporary chunks. This code is used
+	in the UI while building generic objects and by the detach
+	mechanism.
+
+lmemCode.asm
+	The actual LMem code. All the standard chunk manipulation routines
+	are in here. (Alloc, ReAlloc, Free, InsertAt, DeleteAt).
+
+lmemMacros.def
+	Macros used in the LMem code. Not a whole lot in here... Most of the
+	really useful macros are in localmem.def, in /staff/pcgeos/Include.
+
+*******************************************************************************
+			  LMEM OVERVIEW
+*******************************************************************************
+
+The global heap manager gives applications access to memory, but not always
+in the most efficient way. Very often applications will want to manipulate
+data structures which are small, and which reside in the same segment (and
+can therefore be accessed using the same segment register). This is the void
+that the LMem code tries to fill.
+
+An LMem heap can be created with LMemInitHeap(). Then chunks can be
+allocated on this local heap using LMemAlloc(). To allow the system to
+compact this local heap, direct pointers to the allocated chunks are not
+returned to the application, instead chunk handles are returned. A chunk
+handle contains a pointer to the chunk itself.
+
+			Chunk Handle contains a pointer to the chunk.
+		      +--------+
+		      |	       V
+	   Heap +++++|+|++++++|  Chunk    |
+		^     ^
+		|     |
+		|     si (chunk handle)
+		|
+		ds (segment pointing at the base of the lmem heap)
+
+The pointer to the chunk can be gotten by dereferencing the chunk handle:
+	; ds = segment address of the lmem heap
+	; si = chunk handle
+	mov	si, ds:[si]		; si <- pointer to the chunk.
+
+The basic structure of an LMem heap is:
+	Handle of the block
+	Header information
+	Handle table
+	Chunks
+	... More chunks ...
+
+LMem heaps are used all over the system. Here are some examples:
+
+A Window is an LMem heap. The header contains the window information. The
+different regions associated with the window are stored as chunks in the
+window block.
+
+A GState is an LMem heap. The GState information is in the header, and the
+application clip-rectangle is stored in a chunk.
+
+Objects are stored in object blocks, which are LMem heaps. An object block
+has some special extra header information, and contains one chunk which
+contains only flags. All the objects in the block are stored in chunks on
+the heap.
+
+Temporary chunks are used by the UI for building generic objects and by the
+detach mechanism. The detach mechanism needs 8 bytes to hold temporary
+information. Rather than having those bytes in every object, the
+detach mechanism allocates a temporary chunk that is associated with the
+object that is detaching. It stores its data there and retrieves it by
+calling LMemFindTempChunk() later.
+
+Most LMem heaps should only be accessed by a single thread at a time. This is
+enforced outside the LMem module, however. For example, object blocks are
+locked in the usual way, but ObjLockObjBlock ensures that only the thread that
+is running the objects in that block can lock the block down. Windows and
+GStates are locked by MemPLock -- multiple threads can access them, but only
+one thread can do it at a time. The only time this restriction isn't needed is
+for static LMem resources where chunks are never allocated or resized (e.g.
+string resources in applications).
+

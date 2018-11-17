@@ -1,0 +1,90 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) Berkeley Softworks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Library/Styles
+FILE:		stylesConstant.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	12/91		Initial version
+
+DESCRIPTION:
+	This file contains constants for the styles library.
+
+	$Id: stylesConstant.def,v 1.1 97/04/07 11:15:41 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+USE_FULL_EC			=	FALSE
+
+
+;------------------------------------------------------------------------------
+;  FULL_EXECUTE_IN_PLACE : Indicates that the styles lib is going to
+;	be used in a system where all geodes (or most, at any rate)
+;	are to be executed out of ROM.  
+;------------------------------------------------------------------------------
+ifndef FULL_EXECUTE_IN_PLACE
+	FULL_EXECUTE_IN_PLACE		equ	FALSE
+endif
+
+;------------------------------------------------------------------------------
+;  The .GP file only understands defined/not defined;
+;  it can not deal with expression evaluation.
+;  Thus, for the TRUE/FALSE conditionals, we define
+;  GP symbols that _only_ get defined when the
+;  condition is true.
+;-----------------------------------------------------------------------------
+if	FULL_EXECUTE_IN_PLACE
+	GP_FULL_EXECUTE_IN_PLACE	equ	TRUE
+endif
+
+;-----------------------------------------------------------------------------
+;	Fatal errors
+;-----------------------------------------------------------------------------
+
+if	ERROR_CHECK
+
+STYLE_SHEET_ELEMENT_IS_FREE				enum FatalErrors
+STYLE_SHEET_ELEMENT_HAS_WRONG_STYLE_TOKEN		enum FatalErrors
+STYLE_SHOULD_NOT_HAVE_EXISTED				enum FatalErrors
+STYLE_SHEET_WRONG_CHUNK_ALLOCATED			enum FatalErrors
+STYLE_RESERVED_SPACE_MUST_BE_0				enum FatalErrors
+STYLE_SHEET_ATTEMPT_TO_DELETE_PROTECTED_STYLE		enum FatalErrors
+STYLE_SHEET_ELEMENT_IS_TOO_LARGE			enum FatalErrors
+STYLE_SHEET_CANNOT_COPY_NULL_ELEMENT			enum FatalErrors
+endif
+
+;---------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;	Macros
+;-----------------------------------------------------------------------------
+
+ENTER_FULL_EC	macro
+if	USE_FULL_EC
+if	ERROR_CHECK
+	pushf
+	push	ax
+	mov	ax, (mask ErrorCheckingFlags) and not mask ECF_BLOCK_CHECKSUM
+	call	SysSetECLevel
+	pop	ax
+	popf
+endif
+endif
+endm
+
+LEAVE_FULL_EC	macro
+if	USE_FULL_EC
+if	ERROR_CHECK
+	pushf
+	push	ax
+	clr	ax
+	call	SysSetECLevel
+	pop	ax
+	popf
+endif
+endif
+endm

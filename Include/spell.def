@@ -1,0 +1,638 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	Welcome
+MODULE:		Include - Spell Check Library Definitions
+FILE:		spell.def
+
+
+REVISION HISTORY:
+	
+	Name	Date		Description
+	----	----		-----------
+	atw	2/ 4/91		Initial revision
+
+
+DESCRIPTION:
+	Definitions for users of the Spell library.
+		
+	$Id: spell.def,v 1.1 97/04/04 14:22:31 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef __SPELL
+
+StartLibrary	spell
+UseLib Objects/gCtrlC.def
+UseLib Objects/vTextC.def
+
+;******************************************************************************
+;		SpellControlClass
+;******************************************************************************
+;
+; Message(s) sent out:
+; MSG_SPELL_CHECK (a MetaSearchSpellMessage)
+; MSG_REPLACE/MSG_REPLACE_ALL_OCCURRENCES (MetaSearchSpellMessages)
+;
+; Notification type(s) responded to:
+; MANUFACTURER_ID_GEOWORKS.GWNT_SPELL_ENABLE_CHANGE
+;
+; GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+
+SpellControlClass	class	GenControlClass
+
+SPELL_MAX_WORD_LENGTH	equ	64+1
+
+MSG_SPELL_CHECK		message	MetaSearchSpellMessages
+;
+;	Message sent out to continue spell checking from current point in 
+;	document.
+;
+;	Pass: ss:bp <- ptr to SpellCheckInfo
+;	      dx <- size SpellCheckInfo
+;	Returns: nothing
+;
+
+
+SpellCheckStartOption	etype	byte
+	SCSO_BEGINNING_OF_DOCUMENT		enum	SpellCheckStartOption
+	;Goes to start of document before spell checking. Used when the user
+	; selects "Check Entire Document".
+
+	SCSO_BEGINNING_OF_SELECTION		enum	SpellCheckStartOption
+	;Starts at current selection offset. Used to continue a spell check
+	; after a user corrects/ignores a word.
+
+	SCSO_WORD_BOUNDARY_BEFORE_SELECTION	enum	SpellCheckStartOption
+	;Starts at first whitespace before the selection. Used when the user
+	; clicks on "Check Selection" or "Check to End".
+
+	SCSO_END_OF_SELECTION			enum	SpellCheckStartOption
+	;Used when the user skips a word. Basically skips to the first
+	; whitespace after the start of the current selection and continues
+	; from there.
+
+SpellCheckOptions	record
+	:12
+
+	SCO_CHECK_SELECTION:1
+			;Set if we want to just check the current selection.
+			;(This is only used in conjunction with
+			; SCSO_WORD_BOUNDARY_BEFORE_SELECTION)
+			;NOTE: Both CHECK_SELECTION and CHECK_NUM_CHARS
+			; should not be set.
+	SCO_CHECK_NUM_CHARS:1
+			;Set if we want to check a set # chars
+
+	SCO_START_OPTIONS SpellCheckStartOption:2
+			;Where the spell checker starts
+SpellCheckOptions	end
+
+SpellCheckInfo	struct
+	SCI_ICBuff	hptr	
+	;Handle of buffer to pass to spell check library
+
+	SCI_options	SpellCheckOptions
+	;Options for how to spell check
+
+	SCI_numChars	dword	
+	;# chars to check (if SCI_options has SCO_CHECK_NUM_CHARS set)
+	;(This does not count soft hyphens).
+
+	SCI_replyObj	optr
+	;object to send MSG_SPELL_CHECK_COMPLETED to
+	;
+
+SpellCheckInfo	ends
+
+;-----------------------------------------------------------------------------
+;		Messages
+;-----------------------------------------------------------------------------
+MSG_SC_UNKNOWN_WORD_FOUND		message
+;
+;	Display an unknown word and enable spell options.
+;
+;	Pass: ss:bp <- UnknownWordInfo
+;	      dx - size of stack data
+;	Destroyed: ax, cx, dx, bp
+;
+
+UnknownWordInfo	struct
+	UWI_numChars	dword	
+	;Num chars left to check (if currently checking a selection, otherwise
+	; value doesn't matter).
+
+	UWI_offset	word
+	;Offset from start of UnknownWordInfo that the string starts
+	; (there may be ignored chars like quotes at the beginning of 
+	; UWI_word).
+
+SBCS <	UWI_word	char	SPELL_MAX_WORD_LENGTH dup (?)		>
+DBCS <	UWI_word	wchar	SPELL_MAX_WORD_LENGTH dup (?)		>
+	even
+UnknownWordInfo	ends
+
+MSG_SC_SPELL_CHECK_COMPLETED	message
+;
+;	Displays a box letting the user know that he has finished spell 
+;	checking the document, and brings down the spell check box.
+;
+;
+;	Pass: cx - SpellCheckResult (type of spell that was completed)
+;	Destroyed: ax, cx, dx, bp
+;
+
+SpellCheckResult	etype	word
+	SCR_ONE_WORD_CHECKED		enum	SpellCheckResult
+	;Returned if user checked a selection, and the selection only had
+	; one word.
+
+	SCR_SELECTION_CHECKED		enum	SpellCheckResult
+	;Returned if the user checked a selection.
+
+	SCR_DOCUMENT_CHECKED		enum	SpellCheckResult
+	;Returned if the user checked either his entire document or checked
+	; to the end of the document.
+
+
+;-----------------------------------------------------------------------------
+;		Internal methods
+;-----------------------------------------------------------------------------
+
+MSG_SC_UPDATE_REPLACEMENT_WORD	message
+;
+;	Message sent out when the user clicks on a new replacement word
+;
+;	Pass: nothing
+
+MSG_SC_SUGGEST_SPELLING			message
+;
+;	Suggest a list of spelling alternates. We do it via the queue so we
+;	can have the little busy cursor turn up.
+;
+;	Pass: nothing
+
+MSG_SC_CHECK_ENTIRE_DOCUMENT	message
+MSG_SC_CHECK_TO_END		message
+MSG_SC_CHECK_SELECTION		message
+;
+;	Messages to start spell checking the document in 3 different ways.
+;
+;	Pass: nothing
+;
+
+MSG_SC_REPLACE_WORD		message
+;
+;	Replaces the current selection with the text in the replace text object
+;
+;	Pass: nothing
+;
+
+MSG_SC_REPLACE_ALL	message
+;
+;	Replaces all occurrences of the current word with the text in the
+;	replace text object.
+;
+;	Pass: nothing
+;
+
+MSG_SC_IGNORE_WORD	message
+;
+;	Add the current unknown word to the list of words to ignore for the
+;	session.
+;
+;	Pass: nothing
+;
+
+MSG_SC_SKIP_WORD	message
+;
+;	Skips the current word
+;
+;	Pass: nothing
+;
+
+MSG_SC_ADD_UNKNOWN_WORD_TO_USER_DICTIONARY	message
+;
+;	Adds word to the user dictionary.
+;
+;	Pass: nothing
+;
+
+MSG_SC_SPELL_CHECK_ABORTED			message	private
+;
+;	Message sent out if the spell check is aborted by a user action.
+;
+;	Pass: nothing
+;
+
+MSG_SC_GET_IC_BUFF				message
+;
+;	Gets an ICBuff for the caller.
+;
+;	Pass: nothing
+;	Return: ax - ICBuff (or 0 if error)
+;	Destroyed: cx, dx, bp
+
+MSG_SC_FINISHED_CHECK_SELECTION			message
+;
+;	Sent by dialog when finished checking selection.
+;
+;	Pass: nothing
+;	Return: ax - IC_YES to continue checking document to end
+;		ax - IC_NO to stop checking
+
+;-----------------------------------------------------------------------------
+;		Hints
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+
+;	Data sent out with GWNT_SPELL_ENABLE_CHANGE
+
+NotifySpellEnableChange	struct
+	NSEC_spellEnabled	word
+	;Non-zero if spell should be enabled
+NotifySpellEnableChange	ends
+
+SpellFeatures	record
+	SF_CLOSE:1
+	SF_CONTEXT:1
+	SF_SIMPLE_MODAL_BOX:1
+	SF_SUGGESTIONS:1
+	SF_CHECK_ALL:1
+	SF_CHECK_TO_END:1
+	SF_CHECK_SELECTION:1
+	SF_SKIP:1
+	SF_SKIP_ALL:1
+	SF_REPLACE_CURRENT:1
+	SF_REPLACE_ALL:1
+	SF_ADD_TO_USER_DICTIONARY:1
+	SF_EDIT_USER_DICTIONARY:1
+	SF_STATUS:1
+SpellFeatures	end
+
+; Toolbox features flags (used with ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI)
+
+SpellToolboxFeatures	record
+	STF_SPELL:1
+SpellToolboxFeatures	end
+
+
+SC_DEFAULT_FEATURES equ mask SF_CHECK_ALL or mask SF_CHECK_TO_END or \
+			mask SF_CHECK_SELECTION or mask SF_SKIP or \
+			mask SF_SKIP_ALL or mask SF_REPLACE_CURRENT or \
+			mask SF_REPLACE_ALL or mask SF_EDIT_USER_DICTIONARY or \
+			mask SF_ADD_TO_USER_DICTIONARY or mask SF_STATUS or \
+			mask SF_SUGGESTIONS or mask SF_CONTEXT or mask SF_CLOSE
+
+SC_SUGGESTED_INTRODUCTORY_FEATURES = mask SF_SIMPLE_MODAL_BOX or mask SF_CONTEXT or mask SF_SUGGESTIONS or mask SF_SKIP or mask SF_REPLACE_CURRENT or mask SF_STATUS
+
+SC_DEFAULT_TOOLBOX_FEATURES equ mask STF_SPELL
+
+SpellBoxState	etype	byte
+	SBS_NO_SPELL_ACTIVE	enum	SpellBoxState
+	SBS_CHECKING_DOCUMENT	enum	SpellBoxState
+	SBS_CHECKING_SELECTION	enum	SpellBoxState
+
+ATTR_SPELL_CONTROL_INTERACT_ONLY_WITH_TARGETED_TEXT_OBJECTS	vardata
+;
+;	When this is present, the spell controller will enable itself 
+;	only if there is a targeted editable text object.
+;
+
+ATTR_SPELL_CONTROL_HAS_USER_DICT				vardata
+; 	
+;	Redwood-only, used when the spell control has queried for a 
+;	user dictionary.
+;
+
+ATTR_SPELL_CONTROL_NEVER_PROMPT_FOR_USER_DICT			vardata
+;
+;	Setting this attribute will prevent the user from being prompted
+;	to insert the diskette on which the User Dictionary is located.
+;	If no disk is in the drive, or no dictionary could be found, then
+;	no User Dictionary is used.
+;
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+	SCI_ICBuffHan		hptr	;Handle of ICbuff
+	SCI_spellState		SpellBoxState
+	SCI_haveSelection	byte	;0 if no selection
+	SCI_charsLeft		dword	;# chars left to spell check
+	SCI_enableFlags		word
+	;	Which options the current target handles.
+SpellControlClass	endc
+
+;******************************************************************************
+;		EditUserDictionaryControlClass
+;******************************************************************************
+;
+; Message(s) sent out:
+;  	none
+;
+; Notification type(s) responded to:
+; 	none (should be enabled/disabled manually)
+;
+; GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+;
+
+EditUserDictionaryControlClass	class	GenControlClass
+
+MSG_EUDC_GET_USER_DICTIONARY_LIST_MONIKER		message
+;
+;	Message used by the dynamic list to query for the name of a moniker
+;
+
+MSG_EUDC_DELETE_SELECTED_WORD_FROM_USER_DICTIONARY	message
+;
+;	Message used to delete the currently selected word from the user
+;	dict.
+;
+
+MSG_EUDC_ADD_NEW_WORD_TO_USER_DICTIONARY		message
+;
+;	Message used to add a new word to the user dictionary
+;
+
+MSG_EUDC_UPDATE_SELECTED_WORD				message
+;
+;	Message sent out when a new item was selected in the user dict list
+;
+MSG_EUDC_CLOSE_EDIT_BOX					message
+;
+;	
+
+MSG_META_EDIT_USER_DICTIONARY_COMPLETED		message	MetaSearchSpellMessages
+;
+;	Notification sent out after the user closes the EditUserDictionary
+;       box.
+;
+;	Pass: nothing
+;	Return: nothing
+
+MSG_EUDC_LOAD_DICTIONARY			message 
+;	Message sent out when the user wants to load a user
+;	dictionary from a disk without leaving the edit user
+;	dictionary dialog box.
+;	
+;	Pass : Nothing.
+;	Return : Nothing.
+; 
+;
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+EditUserDictionaryFeatures	record
+	EUDF_EDIT_USER_DICTIONARY:1
+EditUserDictionaryFeatures	end
+
+; Toolbox features flags (used with ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI)
+
+EditUserDictionaryToolboxFeatures	record
+	EUDTF_EDIT_USER_DICTIONARY:1
+EditUserDictionaryToolboxFeatures	end
+
+
+
+EUDC_DEFAULT_FEATURES equ mask EUDF_EDIT_USER_DICTIONARY
+EUDC_DEFAULT_TOOLBOX_FEATURES equ mask EUDTF_EDIT_USER_DICTIONARY
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+	EUDCI_userDictList	hptr
+	EUDCI_icBuff		hptr	;Handle of ICbuff
+EditUserDictionaryControlClass	endc
+
+
+;*****************************************************************************
+;		ThesControlClass
+;*****************************************************************************
+
+;
+; Messages sent out:
+; MSG_THES_GET_SELECTED_WORD (a MetaSearchSpellMessage)
+; MSG_THES_REPLACE_SELECTED_WORDS (a MetaSearchSpellMessage)
+; MSG_THES_SELECT_WORD (a MetaSearchSpellMessage)
+;
+; Notification types responded to:
+; MANUFACTURER_ID_GEOWORKS.GWNT_SPELL_ENABLE_CHANGE
+; MANUFACTURER_ID_GEOWORKS.GWNT_SELECT_STATE_CHANGE
+;
+; GenApplication GCN lists to be placed on:
+; GAGCNLT_SELF_LOAD_OPTIONS
+;
+
+ThesControlClass	class	GenControlClass
+
+MSG_THES_REPLACE_SELECTED_WORDS	message MetaSearchSpellMessages
+; 
+; 	Message send out to replace the current selection.
+;
+;	PASS:	ss:bp	= Pointer to ReplaceSelectedWordParameters
+;
+;	RETURN:	nothing (cx, dx, bp preserved)
+;
+ReplaceSelectedWordParameters	struct
+    RSWP_string		hptr		; handle of block with replace text
+    RSWP_message	word		; message to send
+    RSWP_output		optr		; place to send the message
+	;
+	; The message is sent to the output with no parameters.
+	;
+ReplaceSelectedWordParameters	ends
+
+MSG_THES_SELECT_WORD	message MetaSearchSpellMessages
+; 
+; 	Message send out to select a word 
+;		selection	=> do nothing
+;		no selection	=> select numChars chars right of the cursor
+;
+;	PASS:	ss:bp 	= Pointer to SelectWordParameters
+;
+;	RETURN:	nothing (cx, dx, bp preserved)
+;
+SelectWordParameters	struct
+	SWP_type	word	; type of selection to do
+				; nonzero = select numchars from cursor
+				; 0 = select numchars from left wordedge
+	SWP_numChars	word	; number of chars to select
+	SWP_message	word	; message to send
+    	SWP_output	optr	; place to send the message
+SelectWordParameters	ends
+
+;-----------------------------------------------------------------------------
+;		Methods
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Internal methods
+;-----------------------------------------------------------------------------
+
+MSG_TC_LOOKUP			message
+;
+; Message sent from lookup trigger, causes thesaurus to lookup the current
+; word and fill the meanings and synonym lists.
+;
+
+MSG_TC_GET_TEXT			message
+;
+; Message used to trigger sending MSG_THES_GET_SELECTED_WORD to get the 
+; current selection from the controlled text.
+;
+
+MSG_TC_REPLACE			message
+;
+; Message used to trigger sending MSG_THES_REPLACE_SELECTED_WORDS to send
+; the current text to replace the controlled text's current selection 
+;
+
+MSG_TC_GET_BACKUP_MONIKER 	message
+;
+; Message backup list uses to get a moniker.
+;
+
+MSG_TC_GET_SYNONYM_MONIKER	message
+;
+; Message synonym list uses to get a moniker.
+;
+
+MSG_TC_GET_MEANING_MONIKER 	message
+;
+; Message meaning list uses to get a moniker. 
+;
+
+MSG_TC_BACKUP_SELECTED 		message
+;
+; Message sent by backup list when backup word is selected. Moves the
+; backup word to the lookup field and sends MSG_TC_LOOKUP.
+;
+
+MSG_TC_MEANING_SELECTED		message
+MSG_TC_MEANING_DOUBLE_CLICK 	message
+;
+; Messages sent by meaning list when meaning is selected. Gets synonyms
+; for that meaning and triggers a synonym list fill. 
+;
+
+MSG_TC_SYNONYM_SELECTED		message
+;
+; Message sent by synonym list when synonym is selected. Moves the synonym
+; to the current lookup word field. 
+;
+
+MSG_TC_SYNONYM_DOUBLE_CLICK	message
+;
+; Message sent by synonym list when synonym is double-clicked. Moves the 
+; synonym to the current lookup word field and sends MSG_TC_LOOKUP. 
+;
+
+MSG_TC_REPLACE_DONE	message
+MSG_TC_COPY_DONE	message
+MSG_TC_SELECT_DONE	message
+;
+; Messages returned by controlled text to notify us that an action is done
+;
+
+
+
+;-----------------------------------------------------------------------------
+;		Hints
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+LOOKUP_WHEN_WORD_CHANGES = 1
+; set this constant to 0 if thesaurus should not lookup words automatically
+; when the selection state changes (for instance, when machine is too slow).
+; Normally should be set to 1 causing lookup whenever selected word changes.
+
+MAX_GRAMMAR_STRING	 = 7   ; "(adj) /0" 
+
+; constants involving UI
+
+MEANING_MONIKER_SIZE = 17
+MAX_BACKUP_LIST_SIZE = 11
+MAX_ENTRY_LENGTH = 26
+MINIMAL_SPACING = 1
+EXTRA_SPACING = 10
+
+; constants based on maximum H-M code returns
+
+MAX_DEFINITIONS = 30
+MAX_DEFINITION_SIZE = 200
+MAX_MEANINGS_ARRAY_SIZE = 3000
+
+MAX_SYNONYM_SIZE = 26
+MAX_SYNONYMS = 80
+MAX_SYNONYMS_ARRAY_SIZE = 500
+
+; masks for the thesaurus status word
+
+StatusFlags	record
+	SF_DOING_REPLACE:1
+	SF_DOING_COPY:1
+	SF_DOING_SELECT:1
+	SF_DOING_MANUAL_COPY:1
+	SF_BACKUP_ENABLED:1
+	SF_SELECTION_EXISTS:1
+	SF_DOING_REPLACE_AND_SELECT:1
+StatusFlags	end
+
+; Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_UI)
+
+ThesDictFeatures	record
+	TDF_THESDICT:1
+ThesDictFeatures	end
+
+; Toolbox features flags (used with ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI)
+
+ThesDictToolboxFeatures	record
+	TDTF_THESDICT:1
+ThesDictToolboxFeatures	end
+
+TC_GCM_FEATURES equ mask TDF_THESDICT
+TC_GCM_TOOLBOX_FEATURES equ mask TDTF_THESDICT
+
+
+ATTR_THES_CONTROL_INTERACT_ONLY_WITH_TARGETED_TEXT_OBJECTS	vardata
+;
+;	When this is present, the thesaurus controller will enable itself 
+;	only if there is a targeted editable text object.
+;
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+TCI_meanings		fptr	
+TCI_synonyms		fptr	
+TCI_grammars		fptr
+
+TCI_backups		fptr
+TCI_status		word
+TCI_lastWord		TCHAR MAX_ENTRY_LENGTH dup(0)		
+	noreloc TCI_meanings, TCI_synonyms, TCI_grammars, TCI_backups
+ThesControlClass	endc
+
+EndLibrary	spell
+
+
+

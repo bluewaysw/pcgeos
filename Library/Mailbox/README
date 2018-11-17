@@ -1,0 +1,1174 @@
+
+	$Id: README,v 1.3.7.1 97/03/29 05:23:55 canavese Exp $
+
+data structures:
+
+in main admin file: inbox queue, outbox queue, 
+	MailboxMedium -> MailboxTransport mapping 
+
+	Mailbox must track group blocks and parcel things out appropriately.
+		maybe have one group for each queue? have problem with
+		ungrouped stuff where you can end up with empty or sparse
+		ungroups left behind if a new ungroup gets allocated b/c
+		previous one is full, then lots of stuff in previous group
+		gets emptied.
+
+maybe in admin file: list of VM files for storage (including header & file 
+	size at last close). this could be reconstructed at boot, but it's
+	painful enough (unlike the MailboxStorage -> driver &
+	MailboxTransport -> driver mapping) that it's probably best to keep
+	it around.
+
+in memory: available media (+ connection), MS -> driver map, 
+	MT -> driver map (+ connection info), active transmission threads
+	(+ stack segment, for getting to variable space).
+
+	- actually, place these in the admin file as well, to allow them to be
+	written out on systems with no swap space.
+
+------------------------------------------------------------------------------
+
+files stored in PRIVDATA\MAILBOX
+
+synchronization:
+	VM files *not* marked VMA_SINGLE_THREAD_ACCESS, 
+		are VMAF_USE_BLOCK_LEVEL_SYNCHRONIZATION
+	lmem block holding driver maps, etc., should be lockable shared/excl...
+
+must base address-controller-creation on transport + medium, not transport alone
+
+------------------------------------------------------------------------------
+
+			       CONCEPTS
+
+------------------------------------------------------------------------------
+
+tal ID			Transport Address List ID. This is a 15-bit sequence 
+			number allocated sequentially by the Admin module that 
+			can be stored in the MailboxInternalAddress structures 
+			of a message to identify which addresses are to be 
+			displayed or are to be connected to to transmit a 
+			message. In essence, a tal ID is a quick-and-dirty way
+			of implementing a linked list, without having to
+			maintain multiple head pointers or keep the links
+			up-to-date.
+		
+			A tal ID can also indicate a specific, unmarked address
+			by having its high bit set. The low 15 bits are then
+			the address # (an index into the MMD_transAddrs array).
+			
+			A tal ID of 0 means all addresses for the message.
+
+transport string	A text string to be used inside various template 
+			monikers. Currently, this is simply the body of the
+			VMS_TEXT moniker in the transport driver's moniker list.
+
+transport moniker	A moniker, usually either a VMS_TEXT or VMS_TOOL
+			style, used in the OutboxTransportList class, chosen
+			according to the attributes of the list.
+
+transport verb		A text string to be used inside various template
+	  		monikers and text objects that indicates a message is
+			to be sent via a particular transport + medium pair.
+		
+
+------------------------------------------------------------------------------
+
+			  NAMING CONVENTIONS
+
+------------------------------------------------------------------------------
+
+The primary change in naming conventions from the standard lies in how routines
+are named. It derives from this beast being a library with routines that are
+exported to the outside world.
+
+There are three levels of export, if you will, that a routine can be in:
+
+	1	Used only within the module
+	2	Used by other modules within the library
+	3	Used by clients of the library
+
+The export level determines the prefix for a routine, as follows:
+
+	1	Take the name of the source file, upcase the first letter and
+		add all the other uppercase letters in the source file after it.
+		If this isn't unique among files in the module, pick one of the
+		other lowercase letters that makes it obvious what source file
+		the thing's in. Examples:
+			outboxMedia.asm 	=> OM
+			outboxTransmit.asm	=> OTr
+			outboxThread.asm	=> OT (it got written first)
+
+	2	Use the module name. Thus "MediaNotifyMediumAvailable" because
+		it's called from the SysSendNotification hook in Main.
+
+	3	Use Mailbox.
+
+Each module has an interface definition (.def) file you'll find in the top-level
+directory. This is simply an organizational nicety: keeping various manager
+files up-to-date, including the definitions only for those modules that they
+talk to is a pain. All these files are simply included by mailboxGeode.def.
+
+------------------------------------------------------------------------------
+
+				REMAINING WORK
+
+------------------------------------------------------------------------------
+
+Mailbox Library:
+    Inbox:
+1d	InboxDetailsClass:
+		- format MMD_transWinClose for bounds object
+		- adjust Delete trigger's moniker to opposite of delivery verb
+0d	InboxNotifyAppNotLoaded:
+		- might want to bring down panel, if up. probably not, though
+1d	InboxNotifyNewForegroundApp:
+		- don't notify app if not marked as immediate notify
+3d	- inbox progress dialog of some sort.
+-----
+11.5d
+
+    Message:
+1d	MessagePercentageClass:
+		- steal the code from the Pasta I fax spooler implementation
+		  (an analog GenValue that also provides text)?
+ +--	MailboxGetTransport
+----
+7d
+
+    Outbox:
+1d	OutboxControlPanelClass:
+		- add Poof! menu if any system message can be sent
+4d	OutboxPoofControlClass:
+		- this is what provides the menu ui (can itself be either
+		  GIV_SUBGROUP or GIV_POPUP) to allow the sending of
+		  poof messages. should not be usable unless some transport
+		  can send such a beast
+		- needs a message that can be sent by container that will set
+		  the thing not usable if no poof messages can be sent.
+		- needs to field notifications from Media module when new
+		  poof bit is enabled, set itself usable or reevaluate its
+		  UI
+		- use OTLT_FILTERED type of OutboxTransportList with
+		  OTLI_filter set appropriately
+		- individual dialogs will have to send MSG_MA_REMOVE_BLOCK_-
+		  OBJECTS_FROM_ALL_GCN_LISTS on their destruction to remove
+		  the transport list from the GCN list it's on
+1d	MailboxGetCancelFlag
+ +-	MailboxGetNumTransAddrs
+ +-	MailboxGetTransAddr
+ +-	MailboxSetTransAddr
+ +-	MailboxGetTransData
+ +-	MailboxSetTransData
+-----
+9d
+
+    UI:
+6.5d	MailboxSendControlClass
+    1d		- controller shme
+    1/2d	- create/destroy address control (cope with thing that has
+		  no address control)
+    1/2d	- MSG_GEN_MAKE_APPLYABLE support (i.e. don't enable Send
+		  button unless address control says the address is valid)
+    1/2d	- create Contents list (can just be dynamic list that asks
+		  MSC for monikers; to implement configurable features,
+		  however, requires a little more work, such as determining
+		  how many entries there should be, then scanning through the
+		  array to find the right entry, rather than just using the
+		  entry # as an index into the array)
+    1/2d	- data-object-specific UI:
+			- page range
+			- subclass-defined
+    1/2d	- changing data-object type w/Contents list
+    1/2d	- ask transport to choose format
+			- generate error if no format acceptable
+		- cancel transaction
+    1/2d	- get addresses, transport data, and other things and record
+		  them in a chunk whose handle is sent with the CREATE_MESSAGE
+    1h		- ec code to blow up on DETACH if transactions pending
+    1/2d	- register message, using params + stuff stored in transaction
+		  chunk
+    1/2d	- subclass needs to know contents of transaction chunk + way
+		  to gracefully store its own information, so data-type
+		  specific values can be recorded.
+		- if running on mailbox:0, must make dialog sysModal
+2d	MailboxAddressControlClass
+	MailboxApplicationClass:
+3d		- handle File poof message
+ +-		- handle clipboard poof message
+ +-		- handle quick-message poof message
+-----
+11.5d
+
+    Utils:
+1h	MailboxCheckStorageTypeSupported
+1/2d	MailboxCreateStreamGString		
+1d	MailboxLoadDataDriverWithError
+		- I'm no longer comfortable with storing the error string with
+		  each message. I'd prefer to have the string stored in an
+		  array like that used for the failure-reason storage. The
+		  thing is, when this feature is used, it will be the same
+		  error message for any message registered from the card, so
+		  it's silly to have the same string stored for every message
+		  in the inbox. Storing the error in an array would change
+		  MMD_bodyErrMsg into just a word, with this routine taking
+		  that token.
+-----
+2.5d	
+
+=====
+42d	~~ 8w
+
+Transport Drivers:
+    Socket IRLAP:
+	- capable of sending any poof message
+	- always selects first format offered
+	- specific to the IRLAP protocol for serial media, as a transport
+	  driver is only allowed one verb/string/moniker list for each medium
+	  it supports. can still use other protocols for network media, though.
+2d	- interrogate Socket library to find a domain that uses an indicated
+	  medium, to respond to DR_MBTD_CHECK_MEDIUM
+1d	- respond with appropriate values for DR_MBTD_GET_MEDIUM_PARAMS (must
+	  talk to Socket to find significant & max address sizes for the
+	  medium in whatever domain was found in DR_MBTD_CHECK_MEDIUM)
+1d	- establish connection over appropriate domain to well-known port
+ +	  for transmission
+ +-	- allocate chunk to track connection state
+3d	- send over initial data describing the message, including:
+ +		- body format
+ +		- storage type
+ +		- start/end bounds
+ +		- priority
+ +		- subject
+ +		- sender?
+ +		- estimated size of body
+ +		- dest app token
+ +- 	- detect loss of connection
+ +-	- use abstract data interface to read blocks & send them over as
+ +	  packets
+ +-	- must cope with error being returned at any point
+ +-	- don't wait for an ack back after each packet. just use
+ +	  SocketCheckReady to see if the other side has sent anything back,
+ +	  and process it before transmitting the next block.
+ +-	- when no more blocks to send, send message-complete packet and wait
+	  for response.
+3d	- retrieve messages:
+		- create server socket in all domains (will this conflict 
+		  with LoadOnMsg that might also be registered?)
+		- hang out for a couple minutes, calling SocketCheckReady to
+		  see if any connection wants to happen
+		- after nn minutes with no connection, return
+		- when receiving, if data driver returns error from
+		  WRITE_BLOCK, send final ack with error and drop further
+		  packets (until a start-message packet)
+0-2w	- help track down any problems in IRLAP driver over cable & IR
+-----
+10d-20d
+
+    Spooler:
+	- can send quick message, but not file or clipboard
+	- prefers stream gstring, but will take text_chain or ink
+1/2d	- print control address control responsible for setting
+	  SEND_WITHOUT_QUERY flag if selected printer is always connected
+1d	- address is printer name. insignificant portion of address is any
+	  option changes from the defaults? (paper size, etc) or just complete
+	  set of options for the printer (i.e. most of the contents of the
+	  JobParameters, except the port info)?
+1d	- on preparation: if body is text or ink (quick message), create
+	  appropriate gstring and replace the body with the new
+3d	- on transmit:
+		- use message info & address to build up JobParameters (mark
+		  spool file as DONT_DELETE [thanks, Jim :]). must compute
+		  # pages from gstring, I guess
+		- submit job for printing
+		- loop, checking status every 15 seconds, updating percentage
+		  (add current page to SpoolJobInfo; of course, spooler's
+		  current page is current physical page, which may have very
+		  little to do with the job pages...)
+		- might want a flag in JobParameters that causes the job to
+		  hang around until a final SpoolGetInfo call to report the
+		  job is complete and whether that completion was a happy one,
+		  so this can return an error if the thing got canceled,
+		  or something.
+	- for app-specific ui, like mail merge in geowrite, MSC subclass will
+	  have to store data in the transaction chunk and provide a way for
+	  the application to query that info using the handle sent with the
+	  CREATE_MESSAGE output. we assume this data doesn't need to make it
+	  into the JobParameters block.
+-----
+5.5d
+
+4d  Zoomer 1:
+	- can send clipboard poof message, only
+	- accepts only clipboard_item format
+	- talks directly to net/comm folks to send the clipboard across
+	- connect: create socket
+	- transmit: use ClipboardSend that has been moved from the ui to here
+	- end connect: do what comes naturally
+	- retrieve: use net/comm from ClipboardReceive that has been moved
+	  from the ui to here
+	- "Beam Zoomer I" for INFRARED, "Cable Zoomer I" for SERIAL_CABLE.
+	  nothing else possible.
+	- no address control
+
+Data Drivers:
+1w  VM Tree:
+	- cleanup if VMUpdate at WRITE_COMPLETE	indicates insufficient space
+	- add WRITE_ABORT
+1w  File:
+	- when reopening the file, if FEA_FILE_TYPE is GFT_VM, use VMOpen,
+	  not FileOpen
+	- when closing file, do likewise.
+
+GeoDex:
+2d	- add MSC, allowing single card, or all cards to be sent
+	- default is always single card
+2d	- create address_card format as defined by Palm (with our input?)
+3d	- receive message:
+		- if card with same name already exists, ask user if it
+		  should be merged (new data replacing existing old data; this
+		  assumes a card message can be sparse, so you might just
+		  be receiving the fax number for someone whose other info you
+		  have) or old data should be entirely replaced. should
+		  display complete subject from message, plus indication
+		  of whether any field would be replaced by the merge, or if
+		  the message would just augment the card.
+		- if no card with name exists, just add one
+GeoPlanner:
+2d	- add MSC, allowing single event, or entire day, week, month or
+	  file(?) to be sent.
+1d	- default is event if event selected, day if showing day & no event
+	  selected, month if not showing day.
+	- allow selection of multiple events without sending entire day?
+4d	- receive message:
+		- foreach event:
+			- if time bounds of event doesn't overlap 
+			  anything, just include
+			- if overlap, display conflict and get resolution, or
+			  just include (user option). resolution might include
+			  ignoring new event, deleting old event, shortening
+			  old event, shortening new event, shifting new event
+			  to be right after old, or vice versa
+			- for repeating events w/no time, just include
+GeoWrite:
+4d	- support file, current page, page range, and selection data objects.
+	- default is file
+	- only stream gstring & transfer item formats
+GeoDraw:
+4d	- support file & selection data objects.
+	- default is file
+	- stream gstring, vm gstring, & transfer item formats
+
+PCMCIA Drivers, Spooler, Mailbox library:
+	- generate notification for the different units of various media.
+4d	- PCMCIA drivers must generate notification when they know the type
+	  of card that's been inserted/removed	
+1d	- CARDCS.BIN will have to look for the func-device-type (22h?) tuple
+	  to see if the thing is a data or fax modem and store that info
+	  away, since the CIS will be gone by the time CIDSer is loaded.
+
+------------------------------------------------------------------------------
+
+				ISSUES
+
+------------------------------------------------------------------------------
+
+if a user hides a progress box for the outbox, how can she get it back? should
+all progress boxes be brought back up when the system outbox panel is brought
+up? should the panel offer a list of transports for which the progress box is
+hidden? the MailboxApplication offers a message to bring up all existing
+progress boxes, which could be called from MSG_MCP_SET_SPECIFIC in 
+OutboxControlPanel when it finds it's the system panel.
+
+what do we do about external fax modems? someone's going to have to know
+there's such a beast out there and generate the appropriate medium notification
+if pasta II is to be able to use it.
+
+who's going to know which serial port is which medium? how do we cope with
+things like the zoomer, where there are multiple virtual ports going to one
+real port?
+
+if a message transmission fails, should a retry be automatically scheduled
+for it? under current spec, when the start window time is reached, the user is
+bugged about the message having been scheduled... how about if it's past the
+deadline, we shift the start & end times, so the user is harrassed, else we
+leave the start time alone?
+	- current implementation will extend deadline by 10 minutes, if
+	  deadline has been reached, but otherwise leaves the time bounds
+	  alone. implication: if message fails and has not reached deadline,
+	  user will have to be responsible for retrying.
+
+when and where does the "retry timer", i.e. the timer that fires when the
+start time of the message with the closest future start time is reached, get 
+set? how is it maintained in some low-overhead manner? the same timer can be
+used for message deadlines, as well.
+	
+when the user cancels a message transmission but indicates s/he wants the
+other messages s/he was sending to continue being sent, does this include the
+other addresses for the message that was being sent when s/he clicked Stop? In
+other words, when the typical user clicks Stop, does s/he mean "stop this
+message" or does s/he mean "stop sending this message to this address"? might
+it depend on the transport?
+	- current implementation cancels all addresses for the message, but
+	  this is fairly simple to change (leave the talID as the xmitID
+	  in OTrHandleCancelation and use that for the query box, then pass
+	  xmitID to the CancelMessagesCallback, not queuedID)
+
+when the connection gets lost and the user elects to retry, the current code
+may not immediately retry that address, though it will get to it eventually.
+Is this a problem? Retrying immediately could probably be arranged (the message
+& address on which the connection was lost would have to be the ones used in
+the call to OTrCreateBatch, with OTrCreateBatch being changed to accept which
+MailboxMessage to use as the reference, rather than always using the first
+message from the thread's queue).
+
+it turns out we have to mangle the outbox/inbox after a crash anyway, to
+reset the reference counts for all the messages back to 2, so we could
+actually add QUEUED and SENDING flags to the MITA_flags field and use that
+when deciding whether to display a message, rather than having to go find the
+transmit thread and see if the address has the queued or xmit talID for the
+thread.
+
+should a DMap be markable as auto-find, where it will perform the necessary
+FileEnum to locate any new driver at initialization and at any appropriate
+file-change notification? I suspect we'll want to always be kept apprised of
+all transport drivers, so when the user inserts a filesystem card with a
+transport driver on it, the transport becomes available immediately.
+
+------------------------------------------------------------------------------
+
+			     RANDOM NOTES
+
+------------------------------------------------------------------------------
+
+when extending the deadline of a message, when the user tells us to, there's a
+	utility routine that yields FileDate & FileTime records a certain
+	number of hours & minutes from now. use it.
+
+what about the idea of marking a vm file invalid on an async write until the
+	header gets written? perhaps if one block of an async file wants to
+	be written out, the others should be as well, to avoid possibility of
+	corrupted file?
+
+need to update the admin file on a regular basis, perhaps?
+
+is there fixup needed in the VMStore array after a crash?
+
+want some way for a transport to augment the MailboxMessageFlags (e.g. 
+     	DONT_QUERY needs to be set by the spooler and might need to be set
+	by the fax). Might want to allow transport to override time bounds.
+
+MailboxApplicationListClass:
+	- looks through inbox to find app tokens needed
+	- always adds "All" item, with appropriate index used if selected
+	- message to map index to app token
+
+MailboxTimeoutQueryInteractionClass:
+	a dialog box that assumes a default answer if no user input for
+	a specified amount of time after appearance of the box on-screen.
+		- Add SGIT_LAST_INPUT & set var when doing screen saver
+		  curCount replacement
+
+
+start bound of a message is its retry time. Mess with time-of-next-retry when
+	message is registered.
+
+when retry timer expires (timer is RT unless target time is < 1 min away,
+	when it is msg_one_shot):
+	- find all messages for all transports whose start time is past
+		- create list of unique transports at same time
+		- if message is past end time, mark transmission as forced
+	- foreach transport:
+		- if transmission is forced:
+			- put up box showing... list of forced + list of
+			  optional? user may Deliver, Delete, or Delay messages
+		- else
+			- foreach address:
+				- call transport to map from addr to medium
+				- if medium exists, add message & addr to send
+				  queue
+			- if any message is no-query, remove from queue &
+			  begin transmission
+			- put up box showing list of possible messages. user
+			  may Deliver, Delete, or Delay messages
+
+Add Tcl code for the following warnings:
+
+MailboxSendControl needs to subclass REMOVE_FROM_GCN_LISTS and call MailboxApp
+	with message to tell it to remove all objects in child or tool ui blocks
+	from all GCN lists.
+
+MailboxRegisterMessage:
+	- look at transport and get the appropriate DBQ
+	- load the storage driver
+		- if unable to load, give the appropriate error, if user said
+		  retry, do so (user doesn't get retry option if no msg
+		  passed), else return error
+	- allocate room for the mbox reference based on the driver's
+	  MBDDI_mboxRefSize
+	- call DR_MBDD_STORE_BODY
+	- if error, free mboxref and return the error
+	- allocate & lock down a message descriptor in the DBQ
+	- allocate a chunk in that block for the mbox ref & copy the ref in
+	- allocate a chunk for the subject & copy it in
+	- allocate a chunk for the body error message and copy it in (if
+	  present, of course)
+	- allocate a chunk array (var size) for the trans addrs & copy them
+	  in, one by one
+	- rederef the message descriptor and copy in the fixed-size things
+	  (including all the chunk handles for the above)
+	- unlock the item
+	- add the item to the DBQ
+	- if modified control panel up that should be displaying this message,
+		tell MailboxMessageControlPanel to add it (MMLC will re-sort)
+	- if outbox:
+		re-eval retry timer (should provoke initial send, if necessary)
+		if message sendable (time bounds + media check), put up box
+			asking user if should be sent now or later
+		if message not sendable, put up confirmation box
+	- if inbox, look for server registered. if registered, attempt immediate
+	  delivery, taking into account screening requests, etc.
+	
+inbox has:
+	name array of all app names. 
+		- elements only hold app name.
+		- allows for less overhead when storing names (can be variable
+		  sized while elt array is fixed size for the life of the elt
+		  [elt array code won't even call comparison callback if elts
+		  not of the same size, which means app name would have to be
+		  FileLongName])
+	element array of all tokens ever seen. each element holds:
+		- ref count (extra reference added when element created. ref 
+		  count > 1 => message in inbox for app)
+		- the token
+		- reference to application name or to actual application token,
+		  if token is generic app-class token
+		- state: no-notify-if-foreground, is-alias
+
+	NOTE: when token alias is detected, any existing messages for the alias
+	must have their tokens changed to the true token.
+
+------------------------------------------------------------------------------
+
+			   SYNCHRONIZATION
+
+------------------------------------------------------------------------------
+
+Avoiding deadlock in the face of multiple locks that must be grabbed at the
+same time requires organizing the locks into hierarchies. For a given
+hierarchy, locks that are to be held at the same time must always be grabbed
+in the same order, from the top of the hierarchy down.
+
+There are currently two hierarchies defined for the Mailbox library:
+
+	media status map (mediaStatus.asm)
+	     |
+	media transport map (mediaTransport.asm)
+	     |
+	transport driver map (dmapCode.asm)
+
+Thus, if you have the transport driver map locked, you cannot check the status
+of media or see what transport drivers use what media. Similarly, if you have
+the medium -> transport map locked, you cannot then check on the status of a
+particular unit of a transport medium. You can, however, load a transport
+driver, if you so desire.
+
+	OutboxThreads
+	     |
+	any message or queue (i.e. do not go for the OutboxThreads block
+		while holding a message locked)
+
+The OutboxThreads block holds the per-transmission-thread data. It is always
+MemPLocked or HandlePed to gain exclusive access. You may not call
+OTFindCurrentThread or OTFindThread or any similar routine while holding a
+message locked.
+
+
+Basic philosophy: Do not hold a lock while calling outside the mailbox library.
+		  The one exception to this is the driver map block while
+		  loading a driver.
+
+Because of the exponential complexities introduced by holding multiple locks,
+you should try not to hold a lock while grabbing another one, even within the
+library. There are times when this avoidance isn't possible, and for those
+situations we have synchronization hierarchies.
+		  
+------------------------------------------------------------------------------
+
+			       DATA STRUCTURES
+
+------------------------------------------------------------------------------
+
+There are several key assumptions underlying the choice of data structures in
+this library:
+
+	1) There won't be many messages in the inbox or outbox at any given
+	   time.
+	2) Loading a driver is fairly expensive.
+	3) Asynchronous-update VM files can be made reasonably secure from
+	   corruption by awkwardly-timed resets.
+	4) There are a limited number of transport drivers, data drivers,
+	   reasons for transmission failure, and transmission media.
+
+The primary organizational unit, as far as the raw inbox / outbox
+functionality is concerned, is the DBQ, which is described in greater detail
+below. 
+
+Now come the details on the data structures maintained by each module, with an
+indication of how the structures relate to structures in other modules.
+
+------------------------------------------------------------------------------
+
+			       THE ADMIN MODULE
+
+------------------------------------------------------------------------------
+
+The only data structure here is the "adminFile" variable, that holds the VM
+file handle of the admin file, and the map block within that file.
+
+The Admin module is responsible for keep track of the handles for all the data
+structures maintained by the other modules. Whenever code in those modules
+needs to get to its data structures, it calls the Admin module to get the
+appropriate handle.
+
+The handles are always fetched from the map block (with the exception of the
+admin file handle itself, which obviously is needed to get to the others),
+rather than being copied into fixed memory, to keep the footprint of the
+library as small as possible.
+
+The Admin module is responsible for opening the admin file; calling appropriate
+routines to create the necessary structures, if the file is just being
+created; and calling other routines to reset the structures that are in the
+file to allow them to be written out and discarded, on systems with no swap
+space, but that don't contain information that persists from one GEOS session
+to another. These data structures are noted as such in the descriptions that
+follow.
+
+------------------------------------------------------------------------------
+
+				THE DBQ MODULE
+
+------------------------------------------------------------------------------
+
+This module has no single structure of its own, but instead implements an
+abstraction that is used by the other modules of the library.
+
+A DBQ is an array of DB items with the following properties:
+
+	- The items are always of a fixed size
+	- An item can be in more than one queue at a time
+	- Items are always added at the end, but quick random-access is
+	  essential. These are not queues in the traditional sense, but
+	  DBQ was a nice, short name for them.
+	- An item may be referenced by something other than a DBQ, and should
+	  not go away until that reference has been removed.
+
+A DBQ is implemented as a HugeArray, with each element of the array being a
+DBGroupAndItem structure. The DB items themselves are allocated "ungrouped",
+relying on the DB system itself to parcel them out reasonably among various
+groups.
+
+Items are allocated through the DBQ module. Each item contains a reference
+count, which lets the DBQ module know when it's safe to destroy the item. When
+the DBQ is created, it has a routine bound to it that is called to perform any
+additional cleanup required before the DB item itself is freed. Because it's
+possible for the DBQ to be destroyed before all the items it references are
+destroyed (because of the external-reference problem mentioned earlier), the
+routine to use for cleaning up an item before destroying it is stored within
+each item. Each item begins with a DBQData structure that holds the item's
+reference count and its cleanup routine.
+
+A DBQ also has bound to it a routine that is to be called when a new item is
+added to the queue. Only the inbox and outbox queues have such a routine, as
+they're the only ones where other people must be notified when something is
+added.
+
+For both the cleanup and the add routines, the Mailbox library doesn't store
+any standard pointer for the routine, as the handle/segment will change from
+GEOS session to GEOS session, and the routine offset may change as changes are
+made to the library. Instead, routines that are bound to the queue are
+exported in the library's .gp file and their entry point number is what is
+stored with the queue. When the DBQ module wishes to call the routine, it
+calls ProcGetLibraryEntry with that number and the Mailbox library's geode
+handle, thereby acquiring the current location of the routine.
+
+------------------------------------------------------------------------------
+
+			       THE DMAP MODULE
+
+------------------------------------------------------------------------------
+
+This is a module similar in nature to DBQ: it provides an abstraction that
+works on a structure that's the responsibility of some other module.
+
+The DMap module maps from a 32-bit token to a device driver, if possible.
+Having done the mapping, it can then also be asked to load the device driver.
+
+To be trackable by this module, a driver's DriverTable must be a standard
+DriverInfoStruct, followed by its 32-bit token, followed by its 16-bit
+attributes word. The module places no interpretation on the token and
+attributes; it simply uses the one to identify the driver, and stores the
+other for other modules to request.
+
+When someone allocates a DMap (all the ones used in the Mailbox library are
+allocated by the Admin module), they pass all the information needed to
+enumerate a directory for suitable drivers and to load those drivers. In
+particular:
+	- the GeodeToken for the drivers
+	- the subdirectory of SP_SYSTEM in which the drivers are located.
+	  Searching happens only in this directory, not in any subdirectories.
+	- the protocol number expected
+	- the entry point number of a routine to call when a new driver is
+	  added to the map while searching for a driver.
+
+Each DMap is an lmem VM block with a variable-sized header, which contains the
+above information, and two chunk arrays. One array holds the drivers
+themselves, while the other holds registered callbacks to be made when
+particular drivers are next loaded (more on that in a moment).
+
+Each element of the driver array holds the 32-bit token for the driver, the
+16-bit attributes, and its FileLongName.
+
+Another module can request that it be called back the next time a particular
+driver is loaded. This is currently used only during cleanup procedures when
+the driver could not be loaded or was unable to perform the function it was
+asked to perform. In such a situation, the other module will store away the
+information it needs to perform the function again at a later date, then store
+a callback with the DMap so it can try the request again the next time the
+driver actually gets loaded. As with other places that store in the admin file
+routines to call, the callback record stores the entry-point number of the
+routine, not a handle or offset. In addition, the record holds 32 bits of data
+to pass to the callback, plus the 32-bit token of the driver whose loading is
+to be watched for.
+
+As an optimization, to avoid multiple fruitless exhaustive searches
+for a driver that cannot be found, if a request is made for a driver that
+DMap's not able to find, this is recorded in the header of the map (the
+DMF_DRIVER_DIR_CHANGED flag is cleared). On the next request for a driver
+whose 32-bit token isn't yet in the map, if the directory hasn't changed since
+that exhaustive, unsuccessful search was made, DMap will not even attempt to
+perform a FileEnum to locate the driver. The DMap module registers a
+file-change-notification callback for each DMap allocated, so it knows when
+the directory has changed and that it needs to once again go searching when
+asked.
+------------------------------------------------------------------------------
+
+			       THE INBOX MODULE
+
+------------------------------------------------------------------------------
+
+The Inbox module, as you'd expect, maintains a DBQ that holds incoming
+messages. In addition, it has an lmem block in the admin file that keeps a
+mapping from GeodeToken to the application name, for quick retrieval when
+generating message list and application list monikers. This GeodeToken -> name
+mapping serves the added purpose of recording which applications have messages
+pending for them in the inbox, though it doesn't record what those messages
+are.
+
+The GeodeToken -> name map takes the form of two arrays, the first of which is
+an ElementArray that is keyed by GeodeToken, while the second is a NameArray
+that stores just the filename of each application (not the full path -- that's
+left to IACP to handle). The names could be stored in individual chunks, but
+the average cost for such storage is greater than if the names are stored in a
+NameArray, and the code to implement the NameArray approach is smaller.
+
+Each element of the ElementArray is for a single GeodeToken. The token can
+either be a "real" token, being a token for which there exists an application
+that has it as its token, or for a "generic" token, which is an artifact of
+IACP (created via a call to IACPBindToken). For a real token, the element
+holds the reference number of the application name within the name array. For
+a generic token, it holds the element number of the real token for the
+application bound to the generic goken.
+
+When a message is sent to a generic token, the destination of the message is
+changed from the generic token to the real token. Without this, we would have
+to provide the same application name for both the real and the generic token,
+yielding two items with the same name in the application list of the inbox
+control panel. The items would, however, display different messages, which the
+user would find rather confusing.
+
+The search for an application's name happens when the first message for the
+unknown token is placed in the inbox, so we know as soon as possible if the
+token is an alias. (Without this initial check, we might put up two panels,
+only to have one of them show up with messages that would all be taken away as
+their destination application was changed from the generic to the real token,
+resulting in the second panel coming back down again; all this activity would
+be very disconcerting.)
+
+When the array stores a GeodeToken for which no application can be found, the
+Inbox module watches for file-change notifications. If a file-change comes in
+that might herald the arrival of a new application, the Inbox module will look
+for any unknown tokens that have messages queued. The discovery of a name for
+a previously unknown application generates a notification to the system inbox
+panel, if it's up, to rebuild its application list. Note that this same search
+is also conducted on bootup, if there are unknown tokens with messages pending.
+
+------------------------------------------------------------------------------
+
+			       THE MAIN MODULE
+
+------------------------------------------------------------------------------
+
+This puppy implements MailboxProcessClass, and is responsible for passing out
+notifications that arrive via SysSendNotification. It has no real data
+structure of its own.
+
+------------------------------------------------------------------------------
+
+			       THE MEDIA MODULE
+
+------------------------------------------------------------------------------
+
+Media maintains two different maps related to transport media. One, the media
+status map (implemented in mediaStatus.asm) tracks the availability and
+connectedness of different units of transport media. This map is reinitialized
+at the start of each GEOS session. The other is the media transport map
+(mediaTransport.asm), that keeps track of which transport drivers use which
+transport media, and the monikers, verbs, and significant address sizes
+associated with each combination of transport driver & transport medium.
+
+The status map is an lmem block in the admin file that has a single chunk
+array in it. Each variable-sized element of the chunk array holds a
+MediaStatusElement structure for a single unit of a medium. The entry has a
+fixed part, which holds the medium token, the type of unit data, the number of
+bytes of unit data, and a byte of status flags, and a variable part, which is
+the unit data passed in the availablity-notification that caused the entry to
+be created.
+
+Each medium has a specific type of unit data. It is an error to pass different
+types of unit data for the same medium. For some, it will be a single integer
+(MMUT_INT, this is the format used by the SERIAL_CABLE medium, where the unit
+is the COM port number), while for others it will be a block of data
+(MMUT_MEM_BLOCK; printer units take this form, with the block being a printer
+name). In this case, the data block must be allocated with HAF_ZERO_INIT set
+so that any bytes you don't use, but that are allocated by the heap behind
+your back, will always be zero.
+
+The currently-defined status flags are MSF_AVAILABLE (the unit is in the
+machine) and MSF_CONNECTED (there's a communication channel active through
+that unit). When a unit becomes unavailable, it is deleted from the array.
+
+When the media status map receives an update that indicates a message might be
+sendable now, where it wasn't before, it calls routines in the Outbox module
+to put up the appropriate control panel.
+
+The media transport map is a persistent one that holds one array, keyed by
+MailboxMedium tokens, which indicates which transport drivers use a particular
+medium, and also contains, for each such combination, the various parameters
+returned by the transport driver from its DR_MBTD_GET_MEDIUM_PARAMS function.
+The actual MailboxTransport tokens are stored in an element array, to reduce
+the size of the elements in the first array, and to make it easy to tell when
+a never-before-seen transport driver is actually seen.
+
+The media transport map serves a multitude of purposes:
+	- the existence of an entry for a transport driver & transport medium
+	  pair is what determines whether the user can send a message using a
+	  particular transport driver. If there's no entry for the driver for
+	  any medium, there will be no entry in any transport list that would
+	  allow the user to choose that transport driver.
+
+	- storing the moniker list, transmit verb, and number of significant
+	  bytes for an address going through that transport driver via that
+	  transport medium allows much faster display of various UI elements,
+	  as the transport driver doesn't have to keep being loaded and
+	  interrogated.
+
+	- the map also maintains a union of the MailboxTransportCapabilities
+	  words from all the transport drivers that are in the media transport
+	  map (i.e. that are available for the user to select). This union
+	  determines whether the Get New and Poof! menus are available in the
+	  system inbox and outbox control panels, respectively. If a driver
+	  is discovered that has a capability related to these that no other
+	  driver had, the Media module is responsible for notifying the
+	  appropriate parties so they can make the capability available to
+	  the user.
+
+------------------------------------------------------------------------------
+
+			      THE MESSAGE MODULE
+
+------------------------------------------------------------------------------
+
+This module contains message-related code that is common to both the inbox and
+the outbox. Any global routines that access the parts of a message descriptor
+that aren't specific to the inbox or outbox are here. In addition, this module
+defines various object classes that are the superclasses of others specific to
+the inbox or outbox. These superclasses implement functionality common to both
+boxes, invoking methods in the subclasses to perform whatever action, or
+gather whatever data are specific to the box in question.
+
+			    MessagePercentageClass
+
+A simple progress gauge that shows progress as both a bar and as text. Stolen
+wholesale from the Pasta I code [not yet stolen, actually -- ardeb 6/9]. It's
+used in the outbox progress box, and can be used in any inbox progress box any
+message receiver chooses to put up.
+
+			   MessageControlPanelClass
+
+This is the superclass of the OutboxControlPanel and InboxControlPanel
+classes, which serve as the root of the non-modal, always-on-top dialog boxes
+the user uses to view messages in the outbox or inbox. It can operate in one
+of two modes (selected before the MSG_GEN_INTERACTION_INITIATE is sent): as a
+system panel, which allows the user to change the selection criteria for the
+messages that are displayed, or as a specific panel, which displays messages
+only for one transport medium, one destination address, one application, etc.
+
+Each control panel must have a certain set of objects, which are pointed to by
+lptrs in the MessageControlPanel instance data:
+	- a MessageList. This is actually a subclass of MessageList, since
+	  that class relies on a subclass to function. It is where the selected
+	  messages are displayed.
+	- a MessageDetails box. When the user clicks on a message in the
+	  MessageList, this box is brought up to display further information
+	  on the message. Again, this is actually a subclass of MessageDetails,
+	  as there's additional information specific to the inbox or outbox
+	  that we like to display.
+	- a template text moniker, with a \1 character in the text, to be used
+	  when the panel is for something specific. The \1 is replaced by text
+	  returned by a call to the subclass.
+	- a tree of objects that are to be set usable only when the panel is
+	  for something specific.
+	- a tree of objects that are to be set usable only when the panel is
+	  in system mode.
+
+When the panel is operating in specific mode, the pointer to the specific
+moniker (MCPI_specificMoniker) is set to 0. This is how MessageControlPanel
+and its subclasses figure whether the panel is in system or specific mode.
+
+MessageControlPanel is the object with which other things (notably the
+MailboxApplication object) communicates to set the selection criteria for the
+message to be displayed. It is responsible for storing the criteria in chunks
+in the object block and then telling the MessageList object what those chunks
+are.
+
+Control panels are always duplicated from a template resource, then sent a
+MSG_MCP_SET_SPECIFIC followed by a MSG_MCP_SET_CRITERIA. If the panel is in
+specific mode and MSG_MCP_SET_CRITERIA indicates the message list is empty,
+the panel will be destroyed before it ever is brought on-screen. A specific-
+mode panel is also expected to destroy itself if its message list becomes
+empty.
+
+			       MessageListClass
+
+This is a subclass of the GenDynamicList that takes care of its own monikers,
+once told the criteria by which it should select the messages to display.
+
+The list of messages is stored as a ChunkArray pointed to by the object. Each
+element of the array holds a MailboxMessage token (with a reference added to
+the message to keep it from vanishing before we've forgotten about it), and an
+address number. For messages in the inbox, the address number is ignored, but
+for those in the outbox, it specifies which address (or addresses, if more
+than one address for the message is actually the same, in its significant
+bytes) should be displayed in the list entry.
+
+MessageList builds and sorts the list with the help of routines that must be
+supplied by a subclass of MessageList: it calls the MSG_ML_GET_SCAN_ROUTINES
+method for the object to get the virtual far pointer to a routine that can
+choose messages and addresses to add to the list, and to a routine that can
+compare two message+address pairs and tell which one should come before the
+other in the list.
+
+The selection routine is called with each message in the source DBQ (either
+the inbox or the outbox) and is expected to examine the message and its
+addresses, decide whether it/they should be displayed, and call
+MessageListAddMessage to actually create an entry for the message+address in
+the list.
+
+Once all the messages have been processed, ArrayQuickSort is used to sort the
+entries, using the compare routine the subclass provided.
+
+			      MessageGlyphClass
+
+This is one of the workhorses of this module, being used in many, many dialog
+boxes. It is passed a MailboxMessage token and a TalID and calls the
+MessageCreateMoniker routine to create a moniker for itself, which it then
+displays. That's all it does, but it's very important.
+
+Because there are only 48 bits of data that can be passed to a method, without
+passing stuff on the stack, there are various ways you can tell the
+MessageGlyph about the message it is to display. Each way dictates a different
+set of MessageMonikerFlags to pass to MessageCreateMoniker, and thus controls
+what the glyph displays about the message.
+
+			     MessageDetailsClass
+
+The superclass of OutboxDetails and InboxDetails, it takes care of extracting
+and displaying the data common to those message details boxes:
+	- the subject
+	- the date the message was registered
+	- the transport or application for which the message is destined,
+	  which is placed in the title bar of the dialog
+	- the verb for transport/delivery of the message, which is placed in a
+	  trigger that causes the message to be sent/delivered.
+
+Any other information is the responsibility of the subclass.
+
+The delivery or deletion of the message is the responsibility of the subclass.
+
+MessageDetails ensures that the message descriptor remains until it's no
+longer needed, and handles bringing the box off-screen if the message is
+removed from the inbox or outbox.
+
+------------------------------------------------------------------------------
+
+			      THE OUTBOX MODULE
+
+------------------------------------------------------------------------------
+
+As you would expect, the Outbox module takes care of all the things specific
+to the outbox, including registering the addresses for each message, putting
+up relevant UI, implementing subclasses of the stuff from Message module to
+display the right things, and actually performing the transmission of messages
+via a transport driver.
+
+In addition to the outbox DBQ, the Outbox module has two other data
+structures: the OutboxMedia map and the OutboxThreads block.
+
+The OutboxMedia map stores the medium & unit information for each address of
+each message in the outbox. This information is obtained by calling the
+DR_MBTD_GET_ADDRESS_MEDIUM function of the appropriate transport driver for
+each address as it is registered. It is stored in an element array with
+variable-sized elements, and the element number is then stored in the
+MailboxInternalTransAddr structure for the address. This allows us to very
+quickly determine whether two addresses are destined for the same medium, as
+we can just compare the medium element numbers for equality.
+
+The OutboxMedia map is also used to build the transports displayed by the
+outbox control panel. It does this by having a second element array, in
+addition to the one that stores the medium unit information, which stores
+pairs of MailboxMedium and MailboxTransport tokens. Whenever an address is
+registered, the medium unit is added to the medium unit array, and the
+transport + medium pair is added to the transport + medium array. It's the
+contents of the transport + medium array that determines what transports are
+listed in the system outbox control panel's popup list.
+
+The OutboxMedia map resides in the admin file.
+
+Transmission threads, on the other hand, are tracked by data in the
+OutboxThreads resource, which is not in the admin file. The resource is always
+locked with MemPLocked (some things which don't actually need access to the
+data but need the resource as a synchronization point simply use HandleP and
+HandleV on the handle). It contains a ChunkArray of OutboxThreadData elements,
+one for each transmission thread currently active.
+
+When told to transmit one or more messages to one or more of their addresses,
+the outbox will spawn a transmission thread for each unique transport+medium
+pair found among that assortment (naturally, if a thread is already active for
+that pair, the message & addresses will simply be queued for that thread).
+
+
+------------------------------------------------------------------------------
+
+				THE UI MODULE
+
+------------------------------------------------------------------------------
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+			THE MAILBOX APPLICATION OBJECT
+
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+
+The Mailbox application object serves a special role in this system, holding
+information of a non-permanent nature that it would be inappropriate to store
+in the admin file. It is also the nexus for all notification of the various
+objects that make up the Clavin UI.
+
+Its main responsibilities are:
+
+* Keep track of the MessageControlPanel objects up on screen
+	Things that wish to display messages matching a particular set
+	of criteria (in response to some event, like the loading of an
+	application, the arrival of a message, or the insertion of a
+	pcmcia card) send a request, along with the selection criteria, to
+	the app object.
+
+	If there's already a panel up using those criteria, or criteria that
+	displays a superset of the messages those criteria would display,
+	the request is dropped.
+
+	Any existing panels that display a subset of the messages the passed
+	criteria would display are taken down.
+
+	The point is to make sure that a message is displayed in only one
+	panel at a time.
+
+* Keep track of things that wish to be notified of file-system changes
+	The application object registers on the GCNSLT_FILE_SYSTEM_CHANGE
+	list and calls interested routines. It is also responsible for
+	breaking up any batch notifications.
+
+* Keep track of progress boxes for the outbox
+	We want to be able to bring all hidden progress boxes back on screen
+	if the user brings up the system outbox control panel (we think).
+
+* Provide the TravelOptions needed to send messages to various system panel
+  objects
+	Current TravelOptions allow delivery of a message to the system
+	inbox panel, the system outbox panel, the InboxApplicationList in the
+	system inbox panel, and the OutboxTransportList in the system outbox
+	panel. All of these are used to update the UI as messages get
+	added and removed.
+
+
+------------------------------------------------------------------------------
+
+			       THE UTILS MODULE
+
+------------------------------------------------------------------------------
+
+------------------------------------------------------------------------------
+
+			      THE VMSTORE MODULE
+
+------------------------------------------------------------------------------
+
+
+------------------------------------------------------------------------------
+
+			      OTHER STUFF...
+
+------------------------------------------------------------------------------
+
+Date: Thu, 30 Jun 94 17:57:51 PDT
+From: john@tungsten.seattle.geoworks.com (John C Wedgwood)
+Message-Id: <9407010057.AA05998@tungsten.seattle.geoworks.com>
+To: chungl@fusion.geoworks.com
+In-Reply-To: Chung Liu's message of Thu, 30 Jun 94 17:55:42 PDT
+Subject: question about DB blocks...
+Status: R
+
+
+Yikes, this is a problem. Personally I don't recommend that people
+allocate chunks in a DB item block (the problem is that the reference
+count is not stored with that block... bad design decision... sorry).
+
+I recommend doing DBAlloc calls to get additional chunks.
+
+If you have a work-around to this reference count problem, then go for
+it.
+
+-john
+
+   Date: Thu, 30 Jun 94 17:55:42 PDT
+   From: chungl@fusion.geoworks.com (Chung Liu)
+
+   Hi!  Don said you worked with the DB code, so I wanted to ask you this 
+   question:  When someone allocates a regular data chunk in a DB block, 
+   should the ref-count in DBItemBlockInfo be incremented?  The worry here is
+   the possibility that if all the DB Items are free'd, then the DB code would 
+   automatically free the block (even though other chunks are still in it.)
+
+   Currently the Mailbox Library does a bunch of LMemAllocs in DB blocks
+   to store extra data.
+
+   -Chung
+
+9/21/94: this is all ok, as the MailboxMessageDesc is never enlarged
+once it's been allocated, which means it will always be in the same
+item block. Since the allocated chunks are always freed before the MMD
+is freed, and since the MMD will never move to another item block,
+they can all happily exist in the item block without causing trouble
+to anyone. Having the things be individual DB items would necessitate
+much playing with segment registers and thus much unhappiness. -- ardeb

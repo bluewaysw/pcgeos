@@ -1,0 +1,1204 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1994 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		mboxInt.def
+
+AUTHOR:		Adam de Boor, Nov  7, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	11/ 7/94		Initial revision
+
+
+DESCRIPTION:
+	Definitions for the mailbox library that are not for general 
+	consumption
+		
+	$Id: mboxInt.def,v 1.1 97/04/04 14:13:28 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__MBOXINT
+
+StartLibrary	mailbox
+
+include Internal/prodFeatures.def
+
+MBSavedMessageData	struct
+    MBSMD_transport	MailboxTransport
+    MBSMD_transOption	MailboxTransportOption
+    MBSMD_transData	dword
+    MBSMD_numAddrs	word
+
+    ;
+    ; Array of addresses. For any far pointer, only the offset is valid.
+    ;
+    MBSMD_addrs		label	MailboxTransAddr
+MBSavedMessageData	ends
+
+
+global	MailboxGetRemainingMessages:far
+;	Desc:	Returns the number of messages remaining to be sent using
+;		the current connection. If called from DR_MBTD_TRANSMIT_
+;		MESSAGE, the count will include the message currently being
+;		transmitted.
+;
+;		NOTE: This routine may only be called from the PREPARE_FOR_-
+;		TRANSPORT, CONNECT, TRANSMIT_MESSAGE, or END_CONNECT functions
+;		of a transport driver. Any other use will generate a fatal
+;		error.
+;
+;	Pass:	nothing
+;	Return:	cx	= number of messages remaining
+;
+global	MAILBOXGETREMAININGMESSAGES:far
+	
+global	MailboxGetRemainingDestinations:far
+;	Desc:	Returns the number of destinations to which the passed message
+;		still needs to be sent. If called from DR_MBTD_TRANSMIT_MESSAGE,
+;		the count will include the destination currently being sent to.
+;
+;		NOTE: This routine may only be called from the PREPARE_FOR_-
+;		TRANSPORT, CONNECT, TRANSMIT_MESSAGE, or END_CONNECT functions
+;		of a transport driver. Any other use will generate a fatal
+;		error.
+;
+;	Pass:	dxax	= MailboxMessage
+;	Return:	cx	= number of destinations queued for transmission (i.e.
+;			  that will be sent to "soon", barring errors)
+;		ax	= total number of destinations yet to be sent to,
+;			  queued or not.
+;
+
+global	MAILBOXGETREMAININGDESTINATIONS:far
+
+global	MailboxGetCancelFlag:far
+;	Desc:	To be called *only* from a transport driver's DR_MBTD_TRANSMIT_
+;		MESSAGE, DR_MBTD_CONNECT, or DR_MBTD_PREPARE_FOR_TRANSPORT
+;		functions, this returns a far pointer to the thread-
+;		specific variable that tells whether the user has canceled the
+;		transmission. Transport drivers should check the flag as
+;		frequently as reasonable.
+;
+;		NOTE: just because the cancel flag has been set does *not* mean
+;		      the driver should sever the connection. It should simply
+;		      abort the transmission of the current message.
+;
+;	Pass:	nothing
+;	Return:	dx:ax	= far pointer to the (word-sized) cancel flag
+;
+
+global	MailboxSetCancelAction:far
+;	Desc:	To be called *only* from a transport driver's DR_MBTD_TRANSMIT_
+;		MESSAGE, DR_MBTD_CONNECT, or DR_MBTD_PREPARE_FOR_TRANSPORT
+;		functions, this specifies an object and message to be sent
+;		when the user indicates she wishes to stop the transmission.
+;		The thread's cancel flag will also be set.
+;
+;		Since transmit threads are not event-driven, the OD passed
+;		will most likely be for a disembodied event queue allocated
+;		with GeodeAllocQueue.
+;
+;		NOTE: just because the cancel message is received does *not*
+;		      mean the driver should sever the connection. It should
+;		      simply abort the transmission of the current message.
+;
+;	Pass:	^lbx:si	= OD to which to send the message
+;		ax	= the message to send:
+;			  Pass:
+;				cx	= MailboxCancelAction
+;			  Return:
+;				nothing
+;				ax, cx, dx, bp - destroyed
+;	Return:	nothing
+;
+
+;if	MAILBOX_PERSISTENT_PROGRESS_BOXES
+MailboxProgressType	etype	word, 0, 2
+    MPT_STRING		enum	MailboxProgressType
+    ; Produces the passed string, word-wrapped as necessary
+
+    MPT_PERCENTAGE	enum	MailboxProgressType
+    ; Produces a progress bar with the percentage drawn in the middle
+    ; in a cute fashion
+    
+    MPT_PAGES		enum	MailboxProgressType
+    ; Produces "Page n of m" or "Page n", depending on whether you give the
+    ; total number of pages
+    
+    MPT_GRAPHIC		enum	MailboxProgressType
+    ; Produces the passed moniker, centered in the progress box
+    
+    MPT_BYTES		enum	MailboxProgressType
+    ; Produces "n bytes", centered in the progress box
+;endif	; MAILBOX_PERSISTENT_PROGRESS_BOXES
+
+if	MAILBOX_PERSISTENT_PROGRESS_BOXES
+MailboxProgressAction	record
+    :13
+    MPA_REPLACE:1
+    ; If set, wipes out all previous progress info, yielding a display of
+    ; only the indicated data.
+    ;
+    ; If clear, the new info is placed below the previous info.
+    ;
+    
+    MPA_UPDATE_MODE VisUpdateMode:2
+    ; How the object's geometry and image should be updated
+MailboxProgressAction	end
+endif	; MAILBOX_PERSISTENT_PROGRESS_BOXES
+
+global	MailboxReportProgress:far
+if	MAILBOX_PERSISTENT_PROGRESS_BOXES
+
+;	Desc:	To be called *only* from a transport driver's DR_MBTD_TRANSMIT_
+;		MESSAGE, DR_MBTD_CONNECT, or DR_MBTD_PREPARE_FOR_TRANSPORT
+;		functions, this updates the progress box for a particular
+;		connection.
+;
+;	Pass:	ax	= MailboxProgressType
+;			  MPT_PERCENTAGE:
+;				cx	= percent complete
+;			  MPT_PAGES:
+;				cx	= current page
+;				dx	= total pages (0 to not give total)
+;			  MPT_STRING:
+;			  	^lcx:dx	= optr of string or
+;				^hcx:dx = string (cx is a non-lmem block)
+;			  MPT_GRAPHIC:
+;			  	^lcx:dx	= optr of moniker to use (may be moniker
+;					  list)
+;			  MPT_BYTES:
+;			  	cxdx	= number of bytes
+;		bp	= MailboxProgressAction
+;	Return:	nothing
+;
+
+global MAILBOXREPORTPROGRESS:far
+
+endif	; MAILBOX_PERSISTENT_PROGRESS_BOXES
+
+global	MailboxRegisterReceiptThread:far
+;	Desc:	Lets the mailbox library know something is receiving messages
+;		and provides it a progress box to put on-screen. The
+;		progress box must be a subclass of MailboxProgressBoxClass,
+;		and the cancel flag must be in memory that will not move
+;		until MailboxUnregisterReceiptThread is called.
+;
+;		The progress box should be in a template resource. It will
+;		be duplicated and run by the Mailbox library's process thread.
+;		It will be destroyed when you call MailboxUnregisterReceipt-
+;		Thread
+;
+;		If you call this from your DR_MBTD_RETRIEVE_MESSAGES function,
+;		in order to put up a progress box, you should not call
+;		MailboxUnregisterReceiptThread. The Mailbox library will handle
+;		that automatically when you return to it.
+;
+;	Pass:	^lbx:si	= MailboxProgressBox object in its template resource
+;			  bx = 0 if just specifying the cancel flag to be used
+;			  to detect system shutdown
+;		cx:dx	= address of MailboxCancelAction flag for the
+;			  progress box to set.
+;		ss:bp	= additional data to pass in MSG_MPB_SETUP
+;		ax	= number of bytes of additional data
+;	Return:	^lbx:si	= duplicated progress box
+;
+
+global	MailboxUnregisterReceiptThread:far
+;	Desc:	The current thread is about to finish receiving messages. The
+;		progress box that was created should be destroyed.
+;
+;		If the thread is going to do something else before destroying
+;		itself, it should send MSG_META_ACK to the returned OD, so
+;		long as the OD is non-zero.
+;
+;	Pass:	nothing
+;	Return:	cx	= ackID to pass to ThreadDestroy
+;		dx:bp	= ackOD to pass to ThreadDestroy
+;
+
+global MAILBOXGETCANCELFLAG:far
+
+
+;------------------------------------------------------------------------------
+;
+;		      MailboxAddressControlClass
+;
+;------------------------------------------------------------------------------
+MailboxAddressControlClass class GenControlClass
+;
+; Messages sent out:
+; 	none
+;
+; GenApplication GCN lists to be placed on:
+; 	none
+;
+; Notification types responded to:
+; 	none
+;
+; Notes:
+; 	Objects subclassed from this are *always* instantiated and destroyed
+; 	on the fly, so subclasses need to be sure to properly initialize any
+;	non-zero instance data on MSG_META_INITIALIZE.
+;
+;	MailboxAddressControl will take care of notifying the Mailbox library
+;	(during MSG_META_FINAL_OBJ_FREE) when the controller has been destroyed
+;	(thereby removing a reference from the transport driver that provided
+;	the subclass). Because the transport driver may be unloaded during
+;	the MailboxAddressControl::MSG_META_FINAL_OBJ_FREE method, anyone
+;	subclassing the method must ensure that when the MailboxAddressControl
+;	method returns, it does not have to return to code in the subclass,
+;	lest that code no longer be there.
+;
+
+MSG_MAILBOX_ADDRESS_CONTROL_SET_MEDIUM	message	
+; Informs the subclass of the type of medium selected by the user, so it can
+; customize its appearance appropriately, should the controller handle media
+; that have different ways of addressing.
+;
+; Context:	Sent by MailboxSendControl immediately after instantiating the
+;		the controller
+; Source:	MailboxSendControl
+; Destination:  MailboxAddressControl *subclass*
+; Interception: If the subclass wishes to do anything special based on the
+;		selected medium, it will have to do all the work itself. The
+;		method defined by MailboxAddressControlClass simply returns.
+;
+; Pass:
+; 		ss:bp	= MACSetMediumArgs
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MACSetMediumArgs	struct
+    MACSMA_medium	MediumType
+    MACSMA_transOption	MailboxTransportOption
+    MACSMA_changed	word		; TRUE if medium/transOpt different
+					; from last time SET_MEDIUM was called
+					; or if this is the first call for this
+					; instance. FALSE if same as last call
+MACSetMediumArgs	ends
+
+
+MSG_MAILBOX_ADDRESS_CONTROL_GET_ADDRESSES	message	
+; Build the block of data that holds the addresses selected by the user to
+; pass to the transport driver.
+;
+; Context:	Called by the MailboxSendControl just before registering a
+;		message.
+; Source:	MailboxSendControl
+; Destination:  MailboxAddressControl *subclass*
+; Interception:	The method at MailboxAddressControlClass will create a
+;		duplicate of the array stored in MACI_defaultAddrs, or if it's
+;		null, create an array with a single address whose opaque data
+;		is a single 0 byte, and whose user-readable form is "Someone
+;		Else" or some similar innocuous string.
+;
+;		If the subclass is able to actually provide addresses, it
+;		shouldn't call its superclass. If the subclass exists only
+;		to provide transData, or create the message, or tweak the
+;		registration parameters, it can simply avoid subclassing this
+;		message and still end up with a single address for the
+;		message.
+;
+; Pass:
+;		cxdx	= 32-bit value returned by MSG_MAILBOX_ADDRESS_-
+;			  CONTROL_GET_TRANS_DATA
+; Return:
+;		if ok:
+;			*ds:ax	= ChunkArray of MBACAddress structures (i.e.
+;				  array should be allocated in the controller's
+;				  own object block, with the chunk handle
+;				  returned in ax)
+;		else
+;			ax	= 0
+;			(subclass is expected to have cleaned up the transData,
+;			if any cleanup is necessary)
+;		cx, dx, bp - destroyed
+;
+
+MBACAddress	struct
+    MBACA_opaqueSize	word		; number of bytes of this element that
+					;  are the opaque address. Immediately
+					;  following the opaque address comes
+					;  the null-terminated user-readable
+					;  form of the address.
+    MBACA_opaque	label byte	; start of the opaque data the driver
+					;  understands.
+MBACAddress	ends
+
+MSG_MAILBOX_ADDRESS_CONTROL_SET_ADDRESSES	message
+; Sets the addresses for the message, wiping out any other addresses the
+; controller might have on record for the message.
+;
+; Context:	The send control is preparing a dialog to send a message to
+;		these addresses.
+; Source:	MailboxSendDialogClass object
+; Destination:	MailboxAddressControlClass object in the dialog
+; Interception:	Subclass who handles addresses by themselves does not have to
+;		call superclass.  Default method makes a copy of the array
+;		and stores it in MACI_defaultAddrs, which is to be returned
+;		by the default method of
+;		MSG_MAILBOX_ADDRESS_CONTROL_GET_ADDRESSES.
+;
+; Pass:
+;		^lcx:dx	= chunk array of MBACAddress structures
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MAILBOX_ADDRESS_CONTROL_GET_TRANS_DATA	message
+; Fetch the transport-driver-opaque 32-bits of data for the transaction, based
+; on what the user has selected.
+;
+; Context:	Called by the MailboxSendControl in the course of its
+;		MSG_MAILBOX_SEND_CONTROL_CREATE_TRANSACTION method.
+; Source:	MailboxSendControl
+; Destination:  subclass of MailboxAddressControl
+; Interception: default method will simply return 0_0, so no need to call the
+;		superclass if you actually return something meaningful in your
+;		subclass
+;
+; Pass:
+;		nothing
+; Return:
+;		dxax	= 32-bit value to store in MRA_transData when
+;			  registering the message.
+;		cx, bp - destroyed
+;
+
+MSG_MAILBOX_ADDRESS_CONTROL_MESSAGE_CANCELED	message
+; Take note that the message for which transport-driver-opaque data was fetched
+; has been canceled, and do something appropriate to clean up the mess.
+;
+; Context:	Called by the MailboxSendControl when handling a
+;		MSG_MAILBOX_SEND_CONTROL_CANCEL_MESSAGE.
+; Source:	MailboxSendControl
+; Destination:	subclass of MailboxAddressControl
+; Interception:	there is no default method for this message. If you allocate
+;		any resource in MSG_MAILBOX_ADDRESS_CONTROL_GET_TRANS_DATA,
+;		you must free it here.
+;
+; Pass:
+; 		cxdx	= 32-bit value returned by MSG_MAILBOX_ADDRESS_-
+;			  CONTROL_GET_TRANS_DATA
+;		bp	= transaction chunk
+; Return:
+; 		nothing
+; 		ax, cx, dx, bp - destroyed
+; 
+
+MSG_MAILBOX_ADDRESS_CONTROL_TWEAK_PARAMS	message
+; Gives the transport driver a chance to manipulate the parameters under which
+; the message will be registered. The intent is to allow transports to adjust
+; such things as the start & end bounds, if they choose to provide a means for
+; the user to set them.
+;
+; This is the final message the controller will receive for this message.
+; If it has anything it needs to clean up, it should do so before returning.
+; Of course, anything needed for the actual transmission should be saved until
+; DR_MBTD_DELETE is called.
+;
+; Context:	Like MSG_MAILBOX_SEND_CONTROL_TWEAK_PARAMS, this is called on
+;		the address control immediately before the MailboxSendControl
+;		calls MailboxRegisterMessage (and after the controller has
+;		called its TWEAK_PARAMS method on itself).
+; Source:	MailboxSendControl
+; Destination:	subclass of MailboxAddressControl
+; Interception:	there is no default method for this message.
+;
+; Pass:
+; 		cx:dx	= MailboxRegisterMessageArgs, fully initialized and
+;			  tweaked by the MSC. NOTE: the data pointed to
+;			  by the MailboxTransAddr structures reside in the
+;			  same block as the address control itself. As such,
+;			  the pointers are not to be trusted if your method
+;			  performs any actions that would cause the chunks
+;			  in the block to move around. The pointers are valid
+;			  at the time the call is made, however.
+; Return:
+; 		nothing
+; 		ax, cx, dx, bp - destroyed
+;
+
+MSG_MAILBOX_ADDRESS_CONTROL_ADD_REF	message	
+; Adds another reason to live to this object.
+;
+; Context:	Called before information on the current addresses, etc., is
+;		gathered to make sure the object will stay around until the
+;		message is registered or canceled.
+; Source:	MailboxSendControl's dialog box
+; Destination:  MailboxAddressControl
+; Interception: don't
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		ax, cx, dx, bp - unchanged
+;
+
+MSG_MAILBOX_ADDRESS_CONTROL_DEL_REF	message	
+; Remove a reason to live from this object. If the reference count drops to 0,
+; MSG_META_OBJ_FREE will be called on the object
+;
+; Context:	Called once a transaction is complete, either due to cancelation
+;		or registration.
+; Source:	MailboxSendControl's dialog box
+; Destination:  MailboxAddressControl
+; Interception: don't
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		ax, cx, dx, bp - unchanged
+;
+
+MSG_MAILBOX_ADDRESS_CONTROL_SET_VALID_STATE	message	
+; Let the containing dialog know whether the address we've got is a valid one,
+; so it can decide whether to allow the user to send the message.
+;
+; Context:	Called by subclass when the validity of the address changes
+; Source:	MailboxAddressControl subclass
+; Destination:  MailboxAddressControl
+; Interception: don't
+;
+; Pass:
+;		cx	= FALSE if address not valid
+;			= TRUE if address is valid
+; Return:
+;		nothing
+;		dx, bp - unchanged
+;		ax, cx - destroyed
+;
+
+MSG_MAILBOX_ADDRESS_CONTROL_CREATE_MESSAGE	message	
+; Allows the MailboxAddressControl subclass to arrange for some other means,
+; than the usual notification of the MSC's output, for creating the message
+; the user wants sent.
+;
+; Context:	Called by MailboxSendControl after the transaction has been
+;		created but before MSG_META_MAILBOX_CREATE_MESSAGE is sent
+; Source:	MailboxSendControl
+; Destination:  MailboxAddressControl subclass
+; Interception: must be subclassed to do anything. Default method simply
+;		returns with carry clear
+;
+; Pass:
+;		cx	= MailboxObjectType selected
+;		*dx:bp	= MSCTransaction
+; Return:
+;		carry set if message will be created by transport driver
+;			ax	= TRUE if controller is non-reentrant, so
+;				  MSC should deny further requests to bring
+;				  up the create dialog for this transport
+;				  until the transaction is complete
+;				= FALSE if controller can be reused immediately
+;		carry clear if MSC should send notification to its output
+;			ax	= destroyed
+;		cx, bp - unchanged
+;		dx - destroyed
+;
+
+MSG_MAILBOX_ADDRESS_CONTROL_GET_TRANSMIT_MONIKER	message	
+; Fetch the moniker to use in the "Send" trigger of the create-message dialog
+;
+; Context:	Called by MailboxSendDialog after MSG_MAILBOX_ADDRESS_CONTROL_-
+;		SET_MEDIUM
+; Source:	MailboxSendDialog (not an exported class)
+; Destination:  MailboxAddressControl
+; Interception: if subclassed, there is no need to call the superclass. Default
+;		method returns a generic moniker like "Send" or something
+;
+; Pass:
+;		nothing
+; Return:
+;		^lcx:dx	= optr of VisMoniker to use
+;		bp - unchanged
+;		ax - destroyed
+;
+
+MSG_MAILBOX_ADDRESS_CONTROL_SET_VALID_ACTION	message	
+; Sets the action the object should take when it receives MSG_MAILBOX_ADDRESS_-
+; CONTROL_SET_VALID_STATE
+;
+; Context:	Called after object is instantiated to set where the
+;		notification from the subclass should be sent.
+; Source:	anyone
+; Destination:  MailboxAddressControl
+; Interception: no point
+;
+; Pass:
+;		^lcx:dx	= notification OD
+;		bp	= notification message
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MAILBOX_ADDRESS_CONTROL_SET_TRANSPORT_DRIVER	message	
+; Record the handle of the driver for which this address control is operating,
+; to allow address controls to be someplace other than within the transport
+; driver itself, for whatever reason.
+;
+; Context:	Called by MailboxSendDialog immediately after the controller
+;		is instantiated.
+; Source:	MailboxSendDialog
+; Destination:  MailboxAddressControl
+; Interception: no point
+;
+; Pass:
+;		cx	= driver handle
+; Return:
+;		nothing
+;		cx, dx, bp - unchanged
+;		ax - destroyed
+;
+
+MSG_MAILBOX_ADDRESS_CONTROL_PROCESS_TRANSPORT_HINT	message	
+; Process the block of data stored under a HINT_MAILBOX_SEND_CONTROL_TRANSPORT_-
+; DATA on the MailboxSendControl. The data in the body of the hint are
+; completely under the address control's interpretation.
+;
+; Context:	Called by MailboxSendControl when the transport has been
+;		selected before the address control is set usable.
+; Source:	MailboxSendControl
+; Destination:  MailboxAddressControl subclass
+; Interception: must be intercepted to be useful. Warning will result if
+;		control reaches MailboxAddressControl, as it implies that
+;		the programmer has specified data for a transport that
+;		doesn't know what to do with them.
+;
+; Pass:
+;		cx:dx	= pointer to data following the MailboxTransport token
+;			  stored at the start of the hint.
+;		bp	= handle of block holding the hint, in case it contains
+;			  things that need to be relocated with ObjDoRelocation
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MAILBOX_ADDRESS_CONTROL_MESSAGE_REGISTERED	message	
+; Note that a message has been successfully registered.
+;
+; Context:	Called once MailboxRegisterMessage has been successfully called,
+;		to allow the address control to clean up after itself, if
+;		it needs to.
+; Source:	MailboxSendDialogClass
+; Destination:  subclass of MailboxAddressControl
+; Interception: MailboxAddressControl method does nothing
+;
+; Pass:
+;		cxdx	= transData
+;		bp	= transaction chunk
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MAILBOX_ADDRESS_CONTROL_VALIDATE_ADDRESSES	message	
+; Check the current set of addresses and see if they are hunky-dory
+;
+; Context:	Called by MailboxSendDialog before calling GET_TRANS_DATA.
+;		The creation dialog remains on-screen
+; Source:	MailboxSendDialog
+; Destination:  MailboxAddressControl subclass
+; Interception: MailboxAddressControl returns carry clear. No point in calling
+;		your superclass
+;
+; Pass:
+;		nothing
+; Return:
+;		carry set if addresses not valid
+;			- this will prevent the dialog box from coming down.
+;			- address control should tell the user what is wrong
+;		carry clear if addresses are ok
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MAILBOX_ADDRESS_CONTROL_BODY_AVAILABLE	message	
+; Take note that the body for the message is now available. This is normally
+; only of interest to transport drivers that set MBTC_NEED_MESSAGE_BODY
+;
+; Context:	Called when MSG_MAILBOX_SEND_CONTROL_REGISTER_MESSAGE
+;		has been called by whoever created the message body.
+; Source:	MailboxSendControl
+; Destination:  MailboxAddressControl subclass
+; Interception: must be subclassed to do anything
+;
+; Pass:
+;		*dx:bp	= MSCTransaction for which body is available.
+;			  MSCT_bodyFormat, MSCT_bodyStorage, and MSCT_bodyRef
+;			  are all filled in (*(dx:bp->MSCT_bodyRef) is the data
+;			  for the body reference)
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MAILBOX_ADDRESS_CONTROL_GET_FEEDBACK_STRING	message	
+; Fetch the string to use in the feedback box, if such there be. Usually the
+; box will say "Starting to send <feedback_string>..." accompanied by a
+; glyph (which you can override by subclassing MSG_MAILBOX_ADDRESS_CONTROL_GET_-
+; FEEDBACK_GLYPH).
+;
+; Context:	Called by the MailboxSendControl or its agent after the user
+;		has activated the Send trigger, so it can confirm to the
+;		user that it's working on it.
+; Source:	MailboxSendControl
+; Destination:  MailboxAddressControl subclass
+; Interception: must be subclassed to do anything. Superclass will just return
+;		cx = dx = 0, which is the caller's indication that it should
+;		use the driver's transport string (downcased).
+;
+; Pass:
+;		nothing
+; Return:
+;		^lcx:dx	= optr of text string (both 0 => use driver's transport
+;			  string as it appears in the transport menu)
+;		bp - unchanged
+;		ax - destroyed
+;
+
+MSG_MAILBOX_ADDRESS_CONTROL_GET_FEEDBACK_GLYPH	message	
+; Fetch the glyph (moniker list) to use in the feedback box, if such there be.
+;
+; Context:	Called by the MailboxSendControl or its agent after the user
+;		has activated the Send trigger, so it can confirm to the user
+;		that it's working on it.
+; Source:	MailboxSendControl
+; Destination:  MailboxAddressControl subclass
+; Interception: must be subclassed to do anything. Superclass will just return
+;		cx = dx = 0, which is the caller's indication that it should
+;		use the default glyph
+;
+; Pass:
+;		nothing
+; Return:
+;		^lcx:dx	= optr of moniker or moniker list (both 0 => use
+;			  default moniker).
+;		bp - unchanged
+;		ax - destroyed
+;
+
+MSG_MAILBOX_ADDRESS_CONTROL_CREATE_FEEDBACK	message
+; Asks the address control to create the feedback box.
+;
+; Context:	Called by the MailboxSendDialog after the user has activated
+;		the Send trigger, to create the feedback box.
+; Source:	MailboxSendDialog
+; Destination:	MailboxAddressControl
+; Interception:	Default handler creates a spinning-globe feedback box.
+;		Subclass can intercept this message to create custom feedback
+;		box or to avoid creating one.  Do NOT call superclass.
+;
+; Pass:
+;		^ldx:bp	= MSCTransaction to fill in
+; Return:
+;		(^ldx:bp).MSCT_feedback set to duplicated block, or
+;			MSCT_feedback.handle = 0 if no feedback box is desired.
+;		cx - unchanged
+;		ax - destroyed
+;
+
+    MACI_refCount	word	1
+    ; Number of references to this controller, 1 for the send dialog box
+    ; itself, if this controller is the current one, and 1 for each incomplete
+    ; transaction.
+    
+    MACI_validDest	optr	0
+    MACI_validMsg	word	0
+    ; Message to send to MACI_validDest when MSG_MAILBOX_ADDRESS_CONTROL_SET_-
+    ; VALID_STATE is received.
+    ;
+    ; Pass:
+    ; 		cx	= FALSE if address not valid
+    ;			= TRUE if address is valid
+    ;		^ldx:bp	= address control sending the message
+    ; Return:
+    ; 		nothing
+    ; 		ax, cx, dx, bp - destroyed
+    ; 
+
+    MACI_driver		hptr	0
+    ; Handle of the transport driver that returned this instance's class
+
+    MACI_defaultAddrs	lptr.ChunkArrayHeader	0
+    ; Array of MBACAddress structures.  Default addresses to return when
+    ; MSG_MAILBOX_ADDRESS_CONTROL_GET_ADDRESSES reaches this class.
+    ; If null, a single address containing a single 0 byte and whose
+    ; user-readable form is "Someone Else" or something similar is
+    ; returned to that message.  MACI_defaultAddrs is set when
+    ; MSG_MAILBOX_ADDRESS_CONTROL_SET_ADDRESSES even reaches this class.
+    ; Subclasses can ignore this instance data if they handle addresses
+    ; themselves.
+
+MailboxAddressControlClass endc
+
+;------------------------------------------------------------------------------
+;
+;			 MailboxSpoolAddressControl
+;
+; An object class that works together with the PrintControl to create messages
+; made up of a stream-based graphics string created using the standard GEOS
+; printing messages.
+;
+; Transport drivers that use this class must set MBTC_REQUIRES_TRANSPORT_HINT,
+; as it cannot perform its function without being told where the application's
+; PrintControl object is.
+;
+; Such transport drivers should also provide a macro to define the body of
+; the ATTR_MAILBOX_SEND_CONTROL_TRANSPORT_HINT, whose first dword should be
+; the unrelocated optr of the application's PrintControl. See
+; Mailbox/spooltd.def for more info.
+;
+
+MailboxSpoolAddressControlClass class MailboxAddressControlClass
+
+MSG_MSAC_PRINTING_COMPLETE	message	
+; Note that a PrintControl we created has been told that printing is complete.
+;
+; Context:	Called by PrintControl in place of SpoolAddJob
+; Source:	PrintControlClass
+; Destination:  SpoolAddressControlClass
+; Interception: not bloody likely
+;
+; Pass:
+;		^hcx	= JobParameters block (will be freed by SAC)
+;		^ldx:bp	= PrintControl sending the message
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MSAC_PRINTING_CANCELED	message	
+; Note that the user or application canceled the print job after we told the
+; PrintControl to start printing.
+;
+; Context:	Called by PrintControl when it's told the job has been canceled,
+;		either because the UI won't work, or the doc won't fit on the
+;		page and the user doesn't want to print, or whatever.
+; Source:	PrintControlClass
+; Destination:  SpoolAddressControlClass
+; Interception: not bloody likely
+;
+; Pass:
+;		^ldx:bp	= PrintControl sending the message
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MSAC_GET_PAGE_RANGE	message	
+; Find the page range the user selected.
+;
+; Context:	Called by PrintControl when it receives MSG_PRINT_CONTROL_-
+;		GET_SELECTED_PAGE_RANGE and it's operating as an address
+;		control.
+; Source:	PrintControlClass
+; Destination:  SpoolAddressControl
+; Interception: not
+;
+; Pass:
+;		nothing
+; Return:
+;		cx	= first page
+;		dx	= last page
+;		ax, bp - destroyed
+;
+
+MSG_MSAC_GET_OBJECT_TYPE	message	
+; Fetch the MailboxObjectType for the current transaction to be returned by
+; the PrintControl object
+;
+; Context:	Called by PrintControl when it receives MSG_PRINT_GET_MAILBOX_-
+;		OBJECT_TYPE
+; Source:	PrintControlClass
+; Destination:  SpoolAddressControlClass
+; Interception: not
+;
+; Pass:
+;		nothing
+; Return:
+;		ax	= MailboxObjectType
+;		cx, dx, bp - unchanged
+;
+
+MSG_MSAC_ADJUST_ADDRESS	message	
+; Adjust the address for a transaction based on the JobParameters contents
+;
+; Context:	Called by MSG_MSAC_PRINTING_COMPLETE to make the necessary
+;		adjustments.
+; Source:	SpoolAddressClass
+; Destination:  SpoolAddressClass or subclass
+; Interception: the default method will change the first address in the
+;		array stored with the transaction to contain the JobParameters
+;		block, preceded by the printer name in a 64-character field.
+;		The user-readable address will be the printer name.
+;
+;		If this isn't what you want, don't call the superclass.
+;
+; Pass:
+;		^hcx	= JobParameters block with JP_fname adjusted to
+;			  contain renamed (to avoid deletion on spooler
+;			  startup) spool file name
+; Return:
+;		cx, bp - unchanged
+;		ax, dx - destroyed
+;
+
+MSG_MSAC_GET_DRIVER_TYPE	message	
+; Ask the subclass what sort of printer driver it wants the PrintControl to
+; display printers for.
+;
+; Context:	Called before the TEMP_PRINT_CONTROL_ADDRESS_CONTROL attribute
+;		is added to the PrintControl object
+; Source:	MailboxSpoolAddressControlClass
+; Destination:  self or subclass
+; Interception: Default method returns PDT_PRINTER and does nothing else.
+;		Intercept if you are dealing with some other type of driver.
+;
+; Pass:
+;		nothing
+; Return:
+;		al	= PrinterDriverType to use
+;		cx, dx, bp - unchanged
+;		ah - destroyed
+;
+
+MSG_MSAC_MODIFY_PRINT_CONTROL_ATTRS	message
+; Ask the subclass how to configure the PrintControl via changing the
+; PrintControlAttrs.
+;
+; Context:	Called from within method for GEN_CONTROL_GENERATE_UI
+; Source:	MailboxSpoolAddressControlClass
+; Destination	self or subclass
+; Interception:	Default method masks out (turns off) PCA_PAGE_CONTROLS.
+;		Intercept this and turn on/off other flags if needed, and
+;		do *not* call the superclass. Try to modify as few flags
+;		as possible, so as to not override app writer's decisions.
+;
+; Pass:
+;		cx	= PrintControlAttrs currently set
+; Return:
+;		cx	= PrintControlAttrs to set
+;		ax, dx, bp - unchanged
+
+
+
+MSG_MSAC_GET_EXTRA_TOP_SPACE		message
+; Fetch the amount of space the application should leave at the top of the
+; first page for the transport driver to use.
+;
+; Context:	Called from the PrintControl's MSG_PRINT_GET_FIRST_PAGE_OFFSET
+;		method.
+; Source:	PrintControlClass
+; Destination:	subclass
+; Interception:	The default method returns 0, indicating no extra space is
+;		needed. However, your best plan is to call your superclass
+;		and then add the space you need to the value your superclass
+;		returned in DX.
+; Pass:
+;		nothing
+; Return: 	dx 	= points of space needed at the top.
+;		ax, cx, bp - unchanged
+;
+;
+
+
+MSG_MSAC_ATTACH_PRINT_CONTROL	message	
+; Attach the associated print control below the address control.
+;
+; Context:	Called from MailboxSpoolAddressControl's GENERATE_UI method
+;		in preparation for the address control being set usable
+; Source:	MailboxSpoolAddressControl
+; Destination:  self
+; Interception: may be intercepted and ignored (or passed on later) if the
+;		subclass has not yet defined a printer, but it will soon.
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		bp - unchanged
+;		ax, cx, dx - destroyed
+;
+
+
+
+;
+; Data to store with the ATTR_MAILBOX_SEND_CONTROL_TRANSPORT_HINT after the
+; MailboxTransportAndOption to tell us where the PrintControl object is.
+;
+MailboxSpoolTransportHint	struct
+    MSTH_pc		optr		?
+MailboxSpoolTransportHint	ends
+
+    ;
+    ; Data from the MSC's hint to set in the PrintControl, when we create it
+    ; 
+    MSACI_pc		optr
+
+    ;
+    ; Original PrintControlAttrs set for PrintControl object
+    ;
+    MSACI_pcAttrs	word
+
+    ;
+    ; Pending transaction for which we're awaiting notification from the
+    ; PrintControl.
+    ;
+    MSACI_trans		word
+
+MailboxSpoolAddressControlClass endc
+
+MailboxCancelAction	etype	word, 0, 1
+    MCA_CANCEL_NONE	enum 	MailboxCancelAction
+    ; User didn't cancel anything.
+
+    MCA_CANCEL_MESSAGE	enum	MailboxCancelAction
+    ; Stop processing the current message
+
+    MCA_CANCEL_CONNECT	enum	MailboxCancelAction
+    ; Shutdown the current connection, but the thread doesn't need to exit
+    ; yet.
+    
+    MCA_CANCEL_ALL	enum	MailboxCancelAction
+    ; Shutdown the current connection and get the heck out.
+
+;------------------------------------------------------------------------------
+;
+;		       MailboxProgressBoxClass
+;
+; NOTE: If you modify this class definition, make sure you modify the dummy
+; definition in Library/Mailbox/mailboxUI.def (as of 4/14/95) as well.
+;
+
+if	MAILBOX_PERSISTENT_PROGRESS_BOXES
+MailboxProgressBoxClass	class	GenInteractionClass
+
+MSG_MPB_SETUP		message
+; Sets the transport & medium for which progress is being given. This causes 
+; the box to attach itself to the mailbox application and set itself usable, 
+; then come up on screen.
+;
+; Context:	Sent from the transmit thread when the box is first created.
+;
+; Pass:
+; 		ss:bp	= MPBSetupArgs
+; Return:
+; 		nothing
+; 		ax, cx, dx - destroyed
+; 
+
+MPBSetupArgs	struct
+    MPBSA_thread	hptr
+    MPBSA_gen		word		; generation number, for ensuring we
+					;  have the proper thread data.
+    MPBSA_showProgress	byte		; non-zero if should display continuous
+					;  progress
+		even
+MPBSetupArgs	ends
+
+MSG_MPB_GET_MONIKER_STRING	message	
+; Fetches a string to store in place of \1 in the object's current moniker.
+; If there's no string returned, no moniker mangling takes place.
+;
+; Context:	Called from the MSG_MPB_SETUP method in MailboxProgressBoxClass
+; Destination:  subclass
+; Interception: No need to call superclass. MailboxProgressBox will return 0
+;		indicating no mangling should take place.
+;
+; Pass:
+;		ss:bp	= MPBSetupArgs
+; Return:
+;		*ds:ax	= string to use in template. ax = 0 means don't
+;			  mess with the moniker.
+;		cx, dx, bp - destroyed
+;
+
+MSG_MPB_SET_PROGRESS	message	
+; Sets the progress for the current message
+;
+; Context:	Sent by MailboxReportProgress once it has found the progress
+;		box for the thread.
+;
+; Pass:
+;		ss:bp	= MPBSetProgressArgs
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MPBSetProgressArgs	struct
+    MPBSPA_type		MailboxProgressType	?
+    MPBSPA_dx		word			?
+    MPBSPA_cx		word			?
+    MPBSPA_action	MailboxProgressAction	<>
+MPBSetProgressArgs	ends
+
+MSG_MPB_HIDE_THYSELF		message
+; Sent from progress gadgetry to tell the progress box to take itself off-screen
+; until it is called for again.
+;
+; Context:	Sent when the user clicks the Hide trigger inside the box
+;
+; Pass:
+; 		nothing
+; Return:
+; 		nothing
+; 		ax, cx, dx, bp - destroyed
+; 
+
+    MPBI_progressGauge	lptr		?
+    ; The MailboxProgressGauge object for this box
+
+MSG_MPB_DETACH_THREAD	message	
+; Tell the thread to cancel its current message without asking the
+; user anything, canceling its batch, etc., and requesting that it send
+; a MSG_META_ACK to the MailboxApplication object once the thread is gone.
+;
+; Context:	Called by MailboxApplication when it receives MSG_META_DETACH.
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+    MPBI_thread		hptr			0
+		noreloc	MPBI_thread
+    MPBI_gen		word			0
+
+MPBType		etype	word, 0
+    MPBT_INBOX	enum 	MPBType
+    MPBT_OUTBOX	enum	MPBType
+    
+    MPBI_type		MPBType		MPBT_INBOX
+
+MailboxProgressBoxClass	endc
+endif
+
+;------------------------------------------------------------------------------
+;
+;		      MailboxProgressGaugeClass
+;
+; The progress gauge functions by instantiating other objects to display the
+; various types of progress. The order in which we're told to report the
+; progress determines the order in which they appear.
+;
+; Strings are given to a GenText object to be displayed, word-wrapped, etc.
+;
+; Percentages are given to a custom gadget that draws a horizontal bar
+; graph with cool clipping effects, etc.
+;
+; Pages are given to a subclass of GenText, which converts the numbers into
+; an appropriate string and gives that to its superclass to display.
+;
+; NOTE: If you modify this class definition, make sure you modify the dummy
+; definition in Library/Mailbox/mailboxUI.def (as of 4/14/95) as well.
+;
+if	MAILBOX_PERSISTENT_PROGRESS_BOXES
+MailboxProgressGaugeClass	class	GenInteractionClass
+
+MSG_MPG_RESET	message	
+; Reset the display to be empty.
+;
+; Context:	May be called by a MailboxProgressBox object at the start of
+;		a new operation.
+; Source:	MailboxProgressBoxClass or subclass
+; Destination:  MailboxProgressGaugeClass
+; Interception: Superclass can be called at any point in subclass's method.
+;		Visual update will be delayed a queue.
+;
+; Pass:
+;		cx	= FALSE to keep the same progress indicators
+;			= TRUE to destroy existing progress indicators
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MPG_SET_PROGRESS	message	
+; Adjusts the progress being displayed
+;
+; Context:	Sent by MailboxProgressBox when it receives MSG_MPB_SET_PROGRESS
+;
+; Pass:
+;		ss:bp	= MPBSetProgressArgs
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+    MPGI_text		lptr
+    MPGI_percent	lptr
+    MPGI_pages		lptr
+    MPGI_graphic	lptr
+    MPGI_bytes		lptr
+
+    .assert (MPGI_text - MPGI_text) eq MPT_STRING
+    .assert (MPGI_percent - MPGI_text) eq MPT_PERCENTAGE
+    .assert (MPGI_pages - MPGI_text) eq MPT_PAGES
+    .assert (MPGI_graphic - MPGI_text) eq MPT_GRAPHIC
+    .assert (MPGI_bytes - MPGI_text) eq MPT_BYTES
+
+MailboxProgressGaugeClass	endc
+endif	; MAILBOX_PERSISTENT_PROGRESS_BOXES
+
+
+;
+;			MailboxPagesClass
+;
+; NOTE: If you modify this class definition, make sure you modify the dummy
+; definition in Library/Mailbox/mailboxUI.def (as of 4/14/95) as well.
+;
+if	MAILBOX_PERSISTENT_PROGRESS_BOXES
+MailboxPagesClass	class	GenTextClass
+MSG_MP_SET_PAGE			message
+; Sets the current and total pages we display.
+;
+; Context:	Called by MailboxProgressGauge when it's told to change the
+;		number of pages.
+;
+; Pass:
+; 		cx	= current page
+; 		dx	= total pages (0 if no total should be displayed)
+; Return:
+; 		nothing
+; 		ax, cx, dx - destroyed
+; 		bp - unchanged
+;
+
+MSG_MP_SET_BYTES		message
+; Sets the number of bytes we display.
+;
+; Context:	Called by MailboxProgressGauge when it's told to change the
+;		number of bytes.
+;
+; Pass:
+; 		cxdx	= number of bytes
+; Return:
+; 		nothing
+; 		ax, cx, dx - destroyed
+;		bp - unchanged
+;
+
+MailboxPagesClass	endc
+endif	; MAILBOX_PERSISTENT_PROGRESS_BOXES
+
+EndLibrary	mailbox

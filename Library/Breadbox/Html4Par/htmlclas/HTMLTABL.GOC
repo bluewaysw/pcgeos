@@ -1,0 +1,747 @@
+/***********************************************************************
+ *
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+ * PROJECT:       HTMLView
+ * FILE:          HTMLTabl.goc
+ *
+ * AUTHOR:        Marcus Gr”ber
+ *                Lysle Shields
+ *
+ ***********************************************************************/
+@include <stdapp.goh>
+@include <Objects/Text/tCtrlC.goh>
+
+#include <Ansi\string.h>
+#include <Ansi\stdio.h>
+#include <Ansi\stdlib.h>
+@include <ec.h>
+
+@include <fixes.goh>
+@include "options.goh"
+@include <html4par.goh>
+
+#include "regiont.h"
+#include "internal.h"
+#include "errors.h"
+#include "tableint.h"
+
+EC( FatalErrors shme ; )
+
+void PrepareCellNextIndices(
+        T_cellArrayHandle cellArray, 
+        T_tableArrayHandle tableArray)
+{
+    byte tableLevel = 0xFF ;
+    byte cellTableLevel ;
+    word numCells ;
+    word cellIndex ;
+    HTMLcellData *p_cell ;
+    HTMLcellData *p_currentCell[HTML_LAYOUT_MAX_LAYOUT_LEVELS] ;
+    word size ;
+    HTMLtableData *p_table ;
+    word firstLevel ;
+    Boolean doRetry ;
+
+    /* All NULL pointers */
+    memset(p_currentCell, 0, sizeof(p_currentCell)) ;
+
+    /* Walk through all the cells linking up Next cells */
+    numCells = CellArrayGetCount(cellArray) ;
+    for (cellIndex=0; cellIndex<numCells; cellIndex++)  {
+        CellLock(cellArray, cellIndex, &p_cell, &size) ;
+
+        /* Determine the cell's level in the table */
+        TableLock(tableArray, p_cell->HCD_table, &p_table, &size) ;
+        cellTableLevel = TABLE_GET_LEVEL(p_table->HTD_flags) ;
+        TableUnlock(p_table) ;
+
+        do {
+            doRetry = FALSE ;
+            if ((cellTableLevel > tableLevel) || (tableLevel == 0xFF))  {
+                /* Going deeper */
+                if (cellTableLevel >= HTML_LAYOUT_MAX_LAYOUT_LEVELS)  {
+                    cellTableLevel = HTML_LAYOUT_MAX_LAYOUT_LEVELS-1 ;
+EC(                 FatalError(-1) ; )
+                }
+
+                if (tableLevel == 0xFF)
+                    firstLevel = cellTableLevel ;
+
+                /* Track this cell at this level. */
+                tableLevel = cellTableLevel ;
+                p_currentCell[tableLevel] = p_cell ;
+            } else if (cellTableLevel == tableLevel)  {
+                /* Same level as before */
+                if (!(p_cell->HCD_flags & HTML_CELL_CONTINUE))  {
+                    /* Not continuing -- just stop here then */
+                    /* Close out previous cell and start another */
+                    if (p_currentCell[tableLevel])  {
+                        p_currentCell[tableLevel]->HCD_nextCellInTable = cellIndex ;
+                        CellDirty(p_currentCell[tableLevel]) ;
+                        CellUnlock(p_currentCell[tableLevel]) ;
+                    }
+                    p_currentCell[tableLevel] = p_cell ;
+                } else {
+                    /* Continue cells are never given a next link */
+                    p_cell->HCD_nextCellInTable = 0xFFFF ;
+
+                    /* Don't need this cell anymore */
+                    CellDirty(p_cell) ;
+                    CellUnlock(p_cell) ;
+                }
+            } else {
+                /* Going up a level(s).  Terminate at these level(s) */
+                while (tableLevel > cellTableLevel)  {
+                    if (p_currentCell[tableLevel])  {
+                        p_currentCell[tableLevel]->HCD_nextCellInTable = cellIndex ;
+                        CellDirty(p_currentCell[tableLevel]) ;
+                        CellUnlock(p_currentCell[tableLevel]) ;
+                        p_currentCell[tableLevel] = NULL ;
+                    }
+                    tableLevel-- ;
+                }
+
+                doRetry = TRUE ;
+            }
+        } while (doRetry) ;
+    }
+
+    /* Terminate all the renaming cells (if any) */
+    /* Going up a level.  Terminate at this level(s) */
+    while (tableLevel >= firstLevel)  {
+        if (p_currentCell[tableLevel])  {
+            p_currentCell[tableLevel]->HCD_nextCellInTable = cellIndex ;
+            CellDirty(p_currentCell[tableLevel]) ;
+            CellUnlock(p_currentCell[tableLevel]) ;
+            p_currentCell[tableLevel] = NULL ;
+        }
+        tableLevel-- ;
+        if (tableLevel == 0xFF)
+            break ;
+    }
+
+    ProfPoint("PrepareCellNextIndices") ;
+}
+
+/**************************************************************************
+ * Routine:  ICellGetNextIndex
+ **************************************************************************
+ *
+ * Description:
+ *     Determines what the index is for the next cell of the same table
+ *     level.  This requires being recursive.
+ *     This routine is very similar to ICalculateCellMinMax except it
+ *     does not do the min max part.
+ *     Skips continue cells.
+ *
+ * Inputs:
+ *     HTMLTextInstance *pself     -- text object to calculate in
+ *     word tableIndex             -- table to calculate
+ *
+ * Outputs:
+ *     word                        -- Cell index of cell past all
+ *                                    related ones here.
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     LES  98/04/08  Created.
+ *
+ **************************************************************************/
+word ICellGetNextIndex(HTMLTextInstance *pself, word cellIndex)
+{
+    T_cellArrayHandle cellArray = pself->HTI_cellArray ;
+    T_tableArrayHandle tableArray = pself->HTI_tableArray;
+    byte firstTableLevel = 0xFF ;
+    byte tableLevel ;
+    word numCells ;
+    HTMLcellData *p_cell ;
+    HTMLcellData *p_cellOrig = NULL ;
+    HTMLtableData *p_table ;
+    word size ;
+EC( word originalCellIndex = cellIndex ; )
+
+    EC_BOUNDS(pself) ;
+    EC_ERROR_IF(
+        cellIndex >= CellArrayGetCount(cellArray),
+        ERROR_CELL_INDEX_OUT_OF_RANGE) ;
+
+EC( ECCheckStack(); )
+    CellLock(cellArray, cellIndex, &p_cell, &size) ;
+    if (p_cell->HCD_nextCellInTable != CELL_NEXT_IN_TABLE_UNKNOWN)  {
+        cellIndex = p_cell->HCD_nextCellInTable ;
+        CellUnlock(p_cell) ;
+    } else {
+        p_cellOrig = p_cell ;
+        numCells = CellArrayGetCount(cellArray) ;
+        while (cellIndex < numCells)  {
+            CellLock(cellArray, cellIndex, &p_cell, &size) ;
+            TableLock(tableArray, p_cell->HCD_table, &p_table, &size) ;
+            tableLevel = TABLE_GET_LEVEL(p_table->HTD_flags) ;
+            if (firstTableLevel == 0xFF)  {
+                firstTableLevel = tableLevel ;
+                cellIndex++ ;
+            } else {
+                /* Is the table level deeper, the same, or above? */
+                if (tableLevel > firstTableLevel)  {
+                    /* Deeper -- we got a table to pass over */
+                    cellIndex = ICellGetNextIndex(pself, cellIndex) ;
+                } else if (tableLevel == firstTableLevel)  {
+                    /* The same level */
+                    /* Stop if it is not a continue cell */
+                    if (!(p_cell->HCD_flags & HTML_CELL_CONTINUE))  {
+                        /* Not continuing -- just stop here then */
+                        TableUnlock(p_table) ;
+                        CellUnlock(p_cell) ;
+                        break ;
+                    }
+
+                    /* Otherwise it is a continue cell that we can skip over */
+                    cellIndex++ ;
+                } else {
+                    /* Higher -- stop here we are outside the list */
+                    TableUnlock(p_table) ;
+                    CellUnlock(p_cell) ;
+                    break ;
+                }
+            }
+            CellUnlock(p_cell) ;
+            TableUnlock(p_table) ;
+        }
+
+        /* Cache the next cell in the list */
+        p_cellOrig->HCD_nextCellInTable = cellIndex ;
+        CellDirty(p_cellOrig) ;
+        CellUnlock(p_cellOrig) ;
+    }
+
+    EC_ERROR_IF(
+       cellIndex <= originalCellIndex,
+       ERROR_NEXT_CELL_INDEX_IS_GOING_TO_A_PREVIOUS_INDEX) ;
+    ProfPoint("ICellGetNextIndex") ;
+    return cellIndex ;
+}
+
+/**************************************************************************
+ * Routine: ICollectSizeForCell
+ **************************************************************************
+ *
+ * Description:
+ *     Utility routine that collects all the size informtion into the
+ *     current spread state (which later calculates the table widths).
+ *
+ * Inputs:
+ *     MemHandle spreadState      -- Handle to spread state block
+ *     HTMLcellData *p_cell       -- Cell to copy data from
+ *     word                       -- Number of columns in table
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     LES  98/04/09  Created.
+ *     LES  98/08/28  Modified to handle new column width determination
+ *
+ **************************************************************************/
+void ICollectSizeForCell(
+               MemHandle spreadState,
+               HTMLcellData *p_cell,
+               word tableColumns)
+{
+    word value ;
+    word pixels=0, percent=0 ;
+    word right ;
+
+EC( ECCheckStack(); )
+
+    /* Determine the data we want to know. */
+    value = HTML_LEN_GET_VALUE(p_cell->HCD_width) ;
+    switch (HTML_LEN_GET_UNIT(p_cell->HCD_width))  {
+        case HTML_LEN_PIXEL:
+            /* Use this pixel width if we have one */
+            pixels = value ;
+            if (value > MAXIMUM_COLUMN_WIDTH) 
+                value = MAXIMUM_COLUMN_WIDTH ;
+            EC_ERROR_IF(value > 0x8000, ERROR_COLUMN_WIDTH_IS_TOO_BIG) ;
+            break ;
+        case HTML_LEN_PERCENT:
+            percent = value ;
+            break ;
+        case HTML_LEN_PROPORTION:
+            /* Do nothing for proportions */
+            break ;
+        case HTML_LEN_VARIABLE:
+            /* Do nothing for variable sized */
+            break ;
+    }
+
+    /* Add it to the spread (taking the max as necessary) */
+    right = p_cell->HCD_col+p_cell->HCD_colspan-1 ;
+    if (right >= TABLE_MAX_COLUMNS)  {
+        right = TABLE_MAX_COLUMNS-1 ;
+        p_cell->HCD_colspan = 1+right-p_cell->HCD_col ;
+        CellDirty(p_cell) ;
+    }
+    if (right > tableColumns-1) {
+        right = tableColumns-1 ;
+        /* Adjust the column span to something more reasonable */
+        p_cell->HCD_colspan = 1+right-p_cell->HCD_col ;
+        CellDirty(p_cell) ;
+    }
+
+    SpreadAdd(
+        spreadState,
+        p_cell->HCD_col,
+        right,
+        pixels,
+        percent,
+        p_cell->HCD_longestLine,
+        p_cell->HCD_hardMinWidth) ;
+    ProfPoint("ICollectSizeForCell") ;
+}
+
+/**************************************************************************
+ * Routine: ICalculateColumnStarts
+ **************************************************************************
+ *
+ * Description:
+ *     This routine has the hard task of taking all the column information
+ *     and determine what ratios to use and determine a pixel position
+ *     of where the column actually starts (without padding)
+ *
+ * Inputs:
+ *     MemHandle spreadState      -- Block of table sizings
+ *     dword *p_lefts             -- Left coordinates
+ *     dword x                    -- Start x (starting from the first
+ *                                   cell at the inner border).
+ *     word *p_width              -- Calculated widths of columns
+ *     HTMLtableData *p_table     -- Table being used (to get border size)
+ *
+ * Outputs:
+ *     word                       -- Right side of cells (just inside table
+ *                                   border)
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     LES  98/04/09  Created.
+ *     LES  98/09/07  No longer need to pass in a flag telling to use
+ *                    the max width
+ *     LES  99/08/27  Optimized the code so it combines alot of
+ *                    simple calculations into one before looping.
+ *
+ **************************************************************************/
+word ICalculateColumnStarts(
+               MemHandle spreadState,
+               T_layoutLevelTable *p_level,
+               HTMLtableData *p_table)
+{
+    word i ;
+    word innerBorder = (TABLE_GET_BORDER(p_table->HTD_flags))?1:0 ;
+    word cellpaddingAndInnerBorderX2PlusSpacing =
+             (p_table->HTD_cellpadding+innerBorder)*2 +
+             p_table->HTD_cellspacing ;
+    T_columnIndex index ;
+    word width ;
+    dword x ;
+
+    x = p_level->LLT_x + p_table->HTD_cellspacing ;
+    EC_ERROR_IF(x > 0x400000, ERROR_X_COORDINATE_UNREASONABLY_BIG) ;
+
+    /* Use the same allocation of empty/used columns */
+    SpreadCopyIndexArray(spreadState, p_level->LLT_indexArray) ;
+
+    /* Calculate where the columns layout to be */
+    for (i=0; i<p_table->HTD_cols; i++)  {
+        if (i >= TABLE_MAX_COLUMNS)  {
+            /* Add in an amount for unknown column widths */
+            x += (cellpaddingAndInnerBorderX2PlusSpacing + 
+                  COLUMN_WIDTH_WHEN_PAST_MAX_TABLE_COLUMNS) * 
+                  (TABLE_MAX_COLUMNS - i) ;
+            break ;
+        }
+        index = p_level->LLT_indexArray[i] ;
+        if (index != TABLE_COLUMN_INDEX_BAD)  {
+            EC_ERROR_IF(x > 0x40000, ERROR_X_COORDINATE_UNREASONABLY_BIG) ;
+            p_level->LLT_columnLeftArray[index] = x ;
+            x += (width = SpreadGetColumnWidth(spreadState, i)) ;
+            if (width)
+                x += cellpaddingAndInnerBorderX2PlusSpacing ;
+
+            if (width > MAXIMUM_COLUMN_WIDTH)
+                width = MAXIMUM_COLUMN_WIDTH ;
+
+            EC_ERROR_IF(width == 0, ERROR_CALCULATED_WIDTH_SHOULD_NOT_BE_ZERO) ;
+            p_level->LLT_columnWidthArray[index] = width ;
+
+            EC_ERROR_IF(
+                width > MAXIMUM_COLUMN_WIDTH,
+                ERROR_COLUMN_WIDTH_IS_TOO_BIG) ;
+        }
+    }
+
+    /* Store an extra past the end, where the next column would start */
+    p_level->LLT_lastX = x ;
+
+    x -= p_table->HTD_cellspacing ;
+
+    EC_ERROR_IF(x > 0x400000, ERROR_X_COORDINATE_UNREASONABLY_BIG) ;
+
+    ProfPoint("ICalculateColumnStarts") ;
+    return x ;
+}
+
+/**************************************************************************
+ * Routine: ITranslateCellGroupPosition
+ **************************************************************************
+ *
+ * Description:
+ *     Translate the location of  all the cells in this 
+ *     cell group (cell and continue cells).
+ *
+ * Inputs:
+ *     word cellIndex             -- Index to first cell of group
+ *     word tableLevel            -- Level of the table this is in
+ *     T_shiftInfo *p_info        -- Group of parameters passed in
+ *                                   for the translation.
+ *
+ * Outputs:
+ *     word                       -- Next cell index after this group
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     LES  00/01/15  Created.
+ *
+ **************************************************************************/
+word ITranslateCellGroupPosition(
+          word cellIndex,
+          word tableLevel,
+          T_shiftInfo *p_info)
+{
+    word size ;
+    HTMLcellData *p_cell ;
+    byte tableIndex = 0xFF ;
+    byte newLevel ;
+    HTMLtableData *p_table ;
+
+    while (cellIndex < p_info->numCells)  {
+        CellLock(p_info->cellArray, cellIndex, &p_cell, &size) ;
+        if (tableIndex == 0xFF)  {
+            /* First cell, remember the table we are dealing with */
+            tableIndex = p_cell->HCD_table ;
+        }
+
+        if (p_cell->HCD_table != tableIndex)  {
+            /* Lower or higher? */
+            TableLock(p_info->tableArray, p_cell->HCD_table, &p_table, &size) ;
+            newLevel = TABLE_GET_LEVEL(p_table->HTD_flags) ;
+            TableUnlock(p_table) ;
+            if (newLevel > tableLevel)  {
+                cellIndex = ITranslateTablePosition(p_cell->HCD_table, p_info) ;
+            } else if (newLevel <= tableLevel) {
+                /* We went up.  Stop here */
+                CellUnlock(p_cell) ;
+                break ;
+            }
+        } else {
+            /* Same table, same level */
+            p_cell->HCD_x += p_info->deltaX ;
+            p_cell->HCD_y += p_info->deltaY ;
+            p_cell->HCD_topY += p_info->deltaY ;
+            CellDirty(p_cell) ;
+
+            /* On to the next cell */
+            cellIndex++ ;
+        }
+        CellUnlock(p_cell) ;
+    }
+
+    ProfPoint("ITranslateCellGroupPosition") ;
+    return cellIndex ;
+}
+
+/**************************************************************************
+ * Routine: ITranslateTablePosition
+ **************************************************************************
+ *
+ * Description:
+ *     Translate all the cells of the table.
+ *
+ * Inputs:
+ *     word tableIndex            -- Index to table entry
+ *     T_shiftInfo *p_info        -- Parameters passed in
+ *                                   for the translation.
+ *
+ * Outputs:
+ *     word                       -- Next cell index after this table
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     LES  00/01/15  Created.
+ *
+ **************************************************************************/
+word ITranslateTablePosition(
+          word tableIndex,
+          T_shiftInfo *p_info)
+{
+    HTMLtableData *p_table ;
+    HTMLcellData *p_cell ;
+    word size ;
+    word cellIndex ;
+    word cellsTable ;
+
+    TableLock(p_info->tableArray, tableIndex, &p_table, &size) ;
+    cellIndex = p_table->HTD_firstCell ;
+    while (cellIndex < p_info->numCells)  {
+        CellLock(p_info->cellArray, cellIndex, &p_cell, &size) ;
+        cellsTable = p_cell->HCD_table ;
+        CellUnlock(p_cell) ;
+        if (cellsTable != tableIndex)
+            break ;
+
+        cellIndex = ITranslateCellGroupPosition(
+                        cellIndex, 
+                        TABLE_GET_LEVEL(p_table->HTD_flags), 
+                        p_info) ;
+    }
+    p_table->HTD_lastX += p_info->deltaX ;
+    p_table->HTD_lastY += p_info->deltaY ;
+    TableDirty(p_table) ;
+    TableUnlock(p_table) ;
+    
+    ProfPoint("ITranslateTablePosition") ;
+    return cellIndex ;
+}
+
+/**************************************************************************
+ * Routine: ICollectRowInfo
+ **************************************************************************
+ *
+ * Description:
+ *     Collect row information and store it in the row sizing array.
+ *     Record the cell index, ending row (for row spanning) and min
+ *     height for this cell.  All of this information is used to determine
+ *     the max height and correct cell vertical spacing.
+ *     Note that this routine copies the same to all spanned columns.s
+ *
+ * Inputs:
+ *     T_layoutLevelTable *p_level-- Current table layout mode
+ *     HTMLtableData *p_table     -- Table to which the cell belongs
+ *     HTMLcellData *p_cell       -- Cell to use
+ *     word cellpadding           -- How much space to add to edges
+ *
+ * Outputs:
+ *     word                       -- Next cell index after this cell
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     LES  98/04/10  Created.
+ *     LES  00/06/12  Modified to handle index array for large tables.
+ *     MG   00/11/13  Adding limitation of rowspan to actual table size
+ *
+ **************************************************************************/
+word ICollectRowInfo(
+         T_layoutLevelTable *p_level,
+         HTMLtableData *p_table,
+         HTMLcellData *p_cell,
+         word cellpadding) 
+{
+    word column = p_cell->HCD_col ;
+    word span ;
+    word nextCellIndex ;
+    dword cellMinHeight ;
+    word height ;
+    sdword realHeight ;
+	T_columnIndex index ;
+
+	word cellIndex = p_level->LLT_cellIndex ;
+	word startRow = p_level->LLT_row ;
+	dword y = p_level->LLT_y ;
+	T_rowSizing *p_sizing ;
+
+EC( ECCheckStack(); )
+    EC_BOUNDS(p_table) ;
+    EC_BOUNDS(p_cell) ;
+    EC_ERROR_IF(y >= 0x80000000, ERROR_Y_COORDINATE_UNREASONABLY_BIG) ;
+    EC_ERROR_IF(cellpadding >= 0x80, ERROR_CELLPADDING_UNREASONABLY_BIG) ;
+
+    span = p_cell->HCD_colspan ;
+
+    /* Calculate what this cell needs (and its encompassing tables) */
+    /* and note what the next cell is */
+    nextCellIndex = p_cell->HCD_nextCellInTable ;
+    cellMinHeight = p_cell->HCD_minHeight ;
+
+    realHeight = cellMinHeight + cellpadding * 2 ;
+
+    /* If the cell has a fixed height, use that one */
+    if (HTML_LEN_GET_UNIT(p_cell->HCD_height) == HTML_LEN_PIXEL)  {
+        height = HTML_LEN_GET_VALUE(p_cell->HCD_height) ;
+        if (height > cellMinHeight)
+            cellMinHeight = height ;
+    }
+
+    cellMinHeight += cellpadding * 2 ;
+
+    /* Copy all the information to each column that we span over */
+    /* (at least hit the column we started on) */
+    while ((span) && (column < TABLE_MAX_COLUMNS)) {
+		/* Fill only columns that are note empty */
+		if ((index = p_level->LLT_indexArray[column]) != TABLE_COLUMN_INDEX_BAD)  {
+			p_sizing = p_level->LLT_sizingArray + index ;
+			EC_BOUNDS(p_sizing) ;
+
+			p_sizing->cellIndex = cellIndex ;
+			p_sizing->rowEnd = startRow + p_cell->HCD_rowspan ;
+                        if(p_sizing->rowEnd > p_table->HTD_rows)
+                          p_sizing->rowEnd = p_table->HTD_rows;
+			p_sizing->minHeight = cellMinHeight ;
+			p_sizing->RS_realHeight = realHeight ;
+			p_sizing->y = y ;
+		}
+        span-- ;
+        column++ ;
+    }
+
+    ProfPoint("ICollectRowInfo") ;
+    return nextCellIndex ;
+}
+
+/**************************************************************************
+ * Routine: ICalculateRowHeights
+ **************************************************************************
+ *
+ * Description:
+ *     All the cells for a row have been find and put in a row
+ *     sizing structure.  This routine determines the max height
+ *     and sets up all the cells that finish at this row have the
+ *     same ending Y position.
+ *
+ * Inputs:
+ *     T_cellArrayHandle cellArray-- Handle to array of cells
+ *     word numColumns            -- Number of columns across
+ *     T_rowSizing *p_sizing      -- Sizing structure
+ *     word row                   -- Row number of next row
+ *     word cellspacing           -- Space between table cells
+ *     dword minHeight            -- Minimum height for a table
+ *
+ * Outputs:
+ *     dword                      -- Calculated max height of all columns
+ *
+ * Revision:
+ *     Who  Date:     Comments:
+ *     ---  --------  --------------------
+ *     LES  98/04/10  Created.
+ *
+ **************************************************************************/
+dword ICalculateRowHeights(
+          T_cellArrayHandle cellArray,
+          T_layoutLevelTable *p_level,
+          word numColumns,
+          word row,
+          word cellspacing,
+          dword minHeight)
+{
+    word column ;
+    sdword maxHeight = 0 ;
+    T_rowSizing *p_size ;
+    dword endY ;
+    HTMLcellData *p_cell ;
+    word size ;
+    dword y = p_level->LLT_y ;
+    T_columnIndex index ;
+
+EC( ECCheckStack(); )
+    EC_ERROR_IF(y >= 0x80000000, ERROR_Y_COORDINATE_UNREASONABLY_BIG) ;
+    EC_ERROR_IF(cellspacing >= 0x80, ERROR_CELLSPACING_UNREASONABLY_BIG) ;
+    EC_ERROR_IF(minHeight >= 0x8000, ERROR_HEIGHT_UNREASONABLY_BIG) ;
+
+    /* Only do what we stored in the structure */
+    if (numColumns > TABLE_MAX_COLUMNS)
+        numColumns = TABLE_MAX_COLUMNS ;
+
+    /* Find the maximum height (excluding spanning rows) */
+    for (column=0; column<numColumns; column++)  {
+        /* Lookup the column or else skip out */
+        index = p_level->LLT_indexArray[column] ;
+        if (index == TABLE_COLUMN_INDEX_BAD)
+            continue ;
+        p_size = p_level->LLT_sizingArray + index ;
+
+        if ((p_size->rowEnd) && ((p_size->rowEnd <= row) && (p_size->minHeight > maxHeight)))
+            maxHeight = p_size->minHeight ;
+    }
+
+    if (maxHeight < minHeight)
+        maxHeight = minHeight ;
+
+    /* Trim any spanning rows so their heights are correctly reflected */
+    /* the next time we come through here */
+    /* NOTE:  If minHeight goes negative, its because it is 'reserving' */
+    /*        slack space at the end, but it doesn't affect the max */
+    /*        height of the new row because it is negative (and 0 is the */
+    /*        absolute minimum */
+    maxHeight += cellspacing ;
+    for (column=0; column<numColumns; column++)  {
+        /* Lookup the column or else skip out */
+        index = p_level->LLT_indexArray[column] ;
+        if (index == TABLE_COLUMN_INDEX_BAD)
+            continue ;
+        p_size = p_level->LLT_sizingArray + index ;
+
+        if (p_size->rowEnd > row)  {
+            p_size->minHeight -= maxHeight ;
+            p_size->RS_realHeight -= maxHeight ;
+        }
+    }
+    maxHeight -= cellspacing ;
+
+    /* Now that we have a maximum height for all the cells, let's force */
+    /* all the cells to have the same ending y position. */
+    endY = y + maxHeight ;
+    for (column=0; column<numColumns; column++)  {
+        /* Lookup the column or else skip out */
+        index = p_level->LLT_indexArray[column] ;
+        if (index == TABLE_COLUMN_INDEX_BAD)
+            continue ;
+        p_size = p_level->LLT_sizingArray + index ;
+
+        /* Only affect cells that are on this row or past it */
+        if ((p_size->rowEnd) && (p_size->rowEnd >= row))  {
+            /* Get the cell for this column */
+            CellLock(cellArray, p_size->cellIndex, &p_cell, &size) ;
+
+            /* Record in the cell the new endY (indirectly since this might */
+            /* be a spanning row with a different starting Y position) */
+            p_cell->HCD_calcHeight = endY - p_cell->HCD_y /* - cellspacing */ ;
+            if (maxHeight > p_size->RS_realHeight)  {
+                p_cell->HCD_slackHeight = maxHeight - p_size->RS_realHeight ;
+            } else {
+                p_cell->HCD_slackHeight = 0 ;
+            }
+
+            CellDirty(p_cell) ;
+            CellUnlock(p_cell) ;
+
+            if (p_size->rowEnd == row)
+                p_size->rowEnd = 0 ;
+        }
+    }
+
+    ProfPoint("ICalculateRowHeights") ;
+    return maxHeight ;
+}
+
+
+

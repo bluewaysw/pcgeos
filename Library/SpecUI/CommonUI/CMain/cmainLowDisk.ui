@@ -1,0 +1,320 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1993 -- All Rights Reserved
+ *
+ * PROJECT:	  
+ * MODULE:	  UI Specification
+ * FILE:	  cmainLowDisk.ui
+ *
+ * AUTHOR:  	  Adam de Boor: Jun  7, 1993
+ *
+ * REVISION HISTORY:
+ *	Name	  Date	    Description
+ *	----	  ----	    -----------
+ *	ardeb	  6/ 7/93    Initial version
+ *
+ * DESCRIPTION:
+ *	Template resource for allowing the user to clean up the disk
+ *	when detaching and there's not enough room for the document.
+ *
+ * 	$Id: cmainLowDisk.ui,v 1.1 97/04/07 10:52:16 newdeal Exp $
+ *
+ ***********************************************************************/
+
+/* defined in cspecFile.ui */
+#if INCLUDE_SC_MONIKERS
+extern	StdDialogErrorSCMoniker;
+#endif
+
+#if INCLUDE_SM_MONIKERS
+extern	StdDialogErrorSMMoniker;
+#endif
+
+#if INCLUDE_CGA_MONIKERS
+extern	StdDialogErrorSCGAMoniker;
+#endif
+
+#if INCLUDE_YM_MONIKERS
+extern	StdDialogErrorYMMoniker;
+#endif
+
+start LowDiskUI;
+
+LowDiskBox = GenInteraction {
+	/* Moniker to be replaced by application name */
+	children = MessageGroup, DiscardChangesTrigger,
+#if !NO_LOW_DISK_DELETE_CURRENT
+		DeleteDocTrigger,
+#endif
+#if !NO_LOW_DISK_MOVE
+		MoveDocBox,
+#endif
+		DeleteFilesBox;
+	type = multipleResponse;
+	visibility = dialog;
+	attributes = notUserInitiatable, sysModal;
+	genStates = default -usable;
+	hints = { 
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		ATTR_GEN_HELP_FILE {
+			char	"ui      ", 0
+		},
+		ATTR_GEN_HELP_CONTEXT {
+			char	"dbLowDisk",0
+		},
+		ATTR_GEN_HELP_TYPE {
+			byte HT_SYSTEM_MODAL_HELP
+		}
+	}
+}
+
+MessageGroup = GenInteraction {
+	children = MessageGlyph, MessageText;
+	hints = { 
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+/*
+ * Hacked, hand-constructed moniker list so we can use the standard dialog
+ * error monikers without having to have a copy of them.
+ */
+chunk MessageGlyphMoniker = data {
+#if INCLUDE_SC_MONIKERS
+	VisMonikerListEntryType <DS_STANDARD, VMS_ICON,
+				 1, 1, DAR_NORMAL, DC_COLOR_4>
+		UN_OPTR StdDialogErrorSCMoniker
+#endif						/* if INCLUDE_SC_MONIKERS */
+#if INCLUDE_SM_MONIKERS
+	VisMonikerListEntryType <DS_STANDARD, VMS_ICON,
+				 1, 1, DAR_NORMAL, DC_GRAY_1>
+	    	UN_OPTR StdDialogErrorSMMoniker
+#endif						/* INCLUDE_SM_MONIKERS */
+#if INCLUDE_CGA_MONIKERS
+	VisMonikerListEntryType <DS_TINY, VMS_ICON,
+				 1, 1, DAR_VERY_SQUISHED, DC_GRAY_1>
+	    	UN_OPTR StdDialogErrorSCGAMoniker
+#endif						/* INCLUDE_CGA_MONIKERS */
+#if INCLUDE_YM_MONIKERS
+	VisMonikerListEntryType <DS_TINY, VMS_ICON,
+				 1, 1, DAR_NORMAL, DC_GRAY_1>
+	    	UN_OPTR StdDialogErrorYMMoniker
+#endif						/* INCLUDE_YM_MONIKERS */
+}
+
+MessageGlyph = GenGlyph {
+	moniker = MessageGlyphMoniker;
+}
+
+#if (FALSE&& NO_LOW_DISK_DELETE_CURRENT)
+
+ #ifdef DO_DBCS
+
+chunk MessageTextText = "There is no memory left to save changes to \\\"\\1\\\". You can revert to the last saved version of \\\"\\1\\\" or delete other documents.\\rNote: If you choose to delete other documents they will be permanently removed.";
+
+ #else
+
+chunk MessageTextText = "There is no memory left to save changes to \\xd2\\1\\xd3. You can revert to the last saved version of \\xd2\\1\\xd3 or delete other documents.\\rNote: If you choose to delete other documents they will be permanently removed.";
+
+ #endif
+
+#endif
+
+#if (FALSE&& (!NO_LOW_DISK_DELETE_CURRENT))
+
+ #ifdef DO_DBCS
+
+chunk MessageTextText = "There is no memory left to save changes to \\\"\\1\\\". You can revert to the last saved version of \\\"\\1\\\", delete it, or delete other documents.\\rNote: If you choose to delete other documents they will be permanently removed.";
+
+ #else
+
+chunk MessageTextText = "There is no memory left to save changes to \\xd2\\1\\xd3. You can revert to the last saved version of \\xd2\\1\\xd3, delete it, or delete other documents.\\rNote: If you choose to delete other documents they will be permanently removed.";
+
+ #endif
+
+#else
+
+ #ifdef DO_DBCS
+
+chunk MessageTextText = "Unable to save \\\"\\1\\\": the disk is full. Please free up space for this document.";
+
+ #else
+
+chunk MessageTextText = "Unable to save \\xd2\\1\\xd3: the disk is full. Please free up space for this document.";
+
+ #endif
+
+#endif
+
+MessageText = GenText {
+	text = MessageTextText;
+	genAttributes = default +readOnly;
+	textDisplayAttributes = {};
+	hints = {
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_MAXIMUM_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 50>
+			SpecHeight <>
+		}
+	}
+}
+
+DiscardChangesTrigger = GenTrigger {
+	moniker = 'D', "Discard Changes";
+	action = MSG_OL_DOCUMENT_REVERT_AFTER_SAVE_ERROR, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_SEEK_REPLY_BAR }
+}
+
+#if !NO_LOW_DISK_DELETE_CURRENT
+ #ifdef DO_DBCS
+visMoniker DeleteDocMoniker = 'e', "Delete \\\"\\1\\\"";
+ #else
+visMoniker DeleteDocMoniker = 'e', "Delete \\xd2\\1\\xd3";
+ #endif
+
+DeleteDocTrigger = GenTrigger {
+	moniker = DeleteDocMoniker;
+	action = MSG_OL_DOCUMENT_DELETE_AFTER_SAVE_ERROR, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_SEEK_REPLY_BAR }
+}
+#endif
+
+/******************************************************************************/
+
+#if !NO_LOW_DISK_MOVE
+
+ #ifdef DO_DBCS
+visMoniker MoveDocMoniker = 'M', "Move \\\"\\1\\\"";
+ #else
+visMoniker MoveDocMoniker = 'M', "Move \\xd2\\1\\xd3";
+ #endif
+
+MoveDocBox = GenInteraction {
+	moniker = MoveDocMoniker;
+	type = multipleResponse;
+	visibility = dialog;
+	attributes = sysModal;
+	children = MoveFileFS, MoveFileDestText, MoveFileTrigger,
+		DoSomethingElseTrigger;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		ATTR_GEN_HELP_CONTEXT {
+			char	"dbLowDiskMove",0
+		},
+		ATTR_GEN_HELP_TYPE {
+			byte HT_SYSTEM_MODAL_HELP
+		},
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+
+MoveFileFS = GenFileSelector {
+	moniker = "Select destination of move:";
+	fileCriteria = dirs;
+#if SINGLE_DRIVE_DOCUMENT_DIR
+	attributes = allowChangeDirs, hasCloseDirButton,
+		hasOpenDirButton, hasChangeDirectoryList, hasFileList,
+		hasChangeDriveList, showFilesDisabled, hasDocumentButton;
+#else
+	attributes = allowChangeDirs, hasCloseDirButton,
+		hasOpenDirButton, hasChangeDirectoryList, hasFileList,
+		hasChangeDriveList, showFilesDisabled;
+#endif
+	action = MSG_OL_DOCUMENT_MOVE_AFTER_ERROR_FEEDBACK,
+		"TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_FILE_SELECTOR_SINGLE_ACTION, 
+		HINT_PLACE_MONIKER_ABOVE
+	}
+}
+
+MoveFileDestText = GenText {
+	text = "";
+	genAttributes = default +readOnly;
+	textDisplayAttributes = singleLineText;
+	hints = { HINT_EXPAND_WIDTH_TO_FIT_PARENT }
+}
+
+MoveFileTrigger = GenTrigger {
+	moniker = 'M', "Move Document";
+	action = MSG_OL_DOCUMENT_MOVE_AFTER_SAVE_ERROR, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_SEEK_REPLY_BAR }
+}
+
+DoSomethingElseTrigger = GenTrigger {
+	moniker = 'D', "Do Something Else";
+	hints = { 
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_DISMISS },
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+#endif
+
+/******************************************************************************/
+
+DeleteFilesBox = GenInteraction {
+	moniker = 'O', "Delete Other Files";
+	type = multipleResponse;
+	visibility = dialog;
+	attributes = sysModal;
+	children = DeleteFilesFS, DeleteFilesFreeSpace, DeleteFileTrigger,
+		GiveUpTrigger;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		ATTR_GEN_HELP_CONTEXT {
+			char	"dbLowDiskDelete",0
+		},
+		ATTR_GEN_HELP_TYPE {
+			byte HT_SYSTEM_MODAL_HELP
+		},
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+DeleteFilesFS = GenFileSelector {
+	moniker = "Select file to delete:";
+	fileCriteria = dirs, nonGeosFiles, geosNonExecutables, geosExecutables;
+#if SINGLE_DRIVE_DOCUMENT_DIR
+	attributes = allowChangeDirs, hasCloseDirButton,
+		hasOpenDirButton, hasChangeDirectoryList, hasFileList,
+		hasChangeDriveList, hasDocumentButton;
+#else
+	attributes = allowChangeDirs, hasCloseDirButton,
+		hasOpenDirButton, hasChangeDirectoryList, hasFileList,
+		hasChangeDriveList;
+#endif
+	action = MSG_OL_DOCUMENT_DELETE_FILES_FS_NOTIFY, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+	HINT_FILE_SELECTOR_SINGLE_ACTION,
+	HINT_PLACE_MONIKER_ABOVE
+	}
+}
+
+DeleteFilesFreeSpace = GenText {
+	text = "";
+	moniker = "Free Space:";
+	genAttributes = default +readOnly;
+	textDisplayAttributes = singleLineText;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+DeleteFileTrigger = GenTrigger {
+	moniker = 'D', "Delete Selected File";
+	action = MSG_OL_DOCUMENT_DELETE_SELECTED_FILE, "TO_OBJ_BLOCK_OUTPUT";
+	hints = { HINT_SEEK_REPLY_BAR }
+}
+
+GiveUpTrigger = GenTrigger {
+	moniker = 'N', "Nothing Else To Delete";
+	hints = { 
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_DISMISS },
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+end LowDiskUI;

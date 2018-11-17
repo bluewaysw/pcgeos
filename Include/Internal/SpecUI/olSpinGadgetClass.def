@@ -1,0 +1,247 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1994 -- All Rights Reserved
+
+PROJECT:	SPUI
+MODULE:		
+FILE:		olSpinGadgetClass.def
+
+AUTHOR:		David Litwin, Oct  6, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	10/ 6/94		Initial revision
+
+
+DESCRIPTION:
+	Definition of OLSpinGadgetClass.
+		
+	OLSpinGadget is the OPEN LOOK spin gadget.  It handles all
+	of the basic functionality of a spin gadget.
+
+	$Id: olSpinGadgetClass.def,v 1.1 97/04/04 14:11:44 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+OLSpinGadgetClass	class OLCtrlClass
+
+MSG_SPIN_DISCARD_TEXT	message
+;
+;	Method sent by the range to itself when the text object loses the 
+; focus.  Range decides whether it should discard the text object or not.
+;
+; Pass:		nothing
+; Return:	nothing
+;
+	
+MSG_SPIN_GIVE_TEXT_FOCUS	message
+;
+;	Method sent by the range to itself when the range gains the 
+; focus.  Range decides whether it should give the text object the focus or
+; not.
+;
+; Pass:		nothing
+; Return:	nothing
+;
+	
+MSG_SPIN_UNBUILD		message
+;
+;	An internal unbuild method called by the range object after throwing
+; away its VisText object.  Method handler just calls its superclass.
+;
+; Pass:		nothing
+; Return:	nothing
+;
+
+
+MSG_SPEC_SPIN_MINIMUM		message
+MSG_SPEC_SPIN_UP_PAGE		message
+MSG_SPEC_SPIN_UP_ARROW		message
+MSG_SPEC_SPIN_VALUE_CHANGED		message
+MSG_SPEC_SPIN_DOWN_ARROW		message
+MSG_SPEC_SPIN_DOWN_PAGE		message
+MSG_SPEC_SPIN_MAXIMUM		message
+SPIN_MSG_BASE equ MSG_SPEC_SPIN_MINIMUM
+;
+;	These come from the scrollbar.  Actually, from our scrollbar, only
+;	MSG_META_SPIN_DECREMENT and MSG_META_SPIN_INCREMENT will appear.
+;
+;	Pass:	nothing
+;	Return:	nothing
+;
+
+MSG_SPEC_SPIN_INCREMENT					method	
+;
+; Sent out by the spin gadget to its OD when the user presses on the up arrow.
+; The OD is expected to respond by either drawing something in the spin
+; gadget or by calling MSG_SPEC_SPIN_SET_ITEM if the spin gadget is a text or
+; moniker type gadget.
+;
+; Pass:		cx:dx -- handle of the gadget being pressed
+; Return:	nothing
+; 		ax, cx, dx, bp - destroyed
+;
+;
+
+MSG_SPEC_SPIN_DECREMENT					method	
+;
+; Sent out by the spin gadget to its OD when the user presses on the down arrow.
+; The OD is expected to respond by either drawing something in the spin
+; gadget or by calling MSG_SPEC_SPIN_SET_ITEM if the spin gadget is a text or
+; moniker type gadget.
+;
+; Pass:		cx:dx -- handle of the gadget being pressed
+; Return:	nothing
+; 		ax, cx, dx, bp - destroyed
+;
+
+MSG_SPEC_SPIN_DRAW_CONTENTS				method	
+;
+; The spin gadget sends this to itself when it needs its contents to be 
+; redrawn, so that subclassed objects can draw what they want.  Only called
+; if the spin gadget is not of type text.
+;
+; Pass:		nothing
+; Return:	nothing
+; 		ax, cx, dx, bp - destroyed
+;
+
+MSG_SPEC_SPIN_GET_ITEM					method	
+;
+; The spin gadget sends this to itself to get the current moniker/text chunk
+; to draw.
+;
+; Pass:		nothing
+; Return:	bp -- handle of new item (either text chunk or moniker chunk)
+;		      (currently assumes item is in same block)
+; 		ax, cx, dx - destroyed
+;
+
+MSG_SPEC_SPIN_GET_REPEAT_RATE				method	
+;
+; The spin gadget sends this to itself to get the repeat rate to use when
+; the user holds down the increment/decrement button.  You can subclass this
+; to get the repeat rate you want for your object.  Faster rates are desireable
+; for large ranges.   The number of repeats is passed and may be useful.
+;
+; Pass:		cx -- number of repeats so far
+; Return:	cx -- repeat rate
+; 		ax, dx, bp - destroyed
+;
+
+MSG_SPEC_SPIN_SET_ITEM					method	
+;
+; Set a new item.  Required if the gadget runs a text object, so the text 
+; object can be updated.
+;
+; Pass:		bp -- new item handle
+; Return:	nothing
+; 		ax, cx, dx, bp - destroyed
+;
+
+MSG_SPEC_SPIN_GET_BOUNDS				method	
+;
+; Can be sent to the spin gadget to get the bounds that the spin gadget can draw
+; its contents in.
+;
+; Pass:		nothing
+; Return:	ax, bp, cx, dx -- bounds of the gadget draw area
+;
+
+MSG_SPEC_SPIN_GET_ATTRS					method	
+;
+; A query for the spin gadget's attributes.  
+;
+; Pass:		nothing
+; Return:	cl -- the spin gadget's attributes.
+; 		ax, ch, dx, bp - destroyed
+;
+
+if BUBBLE_HELP
+MSG_SPEC_SPIN_BUBBLE_TIME_OUT		message
+;
+; Message sent when bubble help has timed out.  Close bubble help.
+;
+;	Pass:	nothing
+;	Return:	nothing
+;
+
+MSG_SPEC_SPIN_BUBBLE_DELAY_TIME_OUT		message
+;
+; Message sent when bubble help delay timer has expired.  Create
+; the bubble help.
+;
+;	Pass:	nothing
+;	Return:	nothing
+;
+endif
+
+				
+;------------------------------------------------------------------------------
+;	Hints
+;------------------------------------------------------------------------------
+		
+if BUBBLE_HELP
+TEMP_SPEC_SPIN_BUBBLE_HELP			vardata	BubbleHelpData
+;
+; Temporary bubble help info
+;
+TEMP_SPEC_SPIN_BUBBLE_HELP_JUST_CLOSED		vardata
+endif
+
+
+OLSpinGadgetStates	record
+	OLSGS_HAS_FOCUS:1		;set if spin gadget has the focus
+	OLSGS_MAKE_DEFAULT_FOCUS:1	;set if we want default focus
+if BUBBLE_HELP
+	:2
+	OLSGS_TOOLBOX_PRE_PASSIVE:1	;set if want pre-passive for toolbox
+	OLSGS_BUBBLE_PRE_PASSIVE:1	;set if want pre-passive for bubble
+	:1
+else
+	:5
+endif
+	OLSGS_DRAW_FRAME:1		;set to draw the frame
+OLSpinGadgetStates	end
+
+OLSpinGadgetAttrs	record	
+	OLSGA_TEXT:1,		   ;points to and displays a text chunk
+if SPINNER_GEN_VALUE
+;
+; since OLSGA_MONIKER isn't used, we'll use it for OLSGA_SPINNER
+;
+	OLSGA_SPINNER:1			; indicates spinner GenValue
+else
+	OLSGA_MONIKER:1, 	   ;points to and displays a moniker chunk
+endif
+	OLSGA_NO_UP_DOWN_ARROWS:1,  ;no up/down arrows, effectively making the
+				   ;   object a glyph or text object.
+	OLSGA_SLIDER:1,		   ;make a slider.
+	OLSGA_ORIENT_VERTICALLY:1, ;whether vertical
+	OLSGA_SHOW_HASH_MARKS:1,   ;show hash marks
+	OLSGA_SHOW_MIN_MAX_MKRS:1, ;show minimums and maximums
+	OLSGA_CANT_EDIT_TEXT:1	   ;can't edit the text
+OLSpinGadgetAttrs	end
+			
+			
+;----------------------------------------
+;	Instance data
+;----------------------------------------
+	OLSGI_attrs		OLSpinGadgetAttrs	;attributes
+	OLSGI_desHeight		word			;desired height
+	OLSGI_desWidth		word			;desired width
+	OLSGI_textWidth		word			;text width, sliders
+	OLSGI_text		lptr VisTextInstance	;text obj, if any
+	OLSGI_repeatCount	word			;repeat count
+	OLSGI_timerID		word			;timer stuff
+	OLSGI_timerHandle	word
+	OLSGI_states		OLSpinGadgetStates	;state
+	OLSGI_scrollbar		lptr GenRangeClass	;scrollbar, if any
+
+OLSpinGadgetClass	endc

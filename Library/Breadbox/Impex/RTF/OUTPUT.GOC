@@ -1,0 +1,274 @@
+@include <stdapp.goh>
+#include <Ansi/stdio.h>
+#include <Ansi/string.h>
+#include "output.h"
+#include "warnings.h"
+#include "global.h"
+
+FileHandle fhOutput = NullHandle;
+MemHandle hOutputBuffer = NullHandle;
+OutputBufferStruct *pOutputBuffer = NULL;
+dword nOutputPos;
+word inContextRangeRef = 0;
+
+#if _DO_HELP
+extern word wHyperlinkNeedsFinishingToken;
+extern word wHyperlinkNeedsFinishingFilenameToken;
+#endif
+
+dword RTFOutputGetPos(void)
+	{
+	return nOutputPos;
+	}
+
+/*  RTFOutputInit initializes the text buffer. The byte count and all of
+    the buffer storage are zeroed. */
+
+Boolean RTFOutputInit(FileHandle fh)
+    {
+    Boolean success = FALSE;
+
+    /* Store the file handle. */
+    fhOutput = fh;
+    ECCheckFileHandle(fh);
+
+    /* Create the output buffer. */
+    hOutputBuffer = MemAlloc (sizeof(OutputBufferStruct), HF_FIXED,
+      HAF_ZERO_INIT);
+    if (hOutputBuffer != NullHandle)
+        {
+        pOutputBuffer = MemDeref(hOutputBuffer);
+        pOutputBuffer->OBS_nCount = 0;
+	    nOutputPos = 0;
+        success = TRUE;
+        }
+    else
+        SetError(TE_OUT_OF_MEMORY);
+    return success;
+    }
+
+/*  RTFOutputAddString is used to send a complete character string to the
+    output. The string will not be broken up. */
+
+Boolean RTFOutputAddString(char* pString)
+	{
+    int nStrLen = strlen(pString);
+	
+    if (pOutputBuffer == NULL)
+        {
+        EC_WARNING (RTF_WARNING_NO_OUTPUT_BUFFER);
+        SetError(TE_ERROR);
+        return FALSE;
+        }
+    if (pOutputBuffer->OBS_nCount + nStrLen > OUTPUT_BUFFER_LEN - 1)
+        if (!RTFOutputFlush())
+            return FALSE;
+    memcpy (&pOutputBuffer->OBS_cData[pOutputBuffer->OBS_nCount], pString, nStrLen);
+    pOutputBuffer->OBS_nCount += nStrLen;
+    nOutputPos += nStrLen;
+    return TRUE;
+	}
+
+Boolean RTFOutputAddEncodedString(char* pString)
+{
+    Boolean success;
+    MemHandle mHandle;
+
+    StringConvertAndAppend(&mHandle, pString);
+    success = RTFOutputAddString(MemDeref(mHandle));
+    MemFree(mHandle);
+    return success;
+}
+
+Boolean AddControlParam(char* pString, long int nParam, Boolean bAddSpace,
+  Boolean bUseHex, Boolean bHasParam)
+    {
+    int nStrLen = strlen(pString);
+    int nExtra = 1;								/* account for '\\' */
+	char* pc;
+	char number[11];
+	
+	if (bAddSpace)
+		nExtra++;
+	if (bHasParam)
+		{
+		if (bUseHex)
+			sprintf(number, "%02X", (int)nParam);
+		else
+			sprintf(number, "%ld", nParam);
+		nExtra += strlen(number);
+		}
+    if (pOutputBuffer == NULL)
+        {
+        EC_WARNING (RTF_WARNING_NO_OUTPUT_BUFFER);
+        SetError(TE_ERROR);
+        return FALSE;
+        }
+
+    if (pOutputBuffer->OBS_nCount + (nStrLen + nExtra) > OUTPUT_BUFFER_LEN - 1)
+        if (!RTFOutputFlush())
+            return FALSE;
+    pc = &pOutputBuffer->OBS_cData[pOutputBuffer->OBS_nCount];
+    *(pc++) = '\\';						/* prepend the control prefix */
+    memcpy (pc, pString, nStrLen);		/* next the string */
+    pc += nStrLen;
+    if (bHasParam)
+    	{
+	    strcat (pc, number);			/* then the number */
+	    pc = strchr(pc, 0);
+    	}
+    if (bAddSpace)						/* finally an optional space */
+    	*pc = ' ';
+    pOutputBuffer->OBS_nCount += nStrLen + nExtra;
+    nOutputPos += nStrLen + nExtra;
+    return TRUE;
+    }
+
+/*  RTFOutputAddControl is used to send a complete character string to the
+    output. The string will not be broken up. */
+
+Boolean RTFOutputAddControl(char* pString, Boolean bAddSpace)
+    {
+    return AddControlParam(pString, 0, bAddSpace, FALSE, FALSE);
+    }
+
+/*  RTFOutputAddControlParameter is used to send a complete character string and
+	parameter to the output. The complete string will not be broken up. */
+
+Boolean RTFOutputAddControlParameter(char* pString, long int nParam, Boolean bAddSpace)
+	{
+	return AddControlParam(pString, nParam, bAddSpace, FALSE, TRUE);
+	}
+
+/*  RTFOutputAddChar is used to send a single character to the output.
+    If the buffer needs to be flushed, it will.  This might cause words
+    to look broken up in the final file, but nothing will come of it. */
+
+Boolean RTFOutputAddChar(unsigned char c)
+    {
+	if (c < 0x20 || c >= 0x80)
+		return AddControlParam("'", c, FALSE, TRUE, TRUE);
+		
+    if (pOutputBuffer == NULL)
+        {
+        EC_WARNING (RTF_WARNING_NO_OUTPUT_BUFFER);
+        SetError(TE_ERROR);
+        return FALSE;
+        }
+    if (pOutputBuffer->OBS_nCount == OUTPUT_BUFFER_LEN - 1)
+        if (!RTFOutputFlush())
+            return FALSE;
+    pOutputBuffer->OBS_cData[pOutputBuffer->OBS_nCount++] = c;
+    nOutputPos++;
+    return TRUE;
+    }
+
+/*  RTFOutputFlush writes the buffered data to the output file.
+    A CR/LF pair will be added if one doesn't already exist. */
+Boolean RTFOutputFlush(void)
+    {
+    word nLength;
+    char *pBuf, *pc;
+    const char endl[] = "\x0D\x0A";
+    Boolean success = FALSE;
+
+    if (pOutputBuffer == NULL)
+        {
+        EC_WARNING (RTF_WARNING_NO_OUTPUT_BUFFER);
+        return FALSE;
+        }
+
+    nLength = pOutputBuffer->OBS_nCount;
+    pBuf = pOutputBuffer->OBS_cData;
+    if (nLength == 0)
+        return TRUE;
+
+    /* Remove any existing CR. */
+/*    if (pBuf[nLength - 1] == '\n')
+        {
+        pBuf[nLength - 1] = '\0';
+        nLength --;
+        if (nLength == 0)       /* don't need blank lines
+            {
+            pBuf[0] = '\0';
+            pOutputBuffer->OBS_nCount = 0;
+            return TRUE;
+            }
+        }
+*/
+    /* Append the proper endline characters. */
+    strcat (pBuf, endl);
+    nLength += sizeof(endl) / sizeof(endl[0]) - 1;
+	nOutputPos += sizeof(endl) / sizeof(endl[0]) - 1;
+
+    /* Write the buffer to the file. */
+    if (FileWrite(fhOutput, pBuf, nLength * sizeof(char), FALSE) != nLength)
+        SetError(TE_FILE_WRITE);
+    else
+        success = TRUE;
+
+    /* Wipe the buffer. */
+    for (pc = pBuf + nLength; pc >= pBuf; pc--)
+        *pc = '\0';
+    pOutputBuffer->OBS_nCount = 0;
+
+    return success;
+    }
+
+void RTFOutputFree(void)
+    {
+    if (hOutputBuffer != NullHandle)
+        MemFree(hOutputBuffer);
+    hOutputBuffer = NullHandle;
+    }
+
+#if _DO_HELP
+
+void RTFOutputEndOfHyperlink(void) {
+    TCHAR* str;
+    NameArrayMaxElement nameData;
+
+    if(wHyperlinkNeedsFinishingToken != 0xffff) {
+	str = GetNameString(wHyperlinkNeedsFinishingToken, &nameData);
+	RTFOutputAddControlParameter("uldb", 0, TRUE);
+	RTFOutputAddChar('{');
+	RTFOutputAddControl("v", TRUE);
+	RTFOutputAddEncodedString(str);
+	if(wHyperlinkNeedsFinishingFilenameToken != 0xffff) {
+	    RTFOutputAddChar('@');
+	    str = GetNameString(wHyperlinkNeedsFinishingFilenameToken, &nameData);
+	    RTFOutputAddString(str);
+	    wHyperlinkNeedsFinishingFilenameToken = 0xffff;
+	}
+	RTFOutputAddChar('}');
+	wHyperlinkNeedsFinishingToken = 0xffff;
+    }
+}
+
+void RTFOutputStartOfHyperlink(word contextToken, word contextFileToken) {
+    if(contextToken != 0xffff) {
+	RTFOutputAddString("\\uldb ");
+	wHyperlinkNeedsFinishingToken = contextToken;
+	if(contextFileToken != 0xffff) {
+	    wHyperlinkNeedsFinishingFilenameToken = contextFileToken;
+	}	
+    }
+}
+
+void RTFOutputStartOfContextRange(void) {
+    inContextRangeRef++;
+    RTFOutputAddChar(171);
+    RTFOutputAddString("startcontextrange");
+    RTFOutputAddChar(187);
+}
+
+void RTFOutputEndOfContextRange(void) {
+    if(inContextRangeRef != 0) {
+	RTFOutputAddChar(171);
+	RTFOutputAddString("endcontextrange");
+	RTFOutputAddChar(187);
+	inContextRangeRef--;
+    }
+}
+
+#endif

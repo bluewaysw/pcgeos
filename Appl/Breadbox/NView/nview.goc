@@ -1,0 +1,197 @@
+/*
+ *      MAIN.GOC - view files and convert to Notes format
+ *
+ *      by Marcus Groeber, mgroeber@compuserve.com
+ *
+ */
+
+@include <stdapp.goh>
+@include <foam.goh>
+@include <viewer.goh>  /* FileOpenControl defined here */
+#include <initfile.h>
+
+#include <ansi\stdio.h>
+#include <ansi\string.h>
+
+
+#define VIEWER_LIBRARY \
+  EC ("EC NView Viewer Library") \
+  NEC("NView Viewer Library")
+
+#define VIEWER_GEODE "nviewlib.geo"
+
+
+@class  DocViewProcessClass, GenProcessClass;
+@endc
+
+@class  FilterFileOpenControlClass, FileOpenControlClass;
+@endc
+
+/*
+ ***************************************************************************
+ *      UI Objects
+ ***************************************************************************
+ */
+
+@start  AppResource;
+
+  /* declare the main application object */
+
+@object FoamSubApplicationClass DocViewApp = {
+
+    GI_visMoniker = list { @DocViewTextMoniker, @Moniker0, @Moniker1 }
+    GI_comp = @DocViewPrimary;          /* main window, nothing else */
+    FSAI_launcherApp = FA_EXTRAS_APP;
+
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) =
+      @DocViewPrimary;
+    gcnList( MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST ) =
+      @OpenControl;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_VIEWER_NOTIFICATIONS ) =
+      @OpenControl;
+
+    HINT_APPLICATION_QUIT_ON_IACP_ALLOW_FILE_ACCESS;
+  }
+
+  @visMoniker DocViewTextMoniker = "NView";
+
+  @include "small.goh"
+  @include "large.goh"
+
+@end    AppResource;
+
+@start  Interface;                      /* resource for misc UI objects */
+
+@object GenPrimaryClass DocViewPrimary  = {
+  GI_comp = @CloseTrigger, @OpenControl;
+  ATTR_GEN_HELP_CONTEXT = "TOC";
+}
+
+  @chunk TCHAR FileSelText[] = "Viewable Files";
+  @object FilterFileOpenControlClass OpenControl = {
+      CMI_topText = @FileSelText;
+        /*
+         * The FileOpenControl comes with a standard bitmap icon.
+         */
+      HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+      HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+      HINT_COMPLEX_MONIKER_DRAW_SEPARATOR;
+
+      HINT_FILE_OPEN_DONT_FILTER_DOCUMENT_SUB_DIRS;
+
+      ATTR_GEN_CONTROL_REQUIRE_UI =
+        { FOF_RENAME | FOF_COPY | FOF_MOVE | FOF_RENAME |
+          FOF_CREATE_FOLDER | FOF_DELETE };
+      ATTR_GEN_CONTROL_PROHIBIT_UI = { FOF_CREATE_NEW };
+
+      ATTR_FILE_OPEN_INCLUDE_DIR  = @IncludeDirList;
+      ATTR_FILE_OPEN_INCLUDE_FILE = @IncludeList;
+  }
+
+  /* List of top level folders shown */
+  @chunk word IncludeDirList[] = {
+      FDD_CREATED_TEXTS,
+      FDD_DOWNLOADED_FILES,
+      FDD_MMC
+  };
+
+  /* List of supported Geos file types */
+  @chunk GeodeToken IncludeList[] = {
+      {NOTES_FILE_TOKEN, MANUFACTURER_ID_GEOWORKS},
+      {SMS_FILE_TOKEN, MANUFACTURER_ID_GEOWORKS},
+      {MEMO_FILE_TOKEN, MANUFACTURER_ID_GEOWORKS},
+      {FAX_NOTE_FILE_TOKEN, MANUFACTURER_ID_GEOWORKS},
+      {"", MANUFACTURER_ID_GEOWORKS}
+  };
+
+  @object ComplexMonikerClass CloseTrigger = {
+    ComplexMoniker = GenTriggerClass;
+    CMI_topText = CMT_CLOSE;
+    GTI_actionMsg = MSG_FSA_RETURN_TO_LAUNCHER;
+    GTI_destination = @DocViewApp;
+
+    HINT_SEEK_MENU_BAR;
+    HINT_SEEK_SLOT = 3;
+  }
+
+@end    Interface;
+
+/*
+ ***************************************************************************
+ *              Methods and procedures for process class
+ ***************************************************************************
+ */
+
+@classdecl  DocViewProcessClass, neverSaved;
+
+@method DocViewProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+    char buf[80];
+    word size;
+
+    @callsuper();
+
+    /* Install tokens... */
+    @call application::MSG_GEN_APPLICATION_INSTALL_TOKEN();
+
+    /* Install associations and plugins if not already present */
+    if(InitFileReadStringBuffer("vilFileTable",".RTF",buf,sizeof(buf),&size))
+    {
+      InitFileWriteString("vilFileTable", ".RTF", VIEWER_LIBRARY);
+      InitFileWriteStringSection("WWW", "plugins",
+        VIEWER_LIBRARY "," VIEWER_GEODE ",APPLICATION/RTF,.rtf");
+
+      InitFileWriteString("vilFileTable", ".HTM", VIEWER_LIBRARY);
+    }
+
+    if(InitFileReadStringBuffer("vilFileTable",".PDB",buf,sizeof(buf),&size))
+    {
+      InitFileWriteString("vilFileTable", ".PDB", VIEWER_LIBRARY);
+      InitFileWriteStringSection("WWW", "plugins",
+        VIEWER_LIBRARY "," VIEWER_GEODE ",APPLICATION/X-PILOT,.pdb");
+
+      InitFileWriteString("vilFileTable", ".PRC", VIEWER_LIBRARY);
+      InitFileWriteStringSection("WWW", "plugins",
+        VIEWER_LIBRARY "," VIEWER_GEODE ",APPLICATION/X-PILOT,.prc");
+    }
+}
+
+/*
+ ***************************************************************************
+ *              Methods and procedures for file openm control class
+ ***************************************************************************
+ */
+
+@classdecl  FilterFileOpenControlClass;
+
+/* Disable and re-enable triggers whose slots overlap
+   the FileOpenControl's when it views a subdirectory. */
+
+@method FilterFileOpenControlClass, MSG_FILE_OPEN_CONTROL_SUB_DIR_OPEN
+{
+    @send CloseTrigger::MSG_GEN_SET_NOT_USABLE( VUM_DELAYED_VIA_APP_QUEUE );
+}
+
+@method FilterFileOpenControlClass, MSG_FILE_OPEN_CONTROL_SUB_DIR_CLOSE
+{
+    @send CloseTrigger::MSG_GEN_SET_USABLE( VUM_DELAYED_VIA_APP_QUEUE );
+}
+
+/********************************************************************
+ *              MSG_FILE_OPEN_CONTROL_GET_VIEWER_LIBRARY_NAME
+ ********************************************************************
+ *
+ * PARAMETERS:   FileLongName *libName
+ *               ViewerAttributes attr
+ * RETURNS:      ViewerInterfaceError
+ *
+ *******************************************************************/
+@method FilterFileOpenControlClass,
+        MSG_FILE_OPEN_CONTROL_GET_VIEWER_LIBRARY_NAME
+{
+    /* The trick is to handle everything using our associated viewer library,
+       overriding any other settings that might exist in the INI file. */
+
+    strcpy(libName, VIEWER_LIBRARY);
+    return 0;                           /* "Identified" viewer library... */
+}

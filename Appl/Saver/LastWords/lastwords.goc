@@ -1,0 +1,980 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1992 -- All Rights Reserved
+ *
+ * PROJECT:	  PCGEOS
+ * MODULE:	  lastwords.goc
+ * FILE:	  lastwords.goc
+ *
+ * AUTHOR:  	  Jeremy Dashe : Apr  23, 1993
+ *
+ * DESCRIPTION:
+ *	The lastwords screen saver main file.
+ *
+ * RCS STAMP:
+ *	$Id: lastwords.goc,v 1.1 97/04/04 16:49:32 newdeal Exp $
+ *
+ ***********************************************************************/
+
+@include <stdapp.goh>
+@include <saver.goh>
+@include <lastwords.goh>
+#include <gstring.h>
+#include <graphics.h>
+#include <timer.h>
+#include <initfile.h>
+#include <Ansi/string.h>
+
+/*******************************************************************
+ 	    	Class Declarations
+ *******************************************************************/
+
+@classdecl  LWApplicationClass;
+@classdecl  LWProcessClass, neverSaved;
+
+
+/*******************************************************************
+ 	    	Forward Declarations
+ *******************************************************************/
+void LWInit(optr oself);
+void LWTimerStart(optr oself);
+void LWDraw(optr oself);
+void LWGetTime(LWApplicationInstance *pself);
+void LWGetDate(LWApplicationInstance *pself);
+void LWDrawMessage(LWApplicationInstance *pself,
+		   Color color,
+		   word angle);
+void LWComputeTextBounds(optr oself,
+			 word *width,
+			 word *height);
+void ComputeBorders(optr oself,
+		    word width,
+		    word height,
+		    word winWidth,
+		    word winHeight,
+		    word *left,
+		    word *right,
+		    word *top,
+		    word *bottom);
+Boolean LWComputeGraphicBounds(optr oself,
+			       word *width,
+			       word *height);
+VMFileHandle LWVMFileOpen(void);
+
+/*******************************************************************
+ 	       	    	App instance...
+ *******************************************************************/
+
+@start AppResource;
+
+@object LWApplicationClass LWApp = {
+	GI_visMoniker = list {@LWTextMoniker};
+}
+@visMoniker LWTextMoniker = "Screen Saver";
+
+/*******************************************************************
+ 	       	    	Code and Message Handlers
+ *******************************************************************/
+
+#define LW_NUMBER_OF_OPTIONS	9
+
+typedef struct {
+    SAOptionTable   LW_saot;
+    SAOptionDesc    LW_saod[LW_NUMBER_OF_OPTIONS];
+} LWSAOptionTable;
+
+LWSAOptionTable lastwordsOptionTable = {
+    {LW_INI_CATEGORY, LW_NUMBER_OF_OPTIONS},
+    { /* Table o' options: */
+    	{LW_INI_KEY_TYPE,
+	 sizeof(LWFormatType),
+	 word_offsetof(LWApplicationInstance, LWCI_format)},
+	{LW_INI_KEY_RANDOM_COLOR,
+	 sizeof(Boolean),
+	 word_offsetof(LWApplicationInstance, LWCI_randomColor)},
+    	{LW_INI_KEY_COLOR,
+	 sizeof(byte),
+	 word_offsetof(LWApplicationInstance, LWCI_color)},
+        {LW_INI_KEY_MOTION,
+	 sizeof(SaverVectorReflectType),
+	 word_offsetof(LWApplicationInstance, LWCI_motion)},
+	{LW_INI_KEY_SPEED,
+	 sizeof(LWSpeedType),
+	 word_offsetof(LWApplicationInstance, LWCI_speed)},
+	{LW_INI_KEY_SIZE,
+	 sizeof(word),
+	 word_offsetof(LWApplicationInstance, LWCI_size)},
+	{LW_INI_KEY_RANDOM_ANGLE,
+	 sizeof(Boolean),
+	 word_offsetof(LWApplicationInstance, LWCI_randomAngle)},
+	{LW_INI_KEY_ANGLE,
+	 sizeof(sword),
+	 word_offsetof(LWApplicationInstance, LWCI_angle)},
+	{LW_INI_KEY_FONT,
+	 sizeof(FontID),
+	 word_offsetof(LWApplicationInstance, LWCI_fontID)},
+    }
+};
+
+@end AppResource;
+
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_LOAD_OPTIONS for LWApplicationClass
+ *
+ * DESCRIPTION:	Load our options from the .ini file.
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	4/12/93		Initial version
+ *
+ ***********************************************************************/
+@method LWApplicationClass, MSG_META_LOAD_OPTIONS
+{
+    word numChars;
+    
+    /*
+     * Get the message text from the .ini file, if it exists, and
+     * place it in our message buffer.
+     */
+    InitFileReadStringBuffer(LW_INI_CATEGORY,
+			     LW_INI_KEY_MESSAGE,
+			     pself->LWCI_msgText,
+			     LW_MAX_LENGTH,
+			     &numChars);
+
+    /*
+     * Load the application object's instance data from the
+     * .ini file via the option table.
+     */
+    SaverApplicationGetOptions((SAOptionTable *)&lastwordsOptionTable, oself);
+
+    @callsuper();
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SAVER_APP_SET_WIN for LWApplicationClass
+ *
+ * DESCRIPTION:	Record the window and gstate to use, and start things going.
+ *
+ * PARAMETERS:
+ *	void (WindowHandle windowHandle, GStateHandle gstateHandle);
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	4/12/93		Initial version
+ *
+ ***********************************************************************/
+@method LWApplicationClass, MSG_SAVER_APP_SET_WIN
+{
+    dword randomSeed;
+
+    /*
+     * Do the superclass thing first.
+     */
+    @callsuper();
+
+    /*
+     * Initialize our state for startup.
+     */
+    pself = ObjDerefGen(oself);
+
+    /*
+     * Create a random number generator and save its token in our instance
+     * data.
+     */
+    randomSeed = TimerGetCount();
+    pself->LWCI_randomToken = SaverSeedRandom(randomSeed, 0);
+    
+    /*
+     * Now initialize everything, draw the first message, and set one-shot
+     * timer that keeps the works in motion.
+     */
+    LWInit(oself);
+
+    LWTimerStart(oself);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	LWInit
+ *
+ * DESCRIPTION: This function initializes counters, starts timers, and
+ *	    	generally prepares the saver for starting.  Also draws
+ *	    	the first message.
+ *
+ * PARAMETERS:	oself - an optr to a LWApplication object.
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	4/12/93		Initial version
+ *
+ ***********************************************************************/
+void
+LWInit(optr oself)
+{
+    LWApplicationInstance *pself;
+    word width, height;
+    word left, right, top, bottom;
+
+    pself = ObjDerefGen(oself);
+
+    /*
+     * Set drawing colors and modes.
+     */
+    GrSetMixMode(pself->SAI_curGState, MM_COPY);
+
+    /*
+     * Set the text colormap
+     */
+    GrSetTextColorMap(pself->SAI_curGState, CMT_CLOSEST);
+
+    /*
+     * Initialize the font.
+     */
+    GrSetFont(pself->SAI_curGState,
+	      pself->LWCI_fontID,
+	      MakeWWFixed(pself->LWCI_size));
+    
+    /*
+     * Figure out the width and height for this message.  It can depend on the
+     * angle and type of message to draw.
+     */
+    switch (pself->LWCI_format) {
+    	case LWFT_TEXT:
+	    LWComputeTextBounds(oself, &width, &height);
+	    break;
+
+	case LWFT_TIME:
+	    LWGetTime(pself);
+	    LWComputeTextBounds(oself, &width, &height);
+	    break;
+
+	case LWFT_DATE:
+	    LWGetDate(pself);
+	    LWComputeTextBounds(oself, &width, &height);
+	    break;
+
+	case LWFT_GRAPHIC:
+	    /*
+	     * We set up some important instance data in here, like
+	     * the gstate we're drawing.  It also used when we
+	     * close down shop.
+	     */
+	    if (!LWComputeGraphicBounds(oself, &width, &height)) {
+		/*
+		 * The graphic file was dorked somehow.  Set the error flag
+		 * and bail.
+		 */
+		pself->LWCI_format = LWFT_BOGUS;
+		return;
+	    }
+	    break;
+    }
+
+    /*
+     * Now compute the borders, having gotten the width and height.
+     */
+    if (!pself->LWCI_randomAngle || (pself->LWCI_motion == SVRT_BOUNCE)) {
+	ComputeBorders(oself, width, height,
+		       pself->SAI_bounds.R_right - pself->SAI_bounds.R_left,
+		       pself->SAI_bounds.R_bottom - pself->SAI_bounds.R_top,
+		       &left, &right, &top, &bottom);
+	/*
+	 * Initialize the X- and Y-vectors.
+	 */
+	SaverVectorInit(&(pself->LWCI_vectorX),
+			pself->LWCI_motion,
+			left, right,
+			LW_DELTA_MAX,
+			LW_DELTA_BASE,
+			pself->LWCI_randomToken);
+
+	SaverVectorInit(&(pself->LWCI_vectorY),
+			pself->LWCI_motion,
+			top, bottom,
+			LW_DELTA_MAX,
+			LW_DELTA_BASE,
+			pself->LWCI_randomToken);
+    }
+
+    /*
+     * Signal that we haven't drawn anything yet, draw the message, then
+     * fire up the timer.
+     */
+    pself->LWCI_drawn = FALSE;
+    pself->LWCI_lastAngle = pself->LWCI_angle;
+
+    LWDraw(oself);
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	LWDraw
+ *
+ * DESCRIPTION:	Draw 
+ *
+ * PARAMETERS:	oself - an optr to the current saver object.
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	4/26/93		Initial version
+ *
+ ***********************************************************************/
+void
+LWDraw(optr oself)
+{
+    LWApplicationInstance *pself = ObjDerefGen(oself);
+    Color newColor;
+    word newAngle;
+    word newPoint;
+
+    /*
+     * If there was an error somewhere, don't draw anything.
+     */
+    if (pself->LWCI_format == LWFT_BOGUS) {
+	return;
+    }
+
+    if (pself->LWCI_drawn) {
+	/*
+	 * Erase the last object we drew before.
+	 */
+	LWDrawMessage(pself, C_BLACK, pself->LWCI_lastAngle);
+    }
+
+    /*
+     * Come up with a new angle (unless it's a set one).
+     */
+    if (pself->LWCI_randomAngle) {
+	newAngle = SaverRandom(360, pself->LWCI_randomToken);
+	pself->LWCI_lastAngle = newAngle;
+	pself->LWCI_angle = newAngle;
+    } else {
+	newAngle = pself->LWCI_angle;
+    }
+
+    /*
+     * Choose the color for the next drawing.
+     */
+    if (pself->LWCI_randomColor) {
+	do {
+	    newColor = SaverRandom(C_WHITE, pself->LWCI_randomToken) + 1;
+	} while (newColor == C_DARK_GRAY);
+    } else {
+	newColor = pself->LWCI_color;
+    }
+
+    /*
+     * Figure out the next position for the message.
+     */
+    if (pself->LWCI_randomAngle && (pself->LWCI_motion != SVRT_BOUNCE)) {
+	word left, right, top, bottom;
+
+	/*
+	 * Figure out the possible bounds for the new angle.
+	 */
+	ComputeBorders(oself, pself->LWCI_width, pself->LWCI_height,
+		        pself->SAI_bounds.R_right - pself->SAI_bounds.R_left,
+		        pself->SAI_bounds.R_bottom - pself->SAI_bounds.R_top,
+		        &left, &right, &top, &bottom);
+	SaverVectorInit(&(pself->LWCI_vectorX),
+			pself->LWCI_motion,
+			left, right,
+			LW_DELTA_MAX,
+			LW_DELTA_BASE,
+			pself->LWCI_randomToken);
+	SaverVectorInit(&(pself->LWCI_vectorY),
+			pself->LWCI_motion,
+			top, bottom,
+			LW_DELTA_MAX,
+			LW_DELTA_BASE,
+			pself->LWCI_randomToken);
+    } else {
+	if (SaverVectorUpdate(&(pself->LWCI_vectorX), pself->LWCI_randomToken,
+			  &newPoint)) {
+	    /*
+	     * We just bounced.  Make sure the current point is within bounds.
+	     */
+	    if ((sword)newPoint < 0) {
+		pself->LWCI_vectorX.SV_point = 0;
+	    } else if (newPoint >= pself->LWCI_vectorX.SV_max) {
+		pself->LWCI_vectorX.SV_point = pself->LWCI_vectorX.SV_max;
+	    }
+	}
+
+	if (SaverVectorUpdate(&(pself->LWCI_vectorY), pself->LWCI_randomToken,
+			  &newPoint)) {
+	    /*
+	     * We just bounced.  Make sure the current point is within bounds.
+	     */
+	    if ((sword)newPoint < 0) {
+		pself->LWCI_vectorY.SV_point = 0;
+	    } else if (newPoint >= pself->LWCI_vectorY.SV_max) {
+		pself->LWCI_vectorY.SV_point = pself->LWCI_vectorY.SV_max;
+	    }
+	}
+    }
+
+    /*
+     * Ok, we've got the position.  Now update the time or date string
+     * if we have to.
+     */
+    switch (pself->LWCI_format) {
+    	case LWFT_TIME:
+	    LWGetTime(pself);
+	    break;
+
+    	case LWFT_DATE:
+	    LWGetDate(pself);
+	    break;
+
+	default:
+	    /* Nothing needs to be done... */
+	    break;
+    }
+
+    LWDrawMessage(pself, newColor, newAngle);
+
+    pself->LWCI_drawn = TRUE;
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	LWGetTime
+ *
+ * DESCRIPTION:	This function blasts the current time (in the DTF_HMS
+ *	    	format) into the buffer at pself->LWCI_msgText.
+ *
+ * PARAMETERS:	pself - points to instance data for the LWApplicationClass
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	4/26/93		Initial version
+ *
+ ***********************************************************************/
+void
+LWGetTime(LWApplicationInstance *pself)
+{
+    TimerDateAndTime now;
+
+    TimerGetDateAndTime(&now);
+    LocalFormatDateTime(pself->LWCI_msgText, DTF_HMS, &now);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	LWGetDate
+ *
+ * DESCRIPTION:	This function blasts the current date (in the DTF_LONG
+ *	    	format) into the buffer at pself->LWCI_msgText.
+ *
+ * PARAMETERS:	pself - points to instance data for the LWApplicationClass
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	4/26/93		Initial version
+ *
+ ***********************************************************************/
+void
+LWGetDate(LWApplicationInstance *pself)
+{
+    TimerDateAndTime now;
+
+    TimerGetDateAndTime(&now);
+    LocalFormatDateTime(pself->LWCI_msgText, DTF_LONG_CONDENSED, &now);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	LWDrawMessage
+ *
+ * DESCRIPTION:	This function draws a text or gstring message at whatever
+ *	    	the current point is with a set angle and color.
+ *
+ * PARAMETERS:	pself - points to instance data for the LWApplicationClass
+ *	    	color - the color to draw in
+ *	    	angle - the angle at which to draw the message
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	4/26/93		Initial version
+ *
+ ***********************************************************************/
+void
+LWDrawMessage(LWApplicationInstance *pself,
+	      Color color,
+	      word angle)
+{
+    GStateHandle gs = pself->SAI_curGState;
+
+    /*
+     * Set the drawing transformation back to its default, then set the
+     * color.
+     */
+    GrSetDefaultTransform(gs);
+    GrSetTextColor(gs, CF_INDEX, color, 0, 0);
+    GrSetAreaColor(gs, CF_INDEX, color, 0, 0);
+
+    /*
+     * Translate the origin to the coordinate at which to draw the text, so
+     * when we rotate, the text still appears there.
+     */
+    GrApplyTranslation(gs,
+		       MakeWWFixed(pself->LWCI_vectorX.SV_point),
+		       MakeWWFixed(pself->LWCI_vectorY.SV_point));
+
+    /*
+     * Apply the rotation.
+     */
+    if (angle) {
+	GrApplyRotation(gs, MakeWWFixed(angle));
+    }
+
+    if (pself->LWCI_format != LWFT_GRAPHIC) {
+	/*
+	 * It's text.  Draw the null-terminated message at (0,0).
+	 */
+	GrDrawText(gs, 0, 0, pself->LWCI_msgText, 0);
+    } else {
+	/*
+	 * It's a graphic.  If we're supposed to erase the thing,
+	 * just use a rectangle.
+	 */
+	if (color == C_BLACK) {
+	    /*
+	     * Erase the graphic.  Enlarge the rectangle slightly to account
+	     * for rotation greebles.
+	     */
+	    GrFillRect(gs, -2, -2,
+		       pself->LWCI_width + 2,
+		       pself->LWCI_height + 2);
+	} else {
+	    /*
+	     * Draw the graphic.
+	     */
+	    word dummy;
+	    GrDrawGString(gs,
+			  pself->LWCI_gstring,
+			  pself->LWCI_xOffset,
+			  pself->LWCI_yOffset,
+			  GSRT_COMPLETE,
+			  &dummy);
+	}
+    }
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	LWComputeTextBounds
+ *
+ * DESCRIPTION:	This function figures out the width and height for the 
+ *	    	text contained in our instance data.
+ *
+ * PARAMETERS:	oself - an optr to a LWApplication object.
+ *	    	width, height - pointers to where
+ *	    	    we can store the sizes.
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	4/23/93		Initial version
+ *
+ ***********************************************************************/
+void
+LWComputeTextBounds(optr oself,
+		    word *width,
+		    word *height)
+{
+    LWApplicationInstance *pself = ObjDerefGen(oself);
+
+    /*
+     * Figure the dimensions of the string so it doesn't go bouncing off
+     * screen alot.  Of course, just knowing the dimensions doesn't help;
+     * we also subtract the width and height of the string from the width
+     * and height of our drawing area as well.
+     */
+    *width = GrTextWidth(pself->SAI_curGState,
+			 pself->LWCI_msgText,
+			 strlen(pself->LWCI_msgText));
+
+    /*
+     * We can figure out the height based on pointsize.
+     */
+    pself->LWCI_height = *height = pself->LWCI_size;
+    pself->LWCI_width = *width;
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	LWComputeGraphicBounds
+ *
+ * DESCRIPTION:	This function figures out the width and height for the 
+ *	    	graphic that's saved in a specific graphic file.
+ *
+ *	    	Returns FALSE if an error occurred; TRUE otherwise.
+ *
+ * PARAMETERS:	oself - an optr to a LWApplication object.
+ *	    	width, height - pointers to where
+ *	    	    we can store the sizes.
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	5/13/93	    	Initial version
+ *
+ ***********************************************************************/
+Boolean
+LWComputeGraphicBounds(optr oself,
+		       word *width,
+		       word *height)
+{
+    LWApplicationInstance *pself = ObjDerefGen(oself);
+    VMFileHandle file;
+    VMBlockHandle mapBlockHandle, gstringHandle;
+    LWGStringHeader *mapBlock;
+    MemHandle mh;
+    Rectangle bounds;
+
+    /*
+     * Open the file.
+     */
+    file = LWVMFileOpen();
+    if (!file) {
+	/*
+	 * Something was wrong with the file.  Return a bogosity flag.
+	 */
+	return FALSE;
+    }
+
+    /*
+     * Ok, it exists.  Grab the height and width from its map block.
+     */
+    mapBlockHandle = VMGetMapBlock(file);
+    mapBlock = VMLock(file, mapBlockHandle, &mh);
+    *width = mapBlock->LWGS_width;
+    *height = mapBlock->LWGS_height;
+    gstringHandle = mapBlock->LWGS_data;
+    VMUnlock(mh);
+
+    /*
+     * Now make a gstring out of the VM block, and load up some
+     * instance data.
+     */
+    pself->LWCI_gstring = GrLoadGString(file, GST_VMEM, gstringHandle);
+    pself->LWCI_file = file;
+    pself->LWCI_width = *width;
+    pself->LWCI_height = *height;
+
+    if (!GrGetGStringBounds(pself->LWCI_gstring, 0, 0, &bounds)) {
+	/*
+	 * There was a bounds overflow.  Clean up and return a
+	 * error flag.
+	 */
+	GrDestroyGString(pself->LWCI_gstring, 0, GSKT_LEAVE_DATA);
+	VMClose(file, FILE_NO_ERRORS);
+	return FALSE;
+    }
+    
+    pself->LWCI_xOffset = -bounds.R_left;
+    pself->LWCI_yOffset = -bounds.R_top;
+    
+    return TRUE;		/* Success! */
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	ComputeBorders
+ *
+ * DESCRIPTION:	Figure out the boundaries within which the message is
+ *	    	allowed to be placed.
+ *
+ * PARAMETERS:	oself - an optr to a LWApplication object.
+ *	    	width, height - the width and height of the thing
+ *	    	    we're drawing.
+ *	    	winWidth, winHeight - the width and height of the
+ *	    	    window we're draing to.
+ *	    	left, right, top, bottom - pointer to where we can
+ *	    	    place the computed borders.
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	4/23/93		Initial version
+ *
+ ***********************************************************************/
+void
+ComputeBorders(optr oself,
+	       word width,
+	       word height,
+	       word winWidth,
+	       word winHeight,
+	       word *left,
+	       word *right,
+	       word *top,
+	       word *bottom)
+{
+    LWApplicationInstance *pself = ObjDerefGen(oself);
+    XYValueAsDWord coord;
+    sword xmin, xmax, ymin, ymax;
+
+#define SET_MAX_MIN(max, min, value)	if ((value) < min) {        \
+					    min = (value);          \
+					} else if ((value) > max) { \
+					    max = (value);  	    \
+				        }
+
+    xmin = xmax = ymin = ymax = 0;
+
+    /*
+     * Grab the coords of the different corners to determine the
+     * bounds.
+     */
+    GrApplyRotation(pself->SAI_curGState, MakeWWFixed(pself->LWCI_angle));
+
+    coord = GrTransform(pself->SAI_curGState, width, 0);
+    SET_MAX_MIN(xmax, xmin, DWORD_X(coord));
+    SET_MAX_MIN(ymax, ymin, DWORD_Y(coord));
+
+    coord = GrTransform(pself->SAI_curGState, width, height);
+    SET_MAX_MIN(xmax, xmin, DWORD_X(coord));
+    SET_MAX_MIN(ymax, ymin, DWORD_Y(coord));
+
+    coord = GrTransform(pself->SAI_curGState, 0, height);
+    SET_MAX_MIN(xmax, xmin, DWORD_X(coord));
+    SET_MAX_MIN(ymax, ymin, DWORD_Y(coord));
+
+    /*
+     * Using the minimum and maximum bounds that were just determined,
+     * figure out the borders.
+     */
+    *left   = (xmin < 0 ? -xmin : xmin);
+    *top    = (ymin < 0 ? -ymin : ymin);
+    *right  = (winWidth  >= xmax ? winWidth  - xmax : 0);
+    *bottom = (winHeight >= ymax ? winHeight - ymax : 0);
+
+    /*
+     * Make sure the mins are smaller than the maxes.
+     */
+    if (*left >= *right) {
+	*right = *left + 1; 	/* Must be at least 1 or SaverRandom will
+				   choke later on... */
+    }
+    if (*top >= *bottom) {
+	*bottom = *top + 1; 	/* Must be at least 1. */
+    }
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	LWTimerStart
+ *
+ * DESCRIPTION:	This function fires up a one-shot timer and places
+ *	    	its ID and handle in instance data
+ *
+ * PARAMETERS:	oself - an optr to the current app object
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	4/23/93		Initial version
+ *
+ ***********************************************************************/
+void
+LWTimerStart(optr oself)
+{
+    LWApplicationInstance *pself = ObjDerefGen(oself);
+
+    /*
+     * Fire up a one-shot timer.
+     */
+    pself->LWCI_timerHandle = TimerStart(TIMER_EVENT_ONE_SHOT,
+					 oself,
+					 pself->LWCI_speed,
+					 MSG_LW_APP_DRAW,
+					 0,
+					 &(pself->LWCI_timerID));
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SAVER_APP_UNSET_WIN for LWApplicationClass
+ *
+ * DESCRIPTION:	Stop saving the screen.
+ *
+ * PARAMETERS:
+ *	Boolean (SaverUnsetRetVal *retVal,
+ *	    	 WindowHandle winHandle);
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	4/23/93		Initial version
+ *
+ ***********************************************************************/
+@method LWApplicationClass, MSG_SAVER_APP_UNSET_WIN
+{
+    /*
+     * Stop the draw timer.
+     */
+    TimerStop(pself->LWCI_timerHandle, pself->LWCI_timerID);
+
+    /*
+     * Nuke the random number generator, too.
+     */
+    SaverEndRandom(pself->LWCI_randomToken);
+
+    /*
+     * Close down the VM file, if we're drawing something out of it.
+     */
+    if (pself->LWCI_format == LWFT_GRAPHIC) {
+	/*
+	 * Close that pup down.
+	 */
+	GrDestroyGString(pself->LWCI_gstring, 0, GSKT_LEAVE_DATA);
+	VMClose(pself->LWCI_file, FILE_NO_ERRORS);
+    }
+
+    return @callsuper();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_LW_APP_DRAW for LWApplicationClass
+ *
+ * DESCRIPTION:	This message is called by the one-shot timer to draw the
+ *	    	next `frame' of the saver.  We then start up another
+ *	    	timer to make this go on indefinately...
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	4/23/93		Initial version
+ *
+ ***********************************************************************/
+@method LWApplicationClass, MSG_LW_APP_DRAW
+{
+    LWDraw(oself);
+    LWTimerStart(oself);
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	LWVMFileOpen
+ *
+ * DESCRIPTION:	This function opens the VM file in which a gstring is
+ *	    	saved for LastWords.  If the file exists and appears to
+ *	    	be ok, it's file handle is returned.  Otherwise, 0
+ *	    	is returned.
+ *
+ * PARAMETERS:	none
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	5/13/93		Initial version
+ *
+ ***********************************************************************/
+VMFileHandle
+LWVMFileOpen(void)
+{
+    GeodeToken token;
+
+    /*
+     * The file should exist in privdata.
+     */
+    FileSetStandardPath(SP_PRIVATE_DATA);
+
+    if (FileGetPathExtAttributes(LW_VM_FILE_NAME,
+				 FEA_TOKEN,
+				 &token,
+				 sizeof(GeodeToken))) {
+	/*
+	 * The file could not be found.  Bail.
+	 */
+	return 0;
+    }
+
+    /*
+     * Does the file have the correct token?  If not, return FALSE.  Otherwise,
+     * open the thing and return its file handle.
+     */
+    if (strncmp(token.GT_chars, LW_FEARLESS_TOKEN, TOKEN_CHARS_LENGTH)) {
+	return 0;
+    }
+
+    /*
+     * The file appears to be ok.  Open it, and return its file handle.
+     */
+    return (VMOpen(LW_VM_FILE_NAME, VMAF_FORCE_READ_ONLY, VMO_OPEN, 0));
+}

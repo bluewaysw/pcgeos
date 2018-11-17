@@ -1,0 +1,255 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC/GEOS
+MODULE:		GeoCalc
+FILE:		spreadsheetGeode.def
+
+AUTHOR:		Gene Anderson, Sep 16, 1991
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	eca	9/16/91		Initial revision
+
+DESCRIPTION:
+	Common geode files for Spreadsheet library
+
+	$Id: spreadsheetGeode.def,v 1.1 97/04/07 11:14:48 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;------------------------------------------------------------------------------
+;			GEODE stuff
+;------------------------------------------------------------------------------
+
+include geos.def
+include geode.def
+
+;------------------------------------------------------------------------------
+;  FULL_EXECUTE_IN_PLACE : Indicates that the spreadsheet lib is going to
+;       be used in a system where all geodes (or most, at any rate)
+;       are to be executed out of ROM.  
+;------------------------------------------------------------------------------
+ifndef FULL_EXECUTE_IN_PLACE
+        FULL_EXECUTE_IN_PLACE           equ     FALSE
+endif
+
+;------------------------------------------------------------------------------
+;  The .GP file only understands defined/not defined;
+;  it can not deal with expression evaluation.
+;  Thus, for the TRUE/FALSE conditionals, we define
+;  GP symbols that _only_ get defined when the
+;  condition is true.
+;-----------------------------------------------------------------------------
+if      FULL_EXECUTE_IN_PLACE
+        GP_FULL_EXECUTE_IN_PLACE        equ     TRUE
+endif
+
+;----------------------------------------------------------------------
+; This is the default setting for all the flags for regular Spreadsheet lib. By
+; default, all the flags are "on". If you need to cut any of the following
+; features, then you can set the particular flags "off".
+; _CHARTS	:	If this flag is "on", Spreadsheet lib will provide
+;			charting features, and the user is also able to create
+;			graphical objects.
+; _PROTECT_CELL	:	If this flag is "on", Spreadsheet lib will provide
+;			the cell protection feature. Since this is the new
+;			feature, we don't use it in regular GeoCalc until
+;			it is found to be stable.
+; _GRID_PRINTING:	If this flag is "on", Spreadhseet lib will always
+;			allow sufficient room for printing the grid lines
+;			around the outside of a document. Without this,
+;			the right or bottom grid line can be missing from
+;			a printout. The cost of turning on this flag is
+;			one less column can be printed on a piece of
+;			US Letter-sized paper, when using the default
+;			column widths
+; _SCROLL_PARTLY_VISIBLE_CELL_ON_SCREEN_ONLY_WITH_KBD
+;			If a cell is selected and if it is partly visible,
+;			having this flag set to TRUE will cause the
+;			spreadsheet to scroll the window in order to bring
+;			the entire cell onto the screen, only if the
+;			cell was moved to via the keyboard. If the user
+;			clicked on the cell, then it is not scrolled on
+;			to the screen.
+;	
+;			This is FALSE by default, in order to maintain the
+;			traditional behavior. Setting it to TRUE gives
+;			the nicer behavior.
+;
+; _CHECK_LIMIT_FOR_FILL
+;			Checks to see if the amount of area that will
+;			be filled is larger than the transferLimit,
+;			and if it is, then the user gets a dialog box
+;			telling them that only part of the area will be
+;			filled, and then only part of the area is filled.
+;
+;			This helps to reduce the problem of the user filling
+;			the spreadsheet and getting a crash because
+;			the new huge spreadsheet is using all of memory.
+;
+;			This is FALSE by default to preserve the old behavior.
+;
+; _USE_UI_DEFAULT_FOR_RULER_FONT_AND_SIZE
+;			Use the system's default font & size instead of
+;			a pre-defined font/size determined by this library
+;			Turning this on results in *slightly* slower
+;			drawing of the rulers.
+;----------------------------------------------------------------------
+
+        _CHARTS         =	TRUE
+
+	_PROTECT_CELL	=	TRUE
+
+	_GRID_PRINTING	=	TRUE
+
+ifdef GPC
+	; works around selection problem at edges
+	_SCROLL_PARTLY_VISIBLE_CELL_ON_SCREEN_ONLY_WITH_KBD = TRUE
+else
+	_SCROLL_PARTLY_VISIBLE_CELL_ON_SCREEN_ONLY_WITH_KBD = FALSE
+endif
+
+	_CHECK_LIMIT_FOR_FILL	= FALSE
+
+ifdef GPC
+	_USE_UI_DEFAULT_FOR_RULER_FONT_AND_SIZE	= TRUE
+else
+	_USE_UI_DEFAULT_FOR_RULER_FONT_AND_SIZE = FALSE
+endif
+
+
+;----------------------------------------------------------------------
+; This part is to set some particular flags for the Redwood project.
+;----------------------------------------------------------------------
+
+
+;----------------------------------------------------------------------
+; Just define the _NIKE flag.
+; Leave all features in the their default state.
+;----------------------------------------------------------------------
+
+	_NIKE		=	FALSE
+
+;----------------------------------------------------------------------
+; This part is the flag setting for Jedi. Basically, we don't need charting
+; and graphical objects in Spreadsheet lib. So we turn the flag off.
+;----------------------------------------------------------------------
+
+	_JEDI		=	FALSE
+
+;----------------------------------------------------------------------
+; This part is the flag setting for Dove. Basically, we don't need charting
+; and graphical objects in Spreadsheet lib. So we turn the flag off.
+;----------------------------------------------------------------------
+
+	_DOVE		=	FALSE
+
+;----------------------------------------------------------------------
+; This part is to set some particular flags for Jedi project. We don't
+; use Chart lib in Jedi, so we turn _CHARTS off.
+; Cell protection is one of the features we want in Jedi.
+;----------------------------------------------------------------------
+
+
+
+;----------------------------------------------------------------------
+; Define the GP_CHARTS symbol for glue (or not).  Make sure that all
+; modifications to the _CHARTS symbol come before this!  The gp file
+; only understands defined/not defined -- see prev discussion of
+; GP_FULL_EXECUTE_IN_PLACE
+;----------------------------------------------------------------------
+if _CHARTS
+	GP_CHARTS	equ	TRUE
+endif
+
+if FULL_EXECUTE_IN_PLACE
+include Internal/xip.def
+include Internal/heapInt.def
+endif
+
+include resource.def
+include ec.def
+include assert.def
+include library.def
+include lmem.def
+include dbase.def
+include heap.def
+include graphics.def
+include font.def
+include gstring.def
+include win.def
+include Objects/winC.def
+include object.def
+include Objects/metaC.def
+include Objects/processC.def
+include Objects/inputC.def
+include thread.def
+include timer.def
+include timedate.def
+include vm.def
+include localize.def
+include system.def
+include initfile.def
+
+include Internal/prodFeatures.def
+
+
+UseLib	ui.def
+UseLib	cell.def
+UseLib	math.def
+UseLib	parse.def
+UseLib	ruler.def
+
+if _CHARTS
+UseLib	chart.def
+endif
+
+UseLib	Objects/vTextC.def
+UseLib 	Objects/Text/tCommon.def
+UseLib	Objects/Text/tCtrlC.def
+
+UseLib	ssmeta.def
+DefLib	ssheet.def
+
+
+include geoworks.def
+include Objects/styles.def			;for controllers
+include Objects/Text/tCtrlC.def			;to send out notifications
+
+include Objects/SSheet/sCtrlC.def
+
+include	geode.def
+
+include spreadsheetMacros.def
+include spreadsheetErrors.def			;FatalErrors
+
+;------------------------------------------------------------------------------
+;			global definitions
+;------------------------------------------------------------------------------
+
+JustifyTextParams	struct
+    JTP_leftX	word				;left x position
+    JTP_rightX	word				;right x position
+    JTP_yPos	word				;y position
+    JTP_width	word				;width (0 if need to calc)
+JustifyTextParams	ends
+
+DrawCode	segment	resource
+global	GrJustifyText:far
+DrawCode	ends
+
+PointerImages	segment lmem
+global	ptrSSheet:chunk
+global	ptrResizeColumn:chunk
+global	ptrResizeRow:chunk
+PointerImages	ends
+
+;
+; We have these here to allow product specific values
+;
+SS_COLUMN_WIDTH_MAX	equ	COLUMN_WIDTH_MAX
+SS_COLUMN_WIDTH_MIN	equ	COLUMN_WIDTH_MIN
+SS_COLUMN_WIDTH_INC	equ	COLUMN_WIDTH_INC

@@ -1,0 +1,559 @@
+/************************************************
+ *						*
+ *	project:	BSW-CD			*
+ *	module:		MAIN\SUBCODE.GOC	*
+ *						*
+ * 	subroutines for CD control logic	*
+ *						*
+ ************************************************/
+
+@include <stdapp.goh>
+@include <Ui\define.goh>
+
+@include <Ui\uimain.goh>
+@include <Ui\uimax.goh>
+
+#include <bbxcd.h>		/* selbsterstellte Datenstrukt.*/
+#include <Lib\cdlib.h>
+@include <Main\process.goh>
+#include <Main\Display.h>
+#include <Main\subcode.h>
+
+#include <file.h>
+#include <ansi/string.h>
+#include <sound.h>
+#include <stdio.h>
+
+@extern chunk DBaseWriteErrorTxt;
+@extern chunk CDsTxt;
+@extern chunk EmptyTxt;
+@extern chunk MinTrackTxt;
+@extern chunk NoneTxt;
+@extern chunk PlayTimeTxt;
+@extern chunk PlayTxt;
+@extern chunk PauseTxt;
+@extern chunk StopTxt;
+@extern chunk DiscTxt;
+@extern chunk BlankTxt;
+
+/****************************************
+ *					*
+ *	ErrorSound			*
+ *					*
+ *	Sound fÅr interne Fehler	*
+ ****************************************/
+
+void	_pascal ErrorSound(byte message)
+{
+	@call BCPrimary::MSG_BC_PRIM_SET_FIRST_AID(message);
+	UserStandardSound(SST_CUSTOM_NOTE,HIGH_A,30);
+	TimerSleep(45);
+	UserStandardSound(SST_CUSTOM_NOTE,HIGH_D,30);
+	TimerSleep(90);
+	@send BCPrimary::MSG_BC_PRIM_SET_FIRST_AID(defaultMessage);
+}
+
+void pascal DialogWindow (char * text)
+{
+  if (dialogWindow) {
+#ifdef BETATEST
+    @call StartGlyph::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(text,VUM_NOW);
+    TimerSleep(15);
+#else
+    UserStandardDialog( 0,0,0,0,
+      text,
+    ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+     (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET))
+    );
+#endif
+  }
+}
+
+
+byte _pascal FindCDData (FileHandle fHand)
+// looks for UPC code in Database and places pointer on the UPC entry start
+// or sets it to end of file. Returns TRUE when found and FALSE if not
+{
+  long i;
+  flag found;
+  i=0;
+  found=FALSE;
+  while (!found) {
+    FilePos(fHand,i*sizeof(dbEntry)+33,FILE_POS_START);
+    if (FileRead(fHand,globalText,15,FALSE)!=15) break;
+    if (!strcmp(globalText,dbEntry.cd_UPC))
+      found = TRUE;
+    else
+      i++;
+  }
+  FilePos(fHand,i*sizeof(dbEntry)+33,FILE_POS_START);
+  return found;
+}
+
+void _pascal WriteCDData (void)
+{
+  FileHandle fHand;
+
+  FileSetCurrentPath(SP_PUBLIC_DATA,".");
+  fHand = FileCreate (dbName,
+                       FILE_CREATE_NO_TRUNCATE|FCF_NATIVE|FILE_ACCESS_RW|FILE_DENY_RW,
+                       FA_ARCHIVE);
+  if (fHand) {
+    FindCDData(fHand);
+    FileWrite(fHand,&dbEntry,sizeof(dbEntry),FALSE);
+    FileClose(fHand,FALSE);
+  } else {
+	MemLock (OptrToHandle(@DBaseWriteErrorTxt));
+	 UserStandardDialog( 0,0,0,0,
+		LMemDeref(@DBaseWriteErrorTxt),
+    ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+     (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET))
+    );
+	MemUnlock (OptrToHandle(@DBaseWriteErrorTxt));
+  }
+}
+
+void _pascal GetCDData (void)
+{
+  FileHandle fHand;
+  long count;
+  FileSetCurrentPath(SP_PUBLIC_DATA,".");
+  fHand = FileOpen (dbName, FILE_DENY_W|FA_READ_ONLY);
+  MemLock (OptrToHandle(@CDsTxt));
+
+  if (fHand) {
+    count = ( FileSize(fHand) / sizeof(dbEntry) );
+    if (FindCDData(fHand))
+      FileRead(fHand,&dbEntry,sizeof(dbEntry),FALSE);
+	 sprintf (globalText,LMemDeref(@CDsTxt),(word)count);
+	 FileClose(fHand,FALSE);
+  } else {
+	 sprintf (globalText,LMemDeref(@EmptyTxt));
+  }
+  MemLock (OptrToHandle(@CDsTxt));
+  @call DBENumberEntries::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(globalText,VUM_NOW);
+}
+
+byte _pascal GetNextTrack (void)
+// return number of the next track to be played
+{
+  static byte rekursion = 0;
+  byte nextTrack, i, j ;
+  nextTrack = 0;
+  if ((isPlaying)&&(repeatMode == REPEAT_SINGLE))
+    return currentTrack;
+  switch (programMode) {
+    case MIG_NORMAL:
+      i = currentTrack+1;
+      for (i=currentTrack+1;(i<=CD_Get_Tracks()) &&(nextTrack==0); i++)
+        if (TracksToPlay(i,2))
+          nextTrack = i;
+      break;
+    case MIG_RANDOM:
+      j=0;
+      for (i=1;i<=MaxTracks; i++)
+        if (tracksToPlay[i]&&(i!=currentTrack))
+          j++;
+      if (j) {
+        j=(random%j)+1;
+        for (i=1;(i<=MaxTracks) && j; i++)
+          if (tracksToPlay[i]&&(i!=currentTrack))
+            j--;
+        nextTrack = i-1;
+      }
+      break;
+    case MIG_PROGRAM:
+      if (programTracks[programCounter+1]&&(programCounter <= MaxTracks))
+        nextTrack = programTracks[++programCounter];
+      break;
+  }
+  if ((!nextTrack)&&(repeatMode== REPEAT_ON)&&(!rekursion)) {
+    @call process::MSG_BCD_TRIG_STOP();
+    rekursion = 1;
+    return GetNextTrack();
+  }
+  rekursion = 0;
+  return nextTrack;
+}
+
+byte _pascal GetPreviousTrack (void)
+// return number of previous track to be skipped back
+{
+  char prevTrack, i ;
+  prevTrack = currentTrack;
+  if ((isPlaying)&&(repeatMode == REPEAT_SINGLE))
+    return currentTrack;
+  switch (programMode) {
+    case MIG_NORMAL:
+      for (i=currentTrack-1; (i>0)&&(prevTrack==currentTrack); i--)
+        if (ValidTracks(i,2))
+          prevTrack = i;
+      break;
+    case MIG_RANDOM:
+      prevTrack = currentTrack;
+      break;
+    case MIG_PROGRAM:
+      if (programCounter)
+        if (programCounter>1)
+          programCounter--;
+        prevTrack = programTracks[programCounter];
+      break;
+  }
+  return prevTrack;
+}
+
+void _pascal StartPlaying (byte track)
+// start or continue playing with given track
+{
+  if (isPlaying)
+    CD_Play_Stop(0);
+  if (track) {
+    CD_Play_Position(CD_Get_Track_Start(track),CD_Get_Length());
+    isPlaying = TRUE;
+    if (pauseState)
+      CD_Play_Stop(1);
+    else
+      ShowPlayMoniker(0);
+  }
+  RedrawStatus(NullHandle);
+}
+
+
+
+void _pascal Get_CD_UPC ( void )
+{
+  int	i;
+  for (i=0;i<14;i++)
+    dbEntry.cd_UPC[i] = CD_Get_UPC(i,optionFlags&FBG_NO_UPC) +48;
+  @call CITR2::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(dbEntry.cd_UPC,VUM_NOW);
+}
+
+void _pascal ReadCDData (void)
+// read track info and database info of changed CD
+{
+  static int audio = 1;
+  int i,digital;
+
+  // mark application busy
+  @call BApp::MSG_GEN_APPLICATION_MARK_BUSY();
+
+  // write old CD dataset if it was an audio cd (do not write data cds)
+  if (!startPhase&&audio)
+    WriteCDData();
+  // clear data tables
+  dbEntry.volume = 255;
+  dbEntry.balance = 50;
+  MemLock (OptrToHandle(@MinTrackTxt));
+  for (i=1;i<=MaxTracks; i++) {
+    calendarFrame[i]=C_LIGHT_BLUE;
+    calendarString[i]=C_LIGHT_BLUE;
+    tracksToPlay[i]=0;
+    validTracks[i]=0;
+    programTracks[i]=0;
+	 sprintf(dbEntry.trackName[i],LMemDeref(@MinTrackTxt),i);
+  }
+  MemUnlock (OptrToHandle(@MinTrackTxt));
+  dbEntry.trackName[0][0]=0;
+  dbEntry.cd_NAME[0]=0;
+  digital = 0;
+  audio=0;
+  programCounter = 0;
+  isPlaying = FALSE;
+  if (CD_Get_Track_Type(1))
+    for (i=1;i<=MaxTracks;i++) {
+      switch (CD_Get_Track_Type(i)) {
+        // (0:none, 1:audio, 2:data)
+        case 0:
+          calendarFrame[i] = backGroundColor ;
+          calendarString[i] = backGroundColor ;
+          validTracks[i] = 0;
+          tracksToPlay[i] = 0;
+          break;
+        case 1:
+          if (programMode == MIG_PROGRAM)
+            calendarFrame[i] = backGroundColor ;
+          else
+            calendarFrame[i] = C_WHITE ;
+          calendarString[i]  = C_WHITE ;
+          tracksToPlay[i] = 1;
+          validTracks[i] = 1;
+          audio++;
+          break;
+        case 2:
+          calendarFrame[i] = backGroundColor ;
+          calendarString[i] = C_RED;
+          validTracks[i] = 0;
+          tracksToPlay[i] = 0;
+          digital++;
+          break;
+      }
+    }
+  ResetABPosition();
+  // read new CD dataset from database
+  Get_CD_UPC();
+  strcpy(dbEntry.cd_NAME,dbEntry.cd_UPC);
+  GetCDData();
+  // set selections according to new CD data
+  for (i=1;i<=MaxTracks;i++) {
+    if ((calendarString[i]==C_WHITE)&&(validTracks[i]==0))
+        calendarString[i] = C_LIGHT_BLUE ;
+    if (validTracks[i]==1)
+      tracksToPlay[i] = 1;
+  }
+  MemLock (OptrToHandle(@NoneTxt));
+  if (digital) {
+    sprintf (globalText,"%u",digital);
+  } else {
+	 sprintf (globalText,LMemDeref(@NoneTxt));
+  }
+  @call CITR3::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(globalText,VUM_DELAYED_VIA_UI_QUEUE);
+  if (audio) {
+    sprintf (globalText,"%u",audio);
+  } else {
+	 sprintf (globalText,LMemDeref(@NoneTxt));
+  }
+  @call CITR4::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(globalText,VUM_DELAYED_VIA_UI_QUEUE);
+  sprintf (globalText,LMemDeref(@PlayTimeTxt),(int)RedbookMin(CD_Get_Length()),(int)RedbookSec(CD_Get_Length()));
+  MemUnlock (OptrToHandle(@NoneTxt));
+  @call CITR5::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(globalText,VUM_DELAYED_VIA_UI_QUEUE);
+  @send ModusItemGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(programMode,FALSE);
+  SetProgramMode (programMode);
+  @send TrackDispList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(dispTrack,FALSE);
+  @send TrackTimeList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(dispTTime,FALSE);
+  @send DiscTimeList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(dispDTime,FALSE);
+  @call ModusRepeatList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(repeatMode,FALSE);
+  if (dbEntry.volume <248) {
+    @call VolumeValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(dbEntry.volume,FALSE);
+    @call process::MSG_BCD_SET_VOLUME();
+  }
+  if (dbEntry.balance !=50) {
+    @call BalanceValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(dbEntry.balance,FALSE);
+    @call process::MSG_BCD_SET_BALANCE();
+  }
+  SetABPositions();
+  @call DBECDTitleText::MSG_VIS_TEXT_REPLACE_ALL_PTR(dbEntry.cd_NAME, 0);
+  @call CDIName::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(dbEntry.cd_NAME,VUM_DELAYED_VIA_UI_QUEUE);
+  // Tracklist aktualisieren
+  @call DBETrackList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(CD_Get_Tracks()+1);
+  @call process::MSG_BCD_DB_LIST_APPLY(0,0,0);
+  RedrawAll();
+  if (!CD_Get_Length())
+    audio = 1;  // allow writing of 'empty' disk as if it is an audio disc
+
+  // reset applications busy state
+  @call BApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+}
+
+
+
+/*******************************************
+ *		CalendarKlick		   *
+ *					   *
+ * Fkt:	react to a click into the calendar *
+ * In: track : selected track number       *
+ *******************************************/
+
+void _pascal CalendarKlick (byte track)
+{
+  byte j;
+  if ( programMode == MIG_NORMAL ) {
+    if ((!validTracks[track])&&(CD_Get_Track_Type(track)==1)) {
+      validTracks[track] = 1;
+      calendarString[track]=C_WHITE;
+    }
+    if (validTracks[track]) {
+      for (j=0; j<track ; j++) {
+        tracksToPlay[j]=0;
+        calendarFrame[j] = backGroundColor;
+      }
+      for (j=track; j<=MaxTracks; j++)
+        if (validTracks[j]) {
+          tracksToPlay[j] = 1;
+          calendarFrame[j] = C_WHITE;
+        }
+      currentTrack = track;
+      calendarFrame[track] = C_YELLOW;
+      StartPlaying(track);
+    }
+  }
+  if ( programMode == MIG_RANDOM ) {
+    if (validTracks[track]) {
+      validTracks[track] = 0;
+      tracksToPlay[track] = 0;
+      calendarFrame[track] = backGroundColor;
+      calendarString[track] = C_LIGHT_BLUE;
+      if (isPlaying&&(track==currentTrack)) {
+        @call process::MSG_BCD_TRIG_FWD();
+      }
+    } else {
+      if (CD_Get_Track_Type(track) == 1) {
+        validTracks[track] = 1;
+        calendarFrame[track] = C_WHITE;
+        calendarString[track]=C_WHITE;
+        tracksToPlay[track]=1;
+      }
+    }
+  }
+  if ( programMode == MIG_PROGRAM ) {
+    if (CD_Get_Track_Type(track) ==1) {
+      for (j=1;(programTracks[j]!=track)&&(j<=MaxTracks);j++);
+      if (j<=MaxTracks) { // Does track already exist?
+        for (;j<=MaxTracks;j++)
+          programTracks[j] = programTracks[j+1];
+        programTracks[MaxTracks] = 0;
+        calendarFrame[track] = backGroundColor;
+        if ((j<=programCounter)&&(programCounter))
+          programCounter--;
+        if (currentTrack==track) {
+          currentTrack = GetNextTrack();
+          StartPlaying(currentTrack);
+          calendarFrame [currentTrack] = C_YELLOW;
+        }
+      } else {
+        for (j=1; programTracks[j]; j++);
+        programTracks[j] = track;
+        if (currentTrack==track)
+          calendarFrame[track] = C_YELLOW;
+        else
+          calendarFrame[track] = C_WHITE;
+      }
+    }
+  }
+  RedrawCalendar(NullHandle);
+  ShowTrackTime();
+}
+
+
+
+char * _pascal StateText ( void )
+{
+  int cdStatus;
+
+  /* the text mem block is locked before this routine is called & unlocked
+  	after it returns - jfh 12/07/03 */
+  cdStatus = CD_Drive_Get_Status()&(CD_STATUS_DOOR_OPEN|CD_STATUS_DRIVE_EMPTY);
+
+  if ((isPlaying)&&(!pauseState))
+	 return LMemDeref(@PlayTxt);
+  if ((isPlaying)&&(pauseState))
+	 return LMemDeref(@PauseTxt);
+  if ((!isPlaying)&& !cdStatus)
+	 return LMemDeref(@StopTxt);
+  if (cdStatus)
+	 return LMemDeref(@DiscTxt);
+
+  return LMemDeref(@BlankTxt);
+}
+
+void _pascal SetProgramMode ( byte newmode )
+// set a new program mode and reset/redraw modus and calendar
+{
+  byte i;
+  programMode = newmode;
+  switch (newmode) {
+    case MIG_NORMAL:
+      for (i=0;i<=MaxTracks;i++)
+        if (tracksToPlay[i]&&(i>currentTrack))
+          calendarFrame[i] = C_WHITE;
+        else
+          calendarFrame[i] = backGroundColor;
+      break;
+    case MIG_RANDOM:
+      for (i=0;i<=MaxTracks;i++)
+        if (tracksToPlay[i])
+          calendarFrame[i] = C_WHITE;
+        else
+          calendarFrame[i] = backGroundColor;
+      break;
+    case MIG_PROGRAM:
+      for (i=0;i<=MaxTracks;i++)
+        calendarFrame[i] = backGroundColor;
+      for (i=programCounter;i<=MaxTracks;i++)
+        calendarFrame[programTracks[i]] = C_WHITE;
+      break;
+  }
+  CalendarFrame(currentTrack,C_YELLOW);
+  RedrawCalendar(NullHandle);
+  RedrawModes(NullHandle);
+}
+
+void _pascal SetABPositions( void )
+{
+  char text[12];
+
+  sprintf (text,"%02d / %02d:%02d",(int)(abTStart>>24),(int)RedbookMin(abTStart),(int)RedbookSec(abTStart));
+  @call ABSGlyphA::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(text,VUM_NOW);
+  sprintf (text,"%02d / %02d:%02d",(int)(abTEnd>>24),(int)RedbookMin(abTEnd),(int)RedbookSec(abTEnd));
+  @call ABSGlyphB::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(text,VUM_NOW);
+
+}
+
+void _pascal ResetABPosition( void )
+{
+  int i;
+  long told,tnew;
+  for (i=1;(i<=MaxTracks)&&(CD_Get_Track_Type(i)!=1);i++);
+  if (i!=MaxTracks) {
+    abStart = CD_Get_Track_Start(i);
+    abTStart = ((long)i)<<24;
+  } else {
+    abStart = 0;
+    abTStart = 0;
+  }
+  for (i=CD_Get_Tracks();(i>0)&&(CD_Get_Track_Type(i)!=1);i--);
+  if (i) {
+    abEnd = CD_Get_Track_Start(i+1);
+    tnew = CD_Get_Track_Start(i);
+    told = RedbookMin(tnew)*60+RedbookSec(tnew);
+    tnew = RedbookMin(abEnd)*60+RedbookSec(abEnd);
+    told = tnew-told;
+    abTEnd = ((long)(i))<<24 ;
+    abTEnd = abTEnd + RedbookPos(told/60,told%60,1) ;
+  } else {
+    abEnd = 0;
+    abTEnd = 0;
+  }
+}
+
+
+/*
+  the following functions are defined as an alternative
+  to a direct access when it is not sure whether the index
+  is in the valied range of 1..MaxTracks. This saves space
+  and should make the code more readable.
+*/
+
+void _pascal CalendarFrame (byte index, byte color)
+{
+  if (index <= MaxTracks)
+    calendarFrame[index] = color;
+}
+
+byte _pascal TracksToPlay (byte index, byte value)
+{
+  if (index <= MaxTracks){
+    if (value <2)
+      tracksToPlay[index] = value;
+    return tracksToPlay[index];
+  } else {
+    if (CD_Get_Track_Type(index) ==1)
+      return 1;
+    else
+      return 0;
+  }
+}
+
+byte _pascal ValidTracks (byte index, byte value)
+{
+  if (index <= MaxTracks){
+    if (value <2)
+      validTracks[index] = value;
+    return validTracks[index];
+  } else {
+    if (CD_Get_Track_Type(index) ==1)
+      return 1;
+    else
+      return 0;
+  }
+}
+

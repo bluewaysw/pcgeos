@@ -1,0 +1,176 @@
+$Id: README,v 1.1.38.1 97/03/29 03:50:38 canavese Exp $
+
+This file provides a general overview, from high altitude, of the structure of
+the File module of the kernel.
+
+*******************************************************************************
+				 FILE LAYOUT
+*******************************************************************************
+The File module, as the name implies, provides the interface to the file
+system that geodes use. It is broken into files based on the type of operation
+performed by the function, or the object on which the operation is performed,
+as follows:
+
+	fileDriver.asm		Primary interface to the filesystem driver(s),
+				as well as the initial version-generic
+				skeleton driver employed by the system before
+				the real initial driver is loaded.
+
+	fileEC.asm		Error-checking code to ensure consistency of
+				data structures and parameters.
+
+	fileEnum.asm		Functions that deal with enumerating/searching
+				for files. This includes FileEnum, as well as
+				some internal routines like FileFindFirst and
+				anything that has to use the Disk Transfer
+				Address (like FileLocateVolume).
+
+	fileFile.asm		This contains functions that deal with disk
+				files w/o using a file handle. E.g.
+				FileSetAttributes.
+
+	fileIO.asm		Any routine that performs I/O on an
+				already-open file handle.
+
+	fileInit.asm		Initialization routines for the module,
+				including the loading of the default fs
+				driver.
+
+	fileList.asm		Routines to manipulate the list of open files,
+				search it, whatever.
+
+	fileManager.asm		The thing Esp actually assembles that includes
+				everything else, of course.
+
+	fileOpenClose.asm	Things to open and close files, of course.
+				This includes things like FileDuplicateHandle.
+
+	filePath.asm		Routines dealing with current working
+				directories, directory stacks and the current
+				directory from DOS's perspective.
+
+	fileSync.asm		The utility routines that deal with the
+				various locks and semaphores in the File
+				module.
+
+	fileUtils.asm		General utility routines, such as the
+				numerous, nested routines that eventually wend
+				their way to Int21 and into DOS.
+
+	fileVolume.asm		API routines to get/set information about disk
+				volumes (both name and dimension)
+
+*******************************************************************************
+		      THE ROLE OF THE FILESYSTEM DRIVER
+*******************************************************************************
+
+Much of the work of the File module is performed by the filesystem (fs)
+driver. Communication between the File module and the driver is usually by
+means of a single-byte SFN (system file number), a magic number that has
+meaning only to the driver, with the single caveat that if two file handles
+have the same SFN, they are open to the same file.
+
+When an application wishes to open a file, the path and access modes are
+passed to the appropriate function in the fs driver. The driver performs the
+necessary DOS manipulations and, if the open was successful, returns the SFN
+of the open file plus the SFN of any other handle open to the same file. The
+File module is then responsible for building a file handle and adding it to
+the list of open files. The fs driver is responsible for enforcing access
+restrictions if more than one application opens a file.
+
+Similarly, when I/O is to be performed with a file handle, the handle and the
+desired DOS operation is passed to the fs driver, which allocates a DOS file
+handle for the open file, invokes the requested DOS operation, and frees the
+DOS file handle (without closing the open file, of course).
+
+Two other classes of function are performed by the fs driver. One is used by
+the Disk module to see if the disk in the drive has been changed. This is
+detailed in Disk/README, not here. The other is the check to see if a file or
+directory is in-use. This is used by several functions in the File module,
+such as FileDelete, to avoid hosing another thread.
+
+Since the File functions rely on the filesystem driver so heavily, and the
+driver is loaded as a separate geode once the version of DOS being used is
+determined, there's something of a chicken-and-egg problem during the loading
+of the fs driver itself. This is solved by having a skeleton "driver" in the
+kernel's init module that implements very few of the functions of a normal fs
+driver and makes no attempts to access any of the internal structures of
+whatever version of DOS is running. The SFNs that are passed to and from it
+are simply DOS file handles. When the real fs driver is loaded, the SFNs (DOS
+handles) of any open files are passed to the driver to obtain the correct SFN,
+from the driver's perspective.
+
+*******************************************************************************
+			       SYNCHRONIZATION
+*******************************************************************************
+
+The synchronization in the File module is the most complex of any module in
+the kernel. I chose to make it multiple level mostly to allow greater
+throughput. The current set of fine-grained, nested locks allows an operation
+to gain access to only the part of the File system it needs, rather than
+grabbing the entire thing for an extended period, as used to be required,
+e.g., during disk formatting.
+
+There are five locks and one semaphore in the File module, with additional
+synchronization, on a drive-by-drive basis, being provided by the Drive
+module. The locks nest in the following fashion:
+
+;			dirLock
+;			   |
+;		      +-sftLock  edtaLock   vdtaLock
+;		      |    |          \      /
+;		      | cwdLock        dtaSem
+;		      |    |      	  |
+;		      +-drives------------+
+;			   |
+;                       dosLock
+
+dirLock controls the ability to modify any directory in the system. It is
+	grabbed by things like FileDelete and FileCreate.
+
+sftLock gives exclusive access to the list of open files. It is grabbed by
+	things like FileCreate, FileOpen, FileClose and FileDuplicateHandle.
+
+cwdLock is grabbed before informing DOS in which directory it should be
+	active. It is grabbed only by SetCWD and released by UnsetCWD. The
+	handle of the FilePath structure that DOS thinks is the current
+	directory is stored in pathHandle to avoid redundant changes of
+	directory if only one thread is performing file operations.
+
+dosLock is the one that gives exclusive access to that non-reentrant monster
+	known as DOS. It is grabbed and released by Int21. Other things grab
+	this lock, however, such as swap drivers and filesystem drivers when
+	they need to make sure nothing goes into DOS for a bit. The dosLock
+	also governs access to BIOS for some calls (like diskette BIOS calls
+	in the Drive module).
+
+edtaLock governs the use of the Disk Transfer Address by FileEnum and its
+	companion routines FileFindFirst and FileFindNext.
+
+vdtaLock controls access to the volume Disk Transfer Address that is used by
+	FileLocateVolume and precious little else.
+
+dtaSem is the semaphore that is grabbed before DOS is told what disk transfer
+	address it should employ. It is released once the operation that fills
+	the DTA is complete (the DTA itself protected by edtaLock or
+	vdtaLock). As indicated by the diagram, these three locks/semaphores
+	are pretty much independent of every other lock.
+
+As indicated by the diagram, these locks are in a definite heirarchy. If
+something needs to grab multiple locks, they must be grabbed from the top down
+and released from the bottom up. For example, FileDuplicateHandle needs the
+sftLock and, eventually, the dosLock. It must call LockSFT first, then call
+LockDOS. If something, such as FileOpen, requires the cwdLock as well, it must
+call SetCWD before grabbing the dosLock, but after calling LockSFT. Failure to
+follow this hierarchy can easily result in deadlock. This hierarchy is
+enforced by error-checking code in fileEC.asm.
+
+One unexplained element of the diagram is "drives." These are the locks, one
+per drive existing in the system, that are maintained by the Drive module.
+They are rarely locked explicitly in the File module. Rather, a drive is
+locked when the disk handle for a file is validated using DiskValidate, and
+unlocked using DiskUnlock.
+
+The final piece of synchronization is the pathSem, which controls the ability
+to alter the directory stack of any thread. This exists so FileForEachPath can
+get a consistent view of the world.

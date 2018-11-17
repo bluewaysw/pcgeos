@@ -1,0 +1,1178 @@
+
+/**************************************************************
+ *  ==CONFIDENTIAL INFORMATION==
+ *  COPYRIGHT 1994-2000 BREADBOX COMPUTER COMPANY --
+ *  ALL RIGHTS RESERVED  --
+ *  THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER A
+ *  NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ *  RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ *  NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ *  CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ *  AGREEMENT.
+ **************************************************************/
+
+/*
+ **************************************************************************
+ *  FILE:			act_mtds.goc
+ *  PROJECT:		GPC Banker
+ *  DESCRIPTION:	This file has methods for the accounts
+ *				functions
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include "bnkr30.goh"
+@include "externs.goh"
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+
+/****************************************************************************
+ *		Code for GPCBnkrProcessClass Accounts stuff
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_SELECT_ACCOUNT for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	Calls the dialog box when the menu
+ *                   item is selected
+ *     
+ *              
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_OPEN_SELECT_ACCOUNT
+{
+
+    /* disable view button until something is selected */
+    @send SelAcctUse::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+    /* set the selection to none */
+    @send SelAcctDList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+
+    /* Open the dialog box */
+    @call SelectAcctDBox::MSG_GEN_INTERACTION_INITIATE();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CANCEL_SELECT_ACCOUNT for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	handles a cancel of acct dbox
+ *
+ * STRATEGY:    
+ *              
+ *              
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_CANCEL_SELECT_ACCOUNT
+{
+
+    if (numAccounts != 0) return;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_USE_ACCOUNT for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	 fills in trans group when acct selected
+ *              
+ *     
+ *              
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_USE_ACCOUNT
+{
+AcctStruct	*acct;
+DBGroupAndItem	mapitem;
+DBMapStruct*	mapPtr;
+char			bankString[ENTRY_SIZE * 2];
+FloatNum		balance;
+VMBlockHandle	saveBlock;
+MemHandle		mh;
+SaveStruct	*state;
+
+    
+    /* dismiss the dbox */
+    @send SelectAcctDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+    /* standard set-up */
+    mapitem = DBGetMap(GPCBnkrFile);
+    mapPtr = DBLockUngrouped(GPCBnkrFile, mapitem);
+    acct = (AcctStruct *) (mapPtr + sizeof(DBMapStruct));
+    /* set the acct group global */
+    currentAcctGroup = acct[currentAcct].AS_group;
+
+    /* tell the account line */
+    MemLock (OptrToHandle(@AcctSP));
+    strcpy(bankString, acct[currentAcct].AS_bank);
+    if (strlen(bankString) > 25) {
+	  bankString[25] = 0;
+	  strcat(bankString, "... ");
+	  }
+    strcat(bankString, LMemDeref(@spNumSym));
+    strcat(bankString, acct[currentAcct].AS_number);
+    MemUnlock (OptrToHandle(@AcctSP));
+    @call AcctNameGlyph::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(bankString, VUM_NOW);
+
+    /* get the balance */
+    balance = acct[currentAcct].AS_balance;
+    /* and the number of trans in this acct */
+    numTrans = acct[currentAcct].AS_numTrans;
+
+	 /* set currentType & check numbering */
+    if (acct[currentAcct].AS_nextNum == 0)  {
+	  currentType = TRANS_DP;
+	  autoNum = FALSE;
+		 }
+      else  {
+       currentType = TRANS_CK;
+	  autoNum = TRUE;
+		 }
+
+    /* retrieve the sort info */
+    transListChunkArray = acct[currentAcct].AS_transChunkHan;
+
+    DBUnlock(mapPtr);
+
+
+    /* save the account that we're using */
+    /* get the saveBlock handle - its id is SAVE */
+    saveBlock = VMFind(GPCBnkrFile, NullHandle, SAVE);
+    state = (SaveStruct *) VMLock(GPCBnkrFile, saveBlock, &mh);
+    state->SS_currentAcct = currentAcct;
+    state->SS_transType = currentType;
+
+    /* mark dirty only if not called by attach routine */
+    if (attachUse == 1) {
+       attachUse = 0;
+	  VMUnlock(mh);
+	  }
+      else {
+       VMDirty(mh);
+	  VMUnlock(mh);
+       }
+
+    /* init the register dlist */
+    if (numTrans > DEFAULT_LIST_LINES-1)
+	  @send RegisterDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numTrans);
+    else
+	  @send RegisterDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(DEFAULT_LIST_LINES);
+
+    if (numTrans)  {
+	  /* enable buttons */
+	  @send ModifyButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send EntriesModifyMenuItem::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send EntriesDeleteMenuItem::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send EntriesVoidMenuItem::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  }
+    else  {
+	  /* disable buttons */
+	  @send ModifyButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send EntriesModifyMenuItem::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send EntriesDeleteMenuItem::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send EntriesVoidMenuItem::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  }
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_NEW_ACCOUNT for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	Calls the dialog box when the trigger
+ *              item is selected
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_OPEN_NEW_ACCOUNT
+{
+ char			dateString[DATE_TIME_BUFFER_SIZE + 1];
+ TimerDateAndTime	date;
+
+
+    /*first see if we're maxed out on accounts */
+    if(numAccounts == MAX_ACCOUNTS) {
+	  NotifyDBox(0, @MaxAcctsMsg);
+	  return;
+	  }
+
+    /* put system date in date box */
+    TimerGetDateAndTime(&date);
+    LocalFormatDateTime(dateString, DTF_SHORT, &date);
+    @call NABalDate::MSG_VIS_TEXT_REPLACE_ALL_PTR(dateString, 0);
+
+    /* and clear the text boxes */
+    @call NAName::MSG_VIS_TEXT_DELETE_ALL();
+    @call NAAcctNum::MSG_VIS_TEXT_DELETE_ALL();
+    @call NACheckNum::MSG_VIS_TEXT_DELETE_ALL();
+    @call NABalance::MSG_VIS_TEXT_DELETE_ALL();
+
+    /* Open the dialog box */
+    @call NewAcctDBox::MSG_GEN_INTERACTION_INITIATE();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_NEW_ACCOUNT for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	Creates a new DB group and all the account info.
+ *
+ * STRATEGY:    
+ *              
+ *              
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_NEW_ACCOUNT
+{
+AcctStruct	*acct;
+DBGroupAndItem	mapitem;
+DBMapStruct*	mapPtr;
+word			length;
+char			bank[ENTRY_SIZE], numString[CKNUM_SIZE];
+char			acctnum[ACCTNUM_SIZE], balString[DOLLAR_IN_SIZE];
+char			dateString[DATE_SIZE];
+dword		transDateNum, dwnumber;
+FloatNum		balance, trash;
+TimerDateAndTime	date;
+DBItem		transItem;
+
+
+    /* Retrieve the new account info. */
+    @call NAName::MSG_VIS_TEXT_GET_ALL_PTR(bank);
+    @call NAAcctNum::MSG_VIS_TEXT_GET_ALL_PTR(acctnum);
+    @call NACheckNum::MSG_VIS_TEXT_GET_ALL_PTR(numString);
+    @call NABalDate::MSG_VIS_TEXT_GET_ALL_PTR(dateString);
+    length = @call NABalance::MSG_VIS_TEXT_GET_ALL_PTR(balString);
+
+    /* Exit if date no good */
+    if (!DateCheck(dateString))  {
+	  /* send the focus back to the date field */
+	  @send NABalDate::MSG_META_GRAB_FOCUS_EXCL();
+	  return;
+	  }
+
+    /* Exit if un-identified */
+    if (*bank == 0) {
+	  /* tell the user */
+	  NotifyDBox(0, @NoAcctNameMsg);
+	  @send NAName::MSG_META_GRAB_FOCUS_EXCL();
+	  return;
+	  }
+
+    /* Exit if balance invalid */
+    if (!AmountChecksOK(balString, TRUE, FALSE))  {
+	  /* send the focus back to the balance field */
+	  @send NABalance::MSG_META_GRAB_FOCUS_EXCL();
+	  return;
+	  }
+
+    /* Exit if no check number & auto num is selected */
+    if (autoNum) {
+	  UtilAsciiToHex32(numString, &dwnumber);
+	  if (!dwnumber) {
+		/* tell the user */
+		NotifyDBox(0, @NoCheckNumberMsg);
+		@send NACheckNum::MSG_META_GRAB_FOCUS_EXCL();
+		return;
+		}
+	  }
+
+    /* dismiss the d box now */
+    @send NewAcctDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+    /* do the DB map updating & intitalizing */
+    mapitem = DBGetMap(GPCBnkrFile);
+    DBReAllocUngrouped(GPCBnkrFile, mapitem,
+		sizeof(DBMapStruct) + ((numAccounts + 1) * sizeof(AcctStruct)));
+    mapPtr = DBLockUngrouped(GPCBnkrFile, mapitem);
+    acct = (AcctStruct *) (mapPtr + sizeof(DBMapStruct));
+    acct[numAccounts].AS_numTrans = 0;
+    acct[numAccounts].AS_balance = 0;
+    strcpy(acct[numAccounts].AS_bank, bank);
+    strcpy(acct[numAccounts].AS_number, acctnum);
+    /* grab the chrg & credt cat names */
+ //   MemLock (OptrToHandle(@I1));
+ //   strcpy(acct[numAccounts].AS_reconChgCat, LMemDeref(@E9));
+ //   strcpy(acct[numAccounts].AS_reconCrdtCat, LMemDeref(@I5));
+ //   MemUnlock (OptrToHandle(@I1));
+    acct[numAccounts].AS_reconChgCat[0] = 0;
+    acct[numAccounts].AS_reconCrdtCat[0] = 0;
+    acct[numAccounts].AS_reconStartBal = 0;
+    acct[numAccounts].AS_reconYear = 0;
+    acct[numAccounts].AS_reconMonth = 0;
+    acct[numAccounts].AS_reconDay = 0;
+    /* do the check number stuff */
+    if (!autoNum)  {
+       acct[numAccounts].AS_nextNum = 0;
+	  acct[numAccounts].AS_nextPrintNum = 0;
+	  }
+      else  {
+   //	  UtilAsciiToHex32(numString, &dwnumber);
+	  acct[numAccounts].AS_nextNum = dwnumber;
+	  acct[numAccounts].AS_nextPrintNum = dwnumber;
+	  }
+    /* Create the new DB group */
+    acct[numAccounts].AS_group = DBGroupAlloc(GPCBnkrFile);
+    currentAcctGroup = acct[numAccounts].AS_group;
+    (mapPtr->MS_numAccts)++;
+    numAccounts++;
+    /* and set the current account globals */
+    currentAcct = numAccounts-1;
+    numTrans = 0;
+    /* Mark the map as dirty */
+    DBDirty(mapPtr);
+    DBUnlock(mapPtr);
+
+    /* and tell the d lists */
+    @send SelAcctDList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(numAccounts,1);
+    @send MngAcctDList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(numAccounts,1);
+
+    /* add it to the view menu */
+    @send process::MSG_UPDATE_VIEW_MENU(UV_ADD);
+
+    /* Create a VM block for the full sort list ------------------ */
+    transListVMBHandle = VMAlloc(GPCBnkrFile, 2048, (currentAcct*10)+ALLSORT);
+    transListHeapHandle = MemAlloc(
+		   2048,
+		   HF_SWAPABLE,
+		   HAF_LOCK);
+    LMemInitHeap(transListHeapHandle,
+                   LMEM_TYPE_GENERAL,
+		   0,
+		   sizeof(LMemBlockHeader),
+                   STD_INIT_HANDLES,
+                   STD_INIT_HEAP);
+    transListChunkArray = ChunkArrayCreate(
+		       transListHeapHandle,
+		       sizeof(TransSortStruct),
+		       0,
+			  0);
+    MemUnlock(transListHeapHandle);
+    VMAttach(GPCBnkrFile, transListVMBHandle, transListHeapHandle);
+
+
+    /* Now save all this sort chunk info back to the account structure
+       so that we can get it back when we need it */
+    /* Do our standard setup */
+    mapitem = DBGetMap(GPCBnkrFile);
+    mapPtr = DBLockUngrouped(GPCBnkrFile, mapitem);
+    acct = (AcctStruct *) (mapPtr + sizeof(DBMapStruct));
+    acct[currentAcct].AS_transChunkHan = transListChunkArray;
+    DBDirty(mapPtr);
+    DBUnlock(mapPtr);
+
+    /* enter balance into appropriate trans */
+    FloatAsciiToFloat(FAF_STORE_NUMBER,
+			length,
+			balString,
+			&balance);
+    @call NABalance::MSG_VIS_TEXT_DELETE_ALL();
+
+    currentType = 0;
+    FloatPushNumber(&balance);
+    if (FloatGt0())  {
+	  currentType = TRANS_CR;
+	  }
+
+    FloatPushNumber(&balance);
+    if (FloatLt0())  {
+	  currentType = TRANS_DB;
+	  FloatPushNumber(&balance);
+	  FloatAbs();
+	  FloatPopNumber(&balance);
+	  }
+
+    if (currentType != 0)  {  /* there is a balance of some sort */
+	  LocalParseDateTime(dateString, DTF_SHORT, &date);
+	  transDateNum = MakeDateNum(date);
+
+	  MemLock (OptrToHandle(@AcctSP));
+	  /* now call the function that enters this transaction */
+	  trash = EnterTransaction(
+				 FALSE,   /* import */
+				 balance,
+				 date.TDAT_year,
+				 date.TDAT_month,
+				 date.TDAT_day,
+				 0,   /* ck numn */
+				 LMemDeref(@BegBalText),   /* payee */
+				 LMemDeref(@BegBalText),   /* memo */
+				 "",    /* category */
+				 FALSE,  /* tax */
+				 TRUE,   /* cleared */
+				 &transItem);
+	  MemUnlock (OptrToHandle(@AcctSP));
+
+	  /* add this transaction to the acct sort index array */
+	  TransIndexInsert(transDateNum,
+		     date,
+			0,      /* check number */
+               balance, /* amount of transaction */
+			TRUE,   /* cleared */
+			transItem);  /* pointer to item */
+
+	  } /* end of bal != 0 if */
+
+    EnableUI();
+
+    if (numAccounts > 1)  {
+	  @send SelectAcctTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    //	  @send NETXfer::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  }
+
+    @send process::MSG_USE_ACCOUNT();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_MANAGE_ACCTS for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	Calls the dialog box when the trigger
+ *              item is selected
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_OPEN_MANAGE_ACCTS
+{
+ ChunkHandle		chunk;
+ MemHandle		mem;
+ GStateHandle		gstate;
+ word			width;
+
+
+    /* draw the dlist title */
+    /* set up the mem and gstate */
+    mem = MemAllocLMem(LMEM_TYPE_GSTRING, 0);
+    gstate = GrCreateGString(mem, GST_CHUNK, &chunk);
+    MemLock (OptrToHandle(@MngAcctNameText));
+    GrSetTextColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+    GrDrawText(gstate, 0, 0, LMemDeref(@MngAcctNameText), 0);
+    GrDrawText(gstate, 205, 0, LMemDeref(@MngAcctNumberText), 0);
+    /* get length to right justify */
+    width = GrTextWidth(gstate, LMemDeref(@MngAcctBalText),
+			   strlen(LMemDeref(@MngAcctBalText)));
+    GrDrawText(gstate, 450 - width, 0, LMemDeref(@MngAcctBalText), 0);
+    MemUnlock (OptrToHandle(@MngAcctNameText));
+    GrEndGString(gstate) ;
+
+    @call MngAcctHeader::MSG_GEN_REPLACE_VIS_MONIKER(
+				  VUM_NOW,
+				  sysPointSize + 4,				/* height */
+				  450,				/* width */
+				  0,
+				  VMDT_GSTRING,
+				  VMST_OPTR,
+				  ConstructOptr(mem, chunk));
+
+    /* and 86 the gstate and mem */
+    GrDestroyGString(gstate, gstate, GSKT_KILL_DATA) ;
+    MemFree(mem) ;
+
+    /* show the total of the account balances */
+    TotalAllAccounts();
+
+    /* init the list to make sure new balances are shown */
+    @send MngAcctDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numAccounts);
+    @send MngAcctDList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+
+    /* disable the buttons */
+    @send MNABtns::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+    /* Open the dialog box */
+    @call ManageAcctDBox::MSG_GEN_INTERACTION_INITIATE();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_MODIFY_ACCOUNT for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	Calls the dialog box when the trigger
+ *              item is selected
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_OPEN_MODIFY_ACCOUNT
+{
+ AcctStruct		*acct;
+ DBGroupAndItem	mapitem;
+ DBMapStruct*		mapPtr;
+ word			modAcct;
+ char			numString[CKNUM_SIZE];
+
+
+    /* get which account is selected */
+    modAcct = @call MngAcctDList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    /* standard set-up */
+    mapitem = DBGetMap(GPCBnkrFile);
+    mapPtr = DBLockUngrouped(GPCBnkrFile, mapitem);
+    acct = (AcctStruct *) (mapPtr + sizeof(DBMapStruct));
+
+    /* fill in the text */
+    @call MABank::MSG_VIS_TEXT_REPLACE_ALL_PTR(acct[modAcct].AS_bank, 0);
+    @call MAAcctNum::MSG_VIS_TEXT_REPLACE_ALL_PTR(acct[modAcct].AS_number, 0);
+    if (acct[modAcct].AS_nextNum) {
+	  @send MAAutoNumGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+							 A_AUTONUM, TRUE);
+	  UtilHex32ToAscii(numString,
+				    (sdword) acct[modAcct].AS_nextNum,
+				    UHTAF_NULL_TERMINATE);
+	  @call MACheckNum::MSG_VIS_TEXT_REPLACE_ALL_PTR(numString, 0);
+	  @send MACheckNum::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  }
+    else  {
+	  @send MAAutoNumGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+							 A_AUTONUM, FALSE);
+	  @send MACheckNum::MSG_VIS_TEXT_DELETE_ALL();
+	  @send MACheckNum::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  }
+    DBUnlock(mapPtr);
+
+    /* Open the dialog box */
+    @call ModAcctDBox::MSG_GEN_INTERACTION_INITIATE();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_MODIFY_ACCOUNT for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	Lets the user change account name or number
+ *              
+ *     
+ *              
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_MODIFY_ACCOUNT
+{
+ AcctStruct		*acct;
+ DBGroupAndItem	mapitem;
+ DBMapStruct*		mapPtr;
+ word			modAcct;
+ char			bankString[ENTRY_SIZE * 2], numString[CKNUM_SIZE];
+ dword              dwnumber;
+ Boolean			mAAutoNum = FALSE;
+
+
+    @call MABank::MSG_VIS_TEXT_GET_ALL_PTR(bankString);
+    /* Exit if bank un-identified */
+    if (*bankString == 0) {
+	  /* tell the user */
+	  NotifyDBox(0, @NoAcctNameMsg);
+	  @send MABank::MSG_META_GRAB_FOCUS_EXCL();
+	  return;
+	  }
+
+    /* Exit if no check number & auto num is selected */
+    if (@call MAAutoNumGroup::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(A_AUTONUM))  {
+	  mAAutoNum = TRUE;
+	  @call MACheckNum::MSG_VIS_TEXT_GET_ALL_PTR(numString);
+	  UtilAsciiToHex32(numString, &dwnumber);
+	  if (!dwnumber) {
+		/* tell the user */
+		NotifyDBox(0, @NoCheckNumberMsg);
+		@send MACheckNum::MSG_META_GRAB_FOCUS_EXCL();
+		return;
+		}
+	  }
+
+    /* put up an Are you sure box */
+    if (AckDBox(0, 0, @ModAcctMsg) == ACK_NO) return;
+
+    /* standard set-up */
+    mapitem = DBGetMap(GPCBnkrFile);
+    mapPtr = DBLockUngrouped(GPCBnkrFile, mapitem);
+    acct = (AcctStruct *) (mapPtr + sizeof(DBMapStruct));
+
+    /* get which account is selected */
+    modAcct = @call MngAcctDList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    /* get the new info and put in dbase */
+    strcpy(acct[modAcct].AS_bank, bankString);
+    @call MAAcctNum::MSG_VIS_TEXT_GET_ALL_PTR(acct[modAcct].AS_number);
+    if (mAAutoNum) {
+	  acct[modAcct].AS_nextNum = dwnumber;
+	  acct[modAcct].AS_nextPrintNum = dwnumber;
+	  }
+    else {
+	  acct[modAcct].AS_nextNum = 0;
+	  acct[modAcct].AS_nextPrintNum = 0;
+	  }
+
+    /* if we've changed the current account, tell the account line */
+    if (modAcct == currentAcct)  {
+	  MemLock (OptrToHandle(@AcctSP));
+   //	  strcpy(bankString, acct[currentAcct].AS_bank);
+	  if (strlen(bankString) > 25) {
+		bankString[25] = 0;
+		strcat(bankString, "... ");
+	     }
+	  strcat(bankString, LMemDeref(@spNumSym));
+	  strcat(bankString, acct[currentAcct].AS_number);
+	  @call AcctNameGlyph::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(bankString,
+										VUM_DELAYED_VIA_APP_QUEUE);
+	  /* and set the global autoNum flag */
+	  autoNum = mAAutoNum;
+	  }
+    DBDirty(mapPtr);
+    DBUnlock(mapPtr);
+
+    /* change the info in the dlist moniker */
+    @call process::MSG_ACCT_DLIST_MONIKER_QUERY(@MngAcctDList, modAcct);
+    @send SelAcctDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numAccounts);
+
+    /* update the view menu */
+    @send process::MSG_UPDATE_VIEW_MENU(UV_MOD);
+
+    /* now we can dismiss the dbox */
+    @send ModAcctDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+    /* and send the focus back to the manage accounts dbox */
+    @send ManageAcctDBox::MSG_META_GRAB_FOCUS_EXCL();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DELETE_ACCOUNT for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	Lets the user delete the account
+ *              AFTER a STRONG warning!
+ *     
+ *              
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_DELETE_ACCOUNT
+{
+ AcctStruct		*acct;
+ DBGroupAndItem	mapitem;
+ DBMapStruct*		mapPtr;
+ word			i, delAcct;
+
+
+    /* get which account is selected */
+    delAcct = @call MngAcctDList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    /* standard set-up */
+    mapitem = DBGetMap(GPCBnkrFile);
+    mapPtr = DBLockUngrouped(GPCBnkrFile, mapitem);
+    acct = (AcctStruct *) (mapPtr + sizeof(DBMapStruct));
+
+    /* put up an Are you sure box */
+    if (AckDBox(acct[delAcct].AS_bank, 0, @DelAcctMsg) == ACK_NO) {
+	  DBUnlock(mapPtr);
+	  return;
+	  }
+
+    /* They're sure so lets delete it! */
+    /* delete the account's DBGroup */
+    DBGroupFree(GPCBnkrFile, acct[delAcct].AS_group);
+    /* Now decrement the number of accts */
+    mapPtr->MS_numAccts--;
+    numAccounts--;
+    DBDirty(mapPtr);
+    DBUnlock(mapPtr);
+
+    /* Now we contract the map item.  */
+    DBDeleteAtUngrouped(GPCBnkrFile, mapitem,
+	 sizeof(word) + (delAcct * sizeof(AcctStruct)),
+	 sizeof(AcctStruct));
+
+    /* update the view menu */
+    @send process::MSG_UPDATE_VIEW_MENU(UV_DELETE);
+
+    /* get the sort file handle  */
+    transListVMBHandle = VMFind(GPCBnkrFile, NullHandle, (delAcct*10)+ALLSORT);
+    /* now free the VMBlocks */
+    VMFree(GPCBnkrFile, transListVMBHandle);
+
+    /* and redo the user ID's of the following accts' sort blocks */
+    for (i = delAcct; i < numAccounts; i++)  {
+	  transListVMBHandle = VMFind(GPCBnkrFile, NullHandle, ((i+1)*10)+ALLSORT);
+	  VMModifyUserID(GPCBnkrFile, transListVMBHandle, (i*10)+ALLSORT);
+	  }
+
+    /* if we've deleted the current account, tell the account line */
+    if (delAcct == currentAcct)  {
+	  @call AcctNameGlyph::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(" ",
+										VUM_DELAYED_VIA_APP_QUEUE);
+	  }
+
+    /* reset account selection */
+    if (!numAccounts) currentAcct = GIGS_NONE;
+    else  {
+	  if(delAcct < currentAcct) currentAcct--;
+	  else  {
+		if ((delAcct == currentAcct) && delAcct) currentAcct--;
+		}
+	  }
+    
+
+    /* re-init the lists */
+    @send SelAcctDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numAccounts);
+    @send MngAcctDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numAccounts);
+
+    if (numAccounts < 2)  {
+	  @send SelectAcctTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    //	  @send NETXfer::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  }
+
+    if (!numAccounts) ClearDisplay();
+    else @send process::MSG_USE_ACCOUNT();
+
+
+    /* disable the buttons */
+    @send MNABtns::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+    /* show the total of the account balances */
+    TotalAllAccounts();
+
+    /* and send the focus back to the manage accounts dbox */
+    @send ManageAcctDBox::MSG_META_GRAB_FOCUS_EXCL();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_MNG_ACCT_DLIST_APPLY for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	Handles an apply of user selection in the mng account list.
+ *
+ * PARAMETERS:  void (word selection, numSelections, flags)
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_MNG_ACCT_DLIST_APPLY
+{
+
+    /* enable the buttons */
+    @send MNABtns::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_ACCT_DLIST_MONIKER_QUERY for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	Queries for monikers for accounts list.
+ *
+ * PARAMETERS:  void (optr list, word item)
+ *
+ *  
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_ACCT_DLIST_MONIKER_QUERY
+{
+AcctStruct	*acct;
+DBMapStruct*	mapPtr;
+char			amtString[MAX_TEXT_LEN], entryString[ENTRY_SIZE];
+ChunkHandle	chunk;
+MemHandle		mem;
+GStateHandle	gstate;
+word			width, numChars, eWidth;
+
+    
+    mapPtr = DBLockMap(GPCBnkrFile);
+    acct = (AcctStruct *) (mapPtr + sizeof(DBMapStruct));
+
+    /* set the ellipsis width depending on font size */
+    if (sysPointSize == 10) eWidth = 8;
+    else if (sysPointSize == 12) eWidth = 10;
+    else  eWidth = 12;
+
+    /* see what we need to show... */
+    if (list == @SelAcctDList)  {
+	  mem = MemAllocLMem(LMEM_TYPE_GSTRING, 0) ;
+	  gstate = GrCreateGString(mem, GST_CHUNK, &chunk);
+	  strcpy(entryString, acct[item].AS_bank);
+	  width = GrTextWidth(gstate, entryString, strlen(entryString));
+	  if(width > 195)  {
+		/* truncate text and add ellipsis */
+		while (width > (195 - eWidth)) {
+		   numChars = strlen(entryString);
+		   entryString[numChars - 1] = 0;
+		   width = GrTextWidth(gstate, entryString, strlen(entryString));
+		   }
+		strcat(entryString, "...");
+		}
+	  GrDrawText(gstate, 2, 0, entryString, 0);
+
+	  strcpy(entryString, acct[item].AS_number);
+	  width = GrTextWidth(gstate, entryString, strlen(entryString));
+	  if(width > 125)  {
+		/* truncate text and add ellipsis */
+		while (width > (125 - eWidth)) {
+		   numChars = strlen(entryString);
+		   entryString[numChars - 1] = 0;
+		   width = GrTextWidth(gstate, entryString, strlen(entryString));
+		   }
+		strcat(entryString, "...");
+		}
+	  GrDrawText(gstate, 202, 0, entryString, 0);
+
+	  GrEndGString(gstate) ;
+	  /* and tell the DList */
+	  @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(
+				  item,
+				  0,
+				  sysPointSize + 4,				/* height */
+				  330,				/* width */
+				  0,
+				  VMDT_GSTRING,
+				  VMST_OPTR,
+				  ConstructOptr(mem, chunk)) ;
+
+	  /* and 86 the gstate and mem */
+	  GrDestroyGString(gstate, gstate, GSKT_KILL_DATA) ;
+	  MemFree(mem) ;
+	  }
+    else  {
+	  FloatFloatToAscii_StdFormat(amtString,
+							&acct[item].AS_balance,
+							FFAF_FROM_ADDR,
+							14,
+							2);
+	  mem = MemAllocLMem(LMEM_TYPE_GSTRING, 0);
+	  gstate = GrCreateGString(mem, GST_CHUNK, &chunk);
+	  strcpy(entryString, acct[item].AS_bank);
+	  width = GrTextWidth(gstate, entryString, strlen(entryString));
+	  if(width > 195)  {
+		/* truncate text and add ellipsis */
+		while (width > (195 - eWidth)) {
+		   numChars = strlen(entryString);
+		   entryString[numChars - 1] = 0;
+		   width = GrTextWidth(gstate, entryString, strlen(entryString));
+		   }
+		strcat(entryString, "...");
+		}
+	  GrDrawText(gstate, 2, 0, entryString, 0);
+
+	  strcpy(entryString, acct[item].AS_number);
+	  width = GrTextWidth(gstate, entryString, strlen(entryString));
+	  if(width > 125)  {
+		/* truncate text and add ellipsis */
+		while (width > (125 - eWidth)) {
+		   numChars = strlen(entryString);
+		   entryString[numChars - 1] = 0;
+		   width = GrTextWidth(gstate, entryString, strlen(entryString));
+		   }
+		strcat(entryString, "...");
+		}
+	  GrDrawText(gstate, 202, 0, entryString, 0);
+
+	  /* get length to right justify */
+	  width = GrTextWidth(gstate, amtString, strlen(amtString));
+	  GrDrawText(gstate, 446 - width, 0, amtString, 0);
+	  GrEndGString(gstate) ;
+	  /* and tell the DList */
+	  @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(
+				  item,
+				  0,
+				  sysPointSize + 4,				/* height */
+				  450,				/* width */
+				  0,
+				  VMDT_GSTRING,
+				  VMST_OPTR,
+				  ConstructOptr(mem, chunk)) ;
+
+	  /* and 86 the gstate and mem */
+	  GrDestroyGString(gstate, gstate, GSKT_KILL_DATA) ;
+	  MemFree(mem) ;
+	  }
+
+    /* Unlock the map item. */
+    DBUnlock(mapPtr);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_ACCT_DLIST_APPLY for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	Handles an apply of user selection in the account list.
+ *
+ * PARAMETERS:  void (word selection, numSelections, flags)
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_ACCT_DLIST_APPLY
+{
+
+    /* Set the current account global variable */
+    currentAcct = selection;
+
+    /* and enable the button */
+    @send SelAcctUse::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_AUTONUM_BOOLEAN_STATUS for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	Handles selection in the auto number checks boolean.
+ *
+ * PARAMETERS:  void (word selectedBooleans)
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_AUTONUM_BOOLEAN_STATUS
+{
+
+
+	if (selectedBooleans)  {
+	   @send NACheckNum::MSG_GEN_SET_ENABLED(VUM_NOW);
+	   autoNum = TRUE;
+	   }
+	else {
+	   @send NACheckNum::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	   autoNum = FALSE;
+	   }
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_MOD_AUTONUM_BOOLEAN_STATUS for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	Handles selection in the auto number checks boolean.
+ *
+ * PARAMETERS:  void (word selectedBooleans)
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_MOD_AUTONUM_BOOLEAN_STATUS
+{
+
+	if (selectedBooleans)  @send MACheckNum::MSG_GEN_SET_ENABLED(VUM_NOW);
+	else @send MACheckNum::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_UPDATE_VIEW_MENU for GPCBnkrProcessClass
+ *             (int whichUpdate)  UV_BUILD, UV_ADD, UV_DELETE, UV_CLEAR,
+ *                                UV_MOD
+ * DESCRIPTION:	sets up the correct account children for the view menu
+ *                  and for the xfer lists
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_UPDATE_VIEW_MENU
+{
+char			bankString[ENTRY_SIZE];
+MemHandle		newBlock;
+optr			newMenuItem;
+word			numKids, lastAcct, firstAcct, i;
+AcctStruct	*acct;
+DBGroupAndItem	mapitem;
+DBMapStruct*	mapPtr;
+
+
+    /* set no selections so we can change instance data */
+    @send NEFXFerFmList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+    @send NEFXFerToList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+
+    /* what do we need to do? */
+    if ((whichUpdate == UV_ADD) || (whichUpdate == UV_BUILD)) {
+	  if (whichUpdate == UV_ADD) {
+		firstAcct = currentAcct;
+		lastAcct = currentAcct + 1;
+		}
+	  else  {
+		firstAcct = 0;
+		lastAcct = numAccounts;
+		}
+
+	  for (i = firstAcct; i < lastAcct; i++) {
+		/* get the moniker */
+		mapitem = DBGetMap(GPCBnkrFile);
+		mapPtr = DBLockUngrouped(GPCBnkrFile, mapitem);
+		acct = (AcctStruct *) (mapPtr + sizeof(DBMapStruct));
+		strcpy(bankString, acct[i].AS_bank);
+		DBUnlock(mapPtr);
+		/* FIRST DO THE SUB-MENU ITEMS */
+		/* duplicate the menu item object and add it*/
+		newBlock = ObjDuplicateResource(OptrToHandle(@AcctViewTemplate), 0, -1);
+		newMenuItem = ConstructOptr(newBlock, OptrToChunk(@AcctViewTemplate));
+		@call AcctViewMenuItem::MSG_GEN_ADD_CHILD(newMenuItem,
+					CCF_MARK_DIRTY | CCO_LAST);
+		/* find out what number child it is */
+		numKids = @call AcctViewMenuItem::MSG_GEN_COUNT_CHILDREN();
+		numKids--;
+		/* add the trigger data var data */
+		@call newMenuItem::MSG_META_ADD_VAR_DATA(
+			 (ATTR_GEN_TRIGGER_ACTION_DATA | VDF_SAVE_TO_STATE),
+			 sizeof(word),
+			 &numKids);
+		/* give it its moniker and make it usable */
+		@call newMenuItem::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+					    bankString,
+					    VUM_DELAYED_VIA_APP_QUEUE);
+		@call newMenuItem::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+
+		/* NOW THE XFER FROM LIST ITEM */
+		/* duplicate the list item object and add it */
+		newBlock = ObjDuplicateResource(OptrToHandle(@XferAcctItemTemplate), 0, -1);
+		newMenuItem = ConstructOptr(newBlock, OptrToChunk(@XferAcctItemTemplate));
+		@call NEFXFerFmList::MSG_GEN_ADD_CHILD(newMenuItem,
+					CCF_MARK_DIRTY | CCO_LAST);
+		/* give the item its ID and moniker and set it usable */
+		@call newMenuItem::MSG_GEN_ITEM_SET_IDENTIFIER(numKids);
+		@call newMenuItem::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+					    bankString,
+					    VUM_DELAYED_VIA_APP_QUEUE);
+		@call newMenuItem::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+
+		/* AND THE XFER TO LIST ITEM */
+		/* duplicate the list item object and add it */
+		newBlock = ObjDuplicateResource(OptrToHandle(@XferAcctItemTemplate), 0, -1);
+		newMenuItem = ConstructOptr(newBlock, OptrToChunk(@XferAcctItemTemplate));
+		@call NEFXFerToList::MSG_GEN_ADD_CHILD(newMenuItem,
+					CCF_MARK_DIRTY | CCO_LAST);
+		/* give the item its ID and moniker and set it usable */
+		@call newMenuItem::MSG_GEN_ITEM_SET_IDENTIFIER(numKids);
+		@call newMenuItem::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+					    bankString,
+					    VUM_DELAYED_VIA_APP_QUEUE);
+		@call newMenuItem::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		} /* end of add for loop */
+	  } /* end of add/build if */
+    else if (whichUpdate == UV_CLEAR)  {
+	  /* remove all the kids */
+	  while ((newMenuItem =
+		@call AcctViewMenuItem::MSG_GEN_FIND_CHILD_AT_POSITION(0)) != 0) {
+		@call newMenuItem::MSG_GEN_REMOVE(VUM_DELAYED_VIA_APP_QUEUE,
+								  CCF_MARK_DIRTY);
+		@send newMenuItem::MSG_META_BLOCK_FREE();
+		}
+	  /* remove all the kids */
+	  while ((newMenuItem =
+		@call NEFXFerFmList::MSG_GEN_FIND_CHILD_AT_POSITION(0)) != 0) {
+		@call newMenuItem::MSG_GEN_REMOVE(VUM_DELAYED_VIA_APP_QUEUE,
+								  CCF_MARK_DIRTY);
+		@send newMenuItem::MSG_META_BLOCK_FREE();
+		}
+	  /* remove all the kids */
+	  while ((newMenuItem =
+		@call NEFXFerToList::MSG_GEN_FIND_CHILD_AT_POSITION(0)) != 0) {
+		@call newMenuItem::MSG_GEN_REMOVE(VUM_DELAYED_VIA_APP_QUEUE,
+								  CCF_MARK_DIRTY);
+		@send newMenuItem::MSG_META_BLOCK_FREE();
+		}
+	  }  /* end of clear else */
+    else if (whichUpdate == UV_MOD)  {
+	  /* get which account is selected */
+	  firstAcct = @call MngAcctDList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	  /* get its new moniker */
+	  mapitem = DBGetMap(GPCBnkrFile);
+	  mapPtr = DBLockUngrouped(GPCBnkrFile, mapitem);
+	  acct = (AcctStruct *) (mapPtr + sizeof(DBMapStruct));
+	  strcpy(bankString, acct[firstAcct].AS_bank);
+	  DBUnlock(mapPtr);
+       /* change the menu item */
+	  newMenuItem =
+		   @call AcctViewMenuItem::MSG_GEN_FIND_CHILD_AT_POSITION(firstAcct);
+	  @call newMenuItem::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+					    bankString,
+					    VUM_DELAYED_VIA_APP_QUEUE);
+	  /* change the from list item */
+	  newMenuItem =
+		   @call NEFXFerFmList::MSG_GEN_FIND_CHILD_AT_POSITION(firstAcct);
+	  @call newMenuItem::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+					    bankString,
+					    VUM_DELAYED_VIA_APP_QUEUE);
+	  /* change the to list item */
+	  newMenuItem =
+		   @call NEFXFerToList::MSG_GEN_FIND_CHILD_AT_POSITION(firstAcct);
+	  @call newMenuItem::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+					    bankString,
+					    VUM_DELAYED_VIA_APP_QUEUE);
+	  }  /* end of mod else */
+    else if (whichUpdate == UV_DELETE)  {
+	  /* get which account is selected */
+	  firstAcct = @call MngAcctDList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	  /* DO THE SUB-MENU ITEM */
+	  newMenuItem =
+		  @call AcctViewMenuItem::MSG_GEN_FIND_CHILD_AT_POSITION(firstAcct);
+	  @call newMenuItem::MSG_GEN_REMOVE(VUM_DELAYED_VIA_APP_QUEUE,
+								  CCF_MARK_DIRTY);
+	  @send newMenuItem::MSG_META_BLOCK_FREE();
+	  /* DO THE FROM LIST ITEM */
+	  newMenuItem =
+		  @call NEFXFerFmList::MSG_GEN_FIND_CHILD_AT_POSITION(firstAcct);
+	  @call newMenuItem::MSG_GEN_REMOVE(VUM_DELAYED_VIA_APP_QUEUE,
+								  CCF_MARK_DIRTY);
+	  @send newMenuItem::MSG_META_BLOCK_FREE();
+	  /* DO THE TO LIST ITEM */
+	  newMenuItem =
+		  @call NEFXFerToList::MSG_GEN_FIND_CHILD_AT_POSITION(firstAcct);
+	  @call newMenuItem::MSG_GEN_REMOVE(VUM_DELAYED_VIA_APP_QUEUE,
+								  CCF_MARK_DIRTY);
+	  @send newMenuItem::MSG_META_BLOCK_FREE();
+	  /* update the rest of the kids' vardata */
+	  for (i = firstAcct; i < numAccounts; i++)  {
+		/* DO THE SUB-MENU ITEM */
+		newMenuItem =
+			    @call AcctViewMenuItem::MSG_GEN_FIND_CHILD_AT_POSITION(i);
+		@call newMenuItem::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@call newMenuItem::MSG_META_DELETE_VAR_DATA(
+								ATTR_GEN_TRIGGER_ACTION_DATA);
+		@call newMenuItem::MSG_META_ADD_VAR_DATA(
+			 (ATTR_GEN_TRIGGER_ACTION_DATA | VDF_SAVE_TO_STATE),
+			 sizeof(word),
+			 &i);
+		@call newMenuItem::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		/* DO THE LIST ITEMS */
+		newMenuItem =
+			    @call NEFXFerFmList::MSG_GEN_FIND_CHILD_AT_POSITION(i);
+		@call newMenuItem::MSG_GEN_ITEM_SET_IDENTIFIER(i);
+		newMenuItem =
+			    @call NEFXFerToList::MSG_GEN_FIND_CHILD_AT_POSITION(i);
+		@call newMenuItem::MSG_GEN_ITEM_SET_IDENTIFIER(i);
+		}   /* end of accts for loop */
+	  }  /* end of delete if */
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_USE_ACCOUNT_FROM_VIEW_MENU for GPCBnkrProcessClass
+ *             (int whichAcct)
+ * DESCRIPTION:	sets current acct acct then uses that acct
+ *
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_USE_ACCOUNT_FROM_VIEW_MENU
+{
+
+    /* Set the current account global variable */
+    currentAcct = whichAcct;
+
+    @send process::MSG_USE_ACCOUNT();
+
+}
+

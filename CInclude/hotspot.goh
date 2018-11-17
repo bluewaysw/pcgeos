@@ -1,0 +1,683 @@
+/******************************************************************************
+ *
+ * 	Copyright (c)   GeoWorks 1994   -- All Rights Reserved
+ *
+ *  PROJECT:	GEOS
+ *  FILE:       hotspot.goh
+ *  AUTHOR:     Edwin Yu, Apr 13, 1994
+ *
+ *  REVISION HISTORY:
+ *	    Name    Date            Description
+ *	    ----    ----            -----------
+ *	    Edwin  4/13/94         Initial version.
+ *
+ *  DESCRIPTION:            
+ *	This file contains class defintions for the HotSpot Library.
+ *
+ *	$Id: hotspot.goh,v 1.1 97/04/04 15:57:09 newdeal Exp $
+ *      
+ *****************************************************************************/
+
+@deflib	hotspot
+
+@include <grobj.goh>
+@include <Objects/splineC.goh>
+@include <Objects/vLTextC.goh>		
+
+
+/*
+ ***************************************************************************
+ *              Constants and Structures
+ ***************************************************************************
+ */
+
+#define	NULL_HOT_SPOT_TOKEN 65535	/* token designating no hotspot */
+
+
+/* enumerated type for GenHotSpotDataStruct */
+typedef enum {
+	HST_RECT,
+	HST_SPLINE
+} HotSpotType;
+
+/*
+ * structure used to reference GenHotSpot instance data as passed
+ * to and from HotSpotTextClass
+ */
+typedef struct {
+	word                    GHSDS_size;
+	HotSpotType             GHSDS_type;
+	BasicInit               GHSDS_instData;
+	WWFixed	    	    	GHSDS_parentWidth;
+	WWFixed	    	    	GHSDS_parentHeight;
+} GenHotSpotDataStruct;
+
+/*
+ * notification structure sent for GWNT_DELETE_VARIABLE_GRAPHIC
+ */
+typedef enum {
+	VGAT_INSERT,
+	VGAT_DELETE
+} VariableGraphicActionType;
+
+typedef struct {
+    VisTextVariableType	    	    NDVG_type;
+    dword   	    	    	    NDVG_position;
+    VariableGraphicActionType	    NDVG_action;
+} NotifyDeleteVariableGraphic;
+
+/*
+ ***************************************************************************
+ *              Class & Message Definitions
+ ***************************************************************************
+ */
+
+/*
+ ***************************************************************************
+ *			HotSpotHeadClass
+ ***************************************************************************
+ */
+
+/* 
+ *	The only reason we subclass GrObjHeadClass is to intercept
+ *	MSG_GH_SET_CURRENT_TOOL to set up the right HotSpot subclasses	
+ */
+@class HotSpotHeadClass, GrObjHeadClass ;
+
+@endc
+
+/*
+ ***************************************************************************
+ *			HotSpotManagerClass
+ *************************************************************************** 
+ */
+ 
+@class HotSpotManagerClass, GrObjBodyClass ;
+
+@message void MSG_HOT_SPOT_MANAGER_ABORT_CREATING_HOTSPOT(optr grobj = cx:dx);
+/*
+ *  Abort the creation of a hotspot if the mouse event for 
+ *  MSG_META_LARGE_END_SELECT is outside of the boundaries of a graphics.
+ *
+ *	Pass:	Nothing
+ *	Return:	Nothing
+ */
+
+@message word MSG_HOT_SPOT_MANAGER_CHECK_CORNERS(
+			    RectDWFixed *grobjBound = dx:bp) = ax;
+/*	
+ *  Determine if the four corners of the HotSpot object are within the
+ *  boundaries of the graphic.  (The four corners are top left, top right, 
+ *  bottom left, and bottom right of the ObjectTransform.)
+ *
+ *  Pass:   *grobjBound - rectangle to be checked
+ *  Return: token of the graphic which contains the HotSpot, or
+ *          NULL_HOT_SPOT_TOKEN if the HotSpot is not properly 
+ *          within a graphic.
+ */
+
+@message void MSG_HOT_SPOT_MANAGER_MOVE_HOT_SPOT(word token = cx);
+/*	
+ * Move HotSpot object to "flow" with the embedded graphic when 
+ * the HotSpot's text position changes.
+ *
+ *	Pass:	token	- token of HotSpot object which is moving
+ *	Return:	Nothing
+ */
+
+@message void MSG_HOT_SPOT_MANAGER_CREATE_HOT_SPOT(@stack word token,
+                    MemHandle dataHandle, ChunkHandle dataChunk, 
+                    PointDWFixed point);
+/*
+ *  Instantiate a HotSpot object with the passed instance data.
+ *  Free the block when done.
+ *
+ *	Pass:	token -  token to assign to the new HotSpot object
+ *        	dataHandle - data block 
+ *          dataChunk - chunk containing instance data
+ *          point - upper left corner of HotSpot's position
+ *			
+ *	Return:	Nothing
+ */
+ 
+@message void MSG_HOT_SPOT_MANAGER_DESTROY_HOT_SPOT(word token = cx);
+/*
+ *  Destroy the HotSpot object associated with the given token.
+ *
+ *	Pass:	token - token of the HotSpot object to be destroyed
+ *	Return:	Nothing
+ */
+
+@message void MSG_HOT_SPOT_MANAGER_GET_LAST_POINTER_EVENT(
+				    PointDWFixed *position = dx:bp);
+/*
+ *  Get GBI_lastPtr data
+ *
+ *	Pass:	pointer to PointDWFixed to fill
+ *	Return: position filled in 
+ */
+
+
+@message word MSG_HOT_SPOT_MANAGER_CHECK_OPEN_SPLINE(
+				    	    	optr targetGrobj = cx:dx) = ax;
+/*
+ *  If the spline is open, give a warning and delete it.
+ *
+ *  Pass:   targetGrobj - the HotSpotSplineGuardian object
+ *  Return: 1   if the spline is closed
+ *          0   if the spline is open or no spline that is currently edited
+ */
+
+
+@message optr MSG_HOT_SPOT_MANAGER_GET_MOUSEGRAB() = dx:ax;
+/*
+ *  Return the mouse grab
+ *
+ *  Pass:	nothing
+ *  Return: 	GBI_mosueGrab
+ *           
+ */
+
+@message void MSG_HOT_SPOT_MANAGER_HS_IN_GROUP_MOVE(
+	CallBackMessageData *callbackData = ss:bp);
+/*
+ *	The group of hotspot has been moved to a different
+ *	graphic.  Thus notify the text about it.
+ *
+ *	Pass:	CallBackMessage:
+ *				CBMD_groupOD
+ *				CBMD_childOD
+ *				CBMD_extraData1 - token of the new graphic
+ *				CBMD_extraData2 - unused
+ *	return	nothing
+ */
+
+@message void MSG_HOT_SPOT_MANAGER_UPDATE_EDIT_CONTROLLER();
+/*
+ *	Send GWNT_SELECT_STATE_CHANGE notification to update the
+ *	edit controller. 
+ *
+ *  Pass:   	nothing
+ *  Return: 	nothing
+ *           
+ */
+
+@message void MSG_HOT_SPOT_MANAGER_UPDATE_HYPERLINK_CONTROLLER();
+/*
+ *	Send GWNT_TEXT_HYPERLINKABILITY_CHANGE notification to update the
+ *	hyperlink controller. 
+ *
+ *  Pass:   	nothing
+ *  Return: 	nothing
+ *           
+ */
+
+@message void MSG_HOT_SPOT_MANAGER_SELECTION_CHANGE_NOTIFICATION();
+/*
+ *  Tell HotSpotText that the user has changed the selection of 
+ *  hotsopt.  HotSpotText will then send a type change notification.
+ *
+ *	Pass:	nothing
+ *	Return:	nothing
+ */
+
+@message void MSG_HOT_SPOT_MANAGER_GROUP_SET_HYPERLINK(
+	CallBackMessageData *callbackData = ss:bp);
+/*
+ *  Set a hyperlink on a group of hotspots
+ *  
+ *	Pass:	CallBackMessageData:
+ *			CBMD_groupOD
+ *			CBMD_childOD
+ *			CBMD_extraData1 - file token 
+ *			CBMD_extraData2 - context token
+ *	Return:	nothing
+ */
+
+@message void MSG_HOT_SPOT_MANAGER_INVALIDATE_HOT_SPOT(word token = cx);
+/*
+ *  Invalidate a hotspot object so that it is redrawn.
+ *  
+ *	Pass:	token of hotspot to invalidate
+ *	Return:	nothing
+ */
+
+
+/*--------------------------------------------------------------------------
+ *	    	Instance Data
+ *--------------------------------------------------------------------------*/
+
+    @vardata word ATTR_HOT_SPOT_MANAGER_GRAPHIC_TOKEN;
+
+@endc
+
+/*
+ ***************************************************************************
+ *              GenHotSpotClass
+ ***************************************************************************
+ */
+ 
+/*
+ *  GenHotSpotClass is a variant master class so that the HotSpot 
+ *  subclasses (HotSpotRectClass, HotSpotSplineClass) can share common
+ *  methods and instance data.
+ */
+@class  GenHotSpotClass, GrObjClass, master, variant ;
+
+@message void MSG_GHS_GET_TOKEN(word *token = cx:dx);
+/*	
+ *  Get the HotSpot's token
+ *
+ *  NOTE: because of the way this message is called by 
+ *	  GrObjBodyProcessSelectedGrObjs... it can't use ax as a 
+ *	  return register.
+ *
+ *	Pass:	word *token - ptr to token buffer
+ *	Return: token put in buffer
+ */
+
+@message void MSG_GHS_SET_TOKEN(word token = cx);
+/*
+ *  Set the HotSpot's token to the passed value
+ *
+ *	Pass:	token	- the token to set
+ *	Return:	Nothing
+ */
+
+@message void MSG_GHS_GET_DWF_SPRITE_TRANSFORM_PARENT_BOUNDS(
+						RectDWFixed *bounds);
+/*
+ *  Calculate HotSpot's spriteTransform to RectDWFixed format
+ *
+ *	Pass:	bounds - pointer to RectDWFixed to fill in
+ *	Return:	bounds - the RectDWFixed format of the 
+ *	    	    	 HotSpot's spriteTranform
+ */
+
+@message void MSG_GHS_SET_POSITION();
+/*
+ *  Move the HotSpot to a new position
+ *
+ *	Pass:	Nothing
+ *	Return:	Nothing
+ */
+
+@message void MSG_GHS_DELETE_HOT_SPOT();
+/*
+ *  Destroy the HotSpot object 
+ *
+ *      Pass:   Nothing
+ *      Return: Nothing
+ */
+
+@message MemHandle MSG_GHS_GET_INSTANCE_DATA() = ax;
+/*
+ *  Get the HotSpot object's instance data into a MemBlock.
+ *
+ *      Pass:	nothing
+ *      Return: MemHandle of block containing instance data
+ */
+
+@message void MSG_GHS_GET_UPPERLEFT_CORNER(PointDWFixed *upperLeft = dx:bp);
+/*
+ *  Calculate the upperleft corner of hotspot object, according to its
+ *  normalTransform.
+ *
+ *      Pass:   empty upperleft
+ *      Return: upperleft filled
+ */
+
+@message void MSG_GHS_SET_HYPERLINK(word fileToken = cx, 
+				    word contextToken = dx);
+/*
+ *  Apply a hyperlink (i.e file token + context token) to the hotspot
+ *
+ *	Pass:	fileToken
+ *		contextToken
+ *	Return:	nothing
+ */
+
+@message void MSG_GHS_NOTIFY_TEXT_MOVE(word newToken = cx);
+/*
+ *  Notify the Text that the hotspot's position has been moved to a new
+ *  graphic.
+ *
+ *	Pass:	newToken - the graphic token where the hotspot has been 
+ *		moved to.
+ *	Return:	nothing
+ */
+
+
+@message void MSG_GHS_NOTIFY_TEXT_RESIZE();
+/*
+ *  Notify the Text that the hotspot's position has been moved to a new
+ *  graphic.
+ *
+ *	Pass:   nothing
+ *	Return:	nothing
+ */
+
+
+/*--------------------------------------------------------------------------
+ *	    	Instance Data
+ *--------------------------------------------------------------------------*/
+
+    @vardata word ATTR_GEN_HOT_SPOT_GRAPHIC_TOKEN;
+    /*
+     *  Token of last valid embedded graphic the hotspot was positioned
+     *  over.  Used during move.
+     */
+
+    @instance word GHSI_token; 	    /* token the HotSpot associates with */
+@endc
+
+
+/*
+ ***************************************************************************
+ *			HotSpotRectClass
+ ***************************************************************************
+ */
+
+@class  HotSpotRectClass, GenHotSpotClass ;
+
+@endc
+
+
+/*
+ ***************************************************************************
+ *			HotSpotSplineGuardianClass
+ ***************************************************************************
+ */
+
+@class  HotSpotSplineGuardianClass, GenHotSpotClass ;
+	@uses SplineGuardianClass;
+
+@endc
+
+
+/*
+ ***************************************************************************
+ *			HotSpotSplineWardClass
+ ***************************************************************************
+ */
+
+@class  HotSpotSplineWardClass, GrObjSplineClass ;
+	@uses VisSplineClass;
+
+@message void MSG_HSSW_COPY_SPLINE_POINTS(word arraySize = cx, 
+                                          byte *sourceArray = dx:bp);
+/*
+ *  Copy the passed spline point array (SplinePointStruct) to the ward.
+ *  The ward will allocate in its own block a chunk of the passed size to
+ *	copy the array.
+ *
+ *      Pass:   arraySize - size of sourceArray in bytes
+ *				sourceArray - chunkArray of SplinePointStruct
+ *      Return: nothing
+ */
+
+@endc
+
+
+/*
+ ***************************************************************************
+ *			HotSpotPointerClass
+ ***************************************************************************
+ */
+
+@class  HotSpotPointerClass, PointerClass ;
+
+@endc
+
+
+/*
+ ***************************************************************************
+ *			HotSpotGroupClass
+ ***************************************************************************
+ */
+
+@class  HotSpotGroupClass, GenHotSpotClass ;
+
+@message optr MSG_HSGROUP_GET_OPTR() = cx:dx;
+/*
+ *  return the optr of HotSpotGroup object
+ *
+ *      Pass:   nothing
+ *      Return: optr of HotSpotGroup object,
+ */
+
+@endc
+
+
+
+/*
+ ***************************************************************************
+ *              HotSpotTextClass 
+ ***************************************************************************
+ */
+
+@class  HotSpotTextClass, VisLargeTextClass ;
+
+@message word MSG_HSTEXT_CREATE_HOT_SPOT(@stack word token,
+ 					 MemHandle data, 
+ 					 PointDWFixed point) = ax;
+/*
+ *  The user has created a new HotSpot object in the graphics layer.  
+ *  Update the text data structures to reflect that.
+ *
+ *	Pass: 	token - graphic run token of the embedded graphic this
+ *                      hot spot is associated with.
+ *      	data - block containing instance data
+ *                      first word in block contains size of the block
+ *          	point - upper left corner of HotSpot object
+ *                      
+ * 	Return: word - new token, or NULL_HOT_SPOT_TOKEN if the
+ *                  the embedded graphic does not exist
+ */
+ 
+@message void MSG_HSTEXT_DELETE_HOT_SPOT(word token = cx);
+/*
+ *  The user has deleted a HotSpot object from the graphics layer.  
+ *  Update the text data structures to reflect that.
+ *
+ *      Pass:   token - token of HotSpot object that has been deleted
+ *      Return: nothing
+ */
+
+
+@message void MSG_HSTEXT_UPDATE_HOT_SPOT(@stack word token,
+					 MemHandle data, 
+					 PointDWFixed point);
+/* 
+ *  The user has moved or resized a HotSpot object in the graphics layer. 
+ *  Update the text data structures.
+ *
+ *  Context:    Sent by HotSpotManager after a HotSpot object has
+ *              been moved or resized.
+ *
+ *      Pass: 	token - token of the HotSpot
+ *              data - block containing new instance data
+ *                  (first word in block contains size of the block)
+ *                  If data = NullHandle, instance data has not
+ *                  changed, but position has.
+ *              point - new position of HotSpot
+ *      Return: nothing
+ */
+
+@message word MSG_HSTEXT_GET_GRAPHIC_AT_POSITION(@stack 
+						 PointDWFixed point,
+						 RectDWFixed *rect)=ax;
+/*
+ *  Given a position in document coordinates, see if there is an
+ *  embedded graphic there.
+ *
+ *      Pass:   point - coordinate to check
+ *              rect - pointer to buffer to fill with graphic's bounds
+ *
+ *      Return: If there is a graphic at the passed point:
+ *                  word - token of graphic, and rect filled in
+ *              else NULL_HOT_SPOT_TOKEN 
+ */
+
+@message void MSG_HSTEXT_GET_HOT_SPOT_POSITION(word token=cx,
+					    PointDWFixed *offset=dx:bp);
+/*
+ *  Given a hot spot token, get the offset in document coordinates
+ *  for the HotSpot object.
+ *
+ *      Pass:   token - token of HotSpot object
+ *              offset - pointer to buffer to fill with offset
+ *
+ *      Return: offset filled in with top left coordinate of HotSpot
+ *				
+ */
+
+
+@message void MSG_HSTEXT_CHECK_FOR_PASTED_HOT_SPOTS(@stack
+				VisTextReplaceParameters params);
+/*
+ *  Some text has been pasted.  Check for graphics which define hot spots,
+ *  and tell HotSpotManager to instantiate them.
+ *
+ *  Context: Sent by HotSpotText to itself when it is filtering a paste
+ *           operation, or during an Undo action, which acts like a paste.
+ *
+ *      Pass:   VisTextReplaceParameters from paste
+ *      Return: nothing
+ *				
+ */
+
+
+@message void MSG_HSTEXT_RECALC_HOT_SPOTS(VisTextRange *range = ss:bp);
+/*
+ * Recalculate the position of every hotspot in the passed range, and
+ * move them accordingly.
+ *
+ *	Pass:	range - pointer to VisTextRange with recalc range
+ *	Return: nothing
+ */
+
+@message void MSG_HSTEXT_SET_HYPERLINK_ON_HOTSPOT(@stack word fileToken,
+						 word contextToken,
+						 word hotspotToken,
+						 VisTextSetContextFlags flags);
+/*
+ * Apply the hyperlink to the hotspot's C_GRAPHIC char
+ *
+ * 	Pass:	fileToken - name token of file
+ * 	    	contextToken - name token of context
+ *	    	hotspotToken - hotspot token
+ *	    	flags - VisTextSetContextFlags as passed to 
+ *	    	    	MSG_META_TEXT_SET_HYPERLINK
+ *	Return:	nothing
+ */
+
+@message void MSG_HSTEXT_FOLLOW_HYPERLINK_ON_HOTSPOT(word token=cx);
+/*
+ * Follow the hyperlink set on the hotspot's C_GRAPHIC char
+ *
+ * 	Pass:	token - hotspot token
+ *	Return:	nothing
+ */
+
+
+@message void MSG_HSTEXT_FOLLOW_HYPERLINK_NOTIFICATION(word token = cx);
+/*
+ * Send a type change notification so that the hyperlink controller
+ * can enable/disable the "follow hyperlink" trigger.
+ * Called by MSG_HOT_SPOT_MANAGER_SELECTION_CHANGE_NOTIFICATION.  
+ *
+ *	Pass:	token - token of the selected hotspot, or
+ *		    	CA_NULL_ELEMENT if no selected hotspot or
+ *		     	mutiple selected hotspots
+ *	Return: nothing
+ */
+
+@message void MSG_HSTEXT_SEND_SELECTION_RANGE(@stack word msg,
+	optr object, word token);
+/*
+ *	Get the range of the C_GRAPHIC character for the hotspot whose
+ *	token was passed, and send it to the passed object.
+ *
+ * 	Pass:	object	= object to update
+ *		msg	= message to send to the object
+ *		token 	= token of the selected hotspot
+ *	Return: nothing
+ */
+
+
+@message void MSG_HSTEXT_GET_GRAPHIC_BOUNDS(@stack word token,
+					    RectDWFixed *rect);
+/*
+ *  Given a graphic token, get the bounds of the embedded graphic.
+ *
+ *      Pass:   token - token of embedded graphic
+ *              rect - pointer to buffer to fill with graphic's bounds
+ *
+ *      Return: rect filled in
+ */
+
+@message void MSG_HSTEXT_UPDATE_HOT_SPOT_ARRAY(@stack 
+				VisTextReplaceParameters params);
+/* 
+ *  Used to queue a call to UpdateHotSpotArray() which must be
+ *  called after filtering a text replace operation.
+ */
+
+@message void MSG_HSTEXT_REPOSITION_HOT_SPOTS();
+/*
+ * Reposition all hotspots in the text object.
+ *
+ *	Pass:	nothing
+ *	Return: nothing
+ */
+
+/*--------------------------------------------------------------------------
+ *              VarData
+ *--------------------------------------------------------------------------*/
+
+/* VMBlockHandle of the HotSpotArray*/
+@vardata    word        ATTR_HOT_SPOT_TEXT_HOT_SPOT_ARRAY;
+
+/*
+ * Vardata added when inserting a graphic into text.  Could be a page name
+ * char, a gstring graphic or a hotspot.
+ */
+@vardata    void        ATTR_HOT_SPOT_TEXT_ADDING_GRAPHIC;
+
+/*
+ * Vardata added when creating or destroying a single HotSpot object, to 
+ * optimize MoveHotSpotObjects and DestroyHotSpotObject
+ */
+@vardata    void        ATTR_HOT_SPOT_TEXT_ADD_OR_DELETE_HOT_SPOT;
+
+/*
+ * Set in MSG_HSTEXT_UPDATE_HOT_SPOT to single that when MSG_VIS_DRAW
+ * is received after the update, there is no need to move hotspots.
+ */
+@vardata    void        ATTR_NO_MOVE_HOTSPOTS_WHEN_DRAWING;
+
+/*
+ * Set when a text attribute change is not something that 
+ * HotSpotText needs to reposition its hotspots for.  If this is
+ * set, RepositionVisibleHotspots won't be called in the
+ * MSG_VIS_TEXT_ATTRIBUTE_CHANGE handler.
+ */
+@vardata    void        ATTR_HOT_SPOT_TEXT_NO_REPOSITION_HOT_SPOTS;
+
+
+/*--------------------------------------------------------------------------
+ *              Instance Data
+ *--------------------------------------------------------------------------*/
+
+@instance   word        HSTI_tokenCount = 0;	
+/* next token number to use when creating a HotSpot */
+
+@instance   VisTextRange    HSTI_unused = {0, 0}; 
+/* XXX - currently visible text range - UNUSED XXX */
+
+@endc
+
+                                    
+@endlib	 
+

@@ -1,0 +1,704 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1991-92 -- All Rights Reserved
+ *
+ * PROJECT:	Sample Applications
+ * MODULE:	Multi-user VM File Sample
+ * FILE:	shareddb.goc
+ * AUTHOR:	Tony Requist: September 4, 1991
+ *
+ * REVISION HISTORY:
+ *	Date	Name	    Description
+ *	----	----	    -----------
+ *	9/4/91	tony	    Initial version
+ *
+ * DESCRIPTION:
+ *	This is one of the sample applications that demonstrate the use
+ *	of the GenDocumentControl object. This particular one shows how
+ *	to cope with a VM file that has been marked for multi-user access.
+ *
+ *	(Throughout this file you will see references like this: [Con 7.2.1]
+ *	This is a reference to chapter 7, section 7.2.1 of the Concepts
+ *	manual. [Obj 7.2.1] is a reference to chapter 7, section 7.2.1 of the
+ *	Objects manual. You should use these references to locate further
+ *	information about the topic being discussed if anything is unclear.)
+ *
+ *	All the sample applications in the Document subdirectory share a
+ *	common document format: a VM file whose map block stores the X and
+ *	Y position, in document coordinates, of a small blue square.
+ *      Most of the applications, including this one, actually display such
+ *      a square; when you click the mouse in the view, the coordinates of
+ *	the square change to be where you clicked. 
+ *
+ *	You should understand about VM files [Con 19] and how to manipulate
+ *	them before reading on.
+ *
+ *		      Document Control Overview [Obj 13]
+ *
+ *	The document-control system of GEOS is made from three object
+ *	classes that work together to produce an harmonious whole (sorry,
+ *	got carried away there). The responsibilities are divide as follows:
+ *
+ *	GenDocumentControl  	is responsible for providing what you might
+ *				consider the UI of the document control. It
+ *				produces menus, submenus, and dialog boxes
+ *				with which the user interacts when s/he wishes
+ *				to open, close, create, or save a document.
+ *				It usually is run by the UI thread of an
+ *				application, to provide fast feedback to
+ *				the user.
+ *
+ *	GenDocument 	    	is the low-level object that deals with a
+ *				single document file. It does all the work
+ *				of interacting with the file and VM systems
+ *	    	    	    	to save/revert/auto-save/revert the document
+ *				itself.
+ *
+ *	GenDocumentGroup    	is a conduit between the GenDocumentControl
+ *				and the GenDocument objects. It is responsible
+ *				for creating, managing, and destroying the
+ *				GenDocument objects, selecting a single object
+ *				as the current document, etc. GenDocumentGroup
+ *	    	    	    	instantiates a separate GenDocument object
+ *				for each document it's told by the
+ *				GenDocumentControl to manage.
+ *
+ *			  Multi-User Access
+ *
+ *	There are two forms of multi-user access supported by the VM
+ *	system and document control: multiple-reader, single-writer; and
+ *	multiple-read/writer. These are known as "shared-single" and
+ *	"shared-multiple," respectively.
+ *
+ *	For a shared-single document, many applications can open it read-only
+ *	while a single one opens it for reading and writing. When such a
+ *	document is opened for reading, the system reads the entire file
+ * 	into memory (swapping some of it out to local disk, extended memory,
+ *	or other swap space, as necessary). During this time, it has
+ *	exclusive access to the file. Once the entire file has been read,
+ *	exclusive access is released and others can open it for reading or
+ *	writing, as appropriate. Since the entire file is cached locally,
+ *	the reader is insulated from any changes made by the sole writer
+ *	the system allows. The writer accesses the document as if it were
+ *	the sole opener of the file, except the system will gain exclusive
+ *	access to the file during the course of any VMUpdate, VMSave, VMRevert
+ *	or VMSaveAs. During this time, any new read-only opener will have
+ *	to wait.
+ *
+ *	When you open a shared-multiple document, you work on a transaction
+ *	basis. Before each transaction, you gain exclusive access to the
+ *	file, by calling VMGrabExclusive. You then perform normal VM operations
+ *	on the file, locking, unlocking, dirtying, allocating, freeing and
+ *	generally wreaking your own private havoc. When the transaction is
+ *	done, you release exclusive access by calling VMReleaseExclusive.
+ *	If any block is dirty, the system writes it to the file during
+ *	the VMReleaseExclusive call, upping the "generation number" stored
+ *	with the file. Each opener of the file records the generation
+ *	number of the file when last it released exclusive access to it.
+ *	When the application next calls VMGrabExclusive, if the number in the
+ *	file doesn't match the number on record, the system discards all the
+ *	cached blocks for the file and sends a message to the opener telling
+ *	it the file has been changed.
+ *
+ *	The purpose of these mechanisms is to allow a document to be
+ *	available to many users on a network, without their having to coordinate
+ *	their efforts among themselves as to who gets to look at the thing
+ *	next.
+ *
+ *	For something like a word-processor document, where the application
+ *	is dealing with the document as a whole, shared-single is the best
+ *	way to provide this access. For a Rolodex(tm)-like application, where
+ *	the document is structured as a series of records and all examination
+ *	and modification can be organized as transactions, shared-multiple
+ *	is best.
+ *
+ * 	By default, the document control will open a shared-single document
+ *	for read-only access; the user must specify writing in the File/Open
+ *	dialog box if the document is marked shared-single.
+ *
+ *	If a document is shared-multiple, the document control will periodically
+ *	check to see if the document has changed, sending a message to the
+ *	GenDocument object to allow it to redraw itself with the new data
+ *	if the file has changed. Save and Revert are not supported for
+ *	shared-multiple documents.
+ *
+ *	This application works with shared-multiple documents.
+ *
+ *		     To See This Thing In Action
+ *
+ *	You'll need to launch this once, save the document under some
+ *	name or other, then choose "Set Document Type" under the Features
+ *	sub-menu of the File menu and select "Multi-User" document.  This
+ *	will close the document and re-open it in multi-user mode.  Launch
+ *	another copy of this app and open this file there as well.
+ *
+ *	When you click in one of the views, the other will react after the
+ *	number of seconds specified in the "change poll time" key of the "ui"
+ *	category in your GEOSEC.INI file. If you quickly click in first
+ *	one view, then the other, then back in the first, you'll see the
+ *	warning box come up about the document having changed and do you
+ *	really want to update it.
+ *
+ *	$Id: shareddb.goc,v 1.1 97/04/04 16:36:50 newdeal Exp $
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+
+/*
+ ***************************************************************************
+ *		Constants and structures
+ ***************************************************************************
+ */
+
+/*
+ * The major and minor protocol number for the document file is an abstract
+ * thing, given meaning only with respect to other protocol numbers, as
+ * described in [Con 6.1.7] and [Obj 13.5.1]. In our case, we've never changed
+ * the format of our document, so our protocol number remains 1.0
+ */
+#define DOCUMENT_PROTOCOL_MAJOR	1
+#define DOCUMENT_PROTOCOL_MINOR	0
+
+/*
+ * Define the extent of the coordinate space on our document. It's specified
+ * in terms of points, so our document is 20 inches by 20 inches.
+ */
+#define DOCUMENT_WIDTH		(20*72)
+#define DOCUMENT_HEIGHT		(20*72)
+
+#define VIEW_BACKGROUND_COLOR	C_WHITE
+
+/*
+ * Initial position (in document coordinates) of our mystical blue square.
+ */
+#define INITIAL_X_POS		20
+#define INITIAL_Y_POS		20
+
+/*
+ * Dimensions (in document coordinates) of our blue square.
+ */
+#define BOX_WIDTH		10
+#define BOX_HEIGHT		10
+
+/*
+ * This is the structure of a datafile.  It is incredibly simple, storing just
+ * a x,y position of the center of the square in the VM file's map block.
+ */
+
+typedef	struct {
+    word	SDBMB_xPos;
+    word	SDBMB_yPos;
+} SDBMapBlock;
+
+/*
+ ***************************************************************************
+ *		Global variables
+ ***************************************************************************
+ */
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+@class	SDBProcessClass, GenProcessClass ;
+
+@endc   /* end of class definition */
+
+/*
+ * SDBDocument class is our subclass of GenDocument that we use to add
+ * behavior to the GenDocument
+ */
+
+@class	SDBDocumentClass, GenDocumentClass ;
+@endc
+
+
+@classdecl	SDBProcessClass, neverSaved ;
+@classdecl	SDBDocumentClass ;
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+/*
+ *		Application Object
+ */
+
+@start	AppResource ;
+
+@object GenApplicationClass SDBApp = {
+    GI_visMoniker = list { @SDBTextMoniker }
+    GI_comp = @SDBPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @SDBPrimary;
+    /*
+     * The GenDocumentControl object must be on the "active list" so it can
+     * have access to the AppLaunchBlock, passed with MSG_META_ATTACH, that
+     * contains the data file the application is supposed to open.
+     */
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) = @SDBDocumentControl;
+    /*
+     * The GenDocumentControl object must also be on the "application startup"
+     * list so the application can manipulate documents when started as a
+     * server for another application (NOTE: it must be on this list even if
+     * you don't ever expect your application to act as such a server).
+     */
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) = @SDBDocumentControl;
+    /*
+     * The GenDocumentControl will load its saved options from the .ini file
+     * itself, but needs to be told when to save them.
+     */
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+	@SDBDocumentControl;
+    /*
+     * Specify the INI file category [Con 6.3] under which to save all options
+     * for this application.
+     */
+    ATTR_GEN_INIT_FILE_CATEGORY = "shareddb";
+}
+
+@visMoniker SDBTextMoniker = "C SharedDB Sample Application";
+
+@end	AppResource
+
+/*
+ *		Primary window
+ */
+
+@start	Interface		/* this resource is for misc UI objects */ ;
+
+@object GenPrimaryClass SDBPrimary  = {
+    GI_comp = @SDBFileMenu, @SDBView;
+    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+@object GenInteractionClass SDBFileMenu = {
+    /*
+     * Turn this thing into the File menu for the application. In an ideal
+     * world, we could just turn the GenDocumentControl object into the
+     * File menu and be done with it (it is a subclass of GenInteraction,
+     * after all). Sadly, due to implementation details, GenDocumentControl
+     * can only be a GIV_ORGANIZATIONAL interaction, so we have a separate
+     * GIV_POPUP interaction to contain it.
+     */
+    GI_comp = @SDBDocumentControl;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+}
+
+/*
+ *	GenDocumentControl
+ *
+ * There are a few things to keep in mind when deciding in what resource to
+ * place the GenDocumentControl object:
+ *	1) because it must be on the application's MGCNLT_ACTIVE_LIST list,
+ *	   the resource that contains it will always be brought in on start-up.
+ *	   If that resource is particularly large, it could slow down the
+ *	   application's start-up.
+ *	2) it is actually used only rarely, when the user wishes to open, close
+ *	   or save a document.
+ *	3) it creates a number of different objects (triggers for the File
+ *	   menu, dialog boxes, etc.) that could make the resource in which
+ *	   it sits become somewhat bloated.
+ * If there were more elements of the File menu (for example, a
+ * SpoolPrintControl object), you might put all the elements into a single
+ * FileMenu resource. For this example, however, we're just going to put it
+ * in the Interface resource, as there's not much else for this app to do.
+ */
+@object GenDocumentControlClass SDBDocumentControl = {
+    /*
+     * Document file's token
+     */
+    GDCI_documentToken = { "SAMP", MANUFACTURER_ID_GEOWORKS };
+    /*
+     * Special attributes: work in shared multiple mode
+     */
+    GDCI_attrs = @default & ~GDCA_MODE |
+				(GDCM_SHARED_MULTIPLE << GDCA_MODE_OFFSET);
+    /*
+     * Text to display in the header area of the primary when no
+     * document is open.
+     */
+    GDCI_noNameText = "No Document";
+    /*
+     * Specify subdirectory of SP_TEMPLATE in which Use Template... should look.
+     */
+    GDCI_templateDir = "Sample";
+    /*
+     * Pointer to the GenDocumentGroup
+     */
+    GDCI_documentGroup = SDBDocumentGroup;
+    /*
+     * List of objects to enable/disable based on whether or not a
+     * document exists. For us, this is the view itself.
+     */
+    GDCI_enableDisableList = SDBUIEnableList;
+}
+
+@chunk optr SDBUIEnableList[] = {
+    @SDBView
+};
+
+@end Interface
+
+/*
+ *	Document Group
+ *
+ * The GenDocumentGroup should be put in a resource of its own run by
+ * the application thread. It is responsible for creating and administering
+ * the various GenDocument objects (one per document), coordinating its actions
+ * with the GenDocumentControl object.
+ */
+
+@start DocumentUI ;
+
+@object GenDocumentGroupClass SDBDocumentGroup = {
+    /*
+     * Name for untitled documents
+     */
+    GDGI_untitledName = "SDB Untitled";
+    /*
+     * Class for document objects. We specify our own subclass of GenDocument
+     * as we wish to add behaviour to the document object.
+     */
+    GDGI_documentClass = &SDBDocumentClass;
+    /*
+     * GenView to which to automatically connect documents.
+     */
+    GDGI_genView = SDBView;
+    /*
+     * Document protocol for current document version
+     */
+    GDGI_protocolMajor = DOCUMENT_PROTOCOL_MAJOR;
+    GDGI_protocolMinor = DOCUMENT_PROTOCOL_MINOR;
+    /*
+     * Pointer to the GenDocumentControl
+     */
+    GDGI_documentControl = SDBDocumentControl;
+}
+
+@end DocumentUI;
+
+/*
+ *		GenView object
+ */
+
+@start Interface ;
+
+@object GenViewClass SDBView = {
+    /*
+     * All objects in the enableDisable list of the GenDocumentControl
+     * must start life disabled.
+     */
+    GI_states = @default & ~GS_ENABLED;
+
+    /*
+     * Specify the bounds of the document the view will be displaying to be
+     * the dimensions of the documents we create.
+     */
+    GVI_docBounds = {0, 0, DOCUMENT_WIDTH, DOCUMENT_HEIGHT};
+
+    GVI_horizAttrs = @default | GVDA_SCROLLABLE;
+    GVI_vertAttrs  = @default | GVDA_SCROLLABLE;
+
+    /*
+     * This view will not take text input, so specify that no floating
+     * keyboard should come up. Otherwise, we would get a floating
+     * keyboard by default on pen systems.
+     */
+     ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+}
+
+@end Interface
+
+/*
+ * Message strings
+ */
+
+@start MessageStrings, notDetachable ;
+
+@chunk char fileChangedString[] =
+	"The document has changed since you last edited it. Do you want"
+	" to make this change anyway?";
+
+@end MessageStrings
+
+/*
+ ***************************************************************************
+ *		Code for SDBDocumentClass
+ ***************************************************************************
+ */
+
+
+/***********************************************************************
+ *		MSG_VIS_RECALC_SIZE for SDBDocumentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Specify how big we want the document object to be
+ * PARAMETERS:	    SizeAsDWord (word width, word height)
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:	    We ignore the suggested width and height and insist
+ *		    on our predetermined dimensions.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	8/91		Initial Revision
+ *
+ ***********************************************************************/
+@method SDBDocumentClass, MSG_VIS_RECALC_SIZE
+{
+    return( MAKE_SIZE_DWORD(DOCUMENT_WIDTH, DOCUMENT_HEIGHT) );
+}
+
+
+/***********************************************************************
+ *	MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE for SDBDocumentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Initialize a newly-created document file.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    The map block is allocated, initialized and set for
+ *		    the file.
+ *
+ * STRATEGY: 	    Handle this message by creating our version of an empty
+ *		    document, which is a map block with the SDBMapBlock
+ *		    structure in it and initialized to default values.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	8/91		Initial Revision
+ *
+ ***********************************************************************/
+@method SDBDocumentClass, MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE
+{
+    VMBlockHandle mapBlock; /* VM block handle of the file's map block,
+			     * which holds the coordinates of the mystic
+			     * square. */
+    SDBMapBlock *mapPtr;	    /* The locked map block */
+    MemHandle mem;  	    /* Memory handle of the locked map block,
+			     * for marking the block dirty */
+
+    /*
+     * Allocate a block, make it the map block and initialize it
+     */
+    mapBlock = VMAlloc(pself->GDI_fileHandle, sizeof(SDBMapBlock), 0);
+    VMSetMapBlock(pself->GDI_fileHandle, mapBlock);
+
+    /*
+     * Lock the newly created block so that we can use it.  Since we
+     * are modifying the contents of the block it is essential that we
+     * call VMDirty to let the VM code know that the block is modified,
+     * and do it *before* we call VMUnlock (else the block might be
+     * thrown out before we can mark it dirty).
+     */
+    mapPtr = VMLock(pself->GDI_fileHandle, mapBlock, &mem);
+    VMDirty(mem);
+    mapPtr->SDBMB_xPos = INITIAL_X_POS;
+    mapPtr->SDBMB_yPos = INITIAL_Y_POS;
+    VMUnlock(mem);
+    return(FALSE);		/* Return no error */
+}
+
+
+/***********************************************************************
+ *		MSG_VIS_DRAW for SDBDocumentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Draw ourselves in the document space.
+ * PARAMETERS:	    void (DrawFlags drawFlags, GStateHandle gstate)
+ * SIDE EFFECTS:    Attributes of the gstate are altered.
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	8/91		Initial Revision
+ *
+ ***********************************************************************/
+@method SDBDocumentClass, MSG_VIS_DRAW
+{
+    VMBlockHandle mapBlock; /* VM block handle of the map block, which
+			     * contains the coordinates of the mystic square */
+    SDBMapBlock *mapPtr;    /* Locked map block */
+    MemHandle mem;  	    /* Memory handle of same, for unlocking the block */
+    VisInstance *visPtr;    /* The Vis portion of our instance data, so we
+			     * can get our bounds */
+
+    /*
+     * If we were not called as the result of a MSG_META_EXPOSED, then we need
+     * to clear the object first (otherwise we're only permitted, by the
+     * graphics system, to draw to the invalid portion of the view, which has
+     * been cleared out by the system for us).
+     */
+
+    if (!(drawFlags & DF_EXPOSED)) {
+	GrSetAreaColor(gstate, CF_INDEX, VIEW_BACKGROUND_COLOR, 0, 0);
+	visPtr = ObjDerefVis(oself);
+	GrFillRect(gstate, visPtr->VI_bounds.R_left, visPtr->VI_bounds.R_top,
+			visPtr->VI_bounds.R_right, visPtr->VI_bounds.R_bottom);
+    }
+    /*
+     * Change to the color of our mystical square.
+     */
+    GrSetAreaColor(gstate, CF_INDEX, C_LIGHT_BLUE, 0, 0);
+
+    /*
+     * Get exclusive access to the data file.  If the data file has changed
+     * since we last read it we don't really care (we're about to display our
+     * only piece of data from the file, anyway), so we discard the return
+     * value from VMGrabExclusive
+     */
+
+    (void) VMGrabExclusive(pself->GDI_fileHandle, 0, VMO_READ,
+			    (VMOperation *)NULL);
+
+    /*
+     * Get position from data file and draw the rectangle
+     */
+
+    mapBlock = VMGetMapBlock(pself->GDI_fileHandle);
+    mapPtr = VMLock(pself->GDI_fileHandle, mapBlock, &mem);
+    GrFillRect(gstate,
+	       mapPtr->SDBMB_xPos - BOX_WIDTH/2,
+	       mapPtr->SDBMB_yPos - BOX_HEIGHT/2,
+	       mapPtr->SDBMB_xPos + BOX_WIDTH/2,
+	       mapPtr->SDBMB_yPos + BOX_HEIGHT/2);
+    VMUnlock(mem);
+
+    /*
+     * Release excluive access to the file
+     */
+    VMReleaseExclusive(pself->GDI_fileHandle);
+}
+
+
+/***********************************************************************
+ *		MSG_META_START_SELECT for SDBDocumentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Field a pointer click within our document.
+ * PARAMETERS:	    void (MouseReturnParams *retVal,
+ *			  sword xPosition,
+ *			  sword yPosition,
+ *			  word inputState)
+ * SIDE EFFECTS:    The position in the map block of the document is
+ *		    updated and the map block (and hence the document)
+ *		    is marked dirty.
+ *
+ * STRATEGY:	    Lock down the map block and store the pointer
+ *		    position (which is already in document coordinates)
+ *		    into it, marking the block dirty.
+ *
+ *	    	    Call ourselves to redraw the entire document.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	8/31/91		Initial Revision
+ *
+ ***********************************************************************/
+@method SDBDocumentClass, MSG_META_START_SELECT
+{
+    VMBlockHandle mapBlock;
+    SDBMapBlock *mapPtr;
+    MemHandle mem;
+    Boolean makeChange = TRUE; /* Whether we should actually change the
+				* coordinates in the file. The only reason
+				* we wouldn't is if someone has changed the
+				* file since last we checked and the user
+				* tells us not to make the change */
+
+    /*
+     * Get exclusive access to the data file.  If the data file has changed
+     * since we last read it (as indicated by the return value from
+     * VMGrabExclusive) we want to warn the user of this.
+     *
+     * We do not specify a timeout value, so we will block until the file
+     * becomes free. If we only wanted to wait a certain amount of time, we'd
+     * give that interval, in 10ths of a second, and provide a variable of
+     * type VMOperation in which the system would put the operation for which
+     * the file is currently locked (to give you some idea of what's going on
+     * so you can tell the user about why you were unable to complete the
+     * action s/he requested).
+     */
+
+    if (VMGrabExclusive(pself->GDI_fileHandle, 0, VMO_WRITE,
+			(VMOperation *)NULL) == VMSERV_CHANGES)
+    {
+	makeChange = (UserStandardDialogOptr(NullOptr, NullOptr,
+			NullOptr, NullOptr, @fileChangedString,
+			((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+			 (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET)))
+		      == IC_YES);
+    }
+
+    if (makeChange) {
+	/*
+	 * Fetch and lock down the map block for the file.
+	 */
+	mapBlock = VMGetMapBlock(pself->GDI_fileHandle);
+	mapPtr = VMLock(pself->GDI_fileHandle, mapBlock, &mem);
+
+	/*
+	 * Store the click position as the new center of the mystic square.
+	 */
+	mapPtr->SDBMB_xPos = xPosition;
+	mapPtr->SDBMB_yPos = yPosition;
+
+	/*
+	 * Mark the map block dirty and unlock it. This will notify us that the
+	 * document is dirty.
+	 */
+	VMDirty(mem);
+	VMUnlock(mem);
+    }
+
+    /*
+     * Release exclusive access to the file. This will flush the dirty block
+     * (if any) to disk automatically for us, as well as up the generation
+     * number of the file (if any blocks were dirty).
+     */
+
+    VMReleaseExclusive(pself->GDI_fileHandle);
+
+    /*
+     * Tell ourselves to redraw the entire object.
+     */
+    @send self::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+
+    retVal->flags = MRF_PROCESSED;	/* this event processed */
+}
+
+
+/***********************************************************************
+ *	MSG_GEN_DOCUMENT_DOCUMENT_HAS_CHANGED for SDBDocumentClass
+ ***********************************************************************
+ * SYNOPSIS:	    Take note that someone else has changed the document.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    the document is redrawn with the new data.
+ *
+ * STRATEGY:	    The system has already thrown out the old cached data,
+ *	    	    so we need only redraw the document with the new
+ *	    	    data.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	9/ 4/91		Initial Revision
+ *
+ ***********************************************************************/
+@method SDBDocumentClass, MSG_GEN_DOCUMENT_DOCUMENT_HAS_CHANGED
+{
+    @send self::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+}

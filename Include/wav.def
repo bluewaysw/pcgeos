@@ -1,0 +1,113 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Wav Library
+FILE:		wav.def
+
+AUTHOR:		Steve Scholl
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	srs	8/12/93   	Initial version.
+
+DESCRIPTION:
+	$Id: wav.def,v 1.1 97/04/04 14:24:41 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+SetDef	__WAV
+
+StartLibrary	wav
+
+global WavPlayFile:far
+; Opens a file containing a .WAV sound, spawns a thread, and plays it in the
+; background.
+;
+;PASS:		
+;	bx - disk handle OR StandardPath
+;		If BX is 0, then the passed path is either relative to
+;		the thread's current path, or is absolute (with a
+;		drive specifier).
+;
+;	ds:dx - Path specification.  The path MAY contain a drive
+;		spec, in which case, BX should be passed in as zero.
+;
+;	es:di - file name with extension and null terminated
+;Return:	nothing
+;Destroyed:	nothing
+;
+
+global PlaySoundFromFile:far
+; Plays a .WAV sound from the passed file handle
+; Pass: bx - file han
+; Return: nothing
+; Destroyed: nothing
+
+
+global WavPlayInitSound:far
+; Play a wav file specified under the [sound] category the .ini file.
+;
+; To call this function, you need to make sure the wav file is pointed by a key
+; under [sound] category.  The key is composed of the GeodeToken of the calling
+; app, and an enumerated word value defined by the app.  For example, the Tetris
+; game plays a wav file for dropping pieces.  In tetris, the code calls this
+; WavPlayInitSound with Tetris GeodeToken and a word value defined by Tetris.
+;
+;	#define TETRIS_DROP_SOUND   0
+;	#define TETRIS_ROTATE_SOUND 1
+;	GeodeToken token;
+;	GeodeGetInfo(GeodeGetCodeProcessHandle(), GGIT_TOKEN_ID, &token);
+;	WavPlayInitSound(&token, TETRIS_DROP_SOUND);
+;	WavPlayInitSound(&token, TETRIS_ROTATE_SOUND);
+;
+; In the net.ini file, you specifed the wav file associate with the sound by:
+;
+;	[sound]
+;	84_69_84_82_0_0 = drop.wav
+;	84_69_84_82_0_1 = rotate.wav
+;
+; where "84_69_84_82" is the ascii decimal value of "TETR", the 4 letter token
+; chars of the app, the second last digit is the manufacutre ID of Tetris.
+; (MANUFACTURE_ID_GEOWORKS is 0.)  The last digit is the enumerated word value
+; defined by the app.
+;
+;
+; Pass: cx:dx = vfptr to GeodeToken
+;	bx - enumerated type, defined by each app.
+; Return: nothing
+; Destroyed: nothing
+
+
+global WavLockExclusive:far
+; Lock the global exclusive.  Only one thread can play
+; a wav file at a time.
+; 		
+; May be called externally to wait for a sound to finish
+; playing.  (Be sure to UnlockExclusive as well).
+; 
+; PASS:		nothing
+; RETURN:	nothing
+; DESTROYED:	nothing
+; SIDE EFFECTS:	
+; 		May block if someone is playing a sound.
+ 
+global WavUnlockExclusive:far
+; Release global exclusive.
+; 
+; PASS:		nothing
+; RETURN:	nothing
+; DESTROYED:	nothing
+; SIDE EFFECTS:	
+ 
+ 
+;
+; C Stubs
+;
+global WAVPLAYFILE:far
+global PLAYSOUNDFROMFILE:far
+global WAVPLAYINITSOUND:far
+EndLibrary	wav

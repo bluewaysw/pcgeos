@@ -1,0 +1,1131 @@
+/***********************************************************************
+ *
+ *	Copyright (c) NewDeal 1999 -- All Rights Reserved
+ *
+ * PROJECT:	  GeoSafari
+ *
+ * AUTHOR:  	  Gene Anderson
+ *
+ *	$Id$
+ *
+ ***********************************************************************/
+
+/**************************************************************************
+ *		Include files
+ *************************************************************************/
+
+@include <stdapp.goh>
+@include <safari.goh>
+@include "safari2.goh"
+
+@include "Art/geicons.goh"
+/*@include "Art/mkrGSafDoc.goh"*/
+
+@start UIBitmaps, data;
+@include "Art/mkrGTool.goh"
+@include "Art/mkrQuiz.goh"
+@include "Art/mkrQuizDown.goh"
+@include "Art/mkrQuit.goh"
+@include "Art/mkrQuitDown.goh"
+@include "Art/mkrSafLogo.goh"
+@include "Art/mkrSafLogo256.goh"
+@include "Art/mkrQOn.goh"
+@include "Art/mkrQOff.goh"
+@include "Art/mkrAOn.goh"
+@include "Art/mkrAOff.goh"
+@end UIBitmaps;
+
+@start BackBitmaps1, data;
+@include "Art/mkrBack1.goh"
+@include "Art/mkrBack3.goh"
+@include "Art/mkrBack4.goh"
+@include "Art/mkrBack5.goh"
+@end BackBitmaps1;
+@start BackBitmaps2, data;
+@include "Art/mkrBack6.goh"
+@include "Art/mkrBack7.goh"
+@include "Art/mkrBack8.goh"
+@include "Art/mkrBack9.goh"
+@end BackBitmaps2;
+
+@start AppIcons, data;
+
+@visMoniker GEDocIconMonikerList = list {
+		@GELCDocMoniker,
+		@GETCDocMoniker
+		};
+
+@end AppIcons;
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+@start	AppResource;
+
+@object SafariAppClass SafariAppObj = {
+    GI_visMoniker = list {
+	@SafariTextMoniker,
+	@GELCAppMoniker,
+	@GETCAppMoniker
+	 }
+    GI_comp =
+        @SafariPrimary,
+        /*@ChooseDB, */
+        @StatusDB,
+        @OptionsDB,
+      /*  @AboutNDDialog, */
+        @CreditDialog;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) =
+        @SafariPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_STARTUP_LOAD_OPTIONS) =
+        @CountdownList,
+        @MaxTimeValue,
+        @NumPlayers,
+        @SoundList,
+        @ShowList,
+        @ShowMax,
+        @QuestionOrderList;
+	 /* jh - what happens if I eliminate this? */
+	 /* GAI_appLevel = UIIL_INTRODUCTORY;  */
+    ATTR_GEN_INIT_FILE_CATEGORY = "safari";
+  //  ATTR_GEN_HELP_CONTEXT = "TOC";
+	 ATTR_GEN_HELP_FILE = "geoexp";
+}
+
+@visMoniker SafariTextMoniker = "GeoExplorer";
+
+@end	AppResource;
+
+@start	Interface;
+
+@object GenPrimaryClass SafariPrimary  = {
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+	 GI_comp = @BackgroundObj, @GameMenu/*, @OptionsButton*/;
+    ATTR_GEN_HELP_CONTEXT = "TOC";
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+	 /* jh - make GS more Ensemble-like */
+	 /* HINT_PRIMARY_FULL_SCREEN;
+	 HINT_PRIMARY_NO_EXPRESS_MENU;
+    HINT_WINDOW_NO_TITLE_BAR;
+    HINT_PRIMARY_NO_FILE_MENU;*/
+    HINT_DISPLAY_MAXIMIZED_ON_STARTUP;
+}
+
+@object GenInteractionClass GameMenu =  {
+	GI_visMoniker = 'G', "Game";
+	GI_comp = @OpenDB, @OptionsButton, @AboutGroup;
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_FILE_MENU;
+}
+
+@object GenTriggerClass OptionsButton = {
+	 GI_visMoniker = 'O', "Options";
+	 GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE;
+	 GTI_destination = @OptionsDB;
+	 HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenInteractionClass AboutGroup = {
+	GI_comp = @AboutDBox;
+	GII_visibility = GIV_SUB_GROUP;
+}
+@object GenInteractionClass AboutDBox = {
+	 GI_visMoniker = 'b', "About";
+	 GI_comp = @Line1, @Line2, @Line3,
+				  @Line4;
+	 GII_visibility = GIV_DIALOG;
+	 GII_type = GIT_NOTIFICATION;
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+@object GenTextClass Line1 = {
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "Produced under license from Educational Insights";
+}
+@object GenTextClass Line2 = {
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "Copyright Educational Insights, Gardena, CA (USA)";
+}
+@object GenTextClass Line3 = {
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "Copyright \xa9 Breadbox Computer Company";
+}
+@object GenTextClass Line4 = {
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "All Rights Reserved";
+}
+
+@object SafBackgroundClass BackgroundObj = {
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GI_comp =
+        @LeftGroup,
+        @MiddleGroup,
+        @RightGroup;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_CUSTOM_CHILD_SPACING = {SST_PIXELS|0};
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass LeftGroup = {
+    GI_comp =
+        @LeftTopGroup,
+        @LeftBottomGroup;
+}
+
+@object GenInteractionClass LeftTopGroup = {
+    GI_comp =
+        @Timebar,
+        @LeftIndicators;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    HINT_CUSTOM_CHILD_SPACING = {SST_PIXELS|2};
+}
+
+@object GenInteractionClass LeftBottomGroup = {
+ //	 GI_comp = @QuizButton;
+    HINT_LEFT_JUSTIFY_CHILDREN;
+}
+
+@object GenInteractionClass MiddleGroup = {
+    GI_comp =
+        @GameCardGroup,
+        @TextGroup,
+        @FeedbackGroup;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_CUSTOM_CHILD_SPACING = {SST_PIXELS|0};
+}
+
+@object GenInteractionClass RightGroup = {
+    GI_comp =
+        @RightTopGroup,
+        @RightBottomGroup;
+    HINT_MINIMUM_SIZE = {SST_PIXELS|31, 0, 0};
+}
+
+@object GenInteractionClass RightTopGroup = {
+    GI_comp =
+        @RightIndicators;
+    HINT_LEFT_JUSTIFY_CHILDREN;
+}
+
+@object GenInteractionClass RightBottomGroup = {
+	// GI_comp = @QuitButton;
+    HINT_RIGHT_JUSTIFY_CHILDREN;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+/*@object SafariButtonClass QuizButton = {
+    SGI_offBitmap = (QuizMoniker);
+    SGI_onBitmap = (QuizDownMoniker);
+	 SBI_destination = @ChooseDB;
+    SBI_message = MSG_GEN_INTERACTION_INITIATE;
+} */
+
+/*@object SafariButtonClass QuitButton = {
+    SGI_offBitmap = (QuitMoniker);
+    SGI_onBitmap = (QuitDownMoniker);
+    SBI_destination = @SafariAppObj;
+    SBI_message = MSG_SAF_APP_QUIT_QUIZ_OR_APP;
+} */
+
+/*****************************************************************************
+ *    Game Card UI
+ *****************************************************************************/
+
+@object SafariTimebarClass Timebar = {
+}
+
+@object GenInteractionClass LeftIndicators = {
+    GI_comp =
+        @CountdownTimer,
+        @LeftIndicatorGroup;
+    HINT_RIGHT_JUSTIFY_CHILDREN;
+}
+
+@object GameTimerClass CountdownTimer = { 
+}
+
+
+@object IndicatorGroupClass LeftIndicatorGroup = {
+    IGI_startNum = 0;
+    IGI_nextGroup = @RightIndicatorGroup;
+    GI_comp =
+        @Indicator0,
+        @Indicator1,
+        @Indicator2,
+        @Indicator3,
+        @Indicator4,
+        @Indicator5,
+        @Indicator6,
+        @Indicator7,
+        @Indicator8,
+        @Indicator9,
+        @Indicator10,
+        @Indicator11,
+        @Indicator12;
+}
+
+@object IndicatorClass Indicator0 = {
+}
+@object IndicatorClass Indicator1 = {
+}
+@object IndicatorClass Indicator2 = {
+}
+@object IndicatorClass Indicator3 = {
+}
+@object IndicatorClass Indicator4 = {
+}
+@object IndicatorClass Indicator5 = {
+}
+@object IndicatorClass Indicator6 = {
+}
+@object IndicatorClass Indicator7 = {
+}
+@object IndicatorClass Indicator8 = {
+}
+@object IndicatorClass Indicator9 = {
+}
+@object IndicatorClass Indicator10 = {
+}
+@object IndicatorClass Indicator11 = {
+}
+@object IndicatorClass Indicator12 = {
+}
+
+@object SafariBackgroundClass GameCardGroup = {
+    GI_comp =
+        @TheGameCard;
+    SBI_color = C_BLUE;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_FIXED_SIZE = {SST_PIXELS|SAFARI_GAME_CARD_WIDTH + 4,
+		       SST_PIXELS|SAFARI_GAME_CARD_HEIGHT + 1,
+		       0};
+}
+
+@object SafGameCardClass TheGameCard = {
+}
+
+@object GenInteractionClass RightIndicators = {
+    GI_comp =
+        @Spacer2,
+        @RightIndicatorGroup;
+    HINT_LEFT_JUSTIFY_CHILDREN;
+}
+
+/* jh - just make it a GenInter */
+@object /*SettingsButtonClass*/GenInteractionClass Spacer2 = {
+	 HINT_FIXED_SIZE = {SST_PIXELS|8,
+				 SST_PIXELS|35,
+				 0};
+}
+
+@object IndicatorGroupClass RightIndicatorGroup = {
+    IGI_startNum = 13;
+    GI_comp =
+        @Indicator13,
+        @Indicator14,
+        @Indicator15,
+        @Indicator16,
+        @Indicator17,
+        @Indicator18,
+        @Indicator19,
+        @Indicator20,
+        @Indicator21,
+        @Indicator22,
+        @Indicator23,
+        @Indicator24,
+        @Indicator25;
+}
+
+@object IndicatorClass Indicator13 = {
+}
+@object IndicatorClass Indicator14 = {
+}
+@object IndicatorClass Indicator15 = {
+}
+@object IndicatorClass Indicator16 = {
+}
+@object IndicatorClass Indicator17 = {
+}
+@object IndicatorClass Indicator18 = {
+}
+@object IndicatorClass Indicator19 = {
+}
+@object IndicatorClass Indicator20 = {
+}
+@object IndicatorClass Indicator21 = {
+}
+@object IndicatorClass Indicator22 = {
+}
+@object IndicatorClass Indicator23 = {
+}
+@object IndicatorClass Indicator24 = {
+}
+@object IndicatorClass Indicator25 = {
+}
+
+
+/*****************************************************************************
+ *    Screen UI
+ *****************************************************************************/
+
+@object GenInteractionClass TextGroup = {
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GI_comp =
+        @Player1Indicator,
+        @Player1Score,
+        @QGlyph,
+        @QuestionText,
+        @AGlyph,
+        @AnswerBack,
+        @Player2Score,
+        @Player2Indicator;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;   /* jh add 7-29-14 */
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_CUSTOM_CHILD_SPACING = {SST_PIXELS|0};
+}
+
+@object SafariScoreClass Player1Score = {
+    SSI_side = SSS_LEFT;
+}
+
+@object SafariScoreClass Player2Score = {
+    SSI_side = SSS_RIGHT;
+}
+
+@object SafariGlyphClass QGlyph = {
+    SGI_onBitmap = (QOnMoniker);
+    SGI_offBitmap = (QOffMoniker);
+}
+
+@object SafariGlyphClass AGlyph = {
+    SGI_onBitmap = (AOnMoniker);
+    SGI_offBitmap = (AOffMoniker);
+}
+
+/*
+ * this object is necessary because with HINT_TEXT_NO_FRAME on the
+ * answer text to get rid of the white frame, the background shows
+ * through. So we make the background for it black.
+ */
+@object SafariBackgroundClass AnswerBack = {
+    GI_comp =
+         @AnswerText;
+    SBI_color = C_BLACK;
+}
+
+@object PlayerInputClass AnswerText = {
+    PII_width = 72;
+    GTXI_maxLength = SAFARI_QUESTION_MAX_LENGTH;
+    ATTR_GEN_TEXT_CHAR_ATTR = @QuestionStyle;
+    HINT_TEXT_WASH_COLOR = {C_BLACK, CF_INDEX, 0, 0};
+    HINT_TEXT_NO_FRAME;
+    ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+}
+
+@chunk VisTextCustomFilterData fractionFilter[] = {
+    /* allow: up to space */
+    {C_SPACE+1, C_PERIOD-1},
+    /* allow: . / 0-9 */
+    {C_NINE+1, 0xffff}
+};
+
+@chunk VisTextCustomFilterData alphaFilter[] = {
+    /* allow: enter */
+    {C_SPACE, 'A'-1},
+    /* allow: A-D */
+    {'D'+1, 'a'-1},
+    /* allow: a-d */
+    {'d'+1, 0xffff}
+};
+
+@object PlayerIndicatorClass Player1Indicator = {
+    PII_destination = @TheGameCard;
+    PII_message = MSG_SAF_GAME_CARD_ASK_QUESTION;
+    PII_label = "1";
+}
+
+@object PlayerInputClass QuestionText = {
+    PII_width = 250;
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "Click on the 'Game' menu to select a quiz to play";
+	 ATTR_GEN_TEXT_CHAR_ATTR = @QuestionStyle;
+    HINT_TEXT_WASH_COLOR = {C_BLACK, CF_INDEX, 0, 0};
+    /*
+     * make the text selectable so this object can grab the focus
+     * when we want AnswerText to not have it
+     */
+    ATTR_GEN_TEXT_SELECTABLE;
+}
+
+@chunk VisTextCharAttr QuestionStyle = {
+    {{{1, 0}}, CA_NULL_ELEMENT},   /* StyleSheetElementHeader */
+    FID_UNIVERSITY,                /* font */
+    {0, 10},                       /* point size */
+    0,                             /* TextStyle */
+    {C_WHITE, CF_INDEX, 0, 0},     /* ColorQuad */
+    0,                             /* track kerning */
+    FWI_MEDIUM, FW_NORMAL,         /* font weight, font width */
+    {VTES_HIDDEN},                 /* VisTextExtendedStyles */
+    SDM_100, {0},                  /* SystemDrawMask, GraphicPattern */
+    {C_BLACK, CF_INDEX, 0, 0},     /* background ColorQuad */
+    SDM_0,                         /* background SystemDrawMask */
+    {0},                           /* background GraphicPattern */
+    {0,0,0,0,0,0,0}                /* unused */
+};
+
+@object PlayerIndicatorClass Player2Indicator = {
+    PII_destination = @TheGameCard;
+    PII_message = MSG_SAF_GAME_CARD_ASK_QUESTION;
+    PII_label = "2";
+}
+
+@object GenInteractionClass StatusDB = {
+    GI_visMoniker = "Score";
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+    GI_comp =
+        @StatusText,
+        @StatusReview,
+        @StatusNext,
+        @StatusAnother;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+@object GenTextClass StatusText = {
+    GI_attrs = @default | GA_READ_ONLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass StatusAnother = {
+    GI_visMoniker = 'A', "Another Quiz";
+    GTI_destination = @TheGameCard;
+    GTI_actionMsg = MSG_SAF_GAME_CARD_STOP_QUIZ;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass StatusReview = {
+    GI_visMoniker = 'R', "Review";
+    GTI_destination = @TheGameCard;
+    GTI_actionMsg = MSG_SAF_GAME_CARD_RESET_QUIZ;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass StatusNext = {
+    GI_visMoniker = 'N', "Next Quiz";
+    GTI_destination = @TheGameCard;
+    GTI_actionMsg = MSG_SAF_GAME_CARD_NEXT_QUIZ;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenInteractionClass FeedbackGroup = {
+	 GI_comp =
+		  @LeftFeedback,
+		  @FeedbackSpacer,
+		 /* @NDButton, */
+		  @RightFeedback;
+	 HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	 HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object SafariFeedbackClass LeftFeedback = {
+    SFI_direction = -1;
+}
+
+@object GenInteractionClass FeedbackSpacer = {
+	 GI_comp =
+		  @FeedbackSpacer1,
+		  @FeedbackSpacer2;
+	 HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+@object GenGlyphClass FeedbackSpacer1 = {
+  GI_visMoniker = "                        ";
+}
+@object GenGlyphClass FeedbackSpacer2 = {
+  GI_visMoniker = "                        ";
+}
+/*@object SafariButtonClass NDButton = {
+    SGI_offBitmap = (SafLogoMoniker);
+	 SBI_destination = @AboutNDDialog;
+    SBI_message = MSG_GEN_INTERACTION_INITIATE;
+} */
+
+@object SafariFeedbackClass RightFeedback = {
+    SFI_direction = 1;
+}
+
+@end Interface;
+
+/*****************************************************************************
+ *    Options UI
+ *****************************************************************************/
+
+@start OptionsUI;
+
+@object GenInteractionClass ChooseDB = {
+    GI_visMoniker = "GeoExplorer";
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = GIA_NOT_USER_INITIATABLE;
+    GI_comp =
+        @ButtonGroup,
+        @DescGroup,
+        @OpenClose,
+        @OpenExit;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    ATTR_GEN_HELP_CONTEXT = "dbChoose";
+}
+
+@object GenInteractionClass ButtonGroup = {
+    GI_comp =
+       /* @OpenDB, */
+		/*  @NextButton/*,
+		  @OptionsButton*/;
+	 HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass DescGroup = {
+    GI_comp =
+        @OpenDescription,
+        @NextDescription,
+        @OptionsDescription;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass OpenExit = {
+    GI_visMoniker = 'Q', "Quit";
+    GTI_actionMsg = MSG_META_QUIT;
+    GTI_destination = @SafariAppObj;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass OpenClose = {
+    GI_visMoniker = 'O', "OK";
+    GTI_actionMsg = MSG_GEN_INTERACTION_ACTIVATE_COMMAND;
+    GTI_destination = @ChooseDB;
+    ATTR_GEN_TRIGGER_ACTION_DATA = {IC_DISMISS};
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass NextButton = {
+    GI_states = @default & ~GS_ENABLED;
+    GI_visMoniker = 'N', "Next";
+    GTI_actionMsg = MSG_SAF_GAME_CARD_NEXT_QUIZ;
+    GTI_destination = @TheGameCard;
+}
+
+@object GenTextClass NextDescription = {
+    GI_states = @default & ~GS_ENABLED;
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "Next quiz in the series.";
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_ALIGN_TOP_EDGE_WITH_OBJECT = @NextButton;
+} 
+
+/* the quiz file selector */
+@object GenInteractionClass OpenDB = {
+	 GI_visMoniker = 'z', "Select Quiz";
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_COMMAND;
+    GI_comp =
+        @PlayButton,
+		  /*@SelectorGroup,*/ @OpenSelector,
+        @FileDesc;
+    ATTR_GEN_HELP_CONTEXT = "dbOpen";
+}
+
+/*@object GenInteractionClass SelectorGroup = {
+    GI_comp =
+		  @OpenSelector,
+        @LogoView;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+} */
+
+@object GenTextClass FileDesc = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTextClass OpenDescription = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "Play a new quiz.";
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass PlayButton = {
+    GI_visMoniker = "Play";
+    GTI_destination = @LogoView;
+    GTI_actionMsg = MSG_LOGO_DISPLAY_FILE_SELECTED;
+    ATTR_GEN_TRIGGER_ACTION_THREE_WORDS = {0, 0, GFSEF_OPEN};
+    HINT_DEFAULT_DEFAULT_ACTION;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenFileSelectorClass OpenSelector = {
+    GFSI_destination = @LogoView;
+	 GFSI_notificationMsg = MSG_LOGO_DISPLAY_FILE_SELECTED;
+	 ATTR_GEN_PATH_DATA = {SP_DOCUMENT, "GeoExplorer"};
+	 /* Yes, the quiz files were created by the builder but we
+		 changed the file attributes when we created it to tell it
+		 that it was created by the player so that we could open the
+		 player on double click of the quiz file */
+	 ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH = {"GEPL", 16431};
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object LogoDisplayClass LogoView = {
+}
+
+/*@object GenTriggerClass OptionsButton = {
+	 GI_visMoniker = 'S', "Settings";
+	 GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE;
+	 GTI_destination = @OptionsDB;
+	 HINT_TRIGGER_BRINGS_UP_WINDOW;
+	 // hook it to the main menu bar
+	 HINT_SEEK_MENU_BAR;
+} */
+
+/* Options/Settiongs dialog box - from main menu */
+@object GenInteractionClass OptionsDB = {
+    GI_visMoniker = "Settings";
+//    GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_PROPERTIES;
+    GI_comp =
+        @CountdownList,
+        @MaxTimeValue,
+        @NumPlayers,
+        @Player1Name,
+        @Player2Name,
+        @SoundList,
+        @ShowList,
+        @ShowMaxGroup,
+        @QuestionOrderList,
+        @BackgroundList;
+//	 HINT_INTERACTION_SINGLE_USAGE;
+	 ATTR_GEN_HELP_CONTEXT = "dbSettings";
+}
+
+@object GenTextClass OptionsDescription = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "Change the number of players or other settings.";
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	/* HINT_ALIGN_TOP_EDGE_WITH_OBJECT = @OptionsButton; */
+}
+
+@object GenItemGroupClass CountdownList = {
+    GI_visMoniker = "Countdown:";
+    GI_comp =
+        @CDOn,
+        @CDOff;
+    GIGI_selection = TRUE;
+    GIGI_numSelections = 1;
+    ATTR_GEN_INIT_FILE_KEY = "countdown";
+}
+
+@object GenItemClass CDOn = {
+    GI_visMoniker = "On";
+    GII_identifier = TRUE;
+}
+
+@object GenItemClass CDOff = {
+    GI_visMoniker = "Off";
+    GII_identifier = FALSE;
+}
+
+@object GenValueClass MaxTimeValue = {
+    GI_visMoniker = "Set Time (1-99) seconds:";
+    GVLI_minimum = MakeWWFixed(1);
+    GVLI_maximum = MakeWWFixed(99);
+    GVLI_value = MakeWWFixed(COUNTDOWN_TIMER_DEFAULT_TIME);
+    ATTR_GEN_INIT_FILE_KEY = "countMax";
+}
+
+@object GenItemGroupClass NumPlayers = {
+    GI_visMoniker = "Number of Players:";
+    GI_comp =
+        @OnePlayer,
+        @TwoPlayer,
+        @TeamPlay;
+    GIGI_selection = 1;
+    GIGI_destination = @SafariAppObj;
+    GIGI_applyMsg = MSG_SAF_APP_RESTART_QUIZ;
+    HINT_ITEM_GROUP_TOOLBOX_STYLE;
+    ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_SAF_APP_SET_NUM_PLAYERS;
+    ATTR_GEN_INIT_FILE_KEY = "numPlayers";
+}
+
+@object GenItemClass OnePlayer = {
+    GI_visMoniker = "One";
+    GII_identifier = 1;
+}
+
+@object GenItemClass TwoPlayer = {
+    GI_visMoniker = "Two";
+    GII_identifier = 2;
+}
+
+@object GenItemClass TeamPlay = {
+    GI_visMoniker = "Teams";
+    GII_identifier = 3;
+}
+
+@object GenTextClass Player1Name = {
+    GI_visMoniker = "Player 1:";
+    GTXI_text = "Player 1";
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = PLAYER_NAME_MAX_LENGTH;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTextClass Player2Name = {
+    GI_visMoniker = "Player 2:";
+    GTXI_text = "Player 2";
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = PLAYER_NAME_MAX_LENGTH;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@visMoniker Player1Mkr = "Player 1:";
+@visMoniker Player2Mkr = "Player 2:";
+@chunk TCHAR Player1Text[] = "Player 1";
+@chunk TCHAR Player2Text[] = "Player 2";
+@visMoniker Team1Mkr = "Team 1:";
+@visMoniker Team2Mkr = "Team 2:";
+@chunk TCHAR Team1Text[] = "Team 1";
+@chunk TCHAR Team2Text[] = "Team 2";
+
+@object GenBooleanGroupClass SoundList = {
+    GI_visMoniker = "Sound:";
+    GI_comp =
+        @SLSynth,
+        @SLSamp;
+    GBGI_selectedBooleans = SS_SYNTH | SS_SAMPLED;
+    ATTR_GEN_INIT_FILE_KEY = "sound";
+}
+
+@object GenBooleanClass SLSynth = {
+    GI_visMoniker = "Music";
+    GBI_identifier = SS_SYNTH;
+}
+
+@object GenBooleanClass SLSamp = {
+    GI_visMoniker = "Effects";
+    GBI_identifier = SS_SAMPLED;
+}
+
+@object GenItemGroupClass ShowList = {
+    GI_visMoniker = "Highlight:";
+    GI_comp =
+        @ShOn,
+        @ShOff;
+    GIGI_selection = TRUE;
+    GIGI_numSelections = 1;
+    GIGI_destination = @TheGameCard;
+    GIGI_applyMsg = MSG_SAF_GAME_CARD_SET_SELECTION_TYPE;
+    HINT_ITEM_GROUP_TOOLBOX_STYLE;
+    ATTR_GEN_INIT_FILE_KEY = "highlight";
+}
+
+@object GenItemClass ShOn = {
+    GI_visMoniker = "Outline";
+    GII_identifier = TRUE;
+}
+
+@object GenItemClass ShOff = {
+    GI_visMoniker = "Rectangle";
+    GII_identifier = FALSE;
+}
+
+@object GenInteractionClass ShowMaxGroup = {
+    GI_comp =
+        @ShowMax,
+        @ShowGlyph;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenValueClass ShowMax = {
+    GI_visMoniker = "Show Answer:";
+    GVLI_value = MakeWWFixed(SHOW_ANSWER_DEFAULT);
+    GVLI_minimum = MakeWWFixed(SHOW_ANSWER_MIN);
+    GVLI_maximum = MakeWWFixed(SHOW_ANSWER_MAX);
+    ATTR_GEN_INIT_FILE_KEY = "maxShow";
+}
+
+@object GenGlyphClass ShowGlyph = {
+    GI_visMoniker = "times";
+}
+
+@object GenItemGroupClass QuestionOrderList = {
+    GI_visMoniker = "Questions:";
+    GI_comp =
+        @QOLRandom,
+        @QOLSequential;
+    GIGI_selection = TRUE;
+    GIGI_numSelections = 1;
+    HINT_ITEM_GROUP_TOOLBOX_STYLE;
+    ATTR_GEN_INIT_FILE_KEY = "order";
+}
+
+@object GenItemClass QOLRandom = {
+    GI_visMoniker = "Random";
+    GII_identifier = TRUE;
+}
+
+@object GenItemClass QOLSequential = {
+    GI_visMoniker = "Sequential";
+    GII_identifier = FALSE;
+}
+
+@object GenDynamicListClass BackgroundList = {
+    GI_visMoniker = "Background:";
+    GDLI_queryMsg = MSG_SAF_BACKGROUND_QUERY_MONIKER;
+    GIGI_applyMsg = MSG_SAF_BACKGROUND_SET_BACKGROUND;
+    GIGI_destination = @BackgroundObj;
+    GIGI_behaviorType = GIGBT_EXCLUSIVE;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_FIXED_SIZE = {SST_PIXELS|BACKGROUND_WIDTH*4, SST_PIXELS|BACKGROUND_HEIGHT/2, 4};
+    ATTR_GEN_INIT_FILE_KEY = "background";
+}
+
+/* about dialog box - click on bottom GeoSafari logo button */
+/*@object GenInteractionClass AboutNDDialog = {
+    GI_visMoniker = "About NewDeal";
+    GII_visibility = GIV_DIALOG;
+    GI_comp =
+        @AboutText,
+        @AboutOK;
+    GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+    HINT_SIZE_WINDOW_AS_RATIO_OF_PARENT = {SWSS_RATIO|PCT_70, 0};
+}
+
+@object GenTextClass AboutText = {
+    GTXI_text = "Be sure to check out the full line of NewDeal GeoSafari and MathSafari educational quiz software including:\r\
+\t\xa5 MathSafari Addition Fun\r\
+\t\xa5 MathSafari Subtraction Fun\r\
+\t\xa5 MathSafari Multiplication Fun\r\
+\t\xa5 MathSafari Division Fun\r\
+\t\xa5 GeoSafari World History\r\
+\t\xa5 GeoSafari World Geography\r\
+\r\
+Call 1-800-985-4263, or visit us on the Web at www.newdealinc.com \
+to place an order or to find out more about NewDeal's unique software \
+solutions!\r\
+\r\
+Copyright \xa9 1999 NewDeal, Inc. Cambridge MA  02138.  All rights reserved.\r\
+MathSafari and GeoSafari are registered trademarks of Educational \
+Insights.  Used by permission.";
+
+    GI_attrs = @default | GA_READ_ONLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass AboutOK = {
+    GI_visMoniker = "OK";
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_DISMISS;
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+/* Opened by a double click in the countdown numeric indicator
+	at the end of the countdown */
+@object GenInteractionClass CreditDialog = {
+    GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+    GII_visibility = GIV_DIALOG;
+    GI_visMoniker = "Credits";
+    GI_comp =
+        @CreditText,
+		  @CreditOK/*,
+		  @CreditSaf*/;
+    HINT_SIZE_WINDOW_AS_RATIO_OF_PARENT = {SWSS_RATIO|PCT_35, SWSS_RATIO|PCT_60};
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass CreditText = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_INIT_SCROLLING;
+    GTXI_text = "Design:\r\
+Elaine Gruenke\r\
+Gene Anderson\r\
+\r\
+Quizzes:\r\
+Derek Mayhew\r\
+Elaine Gruenke\r\
+\r\
+Programming:\r\
+Gene Anderson\r\
+\r\
+Quality Assurance:\r\
+Mark Tenney\r\
+\r\
+Sounds:\r\
+Gene Anderson\r\
+\r\
+Production:\r\
+Stan Chan\r\
+Steve Main\r\
+\r\
+Testers:\r\
+Achim Finger\r\
+Andy Moss\r\
+Bill Flynn\r\
+Bob Bianchini\r\
+Bruce Ward\r\
+Chris Cross\r\
+Clemens Kochinke\r\
+Daniel Kim\r\
+Dave Walker\r\
+Dean Dancey\r\
+Derrick Renaud\r\
+Dick Comegys\r\
+Dirk Haase\r\
+Donald Blank\r\
+Dominique Vocat\r\
+Doug Blair\r\
+Doug Taylor\r\
+Edward di Geronimo, Jr.\r\
+Erik Wellner\r\
+Frank Fischer\r\
+Geoff Poll\r\
+Hans Braunhuber\r\
+Hans Lindgren\r\
+Holger Laux\r\
+James C. Massey, Jr.\r\
+Jens-Michael Gro\xa7\r\
+John Howard\r\
+J\x9arg Polzfu\xa7\r\
+Juha Santala\r\
+Kelly Bergen\r\
+Klaus Kessler\r\
+Konstantin Meyer\r\
+Lee Grant\r\
+Lorraine Hoose\r\
+Lynne Montelauro\r\
+Mark Rose\r\
+Nico Schu\r\
+Paul DeHart\r\
+Peer Cunrady\r\
+Peter Vanspauwen\r\
+Ray Ancog\r\
+Ray Kopczynski\r\
+Richard Cantrell\r\
+Roger D. Bentson\r\
+Roland Evers\r\
+Scott Scholl\r\
+Stephen Haffly\r\
+Steven Hurdle\r\
+Terri Ferrier\r\
+Thomas Haberland\r\
+Tim Harvey\r\
+Tom Stenzel\r\
+Tony Gasparetto\r\
+Tyson Schoeber\r\
+Vicki Camen\r\
+Werni Grieder\r\
+Wess Daniels\r\
+Wilfried Konczynski\r\
+\r\
+Additional Credits:\r\
+Sybil des O'Bedience\r\
+Karen Les\r\
+Speed E. Worker\r\
+Punctuali T.\r\
+\r\
+Feline Support Crew:\r\
+Kat\r\
+Jazm\x92n\r\
+St*rphish\r\
+\r\
+\"There is no snooze button on a cat who wants breakfast.\"\
+";
+@localize not;
+
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_TEXT_WASH_COLOR = C_LIGHT_BLUE;
+}
+
+@object GenTriggerClass CreditOK = {
+    GI_visMoniker = "OK";
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_DISMISS;
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+/*@object SafariButtonClass CreditSaf = {
+    SGI_offBitmap = (SafLogoMoniker);
+    SBI_message = MSG_GEN_INTERACTION_INITIATE;
+	 SBI_destination = @AboutNDDialog;
+} */
+
+@end OptionsUI;
+
+@start STRINGS, data;
+
+@chunk TCHAR logoFormatStr[] = "%d: ";
+@localize {"format string when file is selected in GenFileSelector; %d is quiz number, followed by quiz description"};
+
+@chunk TCHAR allRightStr[] = "Great work, %s! You got all the questions right!";
+@localize {"all questions answered correctly; %s is player name" 80};
+
+@chunk TCHAR some90Str[] = "%s, you answered %d out of %d questions correctly. Great job!";
+@localize {"90-99% right; %s is player name, %d(1) is number right, %d(2) is total number" 80};
+
+@chunk TCHAR some85Str[] = "%s, you answered %d out of %d questions correctly. Keep up the good work!";
+@localize {"85-89% right" 80};
+
+@chunk TCHAR some80Str[] = "%s, you answered %d out of %d questions correctly. Good try!";
+@localize {"80-84% right" 80};
+
+@chunk TCHAR someWorkStr[] = "Good job, %s, you got %d out of %d questions right! You can still use a little more review.";
+@localize {"a few questions missed; %s is player name, %d(1) is number right, %d(2) is total number of questions" 80};
+
+@chunk TCHAR studyHardStr[] = "%s, you got %d out of %d questions right. Study hard and try again.";
+@localize {"<50% right" 80};
+
+
+@chunk TCHAR reviewStr[] = "\r\rWould you like to review?";
+@localize {"appended to status DB if <100%"};
+
+@chunk TCHAR nextStr[] = "\r\rLet's go to the next quiz.";
+@localize {"appended to status DB if next quiz in series"};
+
+@visMoniker quizMoniker = 'A', "Another Quiz";
+@localize {"used for quit quiz or app? dialog"};
+
+@visMoniker appMoniker = 'Q', "Quit GeoExplorer";
+@localize {"used for quit quiz or app? dialog"};
+
+@visMoniker cancelMoniker = "Cancel";
+@localize {"used for quit quiz or app? dialog"};
+
+@chunk TCHAR quitQuizAppStr[] = "Would you like to quit this quiz and play another, or quit GeoExplorer?";
+@localize {"used for quit quiz or app? dialog"};
+
+@chunk TCHAR clickToStart[] = "<- Click on the flashing '1' button to start";
+
+@chunk TCHAR protoMsg[] = "Protocol error. The quiz must be updated using GeoExplorer Builder.";
+@localize {"displayed if old quiz file opened"};
+
+@chunk TCHAR fileErrMsg[] = "File error. Unable to open the quiz file \"\1\".";
+@localize {"message displayed for file error; @1 is filename"};
+
+@chunk TCHAR randomStr[] = "Random";
+@localize {"string that appears in backgrounds list for random setting"};
+
+@end STRINGS;

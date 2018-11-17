@@ -1,0 +1,965 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+ *
+ * PROJECT:	PC/GEOS
+ * FILE:	ssheet.goh
+ * AUTHOR:	Anna Lijphart: November, 1991
+ *
+ * DESCRIPTION:
+ *	This file defines the Spreadsheet class.
+ *
+ *	$Id: ssheet.goh,v 1.1 97/04/04 15:57:23 newdeal Exp $
+ *
+ ***********************************************************************/
+@optimize
+
+@deflib	ssheet
+
+#include <graphics.h>
+#include <vm.h>
+@include <Objects/vCompC.goh>
+@include <Objects/genC.goh>
+#include <parse.h>
+#include <cell.h>
+@include <ruler.goh>
+@include <math.goh>
+
+typedef struct {
+    optr     	SSD_output;
+    Message   	SSD_message;
+    optr	SSD_chartBody;
+} SpreadsheetSetupData;
+
+/* define this flag for cell protection */
+@ifndef _PROTECT_CELL
+#define	_PROTECT_CELL	=	0
+@endif
+
+@class SpreadsheetClass, VisCompClass, master;
+
+@message void MSG_SPREADSHEET_READ_CACHED_DATA(FileHandle fileHandle = dx,
+						word mapBlockHandle = cx);  /*XXX*/
+@message void MSG_SPREADSHEET_WRITE_CACHED_DATA(FileHandle fileHandle = dx);	/*XXX*/
+@message void MSG_SPREADSHEET_ATTACH_UI(word handle = cx, 	/*XXX*/
+					FileHandle fileHandle = dx);
+@message void MSG_SPREADSHEET_ATTACH_FILE(word handle = cx,
+					FileHandle fileHandle = dx);	/*XXX*/
+@message void MSG_SPREADSHEET_MOVE_ACTIVE_CELL(word row = bp, 		/*XXX*/
+						word column = cx);
+@message void MSG_SPREADSHEET_GOTO_CELL();				/*XXX*/
+@message word MSG_SPREADSHEET_ENTER_DATA(word textBlk = dx,
+					 word textLen = cx)=cx;		/*XXX*/
+
+@message void MSG_SPREADSHEET_SET_ROW_HEIGHT(word rowHeight = cx);	/*XXX*/
+@message void MSG_SPREADSHEET_SET_COLUMN_WIDTH(word rowWidth = cx);	/*XXX*/
+@message word MSG_SPREADSHEET_GET_ROW_HEIGHT(word rowNum = cx) = dx;	/*XXX*/
+@message word MSG_SPREADSHEET_GET_COLUMN_WIDTH(word colNum = cx)= dx;	/*XXX*/
+
+@reserveMessages    	1;
+@message word MSG_SPREADSHEET_MAKE_FOCUS();				/*XXX*/
+
+typedef struct {
+    word	GNI_token;
+    word	GNI_entryNum;
+    word	GNI_numDefinedNames;
+    word	GNI_numUndefinedNames;
+} GetNameInfo;
+
+typedef ByteFlags NameFlags;
+#define NF_UNDEFINED	0x80
+
+#define	MAX_NAME_LENGTH	128
+
+#ifdef DO_DBCS
+#define	MAX_NAME_DEF_LENGTH	280
+#else
+#define	MAX_NAME_DEF_LENGTH	512
+#endif
+
+typedef struct {
+    byte		SNP_flags;	/* NameAccessFlags */
+    word		SNP_listEntry;
+    word		SNP_textLength;
+    TCHAR 		SNP_text[MAX_NAME_LENGTH];
+    word		SNP_defLength;
+/*
+ * Note:  Under DBCS, 2*MAX_NAME_LENGTH in
+ *        SpreadsheetNameParameters.SNP_definition results in
+ *        stack overflow, uses "4+MAX_NAME_LENGTH" instead.
+ */
+#ifdef DO_DBCS
+    wchar_t 		SNP_definition[4 + MAX_NAME_DEF_LENGTH];
+#else
+    char 		SNP_definition[MAX_NAME_DEF_LENGTH * 2];
+#endif
+
+    word		SNP_token;
+    byte		SNP_unused;	/* align word */
+} SpreadsheetNameParams;
+
+@message void MSG_SPREADSHEET_ADD_NAME_WITH_PARAM_BLK(); /*NEEDS PROTOTYPE*/
+
+@message void MSG_SPREADSHEET_ADD_NAME(					/*XXX*/
+				GetNameInfo *retValue = axcxdxbp, 
+				SpreadsheetNameParams *ssNameParams = dx:bp);
+@message void MSG_SPREADSHEET_VALIDATE_NAME(				/*XXX*/
+				GetNameInfo *retValue = axcxdxbp, 
+				SpreadsheetNameParams *ssNameParams = dx:bp);
+@message void MSG_SPREADSHEET_DELETE_NAME_WITH_LIST_ENTRY(); /*NEEDS PROTOTYPE*/
+
+@message void MSG_SPREADSHEET_DELETE_NAME(				/*XXX*/
+				GetNameInfo *retValue = axcxdxbp, 
+				SpreadsheetNameParams *ssNameParams = dx:bp);
+@message void MSG_SPREADSHEET_CHANGE_NAME_WITH_PARAM_BLK(); /*NEEDS PROTOTYPE*/
+
+@message void MSG_SPREADSHEET_CHANGE_NAME(				/*XXX*/
+				GetNameInfo *retValue = axcxdxbp, 
+				SpreadsheetNameParams *ssNameParams = dx:bp);
+
+typedef struct {
+    word	GNI_unused;
+    word	GNI_unused2;
+    word	GNI_numDefinedNames;
+    word	GNI_numUndefinedNames;
+} GetNumNamesInfo;
+
+@message void MSG_SPREADSHEET_GET_NAME_COUNT(				/*XXX*/
+				GetNumNamesInfo *retValue = axcxdxbp);
+@message void MSG_SPREADSHEET_GET_NAME_INFO(				/*XXX*/
+				SpreadsheetNameParams *ssNameParams = dx:bp);
+@message void MSG_SPREADSHEET_FORMAT_EXPRESSION(			/*XXX*/
+				SpreadsheetFormatParams *ssFormatParams = ss:bp);
+@message byte MSG_SPREADSHEET_PARSE_EXPRESSION(				/*XXX*/
+				SpreadsheetParserParams *ssParserParams = ss:bp) = al;
+@message byte MSG_SPREADSHEET_EVAL_EXPRESSION();	/* NEEDS PROTOTYPE */
+
+@message void MSG_SPREADSHEET_ERROR();					/*XXX*/
+@message void MSG_SPREADSHEET_SET_NOTE(word *textBlockHandle = cx, 
+				word row = dx, word column = bp);
+@message void MSG_SPREADSHEET_SET_NOTE_FOR_ACTIVE_CELL(			/*XXX*/
+				word *textBlockHandle = cx);
+
+typedef struct {
+    word	GNI_blockHandle;    
+    word	GNI_textSize;    
+} GetNoteInfo;
+
+@message void MSG_SPREADSHEET_GET_NOTE(					/*XXX*/
+				GetNoteInfo *retValue = dxcx, 
+				word row = dx, word column = bp);
+@message void MSG_SPREADSHEET_GET_NOTE_FOR_ACTIVE_CELL(			/*XXX*/
+				GetNoteInfo *retValue = dxcx);
+
+typedef struct {
+    optr 	GTO_textObject; 
+} GetTextObject;
+
+typedef ByteFlags SpreadsheetDoubleClickFlags;
+#define SDCF_NOTE_EXISTS    	    0x02
+#define SDCF_CELL_EXISTS    	    0x01
+@message void MSG_SPREADSHEET_DISPLAY_NOTE(word data = dx);/*XXX*/
+@message void MSG_SPREADSHEET_CHANGE_RECALC_PARAMS(			/*XXX*/
+				SpreadsheetRecalcParams *ssRecalcParams = ss:bp);
+
+
+/*
+ *	SpreadsheetFlags record 
+ */
+typedef WordFlags SpreadsheetFlags;
+#define SF_MANUAL_RECALC		0x8000
+#define SF_ALLOW_ITERATION		0x4000
+#define SF_SUPPRESS_REDRAW		0x2000
+#define SF_APPLICATION_FUNCTIONS	0x1000
+#define SF_QUICK_TRANS_IN_PROGRESS	0x0800
+#define SF_DOING_FEEDBACK		0x0400
+#define SF_IN_VIEW			0x0200
+#define SF_IS_SYS_TARGET    	    	0x0008
+#define SF_HAVE_GRAB	    	    	0x0004
+#define SF_IS_APP_TARGET		0x0002
+#define SF_IS_SYS_FOCUS		    	0x0001
+
+#define	SRP_FLAGS	(SF_MANUAL_RECALC | SF_ALLOW_ITERATION)
+
+typedef struct {
+    SpreadsheetFlags	SRP_flags;
+    word		SRP_circCount;
+    FloatNum		SRP_converge;
+} SpreadsheetRecalcParams;
+
+@message void MSG_SPREADSHEET_GET_RECALC_PARAMS(			/*XXX*/
+				SpreadsheetRecalcParams *ssRecalcParams = ss:bp);
+@message void MSG_SPREADSHEET_RECALC();					/*XXX*/
+@message void MSG_SPREADSHEET_CLEAR_SELECTED(				/*XXX*/
+				SpreadsheetClearFlags ssClearFlags = cx);
+/*
+ *	SpreadsheetClearFlags record 
+ */
+typedef ByteFlags SpreadsheetClearFlags;
+#define SCF_CLEAR_ATTRIBUTES	    0x80
+#define SCF_CLEAR_DATA	    	    0x40
+#define SCF_CLEAR_NOTES	    	    0x20
+
+/*
+ *	SpreadsheetInsertFlags record 
+ */
+
+typedef ByteFlags SpreadsheetInsertFlags;
+#define SIF_COLUMNS		0x80
+#define SIF_COMPLETE		0x40
+#define SIF_DELETE		0x20
+
+@message void MSG_SPREADSHEET_INSERT_SPACE(				/*XXX*/
+				SpreadsheetInsertFlags ssInsertFlags = cx);
+
+
+typedef struct {
+    word	GFC_unused;
+    word	GFC_unused2;
+    word	GFC_numPreDefined;     
+    word	GFC_numUserDefined;     
+} GetFormatCount;
+
+@message void MSG_SPREADSHEET_SET_NUM_FORMAT(word formatToken = cx);	/*XXX*/
+
+@message void MSG_SPREADSHEET_DRAW_RANGE(				/*XXX*/
+				SpreadsheetDrawParams *ssDrawParams = ss:bp);
+
+/*
+ *	SpreadsheetDrawFlags record 
+ */
+typedef WordFlags SpreadsheetDrawFlags;
+#define SDF_DRAW_GRAPHICS		0x0008	;app flag
+#define SDF_DRAW_NOTE_BUTTON		0x0004
+#define SDF_DRAW_HEADER_FOOTER_BUTTON	0x0002
+#define SDF_DRAW_GRID			0x0001
+
+typedef WordFlags SpreadsheetPrintFlags;
+#define SPF_PRINT_TO_SCREEN		0x4000
+#define SPF_PRINT_SIDEWAYS		0x2000	;app flag
+#define SPF_SCALE_TO_FIT		0x1000
+#define SPF_PRINT_ROW_COLUMN_TITLES	0x0800
+#define SPF_SKIP_DRAW			0x0400
+#define SPF_CENTER_VERTICALLY		0x0200
+#define SPF_CENTER_HORIZONTALLY		0x0100
+#define SPF_CONTINUOUS			0x0080	;app flag
+#define SPF_PRINT_HEADER		0x0040
+#define SPF_PRINT_FOOTER		0x0020
+#define SPF_PRINT_DOCUMENT		0x0010	;app flag
+#define SPF_PRINT_NOTES			0x0008	;app flag
+#define SPF_PRINT_GRAPHICS  	    	0x0004	;app flag
+#define SPF_DONE			0x0002	;return flag
+#define SPF_PRINT_GRID	    	    	0x0001
+
+typedef struct {
+    SpreadsheetPrintFlags	SDP_flags;
+    word		SDP_gstate;
+    CellReference	SDP_topLeft;
+    RectDWord		SDP_drawArea;
+    CellRange		SDP_limit;
+    Point		SDP_margins;
+    PointDWord		SDP_translation;
+    PointDWord	    	SDP_titleTrans;
+    WWFixed		SDP_scale;
+    CellRange		SDP_range;
+    RectDWord	    	SDP_rangeArea;
+    /* align word */
+} SpreadsheetDrawParams;
+
+typedef struct {
+    word	GC_unused;
+    word	GC_unused2;
+    word	GC_cellRow;
+    word	GC_cellColumn;
+} GetActiveCell;
+
+@message void MSG_SPREADSHEET_GET_EXTENT(				/*XXX*/
+				CellRange *retValue = axcxdxbp, 
+				SpreadsheetExtentType ssExtentType = cx);
+
+typedef enum /* word */ {
+    SET_ENTIRE_SHEET = 0,
+    SET_NO_EMPTY_CELLS = 2,
+    SET_NO_EMPTY_CELLS_NO_HDR_FTR = 4,
+    SET_NEXT_DATA_CELL = 6,
+    SET_LAST_DATA_CELL = 8,
+    SET_PREV_DATA_CELL = 10,
+    SET_FIRST_DATA_CELL = 12
+} SpreadsheetExtentType;
+
+@message void MSG_SPREADSHEET_GET_RANGE_BOUNDS();	/*NEEDS PROTOTYPE*/
+@message void MSG_SPREADSHEET_SET_HEADER_RANGE(word flag = cx);		/*XXX*/
+@message void MSG_SPREADSHEET_SET_FOOTER_RANGE(word flag = cx);		/*XXX*/
+@message void MSG_SPREADSHEET_GET_HEADER_RANGE(				/*XXX*/
+				CellRange *retValue = axcxdxbp);
+@message void MSG_SPREADSHEET_GET_FOOTER_RANGE(				/*XXX*/
+				CellRange *retValue = axcxdxbp);
+@message void MSG_SPREADSHEET_COMPLETE_REDRAW();			/*XXX*/
+/*** NOTE: CALLBACK ROUTINE. DO LATER ***/
+@message void MSG_SPREADSHEET_NOTES_ENUM();	/** NEEDS PROTOTYPE **/
+@message void MSG_SPREADSHEET_ALTER_DRAW_FLAGS(				/*XXX*/
+				word bitsToSet = cx, word bitsToClear = dx);
+@message SpreadsheetDrawFlags MSG_SPREADSHEET_GET_DRAW_FLAGS();/*XXX*/
+
+@message word MSG_SPREADSHEET_HANDLE_SPECIAL_FUNCTION(			/* NEEDS PROTOTYPE */
+				/* word specialFunction = cx, 	
+				char *bufferPtr = ss:dx */) /* = cx */;		/*XXX*/
+@message void MSG_SPREADSHEET_CHANGE_COLUMN_WIDTH(word change = cx,
+						  word column = dx);	/*XXX*/
+@message void MSG_SPREADSHEET_CHANGE_ROW_HEIGHT(word change = cx,
+						  word row = dx);	/*XXX*/
+
+/*
+ *	SpreadsheetSearchFlags record 
+ */
+typedef ByteFlags SpreadsheetSearchFlags;
+#define SSF_MATCH_CASE		0x80
+#define SSF_MATCH_PARTIAL_WORDS	0x40
+#define SSF_SEARCH_FORMULAS	0x20
+#define SSF_SEARCH_VALUES	0x10
+#define SSF_SEARCH_NOTES	0x08
+#define SSF_SEARCH_TEXT_OBJECTS	0x04
+#define SSF_SEARCH_BY_ROWS	0x02
+
+#define SPREADSHEET_MAX_SEARCH_STRING_LENGTH 128;
+
+typedef struct {
+    SpreadsheetSearchFlags	SSP_flags;
+    char 		SSP_string[128];
+    SpreadsheetSearchFlags	SSP_found;
+    Point		SSP_cell;
+    word		SSP_startPos;
+    word		SSP_endPos;
+} SpreadsheetSearchParams;
+
+@message FileHandle MSG_SPREADSHEET_GET_FILE() = cx;			/*XXX*/
+@message word MSG_SPREADSHEET_SORT_RANGE(				/*XXX*/
+				RangeSortFlags rangeSortFlags = cl) = cx;
+
+@message Boolean MSG_SPREADSHEET_FUNCTION_TO_TOKEN();	/* NEEDS PROTOTYPE */
+
+typedef struct {
+    word	GC_unused;
+    word	GC_errorCode;
+    word	GC_row;
+    word	GC_column;
+} GetCell;
+
+@message Boolean MSG_SPREADSHEET_FUNCTION_TO_CELL();	/*NEEDS PROTOTYPE*/
+
+@message word MSG_SPREADSHEET_FORMAT_FUNCTION();	/*NEEDS PROTOTYPE*/
+@message Boolean MSG_SPREADSHEET_EVAL_FUNCTION();	/*NEEDS PROTOTYPE*/
+
+typedef struct {
+    word	SEFP_stacksSeg;
+    word	SEFP_opStackPtr;
+    word	SEFP_argStackPtr;
+    word	SEFP_funcID;
+    word	SEFP_nArgs;
+} SpreadsheetEvalFuncParams;
+
+typedef ByteEnum SpreadsheetChartReturnType;
+#define SCRT_TOO_MANY_CHARTS	    0
+#define SCRT_INSUFFICIENT_MEMORY    2
+#define SCRT_NO_DATA	    	    4
+
+@message void MSG_SPREADSHEET_CHART_RANGE(word chartNum = cx);		/*XXX*/
+@message void MSG_SPREADSHEET_DELETE_CHART(word chartNum = cx);	    	/*XXX*/
+@message void MSG_SPREADSHEET_START_MOVE_COPY();			/*XXX*/
+@message void MSG_SPREADSHEET_END_MOVE_COPY();				/*XXX*/
+@message void MSG_SSHEET_INIT_FOR_EXPORT();				/*XXX*/
+
+typedef struct
+{
+  CellRange	SRP_selection;		/* (r,c), (r,c) of selection.	*/
+  CellReference	SRP_active;		/* (r,c) of active cell.	*/
+} SpreadsheetRangeParams;
+
+
+typedef enum /* word */ {
+    SPREADSHEET_ADDRESS_ON_SCREEN = 0xf000,
+    SPREADSHEET_ADDRESS_IN_SELECTION = 0xf001,
+    SPREADSHEET_ADDRESS_DATA_AREA = 0xf100,
+    SPREADSHEET_ADDRESS_PAST_END = 0xf101,
+    SPREADSHEET_ADDRESS_USE_SELECTION = 0xf200,
+    SPREADSHEET_ADDRESS_NIL = 0xffff
+} SpreadsheetAddress;
+
+@message void MSG_SPREADSHEET_SET_SELECTION(
+		    	SpreadsheetRangeParams *ssRangeParams=ss:bp); /*XXX*/
+
+/*
+ * SRP_active ignored
+ */
+@message void MSG_SPREADSHEET_EXTEND_CONTRACT_SELECTION(
+		    	SpreadsheetRangeParams *ssRangeParams=ss:bp); /*XXX*/
+
+@message void MSG_SPREADSHEET_GET_SELECTION(
+			SpreadsheetRangeParams *ssRangeParams=ss:bp); /*XXX*/
+
+@message void MSG_SSHEET_PASTE_FROM_DATA_FILE();	    	    /*XXX*/
+@message void MSG_SSHEET_EXPORT_FROM_DATA_FILE();	    	    /*XXX*/
+
+@message void MSG_SPREADSHEET_INIT_NAME_LIST(); /*NEEDS PROTOTYPE*/
+@message void MSG_SPREADSHEET_INIT_CHOOSE_NAME_LIST(); /*NEEDS PROTOTYPE*/
+@message void MSG_SPREADSHEET_NAME_REQUEST_ENTRY_MONIKER(); /*NEEDS PROTOTYPE*/
+@message void MSG_SPREADSHEET_NAME_UPDATE_DEFINITION(); /*NEEDS PROTOTYPE*/
+@message void MSG_SPREADSHEET_NAME_UPDATE_NAME(); /*NEEDS PROTOTYPE*/
+@message void MSG_SPREADSHEET_GET_NAME_WITH_LIST_ENTRY(); /*NEEDS PROTOTYPE*/
+
+@importMessage MetaSpreadsheetMessages, void MSG_SPREADSHEET_REPLACE_TEXT_SELECTION(); /*NEEDS PROTOTYPE*/
+
+@message void MSG_SPREADSHEET_GET_ROW_AT_POSITION(sdword yPos=dxcx); /*XXX*/
+@message void MSG_SPREADSHEET_GET_COLUMN_AT_POSITION(sdword xPos=dxcx); /*XXX*/
+@message void MSG_SPREADSHEET_SET_CELL_BORDERS(CellBorderInfo border=cl); /*XXX*/
+@message void MSG_SPREADSHEET_SET_CELL_BORDER_COLOR(ColorQuad color=dxcx); /*XXX*/
+@message void MSG_SPREADSHEET_SET_CELL_BORDER_GRAY_SCREEN(SystemDrawMask drawMask=cl); /*XXX*/
+@message void MSG_SPREADSHEET_SET_CELL_BORDER_PATTERN(GraphicPattern pattern=cx); /*XXX*/
+
+typedef enum /* word */ {
+    SSFT_NUMBER,
+    SSFT_DAY,
+    SSFT_WEEKDAY,
+    SSFT_MONTH,
+    SSFT_YEAR
+} SpreadsheetSeriesFillType;
+
+typedef ByteFlags SpreadsheetSeriesFillFlags;
+#define SSFF_ROWS   	    	0x02
+#define SSFF_GEOMETRIC	    	0x01
+
+typedef struct {
+    SpreadsheetSeriesFillType	SRP_type;
+    SpreadsheetSeriesFillFlags	SRP_flags;
+    FloatNum	    	    	SRP_stepValue;
+} SpreadsheetSeriesFillParams;
+
+typedef ByteEnum SpreadsheetFillError;
+#define	SFE_NO_ERROR	    0
+#define SFE_NOT_DATE_NUMER  2
+#define SFE_DATE_STEP_TOO_LARGE  4
+
+#define SPREADSHEET_MAX_DATE_FILL_STEP		90
+#define SPREADSHEET_MIN_DATE_FILL_STEP		-90
+
+@message SpreadsheetFillError MSG_SPREADSHEET_FILL_SERIES(SpreadsheetSeriesFillParams *fillParams=ss:bp)=al; /*XXX*/
+@message void MSG_SPREADSHEET_FILL_RANGE(SeriesFillFlags flags=cl); /*XXX*/
+
+typedef struct {
+    TCHAR    	SSFPRP_text[MAX_RANGE_REF_SIZE / sizeof(TCHAR)];
+    CellRange	SSFPRP_range;
+} SpreadsheetFormatParseRangeParams;
+
+@message void MSG_SPREADSHEET_PARSE_RANGE_REFERENCE(SpreadsheetFormatParseRangeParams *params=ss:bp); /*XXX*/
+@message void MSG_SPREADSHEET_FORMAT_RANGE_REFERENCE(SpreadsheetFormatParseRangeParams *params=ss:bp); /*XXX*/
+
+
+@message void MSG_SPREADSHEET_ENTER_DATA_WITH_EVENT(word textBlk = dx,
+					 word textLen = cx,
+					EventHandle event = bp);  /*XXX*/
+
+@protominor	SSheetNewForRedwood
+
+@message SpreadsheetInsertSpaceError MSG_SPREADSHEET_CHECK_INSERT_SPACE(SpreadsheetInsertFlags ssInsertFlags = cx) = al;
+
+@message void MSG_SPREADSHEET_INVERT_RANGE_LAST(GStateHandle gstate=bp); /*XXX*/
+
+@message void MSG_SPREADSHEET_SET_DOC_ORIGIN(PointDWord *origin=ss:bp);
+/*
+ * Set the document origin.  The spreadsheet won't be scrollable above
+ * or to the left of this origin.
+ *
+ */
+
+@if _PROTECT_CELL
+/* This part is for cell protection feature. */
+typedef ByteEnum SpreadsheetProtectionOptions;
+#define	SPO_SELECTED_CELLS	0
+#define	SPO_ALL_CELLS		2
+@endif
+
+@message void MSG_SPREADSHEET_PROTECT_RANGE(
+				SpreadsheetProtectionOptions option = cl);
+
+@message void MSG_SPREADSHEET_UNPROTECT_RANGE(
+				SpreadsheetProtectionOptions option = cl);
+
+@message void MSG_SPREADSHEET_LOCKED_CELL_RECALC(word row = dx, 
+						 word column = cx);
+
+@message Boolean MSG_SPREADSHEET_CHECK_PROTECTED_CELLS(
+                              @stack CellRange cellRange) = carry;
+
+@protominor ModifyNumFormat
+
+@message void MSG_SPREADSHEET_MODIFY_NUM_FORMAT(
+					FloatModifyFormatFlags flags = cx);
+
+@protoreset
+
+typedef enum /* byte */ {
+    SISE_NO_ERROR,
+    SISE_TOO_MANY_ROWS,
+    SISE_TOO_MANY_COLUMNS,
+    SISE_DELETE_ROW_DATA,
+    SISE_DELETE_COLUMN_DATA
+    
+} SpreadsheetInsertSpaceError;
+
+/* SpreadsheetAttributes record */
+typedef ByteFlags SpreadsheetAttributes;
+
+#define SA_TARGETABLE		0x80
+#define SA_ENGINE_MODE		0x40
+#define SA_SPREADSHEET_IS_LAYER	0x20
+
+/* Constants and Structures */
+
+#define	MAX_ROW		(8191+MIN_ROW)
+#define	MAX_COLUMN	(255+MIN_ROW)
+
+/*
+ *	SSRefCountAndFlags record
+ */
+
+#define	SSRCAF_TRANSFORM_VALID	0x80
+#define SSRCAF_REF_COUNT	0x7f
+#define MAX_GSTATE_REF_COUNT	(SSRCAF_REF_COUNT)
+
+/*
+ * 	Instance Data
+*/
+    @instance CellFunctionParameters	SSI_cellParams = {0, 0, {0}};
+    @instance word			SSI_chunk = 0;
+    @instance optr			SSI_chartBody;
+
+    @instance word			SSI_mapBlock = 0;
+    @instance word			SSI_styleArray = 0;
+    @instance word			SSI_rowArray = 0;
+    @instance word			SSI_formatArray = 0;
+    @instance word			SSI_nameArray = 0;
+
+    @instance word			SSI_maxRow = MAX_ROW;
+    @instance word			SSI_maxCol = MAX_COLUMN;
+
+    @instance PointDWord		SSI_offset = {0, 0};
+    @instance CellRange			SSI_visible = {{0, 0}, {0, 0}};
+    @instance CellReference		SSI_active = {0, 0};
+
+    @instance CellRange			SSI_quickSource = {{0, 0}, {0, 0}};
+    @instance CellRange			SSI_selected = {{0, 0}, {0, 0}};
+    @instance word    	    		SSI_curAttrs = 0;
+    @instance word     			SSI_gstate = NullHandle;
+    @instance byte   			SSI_gsRefCount = 0;	/* SSRefCountAndFlags */
+
+    @instance SpreadsheetFlags		SSI_flags = 0;	
+    @instance SpreadsheetDrawFlags	SSI_drawFlags = 0;	
+    @instance byte			SSI_attributes = 0;
+
+    @instance CellRange   		SSI_header = {{-1, -1}, {-1, -1}};
+    @instance CellRange   		SSI_footer = {{-1, -1}, {-1, -1}};
+    @instance word	   		SSI_circCount = 0;
+    @instance FloatNum	   		SSI_converge = 0;
+    @instance word	   		SSI_ancestorList = 0;
+    @instance word	   		SSI_childList = 0;
+    @instance word	   		SSI_finalList = 0;
+    @instance optr			SSI_ruler;
+    @instance RectDWord	    	    	SSI_bounds = {0, 0, 0, 0};
+
+/*
+ * VARDATA
+ */
+
+typedef struct {
+    CellReference SDO_rowCol;
+} SpreadsheetDocOrigin;
+
+@vardata SpreadsheetDocOrigin	TEMP_SPREADSHEET_DOC_ORIGIN;
+/* 
+ * contains the document origin if it's nonzero.  Used for
+ * "locking rows and columns" 
+ *
+ */
+
+
+@endc
+
+typedef struct {
+    word    SIFD_file;
+    word    SIFD_numRows;
+    word    SIFD_numCols;
+    SpreadsheetDrawFlags    SIFD_drawFlags;
+} SpreadsheetInitFileData;
+
+extern VMBlockHandle
+    _pascal SpreadsheetInitFile(SpreadsheetInitFileData *ifd);
+
+extern void
+    _pascal SpreadsheetParseNameToToken(C_CallbackStruct *cb_s);
+
+extern void
+    _pascal SpreadsheetParseCreateCell(C_CallbackStruct *cb_s);
+
+extern void
+    _pascal SpreadsheetParseEmptyCell(C_CallbackStruct *cb_s);
+
+extern void
+    _pascal SpreadsheetParseDerefCell(C_CallbackStruct *cb_s);
+
+extern word
+    _pascal SpreadsheetNameTextFromToken(SpreadsheetInstance *ssheet,
+				 word nameToken,
+				 char *destinationPtr,
+				 word maxCharsToWrite);
+
+extern Boolean
+    _pascal SpreadsheetNameTokenFromText(SpreadsheetInstance *ssheet,
+				 char *nameText,
+				 word nameLen,
+				 word *tokenDest,
+				 NameFlags *flagsDest);
+
+extern word
+    _pascal SpreadsheetNameLockDefinition(SpreadsheetInstance *ssheet,
+				  word nameToken,
+				  void **defaddr);
+
+extern void
+    _pascal SpreadsheetCellAddRemoveDeps(SpreadsheetInstance *spreadsheetInstance,
+				 dword cellParams,
+				 PCB(void, callback,(C_CallbackStruct *)),
+				 word addOrRemoveDeps,
+				 word eval_flags,
+				 word row,
+				 word column,
+				 word maxRow,
+				 word maxColumn);
+
+extern void
+    _pascal SpreadsheetRecalcDependents(SpreadsheetInstance *spreadsheetInstance,
+				 PCB(void, callback,(optr oself,
+						 word row, word column)),
+				 word row,
+				 word column);
+
+#ifdef __HIGHC__
+pragma Alias (SpreadsheetInitFile, "SPREADSHEETINITFILE");
+pragma Alias (SpreadsheetParseNameToToken, "SPREADSHEETPARSENAMETOTOKEN");
+pragma Alias (SpreadsheetParseDerefCell, "SPREADSHEETPARSEDEREFCELL");
+pragma Alias (SpreadsheetParseCreateCell, "SPREADSHEETPARSECREATECELL");
+pragma Alias (SpreadsheetParseEmptyCell, "SPREADSHEETPARSEEMPTYCELL");
+pragma Alias (SpreadsheetNameTextFromToken, "SPREADSHEETNAMETEXTFROMTOKEN");
+pragma Alias (SpreadsheetNameTokenFromText, "SPREADSHEETNAMETOKENFROMTEXT");
+pragma Alias (SpreadsheetNameLockDefinition, "SPREADSHEETNAMELOCKDEFINITION");
+pragma Alias (SpreadsheetCellAddRemoveDeps, "SPREADSHEETCELLADDREMOVEDEPS");
+pragma Alias (SpreadsheetRecalcDependents, "SPREADSHEETRECALCDEPENDENTS");
+/*
+pragma Alias (SpreadsheetCheckShortcut, "SPREADSHEETCHECKSHORTCUT");
+pragma Alias (SpreadsheetGetTokenByStyle, "SPREADSHEETGETTOKENBYSTYLE");
+pragma Alias (SpreadsheetDeleteStyleByToken, "SPREADSHEETDELETESTYLEBYTOKEN");
+pragma Alias (SpreadsheetGetStyleByToken, "SPREADSHEETGETSTYLEBYTOKEN");
+pragma Alias (SpreadsheetGetAttrByToken, "SPREADSHEETGETATTRBYTOKEN");
+*/
+#endif
+
+/*
+ * Visual Cell Attributes 
+ */
+
+/* Color/Mask Info */
+typedef struct {
+    ColorQuad	    AI_color;
+    SystemDrawMask  AI_grayScreen;
+} AreaInfo;
+
+/* Border Info record */
+typedef ByteFlags CellBorderInfo;
+#define CBI_OUTLINE  	0x80
+#define	CBI_LEFT	0x08
+#define	CBI_TOP		0x04
+#define	CBI_RIGHT	0x02
+#define	CBI_BOTTOM	0x01
+
+/* Cell Info record */
+typedef ByteFlags CellInfo;
+#define	CI_LOCKED	0x04
+#define	CI_JUSTIFICATION	0x03
+
+#define	J_GENERAL       J_FULL
+
+/*
+ * Common Cell Attributes 
+ */
+
+typedef struct {
+    RefElementHeader	CA_refCount;
+    AreaInfo	CA_textAttrs;
+    AreaInfo	CA_bkgrndAttrs;
+    FontID	CA_font;
+    word	CA_pointsize;	/* pointsize*8 */
+    byte	CA_style;	/* TextStyle */
+    CellBorderInfo	CA_border;	
+    AreaInfo	CA_borderAttrs;
+    CellInfo	CA_info;
+    word	CA_format;
+    BBFixed 	CA_trackKern;
+    byte    	CA_fontWeight;
+    byte    	CA_fontWidth;
+    byte	CA_reserved[9];
+} CellAttrs;
+
+/* assert word align */
+
+#define	ROW_HEIGHT_AUTOMATIC	0x8000
+#define	MIN_ROW			0
+#define	COLUMN_WIDTH_MIN	0
+#define	COLUMN_WIDTH_MAX	512
+#define	ROW_HEIGHT_MIN		0
+#define	ROW_HEIGHT_MAX		(792*5/4)
+
+
+typedef struct {
+    word	NH_blockSize;
+    word	NH_definedCount;
+    word	NH_undefinedCount;
+    word	NH_nextToken;
+} NameHeader;
+
+/*
+ * NameFlags record
+*/
+typedef ByteFlags NameFlags;
+#define	NF_UNDEFINED	0x80
+
+typedef struct {
+    byte	NS_flags;	/* NameFlags */
+    word	NS_token;
+    word	NS_length;
+} NameStruct;
+
+#ifdef DO_DBCS
+#define	MAX_NAMES	170
+#else
+#define	MAX_NAMES	255
+#endif
+
+#define	MAX_NAME_BLOCK_SIZE	(sizeof(NameHeader) + \
+				(MAX_NAMES * (sizeof(NameStruct) + \
+				(sizeof(TCHAR) * MAX_NAME_LENGTH))))
+
+
+
+/*
+ *	NameAccessFlags record 
+ */
+typedef ByteFlags NameAccessFlags;
+#define NAF_NAME			0x80
+#define NAF_DEFINITION			0x40
+#define NAF_BY_TOKEN			0x20
+#define NAF_TOKEN_DEFINITION		0x10
+
+typedef struct {
+    byte	SNP_flags;	/* NameAccessFlags */
+    word	SNP_listEntry;
+    word	SNP_textLength;
+    TCHAR	SNP_text[MAX_NAME_LENGTH];
+    word	SNP_defLength;
+#ifdef DO_DBCS
+    byte	SNP_definition[MAX_NAME_DEF_LENGTH*2];
+#else
+    byte	SNP_definition[MAX_NAME_DEF_LENGTH+4];
+#endif
+    word	SNP_token;
+    byte	SNP_nameFlags;
+    byte	SNP_unused;
+} SpreadsheetNameParameters;
+
+typedef struct {
+    FormatParameters	SFP_formatParams;
+    dword		SFP_expression;
+    dword		SFP_text;
+    word		SFP_length;
+} SpreadsheetFormatParams;
+
+typedef struct {
+    ParserParameters	SPP_parserParams;
+    dword		SPP_text;
+    dword		SPP_expression;
+    word		SPP_exprLength;
+} SpreadsheetParserParams;
+
+typedef struct {
+    EvalParameters	SEP_evalParams;
+    dword		SEP_expression;
+    dword		ArgumentStackElement;
+} SpreadsheetEvalParams;
+
+#define	NAME_ROW	(LARGEST_ROW - 4)
+#define CHART_ROW	(LARGEST_ROW - 3)
+#define FORMATTED_RANGE_BUFFER_SIZE	14
+
+/* ParserScannerEvaluatorError enum types */
+#define PSEE_RESULT_SHOULD_BE_CELL_OR_RANGE  PSEE_SSHEET_BASE
+#define PSEE_NO_NAME_GIVEN  	    	    (PSEE_SSHEET_BASE + 1)
+#define PSEE_NO_DEFINITION_GIVEN    	    (PSEE_SSHEET_BASE + 2)
+#define PSEE_NAME_ALREADY_DEFINED    	    (PSEE_SSHEET_BASE + 3)
+#define PSEE_BAD_NAME_DEFINITION    	    (PSEE_SSHEET_BASE + 4)
+#define PSEE_REALLOC_FAILED	    	    (PSEE_SSHEET_BASE + 5)
+#define PSEE_CELL_OR_RANGE_IS_LOCKED	    (PSEE_SSHEET_BASE + 6)
+#define PSEE_LAST_SPREADSHEET_ERROR 	    230
+
+#define PSEE_SSHEET_ERRORS	\
+    PSEE_PARSER_ERRORS,	\
+    PSEE_RESULT_SHOULD_BE_CELL_OR_RANGE, \
+    PSEE_NO_NAME_GIVEN,	\
+    PSEE_NO_DEFINITION_GIVEN,	\
+    PSEE_NAME_ALREADY_DEFINED,	\
+    PSEE_BAD_NAME_DEFINITION,	\
+    PSEE_REALLOC_FAILED,    \
+    PSEE_CELL_OR_RANGE_IS_LOCKED
+
+typedef struct {
+    word	NLH_endOfData;
+    word	NLH_blockSize;
+} NameListHeader;
+
+typedef struct {
+    word	NLE_token;
+    byte	NLE_flags;
+    byte	NLE_unused;
+    word	NLE_textLength;
+    word	NLE_defLength;
+} NameListEntry;
+
+#define	NAME_LIST_INCREMENT	2048
+
+/*** FORMAT stuff ***/
+
+#define CELL_GOTO_MAX_TEXT	    15
+#define	CELL_MAX_TEXT		    511
+#define CELL_TEXT_BUFFER_SIZE 	    (CELL_MAX_TEXT + size CellText)
+#define CELL_MAX_FORMULA	    512	
+#define CELL_FORMULA_BUFFER_SIZE    (CELL_MAX_FORMULA + size CellFormula)
+
+/* adding to existing FunctionID (from parse library) enum at this point...*/
+
+#define SPREADSHEET_LIB_FUNCTIONID_ERRORS \
+	FUNCTION_ID_SPREADSHEET_CELL, \
+	FUNCTION_ID_LAST_SPREADSHEET_FUNCTION  
+
+#define	SPREADSHEET_RULER_WIDTH		40
+#define	SPREADSHEET_RULER_HEIGHT	12
+
+typedef ByteFlags SpreadsheetRulerFlags;
+#define SRF_SSHEET_IS_FOCUS 	    0x8
+#define	SRF_NO_INTERACTIVE_RESIZE   0x4
+#define SRF_SSHEET_IS_TARGET	    0x2
+#define SRF_HAVE_GRAB	    	    0x1
+
+@class	SpreadsheetRulerClass,VisRulerClass;
+
+@message void MSG_SPREADSHEET_RULER_DRAW_RANGE(		/*XXX*/
+				SpreadsheetDrawParams *ssDrawParams);
+@message void MSG_SPREADSHEET_RULER_SET_FLAGS(
+				SpreadsheetRulerFlags setFlags = dl,
+			    	SpreadsheetRulerFlags clearFlags = dh);
+
+@instance   	SpreadsheetRulerFlags	SRI_flags;
+@instance	optr	SRI_spreadsheet;
+@instance   	word	SRI_resizeRC;
+@instance   	dword	SRI_startRCPos;
+
+@endc
+
+typedef ByteEnum CellError;
+#define CE_NO_ERROR 0
+#define CE_TOO_COMPLEX 1
+#define CE_REF_OUT_OF_RANGE 2
+#define CE_NAME 3
+#define CE_ARG_COUNT 4
+#define CE_TYPE	 5
+#define CE_DIVIDE_BY_ZERO 6
+#define CE_CIRCULAR_REF 7
+#define CE_GEN_ERR 8
+#define CE_NA 9
+#define CE_FLOAT_POS_INF 10
+#define CE_FLOAT_NEG_INF 11
+#define CE_FLOAT_GEN_ERR 12
+#define CE_CIRC_NAME_REF 13
+#define CE_CIRC_DEPEND 14
+#define	CE_NUM_OUT_OF_RANGE 15
+
+typedef ByteEnum CellType;
+#define CT_TEXT			0
+#define CT_CONSTANT		2
+#define CT_FORMULA		4
+#define CT_NAME			6
+#define CT_CHART		8
+#define CT_EMPTY		10
+#define CT_DISPLAY_FORMULA	12
+
+/*
+ *	CellRecalcFlags record
+ */
+typedef ByteFlags CellRecalcFlags;
+#define CRF_IN_PARENT_LIST	0x80
+#define CRF_IN_FINAL_LIST	0x40
+@if _PROTECT_CELL
+#define CRF_PROTECTION		0x01
+@else
+#define	CRF_RESERVED		0x01
+@endif
+
+typedef struct {
+    dword	CC_dependencies;
+    byte	CC_type;
+    byte	CC_recalcFlags;	/* CellRecalcFlags */
+    word	CC_attrs;
+    dword	CC_notes;
+} CellCommon;
+
+typedef struct {
+    CellCommon	CT_common;
+} CellText;
+
+typedef struct {
+    CellCommon	CC_common;
+    FloatNum	CC_current;
+} CellConstant;
+
+typedef ByteEnum ReturnType;
+#define RT_VALUE 0
+#define RT_TEXT 1
+#define	RT_ERROR 2
+
+typedef union {
+    FloatNum	RV_VALUE;
+    word	RV_TEXT;
+    CellError	RV_ERROR;
+} ReturnValue;
+
+typedef struct {
+    CellCommon	CF_common;
+    ReturnType	CF_return;
+    ReturnValue	CF_current;
+    word	CF_formulaSize;
+} CellFormula;
+
+typedef struct {
+    CellCommon	CN_common;
+} CellName;
+
+typedef struct {
+    CellFormula	CG_formula;
+} CellChart;
+
+typedef struct {
+    CellCommon	CUF_common;
+} CellUserFunction;
+
+typedef struct {
+    CellCommon	CE_common;
+} CellEmpty;
+
+@endlib
+

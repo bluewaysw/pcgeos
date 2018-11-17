@@ -1,0 +1,59 @@
+#!/bin/sh -
+##############################################################################
+#
+# 	Copyright (c) Berkeley Softworks 1989 -- All Rights Reserved
+#
+# PROJECT:	PC GEOS
+# MODULE:	Tools/scripts -- File Installation
+# FILE: 	merge3
+# AUTHOR: 	Tony Requist, March 1, 1990 (with much help from Adam)
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	tony	3/1/90		Initial Revision
+#
+# DESCRIPTION:
+#
+#	Script to merge changes between three files
+#
+#	merge3 file1 file2 file3
+#
+#	file1 is the common ancestor
+#	file2 and file3 are both dirivitives of file1
+#
+#	file3 is overwritten with the "new and improved" combined file
+#
+#	$Id: merge3,v 1.3 92/08/25 11:41:46 adam Exp $
+#
+###############################################################################
+
+trap "s=$?; rm -f /tmp/a$$ /tmp/b$$ /tmp/c$$; exit $s" 1 2 3 15
+
+echo "Backing $3 up to $3~"
+cp $3 $3~
+
+echo "diffing $3 and $2..."
+diff $3 $2 > /tmp/a$$
+
+echo "diffing $1 and $2..."
+diff $1 $2 > /tmp/b$$
+
+echo "creating ed script..."
+/usr/lib/diff3 -E /tmp/a$$ /tmp/b$$ $3 $1 $2 "<<<" ">>>" > /tmp/c$$
+
+case $? in
+	0) 	echo >&2 no overlaps.
+		;;
+	1) 	echo >&2 $0: warning: 1 overlap during merge.
+		;;
+	*) 	echo >&2 $0: warning: $? overlaps during merge.
+		;;
+esac
+
+echo "applying ed script to $3..."
+echo w | cat /tmp/c$$ - | ed - $3
+
+rm -f /tmp/a$$ /tmp/b$$ /tmp/c$$
+
+echo "done."

@@ -1,0 +1,287 @@
+/*
+ *	Copyright (c) Geoworks 1993 -- All Rights Reserved
+ *
+ * PROJECT:	PC GEOS 
+ * MODULE:	
+ * FILE:	prefTimeDateControl.ui
+ *
+ * AUTHOR:	Chris Boyke
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *       chrisb	10/19/93   	Initial version.
+ *
+ * DESCRIPTION:
+ *
+ * 	$Id: prefTimeDateControl.ui,v 1.2 98/04/24 01:22:27 gene Exp $
+ *
+ */
+
+#ifdef NIKE_EUROPE
+#define _NIKE_EUROPE	-1
+#endif
+
+
+
+#include <generic.uih>
+#include <config.uih>
+
+#define TIME_DATE_VALUE_HINTS HINT_IF_SYSTEM_ATTRS { \
+			SystemAttrs mask SA_HORIZONTALLY_TINY\
+		}, HINT_PLACE_MONIKER_ABOVE, HINT_ENDIF
+
+
+class PrefMonthList = PrefDynamicList {
+}
+
+class PrefDayPicker = GenGadget {
+	currentDay = byteComp : 1;
+}
+
+start	TimeDateControlUI, notDetachable;
+
+
+
+/****************************************
+ * 	Date Interaction
+ ****************************************/
+
+DateInteraction = PrefInteraction {
+	genStates = default -usable;
+	moniker = "Date";
+	children = 
+		MonthYearGroup,
+		DayPicker;
+	hints = {
+		HINT_DRAW_IN_BOX,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_CENTER_CHILDREN_HORIZONTALLY
+	}
+}
+
+DayPicker = PrefDayPicker {
+}
+
+MonthYearGroup = PrefInteraction {
+	children = 
+		MonthList,
+		DateYear;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+
+MonthList = PrefMonthList {
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		ATTR_GEN_ITEM_GROUP_STATUS_MSG {
+			word MSG_PTDC_MONTH_CHANGE
+		},
+		HINT_ITEM_GROUP_MINIMIZE_SIZE,
+		HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION
+	}
+}
+
+DateYear = PrefValue {
+	minimum = 1990;
+	maximum = 2099;
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		TIME_DATE_VALUE_HINTS,
+		ATTR_GEN_VALUE_STATUS_MSG {
+			word	MSG_PTDC_YEAR_CHANGE
+		},
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 6>
+			SpecHeight <>
+		}
+	}
+}	
+
+/****************************************
+ * 	Time Interaction
+ ****************************************/
+
+TimeInteraction = PrefInteraction {
+	genStates = default -usable;
+	moniker = "Time";
+	children = 
+		TimeCurrent,
+		TimeGroup,
+		TimeAMPMGroup,
+	        TimezoneGroup;
+	hints = {
+		HINT_DRAW_IN_BOX,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT
+	}
+}
+
+TimeCurrent = GenText {
+	moniker = "Current Time:";
+	textDisplayAttributes = default +singleLineText;
+	genAttributes = default +readOnly;
+	hints = {
+		ATTR_GEN_TEXT_DEFAULT_PARA_ATTR {
+			VisTextDefaultParaAttr <
+				J_RIGHT, VTDDT_NONE, 0, 0, 0
+			>
+		},
+		HINT_INITIAL_SIZE {
+			SpecWidth <SST_PIXELS, 80>
+			SpecHeight <>
+		},
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+TimeGroup = PrefInteraction {
+	children = 
+		TimeHours,
+		TimeMinutes,
+		TimeSeconds;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY
+	}
+}
+
+TimeHours = PrefValue {
+	minimum = 1;
+	maximum = 12;
+	hints = {
+		TIME_DATE_VALUE_HINTS,
+		ATTR_PREF_VALUE_WRAP,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 4>
+			SpecHeight <>
+		}
+	}
+}
+
+TimeMinutes = PrefValue {
+	minimum = 0;
+	maximum = 59;
+	hints = {
+		TIME_DATE_VALUE_HINTS,
+		ATTR_PREF_VALUE_WRAP,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 4>
+			SpecHeight <>
+		}
+	}
+}
+
+TimeSeconds = PrefValue {
+	minimum = 0;
+	maximum = 59;
+	hints = {
+		TIME_DATE_VALUE_HINTS,
+		ATTR_PREF_VALUE_WRAP,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 4>
+			SpecHeight <>
+		}
+	}
+}
+
+
+TimeAMPMGroup = PrefInteraction {
+	children = TimeAMPM;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_RIGHT_JUSTIFY_CHILDREN
+	}
+}
+
+TimeAMPM = GenItemGroup {
+	children =
+		TimeAM,
+		TimePM;
+}
+
+TimeAM = GenItem {
+	moniker = 'A',"AM";
+	identifier = 0;
+}
+
+TimePM = GenItem {
+	moniker = 'P',"PM";
+	identifier = 12;
+}
+
+TimezoneGroup = PrefInteraction {
+    children =
+	TimezoneList,
+	TimezoneDST;
+}
+
+TimezoneList = GenDynamicList {
+    applyMsg = MSG_PTDC_SET_TIMEZONE;
+    queryMsg = MSG_PTDC_QUERY_TIMEZONE;
+    destination = "TO_OBJ_BLOCK_OUTPUT";
+    hints = {
+	HINT_PLACE_MONIKER_ABOVE,
+	HINT_ITEM_GROUP_SCROLLABLE,
+	HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION,
+	HINT_FIXED_SIZE {
+	    SpecWidth <SST_AVG_CHAR_WIDTHS, 27>
+	    SpecHeight <SST_LINES_OF_TEXT, 3>
+	    word	3
+	},
+	ATTR_GEN_ITEM_GROUP_STATUS_MSG { word MSG_PTDC_TIMEZONE_SELECTED }
+    }
+}
+
+
+TimezoneDST = PrefBooleanGroup {
+    children =
+	TimezoneUseDST;
+}
+
+TimezoneUseDST = PrefBoolean {
+    moniker = "Daylight Savings Time";
+    identifier = "mask QTZF_DAYLIGHT_TIME";
+}
+
+end	TimeDateControlUI;
+
+start StringData, data;
+
+chunk gmtM12Str = "(GMT -12:00)";
+chunk gmtM11Str = "(GMT -11:00)";
+chunk gmtM10Str = "(GMT -10:00) Hawaii";
+chunk gmtM9Str = "(GMT -09:00) Alaska";
+chunk gmtM8Str = "(GMT -08:00) Pacific Time";
+chunk gmtM7Str = "(GMT -07:00) Mountain Time";
+chunk gmtAZStr = "(GMT -07:00) Arizona";
+chunk gmtM6Str = "(GMT -06:00) Central Time";
+chunk gmtM5Str = "(GMT -05:00) Eastern Time";
+chunk gmtINStr = "(GMT -05:00) Indiana (East)";
+chunk gmtM4Str = "(GMT -04:00) Atlantic";
+chunk gmtNewfStr = "(GMT -03:30) Newfoundland";
+chunk gmtM3Str = "(GMT -03:00)";
+chunk gmtM2Str = "(GMT -02:00)";
+chunk gmtM1Str = "(GMT -01:00)";
+chunk gmtGMTStr = "(GMT) Greenwich Mean Time";
+chunk gmtP1Str = "(GMT +01:00) Central European Time";
+chunk gmtP2Str = "(GMT +02:00)";
+chunk gmtP3Str = "(GMT +03:00)";
+chunk gmtIranStr = "(GMT +3:30) Iran";
+chunk gmtP4Str = "(GMT +04:00)";
+chunk gmtKabulStr = "(GMT +04:30) Afghanistan";
+chunk gmtP5Str = "(GMT +05:00)";
+chunk gmtIndiaStr = "(GMT +05:30) India";
+chunk gmtP6Str = "(GMT +06:00)";
+chunk gmtMyanmarStr = "(GMT +06:30) Myanmar";
+chunk gmtP7Str = "(GMT +07:00)";
+chunk gmtP8Str = "(GMT +08:00)";
+chunk gmtP9Str = "(GMT +09:00)";
+chunk gmtCentralAusStr = "(GMT +09:30) Australia (Central)";
+chunk gmtP10Str = "(GMT +10:00)";
+chunk gmtP11Str = "(GMT +11:00)";
+chunk gmtP12Str = "(GMT +12:00)";
+
+end StringData;

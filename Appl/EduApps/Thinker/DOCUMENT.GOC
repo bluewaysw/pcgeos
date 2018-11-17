@@ -1,0 +1,747 @@
+/**********************************************************************
+ * DOCUMENT.GOC - Document code                                       *
+ * Project - Thinker Pro                                              *
+ **********************************************************************/
+
+/**********************************************************************
+ * Includes                                                           *
+ **********************************************************************/
+
+@include <stdapp.goh>
+
+#include <ansi/stdlib.h>
+#include <ansi/stdio.h>
+#include <ansi/string.h>
+
+@include "thinker.goh"
+@include "extern.goh"
+@include "password.goh"
+ 
+extern void PlaySimpleSound(word soundId, word priority) ;
+
+#define SOUND_ID_START_QUIZ         1
+#define SOUND_ID_WRONG              3
+#define SOUND_ID_RIGHT              2
+#define SOUND_ID_SUMMARY            4
+#define SOUND_ID_NEXT               5
+
+/**********************************************************************
+ * Class Declaration                                                  *
+ **********************************************************************/
+
+@classdecl ThinkerDocumentClass;
+
+/**********************************************************************
+ * Methods                                                            *
+ **********************************************************************/
+
+/**********************************************************************
+ * MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE                          *
+ **********************************************************************/
+@method ThinkerDocumentClass, MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE
+{
+    VMFileHandle file = pself->GDI_fileHandle;
+    DBGroupAndItem block;
+    DocumentMapBlock *mapBlockPtr;
+
+    @callsuper();
+
+    /* Create a map block */
+    block = DBAllocUngrouped(file, sizeof(DocumentMapBlock));
+    DBSetMapUngrouped(file, block);
+
+    /* Initialize the map block */
+    mapBlockPtr = DBLockUngrouped(file, block);
+    mapBlockPtr->DMB_numEntries = 0;
+    mapBlockPtr->DMB_lastEdit = 0;
+    DBDirty(mapBlockPtr);
+    DBUnlock(mapBlockPtr);
+
+    /* Report an error if the password failed */
+    if (!PwdCheckPasswordInINI("thinker", "pwd", TRUE, TRUE))
+        return TRUE ;
+
+    return(FALSE);
+}
+
+/**********************************************************************
+ * MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT                             *
+ **********************************************************************/
+@method ThinkerDocumentClass, MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT
+{
+    VMFileHandle file = pself->GDI_fileHandle;
+	 DocumentMapBlock *mapBlockPtr;
+	 char		docName[FILE_LONGNAME_BUFFER_SIZE];
+
+    /* Get the number of entries */
+    mapBlockPtr = DBLockMap(file);
+    pself->TDI_numEntries = mapBlockPtr->DMB_numEntries;
+    DBUnlock(mapBlockPtr);
+
+    /* Show the first entry when attached or start the quiz. */
+    if (pself->TDI_numEntries > 0)  {
+        @call self::MSG_THINKER_DOCUMENT_START_QUIZ() ;
+    } else {
+        /* Need at least one item so things work right */
+        @call self::MSG_THINKER_DOCUMENT_ADD_ITEM();
+
+        @call ConstructOptr(pself->GDI_display,
+            OptrToChunk(@DocStopQuizButton))::MSG_GEN_SET_NOT_USABLE(\
+            VUM_DELAYED_VIA_UI_QUEUE);
+        @call ThinkerGoToEdit::MSG_GEN_SET_NOT_ENABLED(
+            VUM_DELAYED_VIA_UI_QUEUE);
+
+        @call self::MSG_THINKER_DOCUMENT_DISPLAY_ENTRY(0);
+	 }
+
+	 /* add the doc name... Note: Lysle & I aren't sure why the GenDoc
+	  * stuff isn't doing this automatically.  We think it might be because
+	  * Thinker Doc stuff uses a Display and DisplayControl which none
+	  * of the other Breadbox doc type apps do.  And since they work fine
+	  * and the display is the only difference...  I also added the
+	  * following two methods to take care of all the file name change
+	  * situations.  jfh 7/5/02 */
+	 @call self::MSG_GEN_DOCUMENT_GET_FILE_NAME(docName);
+
+	 @call ThinkerPrimary::MSG_GEN_PRIMARY_REPLACE_LONG_TERM_MONIKER(
+			VUM_NOW, 0, 0, 0, VMDT_TEXT, VMST_FPTR, (dword)docName);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT for ThinkerDocumentClass
+ *
+ * DESCRIPTION:	Called when the doc is closed.
+ *              
+ *
+ ***********************************************************************/
+
+@method ThinkerDocumentClass, MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT
+{
+ char		docName[FILE_LONGNAME_BUFFER_SIZE];
+
+
+	 /* add the doc name... */
+	 @call self::MSG_GEN_DOCUMENT_GET_FILE_NAME(docName);
+
+	 @call ThinkerPrimary::MSG_GEN_PRIMARY_REPLACE_LONG_TERM_MONIKER(
+			VUM_NOW, 0, 0, 0, VMDT_TEXT, VMST_FPTR, (dword)docName);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_DOCUMENT_SAVE_AS_COMPLETED for ThinkerDocumentClass
+ *
+ * DESCRIPTION:	Called on Save As.
+ *
+ *
+ ***********************************************************************/
+
+@method ThinkerDocumentClass, MSG_GEN_DOCUMENT_SAVE_AS_COMPLETED
+{
+ char		docName[FILE_LONGNAME_BUFFER_SIZE];
+
+
+	 /* add the doc name... */
+	 @call self::MSG_GEN_DOCUMENT_GET_FILE_NAME(docName);
+
+	 @call ThinkerPrimary::MSG_GEN_PRIMARY_REPLACE_LONG_TERM_MONIKER(
+			VUM_NOW, 0, 0, 0, VMDT_TEXT, VMST_FPTR, (dword)docName);
+
+
+}
+
+/**********************************************************************
+ * MSG_GEN_DOCUMENT_UPDATE_EARLIER_INCOMPATIBLE_DOCUMENT              *
+ **********************************************************************/
+@method ThinkerDocumentClass,
+        MSG_GEN_DOCUMENT_UPDATE_EARLIER_INCOMPATIBLE_DOCUMENT
+{
+    VMFileHandle file = pself->GDI_fileHandle;
+    DBGroupAndItem block, map;
+    DocumentMapBlock *mapBlockPtr;
+    DocumentMapBlockV1 *oldBlockPtr;
+    word count;
+
+    /* Get the old map block */
+    map = DBGetMap(file);
+    oldBlockPtr = DBLockUngrouped(file, map);
+
+    /* Create the new map block */
+    block = DBAllocUngrouped(file, sizeof(DocumentMapBlock) +
+                             sizeof(QuizEntry) * oldBlockPtr->DMB_numEntries);
+    mapBlockPtr = DBLockUngrouped(file, block);
+
+    /* Convert the entries */
+    mapBlockPtr->DMB_numEntries = oldBlockPtr->DMB_numEntries;
+    mapBlockPtr->DMB_lastEdit = oldBlockPtr->DMB_lastEdit;
+    for (count = 0; count < oldBlockPtr->DMB_numEntries; count++) {
+        mapBlockPtr->DMB_data[count].QE_group = oldBlockPtr->DMB_data[count];
+        mapBlockPtr->DMB_data[count].QE_question = QUESTION_DB_ITEM;
+        mapBlockPtr->DMB_data[count].QE_answer = ANSWER_DB_ITEM;
+    }
+
+    DBDirty(mapBlockPtr);
+    DBUnlock(mapBlockPtr);
+    DBUnlock(oldBlockPtr);
+
+    /* Release and set the new block */
+    DBFreeUngrouped(file, map);
+    DBSetMapUngrouped(file, block);
+
+    return(FALSE);
+}
+
+/**********************************************************************
+ * MSG_THINKER_DOCUMENT_ADD_ITEM                                      *
+ **********************************************************************/
+@method ThinkerDocumentClass, MSG_THINKER_DOCUMENT_ADD_ITEM
+{
+    DocumentMapBlock *mapBlockPtr;
+    VMFileHandle file = pself->GDI_fileHandle;
+    DBGroupAndItem map;
+    DBItem item;
+    word entry;
+    char *data;
+    word len ;
+
+    if (pself->TDI_numEntries)  {
+        /* Store the current entry (if any and modified) */
+        @call self::MSG_THINKER_DOCUMENT_CHECK_MODIFIED();
+
+        /* Get the last entry (where a blank would be) */
+        @call self::MSG_THINKER_DOCUMENT_DISPLAY_ENTRY(pself->TDI_numEntries-1);
+
+        /* Check to see if we have empty text */
+        len = @call ConstructOptr(pself->GDI_display,
+                        OptrToChunk(@DocumentQuestionBox))::
+                        MSG_VIS_TEXT_GET_TEXT_SIZE() ;
+        len += @call ConstructOptr(pself->GDI_display,
+                        OptrToChunk(@DocumentAnswerBox))::
+                        MSG_VIS_TEXT_GET_TEXT_SIZE() ;
+    } else {
+        len = 0 ;
+    }
+
+    /* Only add data if we are NOT empty or we have no entries yet */
+    if ((len) || (!pself->TDI_numEntries))  {
+        map = DBGetMap(file);
+
+        /* Add an entry at the end of the map file */
+        DBReAllocUngrouped(file, map, sizeof(DocumentMapBlock) +
+                           sizeof(QuizEntry) * (pself->TDI_numEntries+1));
+
+        /* Store if changed. */
+        mapBlockPtr = DBLockUngrouped(file, map);
+        entry = mapBlockPtr->DMB_numEntries;
+        mapBlockPtr->DMB_numEntries++;
+        pself->TDI_numEntries++;
+
+        /* ALlocate a new group and the items in it (although empty) */
+        mapBlockPtr->DMB_data[entry].QE_group = DBGroupAlloc(file);
+        item = DBAlloc(file, mapBlockPtr->DMB_data[entry].QE_group, 1);
+        mapBlockPtr->DMB_data[entry].QE_question = item;
+        data = DBLock(file, mapBlockPtr->DMB_data[entry].QE_group, item);
+        data[0] = 0;
+        DBDirty(data);
+        DBUnlock(data);
+        item = DBAlloc(file, mapBlockPtr->DMB_data[entry].QE_group, 1);
+        mapBlockPtr->DMB_data[entry].QE_answer = item;
+        data = DBLock(file, mapBlockPtr->DMB_data[entry].QE_group, item);
+        data[0] = 0;
+        DBDirty(data);
+        DBUnlock(data);
+
+        DBDirty(mapBlockPtr);
+        DBUnlock(mapBlockPtr);
+    }
+
+    /* Show this new entry */
+    @call self::MSG_THINKER_DOCUMENT_DISPLAY_ENTRY(pself->TDI_numEntries-1);
+}
+
+/**********************************************************************
+ * MSG_THINKER_DOCUMENT_DELETE_ITEM                                   *
+ **********************************************************************/
+@method ThinkerDocumentClass, MSG_THINKER_DOCUMENT_DELETE_ITEM
+{
+    DocumentMapBlock *mapBlockPtr;
+    DBGroupAndItem map;
+    QuizEntry *entries;
+
+    /* Must always have one item */
+/* LES!!! But it should be blanked out! */
+    if (pself->TDI_numEntries == 1) {
+        return;
+    }
+
+    map = DBGetMap(pself->GDI_fileHandle);
+    mapBlockPtr = DBLockUngrouped(pself->GDI_fileHandle, map);
+    entries = mapBlockPtr->DMB_data;
+
+    /* Delete the whole group */
+/* LES!!! Does deleting a group get rid of the items in a group? */
+    DBGroupFree(pself->GDI_fileHandle, entries[pself->TDI_curEntry].QE_group);
+
+    /* Delete the entry in the ungrouped map block */
+    DBDeleteAtUngrouped(pself->GDI_fileHandle, map, sizeof(DocumentMapBlock) +
+                        sizeof(QuizEntry) * pself->TDI_curEntry,
+                        sizeof(QuizEntry));
+
+    /* One less and adjust the current entry */
+    mapBlockPtr->DMB_numEntries--;
+    pself->TDI_numEntries--;
+    if (pself->TDI_curEntry == pself->TDI_numEntries) {
+        pself->TDI_curEntry--;
+    }
+    DBDirty(mapBlockPtr);
+    DBUnlock(mapBlockPtr);
+
+    /* Show the new current entry */
+    @call self::MSG_THINKER_DOCUMENT_DISPLAY_ENTRY(pself->TDI_curEntry);
+}
+
+/**********************************************************************
+ * MSG_THINKER_DOCUMENT_PREV_ITEM                                     *
+ **********************************************************************/
+@method ThinkerDocumentClass, MSG_THINKER_DOCUMENT_PREV_ITEM
+{
+    /* Save if anythings changed */
+    @call self::MSG_THINKER_DOCUMENT_CHECK_MODIFIED();
+
+    /* Go back one slot */
+    if (pself->TDI_curEntry) {
+        pself->TDI_curEntry--;
+        @call self::MSG_THINKER_DOCUMENT_DISPLAY_ENTRY(pself->TDI_curEntry);
+    }
+}
+
+/**********************************************************************
+ * MSG_THINKER_DOCUMENT_NEXT_ITEM                                     *
+ **********************************************************************/
+@method ThinkerDocumentClass, MSG_THINKER_DOCUMENT_NEXT_ITEM
+{
+    /* Save if anything changed */
+    @call self::MSG_THINKER_DOCUMENT_CHECK_MODIFIED();
+
+    /* Go to the next item */
+    if (pself->TDI_curEntry < pself->TDI_numEntries - 1) {
+        pself->TDI_curEntry++;
+        @call self::MSG_THINKER_DOCUMENT_DISPLAY_ENTRY(pself->TDI_curEntry);
+    }
+}
+
+/**********************************************************************
+ * MSG_THINKER_DOCUMENT_CHECK_MODIFIED                                *
+ **********************************************************************/
+@method ThinkerDocumentClass, MSG_THINKER_DOCUMENT_CHECK_MODIFIED
+{
+    DocumentMapBlock *mapBlockPtr;
+    VMFileHandle file = pself->GDI_fileHandle;
+    Boolean modified1, modified2;
+    optr text1, text2;
+
+    /* Check if either of the text objects have been modified */
+    text1 = ConstructOptr(pself->GDI_display, OptrToChunk(@DocumentQuestionBox));
+    text2 = ConstructOptr(pself->GDI_display, OptrToChunk(@DocumentAnswerBox));
+    modified1 = @call text1::MSG_VIS_TEXT_GET_USER_MODIFIED_STATE();
+    modified2 = @call text2::MSG_VIS_TEXT_GET_USER_MODIFIED_STATE();
+
+    /* Save if either have changed */
+    if (modified1 || modified2) {
+        mapBlockPtr = DBLockMap(file);
+        @call text1::MSG_VIS_TEXT_GET_ALL_DB_ITEM(file,
+            mapBlockPtr->DMB_data[pself->TDI_curEntry].QE_group,
+            mapBlockPtr->DMB_data[pself->TDI_curEntry].QE_question);
+        @call text2::MSG_VIS_TEXT_GET_ALL_DB_ITEM(file,
+            mapBlockPtr->DMB_data[pself->TDI_curEntry].QE_group,
+            mapBlockPtr->DMB_data[pself->TDI_curEntry].QE_answer);
+        DBUnlock(mapBlockPtr);
+    }
+}
+
+/**********************************************************************
+ * MSG_THINKER_DOCUMENT_DISPLAY_ENTRY                                 *
+ **********************************************************************/
+@method ThinkerDocumentClass, MSG_THINKER_DOCUMENT_DISPLAY_ENTRY
+{
+    DocumentMapBlock *mapBlockPtr;
+    VMFileHandle file = pself->GDI_fileHandle;
+    char *string, buffer[200];
+    optr status, text;
+
+    /* Lock in the map block for an entry */
+    mapBlockPtr = DBLockMap(file);
+    pself->TDI_curEntry = entry;
+
+    /* Show on the status line the number of current entry */
+    MemLock(OptrToHandle(@ItemNumberString));
+    string = LMemDeref(@ItemNumberString);
+    sprintf(buffer, string, entry + 1, pself->TDI_numEntries);
+    MemUnlock(OptrToHandle(@ItemNumberString));
+    status = ConstructOptr(
+                 pself->GDI_display,
+                 OptrToChunk(@DocStatusLine));
+    @call status::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(buffer, VUM_NOW);
+
+      /*
+       * Optimizations here. Both the question and the answer are in the same
+       * memory block. Locking one or both at the same time won't effect memory
+       * usage, just the lock count. When we unlock, all that matters is the
+       * segment of the pointer; the offset is discarded. Taking this into
+       * account, we lock the question and put it into the text box. Then we
+       * lock the answer and put it into the text box, without first unlocking
+       * the question. This way we are guarenteed that it won't be swapped out
+       * in between accesses. When done, just call unlock with the same pointer
+       * twice.
+       */
+
+    /* Show the question and answer in the window text */
+    string = DBLock(
+                 file,
+                 mapBlockPtr->DMB_data[entry].QE_group,
+                 mapBlockPtr->DMB_data[entry].QE_question);
+    text = ConstructOptr(pself->GDI_display, OptrToChunk(@DocumentQuestionBox));
+    @call text::MSG_VIS_TEXT_REPLACE_ALL_PTR(string, 0);
+    @call text::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+    string = DBLock(
+                 file,
+                 mapBlockPtr->DMB_data[entry].QE_group,
+                 mapBlockPtr->DMB_data[entry].QE_answer);
+    text = ConstructOptr(pself->GDI_display, OptrToChunk(@DocumentAnswerBox));
+    @call text::MSG_VIS_TEXT_REPLACE_ALL_PTR(string, 0);
+    @call text::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+    DBUnlock(string);
+    DBUnlock(string);
+
+    DBUnlock(mapBlockPtr);
+}
+
+/**********************************************************************
+ * MSG_THINKER_DOCUMENT_START_QUIZ                                    *
+ **********************************************************************/
+@method ThinkerDocumentClass, MSG_THINKER_DOCUMENT_START_QUIZ
+{
+    PlaySimpleSound(SOUND_ID_START_QUIZ, 5) ;
+
+    /* Allocate an array to track questions asked */
+    pself->TDI_asked = MemAlloc(
+                           pself->TDI_numEntries,
+                           HF_SWAPABLE,
+                           HAF_ZERO_INIT);
+
+    /* Initialize the data */
+    pself->TDI_numLeft = pself->TDI_numEntries;
+    pself->TDI_numWrong = 0;
+    pself->TDI_numRight = 0;
+    pself->TDI_totalRight = 0;
+    pself->TDI_totalWrong = 0;
+
+    /* Change the UI to match */
+    @call ThinkerGoToEdit::MSG_GEN_SET_ENABLED(
+        VUM_DELAYED_VIA_UI_QUEUE);
+    @call ConstructOptr(pself->GDI_display,
+        OptrToChunk(@DocumentNonQuizTopLine))::MSG_GEN_SET_NOT_USABLE(\
+        VUM_DELAYED_VIA_UI_QUEUE);
+    @call ConstructOptr(pself->GDI_display,
+        OptrToChunk(@DocButtonGroup))::MSG_GEN_SET_NOT_USABLE(\
+        VUM_DELAYED_VIA_UI_QUEUE);
+    @call ConstructOptr(pself->GDI_display,
+        OptrToChunk(@DocumentAnswerStuff))::MSG_GEN_SET_NOT_USABLE(\
+        VUM_DELAYED_VIA_UI_QUEUE);
+    @call ConstructOptr(pself->GDI_display,
+        OptrToChunk(@DocumentAnswerButtonBar))::MSG_GEN_SET_USABLE(\
+        VUM_DELAYED_VIA_UI_QUEUE);
+    @send ConstructOptr(pself->GDI_display,
+        OptrToChunk(@DocumentAnswerButton))::MSG_META_GRAB_FOCUS_EXCL();
+    @call ConstructOptr(pself->GDI_display,
+        OptrToChunk(@DocumentAnswerGroup))::MSG_GEN_UPDATE_VISUAL(
+        VUM_DELAYED_VIA_UI_QUEUE);
+    @call ConstructOptr(pself->GDI_display,
+        OptrToChunk(@DocumentQuizTopLine))::MSG_GEN_SET_USABLE(\
+        VUM_DELAYED_VIA_UI_QUEUE);
+    @call ConstructOptr(pself->GDI_display,
+        OptrToChunk(@DocStopQuizButton))::MSG_GEN_SET_USABLE(\
+        VUM_DELAYED_VIA_UI_QUEUE);
+
+
+    @call self::MSG_THINKER_DOCUMENT_QUIZ_NEXT_QUESTION();
+}
+
+/**********************************************************************
+ * MSG_THINKER_DOCUMENT_QUIZ_NEXT_QUESTION                            *
+ **********************************************************************/
+@method ThinkerDocumentClass, MSG_THINKER_DOCUMENT_QUIZ_NEXT_QUESTION
+{
+    word num, count, found;
+    byte *data;
+    char buffer[80] ;
+    BackgroundColors *p_colors ;
+    static Color colorTable[6] =  {
+        C_BLUE,
+        C_GREEN,
+        C_YELLOW,
+        C_CYAN,
+        C_VIOLET,
+        C_BROWN
+    } ;
+
+    PlaySimpleSound(SOUND_ID_NEXT, 4) ;
+
+    MemLock(pself->GDI_display) ;
+    p_colors = ObjVarFindData(ConstructOptr(pself->GDI_display,
+        OptrToChunk(@DocumentAnswerButton)), HINT_GADGET_BACKGROUND_COLORS);
+    if (p_colors)  {
+        p_colors->BC_unselectedColor1 =
+        p_colors->BC_unselectedColor2 =
+        p_colors->BC_selectedColor1 =
+        p_colors->BC_selectedColor2 =
+            colorTable[pself->TDI_numLeft%sizeof(colorTable)] ;
+    }
+    MemUnlock(pself->GDI_display) ;
+
+    MemLock(OptrToHandle(@Strings)) ;
+
+    /* Randomly pick a new question by generating a random number and
+       then walking to the next free question */
+    num = TimerGetCount() % pself->TDI_numLeft + 1;
+    data = MemLock(pself->TDI_asked);
+    for (count = found = 0; count < pself->TDI_numEntries; count++) {
+        if (data[count] == 0) {
+            found++;
+            if (found == num)
+                break;
+        }
+    }
+    MemUnlock(pself->TDI_asked);
+
+    /* Record this question and display it */
+    pself->TDI_curQuestion = count;
+    @call self::MSG_THINKER_DOCUMENT_DISPLAY_ENTRY(count);
+
+    /* Set up the question in ask mode */
+    @call ConstructOptr(pself->GDI_display,
+        OptrToChunk(@DocumentAnswerStuff))::MSG_GEN_SET_NOT_USABLE(\
+        VUM_DELAYED_VIA_UI_QUEUE);
+    @call ConstructOptr(pself->GDI_display,
+        OptrToChunk(@DocumentAnswerButton))::MSG_GEN_SET_USABLE(\
+        VUM_DELAYED_VIA_UI_QUEUE);
+    @call ConstructOptr(pself->GDI_display,
+        OptrToChunk(@DocumentAnswerGroup))::MSG_GEN_UPDATE_VISUAL(
+        VUM_DELAYED_VIA_UI_QUEUE);
+    sprintf(buffer, LMemDeref(@QuestionsLeftString), pself->TDI_numLeft) ;
+    @call ConstructOptr(pself->GDI_display,
+        OptrToChunk(@DocQuestionsRemaining))::MSG_VIS_TEXT_REPLACE_ALL_PTR(\
+        buffer, 0) ;
+    @call ConstructOptr(pself->GDI_display,
+        OptrToChunk(@DocumentAnswerButton))::MSG_META_GRAB_FOCUS_EXCL();
+
+    MemUnlock(OptrToHandle(@Strings)) ;
+}
+
+/**********************************************************************
+ * MSG_THINKER_DOCUMENT_ANSWER_QUESTION                               *
+ **********************************************************************/
+@method ThinkerDocumentClass, MSG_THINKER_DOCUMENT_ANSWER_QUESTION
+{
+    /* User says he thinks he knows he has an answer */
+    /* Show the right/wrong choices */
+    @call ConstructOptr(pself->GDI_display,
+        OptrToChunk(@DocumentAnswerButton))::MSG_GEN_SET_NOT_USABLE(\
+        VUM_DELAYED_VIA_UI_QUEUE);
+    @call ConstructOptr(pself->GDI_display,
+        OptrToChunk(@DocumentAnswerStuff))::MSG_GEN_SET_USABLE(\
+        VUM_DELAYED_VIA_UI_QUEUE);
+    @call ConstructOptr(pself->GDI_display,
+        OptrToChunk(@DocumentAnswerCorrect))::MSG_META_GRAB_FOCUS_EXCL();
+}
+
+/**********************************************************************
+ * MSG_THINKER_DOCUMENT_QUIZ_QUESTION_RIGHT                           *
+ * MSG_THINKER_DOCUMENT_QUIZ_QUESTION_WRONG                           *
+ **********************************************************************/
+@method ThinkerDocumentClass, MSG_THINKER_DOCUMENT_QUIZ_QUESTION_RIGHT,
+                              MSG_THINKER_DOCUMENT_QUIZ_QUESTION_WRONG
+{
+    byte *data, value;
+
+    /* One less question down */
+    pself->TDI_numLeft--;
+
+    /* Record a right or wrong result */
+    if (message == MSG_THINKER_DOCUMENT_QUIZ_QUESTION_WRONG) {
+        pself->TDI_numWrong++;
+        value = QQV_WRONG;
+        PlaySimpleSound(SOUND_ID_WRONG, 5) ;
+    }
+    else {
+        pself->TDI_numRight++;
+        value = QQV_RIGHT;
+        PlaySimpleSound(SOUND_ID_RIGHT, 5) ;
+    }
+
+    /* Store a right or wrong in our array of answered questions */
+    data = MemLock(pself->TDI_asked);
+    data[pself->TDI_curQuestion] = value;
+    MemUnlock(pself->TDI_asked);
+
+    /* If any are left, go to the next question or show the totals */
+    if (pself->TDI_numLeft) {
+        @call self::MSG_THINKER_DOCUMENT_QUIZ_NEXT_QUESTION();
+    } else {
+        @call self::MSG_THINKER_DOCUMENT_QUIZ_TOTALS();
+    }
+}
+
+/**********************************************************************
+ * MSG_THINKER_DOCUMENT_QUIZ_TOTALS                                   *
+ **********************************************************************/
+@method ThinkerDocumentClass, MSG_THINKER_DOCUMENT_QUIZ_TOTALS
+{
+    char buffer[80] ;
+
+    /* Add the total right and wrong for the round into the absolute */
+    /* totals. */
+    pself->TDI_totalRight += pself->TDI_numRight;
+    pself->TDI_totalWrong += pself->TDI_numWrong;
+
+/*
+    if ((pself->TDI_totalRight+pself->TDI_totalWrong)==0)  {
+        @call oself::MSG_THINKER_DOCUMENT_STOP_QUIZ() ;
+    } else {
+*/
+        sprintf(buffer, "%d", pself->TDI_numRight + pself->TDI_numWrong) ;
+        /* Setup the final report */
+        @call ThisRoundAttempted::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(\
+            buffer, 0);
+        sprintf(buffer, "%d", pself->TDI_numRight) ;
+        @call ThisRoundCorrect::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(\
+            buffer, 0);
+        sprintf(buffer, "%d", pself->TDI_numWrong) ;
+        @call ThisRoundIncorrect::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(\
+            buffer, 0);
+        if ((pself->TDI_numRight+pself->TDI_numWrong)==0)
+            strcpy(buffer, "--- %") ;
+        else
+            sprintf(buffer, "%d %%", pself->TDI_numRight*100/(pself->TDI_numRight+pself->TDI_numWrong)) ;
+        @call ThisRoundPercent::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(\
+            buffer, 0);
+        sprintf(buffer, "%d", pself->TDI_totalRight + pself->TDI_totalWrong) ;
+        @call TotalAttempted::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(\
+            buffer, 0);
+        sprintf(buffer, "%d", pself->TDI_totalRight) ;
+        @call TotalCorrect::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(\
+            buffer, 0);
+        sprintf(buffer, "%d", pself->TDI_totalWrong) ;
+        @call TotalIncorrect::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(\
+            buffer, 0);
+        if ((pself->TDI_totalRight+pself->TDI_totalWrong)==0)
+            strcpy(buffer, "--- %") ;
+        else
+            sprintf(buffer, "%d %%", pself->TDI_totalRight*100/(pself->TDI_totalRight+pself->TDI_totalWrong)) ;
+        @call TotalPercent::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(\
+            buffer,
+            0);
+
+        /* If any are wrong, allow the quiz to be continued */
+        if ((pself->TDI_numWrong)||(pself->TDI_numLeft)) {
+            @call QuizContinueButton::MSG_GEN_SET_ENABLED(VUM_NOW);
+        } else {
+            @call QuizContinueButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+        }
+
+        /* Show the summary dialog now it is setup */
+        PlaySimpleSound(SOUND_ID_SUMMARY, 5) ;
+        @call SummaryDialog::MSG_GEN_INTERACTION_INITIATE();
+/*
+    }
+*/
+}
+
+/**********************************************************************
+ * MSG_THINKER_DOCUMENT_CONTINUE_QUIZ                                 *
+ **********************************************************************/
+@method ThinkerDocumentClass, MSG_THINKER_DOCUMENT_CONTINUE_QUIZ
+{
+    word count;
+    byte *data;
+
+    /* Go through and mark all the wrong answers as not answered
+       so another round of testing can continue */
+    if (pself->TDI_numLeft == 0) {
+        pself->TDI_numLeft = pself->TDI_numWrong;
+
+        data = MemLock(pself->TDI_asked);
+        for (count = 0; count < pself->TDI_numEntries; count++) {
+            if (data[count] == QQV_WRONG) {
+                data[count] = QQV_NOT_ANSWERED;
+            }
+        }
+        MemUnlock(pself->TDI_asked);
+    }
+
+    /* Reset the right/wrong counters */
+    pself->TDI_numRight = 0;
+    pself->TDI_numWrong = 0;
+
+    /* Get rid of the summary dialog */
+    @call SummaryDialog::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+
+    /* Immediate move to the next quizing */
+    @call self::MSG_THINKER_DOCUMENT_QUIZ_NEXT_QUESTION();
+}
+
+/**********************************************************************
+ * MSG_THINKER_DOCUMENT_RESTART_QUIZ                                  *
+ * MSG_THINKER_DOCUMENT_STOP_QUIZ                                     *
+ **********************************************************************/
+@method ThinkerDocumentClass, MSG_THINKER_DOCUMENT_RESTART_QUIZ,
+                              MSG_THINKER_DOCUMENT_STOP_QUIZ
+{
+    /* Done with quiz.  Get rid of the quiz block and summary dialog */
+    MemFree(pself->TDI_asked);
+    pself->TDI_asked = NullHandle;
+    @call SummaryDialog::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+
+    /* If restarting the quiz, just start over now */
+    /* Otherwise, we put everything back into editor mode */
+    if (message == MSG_THINKER_DOCUMENT_RESTART_QUIZ) {
+        @call self::MSG_THINKER_DOCUMENT_START_QUIZ();
+    } else {
+        /* Turn off the answer buttons */
+        @call ConstructOptr(pself->GDI_display,
+            OptrToChunk(@DocumentAnswerButton))::MSG_GEN_SET_NOT_USABLE(\
+            VUM_DELAYED_VIA_UI_QUEUE);
+        @call ConstructOptr(pself->GDI_display,
+            OptrToChunk(@DocumentQuizTopLine))::MSG_GEN_SET_NOT_USABLE(\
+            VUM_DELAYED_VIA_UI_QUEUE);
+        @call ConstructOptr(pself->GDI_display,
+            OptrToChunk(@DocStopQuizButton))::MSG_GEN_SET_NOT_USABLE(\
+            VUM_DELAYED_VIA_UI_QUEUE);
+        @call ConstructOptr(pself->GDI_display,
+            OptrToChunk(@DocumentAnswerButtonBar))::MSG_GEN_SET_NOT_USABLE(\
+            VUM_DELAYED_VIA_UI_QUEUE);
+        @call ConstructOptr(pself->GDI_display,
+            OptrToChunk(@DocButtonGroup))::MSG_GEN_SET_USABLE(\
+            VUM_DELAYED_VIA_UI_QUEUE);
+        @call ConstructOptr(pself->GDI_display,
+            OptrToChunk(@DocumentNonQuizTopLine))::MSG_GEN_SET_USABLE(\
+            VUM_DELAYED_VIA_UI_QUEUE);
+        @call ConstructOptr(pself->GDI_display,
+            OptrToChunk(@DocumentAnswerStuff))::MSG_GEN_SET_USABLE(\
+            VUM_DELAYED_VIA_UI_QUEUE);
+        @call ThinkerGoToEdit::MSG_GEN_SET_NOT_ENABLED(
+            VUM_DELAYED_VIA_UI_QUEUE);
+
+        /* Jump to the first entry of the database */
+        @call self::MSG_THINKER_DOCUMENT_DISPLAY_ENTRY(0);
+    }
+}
+
+@method ThinkerDocumentClass, MSG_THINKER_DOCUMENT_EDIT
+{
+    if (PwdCheckPasswordInINI("thinker", "pwd", TRUE, TRUE))
+        @call oself::MSG_THINKER_DOCUMENT_STOP_QUIZ() ;
+}

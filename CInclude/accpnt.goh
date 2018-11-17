@@ -1,0 +1,715 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	socket
+MODULE:		access point database
+FILE:		accpnt.goh
+
+AUTHOR:		Eric Weber, May 24, 1995
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	EW	5/24/95   	Initial version.
+
+DESCRIPTION:
+	C API for managing access points
+
+	$Id: accpnt.goh,v 1.1 97/04/04 15:59:34 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#ifndef __ACCPNT_GOH_
+#define __ACCPNT_GOH_ 1
+
+@deflib accpnt
+
+/*
+ * Each access point has an ID number, which applications should use to
+ * identify it.  This number does not change over the life of the access
+ * point, and no two access points have the same ID.  ID numbers are assigned
+ * sequentially from 1 to 65535.  If an access point is deleted, it's
+ * ID will not be reused unless all 65535 possible IDs have been exhausted,
+ * in which case currently unused values starting with 1 again will be
+ * assigned.
+ *
+ * ID 0 will never be assigned.  It is used by the controller and various
+ * API routines as a canonical invalid ID number.
+*/
+#define ACCESS_POINT_INVALID_ID	0
+
+/*
+ *  what type of access an access point defines
+ */
+/* enum AccessPointType */
+typedef enum {
+    APT_INTERNET = 0x1,
+    APT_TERMINAL,
+    APT_TELNET,
+    APT_APP_LOCAL,
+
+    /* new for Lizzy */
+    APT_CALLING_CARD
+} AccessPointType;
+
+
+/* an obsolete alias for APT_APP_LOCAL */
+#define APT_RESPONDER APT_APP_LOCAL
+#define APT_ALL	(0)
+
+/*
+ *  some common property strings
+ *
+ * Any access point function requesting a property name as a far pointer,
+ * can also accept a "pointer" with segment=0 and
+ * offset=AccessPointStandardProperty.  Any APSP can be combined with
+ * APSP_AUTOMATIC to make an alternative form of the name.  This library
+ * puts no special interpretation on temporary names, but they are intended
+ * to represent values which are obtained from automatic configuration and
+ * not from the user.
+ *
+ */
+/* enum AccessPointStandardProperty */
+typedef enum {
+    APSP_NAME = 0x0,
+    APSP_PHONE = 0x2,
+    APSP_USER = 0x4,
+    APSP_SECRET = 0x6,
+    APSP_ADDRESS = 0x8,
+    APSP_MASK = 0xa,
+    APSP_GATEWAY = 0xc,
+    APSP_DNS1 = 0xe,
+    APSP_DNS2 = 0x10,
+    APSP_DATA_BITS = 0x12,
+    APSP_STOP_BITS = 0x14,
+    APSP_PARITY = 0x16,
+    APSP_DUPLEX = 0x18,
+    APSP_MODEM_INIT = 0x1a,
+    APSP_BS = 0x1c,
+    APSP_HOSTNAME = 0x1e,
+    APSP_INTERNET_ACCPNT = 0x20,
+    APSP_PROMPT_SECRET = 0x22,
+
+    /*
+     * Special values 
+     */
+    APSP_AUTOMATIC = 0x4000,   /* see above for description */
+    APSP_UNDEFINED = 0xffff,   /* for change notification only */
+
+    /* 
+     * The following types are new for Lizzy.  Using them on an earlier
+     * release will cause a fatal error.
+     */
+    APSP_USE_LOGIN_APP = 0x24,
+    APSP_LOGIN_APP_NAME = 0x26,
+    APSP_SCRIPT_NAME = 0x28,
+    APSP_CCARD_NAME = 0x2a,
+    APSP_CCARD_ACCESS = 0x2c,
+    APSP_CCARD_ID = 0x2e,
+    APSP_CCARD_PREFIX = 0x30,
+    APSP_CCARD_SEQUENCE = 0x32,
+
+    APSP_COMPRESSION = 0x34,
+    APSP_BEARER_CAPABILITY = 0x36,
+    APSP_LINE_END = 0x38,
+
+    /* New for GPC */
+    APSP_USE_DIALING_OPTIONS = 0x3a,	/* Int value, non-zero to enable */
+    APSP_LOCAL_DIALING_OPTIONS = 0X3c,  /* AccessPointLocalDialingOptions */
+
+} AccessPointStandardProperty;
+
+/* enum AccessPointChangeType */
+typedef enum {
+    APCT_CREATE = 0x0,     /*  access pnt created */
+    APCT_DESTROY = 0x2,    /*  access pnt destroyed */
+    APCT_PROPERTY = 0x4,   /*  prop value changed */
+    APCT_MULTI_DESTROY = 0x6, /* multiple accpnts destroyed */
+	/* If change type is APCT_MULTI_DESTROY, APCD_id field is the
+	 * number of access points which were deleted, and an array of
+	 * access point IDs is stored starting at APCD_property.
+	 */
+    APCT_LOCK = 0x8,       /* lock status of an access point changed */
+
+} AccessPointChangeType;
+
+/* enum AccessPointValueType */
+typedef enum {
+    APVT_INTEGER = 0x0,
+    APVT_STRING,
+    APVT_UNDEFINED = 0xffff,
+} AccessPointValueType;
+
+
+
+
+/*
+ *  data for GWNT_ACCESS_POINT_CHANGE
+ */
+typedef struct {
+    /*  what kind of change occurred */
+    AccessPointChangeType	APCD_changeType;
+    /*  which access point changed - or number of changed points */
+    word	APCD_id;
+    /*  the type of the access point */
+    AccessPointType	APCD_accessType;
+    /* 
+     * If the change type is not APCT_PROPERTY, this field has no meaning
+     * and may contain arbitrary values.
+     *
+     * For APCT_PROPERTY, this field contains the standard property value
+     * if it is known, and APSP_UNDEFINED if it is unknown.
+     *
+     * The standard property will only be known if an APSP constant
+     * was explicitly passed to an accpnt routine.  If a custom string
+     * which happens to be identical to a standard property is used,
+     * the coincidence will not be detected.  
+     */
+    AccessPointStandardProperty	APCD_stdProperty;
+    /* 
+     * If change type is APCT_PROPERTY, the null terminated name of the
+     * property follows this structure.
+     *
+     * If change type is APCT_MULTI_DESTROY, the array of ID numbers
+     * follows this structure.
+     *
+     */
+} AccessPointChangeDescription;
+
+typedef WordFlags AccessPointControlFeatures;
+/* 13 bits unused */
+/*  put edit/create/delete on seperate subgroup */
+#define APCF_TWOLEVEL   (0x04)
+/*  edit, create, and delete triggers */
+#define APCF_EDIT	(0x02)
+/*  list of access points */
+#define APCF_LIST	(0x01)
+
+
+/*
+ * These types are used in AccessPointSetDialingOptions() and
+ * AccessPointGetDialingOptions().
+ */
+typedef enum {		/* Byte */
+    APDM_TONE = 'T',
+    APDM_PULSE = 'P'
+} AccessPointDialingMethod;
+
+/* These lengths do not include zero byte termination */
+#define APDO_AREA_CODE_LEN	3
+#define APDO_CALL_WAITING_LEN	10
+#define APDO_OUTSIDE_LINE_LEN	10
+
+typedef struct {
+    TCHAR APDO_areaCode[APDO_AREA_CODE_LEN+1];		/* null terminated */
+    TCHAR APDO_callWaiting[APDO_CALL_WAITING_LEN+1];	/* null terminated */
+    TCHAR APDO_outsideLine[APDO_OUTSIDE_LINE_LEN+1];	/* null terminated */
+    byte APDO_dialMethod;			/* AccessPointDialingMethod */
+    byte APDO_tenDigit;				/* Boolean */
+    byte APDO_waitForDialtone;			/* Boolean */
+} AccessPointDialingOptions;
+
+/* record AccessPointLocalDialingOptions */
+typedef WordFlags AccessPointLocalDialingOptions;
+#define APLDO_OMIT_ONE_FOR_LONG_DISTANCE	0x0002
+#define APLDO_ALWAYS_ADD_AREA_CODE		0x0001
+
+/*
+ *  controller for selecting an access point
+ */
+@class  AccessPointControlClass, GenControlClass;
+
+/*
+ *  Set the APSI_type instance data
+ * 
+ *  Pass:	cx	= AccessPointType
+ *  Return:	nothing
+ *  Destroyed:	nothing
+ */
+@message void MSG_ACCESS_POINT_CONTROL_SET_TYPE(AccessPointType apt = cx);
+
+/*
+ *  Get APSI_type
+ * 
+ *  Pass:	nothing
+ *  Return:	ax	= AccessPointType
+ *  Destroyed:	nothing
+ */
+@message AccessPointType MSG_ACCESS_POINT_CONTROL_GET_TYPE() = ax;
+
+/*
+ *  Get the current selection
+ * 
+ *  Pass:	nothing
+ *  Return:	selection ID (0 if no selection)
+ * 		carry set if no selection
+ *  Destroyed:	nothing
+ */
+@message word MSG_ACCESS_POINT_CONTROL_GET_SELECTION() = ax;
+
+/*
+ *  Get the current selection
+ * 
+ *  Pass:	id = selection ID
+ *  Return:	carry set if not in list
+ *  Destroyed:	nothing
+ */
+@message void MSG_ACCESS_POINT_CONTROL_SET_SELECTION(word id = cx);
+
+/*
+ *  Get the ASPCI_editMsg
+ * 
+ *  Pass:	nothing
+ *  Return:	edit message number
+ *  Destroyed:	nothing
+ */
+@message word MSG_ACCESS_POINT_CONTROL_GET_EDIT_MSG() = ax;
+
+/*
+ *  Set the ASPCI_editMsg
+ * 
+ *  Pass:	msg = edit message number
+ *  Return:	nothing
+ *  Destroyed:	nothing
+ */
+@message void MSG_ACCESS_POINT_CONTROL_SET_EDIT_MSG(word msg = cx);
+
+/*
+ *  Send the edit messge to the controller's output
+ * 
+ *  Pass:	id = access point to edit
+ *  Return:	nothing
+ *  Destroyed:	nothing
+ */
+@message void MSG_ACCESS_POINT_CONTROL_SEND_EDIT_MSG(word id = cx);
+
+/*
+ *  Get the ASPCI_enableDisable
+ * 
+ *  Pass:	nothing
+ *  Return:	object to enable
+ *  Destroyed:	nothing
+ */
+@message optr MSG_ACCESS_POINT_CONTROL_GET_ENABLE_DISABLE() = cx:dx;
+
+/*
+ *  Set the ASPCI_enableDisable
+ * 
+ *  Pass:	obj = object to enable
+ *  Return:	nothing
+ *  Destroyed:	nothing
+ */
+@message void MSG_ACCESS_POINT_CONTROL_SET_ENABLE_DISABLE(optr obj = cx:dx);
+
+/*  
+ * One of the two-level triggers has been activated, and the controller
+ * should exchange icons and update vardata.  Should not be used
+ * externally.
+ */
+@message void MSG_ACCESS_POINT_CONTROL_CHANGING_LEVELS();
+
+/*
+ * The user has changed the dynamic list's selection.  Should only be sent
+ * by the list object.  Returns the selection ID.
+ */
+@message word MSG_ACCESS_POINT_CONTROL_UPDATE_SELECTION(word index = cx) = cx;
+
+@protominor AccessNewForMultiselection
+
+/*
+ * Get the current number of selections in the access point list.
+ * Returns zero if there is no selection.
+ */
+@message word MSG_ACCESS_POINT_CONTROL_GET_NUM_SELECTIONS() = ax;
+
+/*
+ * Return the current list of selection IDs.  The caller must allocate 
+ * a buffer for the entries and pass the size of the buffer.  If 
+ * there is insufficient space in the passed buffer for the IDs, 
+ * the buffer will not be filled in.  
+ * Call MSG_ACCESS_POINT_CONTROL_GET_NUM_SELECTIONS if you don't
+ * know the number of selections beforehand.  If you are using an
+ * exclusive list in the Access Point Controller, or know that the
+ * access point list has none or one item selected, an easier way
+ * to get the selection is to call MSG_ACCESS_POINT_CONTROL_GET_SELECTION.
+ */
+@message word MSG_ACCESS_POINT_CONTROL_GET_MULTIPLE_SELECTIONS(
+			  word *buffer = cx:dx, 
+			  word maxIDs = bp) = ax;
+
+@protoreset
+
+/*
+ * adds HINT_ITEM_GROUP_MINIMIZE_SIZE to the dynamic list inside the
+ * controller's UI
+ */
+@vardata void HINT_ACCESS_POINT_CONTROL_MINIMIZE_SIZE;
+
+/*
+ * Null-terminated string to be used as a moniker for the dynamic list.
+ */
+@vardata ChunkHandle ATTR_ACCESS_POINT_CONTROL_LIST_MONIKER;
+
+/*
+ * The ID of the current selection.
+ */
+@vardata word ATTR_ACCESS_POINT_CONTROL_SELECTION;
+
+/*
+ * On a controller with APCF_TWOLEVEL, indicates that the edit buttons
+ * are active and APCI_defineParent is inactive.  If present when the
+ * controller is built, the second level will be initially usable.  In 
+ * this case, the APCI_defineParent should not be usable.
+ */
+@vardata void ATTR_ACCESS_POINT_CONTROL_SECOND_LEVEL_ACTIVE;
+
+/*
+ * ATTR_GEN_CONTROL_APP_UI is used internally to ensure proper cleanup
+ * of the two-level trigger.  Applications should not use this attribute.
+ */
+
+@protominor AccessNewForMultiselection
+
+/*
+ * Causes the dyanmic list inside the controller's ui to be non-exclusive.
+ */
+@vardata void HINT_ACCESS_POINT_CONTROL_MULTISELECTABLE;
+
+@protoreset
+
+/*  type of access point to be displayed */
+@instance AccessPointType	APCI_type = APT_INTERNET;
+
+/*
+ *  message sent to output when a value should be edited
+ * 
+ *  Pass:		cx	= access point ID to edit
+ *  Return:		nothing
+ * */
+@instance word	APCI_editMsg = 0;
+
+/*  parent object for the "define" two level trigger */
+@instance optr	APCI_defineParent = 0;
+
+/*  menu slot in which the trigger should be placed */
+@instance word	APCI_defineSlot = 0;
+
+/*  object to enable when at least one access point exists */
+@instance optr	APCI_enableDisable = 0;
+
+/*  
+ * Bitmap lptr or ComplexMonikerBitmap to be exchanged with
+ * ComplexMoniker icon when switching between viewing mode and edit
+ * mode.  A value of 0 means do not change icon.  This field has no
+ * effect unless APCF_TWOLEVEL is set, and the controller is a
+ * ComplexMoniker.
+ */
+@instance word APCI_altBitmap = 0;
+
+@endc /* AccessPointControlClass */
+/*
+ *  generic API for manipulating properties
+ */
+
+extern  word _pascal AccessPointCreateEntry(word loc, 
+					    AccessPointType apt);
+/*
+ * SYNOPSIS:	Create an access point
+ *
+ * PASS:	loc = access point before which to insert (0 for end)
+ * 		apt = type of access point to create
+ * RETURN:	new access point id
+ */
+
+extern	Boolean _pascal AccessPointDestroyEntry(word id);
+extern	Boolean _pascal AccessPointDestroyEntryDirect(word id);
+/* 
+ * SYNOPSIS:	Destroy an access point
+ *
+ * PASS:	id = access point to remove
+ * RETURN:	TRUE if error 
+ *	    	    (no such access point or access point is locked)
+ */
+
+extern  AccessPointType _pascal AccessPointGetType(word id);
+/* 
+ * SYNOPSIS:	Get the access point type
+ *
+ * PASS:	id = access point to get type of
+ * RETURN:	type of requested access point
+ */
+
+extern Boolean _pascal AccessPointSetStringProperty(word id, 
+						 char *prop,
+						 TCHAR *val);
+extern Boolean _pascal AccessPointSetStringPropertyDirect(word id, 
+						 char *prop,
+						 TCHAR *val);
+/* 
+ * SYNOPSIS:	Set a string property on an access point
+ *
+ * PASS:	id = access point to modify
+ * 		prop = name of property, or AccessPointStandardProperty
+ *		val = new value for property
+ * 
+ * RETURN:	TRUE if error 
+ *	    	    (no such access point or access point is locked)
+ */
+
+extern Boolean _pascal AccessPointSetIntegerProperty(word id,
+						  char *prop,
+						  int val);
+extern Boolean _pascal AccessPointSetIntegerPropertyDirect(word id,
+						  char *prop,
+						  int val);
+/* 
+ * SYNOPSIS:	Set a integer property on an access point
+ * 
+ * PASS:	id = access point to modify
+ * 		prop = name of property, or AccessPointStandardProperty
+ *		val = new value for property
+ * 
+ * RETURN:	TRUE if error 
+ *	    	    (no such access point or access point is locked)
+ */
+
+
+extern Boolean _pascal AccessPointGetStringPropertyBlock(word id, 
+						        char *prop,
+							MemHandle *data,
+							int *datalen);
+extern Boolean _pascal AccessPointGetStringPropertyBlockDirect(word id, 
+						        char *prop,
+							MemHandle *data,
+							int *datalen);
+/*
+ * SYNOPSIS:	Get a string property on an access point
+ * 
+ * PASS:	id = access point to read
+ *		prop = name of property, or AccessPointStandardProperty
+ *		data = block in which to put data (0 to allocate)
+ *		datalen = buffer for data size
+ * 
+ * RETURN:	TRUE if error
+ *              data = block containing data
+ *		datalen = length of data excluding NULL
+ */
+
+extern Boolean _pascal AccessPointGetStringPropertyBuffer(word id,
+						       char *prop,
+						       char *buf,
+						       int *datalen);
+extern Boolean _pascal AccessPointGetStringPropertyBufferDirect(word id,
+						       char *prop,
+						       char *buf,
+						       int *datalen);
+/*
+ * SYNOPSIS:	Get a string property on an access point
+ * 
+ * PASS:	id = access point to read
+ *		prop = name of property, or AccessPointStandardProperty
+ *		buf = buffer to hold data
+ *		datalen = size of buffer in bytes
+ *
+ * RETURN:	TRUE if error
+ *		data filled in
+ *		datalen = length of data in chars
+ *
+ * note that you pass a size and get back a length
+ * it's weird, but it's consistent with InitFileReadStringBuffer
+ */
+
+extern Boolean _pascal AccessPointGetIntegerProperty(word id,
+						     char *prop,
+						     int *val);
+extern Boolean _pascal AccessPointGetIntegerPropertyDirect(word id,
+						     char *prop,
+						     int *val);
+/*
+ * SYNOPSIS:	Get a integer property on an access point
+ *
+ * PASS:	id = access point to read
+ *		prop = name of property, or AccessPointStandardProperty
+ *		val = buffer to hold value
+ *
+ * RETURN:	TRUE if error
+ *		val filled in
+ */
+
+extern Boolean _pascal AccessPointDestroyProperty(word id, char *prop);
+extern Boolean _pascal AccessPointDestroyPropertyDirect(word id, char *prop);
+/*
+ * SYNOPSIS:	Destroy one property of an access point
+ *
+ * PASS:	id = access point to read
+ *		prop = name of property, or AccessPointStandardProperty
+ *
+ * RETURN:	TRUE If error
+ *	    	    (no such access point or access point is locked)
+ */
+
+extern ChunkHandle _pascal AccessPointGetEntries(MemHandle mh,
+						 ChunkHandle chunk,
+						 AccessPointType apt);
+/*
+ * SYNOPSIS:	Get a chunk array of entry IDs of a given type
+ *
+ * PASS:	mh = block containing chunk aray (locked)
+ * 		chunk = chunk of chunk array, or 0 to allocate
+ *		apt = type of entries to list
+ *
+ * RETURN:	handle of alloated array
+ */
+
+extern Boolean _pascal
+    AccessPointCompareStandardProperty(AccessPointStandardProperty prop,
+				       char *str);
+/*
+ * SYNOPSIS:	Compare a string to a standard property name
+ *
+ * PASS:	prop - standard property to check
+ *		str - string to compare standard property name to
+ *
+ * RETURN:	TRUE if identical
+ */
+
+extern void _pascal AccessPointCommit(void);
+/*
+ * SYNOPSIS:	force database to be written to disk
+ * 
+ * PASS:	nothing
+ * RETURN:	nothing
+ *
+ * This happens automaticly during shutdown, so this call is mainly useful
+ * when debugging, where the system is likely to crash before committing.
+ */
+
+extern Boolean _pascal AccessPointIsEntryValid(word id);
+extern Boolean _pascal AccessPointIsEntryValidDirect(word id);
+/*
+ * SYNOPSIS:    Determine whether an access point exists
+ *
+ * PASS:        id - access point ID to verify
+ * RETURN:      TRUE if access point exists, FALSE if it does not
+ */
+
+/*-----------------------------------------------------------------------
+ *   Routines below this line are not available on Communicators 
+ *   shipped before January 1997.  (pragmas excepted)
+ *----------------------------------------------------------------------*/
+
+extern void _pascal AccessPointLock (word id);
+extern void _pascal AccessPointLockDirect (word id);
+/*
+ * SYNOPSIS:	Lock an access point, preventing changes to it.
+ *	    	Automatic properties may still be modified.
+ *
+ * PASS:    	id - access point to lock
+ * RETURN:  	nothing
+ */
+
+extern void _pascal AccessPointUnlock (word id); 
+extern void _pascal AccessPointUnlockDirect (word id); 
+/* 
+ * SYNOPSIS:	Unlock an access point.
+ *
+ * PASS:    	id - access point to unlock
+ * RETURN:  	nothing
+ */
+
+extern Boolean _pascal AccessPointInUse (word id);
+extern Boolean _pascal AccessPointInUseDirect (word id);
+/*
+ * SYNOPSIS:    Check if an access point is being used by a connection.
+ * 
+ * PASS:        id - access point to check
+ * RETURN:      TRUE if access point is in use, FALSE if it is not
+ */
+
+extern word _pascal AccessPointGetActivePoint (word tp);
+extern Boolean _pascal AccessPointSetActivePoint (word id, word tp);
+
+/*
+ * SYNOPSIS:	Set the dialing options to be used if
+ *		APSP_USE_DIALING_OPTIONS is set non-zero for access point.
+ *
+ * PASS:	pOptions - pointer to options structure.
+ * RETURN:	nothing
+ */
+extern void _pascal AccessPointSetDialingOptions(
+    AccessPointDialingOptions *pOptions);
+
+/*
+ * SYNOPSIS:	Get the dialing options to be used if
+ *		APSP_USE_DIALING_OPTIONS is set non-zero for access point.
+ *
+ * PASS:	pOptions - pointer to options structure to be filled in.
+ * RETURN:	nothing
+ */
+extern void _pascal AccessPointGetDialingOptions(
+    AccessPointDialingOptions *pOptions);
+
+/*
+ * SYNOPSIS:	Return the phone string (stored in APSP_PHONE) with
+ *		dialing options applied for the currently set
+ *		access point.  Options will only be applied
+ *		if (1) they are set (may be in INI file) and (2) if
+ *		APSP_USE_DIALING_OPTIONS is set non-zero for access point.
+ *
+ * PASS:	id - access point ID
+ *		pStringHan - pointer to handle in which to store phone
+ *			number string.  If NULL, a block will be allocated.
+ *		datalen - set to length of phone string if successful.
+ * RETURN:	TRUE if APSP_PHONE is set, FALSE otherwise.
+ */
+extern Boolean _pascal AccessPointGetPhoneStringWithOptions(word id,
+    MemHandle *pStringHan, int *datalen);
+
+@endlib
+
+#ifdef __HIGHC__
+pragma Alias(AccessPointCreateEntry,"ACCESSPOINTCREATEENTRY");
+pragma Alias(AccessPointDestroyEntry,"ACCESSPOINTDESTROYENTRY");
+pragma Alias(AccessPointDestroyEntryDirect,"ACCESSPOINTDESTROYENTRYDIRECT");
+pragma Alias(AccessPointGetType,"ACCESSPOINTGETTYPE");
+pragma Alias(AccessPointSetStringProperty,"ACCESSPOINTSETSTRINGPROPERTY");
+pragma Alias(AccessPointSetStringPropertyDirect,"ACCESSPOINTSETSTRINGPROPERTYDIRECT");
+pragma Alias(AccessPointSetIntegerProperty,"ACCESSPOINTSETINTEGERPROPERTY");
+pragma Alias(AccessPointSetIntegerPropertyDirect,"ACCESSPOINTSETINTEGERPROPERTYDIRECT");
+pragma Alias(AccessPointGetStringPropertyBlock,"ACCESSPOINTGETSTRINGPROPERTYBLOCK");
+pragma Alias(AccessPointGetStringPropertyBlockDirect,"ACCESSPOINTGETSTRINGPROPERTYBLOCKDIRECT");
+pragma Alias(AccessPointGetStringPropertyBuffer,"ACCESSPOINTGETSTRINGPROPERTYBUFFER");
+pragma Alias(AccessPointGetStringPropertyBufferDirect,"ACCESSPOINTGETSTRINGPROPERTYBUFFERDIRECT");
+pragma Alias(AccessPointGetIntegerProperty,"ACCESSPOINTGETINTEGERPROPERTY");
+pragma Alias(AccessPointGetIntegerPropertyDirect,"ACCESSPOINTGETINTEGERPROPERTYDIRECT");
+pragma Alias(AccessPointDestroyProperty,"ACCESSPOINTDESTROYPROPERTY");
+pragma Alias(AccessPointDestroyPropertyDirect,"ACCESSPOINTDESTROYPROPERTYDIRECT");
+pragma Alias(AccessPointGetEntries,"ACCESSPOINTGETENTRIES");
+pragma Alias(AccessPointCompareStandardProperty,"ACCESSPOINTCOMPARESTANDARDPROPERTY");
+pragma Alias(AccessPointCommit,"ACCESSPOINTCOMMIT");
+
+pragma Alias(AccessPointIsEntryValid, "ACCESSPOINTISENTRYVALID");
+pragma Alias(AccessPointIsEntryValidDirect, "ACCESSPOINTISENTRYVALIDDIRECT");
+pragma Alias(AccessPointLock, "ACCESSPOINTLOCK");
+pragma Alias(AccessPointLockDirect, "ACCESSPOINTLOCKDIRECT");
+pragma Alias(AccessPointUnlock, "ACCESSPOINTUNLOCK");
+pragma Alias(AccessPointUnlockDirect, "ACCESSPOINTUNLOCKDIRECT");
+pragma Alias(AccessPointInUse, "ACCESSPOINTINUSE");
+pragma Alias(AccessPointInUseDirect, "ACCESSPOINTINUSEDIRECT");
+
+pragma Alias(AccessPointGetActivePoint, "ACCESSPOINTGETACTIVEPOINT");
+pragma Alias(AccessPointSetActivePoint, "ACCESSPOINTSETACTIVEPOINT");
+
+pragma Alais(AccessPointSetDialingOptions, "ACCESSPOINTSETDIALINGOPTIONS");
+pragma Alais(AccessPointGetDialingOptions, "ACCESSPOINTGETDIALINGOPTIONS");
+pragma Alias(AccessPointGetPhoneStringWithOptions,
+	     "ACCESSPOINTGETPHONESTRINGWITHOPTIONS");
+
+#endif
+
+#endif

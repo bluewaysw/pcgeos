@@ -1,0 +1,701 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+FILE:		powerDr.def
+
+DECLARER:	Kernel
+
+DESCRIPTION:
+	This file defines structures and routines intended for power
+	management drivers.
+
+	$Id: powerDr.def,v 1.1 97/04/04 14:13:07 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__POWERDR
+
+include driver.def
+
+;---
+
+StartDriver	power
+
+ifndef HARDWARE_TYPE
+HARDWARE_TYPE	equ	<PC>
+endif
+
+;
+; Protocol number for this interface. Adjust the final numbers, below, if the
+; interface is changed.
+;
+POWER_PROTO_MAJOR equ DRIVER_PROTO_MAJOR+1
+POWER_PROTO_MINOR equ DRIVER_PROTO_MINOR+0
+
+;	Power management Driver calls
+;
+PowerManagementFunction 	etype word, DriverFunction, 2
+
+DR_POWER_IDLE	enum PowerManagementFunction
+;
+; Description:
+;	Called during the idle (dispatch) loop when there are no runnable
+;	threads.  The CPU can be turned off until the next IRQ happens.
+; Pass:
+;	none
+; Return:
+;	none
+; Destroy:
+;	di
+
+DR_POWER_NOT_IDLE	enum PowerManagementFunction
+;
+; Description:
+;	Called when an interrupt occurs and PC/GEOS is in the idle state.
+;	Drivers that slow (rather than stop) the clock on DR_POWER_IDLE should
+;	speed it up again on DR_POWER_NOT_IDLE.
+;
+; Responder:
+;	This is called by UnBlankScreens in input manager to notify the
+;	power driver that some user input is getting the machine out of
+;	SUSP_READY state.  There are other uses of this event in power driver
+;	finite state machine.
+;
+; Pass:
+;	none
+; Return:
+;	none
+; Destroy:
+;	di
+;
+
+DR_POWER_NOT_IDLE_ON_INTERRUPT_COMPLETION	enum PowerManagementFunction
+;
+; Description:
+;	Called when a thread has been woken up (usually as the result of an
+;	IRQ).  If the CPU has been halted in the DR_POWER_IDLE call, this
+;	provides notification that the CPU should not be idle when the
+;	interrupt completes. (Generally meaning that there is now a runnable
+;	thread.)
+; Pass:
+;	none
+; Return:
+;	none
+; Destroy:
+;	di
+
+DR_POWER_LONG_TERM_IDLE	enum	PowerManagementFunction
+;
+; Description:
+;	Called when the screen saver is about to be invoked, meaning that
+;	the user has done nothing for the screen saver idle time (typically
+;	one to five minutes).
+; Pass:
+;	none
+; Return:
+;	carry - set if machine has been turned off and has been awakened
+;		by new user activity (this causes the screen saver to be
+;		bypassed).
+; Destroy:
+;	di
+
+DR_POWER_GET_STATUS	enum	PowerManagementFunction
+;
+; Description:
+;	Return power management status
+; Pass:
+;	ax - PowerGetStatusType
+; Return:
+;	carry set if error (not supported)
+;	ax, bx, cx, dx - return value based on PowerGetStatusType
+; Destroy:
+;	di
+
+PowerGetStatusType	etype	word
+PGST_POWER_ON_WARNINGS		enum	PowerGetStatusType
+	; ax = PowerWarnings
+	; bx = mask of PowerWarnings flags supported
+PGST_POLL_WARNINGS		enum	PowerGetStatusType
+	; ax = PowerWarnings
+	; bx = mask of PowerWarnings flags supported
+PGST_STATUS			enum	PowerGetStatusType
+	; ax = PowerStatus
+	; bx = mask of PowerStatus flags supported
+PGST_BATTERY_CHARGE_MINUTES	enum	PowerGetStatusType
+	; dxax = battery life remaining (at normal use) in minutes
+PGST_BATTERY_CHARGE_PERCENT	enum	PowerGetStatusType
+	; dxax = battery power available, as compared to total: 0 to 1000
+	;	0 means none, 1000 means all
+;         (included below, commented here for completness)
+;PGST_BATTERY_CHARGE_MINUTES_BACKUP	enum	PowerGetStatusType
+;	; dxax = battery life remaining (at normal use) in minutes
+;PGST_BATTERY_CHARGE_PERCENT_BACKUP	enum	PowerGetStatusType
+;	; dxax = battery power available, as compared to total: 0 to 100
+;	;	0 means none, 1000 means all
+
+PowerWarnings	record
+    PW_MAIN_BATTERY:1			;Main battery is low
+    PW_BACKUP_BATTERY:1			;Backup battery is low
+    PW_PCMCIA_SLOT_1_BATTERY:1		;Battery on PCMCIA slot 1 is low
+    PW_PCMCIA_SLOT_2_BATTERY:1		;Battery on PCMCIA slot 2 is low
+    PW_PCMCIA_SLOT_3_BATTERY:1		;Battery on PCMCIA slot 3 is low
+    PW_PCMCIA_SLOT_4_BATTERY:1		;Battery on PCMCIA slot 4 is low
+    PW_CUSTOM_1:1
+    PW_CUSTOM_2:1
+    PW_CUSTOM_3:1
+    PW_CUSTOM_4:1
+    PW_CUSTOM_5:1
+    PW_CUSTOM_6:1
+    PW_CUSTOM_7:1
+    PW_CUSTOM_8:1
+    PW_CUSTOM_9:1
+    PW_CUSTOM_10:1
+PowerWarnings	end
+
+PowerStatus	record
+    PS_AC_ADAPTER_CONNECTED:1
+    PS_CHARGING:1
+    :14
+PowerStatus	end
+
+NUMBER_OF_STANDARD_POWER_WARNINGS = 7
+
+DR_POWER_SET_STATUS	enum	PowerManagementFunction
+;
+; Description:
+;	Set the power management status
+; Pass:
+;	bx - PowerSetStatusType
+;	dx:ax - value to set based on PowerSetStatusType
+; Return:
+;	carry set on error (not supported)
+; Destroy:
+;	di
+
+PowerSetStatusType      etype   word, 0, 2
+  PSST_BATTERY_STATUS	enum	PowerSetStatusType
+  ; Used to notify the power driver of changes in battery status.
+  ; Power driver will take appropriate actions on these notices.
+  ; ( e.g. responder power drv will disable suspend mode during battery
+  ;   recharge or go into reduced wake up when battery is low, etc...)
+  ;
+  ; AX - BatterySetStatus
+  ;
+  PSST_SUSPEND_STATUS	enum	PowerSetStatusType
+  ;
+  ; Used to disable/enable suspend in power manager.  A couonter will
+  ; be maintained and each disable request will increment the counter by 1.
+  ; (and of course enable request will decrement it).  When counter is >0,
+  ; suspend will be disabled.
+  ;
+  ; AX - SuspendSetStatus
+  ;
+  PSST_IDLE_STATUS		enum	PowerSetStatusType
+  ;
+  ; Modifies how the power driver behaves when the system is Idle.
+  ; Basically, dozing can be enabled or disabled.  Some power drivers
+  ; support the PARTIAL_DOZE mode which indicates that some form of DOZE is
+  ; enabled when the system is Idle, but it consumes more power than normal
+  ; DOZE mode.
+  ;
+  ; AX - IdleSetStatus
+  ;
+
+BatterySetStatus  	etype word, 0, 2
+  BSS_BATTERY_LOW    	enum  BatterySetStatus
+  BSS_BATTERY_OK     	enum  BatterySetStatus
+  BSS_RECHARGE_START 	enum  BatterySetStatus
+  BSS_RECHARGE_END   	enum  BatterySetStatus
+
+SuspendSetStatus	etype word
+  SSS_ENABLE		enum  SuspendSetStatus
+  SSS_DISABLE		enum  SuspendSetStatus
+  SSS_RELOAD		enum  SuspendSetStatus
+  ; restart suspend count-down
+  ; this means resetting long tern idle timer to initial value
+
+IdleSetStatus		etype word
+  ISS_DOZE_ENABLE	enum	IdleSetStatus	; Doze enabled on Idle
+  ISS_DOZE_DISABLE	enum	IdleSetStatus	; Doze disabled
+  ISS_PARTIAL_DOZE	enum	IdleSetStatus	; Enable "partial" doze mode,
+  						; a mode that, if supported,
+						; consumes more power then
+						; normal doze mode.
+
+
+DR_POWER_DEVICE_ON_OFF	enum PowerManagementFunction
+;
+; Description:
+;	Called when a device is going to be used or is finished being used.
+;
+;	NOTE: This function can also be reached by calling SysSendNotification
+;	passing si=SST_DEVICE_POWER, di=0, and ax-dx filled with these same
+;	parameters. SysSendNotification may not be called from interrupt
+;	code, however. For those cases where you're not in interrupt code,
+;	calling SysSendNotification allows you to not care if there's a
+;	power management driver loaded.
+;
+; Pass:
+;	ax - PowerDeviceType
+;	bx - unit number
+;	cx - non-zero if turning on device, zero if turning off
+;	dx - device specific data
+; Return:
+;	carry set if error (if turning off a device, carry will be clear)
+;		AX = PowerDeviceError
+;	
+;	NOTE: If you get an error turning on a device, you still need to
+;	      turn the device off anyway.
+;	
+; Destroy:
+;	di
+
+PowerDeviceError	etype	word
+	PDE_LOW_POWER		enum	PowerDeviceError
+	; The machine is too low on power to support the device
+
+	PDE_NO_SUCH_DEVICE	enum	PowerDeviceError
+	; The machine has no such device to turn on or off.
+
+PowerDeviceType		etype	word
+PDT_SERIAL_PORT		enum	PowerDeviceType
+	; Zoomer:	bx	= SerialPortNum
+	; All others: 	bx = 0 for COM1, 1 for COM2, ...
+	; For 3.0 and later:
+	; 		High bit set to indicate a passive serial connection:
+	; 		bx = 8000h for COM1_PASSIVE, 8001h for COM2_PASSIVE, ...
+	; 		dx = SerialPowerInfo if turning on. Ignored if turning
+	;		     off.
+	; 3.0+:
+	; 
+	; Different aspects of the serial port can be turned on at once. For
+	; example, the receive buffers can be enabled, while the transmit
+	; buffers are turned off. These are controlled by the SerialPowerInfo
+	; record. Once a port has been turned on, the enabled aspects are
+	; changed by calling DR_POWER_DEVICE_ON_OFF indicating the device
+	; should remain on, but providing a different SerialPowerInfo record.
+	;
+	; Only indicate the device should be powered off when the port is
+	; closed.
+	;
+	; NOTE: THE HANDLER FOR THIS DEVICE TYPE MUST RESIDE COMPLETELY IN
+	; FIXED MEMORY AS IT WILL BE CALLED FROM INTERRUPT CODE.
+	
+PDT_PARALLEL_PORT	enum	PowerDeviceType
+	; bx = 0 for LPT1, 1 for LPT2, ...
+PDT_PCMCIA_SOCKET	enum	PowerDeviceType
+	; Zoomer: 	bl = adapter #, bh = socket #
+	; All others:	bx = logical socket #
+	; dx = PCMCIAPowerInfo
+PDT_KEYBOARD		enum	PowerDeviceType
+	; (use to check whether or not a detachable keyboard is connected) 
+	; RETURN:	CF = set if no keyboard
+	;		     clear otherwise
+
+;         (included below, commented here for completness)
+;PDT_DISPLAY		enum	PowerDeviceType
+;	; bx = 0 for main display, 1 for secondary...
+	
+;PDT_SPEAKER		enum	PowerDeviceType
+;	; bx=0 for main speaker, 1 for secondary, etc etc etc
+
+;PDT_CPU		enum	PowerDeviceType
+
+;PDT_AC_ADAPTER		enum	PowerDeviceType
+
+;PDT_MAIN_BATTERY	enum	PowerDeviceType
+
+;PDT_BACKUP_BATTERY	enum	PowerDeviceType
+
+;PDT_MICROPHONE		enum	PowerDeviceType
+
+;PDT_TELEPHONE		enum	PowerDeviceType
+   
+    PCMCIAPowerInfo	record
+	:14
+	PCMCIAPI_WAKE_UP_ON_INTERRUPT:1
+	;Allow computer to be powered off, but arrange for the computer to
+	;wake up if the pcmcia card generates an interrupt.
+	
+	PCMCIAPI_NO_POWER_OFF:1
+	;Disables the ability to power off the computer while this is in use
+    PCMCIAPowerInfo	end
+	
+
+SerialPowerDeviceMode	etype	byte
+    SPDM_RS232		enum	SerialPowerDeviceMode
+    ; Connect UART to standard RS232-C interface
+    
+    SPDM_SHORT_IR	enum	SerialPowerDeviceMode
+    ; Connect UART to lower-power (i.e. short-range) Infrared transceiver
+    
+    SPDM_LONG_IR	enum	SerialPowerDeviceMode
+    ; Connect UART to high-power (i.e. long-range) Infrared transceiver
+
+SerialPowerInfo		record
+    :11
+
+    SPI_CONTROLS:1
+    ; Power needs to be applied to control signals
+
+    SPI_RECEIVE:1
+    ; Power needs to be applied for receiving data
+
+    SPI_TRANSMIT:1
+    ; Power needs to be applied for transmitting data
+
+    SPI_MODE SerialPowerDeviceMode:2
+    ; Device-specific mode for the port to be in. The contents and meaning of
+    ; this field are completely up to the platform, though some values are
+    ; suggested above (SerialPowerDeviceMode) to keep the code reasonably
+    ; sane.
+SerialPowerInfo		end
+
+DR_POWER_SET_PASSWORD_OLD	enum PowerManagementFunction
+DR_POWER_VERIFY_PASSWORD_OLD	enum PowerManagementFunction
+
+DR_POWER_ON_OFF_NOTIFY	enum PowerManagementFunction
+;
+; Description:
+;	register a call back routine (in non-movable memory) that will get 
+;		called when the power if going off or just come back on
+; Pass:
+;	dx:cx = fptr to call back routine
+;
+;		Routine called:
+;			PASS:
+;				ax = PowerNotifyChange
+;			RETURN:
+;				nothing
+;			DESTROY:
+;				nothing
+;
+; Return:
+;	carry set if too many routines already registered
+;
+; Destroy:
+;	nothing
+;
+
+PowerNotifyChange		etype	word
+PNC_POWER_SHUTTING_OFF		enum	PowerNotifyChange, 0
+PNC_POWER_TURNING_ON		enum	PowerNotifyChange, 1
+PNC_POWER_TURNED_OFF_AND_ON	enum	PowerNotifyChange, 2
+PNC_POWER_AUTO_OFF		enum	PowerNotifyChange, 3
+
+
+;--------------------------------------------
+;	Additional Bullet Password Commands
+;	DON'T USE THIS STUFF IF YOU ARE CODING FOR THE ZOOMER
+;--------------------------------------------
+DR_POWER_DISABLE_PASSWORD_OLD	enum	PowerManagementFunction
+DR_POWER_PASSWORD_OK_OLD	enum	PowerManagementFunction
+DR_POWER_RTC_ACK_OLD		enum	PowerManagementFunction
+
+DR_POWER_ON_OFF_UNREGISTER	enum	PowerManagementFunction
+;
+; Description:
+;	remove a previously registered callback routine
+; Pass:
+;	dx:cx = fptr to call back routine
+;
+; Return:
+;	carry set if no routine at that address found
+;
+; Destroy:
+;	nothing
+;
+
+DR_POWER_ESC_COMMAND		enum	PowerManagementFunction
+;
+; Descrption:
+;	Perform an ESC_COMMAND that may, or may not, be supported
+; Pass:
+;	si	-> PowerEscCommand to execute
+;	others	-> as command
+; Return:
+;	carry set if PowerEscCommand not supported
+;
+; Destroy:
+;	nothing
+;
+
+DR_POWER_LONG_TERM_IDLE_END	enum	PowerManagementFunction
+;
+; Description:
+;	Called by input manager to notify power management driver that
+;	video driver intends to unblank the screen.  Power driver should
+;	handle this by powering up video if appropriate
+;
+; Pass:
+;	none
+; Return:
+;	none  
+;
+
+		;
+		;  Additional enumerations
+PGST_BATTERY_CHARGE_MINUTES_BACKUP	enum	PowerGetStatusType
+	; dxax = battery life remaining (at normal use) in minutes
+PGST_BATTERY_CHARGE_PERCENT_BACKUP	enum	PowerGetStatusType
+	; dxax = battery power available, as compared to total: 0 to 100
+	;	0 means none, 1000 means all
+
+PDT_DISPLAY		enum	PowerDeviceType
+	; bx = 0 for main display, 1 for secondary...
+	
+PDT_SPEAKER		enum	PowerDeviceType
+	; bx=0 for main speaker, 1 for secondary, etc etc etc
+
+PDT_CPU		enum	PowerDeviceType
+
+PDT_AC_ADAPTER		enum	PowerDeviceType
+
+PDT_MAIN_BATTERY	enum	PowerDeviceType
+
+PDT_BACKUP_BATTERY	enum	PowerDeviceType
+
+PDT_MICROPHONE		enum	PowerDeviceType
+
+PDT_TELEPHONE		enum	PowerDeviceType
+
+
+
+protoreset
+
+
+;-----------------------------------------------------------------------------
+;		Escape Codes
+;-----------------------------------------------------------------------------
+
+PowerEscCommand				etype	word, 0, 2
+	POWER_ESC_PASSWORD_VERIFY	enum	PowerEscCommand
+	; Description:
+	;	Verify the BIOS password.
+	; Pass:
+	;	cx:dx - password to verify (size BIOS_PASSWORD_SIZE zero padded)
+	;	cx = dx = 0 - tests to see if password exists
+	; Return:
+	;	carry - set if error (function not supported)
+	;	ax - non-zero if passwords do not match
+	; Destroy:
+	;	di
+
+
+
+	POWER_ESC_PASSWORD_SET		enum	PowerEscCommand
+	;
+	; Description:
+	;	Set the BIOS password (if the BIOS supports a password).
+	; Pass:
+	;	cx:dx - password (size BIOS_PASSWORD_SIZE) (zero padded)
+	; Return:
+	;	carry - set if error
+	; Destroy:
+	;	di
+
+
+BIOS_PASSWORD_SIZE	=	8
+
+
+	POWER_ESC_PASSWORD_DISABLE	enum	PowerEscCommand
+	;	
+	; Description:
+	;	disable a password without setting a new one.
+	;
+	; Pass:
+	;	dx:cx = fptr to old password
+	;
+	; Return:
+	;	carry set if routine not supported
+	;	ax	<- PasswordDisableResult
+	;
+	; Destroy:
+	;	nothing
+	;
+
+PasswordDisableResult		etype	word
+
+PDR_PASSWORD_DISABLED		enum	PasswordDisableResult, 0
+PDR_PASSWORD_NOT_DISABLED	enum	PasswordDisableResult, 1
+
+
+
+	POWER_ESC_PASSWORD_OK		enum	PowerEscCommand
+	;
+	; Description:
+	;	Notify the power driver that a valid password has been entered
+	;	by the user, or that no password was necessary.  Sent by the
+	;	UI when resuming from shutdown
+
+
+
+	POWER_ESC_RTC_ACK		enum	PowerEscCommand
+	;
+	; Description:
+	;	Notify the power driver and the real-time clock hardware that
+	;	a real-time clock event has been handled.
+	;
+	; Pass:
+	;	nothing
+	;
+	; Return:
+	;	nothing
+	;
+	; Destroy:
+	;	nothing 
+
+
+	POWER_ON_OFF_PRESS		enum	PowerEscCommand
+	;
+	;  Description:
+	;	Notify the power driver that on-off button of the device
+	;	has been pressed.
+	;  Pass:
+	;	nothing
+	;  Return:
+	;	nothing
+	;  Destroy:
+	;	nothing
+	;
+
+	POWER_ESC_PASSWORD_MONITOR	enum	PowerEscCommand
+	;
+	;  Description:
+	;	Install or remove the monitor for checking various
+	;	Bad Person keys when the password dialog is up.
+	;  Pass:
+	;	cx = nonzero to install, zero to remove monitor
+	;  Return:
+	;	nothing
+	;  Destroy:
+	;	nothing
+	;
+
+	POWER_ESC_RELOAD_PREFERENCES	enum	PowerEscCommand
+	;
+	;  Description:
+	;	If the power driver has any preferences, this will
+	;	force the power driver to reload them.  This would
+	;	usually be sent from something such as a prefernces
+	;	module.
+	;  Pass:
+	;	nothing
+	;  Return:
+	;	nothing
+	;  Destroy:
+	;	nothing
+
+	POWER_ESC_NOTIFY_VIDEO_MODE_CHANGE	enum	PowerEscCommand
+	;
+	;  Description:
+	;	The video hardware has been set to a new mode.  The
+	;	video driver will notify the power driver of this in
+	;	case the driver needs to know about it.
+	;  Pass:
+	;	cx = new DisplayMode
+	;  Return:
+	;	nothing
+	;  Destroy:
+	;	nothing
+
+	POWER_ESC_VOL_BUTTON_NOTIF_REGISTER	enum	PowerEscCommand
+	;
+	;  Description:
+	;	Register a recipient that will get notified when the front
+	;	panel volume buttons are pressed.
+	;  Pass:
+	;	dx:cx	= OD to be notified
+	;	ax	= msg to send when volume up button is pressed
+	;	bp	= msg to send when volume down button is pressed
+	;	message sent:
+	;		Pass:		nothing
+	;		Return:		nothing
+	;		Destroy:	ax, cx, dx, bp
+	;  Return:
+	;	carry clear if function supported
+	;		ax	= non-zero if too many recipients registered
+	;  Destroy:
+	;	nothing
+
+	POWER_ESC_VOL_BUTTON_NOTIF_UNREGISTER	enum	PowerEscCommand
+	;
+	;  Description:
+	;	Remove a previously registered recipient.
+	;  Pass:
+	;	dx:cx	= OD previously registered
+	;  Return:
+	;	carry clear if function supported
+	;		ax	= non-zero if OD not previously registered
+	;  Destroy:
+	;	nothing
+
+	POWER_ESC_GET_VERSION			enum PowerEscCommand
+	;
+	; Description:
+	;	Get the protocol-specific (e.g., APM) version number
+	; Pass:
+	;	none
+	; Return:
+	;	carry clear
+	;		ah - minor version
+	;		al - major version
+	;
+
+	POWER_ESC_SUSPEND			enum PowerEscCommand
+	;
+	; Description:
+	;	Suspend the machine
+	; Pass:
+	;	none
+	; Return:
+	;	carry set if error
+	;
+
+	POWER_ESC_ON_OFF_BUTTON_CONFIRM_REGISTER	enum PowerEscCommand
+	;
+	; Description:
+	;	Register a callback routine that will decide whether to allow
+	;	or deny a power-off upon button press.  (This does not include
+	;	auto power-off or POWER_ESC_SUSPEND request.)
+	; Pass:
+	;	dx:cx	= fptr to callback routine (vfptr if movable)
+	;		  Parameters for callback:
+	;			Pass:	nothing
+	;			Return:	carry clear if allow, set if deny
+	;			Destroy:nothing
+	; Return:
+	;	carry clear if function supported
+	;		ax	= non-zero if too many callbacks registered
+	; Destroy:
+	;	nothing
+
+	POWER_ESC_ON_OFF_BUTTON_CONFIRM_UNREGISTER	enum PowerEscCommand
+	;
+	; Description:
+	;	Remove a previously registered callback routine.
+	; Pass:
+	;	dx:cx	= fptr/vfptr to callback previously registered
+	; Return:
+	;	carry clear if function supported
+	;		ax	= non-zero if callback not found
+	; Destroy:
+	;	nothing
+
+;-----------------------------------------------------------------------------
+;		OLD Aliases
+;-----------------------------------------------------------------------------
+
+	DR_POWER_SET_PASSWORD		equ DR_POWER_SET_PASSWORD_OLD
+	DR_POWER_VERIFY_PASSWORD	equ DR_POWER_VERIFY_PASSWORD_OLD
+	DR_POWER_DISABLE_PASSWORD	equ DR_POWER_DISABLE_PASSWORD_OLD
+	DR_POWER_PASSWORD_OK 		equ DR_POWER_PASSWORD_OK_OLD
+	DR_POWER_RTC_ACK		equ DR_POWER_RTC_ACK_OLD
+
+
+
+EndDriver	power
+
+

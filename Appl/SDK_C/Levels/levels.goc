@@ -1,0 +1,1412 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1992 -- All Rights Reserved
+
+PROJECT:	GEOS
+MODULE:		SDK_C/Levels
+FILE:		levels.goc
+
+AUTHOR:		John D. Mitchell
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.10.05	Initial version.
+
+DESCRIPTION:
+	This application tests the C language use of the UI Levels
+	mechanism.
+
+	Also note that Zoomer is set at the introductory user level
+	and does not allow user level changes, so this application
+	does not function fully on Zoomer.
+
+	$Id: levels.goc,v 1.1 97/04/04 16:37:29 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Include Files
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+#include <initfile.h>
+@include <Objects/styles.goh>
+@include <Objects/Text/tCtrlC.goh>
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	Application Specific Types & Constants
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*
+ * LevelsBarStates is used to keep track of which trigger bars are on.
+ *
+ * Note:
+ *	Be sure to create values for each level (duplicate them if
+ *	necessary) even if your application doesn't support all of the
+ *	levels.
+ */
+typedef	WordFlags LevelsBarStates;
+@define	LBS_SHOW_SNARF_BAR	(0x01)
+@define	LBS_SHOW_ZONK_BAR	(0x02)
+
+@define	INTRODUCTORY_BAR_STATES	(0)
+@define	BEGINNING_BAR_STATES	(@LBS_SHOW_SNARF_BAR)
+@define	INTERMEDIATE_BAR_STATES	(@BEGINNING_BAR_STATES)
+@define	ADVANCED_BAR_STATES	(@INTERMEDIATE_BAR_STATES |	\
+				 @LBS_SHOW_ZONK_BAR)
+@define	DEFAULT_BAR_STATES	(@ADVANCED_BAR_STATES)
+
+/*
+ * LevelsFeatures is used to control which UI features are active.
+ *
+ * !!!!! NOTE !!!!! !!!!! NOTE !!!!! !!!!! NOTE !!!!! !!!!! NOTE !!!!!
+ * Note:
+ *	These values *MUST* be packed from the Most Significant Bit to
+ *	the Least Significant Bit due to the way that the low-level
+ *	generic UI handling code for updating the features shifts things
+ *	leftward rather than right.
+ * !!!!! NOTE !!!!! !!!!! NOTE !!!!! !!!!! NOTE !!!!! !!!!! NOTE !!!!!
+ *
+ * Note:  Be sure to create values for each level (duplicate them if
+ *	necessary) even if your application doesn't support all of the
+ *	levels.
+ */
+typedef	WordFlags LevelsFeatures;
+
+/* General features.	*/
+@define	LF_FOO_FEATURES		(0x8000)
+@define	LF_DORF_STUFF		(0x4000)
+@define	LF_WHIFFLE_ATTRIBUTES	(0x2000)
+
+/* The following are for SET_FEATURES_IF_APP_FEATURES_OFF.	*/
+@define	LF_SIMPLE_TEXT		(0x1000)
+@define	LF_COMPLEX_TEXT		(0x0800)
+
+/* The following are for ADD_FEATURES_IF_FEATURE_ON.	*/
+@define	LF_MORE_TEXT		(0x0400)
+
+
+@define	INTRODUCTORY_FEATURES	(0)
+
+@define	BEGINNING_FEATURES	(@LF_FOO_FEATURES	| \
+				 @LF_SIMPLE_TEXT)
+
+@define	INTERMEDIATE_FEATURES	(@BEGINNING_FEATURES	| \
+				 @LF_DORF_STUFF		| \
+				 @LF_COMPLEX_TEXT)
+
+@define	ADVANCED_FEATURES	(@INTERMEDIATE_FEATURES	| \
+				 @LF_MORE_TEXT		| \
+				 @LF_WHIFFLE_ATTRIBUTES)
+
+@define	DEFAULT_FEATURES	(@ADVANCED_FEATURES)
+
+/*
+ * LevelsSettingEntry describes which LevelsBarStates correspond to which
+ * LevelsFeatures.
+ */
+typedef struct
+{
+	LevelsBarStates	LSE_barStates;
+	LevelsFeatures	LSE_features;
+} LevelsSettingsEntry;
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Class Definitions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*
+ * Application's Process Class.
+ */
+@class	LevelsProcessClass, GenProcessClass;
+
+/* Nothing added.  Just done so we can intercept some messages.	*/
+
+@endc;
+
+
+/*
+ * Application's Application Class.
+ */
+@class	LevelsApplicationClass, GenApplicationClass;
+
+/* Message declarations.	*/
+@message (GEN_BOOLEAN_GROUP_APPLY_MSG)
+			MSG_LEVELS_APPLICATION_UPDATE_BARS;
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_LEVELS_APPLICATION_SET_USER_LEVEL;
+@message void MSG_LEVELS_APPLICATION_INITIATE_FINE_TUNE ();
+@message void MSG_LEVELS_APPLICATION_FINE_TUNE ();
+@message void MSG_LEVELS_APPLICATION_CHANGE_USER_LEVEL ();
+@message void MSG_LEVELS_APPLICATION_CANCEL_USER_LEVEL ();
+@message void MSG_LEVELS_APPLICATION_QUERY_RESET_OPTIONS ();
+@message (GEN_ITEM_GROUP_STATUS_MSG) MSG_LEVELS_APPLICATION_USER_LEVEL_STATUS;
+
+/* Instance data.	*/
+@instance	LevelsBarStates	LAI_barStates	= @DEFAULT_BAR_STATES;
+
+/* Default inherited attributes values.	*/
+@default	GAI_appFeatures	= @DEFAULT_FEATURES;
+
+@endc;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Class Declarations
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@classdecl	LevelsProcessClass, neverSaved;
+@classdecl	LevelsApplicationClass;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Internal Function Prototypes
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+static void _pascal SetBarState (LevelsBarStates levelsBarStates);
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		User Interface
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Application Resource & Object
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@start	AppResource;
+
+@visMoniker LevelsTextMoniker	= "C UI Levels Sample Application";
+
+@object LevelsApplicationClass LevelsApplication =
+{
+	GI_visMoniker	= list { @LevelsTextMoniker };
+	GI_comp		= @LevelsPrimary;
+	gcnList (MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS)
+			= @LevelsPrimary;
+	gcnList (MANUFACTURER_ID_GEOWORKS, GAGCNLT_STARTUP_LOAD_OPTIONS)
+			= @UserLevelList,
+			  @ShowBarList;
+	gcnList (MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS)
+			= @ByFeature,
+			  @ByLevel,
+			  @ByReparent;
+	ATTR_GEN_INIT_FILE_CATEGORY	= "levels";
+	ATTR_GEN_APPLICATION_SAVE_OPTIONS_TRIGGER = @SaveOptionsTrigger;
+}
+
+@end	AppResource;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Primary Window
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@start	Interface;
+
+@object	GenPrimaryClass	LevelsPrimary =
+{
+	GI_comp		= @OptionsMenu,
+			  @ByFeature,
+			  @ByLevel,
+			  @AMenu,
+			  @FakeTools,
+			  @FooTrigger,
+			  @DorfTrigger,
+			  @WhiffleTrigger,
+			  @FooText;
+	ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+	HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+@end	Interface;
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Options Menu
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@start	Interface;
+
+@object	GenInteractionClass OptionsMenu =
+{
+	GI_comp	        = @SetUserLevelDialog, @OptionsGroup, @SaveResetGroup;
+	GII_visibility	= GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE	= GIGT_OPTIONS_MENU;
+}
+
+@end	Interface;
+
+/*
+ * SetUserLevelDialog and it's attendents are generated by setting up the
+ * following constant definitions and including "usrLevel.goh".
+ *
+ * Note that following are already set:
+ *		INTRODUCTORY_FEAUTURES,
+ *		BEGINNING_FEATURES,
+ *		INTERMEDIATE_FEATURES,
+ *		ADVANCED_FEATURES,
+ *		DEFAULT_FEATURES.
+ */
+@define RESOURCE_FOR_STRINGS	Strings
+@define RESOURCE_FOR_USER_LEVEL_DIALOG_TOP	OptionsMenuUI
+@define RESOURCE_FOR_USER_LEVEL_DIALOG_INSIDES	UserLevelUI
+
+@define USER_LEVEL_APPLICATION_OBJECT	LevelsApplication
+@define USER_LEVEL_FEATURES_LIST_OBJECT	@FeaturesList
+@define USER_LEVEL_SET_USER_LEVEL_MSG		\
+			MSG_LEVELS_APPLICATION_SET_USER_LEVEL
+@define USER_LEVEL_INITIATE_FINE_TUNE_MSG	\
+			MSG_LEVELS_APPLICATION_INITIATE_FINE_TUNE
+@define USER_LEVEL_FINE_TUNE_MSG		\
+			MSG_LEVELS_APPLICATION_FINE_TUNE
+@define USER_LEVEL_CHANGE_USER_LEVEL_MSG	\
+			MSG_LEVELS_APPLICATION_CHANGE_USER_LEVEL
+@define USER_LEVEL_CANCEL_USER_LEVEL_MSG	\
+			MSG_LEVELS_APPLICATION_CANCEL_USER_LEVEL
+@define USER_LEVEL_STATUS_MSG	\
+			MSG_LEVELS_APPLICATION_USER_LEVEL_STATUS
+@define USER_LEVEL_FINE_TUNE_TEXT	"Fine Tune C Levels App. Features"
+
+@include <usrLevel.goh>
+
+@start	UserLevelUI;
+
+@object	GenBooleanGroupClass FeaturesList =
+{
+	GI_comp		= @FooEntry,
+			  @DorfEntry,
+			  @WhiffleEntry,
+			  @SimpleTextEntry,
+			  @ComplexTextEntry,
+			  @MoreTextEntry;
+	GBGI_selectedBooleans	= @DEFAULT_FEATURES;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object	GenBooleanClass FooEntry =
+{
+	GI_visMoniker	= 'F', "Foo Features";
+	GBI_identifier	= @LF_FOO_FEATURES;
+}
+
+@object	GenBooleanClass DorfEntry =
+{
+	GI_visMoniker	= 'D', "Dorf Stuff";
+	GBI_identifier	= @LF_DORF_STUFF;
+}
+
+@object	GenBooleanClass WhiffleEntry =
+{
+	GI_visMoniker	= 'W', "Whiffle Attributes";
+	GBI_identifier	= @LF_WHIFFLE_ATTRIBUTES;
+}
+
+@object	GenBooleanClass SimpleTextEntry =
+{
+	GI_visMoniker	= 'S', "Simple Text";
+	GBI_identifier	= @LF_SIMPLE_TEXT;
+}
+
+@object	GenBooleanClass ComplexTextEntry =
+{
+	GI_visMoniker	= 'C', "Complex Text";
+	GBI_identifier	= @LF_COMPLEX_TEXT;
+}
+
+@object	GenBooleanClass MoreTextEntry =
+{
+	GI_visMoniker	= 'M', "More Text";
+	GBI_identifier	= @LF_MORE_TEXT;
+}
+
+@end	UserLevelUI;
+
+@start	OptionsMenuUI;
+
+@object GenInteractionClass OptionsGroup =
+{
+	GI_comp	    	= @ShowToolsPopup;
+}
+
+@object GenInteractionClass SaveResetGroup =
+{
+	GI_comp	    	= @SaveOptionsTrigger, @ResetOptionsTrigger;
+}
+
+/* --- */
+
+@object GenInteractionClass ShowToolsPopup =
+{
+	GI_visMoniker	= 'S', "Show Tools";
+	GI_comp	    	= @ShowBarList;
+	GII_visibility	= GIV_POPUP;
+}
+
+@object	GenBooleanGroupClass ShowBarList =
+{
+	GI_comp		= @ShowSnarfBarEntry,
+			  @ShowZonkBarEntry;
+	GBGI_applyMsg	= MSG_LEVELS_APPLICATION_UPDATE_BARS;
+	GBGI_destination	= LevelsApplication;
+	GBGI_selectedBooleans	= @DEFAULT_BAR_STATES;
+	ATTR_GEN_INIT_FILE_KEY	= "showBars";
+}
+
+@object	GenBooleanClass ShowSnarfBarEntry =
+{
+	GI_visMoniker	= 'S', "Show Snarf Bar";
+	GBI_identifier	= @LBS_SHOW_SNARF_BAR;
+}
+
+@object	GenBooleanClass ShowZonkBarEntry =
+{
+	GI_visMoniker	= 'Z', "Show Zonk Bar";
+	GBI_identifier	= @LBS_SHOW_ZONK_BAR;
+}
+
+@object	GenTriggerClass SaveOptionsTrigger =
+{
+	GI_visMoniker	= 'v', "Save Configuration";
+	GTI_actionMsg	= MSG_META_SAVE_OPTIONS;
+	GTI_destination	= LevelsApplication;
+}
+
+@object	GenTriggerClass ResetOptionsTrigger =
+{
+	GI_visMoniker	= 'e', "Reset Configuration";
+	GTI_actionMsg	= MSG_LEVELS_APPLICATION_QUERY_RESET_OPTIONS;
+	GTI_destination	= LevelsApplication;
+}
+
+@end	OptionsMenuUI;
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ByFeature Controller
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@start	Interface;
+
+@object	TextStyleControlClass ByFeature =
+{
+	GI_visMoniker	= 'F', "By Feature";
+	GII_visibility	= GIV_POPUP;
+	HINT_GEN_CONTROL_SCALABLE_UI_DATA [3]	=
+	{
+		{
+		GCSUIC_SET_NORMAL_FEATURES_IF_APP_FEATURE_OFF,
+		@LF_COMPLEX_TEXT,
+		TSCF_PLAIN | TSCF_BOLD | TSCF_ITALIC |
+		TSCF_UNDERLINE | TSCF_SUBSCRIPT | TSCF_SUPERSCRIPT
+		},
+		{
+		GCSUIC_SET_NORMAL_FEATURES_IF_APP_FEATURE_OFF,
+		@LF_SIMPLE_TEXT,
+		TSCF_PLAIN | TSCF_BOLD | TSCF_ITALIC | TSCF_UNDERLINE
+		},
+		{
+		GCSUIC_ADD_NORMAL_FEATURES_IF_APP_FEATURE_ON,
+		@LF_MORE_TEXT,
+		TSCF_STRIKE_THRU
+		}
+	};
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ByLevel Controller
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@object	TextStyleControlClass ByLevel =
+{
+	GI_visMoniker	= 'L', "By Level";
+	GII_visibility	= GIV_POPUP;
+	HINT_GEN_CONTROL_SCALABLE_UI_DATA [3]	=
+	{
+		{
+		GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		UIIL_INTRODUCTORY,
+		TSCF_PLAIN | TSCF_BOLD
+		},
+		{
+		GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		UIIL_BEGINNING,
+		TSCF_PLAIN | TSCF_BOLD | TSCF_ITALIC | TSCF_UNDERLINE
+		},
+		{
+		GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		UIIL_ADVANCED,
+		TSCF_PLAIN | TSCF_BOLD | TSCF_ITALIC |
+		TSCF_UNDERLINE | TSCF_SUPERSCRIPT | TSCF_SUBSCRIPT
+		}
+	};
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		AMenu Interaction
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@object	GenInteractionClass AMenu =
+{
+	GI_visMoniker	= 'R', "Reparent";
+	GI_comp		= @Child1,
+			  @Child2,
+			  @ByReparent;
+	GII_visibility	= GIV_POPUP;
+}
+
+@object	GenTriggerClass Child1 =
+{
+	GI_visMoniker	= '1', "Child 1";
+}
+
+@object	GenTriggerClass Child2 =
+{
+	GI_visMoniker	= '2', "Child 2";
+}
+
+@object	TextStyleControlClass ByReparent =
+{
+	GI_visMoniker	= 'C', "Child";
+	GII_visibility	= GIV_POPUP;
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		The Rest of the UI
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@object	GenInteractionClass FakeTools =
+{
+	GI_visMoniker	= "Fake Tools";
+	GI_comp		= @SnarfToolbar,
+			  @ZonkToolbar;
+	HINT_DRAW_IN_BOX;
+}
+
+@object	GenTriggerClass SnarfToolbar =
+{
+	GI_visMoniker	= "Snarf Tools";
+}
+
+@object	GenTriggerClass ZonkToolbar =
+{
+	GI_visMoniker	= "Zonk Tools";
+}
+
+@object	GenTriggerClass FooTrigger =
+{
+	GI_visMoniker	= "Foo (beginner mode and above)";
+}
+
+@object	GenTriggerClass DorfTrigger =
+{
+	GI_visMoniker	= "Dorf (intermediate mode and above)";
+}
+
+@object	GenTriggerClass WhiffleTrigger =
+{
+	GI_visMoniker	= "Whiffle (advanced mode)";
+}
+
+@object	GenTextClass FooText =
+{
+	GI_attrs	= GA_TARGETABLE;
+	GTXI_text	= "Random text for the style menus";
+	HINT_DEFAULT_FOCUS;
+	HINT_DEFAULT_TARGET;
+}
+
+@end	Interface;
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Global Data
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#ifdef __HIGHC__
+_pragma_const_in_code;
+#define vfar
+#endif
+
+#ifdef __BORLANDC__
+#pragma option -zELEVELS_TEXT -zFCODE
+#define vfar _far
+#endif
+
+/*
+ * featuresKey is the name of the system InitFile key for the user level
+ * features for this application.
+ */
+static const char vfar featuresKey [] = "features";
+
+/*
+ * settingsTable maps each user level feature set to the
+ * corresponding trigger bar states  and is used to map the current system
+ * default user level to the appropriate application specific features.
+ */
+static const LevelsSettingsEntry vfar settingsTable [] =
+{
+	{ @INTRODUCTORY_BAR_STATES, 	@INTRODUCTORY_FEATURES	},
+	{ @BEGINNING_BAR_STATES,	@BEGINNING_FEATURES	},
+	{ @INTERMEDIATE_BAR_STATES,	@INTERMEDIATE_FEATURES	},
+	{ @ADVANCED_BAR_STATES,		@ADVANCED_FEATURES	}
+};
+
+/*
+ * The following lists map a given feature to the list of objects that
+ * should be appropriately (de-)activated.
+ */
+static const GenAppUsabilityTuple vfar fooFeaturesList [] =
+{
+	{ GAUC_TOOLBAR,		@ShowSnarfBarEntry	},
+	{ GAUTF_END_OF_LIST,	@FooTrigger		}
+};
+
+static const GenAppUsabilityTuple vfar dorfStuffList [] =
+{
+	{ GAUC_TOOLBAR,		@ShowZonkBarEntry	},
+	{ GAUTF_END_OF_LIST,	@DorfTrigger		}
+};
+
+static const GenAppUsabilityTuple vfar whiffleAttributesList [] =
+{
+	{ GAUTF_END_OF_LIST,	@WhiffleTrigger		}
+};
+
+/*
+ * NOTE:
+ *
+ * The object "ByFeature" uses different features specified with
+ * HINT_GEN_CONTROL_SCALABLE_UI_DATA. 
+ * Because of this, it is marked as "recalc".
+ * 
+ * The object "ByReparent" is marked such that:
+ * (1) if "simple text" is on, it is a direct menu
+ * (2) if "complex text" (and by implication, "simple text") it is a
+ *     sub-menu of "AMenu".
+ *
+ * The object "AMenu" is marked such that:
+ * (1) it only exists if "complex text" is on.
+ */
+static const GenAppUsabilityTuple vfar simpleTextList [] =
+{
+	{
+	GAUTF_END_OF_LIST | GAUC_RECALC_CONTROLLER,
+	@ByFeature
+	}
+};
+
+static const GenAppUsabilityTuple vfar complexTextList [] =
+{
+	{
+	GAUC_USABILITY,
+	@AMenu
+	},
+	{
+	GAUTF_OFF_IF_BIT_ON | GAUC_REPARENT,
+	@ByReparent
+	},
+	{
+	GAUTF_END_OF_LIST | GAUC_RECALC_CONTROLLER,
+	@ByFeature
+	}
+};
+
+static const GenAppUsabilityTuple vfar moreTextList [] =
+{
+	{
+	GAUTF_END_OF_LIST | GAUC_RECALC_CONTROLLER,
+	@ByFeature
+	}
+};
+
+/*
+ * usabilityTable maps each feature to the apppropriate list of objects
+ * (de-)activate.
+ */
+static const GenAppUsabilityTuple * const vfar usabilityTable [] =
+{
+	fooFeaturesList,
+	dorfStuffList,
+	whiffleAttributesList,
+	simpleTextList,
+	complexTextList,
+	moreTextList
+};
+
+/*
+ * levelsTable contains all of the UI objects that must be
+ * notified/modified whenever the user interface level is changed.
+ */
+static const GenAppUsabilityTuple vfar levelsTable [] =
+{
+	{
+	GAUTF_END_OF_LIST | GAUC_RECALC_CONTROLLER,
+	@ByLevel
+	}
+};
+
+#ifdef __BORLANDC__
+#pragma option -zE* -zF*
+#endif
+
+#ifdef __HIGHC__
+_pragma_end_const_in_code;
+#endif
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Message Handlers
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_META_ATTACH_OBJECT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Perform all of the necessary functions pertaining to
+		starting up the Levels application.
+
+PASS: 		MemHandle	appLaunchBlock	= Application startup
+						  information.
+		MemHandle	extraState	= Extra state information
+						  block (if any) that was
+						  given on last detach.
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:			None.
+
+PSEUDO CODE/STRATEGY:
+	Check for the existence of the options menu.
+	Set it not usable if it shouldn't appear (don't need to set it
+	usable because it's usable by default).
+	Call the superclass.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.10.05	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method LevelsApplicationClass, MSG_META_ATTACH_OBJECT
+{
+    /*
+     * Set things that are solely dependent upon the UI state.
+     * Should there be an options menu?
+     */
+    if (! (UserGetInterfaceOptions () & UIIO_OPTIONS_MENU))
+	{
+	/* Nope.  Make sure that the options menu is not usable.	*/
+	@send GeodeGetOptrNS (@OptionsMenu)::MSG_GEN_SET_NOT_USABLE
+			(VUM_NOW);
+	}
+
+    /* Let the superclass do it's thing.	*/
+    @callsuper ();
+}	/* End of MSG_META_ATTACH_OBJECT.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_META_{LOAD,RESET}_OPTIONS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Perform all of the necessary functions pertaining to
+		setting the UI level options during application startup.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:			None.
+
+PSEUDO CODE/STRATEGY:
+	Call the superclass.
+	If there are any user level settings for this application in the
+	   system initialization file then
+		The user level is set elsewhere.
+	Otherwise,
+		Get the current user default level setting.
+		Figure out what the feature and show bar states should be
+		and set things accordingly.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.10.05	Initial version.
+	JDM	92.10.25	Proper use of settingsTable.
+	JDM	92.10.28	Duh, proper use of InitFile arguments.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method LevelsApplicationClass, MSG_META_LOAD_OPTIONS,
+				MSG_META_RESET_OPTIONS
+{
+    optr	userLevelListObject;
+    word	defaultUserLevel;
+    word	iniFeaturesValue	= 0;
+    LevelsFeatures	tableFeaturesValue;
+    LevelsBarStates	tableBarStates;
+    LevelsSettingsEntry	*featuresTable;
+    const char	*featuresIniKey;
+    char	category [INI_CATEGORY_BUFFER_SIZE];
+
+    /* First, let the superclass do its thing.	*/
+    @callsuper ();
+
+    /* Get ahold of the application's init. file features key.	*/
+    featuresIniKey = MemLockFixedOrMovable (featuresKey);
+
+    /* Get the category */
+    @call self::MSG_META_GET_INI_CATEGORY(category);
+
+    /* Any feature settings in the system initialization file?	*/
+    if (InitFileReadInteger (category,
+			      featuresIniKey,
+			      &iniFeaturesValue))
+	{
+	/* Nope.  Get the default user level.	*/
+	defaultUserLevel = UserGetDefaultLaunchLevel ();
+
+	/* Extract the feature settings data from the table.	*/
+	featuresTable = MemLockFixedOrMovable (settingsTable);
+	tableFeaturesValue = featuresTable [defaultUserLevel].LSE_features;
+	tableBarStates = featuresTable [defaultUserLevel].LSE_barStates;
+
+	/* Set the user level list selection.	*/
+	userLevelListObject = GeodeGetOptrNS (@UserLevelList);
+	@send userLevelListObject::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+			(tableFeaturesValue, 0);
+
+	/* Mark the list modified and apply changes.	*/
+	@send userLevelListObject::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE
+			(TRUE);
+	@send userLevelListObject::MSG_GEN_APPLY ();
+
+	/* Set the state of the trigger bars.	*/
+	SetBarState (tableBarStates);
+
+	/* Unlock the levels settings table.	*/
+	MemUnlockFixedOrMovable (settingsTable);
+
+    }	/* End of if Not InitFileReadInteger...	*/
+
+    /* Nuke the application's features init. file key.	*/
+    MemUnlockFixedOrMovable (featuresKey);
+}	/* End of MSG_META_{LOAD,RESET}_OPTIONS.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GEN_APPLICATION_UPDATE_APP_FEATURES
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Update the application's features.
+
+PASS:		optr	unReparentObject	= Object to be unreparented.
+		optr	reparentObject		= Object to be reparented.
+		GenAppUsabilityTuple *levelTable
+						= Table of objects that
+						  must be updated when the
+						  user level changes.
+		word	tableLength		= Number of table entries.
+		GenAppUsabilityTuple *table	= Table mapping the various
+						  application features to
+						  objects that must be
+						  updated when that feature
+						  is modified.
+		word	appOpeningFlag		= Application starting?
+		UIInterfaceLevel oldLevel	= Current user level.
+		UIInterfaceLevel level		= New user level.
+		word	featuresChanged		= Modified features.
+		word	featuresOn		= Active features.
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:			None.
+
+PSEUDO CODE/STRATEGY:
+	Use the myriad user level features tables to update the
+	application's current user level features.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.10.07	Initial version.
+	JDM	92.10.21	Documentation and dependent header update.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method LevelsApplicationClass, MSG_GEN_APPLICATION_UPDATE_APP_FEATURES
+{
+    /* Use the tables to update the application's features.	*/
+    @call oself::MSG_GEN_APPLICATION_UPDATE_FEATURES_VIA_TABLE
+		(NullOptr,
+		 GeodeGetOptrNS(@AMenu),
+		 (GenAppUsabilityTuple *) levelsTable,
+		 sizeof (usabilityTable) / sizeof (usabilityTable [0]),
+		 usabilityTable,
+		 appOpeningFlag,
+		 oldLevel,
+		 level,
+		 featuresChanged,
+		 featuresOn);
+}	/* End of MSG_GEN_APPLICATION_UPDATE_APP_FEATURES.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_LEVELS_APPLICATION_UPDATE_BARS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Update the application's toolbar.
+
+PASS: 		LevelsBarStates	selectedBooleans	= Active items.
+		LevelsBarStates	indeterminateBooleans	= 0;
+		LevelsBarStates	modifiedsBooleans	= Modified items.
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:			None.
+
+PSEUDO CODE/STRATEGY:
+	Store the given selected toobar information in the instance data.
+	Update the Snarf and/or the Zonk toolbar if they were modifed.
+	Turn them on or off according to their selected toolbar state (the
+	visual update is done immediately if the the application is in the
+	middle of attaching otherwise they're delayed via the UI queue).
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.10.07	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method LevelsApplicationClass, MSG_LEVELS_APPLICATION_UPDATE_BARS
+{
+    optr	snarfObject;
+    optr	zonkObject;
+    VisUpdateMode	vum;
+
+    /* How should the toolbars be visually updated?	*/
+    if (pself->GAI_states & AS_ATTACHING)
+	vum = VUM_NOW;
+    else
+	vum = VUM_DELAYED_VIA_UI_QUEUE;
+
+    /*
+     * Update the application object's idea of the currently
+     * selected items.
+     */
+    pself->LAI_barStates = selectedBooleans;
+
+    /* Has the Snarf bar been modified?	*/
+    if (@LBS_SHOW_SNARF_BAR & modifiedBooleans)
+	{
+	/* Yep.  Make it usable?	*/
+	snarfObject = GeodeGetOptrNS (@SnarfToolbar);
+	if (@LBS_SHOW_SNARF_BAR & selectedBooleans)
+	    @call snarfObject::MSG_GEN_SET_USABLE (vum);
+	else
+	    @call snarfObject::MSG_GEN_SET_NOT_USABLE (vum);
+	}
+
+    /* Has the Zonk bar been modified?	*/
+    if (@LBS_SHOW_ZONK_BAR & modifiedBooleans)
+	{
+	/* Yep.  Make it usable?	*/
+	zonkObject = GeodeGetOptrNS (@ZonkToolbar);
+	if (@LBS_SHOW_ZONK_BAR & selectedBooleans)
+	    @call zonkObject::MSG_GEN_SET_USABLE (vum);
+	else
+	    @call zonkObject::MSG_GEN_SET_NOT_USABLE (vum);
+	}
+}	/* End of MSG_LEVELS_APPLICATION_UPDATE_BARS.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_LEVELS_APPLICATION_SET_USER_LEVEL
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Set the application's user interface level.
+
+PASS: 		LevelsFeatures	selection	= Active features.
+		word		numSelections	= ???
+		byte		stateFlags	= ???
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	Assumes that the UIInterfaceLevel values are
+			ascending and contiguous from zero
+			(UIIL_INTRODUCTORY).
+
+	Asserts:	???
+
+CHECKS:			None.
+
+PSEUDO CODE/STRATEGY:
+	Look for the feature set list that's closest (but not greater than)
+	the requested features.
+	Set the application's current user level to whatever was found.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:
+	Note:	The user level set here is expressed in terms of
+		features bits.
+
+	Note:	The algorithm used to compute closest (non-exact) level
+		match is based on the Levenshtein distance (obviously just
+		using substitutions :-) (that's basically the minimum
+		number of operations (e.g., substitutions) that it takes to
+		transform the current feature bits into the requested
+		bits).  Note that there's no bias or weighting of any
+		particular bits over any others.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.10.07	Initial version.
+	JDM	92.10.12	Updated to new algorithm.
+	JDM	92.11.19	Nuked extraneous checks.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method LevelsApplicationClass, MSG_LEVELS_APPLICATION_SET_USER_LEVEL
+{
+    word	wLcv;
+    word	wLcvInner;
+    byte	bitCount;
+    byte	closestCount;
+    UIInterfaceLevel	closestLevel;
+    LevelsFeatures	tableFeatures;
+    LevelsFeatures	tempFeatures;
+    LevelsSettingsEntry	*featuresTable;
+
+    /* First, lock down the block containing the tables.	*/
+    featuresTable = MemLockFixedOrMovable (settingsTable);
+
+    /*
+     * Figure out bar and level/features that correspond to the given
+     * user level.
+     * Note that 'closestCount' is initially set to the number of bits
+     * in 'LevelsFeatures'. 
+     */
+    for (wLcv = closestLevel = 0,
+	 closestCount = sizeof (LevelsFeatures) * 8;
+	 wLcv < (sizeof (settingsTable) / sizeof (settingsTable [0]));
+	 wLcv++)
+	{
+	/* Exact match?	*/
+	tableFeatures = featuresTable [wLcv].LSE_features;
+	if (tableFeatures == selection)
+	    {
+	    closestLevel = wLcv;
+	    break;
+	    }
+
+	/*
+	 * Nope.  Figure out the bit difference between the requested
+	 * features and the current level's features.
+	 */
+	for (wLcvInner = bitCount = 0,
+	     tempFeatures = selection ^ tableFeatures;
+	     wLcvInner < (sizeof (LevelsFeatures) * 8);
+	     wLcvInner++)
+	    {
+	    /* Bit set?	*/
+	    if (tempFeatures & 0x01)
+		bitCount++;
+
+	    tempFeatures >>= 1;		/* Next!	*/
+	    }
+
+	/*
+	 * Closest match so far?
+	 * Note that this will select the retain the first found
+	 * closest match at any given bit count.  If you want the last
+	 * one found then change the < to <=.
+	 */
+	if (bitCount < closestCount)
+	    {
+	    /* Yep.  Update the current closest match information.	*/
+	    closestCount = bitCount;
+	    closestLevel = wLcv;
+	    }
+	}	/* End of outermost for loop.	*/
+
+    /* Set the application features, level, and the bar state.	*/
+    @call oself::MSG_GEN_APPLICATION_SET_APP_FEATURES
+			(selection);
+    @call oself::MSG_GEN_APPLICATION_SET_APP_LEVEL (closestLevel);
+    SetBarState (featuresTable [closestLevel].LSE_barStates);
+
+    /* Unlock the levels settings table.	*/
+    MemUnlockFixedOrMovable (settingsTable);
+}	/* End of MSG_LEVELS_APPLICATION_SET_USER_LEVEL.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_LEVELS_APPLICATION_CHANGE_USER_LEVEL
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	User change to the user level.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:			None.
+
+PSEUDO CODE/STRATEGY:
+	Apply the requested changes.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	92.10.07	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method LevelsApplicationClass, MSG_LEVELS_APPLICATION_CHANGE_USER_LEVEL
+{
+    /* Do the apply.	*/
+    @send GeodeGetOptrNS (@SetUserLevelDialog)::
+		MSG_GEN_GUP_INTERACTION_COMMAND (IC_APPLY);
+}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_LEVELS_APPLICATION_CANCEL_USER_LEVEL
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Cancel User change to the user level.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:			None.
+
+PSEUDO CODE/STRATEGY:
+	Apply the requested changes.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	92.10.07	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method LevelsApplicationClass, MSG_LEVELS_APPLICATION_CANCEL_USER_LEVEL
+{
+    LevelsFeatures	appFeatures;
+
+    /* Save the application's current feature settings. */
+    appFeatures = pself->GAI_appFeatures;
+
+    @send GeodeGetOptrNS (@UserLevelList)::
+		MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION (appFeatures, 0);
+
+    /* Do the cancel.	*/
+    @send GeodeGetOptrNS (@SetUserLevelDialog)::
+		MSG_GEN_GUP_INTERACTION_COMMAND (IC_DISMISS);
+}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_LEVELS_APPLICATION_QUERY_RESET_OPTIONS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Allow the user to reset the options.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:			None.
+
+PSEUDO CODE/STRATEGY:
+	Query the user about reseting the options state and do the reset
+	iff desired.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	92.10.07	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method LevelsApplicationClass, MSG_LEVELS_APPLICATION_QUERY_RESET_OPTIONS
+{
+    /* Ask the user if she wants to reset the options.	*/
+
+    /* NOTE: the ResetOptionsQueryString is in a SHARED resource
+     * (defined in usrLevel.goh in the INCLUDE directory) so
+     * we CAN NOT use GeodeGetOptrNS on the thing to get the optr,
+     * we just use the optr since its a shared resource
+     */
+    if (UserStandardDialogOptr
+		(NullOptr, NullOptr, NullOptr, NullOptr,
+		 @ResetOptionsQueryString,
+		 (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET) |
+		  (CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET)) == IC_YES)
+	{
+	@send self::MSG_META_RESET_OPTIONS();
+	}
+}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_LEVELS_APPLICATION_USER_LEVEL_STATUS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Handle status change in user level list	
+
+PASS:		LevelsFeatures	selection	= Active features.
+		word		numSelections	= ???
+		byte		stateFlags	= ???
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:			None.
+
+PSEUDO CODE/STRATEGY:
+	Disable the Fine Tune trigger unless we're at Advanced level.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	92.10.07	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method LevelsApplicationClass, MSG_LEVELS_APPLICATION_USER_LEVEL_STATUS
+{
+    Message	msg;
+
+    if (selection == @ADVANCED_FEATURES)
+	{
+	msg = MSG_GEN_SET_ENABLED;
+	}
+    else
+	{
+	msg = MSG_GEN_SET_NOT_ENABLED;
+	}
+    @send {MSG_GEN_SET_ENABLED} GeodeGetOptrNS (@FineTuneTrigger)
+		::msg (VUM_NOW);
+}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_LEVELS_APPLICATION_INITIATE_FINE_TUNE
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Activate the application's Fine Tune features dialog box.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:			None.
+
+PSEUDO CODE/STRATEGY:
+	Get the current features from the user level features list.
+	Use those features to set the fine tune box's features list.
+	Activate the fine tune dialog box.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.10.07	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method LevelsApplicationClass, MSG_LEVELS_APPLICATION_INITIATE_FINE_TUNE
+{
+    LevelsFeatures	fineTuneFeatures;
+    
+    /* Get the current fine tune selections from the user level list.	*/
+    fineTuneFeatures = @call GeodeGetOptrNS (@UserLevelList)::
+		MSG_GEN_ITEM_GROUP_GET_SELECTION ();
+
+    /* Set the fine tune dialog box's feature list.	*/
+    @call GeodeGetOptrNS (@FeaturesList)::
+		MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE
+			(fineTuneFeatures, 0);
+
+    /* Initiate the fine tune dialog box.	*/
+    @call GeodeGetOptrNS (@FineTuneDialog)::MSG_GEN_INTERACTION_INITIATE ();
+}	/* End of MSG_LEVELS_APPLICATION_INITIATE_FINE_TUNE.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_LEVELS_APPLICATION_FINE_TUNE
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Set the application's Fine Tune dialog box's settings.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	???
+
+CHECKS:			None.
+
+PSEUDO CODE/STRATEGY:
+	If the current application feature settings are different from the
+	   actual features list feature settings then
+		Make the features list's settings the current settings.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.10.07	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method LevelsApplicationClass, MSG_LEVELS_APPLICATION_FINE_TUNE
+{
+    optr	userLevelList;
+    LevelsFeatures	newFeatures;
+
+    /* Get the features list's current settings.	*/
+    newFeatures = @call GeodeGetOptrNS (@FeaturesList)::
+		MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS ();
+
+    /* Make the new features reality.	*/
+    userLevelList = GeodeGetOptrNS (@UserLevelList);
+    @send userLevelList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+			(newFeatures, 0);
+    @send userLevelList::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE
+			(TRUE);
+}	/* End of MSG_LEVELS_APPLICATION_FINE_TUNE.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Utility Functions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SetBarState
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the state of the "show bar" boolean group.
+
+CALLED BY:	Internal --	MSG_META_{LOAD,RESET}_OPTIONS,
+				MSG_LEVELS_APPLICATION_SET_USER_LEVEL.
+
+PASS:		LevelsBarState	levelsBarState	= New state for the group.
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	????
+
+	Asserts:	????
+
+CHECKS:			None.
+
+PSEUDO CODE/STRATEGY:
+	If the current state of the show bars group is what was
+	   requested then
+		Nothing to do.
+	Otherwise,
+		Set the show bars group state to that which was requested.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	????
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.10.07	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+static void _pascal SetBarState (LevelsBarStates levelsBarStates)
+{
+    optr		showBarListObject;
+    LevelsFeatures	modifiedFeatures;
+
+    /* Is the appropriate state already set?	*/
+    showBarListObject = GeodeGetOptrNS (@ShowBarList);
+    modifiedFeatures = levelsBarStates ^ @call showBarListObject::
+		MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS ();
+    if (modifiedFeatures)
+	{
+	/*
+	 * Requested state is different from the current state.
+	 * Set the current state to the requested state.
+	 */
+	@send showBarListObject::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE
+			(levelsBarStates, 0);
+	@send showBarListObject::
+			MSG_GEN_BOOLEAN_GROUP_SET_GROUP_MODIFIED_STATE
+				(modifiedFeatures, 0);
+	@send showBarListObject::MSG_GEN_APPLY ();
+	}
+}	/* End of SetBarState().	*/
+

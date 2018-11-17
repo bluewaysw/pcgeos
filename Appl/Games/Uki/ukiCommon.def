@@ -1,0 +1,296 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+PROJECT:	Practice Project
+MODULE:		Go program
+FILE:		ukiCommon.def
+
+Author		Jimmy Lefkowitz, January 14, 1991
+
+	$Id: ukiCommon.def,v 1.1 97/04/04 15:47:08 newdeal Exp $
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;----------------------------------------------------------------------
+;			Common Geode Stuff
+;----------------------------------------------------------------------
+
+_Application		 = 1
+
+include geos.def
+include geode.def
+include Objects/processC.def
+include	file.def
+include library.def
+include object.def
+include graphics.def
+include gstring.def
+include win.def
+include system.def
+include resource.def
+include heap.def
+include ec.def
+
+include timedate.def
+include lmem.def
+include input.def
+include timer.def
+include initfile.def
+include vm.def
+include Objects/winC.def
+include Objects/inputC.def
+
+; -----------------------------------------------------------------------
+;	Product Macros
+;------------------------------------------------------------------------
+_NIKE 	= 0
+
+_JEDI 	= 0
+
+
+;---------------------------------------------------------------------
+;			Libraries Used
+;---------------------------------------------------------------------
+
+ACCESS_INPUT_MANAGER = 1
+UseLib ui.def
+UseLib Objects/vTextC.def
+UseLib sound.def
+
+;
+;	Declaration of our process class
+;
+UkiProcessClass	class	GenProcessClass
+
+MSG_UKI_QUIT							message
+;
+;	quits the program
+;
+UkiProcessClass endc
+
+UkiContentClass	class	VisContentClass
+	
+MSG_UKI_CHOOSE_UKI						message
+;
+; Set up to play uki
+;
+
+MSG_UKI_START							message
+;
+; Starts a new game
+;
+
+MSG_UKI_COMPUTER_MOVE						message
+;
+; Tell the computer to make its next move
+;
+;	Pass:		Nothing
+;	Returns:	Nothing
+;			AX, CX, DX, BP - destroyed
+
+MSG_UKI_COMPUTER_HINT						message
+;
+; Ask the computer to display a hint
+;
+;	Pass:		Nothing
+;	Returns:	Nothing
+;			AX, CX, DX, BP - destroyed
+;
+
+MSG_UKI_SET_PLAY_MODE						message
+;
+; Set the player mode
+;
+;	Pass:		CX	= UkiPlayMode
+;	Returns:	Nothing
+;			AX, CX, DX, BP - destroyed
+;
+
+MSG_UKI_SET_BOARD_SIZE						message
+;
+; Set the board size to be used
+;
+;	Pass	:	CX	= # of rows & columns
+;	Returns:	Nothing
+;			AX, CX, DX, BP - destroyed
+;
+
+MSG_UKI_SET_OBSTACLES						message
+;
+; Set whether or not obstacles are displayed
+;
+;	Pass		CX	= 0 (no obstacles) or 1 (obstacles)
+;	Returns:	Nothing
+;			AX, CX, DX, BP - destroyed
+
+MSG_UKI_SET_SOUND						message
+;
+; Sets the sound options
+;
+;	Pass:		CX	= UkiSound
+;	Returns:	Nothing
+;			AX, CX, DX, BP - destroyed
+;
+
+
+UkiContentClass 	endc
+
+UkiPrimaryClass	class	GenPrimaryClass
+UkiPrimaryClass	endc
+
+
+UkiAssignFunction	macro	func, val
+	mov	es:[func].handle, handle val
+	mov	es:[func].offset, offset val
+endm
+
+include uki.rdef
+
+
+GameDataNode	record
+	GDN_PLAYER1:1
+	GDN_PLAYER2:1
+	GDN_OBSTACLE:1
+	:5
+GameDataNode	end
+
+UkiPlayer	struc
+	SP_player		GameDataNode
+	SP_opponent		nptr
+	SP_numberOfGuys		word
+	SP_human		byte
+	SP_pieceColor		byte
+	SP_activeColor		byte
+	SP_noMoveCount		byte
+	SP_noMoveString		nptr
+UkiPlayer	end
+
+PiecePosition struc
+	x_pos	byte	-1
+	y_pos	byte	-1
+PiecePosition	end
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;				CONSTANTS
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+NUMBER_OF_INITIAL_PLAYERS 	equ	2
+BAD_COORD = 0xff
+
+BACKGROUND_COLOR 		equ	C_LIGHT_GREY
+TRADITIONAL_PLAYER1_COLOR	equ	C_WHITE
+TRADITIONAL_PLAYER2_COLOR	equ	C_BLACK
+PLAYER1_COLOR			equ	C_LIGHT_GREEN
+PLAYER2_COLOR			equ	C_LIGHT_VIOLET
+OBSTACLE_COLOR			equ	C_BLUE
+OBSTACLE_LIGHTER_COLOR		equ	C_LIGHT_BLUE 
+OBSTACLE_DARKER_COLOR		equ	C_DARK_GREY
+PLAYER1_ACTIVE_COLOR		equ	C_GREEN
+PLAYER2_ACTIVE_COLOR		equ	C_VIOLET
+HINT_COLOR			equ	C_RED
+
+UKI_MIN_SIZE 			equ	10
+UKI_MIN_CELL_SIZE		equ	6
+
+UkiInputResponses		etype	byte, 0
+    UKI_MOVE_MADE		enum	UkiInputResponses
+    UKI_NO_MOVE_MADE		enum	UkiInputResponses
+    UKI_ACTIVE_MOVE_MADE	enum	UkiInputResponses
+
+UkiSound			etype	byte, 0
+    US_OFF			enum	UkiSound
+    US_ON			enum	UkiSound
+    US_PREF			enum	UkiSound
+
+UkiPlayMode			etype	word, 0, 2
+    UPM_TWO_PLAYER		enum	UkiPlayMode
+    UPM_PLAY_WHITE		enum	UkiPlayMode
+    UPM_PLAY_BLACK		enum	UkiPlayMode
+    UPM_COMPUTER		enum	UkiPlayMode
+    UPM_COMPUTER_CONTINUOUS	enum	UkiPlayMode
+
+
+idata segment
+
+	;;;;;;;;;;;;;;;;;;functions;;;;;;;;;;;;;;;;
+
+	initGame		fptr.far
+	validMove		fptr.far
+	movePiece		fptr.far
+	adjustMoveValues	fptr.far
+	userInput		fptr.far
+	computerFindMove	fptr.far
+;;;	typeOfMove		fptr.far
+
+
+
+	;;;;;;;;;State variables (must be saved to state file);;;;;;;;;;;;
+StateVariableStart	label	byte
+
+	player1			UkiPlayer	<>
+	player2			UkiPlayer	<>
+	cells			byte 		0
+	obstacles		word		0
+	maxObstacles		word		0
+	computerTwoPlayer	byte		0
+;	computerContinuous	byte		0
+;	generalValue1		byte		0
+	generalValue2		byte		0
+	kbdState		PiecePosition <BAD_COORD,BAD_COORD>
+	kbdVisible		byte		0
+	computerPlayer		nptr		0
+	playMode		byte		0
+	randomSeed		word		0
+	gameOver		byte		1
+	whoseTurn		nptr		0
+	activePiece		PiecePosition <BAD_COORD, BAD_COORD>
+;	turnColor		byte		PLAYER1_COLOR
+	soundState		byte		1
+	firstWin		byte		0
+StateVariableEnd	label	byte
+
+	;;;;;;;;;;;;other variables;;;;;;;;;;;;;;;;;;;;;;;;; 
+	cellDepth		byte		0
+	maxcells		word		0
+	lines			word		0
+	cellSize		word		0
+	xStartCoord		word		0
+	yStartCoord		word		0
+	xEndCoord		word		0
+	yEndCoord		word		0
+	borderWidth		word		0
+
+	borderColor		byte		0
+	backGroundColor1	byte		0
+	backGroundColor2	byte		0
+	boardColor		byte		0
+	viewColor		byte		0
+
+	bestMoveSoFar		byte		0
+	bestMoveCoord		PiecePosition <BAD_COORD,BAD_COORD>
+	hintMoveCoord		PiecePosition <BAD_COORD,BAD_COORD>
+;	hintColor		byte		HINT_COLOR
+	obstacleColor		byte		OBSTACLE_COLOR
+	obstacleLighterColor	byte		OBSTACLE_LIGHTER_COLOR
+	obstacleDarkerColor	byte		OBSTACLE_DARKER_COLOR
+;	xTextOffset		word		0
+	viewWindow		word		0
+	gameBoard		hptr		0
+
+	UkiContentClass
+	UkiPrimaryClass	
+	UkiProcessClass	mask CLASSF_NEVER_SAVED	
+
+idata ends
+
+udata segment
+udata ends
+
+
+BAD_COORDINATE	enum	FatalErrors
+
+
+
+
+
+
+

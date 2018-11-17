@@ -1,0 +1,747 @@
+/*
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+*/
+/***********************************************************************
+ *
+ * PROJECT:       HTMLView
+ * FILE:          HTMLView.goc
+ *
+ * AUTHOR:        Marcus Gr”ber
+ *
+ ***********************************************************************/
+
+/**************************************************************************
+ *      Include files
+ **************************************************************************/
+
+@include <stdapp.goh>
+@include <Objects/Text/tCtrlC.goh>
+
+#include <initfile.h>
+#include <fileEnum.h>
+#include <sysStats.h>
+#include <sem.h>
+
+#include <ansi\string.h>
+#include <ansi\stdio.h>
+#include <ansi\stdlib.h>
+#include <geomisc.h>
+
+@include <fixes.goh>
+@include "htmlview.goh"
+@ifdef COMPILE_OPTION_BOOKMARKS
+@include "bookmark.goh"
+@endif
+@ifdef COMPILE_OPTION_FAVORITES
+@include "favorite.goh"
+@endif
+@include "urlfetch.goh"
+@include "importg.goh"
+@include "expire.goh"
+@include "stattext.goh"
+#include "javascr.h"
+//#include <hlfind.h>
+//#define HEAP_LEAK_CHECKING
+
+@extern object StatusLineDone ;
+
+/***************************************************************************
+ *      UI Objects
+ ***************************************************************************/
+
+@extern object HTMLDocumentGroup;
+
+@include "htmlv_ui.goh"                 /* User interface, App object */
+
+@include "art\toolicon.goh"
+//@include "bboxsmal.goh"
+@include "breadbox.goh"
+
+@extern chunk MsgNoEdit;
+@extern chunk MsgBadEdit;
+@extern chunk MsgBadFile;
+@extern chunk MsgEditInfo;
+@extern chunk MsgClearCache;
+
+@extern object MsgBlank;
+
+@extern visMoniker ClearCacheReset;
+@extern visMoniker ClearCacheDont;
+
+@ifdef COMPILE_OPTION_PARENTAL_CONTROL
+Boolean G_pcBypassed = FALSE;
+AccessFlags G_pcAccess;
+Boolean G_startupPassword = FALSE;  /* hack for busy cursor override */
+@endif
+
+/* user requested stop */
+Boolean G_stopped = FALSE;
+
+@ifdef COMPILE_OPTION_PROGRESS_INDICATOR
+/* TRUE if we are using the progress indicator to show download status */
+Boolean G_progressStatus = FALSE;
+/* TRUE if we are downloading a file, show progress dialog */
+@ifdef COMPILE_OPTION_DOWNLOAD_PROGRESS_DIALOG
+Boolean G_fileDownload = FALSE;
+Boolean G_fileUpload = FALSE;
+Boolean G_allowFileDownloadStatus = FALSE;
+@endif
+@endif
+
+
+/**************************************************************************
+ *              Process class
+ **************************************************************************/
+
+@classdecl HTMLVProcessClass, neverSaved;
+
+/* In HTMLVIEW/SCRAPBK.GOC */
+@extern method HTMLVProcessClass, MSG_HMLVP_COPY_TO_SCRAPBOOK ;
+
+@ifdef COMPILE_OPTION_AUTO_BROWSE
+/* In HTMLVIEW/SCRAPBK.GOC (for lack of a better place) */
+@extern method HTMLVProcessClass, MSG_HMLVP_BULK_TEST_INDEX_FILE_TRIGGER ;
+@extern method HTMLVProcessClass, MSG_HMLVP_BULK_TEST_TRIGGER ;
+@extern method HTMLVProcessClass, MSG_HMLVP_AUTO_BROWSE_TRIGGER ;
+@extern method HTMLVProcessClass, MSG_HMLVP_DO_AUTO_BROWSE ;
+@endif
+
+/* In HTMLVIEW/UIRare.goc */
+@extern method HTMLVProcessClass, MSG_HMLVP_NOTIFY_TOP_CHANGE ;
+@extern method HTMLVProcessClass, MSG_HMLVP_GET_EXTRA ;
+@extern method HTMLVProcessClass, MSG_HMLVP_LOAD_GRAPHICS_CHANGED ;
+@ifdef TV_BW_OPTION
+@extern method HTMLVProcessClass, MSG_HMLVP_TV_BW_CHANGED ;
+@endif
+@ifdef COMPILE_OPTION_SHOW_HIDE_TOOLBAR
+@extern method HTMLVProcessClass, MSG_HMLVP_SHOW_TOOLBAR ;
+@extern method HTMLVProcessClass, MSG_HMLVP_HIDE_TOOLBAR
+@endif
+@ifdef COMPILE_OPTION_TOGGLE_GOTO_BAR
+@extern method HTMLVProcessClass, MSG_HMLVP_TOGGLE_GOTO_BAR ;
+@endif
+@ifdef COMPILE_OPTION_PARENTAL_CONTROL
+@extern method HTMLVProcessClass, MSG_HMLVP_PC_ADD_SITE ;
+@extern method HTMLVProcessClass, MSG_HMLVP_PC_REMOVE_SITE ;
+@extern method HTMLVProcessClass, MSG_HMLVP_PC_TOGGLE ;
+@extern method HTMLVProcessClass, MSG_HMLVP_PC_TURN_OFF ;
+@extern method HTMLVProcessClass, MSG_HMLVP_PC_TURN_ON ;
+@endif
+@ifdef JAVASCRIPT_SUPPORT
+@extern method HTMLVProcessClass, MSG_HMLVP_STANDARD_DIALOG;
+@ifndef JS_ERROR_DIALOG
+@extern method HTMLVProcessClass, MSG_HMLVP_REPORT_JS_ERROR;
+@endif
+@endif
+@if defined(JAVASCRIPT_SUPPORT) || defined(COMPILE_OPTION_AUTO_BROWSE)
+@extern method HTMLVProcessClass, MSG_HMLVP_HTML_OPTIONS_CHANGED;
+@endif
+@ifdef DO_DBCS
+@extern method HTMLVProcessClass, MSG_HMLVP_CHANGE_ENCODING;
+@endif
+
+/* In HTMLVIEW/UIOften.goc */
+@extern method HTMLVProcessClass, MSG_META_NOTIFY ;
+@ifdef COMPILE_OPTION_SHOW_ALLOC_WATCHER_READ_OUT
+@extern method HTMLVProcessClass, MSG_HMLVP_UPDATE_ALLOC_WATCHER_READ_OUT ;
+@endif
+@ifndef UPDATE_ON_UI_THREAD
+@extern method HTMLVProcessClass, MSG_HMLVP_STATUS_UPDATE;
+@extern method HTMLVProcessClass, MSG_HMLVP_STATUS_UPDATE_OPTR ;
+@extern method HTMLVProcessClass, MSG_HMLVP_STATUS_UPDATE_BLOCK ;
+@extern method HTMLVProcessClass, MSG_HMLVP_PROGRESS_TIMER ;
+@extern method HTMLVProcessClass, MSG_HMLVP_UPDATE_PROGRESS_INDICATOR ;
+@extern method HTMLVProcessClass, MSG_HMLVP_STATUS_GET_PTR ;
+@endif
+
+/* Methods in HTMLVIEW/OpenClos.goc */
+@extern method HTMLVProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION ;
+@extern method HTMLVProcessClass, MSG_GEN_PROCESS_TRANSITION_FROM_ENGINE_TO_APPLICATION_MODE ;
+@extern method HTMLVProcessClass, MSG_META_DETACH ;
+@extern method HTMLVProcessClass, MSG_PROCESS_CREATE_UI_THREAD ;
+@extern method HTMLVProcessClass, MSG_HMLVP_OPEN_URL ;
+@ifdef EMAIL_ACCT_CMD
+@extern method HTMLVProcessClass, MSG_NOTIFY_APP_EXITED ;
+@endif
+
+/* Methods in HTMLVIEW/UIActions.goc */
+@extern method HTMLVProcessClass, MSG_HMLVP_NOTIFY_NAVIGATION_CHANGE ;
+@extern method HTMLVProcessClass, MSG_HMLVP_URL_CHANGED ;
+@extern method HTMLVProcessClass, MSG_HMLVP_HOME_TRIGGER ;
+@ifdef COMPILE_OPTION_TOGGLE_GOTO_BAR
+@extern method HTMLVProcessClass, MSG_HMLVP_GOTO ;
+@endif
+@ifdef GLOBAL_INTERNET_BUILD
+@extern method HTMLVProcessClass, MSG_HMLVP_JUMP ;
+@extern method HTMLVProcessClass, MSG_HMLVP_SEARCH ;
+@endif
+@ifdef COMPILE_OPTION_TOGGLE_STATUS_BAR
+@extern method HTMLVProcessClass, MSG_HMLVP_TOGGLE_GOTO_BAR, MSG_HMLVP_TOGGLE_STATUS_BAR ;
+@endif
+@ifndef COMPILE_OPTION_SHOW_HIDE_TOOLBAR
+@extern method HTMLVProcessClass, MSG_HMLVP_OPTIONS_CHANGED ;
+@endif
+@ifdef COMPILE_OPTION_ENABLE_NUMCONN_OPTION
+@extern method HTMLVProcessClass, MSG_HMLVP_NUMCONN_OPTION_CHANGED;
+@endif
+
+@ifdef COMPILE_OPTION_LOCAL_PAGES
+@method HTMLVProcessClass, MSG_HMLVP_NOTIFY_LOCAL_PAGE_CHANGE
+{
+    word sel = CA_NULL_ELEMENT;
+    word count,i;
+    NameToken *page;
+
+    if(localPage != NAME_POOL_NONE)     /* page specified? */
+    {
+      MemLock(OptrToHandle(localPageArray));
+      count = ChunkArrayGetCount(localPageArray);
+      for(i=0; i<count; i++)
+      {
+        page = ChunkArrayElementToPtr(localPageArray, i, NULL);
+        if(*page==localPage)
+        {
+          sel = i;
+          break;
+        }
+      }
+      MemUnlock(OptrToHandle(localPageArray));
+    }
+
+    if(sel != CA_NULL_ELEMENT)          /* found page in current list? select */
+      @send LocalOpenList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(sel, FALSE);
+    else
+      @send LocalOpenList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+
+    /* enable Update trigger if there is something to update */
+    EnabledOrNot(@LocalUpdateTrigger, (sel != CA_NULL_ELEMENT));
+
+    /* we're done with the passed token, if any */
+    if(localPage != NAME_POOL_NONE)
+      NamePoolReleaseToken(namePool, localPage);
+}
+@endif
+
+@ifdef TV_BW_OPTION
+/* currently used when browser exits, may also use when losing focus */
+void RestoreTVBW(void)
+{
+    word tvBW = 0;  /* assume color */
+    /* restore B/W mode set in .ini file */
+    InitFileReadInteger("screen0", "tvOptions", &tvBW);
+    /* second bit from right is BW flag */
+    SetVidBW(tvBW & 2);
+}
+@endif
+
+@method HTMLVProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+@ifdef COMPILE_OPTION_AUTO_BROWSE
+    IBM = 0;                            /* signal termination to auto browser */
+@endif
+    @CallStatusUpdate(
+              _TEXT(""),
+              HTML_STATUS_TYPE_DONE);
+    @call LinkStatus::MSG_STATUS_TEXT_DEINITIALIZE() ;
+
+@ifdef EMAIL_ACCT_CMD
+     GCNListRemove(ConstructOptr(GeodeGetProcessHandle(), 0),
+		   MANUFACTURER_ID_GEOWORKS, GCNSLT_APPLICATION);
+@endif
+
+    DeInitNavigation();                 /* History, Cache File etc. */
+
+@ifdef COMPILE_OPTION_PARENTAL_CONTROL
+     /* remove from notification lists */
+     GCNListRemove(ConstructOptr(GeodeGetProcessHandle(), 0),
+		   MANUFACTURER_ID_GEOWORKS, GCNSLT_PARENTAL_CONTROL_CHANGE);
+     GCNListRemove(ConstructOptr(GeodeGetProcessHandle(), 0),
+		   MANUFACTURER_ID_GEOWORKS, GCNSLT_PARENTAL_CONTROL_WEBSITE_LIST_CHANGES);
+     /* close site file */
+     ParentalControlCloseData();
+@endif
+
+    /* Stop the import thread */
+    ImportThreadEngineStop() ;
+
+    /* Stop the fetch engine */
+    URLFetchEngineStop() ;
+
+@ifdef COMPILE_OPTION_BOOKMARKS
+    /* Close out bookmark access */
+    BookmarksClose() ;
+@endif
+@ifdef COMPILE_OPTION_FAVORITES
+    /* Close out favorites access */
+    FavoritesClose() ;
+@endif
+
+@ifdef COMPILE_OPTION_AUTO_SAVE_OPTIONS
+    /* Save options to INI file before exiting */
+    @call HTMLVApp::MSG_META_SAVE_OPTIONS();
+@endif
+
+@ifdef TV_BW_OPTION
+    RestoreTVBW();
+@endif
+
+    /* @send,forceQueue self::MSG_HMLVP_DEINIT_NAVIGATION(); */
+    return @callsuper();
+}
+
+/* Completely disable the state file for this application. */
+@method HTMLVProcessClass, MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE
+{
+        return (NullHandle);
+}
+//pragma codeseg
+
+@classdecl HTMLVApplicationClass;
+/* Methods in HTMLVIEW/Scrapbk.goc */
+@extern method HTMLVApplicationClass, MSG_META_NOTIFY_WITH_DATA_BLOCK ;
+
+/* Methods in HTMLVIEW/UIRare.goc */
+@extern method HTMLVApplicationClass, MSG_META_SAVE_OPTIONS ;
+@extern method HTMLVApplicationClass, MSG_GEN_APPLICATION_IGNORE_INPUT ;
+@extern method HTMLVApplicationClass, MSG_GEN_APPLICATION_ACCEPT_INPUT ;
+@extern method HTMLVApplicationClass, MSG_HMLVA_START_OPERATION ;
+@extern method HTMLVApplicationClass, MSG_HMLVA_ABORT_OPERATION ;
+@extern method HTMLVApplicationClass, MSG_HMLVA_END_OPERATION ;
+@extern method HTMLVApplicationClass, MSG_HMLVA_REQUEST_DETACH ;
+@extern method HTMLVApplicationClass, MSG_META_IMPLIED_WIN_CHANGE ;
+
+/* Methods in HTMLVIEW/UIOften.goc */
+@extern method HTMLVApplicationClass, MSG_HMLVA_SET_CONNECTION_ERROR ;
+@extern method HTMLVApplicationClass, MSG_HMLVA_CLEAR_CONNECTION_ERROR ;
+@extern method HTMLVApplicationClass, MSG_HMLVA_CHECK_CONNECTION_ERROR ;
+@extern method HTMLVApplicationClass, MSG_META_PTR ;
+@ifdef UPDATE_ON_UI_THREAD
+@extern method HTMLVApplicationClass, MSG_HMLVA_STATUS_UPDATE;
+@extern method HTMLVApplicationClass, MSG_HMLVA_STATUS_UPDATE_OPTR;
+@extern method HTMLVApplicationClass, MSG_HMLVA_STATUS_UPDATE_BLOCK ;
+@extern method HTMLVApplicationClass, MSG_HMLVA_PROGRESS_TIMER ;
+@extern method HTMLVApplicationClass, MSG_HMLVA_UPDATE_PROGRESS_INDICATOR ;
+@extern method HTMLVApplicationClass, MSG_HMLVA_STATUS_GET_PTR ;
+@ifdef COMPILE_OPTION_DOWNLOAD_PROGRESS_DIALOG
+@extern method HTMLVApplicationClass, MSG_HMLVA_UPDATE_DOWNLOAD_PROGRESS_DIALOG;
+@endif
+@endif
+
+/* Methods in HTMLVIEW/OpenClos.goc */
+@extern method HTMLVApplicationClass, MSG_HMLVA_GET_LAUNCH_URL ;
+@extern method HTMLVApplicationClass, MSG_META_QUIT ;
+@extern method HTMLVApplicationClass, MSG_META_IACP_NEW_CONNECTION ;
+
+
+/* Methods in HTMLVIEW/UIActions.goc */
+@extern method HTMLVApplicationClass, MSG_HMLVA_STOP_TRIGGER ;
+@ifdef COMPILE_OPTION_IGNORE_INPUT_DURING_LOADING
+@extern method HTMLVApplicationClass, MSG_HMLVA_IGNORE_INPUT;
+@extern method HTMLVApplicationClass, MSG_HMLVA_ACCEPT_INPUT;
+@extern method HTMLVApplicationClass, MSG_HMLVA_IGNORING_INPUT;
+@endif
+@extern method HTMLVApplicationClass, MSG_HMLVA_MARK_BUSY;
+@extern method HTMLVApplicationClass, MSG_HMLVA_MARK_NOT_BUSY;
+@extern method HTMLVApplicationClass, MSG_HMLVA_OVERRIDE_BUSY;
+@extern method HTMLVApplicationClass, MSG_HMLVA_RESTORE_BUSY;
+
+#define HISTORY_MAXLEN 35               /* maximum length of history entry */
+
+@method HTMLVProcessClass, MSG_HMLVP_HISTORY_QUERY
+{
+    TCHAR buf[HTML_STATIC_BUF],*p;
+    NameToken name;
+
+    if(item==0 && HistoryGetEntryNum()==0)
+    {                                   /* special text for empty list */
+      @call list::
+        MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER_OPTR(item, @HistoryEmpty);
+    }
+    else
+    {
+      name = HistoryGetEntryName(item); /* request item name to buffer */
+      NamePoolCopy(namePool, buf, sizeof(buf), name, &p);
+      NamePoolReleaseToken(namePool, name);
+      if(strlen(p)>HISTORY_MAXLEN)      /* item name too long? */
+      {
+        p[HISTORY_MAXLEN-3] = 0;        /* terminate name */
+        strcat(p,_TEXT("..."));                /* show that it has been truncated */
+      }
+      @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, p);
+                                        /* set list entry */
+      NamePoolDestroyIfDynamic(p);
+    }
+}
+
+@method HTMLVProcessClass, MSG_HMLVP_HISTORY_SELECT
+{
+    optr frameSet;
+    EventHandle evt;
+
+    HWChecksumCheck() ;
+
+    /* request framset of entry */
+    frameSet = HistoryGetEntryFrames(selection);
+
+    /* Make a copy of it to attach to the message. This is not really a good
+       idea because a) the copy could be leaked if the message is not handled
+       and b) there is no intrinsic guarantee that the block in which the
+       frameset chunk lives survives until the message is handled.
+       Of course, this is not likely to cause any problems here. */
+
+    MemLock(OptrToHandle(frameSet));
+    frameSet = LMemDup(frameSet);
+    MemUnlock(OptrToHandle(frameSet));
+
+    HWChecksumCheck() ;
+    evt = @record
+      URLDocumentClass::MSG_URL_DOCUMENT_LOAD_FRAME_SET(frameSet, DIR_GO);
+    HWChecksumCheck() ;
+    @send application::MSG_META_SEND_CLASSED_EVENT(evt, TO_APP_MODEL);
+                                        /* load requested URL */
+}
+
+@ifdef COMPILE_OPTION_HTML_EDITOR
+@method HTMLVProcessClass, MSG_HMLVP_EDIT_TRIGGER
+{
+    MemHandle albHandle, bufH;
+    myAppLaunchBlock *alb;
+    GeodeHandle app;
+    GeodeLoadError err;
+    TCHAR *bufP, *pathPtr, *filePtr, mime[MIME_MAXBUF];
+    PathName editor, tempname;
+    DiskHandle dh;
+    dword ret;
+    NameToken url;
+    word type;
+
+    if( @call textEditorName::MSG_VIS_TEXT_GET_ALL_PTR(editor)==0 )
+    {                                   /* get current editor name */
+      UserStandardDialogOptr(           /* notify user */
+        0, 0, 0, @MsgEditInfo, @MsgNoEdit,
+        (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+        (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+      return;                           /* don't try to launch it */
+    }
+
+    bufH = @call CurrentURLText::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+    bufP = MemLock(bufH);
+    url = NamePoolTokenize(namePool, bufP, TRUE);
+    MemUnlock(bufH);
+    tempname[0] = 0;
+#if PROGRESS_DISPLAY
+    type = LoadURLToFile(&url, tempname, mime, ULM_CACHE, &ret, NullHandle, NAME_POOL_NONE, NULL, 0xFFFF, NULL, NULL);
+#else
+    type = LoadURLToFile(&url, tempname, mime, ULM_CACHE, &ret, NullHandle, NAME_POOL_NONE, NULL, 0xFFFF, NULL);
+#endif
+    NamePoolReleaseToken(namePool, url);
+
+    if(type==URL_RET_MESSAGE)           /* returned some kind of message */
+    {
+      /* Discard block if it contains nothing but this message. */
+      if( OptrToChunk(ret)==0 )
+        MemFree(OptrToHandle(ret));
+      UserStandardDialogOptr(           /* notify user */
+        0, 0, 0, 0, @MsgBadFile,
+        (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+        (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+      MemFree(bufH);
+      return;
+    }
+
+    bufP = tempname;/*MemLock(bufH);*/
+    filePtr = strrchr(bufP,'\\');        /* separate filename from path */
+    if(!filePtr)
+      filePtr = bufP;
+    else
+      *(filePtr++) = 0;
+
+    pathPtr = bufP;
+    dh = ToolsParseDiskOrStandardPath(&pathPtr);
+
+    albHandle = MemAlloc(sizeof(*alb), HF_DYNAMIC, HAF_NO_ERR);
+
+    alb = MemLock(albHandle);
+    memset(alb,0,sizeof(*alb));
+    alb->ALB_appMode = MSG_GEN_PROCESS_OPEN_APPLICATION;
+    alb->ALB_launchFlags = 0;
+    alb->ALB_diskHandle = dh;
+    strcpy(alb->ALB_path,pathPtr);
+    strcpy(alb->ALB_dataFile,filePtr);
+    MemUnlock(albHandle);
+
+    MemFree(bufH);
+
+    err = -1;                           /* this is not an error code */
+    app = UserLoadApplication(
+      0, 0,
+      albHandle,
+      editor, SP_APPLICATION,
+      &err);
+
+    if(app==NullHandle || err!=-1)      /* see LoadURLByDriver() */
+    {
+      UserStandardDialogOptr(           /* notify user */
+        0, 0, 0, @MsgEditInfo, @MsgBadEdit,
+        (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+        (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+    }
+}
+@endif
+
+@method HTMLVProcessClass, MSG_HMLVP_CLEAR_CACHE
+{
+    const StandardDialog2ResponseTriggerTable responseTable = {
+      2,
+      {@ClearCacheReset, IC_YES},
+      {@ClearCacheDont, IC_NO}
+    };
+
+    if(UserStandardDialogOptr(           /* notify user */
+        _TEXT("ResetMemory"), &responseTable, 0, 0, @MsgClearCache,
+        (CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+        (GIT_MULTIPLE_RESPONSE << CDBF_INTERACTION_TYPE_OFFSET)) == IC_YES)
+    {
+      HWChecksumCheck() ;
+
+      /* Do all the work to actually clear out the cache */
+      @call application::MSG_GEN_APPLICATION_MARK_BUSY();
+      SrcCacheClear() ;
+      ObjCacheClear() ;
+      @call application::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+      HWChecksumCheck() ;
+@ifdef COMPILE_OPTION_SHOW_ALLOC_WATCHER_READ_OUT
+      @call oself::MSG_HMLVP_UPDATE_ALLOC_WATCHER_READ_OUT() ;
+@endif
+    }
+}
+
+@ifdef COMPILE_OPTION_LOCAL_PAGES
+@method HTMLVProcessClass, MSG_HMLVP_DELETE_LOCAL_TRIGGER
+{
+    FileLongName currentFile;
+
+    @call LocalDeleteList::MSG_GEN_FILE_SELECTOR_GET_SELECTION(&currentFile);
+
+    FilePushDir();
+    FileSetCurrentPath(HTML_LOCAL_PAGE_SP, HTML_LOCAL_PAGE_DIR);
+    FileDelete(currentFile);
+    FilePopDir();
+
+    @call process::MSG_HMLVP_LOCAL_PAGE_UPDATE();
+}
+
+@method HTMLVProcessClass, MSG_HMLVP_DELETE_LOCAL_FILE
+{
+    /* conditionally enable "delete" trigger if current selection is a file */
+    EnabledOrNot(@LocalDeleteTrigger,
+      GFS_GET_ENTRY_TYPE(entryFlags)==GFSET_FILE &&
+        !(entryFlags & GFSEF_NO_ENTRIES));
+}
+
+@method HTMLVProcessClass, MSG_HMLVP_LOCAL_PAGE_UPDATE
+{
+    static GeodeToken pageToken = {{LOCAL_PAGE_TOKEN}, LOCAL_PAGE_MFID};
+    static FileExtAttrDesc findLocalFEAD[] =
+      {{ FEA_TOKEN, &pageToken, sizeof(GeodeToken), NULL },
+       { FEA_END_OF_LIST, 0, 0, NULL }};
+    static FileEnumParams findLocalFEP=
+      {FESF_GEOS_NON_EXECS,
+       (void *)FESRT_NAME,
+       FILE_LONGNAME_BUFFER_SIZE,
+       findLocalFEAD,
+       FILE_LONGNAME_BUFFER_SIZE * LOCAL_PAGE_LIMIT,
+       0,
+       NULL,
+       NULL,0,0,
+       0};
+
+    word n, i;
+    NameToken *name;
+    MemHandle mh;
+    word found, notHandled;
+    EventHandle evt;
+    struct {
+      FileLongName FLR_name;
+    } *findLocalRet;
+
+    MemLock(OptrToHandle(localPageArray));
+
+    n = ChunkArrayGetCount(localPageArray);
+    for(i=0; i<n; i++)                  /* free currently allocated tokens */
+    {
+      name = ChunkArrayElementToPtr(localPageArray, i, NULL);
+      NamePoolReleaseToken(namePool, *name);
+    }
+    ChunkArrayZero(localPageArray);     /* destory existing array contents */
+
+    /* Get names of files matching the Local Page token. */
+    FilePushDir();
+    FileSetCurrentPath(HTML_LOCAL_PAGE_SP, HTML_LOCAL_PAGE_DIR);
+    found = FileEnum(&findLocalFEP, &mh, &notHandled);
+    FilePopDir();
+
+    if(found)
+    {
+      findLocalRet = MemLock(mh);       /* access search results */
+      for(i=0; i<found; i++)            /* tokenize found names into array */
+      {
+        name = ChunkArrayAppend(localPageArray, 0);
+        *name = NamePoolTokenize(namePool, findLocalRet[i].FLR_name, TRUE);
+      }
+      MemUnlock(mh);
+    }
+
+    MemUnlock(OptrToHandle(localPageArray));
+
+    /* Notify list in UI about new status. */
+    @send LocalOpenList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(found);
+
+    /* Disabled delete command depending on whether there are pages or not */
+    EnabledOrNot(@LocalDelete, found);
+
+    /* Request update from document telling us what page it currently shows */
+    evt = @record URLDocumentClass::
+      MSG_URL_DOCUMENT_REQUEST_LOCAL_PAGE_NOTIFY();
+    @call application::MSG_META_SEND_CLASSED_EVENT(evt, TO_APP_MODEL);
+}
+
+@method HTMLVProcessClass, MSG_HMLVP_LOCAL_PAGE_QUERY
+{
+    FileLongName fileName;
+    NameToken *name;
+
+    MemLock(OptrToHandle(localPageArray));
+    name = ChunkArrayElementToPtr(localPageArray, item, NULL);
+    NamePoolCopy(namePool, fileName, sizeof(fileName), *name, NULL);
+    MemUnlock(OptrToHandle(localPageArray));
+
+    /* Set list entry. */
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, fileName);
+
+}
+
+@method HTMLVProcessClass, MSG_HMLVP_LOCAL_PAGE_OPEN
+{
+    EventHandle evt;
+
+    evt = @record URLDocumentClass::MSG_URL_DOCUMENT_OPEN_LOCAL(selection);
+    @call application::MSG_META_SEND_CLASSED_EVENT(evt, TO_APP_MODEL);
+    @send LocalOpenList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, TRUE);
+}
+@endif
+
+@if defined(JAVASCRIPT_SUPPORT) && defined(DO_ERROR_CHECKING)
+@method HTMLVProcessClass, MSG_HMLVP_ANALYZE_JS
+{  
+    if (jsecontext) {
+	jseEnter();
+	jseGarbageCollect(jsecontext, JSE_COLLECT_AND_ANALYZE);
+	jseLeave();
+    }
+}
+@endif
+
+/***************************************************************************
+ *             Application class
+ ***************************************************************************/
+@ifndef UPDATE_ON_UI_THREAD
+@classdecl HTMLVApplicationClass;
+@endif
+
+
+
+/***************************************************************************
+ *              URL entry field class
+ ***************************************************************************/
+@classdecl URLEntryClass;
+
+@method URLEntryClass, MSG_VIS_TEXT_SET_POINT_SIZE
+{
+    NotifyPointSizeChange npsc;
+
+    pself->UEI_pointSize = *(WWFixedAsDWord *)&pointSize;
+
+    /* pass around info about current font size */
+    npsc.NPSC_pointSize = pself->UEI_pointSize;
+    npsc.NPSC_diffs = 0;
+    SysNotifyWithData(&npsc,sizeof(npsc),
+                      GWNT_POINT_SIZE_CHANGE,
+                      GAGCNLT_APP_TARGET_NOTIFY_POINT_SIZE_CHANGE);
+}
+
+@method URLEntryClass, MSG_URL_ENTRY_GET_POINT_SIZE
+{
+    return pself->UEI_pointSize;
+}
+
+@method URLEntryClass, MSG_VIS_TEXT_SET_FONT_ID
+{
+    NotifyFontChange nfc;
+
+    pself->UEI_plainFont = fid;
+
+    /* pass around info about current font */
+    nfc.NFC_fontID = pself->UEI_plainFont;
+    nfc.NFC_diffs = 0;
+    SysNotifyWithData(&nfc,sizeof(nfc),
+                      GWNT_FONT_CHANGE,
+                      GAGCNLT_APP_TARGET_NOTIFY_FONT_CHANGE);
+}
+
+@method URLEntryClass, MSG_URL_ENTRY_GET_FONT_ID
+{
+    return pself->UEI_plainFont;
+}
+
+@ifdef GLOBAL_INTERNET_BUILD
+/*
+ * forward search request to HTML area
+ */
+@extern method URLEntryClass, MSG_SEARCH
+{
+    optr display;
+
+    /* throw away current search params */
+    MemFree(searchInfo);
+    /* forward to HTML area if there is one */
+    display = @call HTMLDisplayGroup::MSG_GEN_FIND_CHILD_AT_POSITION(0);
+    if (display) {
+	/* make HTML area active */
+	@call HTMLDisplayGroup::MSG_META_GRAB_TARGET_EXCL();
+	/* now, just do a search from top */
+	@send SearchReplaceControl::MSG_SRC_FIND_FROM_TOP();
+    }
+}
+@endif
+
+/* convenient way to ensure start of URL is shown */
+@method URLEntryClass, MSG_VIS_TEXT_REPLACE_ALL_PTR
+{
+    VisTextGetLineInfoParameters lParams;
+    VisTextGetLineInfoReturnValues lRet;
+    LineInfo lineInfo;
+    VisTextConvertOffsetParams offsetParams;
+    
+    @callsuper();
+    /* if we have line, make sure start of it is visible */
+    lParams.VTGLIP_buffer = &lineInfo;
+    lParams.VTGLIP_bsize = sizeof(LineInfo);
+    lParams.VTGLIP_line = 0;  /* get first line */
+    /* contrary to docs, 0 is returned on success */
+    if ((@call oself::MSG_VIS_TEXT_GET_LINE_INFO(&lRet, &lParams)) == 0) {
+	offsetParams.VTCOP_offset = 0;
+	@call oself::MSG_VIS_TEXT_CONVERT_OFFSET_TO_COORDINATE(&offsetParams);
+	@call oself::MSG_VIS_TEXT_SCROLL_ONE_LINE(offsetParams.VTCOP_xPos);
+    }
+}
+

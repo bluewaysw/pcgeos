@@ -1,0 +1,679 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	Responder
+MODULE:		hardware interface
+FILE:		respondr.def
+AUTHOR:		Steve Jang, Mar 29, 1995
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SJ	3/29/95   	Initial revision
+
+DESCRIPTION:
+	Responder hardware(E3G) interface.
+		
+	$Id: respondr.def,v 1.1 97/04/04 14:13:23 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+StartLibrary	respondr
+
+include	Internal/respondrStr.def	; contains all records and structures
+					; ***********************************
+; ==================
+;  ROUTINES TO CALL
+; ==================
+
+;
+; The routines marked as "FIXED" means that they may be called at interrupt
+; time.  The other routines should not be called at interrupt time.
+;
+
+;----------------------------------------------------------------------------
+; CLIENT REGISTRATION
+;
+global RespRegisterForNMI:far
+; Register a callback routine for NMI notifications
+; PASS:		ax	= ResponderMachineStatus to indicate notifications
+;			  the client is interested in
+;		cxdx	= callback to call when NMI occurs
+; RETURN:	carry set on error
+;		otherwise
+;			cx	= client handle
+; CALLBACK:
+;		PASS:	on stack: {word} ResponderNotificationType
+;			( popped by the time it returns )
+;		RETURN: as soon as possible, nothing
+;
+global RespUnregisterForNMI:far
+; Unregister the callback routine from responder NMI notification list
+; PASS:		cx	= client handle
+; RETURN:	nothing
+;
+
+;----------------------------------------------------------------------------
+; REAL TIME CLOCK
+;
+global RespGetRealTimeClock:far
+; Get system time from hardware real time clock
+; ( applications should use TimerGetDateAndTime rather than this routine )
+; Pass:		es:di	= buffer for RealTimeStruct
+; Return:	es:di	= filled in
+;
+global RespSetRealTimeClock:far
+; Set system time
+; Pass:		ds:si	= RealTimeStruct
+; Return:	nothing
+;
+global RespSetRTCAlarm:far
+;
+; Called by Kernel to reprogram responder RTC
+; Nobody other than the kernel should call this routine
+;
+; Pass: bl	= sec
+;       bh	= min
+;	cl	= hour
+; Return:
+;	nothing
+;
+
+RespGetCMOSBatteryStatus	equ	RESPGETCMOSBATTERYSTATUS
+global RESPGETCMOSBATTERYSTATUS:far
+;
+; Returns non-zero if the CMOS values were lost since the last time this
+; value was read, due to a low battery.
+;
+; Pass: nothing
+; Return: ax non-zero if CMOS values not valid
+;
+
+;----------------------------------------------------------------------------
+; POWER MANAGEMENT
+;
+global RespGetPowerMgmtMode:far
+;
+; get the status of power management
+;
+; Pass:	  none
+; Return: al = PMSRFlag
+;
+; FIXED
+;
+global RespGetPMIStatus:far
+;
+; Get PMI status
+;
+; Pass:   none
+; Return: ax = PMISRFlag
+;
+; FIXED
+;
+
+;
+; In this record, RWS_INTR_RBUS, RWS_INT_SER are OBSOLETE but does not do
+; any harm.  These interrupts are masked and unmasked only by calling
+; RespPowerUp/DownExtSerial.  Keyboard interrupts are not included in this
+; record since they mainly depend on LID status and what state power management
+; driver is in.  They can be controlled by calling RespEnable/DisableKbd.;
+; I thought you might want to know...
+;
+RespWakeupSource	record
+  :7
+  RWS_RTC:1		; 1= turn on RTC int
+  RWS_TMR0:1		; 1= turn on TMR0 int
+  RWS_INTR_RBUS:1	; 1= turn on RBUS int
+  RWS_INTR_SER:1	; 1= turn on serial ints	
+  RWS_PMI0:1		; 1= LID NMIs wake up CPU from suspend
+  RWS_PMI1_ON:1		; 1= PHONE ON NMI wakes up CPU from suspend
+  RWS_PMI1_OFF:1	; 1= PHONE OFF NMI wakes up CPU from suspend
+  RWS_PMI8:1		; 1= interrupts wakeup CPU
+  RWS_PMI_REST:1	; 1= rest of the PMIs wake up CPU
+RespWakeupSource	end
+
+;
+; mask0 = any interrupt can wakeup machine
+;
+RWS_MASK0	equ	mask RWS_RTC or \
+			mask RWS_TMR0 or \
+			mask RWS_INTR_RBUS or \
+			mask RWS_INTR_SER or \
+			mask RWS_PMI0 or \
+			mask RWS_PMI1_ON or \
+			mask RWS_PMI1_OFF or \
+			mask RWS_PMI8 or \
+			mask RWS_PMI_REST
+
+;
+; mask1 = all but TRM0 wakeup enabled
+;
+RWS_MASK1	equ	RWS_MASK0 and (not mask RWS_TMR0)
+
+;
+; mask2 = Phone on wakeup only
+;	  some interrupts are enabled but they will not wakeup the machine
+;
+RWS_MASK2	equ	mask RWS_TMR0 or \
+			mask RWS_INTR_RBUS or \
+			mask RWS_PMI8 or \
+			mask RWS_PMI1_ON
+;
+; mask3 = TMR0 int, RBUS int and PHONE ON NMI will wake up machine from "NAP"
+;         ( this mask is only used when going into BATT_LO_NAP )
+;
+RWS_MASK3	equ	RWS_MASK2
+
+global RespSetWakeupMask:far
+;
+; Called by power driver to set wakeup sources before going into suspend
+;
+; Pass:	ax = RespWakeupSource
+; Return: nothing
+;
+global RespEnterNap:far
+;
+; Called by Power driver and lets the system enter hardware nap mode
+; In nap mode, CPU clock is stopped, but all other the clocks are active.
+;
+; Pass: nothing
+; Return: nothing
+;
+; FIXED
+;
+
+global RespEnterSusp:far
+;
+; Called by power driver and lets the system enter hardware suspend mode
+; In suspend mode, all clocks are stopped except for RTC clock.
+;
+; Pass: nothing
+; Return: nothing
+;
+;
+; FIXED
+;
+
+
+global RespEnterCriticalSusp:far
+;
+; Called by power driver when we want to enter a battery-low suspend. We stay
+; there until woken up by a phone-on NMI...
+;
+; Pass: nothing
+; Return: nothing
+;
+;
+; FIXED
+;
+
+;----------------------------------------------------------------------------
+; CHIP CONFIGURATION
+;
+global RespGetGlobalPeripheralDisableL:far
+;
+; Get global peripheral disable register low byte
+;
+; Pass:   none
+; Return: al = GLOBALDISLFlag
+;
+; FIXED
+;
+global RespGetGlobalPeripheralDisableH:far
+;
+; Get global peripheral disable register high byte
+;
+; Pass:   none
+; Return: al = GLOBALDISHFlag
+;
+; FIXED
+;
+global RespSetGlobalPeripheralDisableL:far
+;
+; Set global peripheral disable register low byte
+;
+; Pass:   al = GLOBALDISLFlag
+; Return: none
+;
+; FIXED
+;
+global RespSetGlobalPeripheralDisableH:far
+;
+; Set global peripheral disable register high byte
+;
+; Pass:   al = GLOBALDISHFlag
+; Return: none
+;
+; FIXED
+;
+
+;----------------------------------------------------------------------------
+; DISPLAY CONTROL
+;
+global RespSetDisplayController:far
+;
+; Set display controller mode
+;
+; Pass:   al = DisplayCtrlModeFlag
+; Return: none
+;
+; FIXED
+;
+global RespPowerDownVideo:far
+;
+; ditto
+;
+; Pass:   none
+; Return: none
+;
+; FIXED
+;
+global RespPowerUpVideo:far
+;
+; ditto
+;
+; Pass:   none
+; Return: none
+;
+; FIXED
+;
+
+;----------------------------------------------------------------------------
+; TIMER/COUNTER UNIT
+;
+global RespSetCounterCtrl:far
+;
+; Set mode of a counter
+;
+; Pass:   al = TMRCONFlag
+; Return: none
+;
+; FIXED
+;
+global RespSetCounterLatchCmd:far
+;
+; Latch the value of a counter for read operation
+;
+; Pass:   al = TMRCONFlag ( note that TMRCONF_RW must be set to 00b )
+; Return: none
+;
+; FIXED
+;
+global RespSetCounterReadBackCmd:far
+;
+; Latch status or value(or both) of counter(s).
+;
+; Pass:   al = CounterReadBackFlag
+; Return: none
+;
+; FIXED
+;
+global RespSetCounter:far
+;
+; Set byte value of a counter
+;
+; Pass:   bl = TMRCONScVal( TMRCONSV_RB doesn't count )
+;		bh = RespCounterSize
+;		if counter is word size,
+;			ax = value
+;		if byte size
+;			al = value
+; Return: none
+;
+; FIXED
+;
+;NOTE:		This routine does not do checking for counter size.
+;		Notice that you can call this routine twice with bh=RCS_WORD
+;		in order to set a counter of size word.  Please read h/w spec.
+;
+global RespGetCounter:far
+;
+; read a counter byte
+;
+; Pass:   dl = TMRCONScVal( TMRCONSV_RW is not valid );
+; Return: al = byte read from counter
+;		( in case of word size counter, one should call this
+;		  routine twice to get low byte first and then high byte;
+;		  or you can call RespGetCounterWord )
+;
+; FIXED
+;
+global RespGetCounterWord:far
+;
+; Get value of a counter when it is a word
+;
+; Pass:   dl = TMRCONScVal( TMRCONSV_RW is not valid 
+; Return: ax = word read from counter
+;
+; FIXED
+;
+
+;----------------------------------------------------------------------------
+; KEYBOARD
+;
+global RespDisableKbd:far
+;
+; Disable Keyboard logic
+;
+; Pass:  nothing
+; Return: nothing
+;
+global RespEnableKbd:far
+;
+; Enable Keyboard logic
+;
+; Pass:  nothing
+; Return: nothing
+;
+global RespSetKbdScanOut:far
+;
+; Set KBD SCAN OUT register
+;
+; Pass:   al = KBOUTFlag
+; Return: none
+;
+; FIXED
+;
+global RespGetKbdScanOut:far
+;
+; Get KBD SCAN OUT register
+;
+; Pass:   none
+; Return: al = KBOUTFlag
+;
+; FIXED
+;
+global RespSetKbdScanEnable:far
+;
+; Set KBD SCAN ENABLE
+;
+; Pass:   al = KBENABLEFlag
+; Return: none
+;
+; FIXED
+;
+global RespGetKbdInput:far
+;
+; Get Kbd Input register
+;
+; Pass:   none
+; Return: ax = KBINFlag
+;
+; FIXED
+;
+global RespSetKbdIntEnable:far
+;
+; Set Kbd Int Enable
+;
+; Pass:   ax = KBINTENFlag
+; Return: none
+;
+; FIXED
+;
+global RespGetKbdIntEnable:far
+;
+; Get Kbd Int Enable
+;
+; Pass:   none
+; Return: ax = KBINTENFlag
+;
+; FIXED
+;
+global RespSetKbdIntCtrl:far
+;
+; Set kbd int control register
+;
+; Pass:   al = KBCTRLFlag
+; Return: none
+;
+; FIXED
+;
+global RespCatchKbdInterrupt:far
+;
+; Catches the keyscan vector for the keyscan interrupt level. 
+;
+; Pass:	  bx:cx = Routine to be invoked
+;	  es:di = Place to store previous vector
+; Return: nothing
+;
+; FIXED
+;
+global RespResetKbdInterrupt:far
+;
+; Resets the vector for the keyscan interrupt level. 
+;
+; Pass:	  es:di = Place where previous vector was stored.
+; Return: nothing
+;
+; FIXED
+;
+
+;----------------------------------------------------------------------------
+; PULSE WIDTH MODULATOR
+;
+global RespSetPWMCtrl:far
+;
+; Set PWM_CTRL
+;
+; Pass:   al = PWMCTRLFlag
+; Return: none
+;
+; FIXED
+;
+global RespSetDutyCycle:far
+;
+; Set PWM_DUTY_CYCLE register
+;
+; Pass:   al = value for DUTY CYCLE of PWM(1-254) or
+;		     PWM_CNST_STOP_CLK_OUT0 or
+;		     PWM_CNST_STOP_CLK_OUT1
+; Return: none
+;
+; FIXED
+;
+global RespGetPWMCtrl:far
+;
+; Get the value in PWM_CONTROL register
+;
+; Pass:   none
+; Return: al = PWMCTRLFlag
+;
+; FIXED
+;
+global RespGetDutyCycle:far
+;
+; Get value in PWM_DUTY_CYCLE register
+;
+; Pass:   none
+; Return: al = value in PWM_DUTY_CYCLE register
+;
+; FIXED
+;
+
+;----------------------------------------------------------------------------
+; SERIAL PORT
+;
+global RespGetSerial:far
+;
+; Get IO address of UART
+;
+; Pass:   ax = UartID
+; Return: ax = starting IO address ofr register set that controled UART
+;
+; FIXED
+;
+
+;----------------------------------------------------------------------------
+; IR PORT
+;
+global RespGetIrDASelect:far
+;
+; Get IRDASEL register value
+;
+; Pass:   none
+; Return: al = IRDASELFlag
+;
+; FIXED
+;
+global RespSetIrDASelect:far
+;
+; Set IRDASEL register value
+;
+; Pass:   al = IRDASELFlag
+; Return: none
+;
+; FIXED
+;
+
+;----------------------------------------------------------------------------
+; MISCELLANEOUS
+;
+global RespGetPhoneModuleStatus:far
+;
+; Get Status of Phone module
+;
+; Pass:   nothing
+; Return: carry set if on
+;	  carry clear if off
+;
+; FIXED
+;
+global RespSetPhoneModuleStatus:far
+;
+; Turn phone module on for PDA service request
+; Phone module will go off after answering one service request
+;
+; Pass:	nothing
+; Return: nothing
+;
+; FIXED
+;
+global RespGetLidStatus:far
+;
+; Get Status of Lid
+;
+; Pass:	nothing
+; Return: carry clear if open; carry set if closed 	  
+;
+; FIXED
+;
+global RespHardwareStatusChange:far
+;
+; Called by Kernel timer interrupt through responder power driver to notify
+; hardware status change
+;
+; Pass:	bx	= statusChange
+;	cx	= current machine status
+; Return:
+;	nothing
+;
+; FIXED
+;
+global RespNotifyStatusChange:far
+;
+; Force responder library to send out the notification passed in to registered
+; clients
+;
+; Pass: bx	= ResponderNotificationType
+; Return: nothing
+;
+
+global RespSetContrastLevel:far
+;
+; Set current contrast level for the screen
+;
+; Pass: al = 1-16 value for contrast level
+; Return: nothing
+;
+
+global	CallOnUiThread:far
+;
+; Call a routine on UI thread; this utility routine can be used to have
+; routines called on UI thread, so that you can call things on interrupt time.
+; It only works if you don't expect a value back.
+;
+; Pass:	ax,bx,cx,dx	= arguments to the called routine
+; 	sidi		= routine to be called( vseg will do )
+; Return: carry set if UI thread does not exist yet
+;
+
+RespReloadSuspTimer	equ	RESPRELOADSUSPTIMER
+;
+; Reload LTI timer to user setting so that suspend gets delayed as much as
+; LTI timer value.
+;
+; Pass:	nothing
+; Return: nothing
+;
+
+global	RespPowerUpExtSerial:far
+;
+; Perform correct power initialization sequence for external serial port such
+; as RS-232 or IR port unit
+; Pass: ax = SERIAL_PORT?
+; Return: nothing
+;
+global	RespPowerDownExtSerial:far
+;
+; Perform correct power down sequence for external serial device
+; Pass: ax = SERIAL_PORT?
+; Return: nothing
+;
+
+global	RespReadRTCCMOS:far
+;
+; Reads the data byte at the given address in RTC CMOS
+; Pass: ah = address
+; Return: al = value
+;
+global	RespWriteRTCCMOS:far
+;
+; Writes the data byte to the given address in RTC CMOS
+; Pass: ah = address
+;	al = value
+;
+
+RespDriveRbus		equ	RESPDRIVERBUS
+;
+; Activate the RBUS TxD line (the line now gets driven by the chip)
+;
+; Pass: nothing
+; Return: nothing
+;
+
+global	RespSetBacklightState:far
+;
+; Turns on the backlighting on or off.
+; Pass: ax = non-zero to turn it on
+;	     zero to turn it off
+;
+
+RespGetPDAHardwareInfo	equ	RESPGETPDAHARDWAREINFO
+;
+; Returns some information about the PDA hardware
+; Pass: nothing
+; Return: PDAHardwareInfo
+;
+
+; 
+; ============================================================================
+; C stubs
+; ============================================================================
+
+global	RESPREGISTERFORNMI:far
+global	RESPUNREGISTERFORNMI:far
+global	RESPDISABLESUSP:far
+global	RESPENABLESUSP:far
+global	RESPNOTIFYBATTERYSTATUS:far
+global	RESPGETPHONEMODULESTATUS:far
+global	RESPSETPHONEMODULESTATUS:far
+global	RESPGETLIDSTATUS:far
+global	RESPRELOADSUSPTIMER:far
+global	RESPREADRTCCMOS:far
+global	RESPWRITERTCCMOS:far
+global	RESPDRIVERBUS:far
+global	RESPSETBACKLIGHTSTATE:far
+global	RESPGETPDAHARDWAREINFO:far
+
+EndLibrary	respondr

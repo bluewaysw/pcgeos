@@ -1,0 +1,472 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1994 -- All Rights Reserved
+
+PROJECT:	SPUI
+MODULE:		
+FILE:		olButtonClass.def
+
+AUTHOR:		David Litwin, Oct  6, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	10/ 6/94		Initial revision
+
+
+DESCRIPTION:
+	Definition of OLButtonClass.
+		
+	$Id: olButtonClass.def,v 1.2 98/03/11 06:10:54 joon Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+	;
+	;	For documentation of the OLButtonClass see:
+	;	/staff/pcgeos/Spec/olButtonClass.doc
+	; 
+
+
+OLButtonClass	class VisClass
+	uses	GenTriggerClass
+
+REDRAW_VIA_QUEUE = TRUE	;if this seems OK in non-error checking code, 
+			;make it permanent.
+
+;------------------------------------------------------------------------------
+;	Methods
+;------------------------------------------------------------------------------
+
+MSG_OL_BUTTON_REDRAW		message
+;	This method is sent by OLButtonDrawLATERIfNewState if there is
+; no pending EXPOSE event, and we want to draw the button at a later time.
+
+MSG_OL_BUTTON_SET_DRAW_STATE_UNKNOWN	message
+;	Set this button as invalid so that no optimizations are attempted
+; the next time it is drawn.
+
+MSG_OL_BUTTON_SETUP	message
+;	This method is sent to OLButtonClass and OLMenuButtonClass objects to
+; initialize some instance data.  MAY NOT BE USED on generic objects.
+; (See HINT_MDI_LIST_ENTRY)
+;
+;	Pass:	cx	- chunk handle of Generic object associated with this
+;			  button: will use for moniker, gen queries, etc.
+;			  For buttons which open windows, and for menubuttons
+;			  (which of course open menus), this is the handle
+;			  of the window to open.
+;		dl	- window type (OLWT_MENU, OLWT_SUBMENU, etc)
+;				(if button opens a window)
+;		dh	- OLWinFixedAttr (contains OWFA_IS_MENU, etc)
+;		bp	- OLBuildFlags from OLPopupWin object this button opens
+;			(contains info about whether this button has been
+;			adopted by a GenPrimary above the GenDisplayControl,etc)
+
+MSG_OL_BUTTON_GET_GEN_PART	message
+;	see method handler for doc
+
+if _OL_STYLE	;---------------------------------------------------------------
+
+MSG_OL_BUTTON_SET_BORDERED	message	VisSpecMessages
+;	This is sent by a menu when it is pinned. This method must be able
+; to decend through levels of sub-groups within a menu, so we define it
+; as a VisClass method. It is handled in OLCtrl class to handle cases where
+; we want it sent into SUB_GROUPs in menus. We use VisIfFlagSetCallVisChildren
+; to send this to visible children, to prevent it from being sent into
+; children which are WIN_GROUPs.
+;	Pass:	CX - TRUE to make the button bordered, FALSE to not
+
+endif		;---------------------------------------------------------------
+
+MSG_OL_BUTTON_QUERY_IS_TRIGGER		message
+; Sent by OLMenuItemGroup object, to see if next sibling is a trigger-
+; type object or not, so will know whether to draw bottom separator.
+
+MSG_OL_BUTTON_SET_WIN_FLAG		message
+;
+; Set that the button invokes a window
+
+MSG_OL_BUTTON_CLEAR_WIN_FLAG		message
+;
+; Set that the button does not invoke a window
+
+MSG_OL_BUTTON_KBD_ACTIVATE		message
+;
+;	This method is sent to this button is several situations related to
+; keyboard navigation. We handle this by sending a GEN_ACTIVATE to ourself,
+; then closing all stay-up-mode menus in the system.
+;
+;	Pass:	nothing
+;	Return:	nothing
+
+if BUBBLE_HELP
+MSG_OL_BUTTON_BUBBLE_TIME_OUT		message
+;
+; Message sent when bubble help has timed out.  Close bubble help.
+;
+;	Pass:	nothing
+;	Return:	nothing
+;
+
+MSG_OL_BUTTON_BUBBLE_DELAY_TIME_OUT		message
+;
+; Message sent when bubble help delay timer has expired.  Create
+; the bubble help.
+;
+;	Pass:	nothing
+;	Return:	nothing
+;
+endif
+
+;------------------------------------------------------------------------------
+;	Hints
+;------------------------------------------------------------------------------
+; Specific hints:
+
+    HINT_SYS_ICON		vardata
+		;this is used internally in the specific UI when creating
+		;a button for the title area of a window.
+
+    HINT_GCM_SYS_ICON		vardata
+		;this is used internally in the specific UI when creating
+		;a button for a GCM Primary window. Is same as HINT_SYS_ICON,
+		;but sets an additional attribute flag.
+
+    HINT_MDI_LIST_ENTRY vardata
+    ; This hint is used internally by the specific UI when creating a list
+    ; entry which will appear in the MDI windows menu.  The specific UI
+    ; uses this hint to set certain flags for appropriate behavior.
+    ; 
+    ; Has 1 word of data following, which is the chunk handle of the generic
+    ; object in the same block which should be used for its generic
+    ; moniker/enable bit.  This should be stuffed in before the first method
+    ; is sent to the object, as this data is copied out in MSG_META_INITIALIZE.
+
+if _STYLUS
+    HINT_CLOSE_BUTTON		vardata
+	;this is the exit button for a window or dialog
+endif
+
+
+ATTR_OL_BUTTON_IN_TITLE_BAR	vardata
+; Internal flag indicating that the OLButton object is in a title bar group.
+
+ATTR_SYSTEM_MENU_CLOSE		vardata
+; Internal flag indicating that this is the Close item for a window's
+; system menu.  Used to always enable it if in
+; ALLOW_ACTIVATION_OF_DISABLED_MENUS mode, cause it'll be pinnable, must allow
+; dismissing.
+
+if _ROUND_THICK_DIALOGS
+ATTR_OL_BUTTON_ROUNDED_TOP_LEFT_CORNER		vardata
+; Internal flag used only when round thick dialogs are enabled
+; (Stylus SPUI).  This flag is referenced when the
+; OLBOF_HAS_ROUNDED_TOP_CORNER flag has been set.  This is for buttons in
+; the title bar that have to have rounded corners.  If
+; OLBOF_HAS_ROUNDED_TOP_CORNER is set, and this attribute is not present,
+; then the button is assumed to have a rounded top right corner
+
+ATTR_OL_BUTTON_NO_ROUNDED_TOP_CORNER		vardata
+; Internal flag used only when round thick dialogs are enabled
+; (Stylus SPUI).  This flag indicates that the button is in the title
+; bar, but does not have a rounded top corner (it is not on either end).
+; This is used for optimization in OLButtonVisOpen.
+
+endif
+
+
+if BUBBLE_HELP
+TEMP_OL_BUTTON_BUBBLE_HELP			vardata	BubbleHelpData
+;
+; Temporary bubble help info
+;
+endif
+
+if BUBBLE_HELP
+;
+; More bubble help stuff -- to avoid opening on second click.
+;
+TEMP_OL_BUTTON_BUBBLE_HELP_JUST_CLOSED		vardata
+endif
+
+;------------------------------------------------------------------------------
+;	Constants & Structures
+;------------------------------------------------------------------------------
+;Fixed attributes: describe how this OLButtonClass object is subclassed,
+;and provides some contextual info.
+
+OLButtonFixedAttrs	record
+    OLBFA_GCM_SYS_ICON:1	;set if button is a GCM icon in the header area
+				;(implies OLBSS_SYS_ICON)
+    OLBFA_DEFAULT_FOCUS:1	;set if button has HINT_DEFAULT_FOCUS on it.
+  
+    ;these two are mutually exclusive.
+
+    OLBFA_MASTER_DEFAULT_TRIGGER:1 ;set if HINT_DEFAULT_DEFAULT_ACTION is present. During
+				;SpecBuild, will notify window that this trigger
+				;gets the DEFAULT exclusive if no other trigger
+				;has requested it.
+
+    OLBFA_CAN_BE_TEMP_DEFAULT_TRIGGER:1
+				;set by default, except in for non-reply
+				;bar buttons in Motif.
+				;Reset with HINT_TRIGGER_DESTRUCTIVE_ACTION;
+				;set with HINT_ENSURE_TEMPORARY_DEFAULT.
+				;When gain the FOCUS exclusive, prevents this
+				;trigger from grabbing the DEFAULT exclusive.
+
+    OLBFA_IMMEDIATE_ACTION:1	;set if ATTR_GEN_TRIGGER_IMMEDIATE_ACTION (should send the
+				;MSG_GEN_TRIGGER_SEND_ACTION before it takes the menu down.)
+
+    OLBFA_IN_REPLY_BAR:1	;set if GenTrigger is located inside reply bar,
+				;and so needs larger margins, etc.
+    OLBFA_FORCE_SHORTCUT:1
+    ;set if shortcut should be shown even if it would otherwise not be
+    ;(i.e. gstring, not in a menu)
+    ;(set by HINT_SHOW_SHORTCUT, used if not keyboard-only or no-keyboard modes)
+
+    OLBFA_FORCE_NO_SHORTCUT:1
+    ;set if shortcut should *not* be shown even if it would otherwise be
+
+OLButtonFixedAttrs	end
+
+			
+OLButtonMoreAttrs	record
+    OLBMA_EXPAND_WIDTH_TO_FIT_PARENT:1
+    OLBMA_EXPAND_HEIGHT_TO_FIT_PARENT:1
+    OLBMA_CAN_CLIP_MONIKER_WIDTH:1
+    OLBMA_CAN_CLIP_MONIKER_HEIGHT:1
+    OLBMA_CENTER_MONIKER:1
+    ;Various geometry attributes for the button.  Must be in same order as in
+    ;OLGlyphDisplay!
+
+    OLBMA_IN_TOOLBOX:1		;set if in toolbox
+    OLBMA_DRAW_SHORTCUT_BELOW:1
+    ;set if keyboard accelerator should be draw below moniker instead of
+    ;to the right
+
+    OLBMA_WAS_DOUBLE_CLICKED:1	;set if was double-clicked on last press
+OLButtonMoreAttrs	end
+
+;******************************************************************************
+;	WARNING		WARNING		WARNING		WARNING		WARNING
+;There are many dependencies between the following two structures:
+;SpecState and OptFlags, and between GI_states, and some record in
+;Chris's moniker drawing code. Change these records VERY CAREFULLY!
+;******************************************************************************
+
+;These flags are derived from the specific type of this button. They indicate
+;the state that the button should be in:
+
+OLButtonSpecState	record
+    ;MOVE SOME OF THESE TO OLButtonFixedAttrs to gain some space.
+    OLBSS_IN_MENU:1		;set if button is inside a menu or sub-menu.
+    OLBSS_IN_MENU_BAR:1		;set if button is in the menu bar
+    OLBSS_SETTING:1		;set if subclassed by OLSettingClass
+    OLBSS_SYS_ICON:1		;set if button is an system icon: border is
+				;square and hugs bitmap passed as VisMoniker,
+				;GenPrimary is visdad.
+
+    ;The following two flags are copied from OLBSS_BORDERED and OLBSS_DEPRESSED
+    ;when the user begins to interact with a button. When the user is done,
+    ;this flags are copied back, greatly simplifying our code across spec uis.
+
+    OLBSS_WAS_BORDERED:1	;set if button was bordered before pressed. 
+
+    OLBSS_DEFAULT_TRIGGER:1	;set if HINT_DEFAULT_DEFAULT_ACTION is present. During
+				;SpecBuild, will notify window that this trigger
+				;gets the DEFAULT exclusive if no other trigger
+				;has requested it.
+
+    OLBSS_WAS_DEPRESSED:1	;set if button was depressed before pressed. 
+
+    OLBSS_HAS_MOUSE_GRAB:1	;set if button has active mouse grab
+
+    ;the following 8 flags must be in the lower byte of this record
+
+    OLBSS_MENU_DOWN_MARK:1	;set if button leads to a vertical menu
+    OLBSS_MENU_RIGHT_MARK:1	;set if button leads to a submenu
+    OLBSS_WINDOW_MARK:1		;set if button leads to a dialog box
+
+    ;the following flags match flags in OLButtonOptFlags
+
+    OLBSS_DEFAULT:1		;set if this button has the DEFAULT exclusive
+				;for this window.
+    OLBSS_BORDERED:1		;set if button should not be drawn with a
+    				;border
+    OLBSS_SELECTED:1		;set if the button should be drawn selected
+				;(checkmark to left of button)
+    OLBSS_DEPRESSED:1		;set if button should be drawn depressed (the
+    				;mouse is over the button, OR the keyboard
+				;selection cursor is on this button AND this
+				;button type does not show cursored emphasis
+				;as a dotted outline box.)
+    OLBSS_CURSORED:1		;set if the button should be drawn selected
+OLButtonSpecState	end
+
+;Note: the above structures must match OLMonikerAttrs and OLButtonOptFlags...
+
+.assert (mask OLBSS_MENU_DOWN_MARK eq mask OLMA_DISP_DOWN_ARROW), \
+		"ERROR: OLButtonSpecState does not match OpenMonikerFlags"
+.assert (mask OLBSS_MENU_RIGHT_MARK eq mask OLMA_DISP_RT_ARROW), \
+		"ERROR: OLButtonSpecState does not match OpenMonikerFlags"
+.assert (mask OLBSS_WINDOW_MARK eq mask OLMA_DISP_WIN_MARK), \
+		"ERROR: OLButtonSpecState does not match OpenMonikerFlags"
+
+.assert ((mask OLBSS_WAS_BORDERED shr 8) eq mask OLBSS_BORDERED), \
+		"ERROR: OLButtonSpecState is fucked."
+.assert ((mask OLBSS_WAS_DEPRESSED shr 8) eq mask OLBSS_DEPRESSED), \
+		"ERROR: OLButtonSpecState is fucked."
+
+OLBSS_OPENS_POPUP_WINDOW_MASK = mask OLBSS_MENU_DOWN_MARK or \
+				mask OLBSS_MENU_RIGHT_MARK or \
+				mask OLBSS_WINDOW_MARK
+
+OLBSS_NON_STD_BUTTON_MASK = mask OLBSS_IN_MENU or \
+			    mask OLBSS_IN_MENU_BAR or \
+			    mask OLBSS_SYS_ICON
+
+;These OPTIMIZATION flags represent the current state of the button.
+
+if  _ROUND_THICK_DIALOGS
+
+OLButtonOptFlags	record
+    OLBOF_HAS_ROUNDED_TOP_CORNER:1
+    				;set if the button is in the title bar
+    				;and has to have a rounded top corner
+				
+    OLBOF_ENABLED:1		;set if button is enabled
+    OLBOF_DRAW_STATE_KNOWN:1	;set if state is known to be valid
+    OLBOF_DRAWN_DEFAULT:1	;set if button is drawn as the default button
+    OLBOF_DRAWN_BORDERED:1	;set if button is drawn with a border
+    OLBOF_DRAWN_SELECTED:1	;set if button is drawn with checkmark
+    OLBOF_DRAWN_DEPRESSED:1	;set if button is drawn and unhappy
+    OLBOF_DRAWN_CURSORED:1	;TRUE if this button has the FOCUS
+				;exclusive (for kybd navigation)
+OLButtonOptFlags	end
+    
+else
+    
+OLButtonOptFlags	record
+    :1				;used to be temporary OLBOF_EC_OLD_STATE_SAVED
+    OLBOF_ENABLED:1		;set if button is enabled
+    OLBOF_DRAW_STATE_KNOWN:1	;set if state is known to be valid
+    OLBOF_DRAWN_DEFAULT:1	;set if button is drawn as the default button
+    OLBOF_DRAWN_BORDERED:1	;set if button is drawn with a border
+    OLBOF_DRAWN_SELECTED:1	;set if button is drawn with checkmark
+    OLBOF_DRAWN_DEPRESSED:1	;set if button is drawn and unhappy
+    OLBOF_DRAWN_CURSORED:1	;TRUE if this button has the FOCUS
+				;exclusive (for kybd navigation)
+OLButtonOptFlags	end
+
+endif ;_ROUND_THICK_DIALOGS
+
+;These flags are copied from specState to optFlags by UpdateButtonState.
+
+OLBOF_STATE_FLAGS_MASK =   mask OLBOF_DRAWN_DEFAULT \
+			or mask OLBOF_DRAWN_BORDERED \
+			or mask OLBOF_DRAWN_SELECTED \
+			or mask OLBOF_DRAWN_DEPRESSED \
+			or mask OLBOF_DRAWN_CURSORED
+
+.assert (mask OLBOF_ENABLED eq mask VA_FULLY_ENABLED), \
+		"ERROR: OLBOF_ENABLED does not match VA_FULLY_ENABLED"
+.assert (mask OLBOF_DRAWN_SELECTED eq mask OLBSS_SELECTED), \
+		"ERROR: OLBOF_DRAWN_SELECTED does not match OLBSS_SELECTED"
+.assert (mask OLBOF_DRAWN_BORDERED eq mask OLBSS_BORDERED), \
+		"ERROR: OLBOF_DRAWN_BORDERED does not match OLBSS_BORDERED"
+.assert (mask OLBOF_DRAWN_SELECTED eq mask OLBSS_SELECTED), \
+		"ERROR: OLBOF_DRAWN_SELECTED does not match OLBSS_SELECTED"
+.assert (mask OLBOF_DRAWN_DEPRESSED eq mask OLBSS_DEPRESSED), \
+		"ERROR: OLBOF_DRAWN_DEPRESSED does not match OLBSS_DEPRESSED"
+.assert (mask OLBOF_DRAWN_CURSORED eq mask OLBSS_CURSORED), \
+		"ERROR: OLBOF_DRAWN_CURSORED does not match OLBSS_CURSORED"
+
+;------------------------------------------------------------------------------
+;	Draw stuff
+;------------------------------------------------------------------------------
+	
+if _OL_STYLE	;--------------------------------------------------------------
+
+BWButtonRegionSetStruct	struct
+    BWBRSS_borderPtr		nptr.Region	;pointer to border region def
+    BWBRSS_interiorPtr		nptr.Region	;pointer to interior region def
+    BWBRSS_monikerFlags		DrawMonikerFlags <> ;flags for moniker drawing
+    BWBRSS_monikerXInset	byte	(?)	;x inset for moniker drawing
+    BWBRSS_monikerYInset	byte	(?)	;y inset for moniker drawing
+    BWBRSS_monikerYInsetCGA	byte	(?)	;y inset for CGA
+BWButtonRegionSetStruct	ends
+
+endif
+	
+if _CUA_STYLE
+
+BWButtonRegionSetStruct	struct
+    BWBRSS_borderPtr		nptr.Region	;pointer to border region def
+    BWBRSS_interiorPtr		nptr.Region	;pointer to interior region def
+if _ROUND_NORMAL_BW_BUTTONS
+    BWBRSS_backgroundPtr	nptr.Region	;pointer to bkg region def
+    						; for erasing
+endif ;_ROUND_NORMAL_BW_BUTTONS
+    BWBRSS_monikerFlags		DrawMonikerFlags <> ;flags for moniker drawing
+    BWBRSS_monikerXInset	byte	(?)	;x inset for moniker drawing
+    BWBRSS_monikerYInset	byte	(?)	;y inset for moniker drawing
+    BWBRSS_minHeight		byte	(?)	;min height for button
+    BWBRSS_monikerYInsetCGA	byte	(?)	;y inset for CGA
+    BWBRSS_monikerXInsetNarrow	byte	(?)	;x inset for narrowness
+BWButtonRegionSetStruct	ends
+
+endif
+	
+if (_OL_STYLE or _MOTIF)
+
+ColorButtonRegions	struct
+    CBR_leftTop		nptr.Region	;left/top of border
+    CBR_rightBottom	nptr.Region	;right/bottom of border
+    CBR_interior	nptr.Region	;interior of border
+ColorButtonRegions	ends
+
+endif
+
+if _ISUI
+
+ColorButtonRegions	struct
+    CBR_leftTop				nptr.Region	;left/top of border
+    CBR_rightBottom			nptr.Region	;right/bottom of border
+    CBR_innerLeftTop			nptr.Region	;left/top of border
+    CBR_innerRightBottom		nptr.Region	;right/bottom of border
+    CBR_interior			nptr.Region	;interior of border
+    CBR_ltRbColors			word		;ltColor.rbColor
+    CBR_depressedLtRbColors		word		;ltColor.rbColor
+    CBR_innerLtRbColors			word	;innerLtColor.innerRbColor
+    CBR_depressedInnerLtRbColors	word	;innerLtColor.innerRbColor
+ColorButtonRegions	ends
+
+endif
+
+
+
+;------------------------------------------------------------------------------
+;	Instance Data
+;------------------------------------------------------------------------------
+
+    OLBI_genChunk	lptr			;chunk holding generic data
+    OLBI_fixedAttrs	OLButtonFixedAttrs	;permanent attributes
+    OLBI_moreAttrs	OLButtonMoreAttrs	;more of them.
+    OLBI_optFlags	OLButtonOptFlags	;keep these two flags
+    OLBI_specState	OLButtonSpecState	;bytes in this order
+
+if _HAS_LEGOS_LOOKS
+    OLBI_legosLook	byte
+endif
+
+if DRAW_STYLES
+    OLBI_drawStyle	DrawStyle		; draw style
+endif
+
+OLButtonClass	endc
+

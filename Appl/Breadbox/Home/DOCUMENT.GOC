@@ -1,0 +1,879 @@
+@include <stdapp.goh>
+@include "homeapp.goh"
+@include "home.goh"
+#include <gstring.h>
+#include <initfile.h>
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>
+#include <Ansi/stdio.h>
+
+#define DRIVER_PROTOCOL_MAJOR	1
+#define DRIVER_PROTOCOL_MINOR	0
+
+typedef struct {
+	LMemBlockHeader TGLH_meta;
+	ChunkHandle TGLH_groupArray;
+	word TGLH_numMembers;
+} TempGroupListHeader;
+
+typedef struct {
+	word TGLE_userID;
+	char TGLE_name[33];
+} TempGroupListEntry;
+
+@extern object HomeIconList;
+@extern object UnitSampleText;
+@extern object UnitSampleTextFontName;
+@extern object RoomSampleText;
+@extern object RoomSampleTextFontName;
+@extern object RoomScaleFactor;
+@extern object HomeGridSize;
+@extern object EventsWindow;
+@extern object EventsText;
+@extern object HomeGroupDialog;
+@extern object HomeGroupNameText;
+@extern object HomeGroupMemberList;
+@extern chunk MsgNoControllerOnPort;
+@extern chunk MsgX10FailedToLoad;
+@extern chunk MsgNoPortSpecified;
+@extern chunk NewGroupStr;
+
+char *AllocString(char *str, int d1)
+	{
+	int len = strlen(str) + 6;
+	char *p = (char *)malloc(len);
+	if (p != NULL)
+		sprintf(p, str, d1);
+	return p;
+	}
+
+/*******************************************************************************
+* HOME DOCUMENT CLASS                                                          *
+*******************************************************************************/
+
+@extern method HomeDocumentClass, MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE {
+   VMBlockHandle mapBlock;
+	HomeMapBlock *mapPtr;
+	MemHandle mem, sysEvBlock;
+	HomeEventBlockHeader *sysEvents;
+	byte loop;
+	void InitializeDocOptions(HomeMapBlock *);
+
+	@callsuper();
+	document = pself->GDI_fileHandle;
+	mapBlock = VMAlloc(pself->GDI_fileHandle, sizeof(HomeMapBlock), 0);
+	VMSetMapBlock(pself->GDI_fileHandle, mapBlock);
+
+	mapPtr = VMLock(pself->GDI_fileHandle, mapBlock, &mem);
+	mapPtr->HMB_unitUserID = INITIAL_UNIT_USER_ID;
+	mapPtr->HMB_roomUserID = INITIAL_ROOM_USER_ID;
+	mapPtr->HMB_groupUserID = INITIAL_GROUP_USER_ID;
+	InitializeDocOptions(mapPtr);
+	for (loop = 0; loop < 7; loop++) { /* this loop creates a series of event lists, one for each day */
+		mapPtr->HMB_systemEventBlock[loop] = VMAllocLMem(pself->GDI_fileHandle,
+					LMEM_TYPE_GENERAL, sizeof(HomeEventBlockHeader));
+		sysEvents = VMLock(pself->GDI_fileHandle, mapPtr->HMB_systemEventBlock[loop],
+								 &sysEvBlock);
+		sysEvents->HEBH_numEvents = 0;
+		VMUnlock(sysEvBlock);
+	}
+	VMDirty(mem);
+	VMUnlock(mem);
+	return(FALSE);
+}
+
+@extern method HomeDocumentClass, MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT {
+//	VisUpdateModeAsWord updateMode = {VUM_NOW, 0};
+	VMBlockHandle mapBlock;
+   HomeMapBlock *mapPtr;
+   statusBlockPtr *statusPtr;
+   MemHandle mem;
+   optr dummyObject, newItem;
+	word UserID, RoomID, GroupID, ID, nItems = 1;
+	EC(char *driverName = "EC X-10 Code Driver";)
+	NEC(char *driverName = "X-10 Code Driver";)
+/*  char *iniCategory = "X-10Control"; */
+/*	char *iniKey = "port"; */
+	char *errormsg;
+	Boolean tryAgain, notOnPort;
+	void ReadDocOptions(HomeMapBlock *, optr);
+
+   @callsuper();
+   document = pself->GDI_fileHandle;
+   dummyObject = ObjInstantiate(OptrToHandle(oself), (ClassStruct *)&VisClass);
+	pself = ObjDerefVis(oself);
+	@call self::MSG_VIS_ADD_CHILD(dummyObject, CCO_FIRST);
+   /* Here we add a "dummy" object as the first child of the VisContent, so that
+           future rooms and units will behave correctly. */
+   mapBlock = VMGetMapBlock(document);
+   mapPtr = VMLock(document, mapBlock, &mem);
+   UserID = mapPtr->HMB_unitUserID;
+	RoomID = mapPtr->HMB_roomUserID;
+	GroupID = mapPtr->HMB_groupUserID;
+	ReadDocOptions(mapPtr, oself);
+   VMUnlock(mem);
+   /* initialize the global unit status table */
+   statusBlock = MemAlloc(256, HF_SWAPABLE, HAF_ZERO_INIT);
+   statusPtr = MemLock(statusBlock);
+   /* set all units to on. If they're different when we load from a file, they will update the table */
+   /* themselves. */
+   for (ID = 0; ID < 256; ID++) statusPtr->unitState[ID] = HUS_ON;
+   MemUnlock(statusBlock);
+	for (ID = INITIAL_UNIT_USER_ID; ID < UserID; ID++) {
+		if (VMFind(document, NullHandle, ID) != NullHandle) {
+			newItem = ObjInstantiate(OptrToHandle(oself), (ClassStruct *)&HomeUnitClass);
+			pself = ObjDerefVis(oself);
+			@call self::MSG_VIS_ADD_CHILD(newItem, CCO_FIRST);
+			@call newItem::MSG_ITEM_GET_ATTRS_FROM_FILE(ID);
+			@call newItem::MSG_VIS_MARK_INVALID(VOF_WINDOW_INVALID, VUM_NOW);
+			GCNListAdd(newItem, MANUFACTURER_ID_BREADBOX, BGCNLT_ALL_ITEMS);
+			GCNListAdd(newItem, MANUFACTURER_ID_BREADBOX, BGCNLT_UNITS);
+		}
+	}
+	for (ID = INITIAL_ROOM_USER_ID; ID < RoomID; ID++) {
+		if (VMFind(document, NullHandle, ID) != NullHandle) {
+			newItem = ObjInstantiate(OptrToHandle(oself), (ClassStruct *)&HomeRoomClass);
+			pself = ObjDerefVis(oself);
+			document = @call self::MSG_GEN_DOCUMENT_GET_FILE_HANDLE();
+			@call self::MSG_VIS_ADD_CHILD(newItem, CCO_LAST);
+			@call newItem::MSG_ITEM_GET_ATTRS_FROM_FILE(ID);
+			@call newItem::MSG_VIS_MARK_INVALID(VOF_WINDOW_INVALID, VUM_NOW);
+			GCNListAdd(newItem, MANUFACTURER_ID_BREADBOX, BGCNLT_ALL_ITEMS);
+			GCNListAdd(newItem, MANUFACTURER_ID_BREADBOX, BGCNLT_ROOMS);
+		}
+	}
+	for (ID = INITIAL_GROUP_USER_ID; ID < GroupID; ID++) {
+	/* create any group objects */
+      if (VMFind(document, NullHandle, ID) != NullHandle) {
+         /* instantiate the new object here */
+         nItems++;
+         newItem = ObjInstantiate(OptrToHandle(oself), (ClassStruct*)&HomeGroupClass);
+			@call self::MSG_VIS_ADD_CHILD(newItem, CCO_LAST);
+         /* call the new item to set its attributes from the file */
+			@call newItem::MSG_ITEM_GET_ATTRS_FROM_FILE(ID);
+         GCNListAdd(newItem, MANUFACTURER_ID_BREADBOX, BGCNLT_ALL_ITEMS);
+         GCNListAdd(newItem, MANUFACTURER_ID_BREADBOX, BGCNLT_GROUPS);
+      }
+	}
+   @call HomeGroupList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(nItems);
+	@send LargeIcon::MSG_ICON_VIEW_OPEN_ICON_DB();
+   FilePushDir();
+   FileSetStandardPath(SP_SYSTEM);
+
+   tryAgain = TRUE;
+   notOnPort = FALSE;
+	while (tryAgain)
+	{
+		GeodeLoadError gle = 0;
+		X10Driver = GeodeUseDriver(driverName,DRIVER_PROTOCOL_MAJOR,DRIVER_PROTOCOL_MINOR,&gle);/* Load the X-10 code driver. */
+		if (X10Driver == NullHandle)  {
+			MemLock(OptrToHandle(@MsgNoControllerOnPort));
+			switch (gle)
+	   		{
+				case (GLE_DRIVER_INIT_ERROR):
+				/* we get here if the driver couldn't find a controller on the default */
+				/* port. Since that isn't a fatal error, we tell the user so, and ask  */
+				/* them to change the selected port so we can re-init the driver.      */
+					UserStandardDialog((char *) 0, (char *) 0, (char *) 0, (char *) 0,
+									 LMemDeref(@MsgNoControllerOnPort),
+							  /*		 "Home Automation could not find an X-10 controller on the selected port. You will need to choose a new port from the Settings menu.", */
+	                         ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+	                         (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+	                notOnPort = TRUE;
+					break;
+				default:
+				/* This would mean the driver can't be found, or can't be loaded. Any */
+				/* of those is fairly fatal, so we at least close the document. */
+					errormsg = AllocString(LMemDeref(@MsgX10FailedToLoad), gle);
+//					errormsg = AllocString("The X-10 driver failed to load properly. The document will now close. (Error = %d)", gle);
+		         	if (errormsg != NULL)
+		         		{
+			         	UserStandardDialog((char *) 0, (char *) 0, (char *) 0, (char *) 0, errormsg,
+			                         ((CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+			                         (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+			            free(errormsg);
+		         		}
+		         	@send self::MSG_GEN_DOCUMENT_CLOSE(0);
+		         	tryAgain = FALSE;
+		         	break;
+			}
+			MemUnlock(OptrToHandle(@MsgNoControllerOnPort));
+         }
+		else
+			/* The driver loaded successfully. */
+			tryAgain = FALSE;
+	};
+   FilePopDir();
+   if (X10Driver != NullHandle)
+   	{
+   		EventHandle msg;
+   		
+		ID = PowerCodeGetPort(X10Driver);
+		@send PortSelectList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(ID, FALSE);
+		if (ID == 0 && notOnPort == FALSE) {
+			MemLock(OptrToHandle(@MsgNoPortSpecified));
+		  UserStandardDialog((char *) 0, (char *) 0, (char *) 0, (char *) 0,
+									LMemDeref(@MsgNoPortSpecified),
+							//		"There is no port specified for the X-10 Controller. You will need to choose a port from the Settings menu.",
+		                     ((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+		                     (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+			MemUnlock(OptrToHandle(@MsgNoPortSpecified));
+		  ID = 0;
+		}
+		document = pself->GDI_fileHandle;
+		/* because we do some funky custom things with the view UI, we tell
+			it to set itself up properly here */
+		@call HomeView::MSG_GEN_VIEW_SUSPEND_UPDATE();
+		@call HomeView::MSG_GEN_VIEW_SET_DOC_BOUNDS(DOCUMENT_WIDTH, DOCUMENT_HEIGHT, 0, 0);
+		/* See item.goc for an explanation of these few lines. */
+		msg = @record GenViewClass::MSG_GEN_VIEW_SET_CONTROLLED_ATTRS(
+		  GVCA_SHOW_HORIZONTAL | GVCA_SHOW_VERTICAL, 100);
+		@call application::MSG_META_GCN_LIST_SEND(GCNLSF_SET_STATUS, msg, 
+		  NullHandle, GAGCNLT_CONTROLLED_GEN_VIEW_OBJECTS, MANUFACTURER_ID_GEOWORKS);
+        @call HomeView::MSG_META_GRAB_TARGET_EXCL();
+		@call HomeView::MSG_GEN_VIEW_UNSUSPEND_UPDATE();
+		@call HomeView::MSG_GEN_VIEW_SEND_NOTIFICATION();
+	}
+}
+
+@extern method HomeDocumentClass, MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT {
+	@send @visChildren::MSG_VIS_DESTROY(VUM_NOW);
+	@send HomeItemEventsList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+	@send HomeIconList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+	@send LargeIcon::MSG_ICON_VIEW_CLOSE_ICON_DB();
+	MemFree(statusBlock);
+	document = NullHandle;
+	@callsuper();
+}
+
+@extern method HomeDocumentClass, MSG_GEN_DOCUMENT_DESTROY_UI_FOR_DOCUMENT {
+	@send @visChildren::MSG_VIS_DESTROY(VUM_NOW);
+	@send HomeItemEventsList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+	@send HomeIconList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+	@callsuper();
+}
+
+@extern method HomeDocumentClass, MSG_META_EXPOSED {
+   GStateHandle gstate;
+
+	gstate = GrCreateState(win);
+	GrBeginUpdate(gstate);
+	@call self::MSG_VIS_DRAW(DF_EXPOSED, gstate);
+   GrEndUpdate(gstate);
+   GrDestroyState(gstate);
+}
+
+@extern method HomeDocumentClass, MSG_VIS_DRAW {
+   @send @visChildren::MSG_VIS_DRAW(DF_EXPOSED, gstate);
+}
+
+@extern method HomeDocumentClass, MSG_VIS_RECALC_SIZE {
+	VisContentInstance *vis;
+
+	vis = ObjDerefVis(oself);
+	if ((vis->VI_bounds.R_right < DOCUMENT_WIDTH) || (vis->VI_bounds.R_bottom < DOCUMENT_HEIGHT))
+   	return(MAKE_SIZE_DWORD(DOCUMENT_WIDTH, DOCUMENT_HEIGHT));
+	else return(MAKE_SIZE_DWORD(vis->VI_bounds.R_right, vis->VI_bounds.R_bottom));
+}
+
+@extern method HomeDocumentClass, MSG_DOC_GET_GROUP_NAME {
+	switch (item) {
+		case 0: /* the first item on this drop-down is the "New Group" command */
+			MemLock(OptrToHandle(@MsgNoPortSpecified));
+	 //		@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, "New Group...");
+			@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, LMemDeref(@NewGroupStr));
+			MemUnlock(OptrToHandle(@MsgNoPortSpecified));
+			break;
+		default:{ /* any others should be the names of the user-defined groups */
+         MemHandle mem;
+         VMBlockHandle groupBlock = @call self::MSG_DOC_FIND_GROUP_BLOCK(item);
+         HomeItemBlock* groupPtr = VMLock(pself->GDI_fileHandle, groupBlock, &mem);
+         @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, groupPtr->HIB_name);
+         VMUnlock(mem);
+      	break;
+      }
+	}
+}
+
+@extern method HomeDocumentClass, MSG_DOC_GROUP_SELECTED {
+	switch(selection) {
+		case 0: /* new group */
+			@call self::MSG_DOC_CREATE_NEW_GROUP();
+			break;
+		default:{ /* send commands to or edit an existing group */
+         MemHandle mem;
+         VMBlockHandle groupBlock = @call self::MSG_DOC_FIND_GROUP_BLOCK(selection);
+         HomeItemBlock* groupPtr = VMLock(pself->GDI_fileHandle, groupBlock, &mem);
+   	   @send @visChildren::MSG_GROUP_SET_GROUP_SELECTED(groupPtr->HIB_userID);
+         VMUnlock(mem);
+			break;
+      }
+	}
+}
+
+@extern method HomeDocumentClass, MSG_DOC_CREATE_NEW_GROUP {
+	word UserID;
+	VMBlockHandle mapBlock;
+	MemHandle mem;
+	HomeMapBlock *mapPtr;
+
+	@send HomeGroupNameText::MSG_VIS_TEXT_DELETE_ALL();
+	mapBlock = VMGetMapBlock(pself->GDI_fileHandle);
+	mapPtr = VMLock(pself->GDI_fileHandle, mapBlock, &mem);
+	UserID = mapPtr->HMB_groupUserID;
+	++(mapPtr->HMB_groupUserID);
+	VMDirty(mem);
+	VMUnlock(mem);
+	@call self::MSG_META_ADD_VAR_DATA(TEMP_DOCUMENT_GROUP_IS_NEW | VDF_SAVE_TO_STATE,
+													0, (void *) 0);
+	@send self::MSG_DOC_SELECT_ITEMS_FOR_GROUP(UserID);
+}
+
+@extern method HomeDocumentClass, MSG_DOC_EDIT_GROUP {
+	VMBlockHandle groupBlock;
+	MemHandle mem;
+	HomeItemBlock *groupPtr;
+
+	groupBlock = VMFind(pself->GDI_fileHandle, NullHandle, groupID);
+	groupPtr = VMLock(pself->GDI_fileHandle, groupBlock, &mem);
+	@call HomeGroupNameText::MSG_VIS_TEXT_REPLACE_ALL_PTR(groupPtr->HIB_name, 0);
+	VMUnlock(mem);
+	@send self::MSG_DOC_SELECT_ITEMS_FOR_GROUP(groupID);
+}
+
+@extern method HomeDocumentClass, MSG_DOC_SELECT_ITEMS_FOR_GROUP {
+	MemHandle groupList;
+	TempGroupListHeader *listPtr;
+	ChunkHandle groupArray;
+	word numMembers;
+
+	groupList = MemAllocLMem(LMEM_TYPE_GENERAL, sizeof(TempGroupListHeader));
+	MemLock(groupList);
+  	groupArray = ChunkArrayCreate(groupList, sizeof(TempGroupListEntry),0,0);
+	listPtr = MemDeref(groupList);
+	listPtr->TGLH_groupArray = groupArray;
+	/* if we're editing an already existing group, we need to get its list of members here... */
+   if (ObjVarFindData(oself, TEMP_DOCUMENT_GROUP_IS_NEW) == NULL) { /* if this isn't a new group */
+      TempGroupListEntry* itemPtr;
+      HomeItemBlock* group, *item;
+      VMBlockHandle groupBlock, itemBlock;
+      MemHandle mem, itemMem;
+      word itemNum, *memberList;
+
+      groupBlock = VMFind(pself->GDI_fileHandle, NullHandle, groupID);
+      group = VMLock(pself->GDI_fileHandle, groupBlock, &mem);
+      numMembers = listPtr->TGLH_numMembers = group->HIB_fields.HGB.members;
+   	for (itemNum = 0, memberList = (word *)&(group->HIB_extraData); itemNum < numMembers;
+           itemNum++, memberList++) {
+   		/* iterate through the array to copy each userID. */
+   		itemPtr = ChunkArrayAppendHandles(groupList, groupArray,
+			   								sizeof(TempGroupListEntry));
+         itemBlock = VMFind(pself->GDI_fileHandle, NullHandle, *(memberList));
+         item = VMLock(pself->GDI_fileHandle, itemBlock, &itemMem);
+		   strcpy((itemPtr->TGLE_name), item->HIB_name);
+         VMUnlock(itemMem);
+         itemPtr->TGLE_userID = *memberList;
+      }
+      VMUnlock(mem);
+   }
+   else { /* it is a new group */
+   	numMembers = listPtr->TGLH_numMembers = 0;
+   }
+	MemUnlock(groupList);
+	/* set our vardata for the group list... */
+	@call self::MSG_META_ADD_VAR_DATA(TEMP_DOCUMENT_GROUP_LIST | VDF_SAVE_TO_STATE,
+												 sizeof(MemHandle), &groupList);
+	@call self::MSG_META_ADD_VAR_DATA(TEMP_DOCUMENT_GROUP_NUMBER | VDF_SAVE_TO_STATE,
+												 sizeof(word), &groupID);
+   /* initiate and set up the group dialog */
+	@call HomeGroupDialog::MSG_GEN_INTERACTION_INITIATE();
+	@call HomeGroupMemberList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numMembers);
+}
+
+@extern method HomeDocumentClass, MSG_DOC_GROUP_BOX_ITEM_SELECTED {
+	MemHandle *pGroupList, groupList;
+	TempGroupListHeader *listPtr;
+	TempGroupListEntry *itemPtr;
+	word itemNum, /*itemToken,*/ found;
+
+   pGroupList= ObjVarFindData(oself, TEMP_DOCUMENT_GROUP_LIST);
+	if (pGroupList == NULL) return; /* we're not creating a group right now */
+    else
+	    groupList = *pGroupList;
+	listPtr = MemLock(groupList);
+	for (itemNum = 0, found = 0; itemNum < listPtr->TGLH_numMembers; itemNum++) {
+		/* iterate through the array to find the clicked-on item. */
+		itemPtr = ChunkArrayElementToPtrHandles(groupList, listPtr->TGLH_groupArray,
+															 itemNum, (void *) 0);
+		if (itemPtr->TGLE_userID == userID) {
+			found = 1;
+			break;
+		}
+	}
+	if (!found) { /* add new item to group list */
+		listPtr->TGLH_numMembers++;
+		itemPtr = ChunkArrayAppendHandles(groupList, listPtr->TGLH_groupArray,
+											sizeof(TempGroupListEntry));
+		strcpy((itemPtr->TGLE_name), itemName);
+		itemPtr->TGLE_userID = userID;
+	}
+	else { /* user clicked on an item already in list--remove it. */
+		itemPtr = ChunkArrayElementToPtrHandles(groupList, listPtr->TGLH_groupArray,
+															 itemNum, (void *) 0);
+		listPtr->TGLH_numMembers--;
+		ChunkArrayDeleteHandle(listPtr->TGLH_groupArray, itemPtr);
+	}
+	listPtr = MemDeref(groupList);
+	@call HomeGroupMemberList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(listPtr->TGLH_numMembers);
+	MemUnlock(groupList);
+}
+
+@extern method HomeDocumentClass, MSG_DOC_GET_GROUP_MEMBER_NAME {
+	MemHandle *pGroupList, groupList;
+	TempGroupListHeader *listPtr;
+	TempGroupListEntry *itemPtr;
+//	word itemNum, itemToken, found;
+
+	pGroupList = ObjVarFindData(oself, TEMP_DOCUMENT_GROUP_LIST);
+	if (pGroupList == NULL) return; /* we're not creating a group right now */
+    else
+	    groupList = *pGroupList;
+	listPtr = MemLock(groupList);
+	itemPtr = ChunkArrayElementToPtrHandles(groupList, listPtr->TGLH_groupArray,
+														 item, (void *) 0);
+	@send list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, itemPtr->TGLE_name);
+	MemUnlock(groupList);
+}
+
+@extern method HomeDocumentClass, MSG_DOC_EDIT_CREATE_GROUP_CANCELLED {
+	MemHandle *groupList;
+
+	groupList = ObjVarFindData(oself, TEMP_DOCUMENT_GROUP_LIST);
+   if (groupList == NULL) return; /* if we're not creating a group, let's not free it... */
+	MemFree(*groupList);
+	@call self::MSG_META_DELETE_VAR_DATA(TEMP_DOCUMENT_GROUP_LIST);
+	if (ObjVarFindData(oself, TEMP_DOCUMENT_GROUP_IS_NEW) != NULL) {
+		/* if we were creating a new group */
+		VMBlockHandle mapBlock;
+		MemHandle mem;
+		HomeMapBlock *mapPtr;
+
+		mapBlock = VMGetMapBlock(pself->GDI_fileHandle);
+		mapPtr = VMLock(pself->GDI_fileHandle, mapBlock, &mem);
+		mapPtr->HMB_groupUserID--;
+		VMDirty(mem);
+		VMUnlock(mem);
+		@call self::MSG_META_DELETE_VAR_DATA(TEMP_DOCUMENT_GROUP_IS_NEW);
+	}
+	@call self::MSG_META_DELETE_VAR_DATA(TEMP_DOCUMENT_GROUP_NUMBER);
+   /* get rid of the dialog box */
+	@send HomeGroupDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+}
+
+/**********************************************************************************************************/
+/* MSG_DOC_EDIT_CREATE_GROUP_COMPLETED -- The user has clicked on the "OK" button in the dialog box.      */
+/*                                        Copy the group user ID's from the document's vardata entry into */
+/*                                        the permanent VMBlock allocated for the group.                  */
+/**********************************************************************************************************/
+@extern method HomeDocumentClass, MSG_DOC_EDIT_CREATE_GROUP_COMPLETED {
+	MemHandle *pGroupList, groupList, mem;
+   VMBlockHandle groupBlock;
+   HomeItemBlock* group;
+	TempGroupListHeader *listPtr;
+	TempGroupListEntry *itemPtr;
+	word itemNum, /*itemToken, */userID, *memberList;
+
+	pGroupList = ObjVarFindData(oself, TEMP_DOCUMENT_GROUP_LIST);
+   if (pGroupList == NULL) return; /* Nothing to do... we weren't creating/editing a group */
+   else
+        groupList = *pGroupList;
+	listPtr = MemLock(groupList);
+   userID = *((word *)ObjVarFindData(oself, TEMP_DOCUMENT_GROUP_NUMBER));
+   if (listPtr->TGLH_numMembers) { /* iterate through the group members (if there are any) */
+      if (ObjVarFindData(oself, TEMP_DOCUMENT_GROUP_IS_NEW) != NULL) { /* if this is a new group */
+         optr newGroup;
+         /* we need to allocate the new VMBlock for the group. */
+         newGroup = ObjInstantiate(OptrToHandle(oself), (ClassStruct *)&HomeGroupClass);
+         pself = ObjDerefVis(oself);
+         @call self::MSG_VIS_ADD_CHILD(newGroup, CCO_LAST);
+         pself = ObjDerefGen(oself);
+   		groupBlock = VMAlloc(pself->GDI_fileHandle,
+                              sizeof(HomeItemBlock) + (sizeof(word) * listPtr->TGLH_numMembers - 1),
+                              userID);
+         @call newGroup::MSG_ITEM_SET_ATTRS(userID);
+         GCNListAdd(newGroup, MANUFACTURER_ID_BREADBOX, BGCNLT_ALL_ITEMS);
+         GCNListAdd(newGroup, MANUFACTURER_ID_BREADBOX, BGCNLT_GROUPS);
+      } else {
+         /* it's an existing group... we simply resize the block and copy the group members over into the */
+         /* freshly re-allocated area. */
+         groupBlock = VMFind(pself->GDI_fileHandle, NullHandle, userID);
+         /* This is the old way: */
+/*       mem = VMDetach(pself->GDI_fileHandle, groupBlock, 0); // detach the block while we resize it */
+/*         mem = MemReAlloc(mem, sizeof(HomeItemBlock) + (sizeof(word) * listPtr->TGLH_numMembers - 1), 0);*/
+/*         groupBlock = VMAttach(pself->GDI_fileHandle, groupBlock, mem);*/
+         /* This is the new way, without VMDetach/VMAttach: DH 6/4/99 */
+         VMLock(pself->GDI_fileHandle, groupBlock, &mem);
+         mem = MemReAlloc(mem, sizeof(HomeItemBlock) + (sizeof(word) * listPtr->TGLH_numMembers - 1), 0);
+         VMDirty(mem);
+         VMUnlock(mem);
+         /* End of changes: DH 6/4/99 */
+         @send @visChildren::MSG_GROUP_UPDATE_GROUP_PROPERTIES(userID);
+      } /* endif */
+      /* lock the new or resized group block into memory, then copy the member list into it */
+      groupBlock = VMFind(pself->GDI_fileHandle, NullHandle, userID);
+      group = VMLock(pself->GDI_fileHandle, groupBlock, &mem);
+      @call HomeGroupNameText::MSG_VIS_TEXT_GET_ALL_PTR(group->HIB_name);
+      group->HIB_fields.HGB.members = listPtr->TGLH_numMembers;
+   	for (itemNum = 0, memberList = (word *)&(group->HIB_extraData); itemNum < listPtr->TGLH_numMembers;
+           itemNum++, memberList++) {   
+   		/* iterate through the array to copy each userID. */
+   		itemPtr = ChunkArrayElementToPtrHandles(groupList, listPtr->TGLH_groupArray,
+   															 itemNum, (void *) 0);
+         *memberList = itemPtr->TGLE_userID;
+      }
+      VMDirty(mem);
+      VMUnlock(mem);
+      MemUnlock(groupList);
+   	MemFree(groupList);
+      /* get rid of our vardata */
+   	@call self::MSG_META_DELETE_VAR_DATA(TEMP_DOCUMENT_GROUP_LIST);
+   	@call self::MSG_META_DELETE_VAR_DATA(TEMP_DOCUMENT_GROUP_NUMBER);
+      /* now notify the group name drop down list that it has more members... (if we were creating a new group) */
+      if (ObjVarFindData(oself,TEMP_DOCUMENT_GROUP_IS_NEW) != NULL) {
+         word nItems = @call HomeGroupList::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS();
+         nItems++;
+         @call HomeGroupList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(nItems);
+         /* drop the vardata */
+   		@call self::MSG_META_DELETE_VAR_DATA(TEMP_DOCUMENT_GROUP_IS_NEW);
+      }
+      else { /* if we weren't creating a new group, just make sure we catch any name changes */
+         @call HomeGroupList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(GDLI_NO_CHANGE);
+      } /* endif */
+   } /* endif */
+   /* get rid of the dialog box */
+	@send HomeGroupDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+}
+
+@extern method HomeDocumentClass, MSG_DOC_CREATE_NEW_UNIT {
+	optr newUnit;
+	word UserID;
+	MemHandle mem;
+   VMBlockHandle mapBlock;
+   HomeMapBlock *mapPtr;
+
+   @send HomeNewUnitNameText::MSG_VIS_TEXT_DELETE_ALL();
+   if (UserDoDialog(@HomeNewUnitDialog) == IC_APPLY){
+      mapBlock = VMGetMapBlock(pself->GDI_fileHandle);
+      mapPtr = VMLock(pself->GDI_fileHandle, mapBlock, &mem);
+      UserID = mapPtr->HMB_unitUserID;
+      mapPtr->HMB_unitUserID++;
+      VMDirty(mem);
+      VMUnlock(mem);
+		mapBlock = VMAlloc(pself->GDI_fileHandle, sizeof(HomeItemBlock), UserID);
+      newUnit = ObjInstantiate(OptrToHandle(oself), (ClassStruct *)&HomeUnitClass);
+      pself = ObjDerefVis(oself);
+      @call self::MSG_VIS_ADD_CHILD(newUnit, CCO_FIRST);
+      @call newUnit::MSG_VIS_SET_SIZE(UNIT_WIDTH, UNIT_HEIGHT);
+      @call newUnit::MSG_VIS_SET_POSITION(10,10);
+      @call newUnit::MSG_ITEM_SET_ATTRS(UserID);
+      @call newUnit::MSG_VIS_MARK_INVALID(VOF_WINDOW_INVALID, VUM_NOW);
+      GCNListAdd(newUnit, MANUFACTURER_ID_BREADBOX, BGCNLT_ALL_ITEMS);
+      GCNListAdd(newUnit, MANUFACTURER_ID_BREADBOX, BGCNLT_UNITS);
+   }
+}
+
+@extern method HomeDocumentClass, MSG_ALL_LIGHTS_ON {
+   HouseCodes House;
+	House = (byte) @call HomeGroupList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	/* Send directly the All Lights On command here. */
+   @send @visChildren::MSG_UNIT_SWITCH(House, UNIT_ALL_LIGHTS, HUS_ON);
+}
+
+@extern method HomeDocumentClass, MSG_ALL_LIGHTS_OFF {
+   HouseCodes House;
+	House = (byte) @call HomeGroupList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	/* Send directly the All Lights Off command here. */
+   @send @visChildren::MSG_UNIT_SWITCH(House, UNIT_ALL_LIGHTS, HUS_OFF);
+}
+
+@extern method HomeDocumentClass, MSG_ALL_UNITS_OFF {
+   HouseCodes House;
+   House = (byte) @call HomeGroupList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	/* Send directly the All Units Off command here. */
+  @send @visChildren::MSG_UNIT_SWITCH(House, UNIT_ALL, HUS_OFF);
+}
+
+@extern method HomeDocumentClass, MSG_DOC_CREATE_NEW_ROOM {
+	optr newRoom;
+	word roomHeight;
+	word roomWidth;
+	word UserID;
+	VMBlockHandle mapBlock;
+	MemHandle mem;
+	HomeMapBlock *mapPtr;
+
+	@send HomeNewRoomNameText::MSG_VIS_TEXT_DELETE_ALL();
+	if (UserDoDialog(@HomeNewRoomDialog) == IC_APPLY){
+		mapBlock = VMGetMapBlock(pself->GDI_fileHandle);
+		mapPtr = VMLock(pself->GDI_fileHandle, mapBlock, &mem);
+		UserID = mapPtr->HMB_roomUserID;
+		mapPtr->HMB_roomUserID++;
+		VMDirty(mem);
+		VMUnlock(mem);
+
+		document = pself->GDI_fileHandle;
+		mapBlock = VMAlloc(pself->GDI_fileHandle, sizeof(HomeItemBlock), UserID);
+		newRoom = ObjInstantiate(OptrToHandle(oself), (ClassStruct *)&HomeRoomClass);
+		pself = ObjDerefVis(oself);
+		@call self::MSG_VIS_ADD_CHILD(newRoom, CCO_LAST);
+      roomHeight = @call HomeNewRoomHeight::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+		roomWidth = @call HomeNewRoomWidth::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+      roomHeight *= ROOM_SCALE_FACTOR;
+		roomWidth *= ROOM_SCALE_FACTOR;
+      @call newRoom::MSG_VIS_SET_SIZE((int) roomWidth, (int) roomHeight);
+		@call newRoom::MSG_VIS_SET_POSITION(10, 10);
+      @call newRoom::MSG_ITEM_SET_ATTRS(UserID);
+		@call newRoom::MSG_VIS_MARK_INVALID(VOF_WINDOW_INVALID, VUM_NOW);
+      GCNListAdd(newRoom, MANUFACTURER_ID_BREADBOX, BGCNLT_ALL_ITEMS);
+		GCNListAdd(newRoom, MANUFACTURER_ID_BREADBOX, BGCNLT_ROOMS);
+   }
+}
+
+@extern method HomeDocumentClass, MSG_PRINT_START_PRINTING {
+	PCMarginParams margins;
+	VisContentInstance *vis;
+
+	@call HomePrintControl::MSG_PRINT_CONTROL_GET_PRINTER_MARGINS(&margins, TRUE);
+	vis = ObjDerefVis(oself);
+	@call HomePrintControl::MSG_PRINT_CONTROL_SET_DOC_SIZE(vis->VI_bounds.R_right,
+																			 vis->VI_bounds.R_bottom);
+	@call self::MSG_VIS_DRAW(DF_PRINT, gstate);
+	@send HomePrintControl::MSG_PRINT_CONTROL_PRINTING_COMPLETED();
+}
+
+@extern method HomeDocumentClass, MSG_DOC_OBJECT_OPTIONS_CHANGED {
+	HomeMapBlock *mapPtr;
+	MemHandle mem;
+
+	mapPtr = VMLock(pself->GDI_fileHandle, VMGetMapBlock(pself->GDI_fileHandle), &mem);
+	mapPtr->HMB_options.HDO_objectOptions = selectedBooleans;
+	VMDirty(mem);
+	VMUnlock(mem);
+	if (selectedBooleans & HOO_ALIGN_OBJECTS_TO_GRID)
+		@call HomeGridSize::MSG_GEN_SET_ENABLED(VUM_NOW);
+	else
+		@call HomeGridSize::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+}
+
+@extern method HomeDocumentClass, MSG_DOC_OBJECT_TEXT_STATUS_CHANGED {
+	VisTextCharAttr unitAttrs, roomAttrs;
+	char unitTextFontName[FID_NAME_LEN], roomTextFontName[FID_NAME_LEN];
+
+	@call UnitSampleText::MSG_VIS_TEXT_GET_CHAR_ATTR(0, (VisTextCharAttrDiffs *) 0,
+																	 &unitAttrs, 32767, 0);
+	@call RoomSampleText::MSG_VIS_TEXT_GET_CHAR_ATTR(0, (VisTextCharAttrDiffs *) 0,
+																	 &roomAttrs, 32767, 0);
+	GrGetFontName(unitAttrs.VTCA_fontID, unitTextFontName);
+	GrGetFontName(roomAttrs.VTCA_fontID, roomTextFontName);
+	@call UnitSampleTextFontName::MSG_VIS_TEXT_REPLACE_ALL_PTR(unitTextFontName, 0);
+	@call RoomSampleTextFontName::MSG_VIS_TEXT_REPLACE_ALL_PTR(roomTextFontName, 0);
+}
+
+@extern method HomeDocumentClass, MSG_DOC_OBJECT_TEXT_OPTIONS_CHANGED {
+	MemHandle mem;
+	HomeMapBlock *mapPtr;
+	char unitTextFontName[FID_NAME_LEN], roomTextFontName[FID_NAME_LEN];
+
+	document = pself->GDI_fileHandle;
+	mapPtr = VMLock(document, VMGetMapBlock(document), &mem);
+	@call UnitSampleText::MSG_VIS_TEXT_GET_CHAR_ATTR(0, (VisTextCharAttrDiffs *) 0,
+								&mapPtr->HMB_options.HDO_unitTextAttr, 32767, 0);
+	@call RoomSampleText::MSG_VIS_TEXT_GET_CHAR_ATTR(0, (VisTextCharAttrDiffs *) 0,
+								&mapPtr->HMB_options.HDO_roomTextAttr, 32767, 0);
+	GrGetFontName(mapPtr->HMB_options.HDO_unitTextAttr.VTCA_fontID, unitTextFontName);
+	GrGetFontName(mapPtr->HMB_options.HDO_roomTextAttr.VTCA_fontID, roomTextFontName);
+	VMDirty(mem);
+	VMUnlock(mem);
+	@call UnitSampleTextFontName::MSG_VIS_TEXT_REPLACE_ALL_PTR(unitTextFontName, 0);
+	@call RoomSampleTextFontName::MSG_VIS_TEXT_REPLACE_ALL_PTR(roomTextFontName, 0);
+	@send @visChildren::MSG_UNIT_RECALC_SIZE();
+	@send @visChildren::MSG_ROOM_REDRAW();
+}
+
+@extern method HomeDocumentClass, MSG_DOC_ROOM_SCALE_FACTOR_CHANGED {
+	MemHandle mem;
+	HomeMapBlock *mapPtr;
+	word oldScale;
+
+	document = pself->GDI_fileHandle;
+	mapPtr = VMLock(document, VMGetMapBlock(document), &mem);
+	oldScale = mapPtr->HMB_options.HDO_roomScaleFactor;
+	mapPtr->HMB_options.HDO_roomScaleFactor = IntegerOf(value);
+	VMDirty(mem);
+	VMUnlock(mem);
+	@send @visChildren::MSG_ROOM_CHANGE_SCALE_FACTOR(oldScale, IntegerOf(value));
+}
+
+@extern method HomeDocumentClass, MSG_DOC_GRID_SIZE_CHANGED {
+	MemHandle mem;
+	HomeMapBlock *mapPtr;
+
+	document = pself->GDI_fileHandle;
+	mapPtr = VMLock(document, VMGetMapBlock(document), &mem);
+	mapPtr->HMB_options.HDO_gridPointSize = IntegerOf(value);
+	VMDirty(mem);
+	VMUnlock(mem);
+}
+
+@extern method HomeDocumentClass, MSG_DOC_LIST_EVENTS_BY_ITEM {
+	char name[33], eventString[80];
+	word kids, loop, events, curEvent;
+	optr item;
+
+	document = pself->GDI_fileHandle;
+	@call EventsText::MSG_GEN_SET_NOT_USABLE(VUM_NOW); /* so it'll redraw the right size */
+	@call EventsText::MSG_VIS_TEXT_DELETE_ALL();
+	kids = @call self::MSG_VIS_COUNT_CHILDREN();
+	for (loop = 0; loop < kids; loop++) {
+		item = @call self::MSG_VIS_FIND_CHILD_AT_POSITION(loop);
+		if (item == NullOptr) continue; /* this had better never happen, but... */
+		events = @call item::MSG_ITEM_GET_NUM_EVENTS();
+		if (!events) continue;
+		@call EventsText::MSG_VIS_TEXT_APPEND_PTR("\r", 1);
+		@call item::MSG_ITEM_GET_NAME(name);
+		@call EventsText::MSG_VIS_TEXT_APPEND_PTR(name, 0);
+		@call EventsText::MSG_VIS_TEXT_APPEND_PTR("\r================================\r", 0);
+		for (curEvent = 0; curEvent < events; curEvent++) {
+			@call item::MSG_ITEM_BUILD_EVENT_STRING(curEvent, eventString);
+			@call EventsText::MSG_VIS_TEXT_APPEND_PTR(eventString, 0);
+			@call EventsText::MSG_VIS_TEXT_APPEND_PTR("\r", 1);
+		}
+	}
+   @call EventsText::MSG_GEN_SET_USABLE(VUM_NOW);
+	if (UserDoDialog(@EventsWindow) == IC_CUSTOM_START) {
+		@send HomePrintControl::MSG_PRINT_CONTROL_SET_OUTPUT(TO_PROCESS);
+		@send HomePrintControl::MSG_PRINT_CONTROL_INITIATE_PRINT();
+	}
+}
+
+/**********************************************************************************/
+/* MSG_DOC_FIND_GROUP_BLOCK -- Finds the "number"th group block in the document.  */
+/*                             We have to do this fancy footwork because deleting */
+/*                             a group block leaves a hole in the block numbers.  */
+/**********************************************************************************/
+@extern method HomeDocumentClass, MSG_DOC_FIND_GROUP_BLOCK {
+   sword found = 0, offset = -1;
+   VMBlockHandle groupBlock;
+   do {
+      do {
+         offset++;
+      } while ((groupBlock = VMFind(pself->GDI_fileHandle, NullHandle, INITIAL_GROUP_USER_ID + offset)) == NullHandle);
+      found++;
+   } while (found < number);
+   return groupBlock;
+}
+
+/*******************************************************************************
+* DOCUMENT OPTION ROUTINES                                                     *
+*******************************************************************************/
+
+void InitializeDocOptions(HomeMapBlock *mapPtr) {
+	mapPtr->HMB_options.HDO_objectOptions = 0;
+	@call UnitSampleText::MSG_VIS_TEXT_GET_CHAR_ATTR(0, (VisTextCharAttrDiffs *) 0,
+								&mapPtr->HMB_options.HDO_unitTextAttr, 32767, 0);
+	@call RoomSampleText::MSG_VIS_TEXT_GET_CHAR_ATTR(0, (VisTextCharAttrDiffs *) 0,
+								&mapPtr->HMB_options.HDO_roomTextAttr, 32767, 0);
+	mapPtr->HMB_options.HDO_roomScaleFactor = 15;
+	mapPtr->HMB_options.HDO_gridPointSize = 15;
+	mapPtr->HMB_options.HDO_docWidth = (72 * 17 / 2);
+	mapPtr->HMB_options.HDO_docHeight = (11 * 72);
+	return;
+}
+
+void ReadDocOptions(HomeMapBlock *mapPtr, optr oself) {
+	char unitTextFontName[FID_NAME_LEN], roomTextFontName[FID_NAME_LEN];
+
+	@call HomeObjectOptionsGroup::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE
+											(mapPtr->HMB_options.HDO_objectOptions, 0);
+	@call UnitSampleText::MSG_VIS_TEXT_SET_CHAR_ATTR(&(mapPtr->HMB_options.HDO_unitTextAttr),
+																	 32767, 0);
+	@call RoomSampleText::MSG_VIS_TEXT_SET_CHAR_ATTR(&(mapPtr->HMB_options.HDO_roomTextAttr),
+																	 32767, 0);
+	@call RoomScaleFactor::MSG_GEN_VALUE_SET_INTEGER_VALUE(mapPtr->HMB_options.HDO_roomScaleFactor,
+																			 FALSE);
+	GrGetFontName(mapPtr->HMB_options.HDO_unitTextAttr.VTCA_fontID, unitTextFontName);
+	GrGetFontName(mapPtr->HMB_options.HDO_roomTextAttr.VTCA_fontID, roomTextFontName);
+	@call UnitSampleTextFontName::MSG_VIS_TEXT_REPLACE_ALL_PTR(unitTextFontName, 0);
+	@call RoomSampleTextFontName::MSG_VIS_TEXT_REPLACE_ALL_PTR(roomTextFontName, 0);
+	/*mapPtr->HMB_options.HDO_gridPointSize = 15;*/
+	@call oself::MSG_VIS_SET_SIZE(mapPtr->HMB_options.HDO_docWidth, mapPtr->HMB_options.HDO_docHeight);
+	return;
+}
+
+WWFixedAsDWord GetUnitTextPointSize(void) {
+	MemHandle mem;
+	HomeMapBlock *mapPtr;
+	WWFixedAsDWord retval;
+
+	mapPtr = VMLock(document, VMGetMapBlock(document), &mem);
+	retval = MakeWWFixed(mapPtr->HMB_options.HDO_unitTextAttr.VTCA_pointSize.WBF_int);
+	VMUnlock(mem);
+	return(retval);
+}
+
+FontID GetUnitTextFont(void) {
+	MemHandle mem;
+	HomeMapBlock *mapPtr;
+	FontID retval;
+
+	mapPtr = VMLock(document, VMGetMapBlock(document), &mem);
+	retval = mapPtr->HMB_options.HDO_unitTextAttr.VTCA_fontID;
+	VMUnlock(mem);
+	return(retval);
+}
+
+WWFixedAsDWord GetRoomTextPointSize(void) {
+	MemHandle mem;
+	HomeMapBlock *mapPtr;
+	WWFixedAsDWord retval;
+
+	mapPtr = VMLock(document, VMGetMapBlock(document), &mem);
+	retval = MakeWWFixed(mapPtr->HMB_options.HDO_roomTextAttr.VTCA_pointSize.WBF_int);
+	VMUnlock(mem);
+	return(retval);
+}
+
+FontID GetRoomTextFont(void) {
+	MemHandle mem;
+	HomeMapBlock *mapPtr;
+	FontID retval;
+
+	mapPtr = VMLock(document, VMGetMapBlock(document), &mem);
+	retval = mapPtr->HMB_options.HDO_roomTextAttr.VTCA_fontID;
+	VMUnlock(mem);
+	return(retval);
+}
+
+word GetRoomScaleFactor(void) {
+	MemHandle mem;
+	HomeMapBlock *mapPtr;
+	word retval;
+
+	mapPtr = VMLock(document, VMGetMapBlock(document), &mem);
+	retval = mapPtr->HMB_options.HDO_roomScaleFactor;
+	VMUnlock(mem);
+	return(retval);
+}
+
+word GetGridPointSize(void) {
+	MemHandle mem;
+	HomeMapBlock *mapPtr;
+	word retval;
+
+	mapPtr = VMLock(document, VMGetMapBlock(document), &mem);
+	retval = mapPtr->HMB_options.HDO_gridPointSize;
+	VMUnlock(mem);
+	return(retval);
+}
+
+

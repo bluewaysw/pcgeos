@@ -1,0 +1,210 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	Security Library
+MODULE:		
+FILE:		security.goh
+
+AUTHOR:		Reza Hussein, May 16, 1995
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	RH	5/16/95   	Initial version.
+
+DESCRIPTION:
+	
+
+	$Id: security.goh,v 1.1 97/04/04 15:59:56 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@optimize
+@deflib	security
+
+/* ----------------------------------------------------------------------------
+ *   Constants
+ * ----------------------------------------------------------------------------*/
+#define MAX_LOCK_CODE_LENGTH		(10)	/*  10 digits */
+#define MAX_LOCK_CODE_LENGTH_WITH_NULL	(MAX_LOCK_CODE_LENGTH + 1)
+#define MIN_LOCK_CODE_LENGTH		(5)	/*  5 digits */
+#define MAX_NEW_LOCK_CODE_LENGTH	(5)	/*  5 digits */
+#define	MAX_NEW_LOCK_CODE_LENGTH_WITH_NULL (MAX_NEW_LOCK_CODE_LENGTH + 1)
+
+#define MAX_PIN_CODE_LENGTH		(8)	/*  8 digits */
+#define MAX_PIN_CODE_LENGTH_WITH_NULL	(MAX_PIN_CODE_LENGTH + 1)
+#define MIN_PIN_CODE_LENGTH		(4)	/*  4 digits */
+
+#define MAX_PUK_CODE_LENGTH		(8)	/*  8 digits */
+#define MAX_PUK_CODE_LENGTH_WITH_NULL	(MAX_PUK_CODE_LENGTH + 1)
+#define MIN_PUK_CODE_LENGTH		(8)	/*  8 digits */
+
+#define MAX_NETWORK_CODE_LENGTH		(4)	/*  4 digits */
+#define MAX_NETWORK_CODE_LENGTH_WITH_NULL (MAX_NETWORK_CODE_LENGTH + 1)
+#define MIN_NETWORK_CODE_LENGTH		(4)	/*  4 digits */
+
+/*
+ *  User changeable settings 
+ */
+#define DEFAULT_PIN_CODE_REQUEST	(BB_TRUE)	/*  On */
+#define DEFAULT_LOCK_TIME_OUT		(15)		/*  15 minutes */
+#define DEFAULT_SECURITY_LEVEL		(BB_TRUE)	/*  Phone */
+#define DEFAULT_LOCKED_STATE		(BB_TRUE)	/*  On */
+
+/* ----------------------------------------------------------------------------
+ *   Enumerated types
+ * ----------------------------------------------------------------------------*/
+typedef enum {
+    SCT_LOCK_CODE = 0x0,
+    SCT_PIN_CODE = 0x2,
+    SCT_NETWORK_CODE = 0x4,
+} SecurityCodeType;
+
+typedef enum {
+    CPMS_OK = 0x0,
+    CPMS_CODE_REQUIRED = 0x2,
+    CPMS_RADIO_UNIT_OFF = 0x4,
+    CPMS_SIM_ERROR = 0x6,
+    CPMS_NO_SERVICE = 0x8
+} CellPhoneMediaStatus;
+
+/* ----------------------------------------------------------------------------
+ *   Classes
+ * ----------------------------------------------------------------------------*/
+typedef WordFlags SecuritySettingsControlFeatures;
+/* 15 bits unused */
+#define SSCF_UI	(0x01)
+
+#define	SSCF_DEFAULT_FEATURES	SSCF_UI
+
+@class  SecuritySettingsControlClass, GenControlClass;
+/*
+ *  Controller to handle user changeable security settings.
+ */
+
+/*
+ *  Internal: Message sent out when PIN code request trigger is pressed to
+ *  initiate changing of PIN code request state on phone power ups.
+ */
+@message void MSG_SECURITY_SETTINGS_CONTROL_CHANGE_PIN_CODE_REQUEST();
+
+/*
+ *  Internal: PIN code dialog sends this to us when user has entered
+ *  correct PIN code, so we can put try to set the PIN code status.
+ */
+@message void MSG_SECURITY_SETTINGS_CONTROL_CHANGE_PIN_CODE_REQUEST_APPROVED();
+
+/*
+ *  Internal: PIN code dialog sends this to us when PIN code request
+ *  change suceeds.
+ */
+@message void MSG_SECURITY_SETTINGS_CONTROL_PIN_CODE_REQUEST_CHANGED();
+
+/*
+ *  Internal: Sent to us when change Lock time-out trigger is pressed.
+ */
+@message void MSG_SECURITY_SETTINGS_CONTROL_CHANGE_LOCK_TIME_OUT();
+
+/*
+ *  Internal: Lock code dialog sends this to us when user has entered
+ *  the correct lock code, so we can put up a lock time out list.
+ */
+@message void MSG_SECURITY_SETTINGS_CONTROL_CHANGE_LOCK_TIME_OUT_APPROVED();
+
+/*
+ *  Internal: Lock time-out list sends this to us when user has selected
+ *  a new lock time-out value.
+ * 
+ *  Pass: cx = lock time-out value (in mins)
+ */
+@message void MSG_SECURITY_SETTINGS_CONTROL_LOCK_TIME_OUT_CHANGED();
+
+/*
+ *  Internal: Sent to us when Change Security level trigger is pressed.
+ */
+@message void MSG_SECURITY_SETTINGS_CONTROL_CHANGE_SECURITY_LEVEL();
+
+/*
+ *  Internal: Lock code dialog sends this to us when user has entered
+ *  correct lock code before allowing user to change security levels.
+ */
+@message void MSG_SECURITY_SETTINGS_CONTROL_CHANGE_SECURITY_LEVEL_APPROVED();
+
+/*
+ *  Internal: Sent to us when Change PIN code trigger is pressed.
+ */
+@message void MSG_SECURITY_SETTINGS_CONTROL_CHANGE_PIN_CODE();
+
+/*
+ *  Internal: PIN code dialog sends this to us when user has entered
+ *  correct PIN code...
+ */
+@message void MSG_SECURITY_SETTINGS_CONTROL_CHANGE_PIN_CODE_APPROVED();
+
+/*
+ *  Internal: Sent to us when Change Lock code trigger is pressed.
+ */
+@message void MSG_SECURITY_SETTINGS_CONTROL_CHANGE_LOCK_CODE();
+
+/*
+ *  Internal: Lock code dialog sends this to us when user has entered
+ *  correct lock code, so we can change to new lock code.
+ */
+@message void MSG_SECURITY_SETTINGS_CONTROL_CHANGE_LOCK_CODE_APPROVED();
+
+/*
+ *  Internal: Sent to us when change Network passwd trigger is pressed.
+ */
+@message void MSG_SECURITY_SETTINGS_CONTROL_CHANGE_NETWORK_PASSWORD();
+
+/*
+ *  Internal: Sent to us when change user has entered correct PUK code.
+ */
+@message void MSG_SECURITY_SETTINGS_CONTROL_CHANGE_NETWORK_PASSWORD_APPROVED();
+
+@endc	/* SecuritySettingsControlClass */
+
+/* ----------------------------------------------------------------------------
+ *   Exported functions
+ * --------------------------------------------------------------------------*/
+extern void _far _pascal \
+   	SecurityEnterLockMode(void);
+extern Boolean _far _pascal \
+	SecurityDoPasswordDialog(SecurityCodeType code,
+		optr notifyObj, word notifyMsg);
+extern Boolean _far _pascal \
+     	SecurityCheckCellPhoneMediaAvailable(void);
+extern CellPhoneMediaStatus _far _pascal \
+	SecurityTryToMakeCellPhoneMediaAvailable(void);
+extern word _far _pascal \
+	SecurityGetLockTimeOutTime(void);
+extern word _far _pascal \
+        SecurityCheckSIMCardAndPhone(void);
+
+#define SecurityCheckSIMCard SecurityTryToMakeCellPhoneMediaAvailable
+
+extern void _far _pascal \
+        SecuritySuspendAutoLock(void);
+extern void _far _pascal \
+        SecurityResumeAutoLock(void);
+
+#ifdef __HIGHC__
+pragma  Alias(SecurityEnterLockMode, "SECURITYENTERLOCKMODE");
+pragma  Alias(SecurityDoPasswordDialog, "SECURITYDOPASSWORDDIALOG");
+pragma	Alias(SecurityCheckCellPhoneMediaAvailable, "SECURITYCHECKCELLPHONEMEDIAAVAILABLE");
+pragma	Alias(SecurityTryToMakeCellPhoneMediaAvailable, "SECURITYTRYTOMAKECELLPHONEMEDIAAVAILABLE");
+pragma	Alias(SecurityGetLockTimeOutTime, "SECURITYGETLOCKTIMEOUTTIME");
+pragma  Alias(SecurityCheckSIMCardAndPhone, "SECURITYCHECKSIMCARDANDPHONE");
+pragma  Alias(SecuritySuspendAutoLock, "SECURITYSUSPENDAUTOLOCK");
+pragma  Alias(SecurityResumeAutoLock, "SECURITYRESUMEAUTOLOCK");
+#endif
+
+@endlib
+
+
+
+

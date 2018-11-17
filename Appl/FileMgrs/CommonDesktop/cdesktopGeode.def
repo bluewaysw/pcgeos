@@ -1,0 +1,732 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1988 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Desktop
+FILE:		desktopGeode.asm
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	brianc	8/89		Initial version
+
+DESCRIPTION:
+	This file contains contains Geode definitions for desktop.
+
+	$Id: cdesktopGeode.def,v 1.3 98/06/03 13:18:37 joon Exp $
+
+------------------------------------------------------------------------------@
+
+;------------------------------------------------------------------------------
+;			Common GEODE stuff
+;------------------------------------------------------------------------------
+
+ifdef FULL_EXECUTE_IN_PLACE
+include	geos.def		; standard macros & constants
+include geode.def		; Geode* functions normally used by apps
+include Internal/xip.def	; XIP stuff
+include Internal/heapInt.def	; For ThreadPrivateData
+include resource.def		; segment & macro definitions needed by all
+				;  geodes
+
+include ec.def			; Error-checking macros and FatalErrors type
+
+include lmem.def		; For static UI resources
+include	object.def		; For sending messages
+include graphics.def		; For drawing things
+include gstring.def		; For icons
+include heap.def		; For allocating memory
+include system.def		; for XIP
+
+UseLib	ui.def			; Generic UI definitions
+
+else
+
+include stdapp.def
+
+endif
+
+include Internal/prodFeatures.def
+include product.def		
+include	win.def
+include timer.def
+include localize.def	; for Resources file
+
+include file.def
+include input.def
+
+include fmtool.def
+
+include Objects/inputC.def
+include Objects/winC.def
+include Objects/metaC.def
+
+include	Internal/im.def
+
+
+; NOTE: "ifdef"  constants must be passed on assembly command line via -D
+; option, so that they will appear to be defined here, for the specific UI
+; you are trying to create.  This is normally done in local.mk for each
+; specific UI.  ifdef's SHOULD NOT BE USED in code, to provide conditional
+; assemblies.  Instead, use the _* constants.
+; -- Doug.
+
+;----------------------------------------------
+
+ifdef GMGR
+_GMGR			= -1
+else
+_GMGR			= 0
+endif
+
+;----------------------------------------------
+
+ifdef ZMGR
+_ZMGR			= -1
+else
+_ZMGR			= 0
+endif
+
+;----------------------------------------------
+
+ifdef BMGR
+_BMGR			= -1
+else
+_BMGR			= 0
+endif
+
+;----------------------------------------------
+
+ifdef PMGR
+_PMGR			= -1
+else
+_PMGR			= 0
+endif
+
+;----------------------------------------------
+
+ifdef HMGR
+_HMGR			= -1
+else
+_HMGR			= 0
+endif
+
+;----------------------------------------------
+ifdef GEOLAUNCHER
+_FCAB			= -1
+else
+_FCAB			= 0
+endif
+
+;----------------------------------------------
+
+if (_GMGR and not _FCAB)
+_GMGRONLY		= -1
+else
+_GMGRONLY		= 0
+endif
+
+;----------------------------------------------
+
+ifdef NEWDESK
+_NEWDESK		= -1
+else
+_NEWDESK		= 0
+endif
+
+;----------------------------------------------
+
+ifdef NEWDESKBA
+_NEWDESKBA		= -1
+else
+_NEWDESKBA		= 0
+endif
+
+;----------------------------------------------
+
+if (_NEWDESK and not _NEWDESKBA)
+_NEWDESKONLY		= -1
+else
+_NEWDESKONLY		= 0
+endif
+
+;----------------------------------------------
+
+ifdef FORCE_DELETE
+_FORCE_DELETE		= -1
+else
+_FORCE_DELETE		= 0
+endif
+
+;----------------------------------------------
+
+_NIKE			= 0
+
+;----------------------------------------------
+
+ifdef DOCMGR
+_DOCMGR			= -1
+else
+_DOCMGR			= 0
+endif
+
+;----------------------------------------------
+
+ifdef GPC
+_GPC			= -1
+else
+_GPC			= 0
+endif
+
+;----------------------------------------------
+
+
+
+;-----------------------------------------------------------------------------
+; COMPILATION CONSTANTS:  Our goal is to make file managers
+; "feature-based", rather than "product-based".  We're a long way off
+; from this goal, as there's a great deal of code that's product-based,
+; but please do your part to help by using generalizable features
+; whenever possible.  Also, if you add a feature, please add a
+; description of that feature here, so that future engineers will know
+; whether to turn that feature on or off when building new file
+; managers. 
+;-----------------------------------------------------------------------------
+ 
+_WINDOW_MENU 		= TRUE
+; Determines whether the app has a window menu or not.  If not, then
+; only one folder will be displayed at a time, and it will always be
+; full-screen.
+
+
+_PEN_BASED 		= FALSE
+; This flag is used to allow quick-transfers using the
+; MSG_META_(START/DRAG/END)_SELECT mechanism, rather than MOVE_COPY,
+; which is unavailable on such systems.
+
+
+_CONNECT_TO_REMOTE 	= FALSE
+; This flag enables connection capabilities.  The default interface
+; presumed by CONNECT_TO_REMOTE is a trigger in the disk menu.
+; Setting CONNECT_MENU (below) will override this, creating a
+; separate "Connect" menu.  CONNECT_ICON (below) determines if an
+; icon will appear.  For these things to appear, the DF_CONNECT flag 
+; must also be set in the .INI file (under fileManager:features).  
+
+_CONNECT_ICON		= FALSE
+; This flag enables the "Connect" icon.  CONNECT_TO_REMOTE must be
+; true to use this flag.
+
+_CONNECT_MENU 		= FALSE
+; This flag enables a separate "Connect" menu which has File Linking
+; and File Transfer options.  If CONNECT_TO_REMOTE is true and 
+; CONNECT_MENU is FALSE, the connect trigger will appear in the
+; disk menu.  CONNECT_MENU is used in ZManager.  CONNECT_TO_REMOTE
+; must be true to set this flag.
+
+_PCMCIA_FORMAT 		= FALSE
+_PREFERENCES_LAUNCH	= FALSE
+_COLLAPSE_BRANCH_BUFFER = FALSE
+
+_KEEP_MAXIMIZED		= TRUE
+; This flag causes GeoManager to remain maximized whenever file
+; linking is established.  This is to prevent switching to other apps
+; that may be behind GeoManager.  Not necessary in HManager, because
+; that app is always maximized, and has no express menu.
+
+
+_STANDARD_COLOR			= TRUE
+; File manager might run on a standard (VGA/EGA) color system
+
+_TINY			= FALSE
+; File manager might run on a tiny screen (zoomer).
+
+_STANDARD_MONO		= TRUE
+; File manager might run on a standard (VGA/EGA) monochrome system.
+
+_CGA			= TRUE
+; File manager might run on a CGA system
+
+
+WRAP = TRUE
+; Allow word-wrapping of long filenames
+
+OPEN_CLOSE_NOTIFICATION		= FALSE
+BOGUS_KEYBOARD_NAVIGATION	= FALSE
+
+CLOSE_IN_OVERLAP		= TRUE
+; Close windows according to LRU after the number of open windows has
+; reached a max value
+
+if PZ_PCGEOS
+NEW_FONT_HANDLING		= FALSE
+else
+NEW_FONT_HANDLING		= TRUE
+; Get Fonts from ini file
+endif
+
+COUNT_SORT_COMPARISONS 		= FALSE
+; count up # comparisons done in SortFolderBuffer
+
+INSTALLABLE_TOOLS		= TRUE
+
+SEPARATE_NAMES_AND_DETAILS	= FALSE
+
+ICON_INVERT_PRESERVES_COLOR	= TRUE
+; If icon inversion (selection) should preserve icon colors:  slower, but
+; better looking
+
+TRY_CLOSE_ON_IN_USE_ERROR	=	FALSE
+; If files that are in-use on a file rename, file move, file delete should
+; attempt to be closed.  Should only be used in TRANSPARENT launch models.
+
+
+CREATE_LOCAL_SP_FILE_CHANGE	=	FALSE
+; HACK for ZMGR only to rescan if this folder is on a standard path for
+; which there is no local copy.  Fixes problem where local standard paths
+; created by the system don't sent out the notification we expect.  Only
+; reasonable on ZMGR where there is only one Folder Window open. - brianc
+; 6/7/93
+;
+
+ENSURE_LOCAL_SP_SUBDIRS		=	FALSE
+; Ensure that if destination directory for copy, move, and create dir
+; is a subdirectory of a standard path, that it exists locally
+
+_AVOID_POWER_OFF		=	FALSE
+; During long file operations, bump the mouse periodically.  Should
+; only be used on battery-powered systems where a power manager is
+; running that might otherwise shut the system off after a long period
+; of inactivity.
+
+FeatureFlag _PRINT_CAPABILITY,		TRUE
+;Add print capability to the manager, which is usually on
+
+FeatureFlag _FAX_CAPABILITY,		FALSE
+;Add fax capability to the manager, not implemented now
+
+_TREE_MENU			= 	TRUE
+; This flag controls inclusion of the "Tree" functionality
+
+_ICON_AREA			= 	TRUE
+; This flag controls inclusion of the drive, directory, and
+; wastebasket icons
+
+_DOS_LAUNCHERS			=	TRUE
+; Controls the inclusion of DOS launcher code and resources
+
+_APP_MONIKER			= 	TRUE
+; Set to false on systems where the file manager icon isn't needed
+
+_WRITABLE_TOKEN_DATABASE	=	TRUE
+; If this flag is turned off, then it is assumed that the token DB
+; resides in ROM, and is never modified by the file manager
+
+_DOS_ICONS			=	TRUE
+; If this flag is turned off, there will be no "generic DOS" icons
+
+_DISK_OPS			=	TRUE
+; Allow for disk format, rename, etc.
+
+
+_DOS_LONG_NAME_SUPPORT		=	FALSE
+; If this flag is turned on, DOS long names (limited to FILE_LONGNAME_LENGTH
+; chars) will be allowed for DOS files in Rename and Duplicate dialogs.
+; Should only be used with a DOS IFS driver that also supports DOS long
+; names.
+
+ifdef GPC
+;
+; Lot's of GPC features here.  Turn on what you want for your non-GPC
+; version.
+;
+
+GPC_TEXT_MODE_ICONS = TRUE
+; Use application- and document-specific icons in Names Only and
+; Names and Details view modes of folder windows.
+
+GPC_MAIN_SCREEN_LINK = TRUE
+; Link to exit to GlobalPC Main Screen exists on Desktop.
+
+FeatureFlag GPC_CUSTOM_FLOPPY_NAME, TRUE
+; Floppy disk drive A: has a nice little name ("Floppy Disk") instead
+; "Drive A:".
+
+FeatureFlag GPC_NAMES_AND_DETAILS_TITLES, TRUE
+; Column titles in Names and Details view mode of folder windows.  Click
+; on column title to sort by that mode (except for "Attr").  Cannot resize
+; columns by dragging between column titles.
+
+FeatureFlag GPC_NO_DRIVES_FOLDER, TRUE
+; Removes "Computer" folder from Desktop that contains link to each
+; drive and link to Preferences.  Drive links are placed directly
+; in Desktop.  geos.ini file can specify which drives should not have
+; drive links (i.e. system drive, backup drive, clean drive):
+;
+; noDriveLink = CDE
+;
+; This specifies that drive links should not be created for C:, D:, and E:
+; drives (system drive, backup drive, clean drive, respectively).  The drive
+; letters must be uppercase.
+
+GPC_HIGHLIGHT_DRAG_DESTINATIONS = TRUE
+; Highlights potential destinations of move/copy when dragging files.
+
+GPC_NO_NAMES_AND_DETAILS_ATTRS = TRUE
+; No DOS file attributes shown in Names and Details view mode of folder
+; windows.  Use Info dialog to view them.
+
+FeatureFlag GPC_FOLDER_WINDOW_MENUS, TRUE
+; Use GPC spec for folder window menus.  Controls folder window menu bar
+; and menu items, plus items enabled/disabled based on selection.
+
+FeatureFlag GPC_DEBUG_MODE, TRUE
+; Support .ini based debug flag that provides access to a few advanced
+; features.
+
+FeatureFlag GPC_POPUP_MENUS, TRUE
+; Use GPC spec for popup menus.  Basically, only allowed on desktop and
+; desktop objects.  Menu contents follow folder window menus for respective
+; object.
+
+
+FeatureFlag GPC_NO_COPY_DISK, TRUE
+; Remove copy disk item from drive menus.
+
+GPC_GET_INFO_DB = TRUE
+; Use GPC spec for Get Info (File Info) dialog box.
+
+ifdef GPC_ONLY
+GPC_FILE_OP_CANCEL_TRIGGERS = TRUE
+else
+GPC_FILE_OP_CANCEL_TRIGGER = FALSE
+endif
+; Use more descriptive names for cancel triggers in file operation dialogs
+; like File Info and Rename.
+
+GPC_FILE_OP_DIALOG_PATHNAME = TRUE
+; Truncates pathname display to be rooted at Document directory, if possible.
+; Used in File Info, Rename, and Create Folder dialogs.  Also put pathname
+; on separate line for Rename and Create Folder dialogs to give them more
+; space.
+
+ifdef GPC_ONLY
+GPC_CREATE_DESKTOP_LINK = TRUE
+else
+GPC_CREATE_DESKTOP_LINK = FALSE
+endif
+; Only allows putting links on the Desktop.  Removes file selector from
+; create link dialog.  Cannot move/copy.
+
+FeatureFlag GPC_PRESERVE_DIRECTORIES, TRUE
+; Do not allow destruction (move, delete, rename) of special folders or
+; creation of subdirectories in special folders.
+;
+; Special folders are specified in geos.ini file:
+;
+; specialFolders = {
+; <SP>,<pathname>
+; 3,Home Office
+; 3,Games
+; }
+;
+; There should be no space between Standard Path, comma, and pathname.
+
+ifdef LEFTCLICKDRAGDROP
+_PEN_BASED = TRUE
+else
+_PEN_BASED = FALSE
+endif
+; Set for left-mouse button file dragging.
+
+GPC_FULL_WASTEBASKET = TRUE
+; Use different icon for wastebasket when not empty.
+
+ifdef GPC_ONLY
+INSTALLABLE_TOOLS = FALSE
+else
+INSTALLABLE_TOOLS = TRUE
+endif
+; Remove these for GPC, leave on for NDO.
+
+GPC_FOLDER_DIR_TOOLS = TRUE
+; Include up-directory button and path display in Folder Windows.
+
+GPC_FOLDER_INFO = TRUE
+; Use Kbytes in FolderInfoString display.
+
+GPC_ICON_INVERT = TRUE
+; Selection shows both name and icon inverted.
+
+GPC_WASTEBASKET_EMPTY = TRUE
+; Don't empty wastebasket on exit, only when user requests.
+
+FeatureFlag GPC_NO_FUNCTION_KEYS, TRUE
+; No F key shortcuts
+
+FeatureFlag GPC_DESKTOP_LINKS_IN_INI, TRUE
+; Create Desktop links from list in geos.ini file.
+
+GPC_DRAG_SOUND = TRUE
+; Make sound when drag item dropped successfully.
+
+FeatureFlag GPC_SIGN_UP_ICON, TRUE
+; Icon on Desktop for Sign Up for ISP service/Warranty Registration
+
+GPC_DISABLE_MOVE_COPY_FOR_SOURCE = TRUE
+; In Move/Copy dialogs, disables action button when source dir selected.
+
+GPC_NO_PRINT = TRUE
+; No printing support, including network printing.
+
+GPC_SIMPLE_KBD_NAVIGATION = TRUE
+; Simple pattern of arrows for moving selection in folder windows.
+
+GPC_PRESERVE_ARCHIVE = TRUE
+; Don't allow destroy Archive directory in SP_DOCUMENT.
+
+GPC_PRESERVE_PAK_UPD = TRUE
+; Don't allow destructive operations on PAK and UPD files.
+
+ifdef GPC_ONLY
+GPC_UI_LEVEL_DIALOG = TRUE
+else
+GPC_UI_LEVEL_DIALOG = FALSE
+endif
+; Display a one-time dialog allowing user to choose the system default
+; UI (skill) level.
+
+else
+if _DOCMGR
+GPC_TEXT_MODE_ICONS = TRUE
+else
+GPC_TEXT_MODE_ICONS = FALSE
+endif
+GPC_MAIN_SCREEN_LINK = FALSE
+FeatureFlag GPC_CUSTOM_FLOPPY_NAME, FALSE
+if _DOCMGR
+FeatureFlag GPC_NAMES_AND_DETAILS_TITLES, TRUE
+else
+FeatureFlag GPC_NAMES_AND_DETAILS_TITLES, FALSE
+endif
+FeatureFlag  GPC_NO_DRIVES_FOLDER, FALSE
+GPC_HIGHLIGHT_DRAG_DESTINATIONS = FALSE
+if _DOCMGR
+GPC_NO_NAMES_AND_DETAILS_ATTRS = TRUE
+else
+GPC_NO_NAMES_AND_DETAILS_ATTRS = FALSE
+endif
+FeatureFlag GPC_FOLDER_WINDOW_MENUS, FALSE
+FeatureFlag GPC_DEBUG_MODE, FALSE
+FeatureFlag GPC_POPUP_MENUS, FALSE
+FeatureFlag GPC_NO_COPY_DISK, FALSE
+GPC_GET_INFO_DB = FALSE
+GPC_FILE_OP_CANCEL_TRIGGERS = FALSE
+if _DOCMGR
+GPC_FILE_OP_DIALOG_PATHNAME = TRUE
+else
+GPC_FILE_OP_DIALOG_PATHNAME = FALSE
+endif
+GPC_CREATE_DESKTOP_LINK = FALSE
+FeatureFlag GPC_PRESERVE_DIRECTORIES, FALSE
+GPC_FULL_WASTEBASKET = FALSE
+GPC_FOLDER_DIR_TOOLS = FALSE
+GPC_FOLDER_INFO = FALSE
+GPC_ICON_INVERT = FALSE
+GPC_WASTEBASKET_EMPTY = FALSE
+FeatureFlag GPC_NO_FUNCTION_KEYS, FALSE
+FeatureFlag GPC_DESKTOP_LINKS_IN_INI, FALSE
+GPC_DRAG_SOUND = FALSE
+FeatureFlag GPC_SIGN_UP_ICON, FALSE
+if _DOCMGR
+GPC_DISABLE_MOVE_COPY_FOR_SOURCE = TRUE
+else
+GPC_DISABLE_MOVE_COPY_FOR_SOURCE = FALSE
+endif
+GPC_NO_PRINT = FALSE
+if _DOCMGR
+GPC_SIMPLE_KBD_NAVIGATION = TRUE
+else
+GPC_SIMPLE_KBD_NAVIGATION = FALSE
+endif
+GPC_PRESERVE_ARCHIVE = FALSE
+if _DOCMGR
+GPC_PRESERVE_PAK_UPD = TRUE
+else
+GPC_PRESERVE_PAK_UPD = FALSE
+endif
+GPC_UI_LEVEL_DIALOG = FALSE
+endif
+
+;-----------------------------------------------------------------------------
+;	This is where the above-defined flags get changed from their
+;defaults for the various file managers.		
+;-----------------------------------------------------------------------------
+ 
+;-------  GMGR  --------
+if _GMGR or _BMGR
+_CONNECT_TO_REMOTE		= TRUE
+_CONNECT_ICON			= TRUE
+endif
+
+;-------  ZMGR  --------
+if _ZMGR
+_WINDOW_MENU 			= FALSE
+_PEN_BASED 			= TRUE
+SEPARATE_NAMES_AND_DETAILS	= TRUE
+_CONNECT_TO_REMOTE		= TRUE
+_CONNECT_MENU			= TRUE
+_DOS_LAUNCHERS			= FALSE
+_TREE_MENU			= FALSE
+
+;-------  PMGR  --------
+; PMGR is a subset of ZMGR, except for the following differences:
+ if not _PMGR
+ _STANDARD_COLOR	= FALSE
+ _TINY			= TRUE
+ _STANDARD_MONO		= FALSE
+ _CGA			= FALSE
+ ICON_INVERT_PRESERVES_COLOR	= FALSE
+ TRY_CLOSE_ON_IN_USE_ERROR	= TRUE
+ CREATE_LOCAL_SP_FILE_CHANGE	= TRUE
+ ENSURE_LOCAL_SP_SUBDIRS	= TRUE
+ _AVOID_POWER_OFF		= TRUE
+ _KEEP_MAXIMIZED		= FALSE
+ endif
+endif
+
+;-------  BMGR  --------
+if _BMGR
+_WINDOW_MENU 		= TRUE
+_PEN_BASED 		= TRUE
+_PCMCIA_FORMAT 		= TRUE
+_STANDARD_COLOR		= FALSE
+_TINY			= FALSE
+_CGA			= FALSE
+_STANDARD_MONO		= TRUE
+ENSURE_LOCAL_SP_SUBDIRS	= TRUE
+_AVOID_POWER_OFF	= TRUE
+TRY_CLOSE_ON_IN_USE_ERROR = TRUE
+endif
+
+
+;-------  HMGR  --------
+if _HMGR
+_PREFERENCES_LAUNCH	= TRUE
+_KEEP_MAXIMIZED		= FALSE
+endif
+
+
+;-------  NEWDESK  --------
+if _NEWDESK
+_KEEP_MAXIMIZED		= FALSE
+_ICON_AREA		= FALSE
+_DOS_LAUNCHERS		= FALSE
+_TREE_MENU		= FALSE
+ifdef GPC_ONLY
+_DOS_LONG_NAME_SUPPORT	= TRUE
+else
+_DOS_LONG_NAME_SUPPORT	= FALSE
+endif
+endif
+
+;------- PZ_PCGEOS --------
+if PZ_PCGEOS
+_CONNECT_TO_REMOTE	= FALSE
+_CONNECT_ICON 		= FALSE
+_KEEP_MAXIMIZED		= FALSE
+endif
+
+;-------  DOCMGR  --------
+if _DOCMGR
+_WINDOW_MENU 			= FALSE
+INSTALLABLE_TOOLS		= FALSE
+;FeatureFlag _PRINT_CAPABILITY,	  FALSE
+;override previous value
+_PRINT_CAPABILITY		= FALSE
+_TREE_MENU			= FALSE
+_DOS_LAUNCHERS			= FALSE
+_CONNECT_TO_REMOTE		= FALSE
+_DISK_OPS			= FALSE
+ _KEEP_MAXIMIZED		= FALSE
+ifdef GPC_ONLY
+_DOS_LONG_NAME_SUPPORT		= TRUE
+else
+_DOS_LONG_NAME_SUPPORT		= FALSE
+endif
+endif
+
+
+; We want to assert that the Connect to remote dependencies are OK.
+; _CONNECT_MENU and _CONNECT_ICON can only be defined if
+; _CONNECT_TO_REMOTE defined, you check the logic...
+;
+;.assert ( _CONNECT_TO_REMOTE or \
+;	((not _CONNECT_TO_REMOTE) and \
+;	 (not _CONNECT_MENU) and \
+;	 (not _CONNECT_ICON) )
+
+;-------  NIKE  --------
+
+
+;------------------------------------------------------------------------------
+;			Libraries used
+;------------------------------------------------------------------------------
+
+UseLib	Objects/vTextC.def
+UseLib	net.def
+UseLib	shell.def
+
+if _NEWDESK
+include	newdesk.def
+endif		; if _NEWDESK
+
+include cdesktopConstant.def
+include cdesktopMacro.def
+include cdesktopGlobal.def
+
+
+
+if _NEWDESK
+ 
+;-----------------------------------------------------------------------------
+;	NewDesk specific includes		
+;-----------------------------------------------------------------------------
+
+include cNDGlobal.def
+include copenfileClass.def
+
+UseLib spool.def
+
+if _NEWDESKBA
+UseLib iclas.def
+endif
+
+FOLDER_VIEW_OFFSET equ offset NDFolderView
+FOLDER_MENU_OFFSET equ offset NDFolderMenu
+FOLDER_WINDOW_OFFSET equ offset NDFolderWindow
+FOLDER_OBJECT_OFFSET equ offset NDFolderObject
+FOLDER_INFO_OFFSET equ offset NDFolderInfo
+
+else 
+
+FOLDER_VIEW_OFFSET equ offset FolderView
+FOLDER_WINDOW_OFFSET equ offset FolderWindow
+FOLDER_OBJECT_OFFSET equ offset FolderObject
+
+endif		; if _NEWDESK
+
+ifdef GPC
+;
+; we allow running DOS programs in Enhanced (debug) mode
+;
+NDO_LAUNCH_DOS_EXE = TRUE
+endif
+ifdef GMGR
+ifdef DOCMGR
+NDO_LAUNCH_DOS_EXE = FALSE
+else
+NDO_LAUNCH_DOS_EXE = TRUE
+endif
+endif

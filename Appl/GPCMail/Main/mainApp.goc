@@ -1,0 +1,990 @@
+/***********************************************************************
+ *
+ *	Copyright (c) New Deal 1998 -- All Rights Reserved
+ *
+ * PROJECT:	  Mail
+ * MODULE:	  Mail
+ * FILE:	  mainProcess.goc
+ *
+ * AUTHOR:  	  Gene Anderson: 12/2/98
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	12/2/98    gene	    Initial version
+ *
+ * DESCRIPTION:
+ *	MailProcessClass for the Mail application
+ *
+ * 	$Id$
+ *
+ ***********************************************************************/
+
+@include "mail.goh"
+@include "class.goh"
+@include "global.goh"
+@include <rolodex.goh>
+#include "sem.h"
+
+@classdecl MailAppClass;
+
+#ifdef __BORLANDC__
+#pragma codeseg RareCode
+#endif
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_MAIL_APP_DEFAULT_ACCOUNT_ERROR
+* PASS:            none
+* RETURN:          none
+* DESCRIPTION:     handle an error creating the default account
+*
+* REVISION HISTORY:
+*         Name      Date        Description
+*         ----      ----        -----------
+*         gene      10/29/99    Initial Revision
+*
+***************************************************************/
+@method MailAppClass, MSG_MAIL_APP_DEFAULT_ACCOUNT_ERROR
+{
+    LockStrings();
+    UserStandardDialog(
+	(char *) NULL,
+	/* GIT_MULTIPLE_RESPONSE, so custom */
+	NULL,
+	/* no string argument */
+	(char *) NULL,
+	(char *) NULL,
+	/* dialog string */
+	LMemDeref (@defaultAccountErr),
+	/* dialog type */
+	(CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+	/* interaction type */
+	(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)
+	);
+    UnlockStrings();
+    @send, forceQueue oself::MSG_META_QUIT();
+}
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_MAIL_APP_LAUNCH_ADDRESS_BOOK
+* PASS:            none
+* RETURN:          none
+* DESCRIPTION:     Launch the Address Book application
+*
+* REVISION HISTORY:
+*         Name      Date        Description
+*         ----      ----        -----------
+*         gene      12/7/98     Initial Revision
+
+***************************************************************/
+@method MailAppClass, MSG_MAIL_APP_LAUNCH_ADDRESS_BOOK
+{
+    GeodeToken token = ROLODEX_TOKEN;
+    MemHandle launchBlk;
+
+    /*
+     * create a launch block
+     */
+    launchBlk = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
+    @call oself::MSG_MAIL_APP_LAUNCH_APPLICATION(token, launchBlk, 0, @addrLaunchErr);
+@ifdef CUI_CLOSE_ADDR_BOOK
+    /*
+     * if we're running in CUI, note that we need to tell address book
+     * to exit
+     */
+    if (UserGetDefaultUILevel() == UIIL_INTRODUCTORY) {
+	ObjDerefGen(oself);
+	pself->MAI_launchedAddr = TRUE;
+    }
+@endif
+}
+
+@ifdef MAIL_STYLES_SUPPORT
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_MAIL_APP_LAUNCH_BROWSER
+* PASS:            iab - handle of InternetAppBlock with IADT_URL
+* RETURN:          none
+* DESCRIPTION:     Launch the Address Book application
+*
+* NOTE: URLs are not parsed if MAIL_STYLES_SUPPORT is not included;
+* hence, there is no reason for this method in those cases
+*
+* REVISION HISTORY:
+*         Name      Date        Description
+*         ----      ----        -----------
+*         gene      2/6/99      Initial Revision
+
+***************************************************************/
+@method MailAppClass, MSG_MAIL_APP_LAUNCH_BROWSER
+{
+    GeodeToken token = {'G','l','b','I', 16431 };
+@ifdef DIALER_URL
+    GeodeToken dtoken = {'G','P','C','s', 0 };
+    static const char dialerURL[] = "dialer:";
+#define DIALER_URL_LEN 7
+    Boolean dialer = FALSE;
+    InternetAppBlock *iap;
+@endif
+    MemHandle launchBlk;
+    AppLaunchBlock *lbs;
+
+    /*
+     * check if dialer
+     */
+@ifdef DIALER_URL
+    if (iab) {
+	iap = MemLock(iab);
+	if (LocalCmpStringsNoCase((char *)(iap+1), dialerURL, DIALER_URL_LEN)==0)
+	    dialer = TRUE;
+	MemUnlock(iab);
+    }
+@endif
+
+    /*
+     * create a launch block
+     */
+    launchBlk = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
+
+    if (launchBlk) {
+	/*
+	 * fill in the launch block with our extra data
+	 */
+	lbs = MemLock(launchBlk);
+	lbs->ALB_extraData = iab;
+	MemUnlock(launchBlk);
+    }
+@ifdef DIALER_URL
+     if (dialer) {
+	 /* docLaunchErr is close enough */
+	 @call oself::MSG_MAIL_APP_LAUNCH_APPLICATION(dtoken, launchBlk, 0, @docLaunchErr);
+     } else {
+	 @call oself::MSG_MAIL_APP_LAUNCH_APPLICATION(token, launchBlk, 0, @browserLaunchErr);
+     }
+@else
+    @call oself::MSG_MAIL_APP_LAUNCH_APPLICATION(token, launchBlk, 0, @browserLaunchErr);
+@endif
+}
+
+@endif
+
+
+/***********************************************************************
+ *		MSG_MAIL_APP_LAUNCH_APPLICATION for MailAppClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	  Launch an application for an attachment  
+ * PARAMETERS:	    
+ *                GeodeToken geodeToken - geode token
+ *                MemHandle launchHan - handle of AppLaunchBlock (NULL if err)
+ *                EventHandle msg - handle of recorded message (0 for none)
+ *                optr errMessage - error message to use for failure
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	2/21/99   	Initial Revision
+ *
+ ***********************************************************************/
+
+@ifdef FORCE_APP_EXIT
+const char forceExitKey[] = "noForceExit";
+@endif
+
+@method MailAppClass, MSG_MAIL_APP_LAUNCH_APPLICATION
+{
+    IACPConnection   iacpConnectionToken = IACP_NO_CONNECTION;
+    word             serverCount;
+@ifdef FORCE_APP_EXIT
+    TCHAR iniCat[MAIL_NAME_MAX];
+    Boolean noForce;
+    GeodeToken adbToken = ROLODEX_TOKEN;
+@endif
+
+    if (launchHan) {
+	iacpConnectionToken = IACPConnect
+	    (&geodeToken, IACPCF_FIRST_ONLY | IACPSM_USER_INTERACTIBLE,
+	     launchHan, NullOptr, &serverCount);
+    }
+
+    if (iacpConnectionToken != IACP_NO_CONNECTION) {
+	/*
+	 * if there is a message, send it
+	 */
+	if (msg) {
+	    IACPSendMessage(iacpConnectionToken, msg,
+			    TO_PROCESS, IACPS_CLIENT, 0);
+	}
+	/*
+	 * all done
+	 */
+	IACPShutdown(iacpConnectionToken, NullOptr);
+	/*
+	 * minimize or quit, as desired
+	 */
+@ifdef FORCE_APP_EXIT
+        if (memcmp(&geodeToken, &adbToken, sizeof(adbToken))) {
+	    @call oself::MSG_META_GET_INI_CATEGORY(iniCat);
+	    noForce = FALSE;
+	    InitFileReadBoolean(iniCat, forceExitKey, &noForce);
+	    if (!noForce) {
+		@send oself::MSG_META_QUIT();
+	    }
+	}
+@endif
+
+@ifdef APP_START_OPTIONS
+	switch (@call PfAppStartOptionList::MSG_GEN_ITEM_GROUP_GET_SELECTION()){
+	case MASO_MINIMIZE:
+	    @call ReadMailWin::MSG_GEN_DISPLAY_CLOSE();
+	    @call MailPrimary::MSG_GEN_DISPLAY_SET_MINIMIZED();
+	    break;
+	case MASO_QUIT:
+	    @send oself::MSG_META_QUIT();
+	    break;
+	}
+@endif
+
+    } else {
+	/*
+	 *  Somehow we can't launch an application
+	 */
+	ReportError(errMessage, NULL);
+    }
+    
+}	/* End of MSG_MAIL_APP_LAUNCH_APPLICATION.	*/
+
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_MAIL_APP_ADD_ADDRESS_ENTRY
+* PASS:            addrBlock - handle of block with RolodexUpdateEntryField
+* RETURN:          none
+* DESCRIPTION:     Launch the Address Book application to add an address
+*
+* REVISION HISTORY:
+*         Name      Date        Description
+*         ----      ----        -----------
+*         gene      12/7/98     Initial Revision
+
+***************************************************************/
+@method MailAppClass, MSG_MAIL_APP_ADD_ADDRESS_ENTRY
+{
+    GeodeToken token = ROLODEX_TOKEN;
+    MemHandle launchBlk;
+    EventHandle msg;
+
+    msg = @record null::MSG_ROLODEX_UPDATE_ENTRY(addrBlock);
+    /*
+     * create a launch block
+     */
+    launchBlk = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
+    @call oself::MSG_MAIL_APP_LAUNCH_APPLICATION(token, launchBlk, msg, @addrLaunchErr);
+    /*
+     * if we're running in CUI, note that we need to tell address book
+     * to exit
+     */
+@ifdef CUI_CLOSE_ADDR_BOOK
+    if (UserGetDefaultUILevel() == UIIL_INTRODUCTORY) {
+	ObjDerefGen(oself);
+	pself->MAI_launchedAddr = TRUE;
+    }
+@endif
+}
+
+#ifdef __BORLANDC__
+#pragma codeseg InitCode
+#endif
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_META_ATTACH_OBJECT
+* PASS:            none
+* RETURN:          none
+* DESCRIPTION:     Handle some initialization
+*
+* REVISION HISTORY:
+*         Name      Date        Description
+*         ----      ----        -----------
+*         gene      12/7/98     Initial Revision
+***************************************************************/
+
+
+@ifdef CUI_SUPPORT
+
+void
+GetMax(GStateHandle gs, MailStdString stdString, word *maxWidth)
+{
+    word width;
+    TCHAR *textP;
+
+    textP = MailLockStdString(stdString);
+    width = GrTextWidth(gs, textP, 0);
+    MailUnlockStdString(stdString);
+    if (width > *maxWidth) {
+	*maxWidth = width;
+    }
+}
+
+@ifdef EMAIL_ADS
+const char adsKey[]="emailads";
+@endif
+@ifdef FIRST_LAUNCH_USER_GUIDE
+const char launchedKey[] = "launched";
+@endif
+@ifdef LEVELS_SUPPORT
+const char featureKey[] = "features";
+@endif
+
+
+@method MailAppClass, MSG_META_ATTACH_OBJECT
+{
+@ifdef LEVELS_SUPPORT
+    word level;
+@endif
+@ifdef EMAIL_ADS
+    Boolean ads;
+@endif
+    TCHAR iniCat[MAIL_NAME_MAX];
+@ifdef FIRST_LAUNCH_USER_GUIDE
+    Boolean haveLaunched=FALSE;
+@endif
+
+    @callsuper();
+
+    @call oself::MSG_META_GET_INI_CATEGORY(iniCat);
+@ifdef EMAIL_ADS
+    /*
+     * Handle Advertisement stuff
+     */
+    if (!InitFileReadBoolean(iniCat, adsKey, &ads)) {
+	if (!ads) {
+	    @call TheAdvertisement::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+	}
+    }
+@endif 
+
+    /*
+     * Handle CUI crap
+     */
+@ifdef CUI_SUPPORT
+    /*
+     * if we're running in CUI, don't include Change Program Level
+     * and force Level 1
+     */
+    if (UserGetDefaultUILevel() == UIIL_INTRODUCTORY) {
+@ifdef LEVELS_SUPPORT
+	@call SetUserLevelDialog::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+@endif
+	@call oself::MSG_MAIL_APP_SET_USER_LEVEL(UIIL_INTRODUCTORY, 1, 0);
+    }
+@ifdef LEVELS_SUPPORT
+@ifndef PRODUCT_NDO2000
+      else {
+	 /*
+	  * if no level saved yet, default to system launchLevel
+	  * we do this because our default UI appears as level 3
+	  * but we want the list and actual default to be launchLevel,
+	  * so we need to force a change
+	  */
+         if (InitFileReadInteger(iniCat, featureKey, &level)) {
+	     level = UserGetDefaultLaunchLevel();
+	     if (level > UIIL_INTERMEDIATE) /* enforce our highest level */
+		 level = UIIL_INTERMEDIATE;
+	     if (level != (@call UserLevelList::
+	         MSG_GEN_ITEM_GROUP_GET_SELECTION())) {
+		 @call UserLevelList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(level, 0);
+		 @call oself::MSG_MAIL_APP_SET_USER_LEVEL(level, 1, 0);
+	     }
+	 }
+    }
+@endif // PRODUCT_NDO2000
+@endif // LEVELS_SUPPORT
+
+    @call ComposeBodyText::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+    @call ComposeSave::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+
+@ifdef GPC_PORTAL_SUPPORT
+     /*
+      * levelObjs is only used when switching levels, not starting up,
+      * so we need this here also
+      */
+     if ((@call oself::MSG_MAIL_APP_GET_USER_LEVEL()) == UIIL_INTRODUCTORY) {
+         @call PfAccountText::MSG_GEN_SET_USABLE(VUM_DLYD);
+         @call PfAccountSeparator::MSG_GEN_SET_USABLE(VUM_DLYD);
+     } else {
+         @call PfAccountText::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+         @call PfAccountSeparator::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+     }
+@endif
+
+@ifdef FIRST_LAUNCH_USER_GUIDE
+    /*
+     * if we're launching for the first time, annoy the user with
+     * a special dialog telling them to RTFM, and then set
+     * a flag so we don't do it again
+     */
+    InitFileReadBoolean(iniCat, launchedKey, &haveLaunched);
+    if (!haveLaunched) {
+	ReportOK(@firstLaunchStr, NULL);
+	InitFileWriteBoolean(iniCat, launchedKey, TRUE);
+    }
+@endif
+
+}
+
+@ifdef CUI_SUPPORT
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_MAIL_APP_SET_USER_LEVEL
+* PASS:            selection - user level
+*                  numSelections - 1
+*                  stateFlags - GenItemGroupStateFlags
+* RETURN:          none
+* DESCRIPTION:     Set the user level
+*
+* REVISION HISTORY:
+*         Name      Date        Description
+*         ----      ----        -----------
+*         gene      12/7/98     Initial Revision
+***************************************************************/
+
+typedef struct {
+    byte OAL_minLevel;
+    byte OAL_maxLevel;
+    optr OAL_object;
+} ObjAndLevel;
+
+const ObjAndLevel levelObjs[] = {
+    {UIIL_INTERMEDIATE, UIIL_GURU, @FolderMenu},
+    {UIIL_INTERMEDIATE, UIIL_GURU, @MoveMessageTrigger},
+    {UIIL_INTERMEDIATE, UIIL_GURU, @MoveMessageTool},
+    {UIIL_INTERMEDIATE, UIIL_GURU, @SortByGroup},
+    {UIIL_INTERMEDIATE, UIIL_GURU, @MainShowToolbar},
+@ifndef NO_COMPOSE_OPTIONS
+    {UIIL_INTERMEDIATE, UIIL_GURU, @ComposeShowToolbar},
+@endif
+@ifdef MBX_IMPORT_SUPPORT
+    {UIIL_INTERMEDIATE, UIIL_GURU, @ImportDialog},
+@endif
+    {UIIL_INTERMEDIATE, UIIL_GURU, @ReadShowToolbar},
+    {UIIL_INTERMEDIATE, UIIL_GURU, @PreferencesDialog},
+@ifndef CUI_ZOOM_IN
+    {UIIL_INTERMEDIATE, UIIL_GURU, @ReadFontControl},
+    {UIIL_INTERMEDIATE, UIIL_GURU, @ReadPointsizeControl},
+@endif
+    {UIIL_INTERMEDIATE, UIIL_GURU, @MailToolbar},
+    {UIIL_BEGINNING,    UIIL_GURU, @MailToolbar},
+    {UIIL_BEGINNING,    UIIL_GURU, @FolderMessageArea},
+    {UIIL_BEGINNING,    UIIL_GURU, @TheFolderList},
+    {UIIL_BEGINNING,    UIIL_GURU, @SearchMenu},
+    {UIIL_BEGINNING,    UIIL_GURU, @FindAgainTrigger},
+@ifndef SORT_BY_COLUMNS
+    {UIIL_BEGINNING,    UIIL_GURU, @MessageListGlyph},
+@endif
+    {UIIL_BEGINNING,    UIIL_GURU, @CreateNewMessageTrigger},
+    {UIIL_BEGINNING,    UIIL_GURU, @EditMessageTrigger},
+    {UIIL_BEGINNING,    UIIL_GURU, @ThrowAwayTrigger},
+    {UIIL_BEGINNING,    UIIL_GURU, @ReadMessageTrigger},
+    {UIIL_BEGINNING,    UIIL_GURU, @EmptyTrashTrigger},
+    {UIIL_BEGINNING,    UIIL_GURU, @SendAndReceiveTrigger},
+    {UIIL_INTRODUCTORY, UIIL_INTRODUCTORY, @CUIMain},
+    {UIIL_INTRODUCTORY, UIIL_INTRODUCTORY, @CUITriggerGroup},
+@ifdef CUI_SUPPORT_2
+    {UIIL_INTRODUCTORY,    UIIL_INTRODUCTORY, @CUIComposePrintTrigger},
+@endif
+    {UIIL_BEGINNING,    UIIL_GURU, @SendBugMailTrigger},
+    {UIIL_BEGINNING,    UIIL_GURU, @CreateNewMessageTrigger},
+    {UIIL_INTRODUCTORY, UIIL_INTRODUCTORY, @CUIComposeDiscardTool},
+    {UIIL_INTRODUCTORY, UIIL_INTRODUCTORY, @CUIComposeDiscardTrigger},
+@ifdef GPC_PORTAL_SUPPORT
+    {UIIL_INTRODUCTORY, UIIL_INTRODUCTORY, @PfAccountText},
+    {UIIL_INTRODUCTORY, UIIL_INTRODUCTORY, @PfAccountSeparator},
+@endif
+@ifdef CUI_SENT_FOLDER
+    {UIIL_INTRODUCTORY, UIIL_BEGINNING, @PfCUISentFolder},
+@endif
+@ifdef NO_CC_IN_CUI
+    {UIIL_BEGINNING,    UIIL_GURU, @ComposeCCTrigger},
+    {UIIL_BEGINNING,    UIIL_GURU, @ComposeCCField},
+@endif
+    {UIIL_BEGINNING,    UIIL_GURU, @ComposeSignTool},
+    {UIIL_BEGINNING,    UIIL_GURU, @ComposeSign},
+    {UIIL_BEGINNING,    UIIL_GURU, @PfSignatureGroup},
+    {UIIL_BEGINNING,    UIIL_GURU, @PrintTrigger},
+    {UIIL_BEGINNING,    UIIL_GURU, @ReadOptionsMenu}
+};
+
+void
+TurnOffMiscCUI(void)
+{
+    /*
+     * Turn off misc. CUI stuff. We do this outside the table
+     * because we don't want it turned on when we switch *to* CUI
+     */
+    @call CUIBackButton::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+    @call CUIReadStuff::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+    @call CUIWriteStuff::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+    @call CUIViewStuff::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+}
+
+@method MailAppClass, MSG_MAIL_APP_SET_USER_LEVEL
+{
+    WWFixed ptSize;
+    word i, maxWidth = 0, width, height;
+    GStateHandle gs;
+    SpecSizeSpec *sss;
+    optr genParent;
+
+    @call oself::MSG_GEN_APPLICATION_SET_APP_LEVEL(selection);
+
+    ObjLockObjBlock(OptrToHandle(@CUIMain));
+    genParent = GenFindParent(@CUIMain);
+    MemUnlock(OptrToHandle(@CUIMain));
+    if (selection == UIIL_INTRODUCTORY) {
+	if (!genParent) {
+	    @call CUIMain::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	    @call CUITriggerGroup::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	    @call MailPrimary::MSG_GEN_ADD_CHILD(@CUIMain, CCF_MARK_DIRTY|CCO_LAST);
+	    @call MessageMenu::MSG_GEN_ADD_CHILD(@CUITriggerGroup, CCF_MARK_DIRTY|1);
+	    @call CUIMain::MSG_GEN_SET_USABLE(VUM_DLYD);
+	    @call CUITriggerGroup::MSG_GEN_SET_USABLE(VUM_DLYD);
+	}
+@ifdef NO_CC_IN_CUI
+	/*
+	 * adjust the field order for no CC: field in CUI
+	 */
+@ifdef ALTERNATE_FIELD_ORDER
+	@call ComposeToField::MSG_MAIL_FIELD_TEXT_SET_NEXT_FIELD(@ComposeSubjectField);
+@else
+	@call ComposeSubjectField::MSG_MAIL_FIELD_TEXT_SET_NEXT_FIELD(@ComposeBodyView);
+@endif // ALTERNATE_FIELD_ORDER
+@endif // NO_CC_IN_CUI
+        /*
+	 * add the centering hint so the Back button is centered
+	 */
+	@call FolderArea::MSG_GEN_ADD_GEOMETRY_HINT(HINT_CENTER_CHILDREN_VERTICALLY, 0, VUM_DLYD);
+    } else {
+	if (genParent) {
+	    @call CUIMain::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	    @call CUITriggerGroup::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	    @call MailPrimary::MSG_GEN_REMOVE_CHILD(@CUIMain, CCF_MARK_DIRTY);
+	    @call MessageMenu::MSG_GEN_REMOVE_CHILD(@CUITriggerGroup, CCF_MARK_DIRTY);
+	}
+@ifdef NO_CC_IN_CUI
+	/*
+	 * adjust the field order for CC: field in AUI
+	 */
+	@call ComposeToField::MSG_MAIL_FIELD_TEXT_SET_NEXT_FIELD(@ComposeCCField);
+@endif
+        /*
+	 * remove the centering hint we added
+	 */
+	@call FolderArea::MSG_GEN_REMOVE_GEOMETRY_HINT(HINT_CENTER_CHILDREN_VERTICALLY, VUM_DLYD);
+    }
+
+    /*
+     * set stuff usable or not depending on the level
+     */
+    for (i = 0; i < lengthof(levelObjs, ObjAndLevel); i++) {
+	if ((selection >= levelObjs[i].OAL_minLevel) &&
+	    (selection <= levelObjs[i].OAL_maxLevel)) {
+	    @call levelObjs[i].OAL_object::MSG_GEN_SET_USABLE(VUM_DLYD);
+	} else {
+	    @call levelObjs[i].OAL_object::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+	}
+    }
+    /* handle addition and removal of features in dialog */
+    @call PfAccountsDialog::MSG_GEN_RESET_TO_INITIAL_SIZE(VUM_DLYD);
+
+
+    /*
+     * change some hints
+     */
+    switch (selection) {
+    case UIIL_BEGINNING:
+	TurnOffMiscCUI();
+	@call TheFolderList::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	ObjLockObjBlock(OptrToHandle(@TheFolderList));
+	ObjVarDeleteData(@TheFolderList, HINT_ITEM_GROUP_SCROLLABLE);
+	ObjVarAddData(@TheFolderList, HINT_ITEM_GROUP_TOOLBOX_STYLE|VDF_SAVE_TO_STATE, 0);
+	sss = ObjVarAddData(@TheFolderList, HINT_CUSTOM_CHILD_SPACING|VDF_SAVE_TO_STATE, sizeof(SpecSizeSpec));
+	*sss = (SST_PIXELS << SSS_TYPE_OFFSET) | 5;
+	MemUnlock(OptrToHandle(@TheFolderList));
+	gs = @call oself::MSG_VIS_VUP_CREATE_GSTATE();
+	GrGetFont(gs, &ptSize);
+	LockStrings();
+	GetMax(gs, MSS_DRAFTS_FOLDER, &maxWidth);
+	GetMax(gs, MSS_INBOX_FOLDER, &maxWidth);
+	GetMax(gs, MSS_OUTBOX_FOLDER, &maxWidth);
+	GetMax(gs, MSS_SENT_FOLDER, &maxWidth);
+	GetMax(gs, MSS_TRASH_FOLDER, &maxWidth);
+	UnlockStrings();
+	width = SST_PIXELS|maxWidth+FOLDER_ICON_OFFSET_X+10;
+	height = SST_PIXELS|NUM_BUILT_IN_FOLDERS*(CUI_FOLDER_ICON_HEIGHT+ptSize.WWF_int+FOLDER_NAME_OFFSET_Y)+5;
+	@call TheFolderList::MSG_GEN_SET_FIXED_SIZE(VUM_DLYD, NUM_BUILT_IN_FOLDERS, height, width);
+	@call FolderArea::MSG_GEN_REMOVE_GEOMETRY_HINT(HINT_FIXED_SIZE, VUM_DLYD);
+	@call FolderArea::MSG_GEN_REMOVE_GEOMETRY_HINT(HINT_MAXIMUM_SIZE, VUM_DLYD);
+	RebuildFolderList(MFID_LEAVE_SELECTION, FALSE);
+	@call TheFolderList::MSG_GEN_SET_USABLE(VUM_DLYD);
+	/*
+	 * change the To button back to "To"
+	 */
+@ifdef TO_HEADER_ICON
+        @call ComposeSendToTrigger::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+        @call ComposeToTrigger::MSG_GEN_SET_USABLE(VUM_DLYD);
+@else
+        @call ComposeToTrigger::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@sendToText, VUM_DLYD);
+@endif
+	break;
+    case UIIL_INTRODUCTORY:
+	@call FolderArea::MSG_GEN_REMOVE_GEOMETRY_HINT(HINT_FIXED_SIZE, VUM_DLYD);
+	/*
+	 * change the To button to "Send To"
+	 */
+@ifdef TO_HEADER_ICON
+        @call ComposeToTrigger::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+        @call ComposeSendToTrigger::MSG_GEN_SET_USABLE(VUM_DLYD);
+@else
+        @call ComposeToTrigger::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@cuiSendToText, VUM_DLYD);
+@endif
+	UpdateCUIMonikers();
+        /*
+	 * if on a TV screen, then get rid of the minimum size hints if not
+	 * running under CUI but at CUI level
+	 */
+        if (UserGetDefaultUILevel() > UIIL_INTRODUCTORY && ((UserGetDisplayType() >> 8) & DT_DISP_ASPECT_RATIO) == (DAR_TV << DT_DISP_ASPECT_RATIO_OFFSET)) {
+	    @call CUIWButton::MSG_GEN_SET_MINIMUM_SIZE(VUM_DLYD, 0, 0, 115);
+	    @call CUIRButton::MSG_GEN_SET_MINIMUM_SIZE(VUM_DLYD, 0, 0, 115);
+	    @call CUISButton::MSG_GEN_SET_MINIMUM_SIZE(VUM_DLYD, 0, 0, 115);
+	    @call CUIAButton::MSG_GEN_SET_MINIMUM_SIZE(VUM_DLYD, 0, 0, 115);
+	}
+	break;
+    default:
+	TurnOffMiscCUI();
+	/*
+	 * remove the hints we use at level 1 and put back what we need
+	 */
+	@call TheFolderList::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+	ObjLockObjBlock(OptrToHandle(@TheFolderList));
+	ObjVarAddData(@TheFolderList, HINT_ITEM_GROUP_SCROLLABLE|VDF_SAVE_TO_STATE, 0);
+	ObjVarDeleteData(@TheFolderList, HINT_ITEM_GROUP_TOOLBOX_STYLE);
+	ObjVarDeleteData(@TheFolderList, HINT_CUSTOM_CHILD_SPACING);
+	ObjVarDeleteData(@TheFolderList, HINT_FIXED_SIZE);
+	@call FolderArea::MSG_GEN_SET_FIXED_SIZE(VUM_DLYD, 0, 0, SST_AVG_CHAR_WIDTHS|MAX_FOLDER_NAME_LENGTH);
+@ifdef SHOW_NUM_MESSAGES_IN_FOLDERS
+	@call FolderArea::MSG_GEN_SET_MAXIMUM_SIZE(VUM_DLYD, 0, 0, SST_PCT_OF_FIELD_WIDTH|PCT_20+0x8);
+@else
+	@call FolderArea::MSG_GEN_SET_MAXIMUM_SIZE(VUM_DLYD, 0, 0, SST_PCT_OF_FIELD_WIDTH|PCT_20);
+@endif
+	MemUnlock(OptrToHandle(@TheFolderList));
+	@call TheFolderList::MSG_GEN_SET_USABLE(VUM_DLYD);
+	/*
+	 * change the To button back to "To"
+	 */
+@ifdef TO_HEADER_ICON
+        @call ComposeSendToTrigger::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+        @call ComposeToTrigger::MSG_GEN_SET_USABLE(VUM_DLYD);
+@else
+        @call ComposeToTrigger::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@sendToText, VUM_DLYD);
+@endif
+	/*
+	 * rebuild the folder list in case we have user defined folders
+	 */
+	RebuildFolderList(MFID_LEAVE_SELECTION, FALSE);
+	break;
+    }
+
+
+    @call TheMessageList::MSG_GEN_RESET_TO_INITIAL_SIZE(VUM_DLYD);
+    @call MailPrimary::MSG_GEN_RESET_TO_INITIAL_SIZE(VUM_DLYD);
+}
+
+@ifdef LEVELS_SUPPORT
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_MAIL_APP_CHANGE_USER_LEVEL
+* PASS:            none
+* RETURN:          none
+* DESCRIPTION:     Set the user level
+*
+* REVISION HISTORY:
+*         Name      Date        Description
+*         ----      ----        -----------
+*         gene      12/7/98     Initial Revision
+***************************************************************/
+
+@method MailAppClass, MSG_MAIL_APP_CHANGE_USER_LEVEL
+{
+    @call SetUserLevelDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_APPLY);
+}
+
+@endif // LEVELS_SUPPORT
+
+@endif // CUI_SUPPORT
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_META_DETACH
+* PASS:            callerID - ID of caller
+*                  caller - optr of caller
+* RETURN:          none
+* DESCRIPTION:     Handle some exit shme
+*
+* REVISION HISTORY:
+*         Name      Date        Description
+*         ----      ----        -----------
+*         gene      12/7/98     Initial Revision
+***************************************************************/
+@method MailAppClass, MSG_META_DETACH
+{
+    @call TheMessageList::MSG_MAIL_LIST_CLOSE_MESSAGE_ARRAY();
+    @call SendReceiveDialog::MSG_MSR_SET_TIMER(0, 0);
+    @callsuper();
+}
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_META_QUIT
+* PASS:            none
+* RETURN:          none
+* DESCRIPTION:     Handle some exit shme
+*
+* REVISION HISTORY:
+*         Name      Date        Description
+*         ----      ----        -----------
+*         gene      2/17/99     Initial Revision
+***************************************************************/
+static const StandardDialog2ResponseTriggerTable exitSendTrigs = {
+    2,
+    {@exitMoniker, IC_NO}, \
+    {@sendMoniker, IC_YES} \
+};
+
+@method MailAppClass, MSG_META_QUIT
+{
+@ifdef CUI_SUPPORT
+    GeodeHandle dex;
+@endif
+    word ret = IC_DISMISS;
+
+    /*
+     * save any options
+     */
+    @call oself::MSG_META_SAVE_OPTIONS();
+
+    /*
+     * see if there are any messages to send
+     */
+    if (@call PfAccountList::MSG_ACCOUNT_LIST_GET_NUM_ACCOUNTS()) {
+@ifndef NO_COMPOSE_OPTIONS
+@ifndef COMPOSE_SEND_NOW
+        if (@call ComposeSendOptionsList::MSG_GEN_ITEM_GROUP_GET_SELECTION() == MSO_SEND_TO_QUEUE) {
+@endif
+@endif
+            if (@call TheFolderList::MSG_FOLDER_LIST_GET_NUM_MESSAGES(MFID_OUTBOX)) {
+		ret = DoCustomDB(@mailToSendStr, NULL, &exitSendTrigs);
+	    }
+@ifndef NO_COMPOSE_OPTIONS
+@ifndef COMPOSE_SEND_NOW
+	}
+@endif
+@endif
+    }
+
+    if (ret == IC_YES) {
+	@call SendReceiveDialog::MSG_MSR_SEND_MESSAGES();
+    } else {
+@ifdef CUI_CLOSE_ADDR_BOOK
+        ObjDerefGen(oself);
+        if (pself->MAI_launchedAddr) {
+	    dex = GeodeFind("geodex", 6, GA_APPLICATION, 0);
+	    if (dex) {
+		@call GeodeGetAppObject(dex)::MSG_META_QUIT();
+	    }
+	}
+@endif
+	/*
+	/*
+	 * no messages to send or quit any way
+	 */
+	@callsuper();
+    }
+}
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_META_IACP_NEW_CONNECTION
+* PASS:            appLaunchBlock - handle of AppLaunchBlock
+*                  justLaunched - TRUE if just launched
+*                  connection - IACPConnection that is now open
+* RETURN:          none
+* DESCRIPTION:     Handle opening from another app for mailto:, etc.
+*
+* REVISION HISTORY:
+*         Name      Date        Description
+*         ----      ----        -----------
+*         gene      12/7/98     Initial Revision
+
+***************************************************************/
+
+@method MailAppClass, MSG_META_IACP_NEW_CONNECTION
+{
+    MemHandle ih;
+    AppLaunchBlock *alb;
+    InternetAppBlock *iab;
+
+    /*
+     * see if there is any interesting extra data
+     */
+    alb = MemLock(appLaunchBlock);
+    ih = alb->ALB_extraData;
+    if (ih) {
+	iab = MemLock(ih);
+	switch (iab->IAB_type) {
+@ifdef MAIL_READ_IACP_SUPPORT
+	case IADT_GET_NEW_MAIL:
+@endif
+	case IADT_MAIL_TO:
+	     MemUnlock(ih);
+	     @send process::MSG_MAIL_PROCESS_DO_MAIL(ih);
+	     break;
+	default:
+	    MemFree(ih);
+	}
+    } else {
+	/*
+	 * no extra data; normal startup
+	 */
+	@send process::MSG_MAIL_PROCESS_DO_MAIL(0);
+    }
+    @call oself::MSG_GEN_BRING_TO_TOP();
+    MemUnlock(appLaunchBlock);
+    @callsuper();
+}
+
+
+@ifdef  KID_GUARD_SUPPORT
+
+/***********************************************************************
+ *		MSG_META_IMPLIED_WIN_CHANGE for MailAppClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	1/24/00   	Initial Revision
+ *
+ ***********************************************************************/
+@method MailAppClass, MSG_META_IMPLIED_WIN_CHANGE
+{
+ EventHandle evt;
+
+
+    @callsuper();
+    /* if modal parental control dialog is up, clear busy cursor */
+    if (startupPassword &&
+		inputObj &&
+		ObjTestIfObjBlockRunByCurThread(OptrToHandle(inputObj)) &&
+		@call inputObj::MSG_META_IS_OBJECT_IN_CLASS(&GenInteractionClass) &&
+		(@call inputObj::MSG_GEN_INTERACTION_GET_ATTRS() & GIA_MODAL)) {
+	  WinGeodeSetPtrImage(GeodeGetProcessHandle(), 0);
+	  evt = @record GenClass::MSG_GEN_SYSTEM_SET_PTR_IMAGE(0, PIL_SYSTEM);
+	  @call self::MSG_GEN_CALL_SYSTEM(evt);
+    }
+
+}
+@endif
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_MAIL_APP_GET_USER_LEVEL
+* PASS:            none
+* RETURN:          UIInterfaceLevel
+* DESCRIPTION:     Get the current user interface level
+*
+* REVISION HISTORY:
+*         Name      Date        Description
+*         ----      ----        -----------
+*         gene      5/12/00     Initial Revision
+
+***************************************************************/
+
+@method MailAppClass, MSG_MAIL_APP_GET_USER_LEVEL
+{
+    return(GET_UI_INTERFACE_LEVEL(@call oself::MSG_GEN_APPLICATION_GET_APP_FEATURES()));
+}
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_MAIL_APP_CONFIGURE_COMPOSE_FORM_UI
+* PASS:            none
+* RETURN:          none
+* DESCRIPTION:     Tweak UI elements in the Compose Message form to
+*                  make them look "right".
+*
+* REVISION HISTORY:
+*         Name      Date        Description
+*         ----      ----        -----------
+*         Don       9/3/00      Initial Revision
+
+***************************************************************/
+
+@method MailAppClass, MSG_MAIL_APP_CONFIGURE_COMPOSE_FORM_UI
+{
+    WWFixed fontSize;
+    DisplayScheme displayScheme;
+
+    /*
+     * In order for the Compose form to look good, we need to maintain
+     * the same font size in all of the objects in the header area of
+     * the form (e.g. "To:" button & field). This is not normally a
+     * problem unless the user has set a size for editable text objects
+     * that is different from that used for display-only objects. So,
+     * we use the defaultCharAttr concept to ensure a match between the
+     * objects on the left-side of the list and the right-side. -Don 9/3/00
+     */
+    @call MailAppObj::MSG_GEN_APPLICATION_GET_DISPLAY_SCHEME(&displayScheme);
+    fontSize.WWF_int = displayScheme.DS_pointSize;
+    fontSize.WWF_frac = 0;
+    @call ComposeToField::MSG_VIS_TEXT_SET_POINT_SIZE(fontSize,
+						      TEXT_ADDRESS_PAST_END,
+						      0);
+    @call ComposeCCField::MSG_VIS_TEXT_SET_POINT_SIZE(fontSize,
+						      TEXT_ADDRESS_PAST_END,
+						      0);
+    @call ComposeSubjectField::MSG_VIS_TEXT_SET_POINT_SIZE(fontSize,
+							 TEXT_ADDRESS_PAST_END,
+							 0);
+@ifdef BCC_SUPPORT
+    @call ComposeBccField::MSG_VIS_TEXT_SET_POINT_SIZE(fontSize,
+						       TEXT_ADDRESS_PAST_END,
+						       0);
+@endif
+}

@@ -1,0 +1,132 @@
+#!/usr/local/bin/perl
+##############################################################################
+#
+# 	Copyright (c) Geoworks 1996 -- All Rights Reserved
+#
+# PROJECT:	profiling
+# MODULE:	
+# FILE: 	phist
+# AUTHOR: 	Steve Kertes, 1996
+#
+# DESCRIPTION:
+#
+#  Histogram Tool
+#  --------------
+#    Take a huge file (20 megs, probably) that is a big array of
+#    integers and generate a histogram that, for a given block-size,
+#    shows how many instructions were executed in each block.
+#
+# USAGE:
+#
+#        phist 16384 prof.data
+#
+#        Output is always to standard-out where it can be redirected
+#        to a file. The output format is a list of block-starts and
+#        numbers where each line represents the number of instructions 
+#        executed in that block, eg:
+#        
+#                0<tab>1021
+#                16384<tab>2
+#                32678<tab>2042
+#                49152<tab>2100
+#                ...
+#
+#        This data will be brought into Excel using the text
+#        import feature, and charted there.
+#	
+# 	$Id: phist,v 1.5 96/09/18 16:28:42 kertes Exp $
+#
+#
+##############################################################################
+
+push (@INC, "/staff/pcgeos/$ENV{'USER'}/Tools/scripts/perl");
+push (@INC, "/staff/pcgeos/Tools/scripts/perl");
+
+require "newgetopt.pl";
+require "profilelib.pl";
+
+&NGetOpt("h", "d") || die "can't grab options";
+# -h for help
+# -d for debugging
+
+$blockSize       = shift(@ARGV);
+$profileFilename = shift(@ARGV);
+
+$opt_h = 1 unless ($profileFilename ne "");
+
+&displayPHistHelp() if $opt_h;
+
+############################################
+
+print "block size = $blockSize\n" if $opt_d;
+die "Block size needs to be greater than zero for this to work!\n"
+	unless $blockSize > 0;
+
+&openProfile($profileFilename);
+
+############################################
+
+$| = 1;					# flush all output as it is printed
+
+$blockStart	= 0;
+$countSum	= 0;
+$countsNeeded	= $blockSize;
+
+while ( defined($count = &readInteger)) {
+	print ">>> $count\n" if $opt_d;
+	$countSum += $count;
+
+	if (!--$countsNeeded) {
+		&printHistogramEntry($blockStart, $countSum);
+		$countsNeeded   = $blockSize;
+		$blockStart    += $blockSize;
+		$countSum	= 0;
+	}
+}
+&printHistogramEntry($blockStart, $countSum)
+				unless ($countsNeeded == $blockSize);
+
+exit 0;
+
+
+############################################
+############################################
+
+
+############################################
+#
+# displayPHistHelp
+#	print usage information, then exit
+#	
+sub displayPHistHelp {
+	print <<EOM;
+Usage:
+        phist block-size prof.data
+
+        The profile histogram tool.
+
+        Output is always to standard-out where it can be redirected
+        to a file. The output format is a list of block-starts and
+        numbers where each line represents the number of instructions 
+        executed in that block, eg:
+        
+                0<tab>1021
+                16384<tab>2
+                32678<tab>2042
+                49152<tab>2100
+EOM
+	exit 0;
+}
+
+############################################
+#
+# printHistogramEntry
+#	print out an address and that blocks count, wow.
+#
+sub printHistogramEntry {
+	local ($address, $count) = @_;
+	print "$address\t"."$count\n";
+}
+
+############################################
+__END__

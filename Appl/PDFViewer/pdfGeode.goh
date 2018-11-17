@@ -1,0 +1,676 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GlobalPC 1999.  All rights reserved.
+	GLOBALPC CONFIDENTIAL
+
+PROJECT:	
+MODULE:		PDF Viewer
+FILE:		pdfGeode.goh
+
+AUTHOR:		John Mevissen, Apr 02, 1999
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	mevissen	4/02/99   	Initial version.
+
+DESCRIPTION:
+
+	All the structs.
+
+	$Id$
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*
+ * There's round-off error in setting the current point after drawing
+ * very small (e.g. 1-pt) fonts.  We scale the font up, and the transfer
+ * matrix down.
+ */
+
+#define FONT_SCALING_FACTOR 32
+
+
+
+typedef struct GooString {
+
+  long length;
+  char *s;
+
+} GooString;
+
+
+typedef struct Ref {
+  long num;			// object number
+  long gen;			// generation number
+}  Ref;
+
+//------------------------------------------------------------------------
+// object types
+//------------------------------------------------------------------------
+
+typedef enum ObjType {
+  // simple objects
+  objBool,			// boolean
+  objInt,			// integer
+  objReal,			// real
+  objString,			// string
+  objName,			// name
+  objNull,			// null
+
+  // complex objects
+  objArray,			// array
+  objDict,			// dictionary
+  objStream,			// stream
+  objRef,			// indirect reference
+
+  // special objects
+  objCmd,			// command name
+  objError,			// error return from Lexer
+  objEOF,			// end of file return from Lexer
+  objNone			// uninitialized object
+} ObjType;
+
+#define numObjTypes 14		// total number of object types
+
+
+//------------------------------------------------------------------------
+// Object
+//------------------------------------------------------------------------
+
+typedef struct Obj {
+
+  ObjType type;			// object type
+  union {			// value for each type:
+    GBool booln;		//   boolean
+    long intg;			//   integer
+    gdouble real;		//   real
+    GooString string;		//   string
+    char *name;			//   name
+    struct Array *array;	//   array
+    struct Dict *dict;		//   dictionary
+    struct Stream *stream;	//   stream
+    Ref ref;			//   indirect reference
+    char *cmd;			//   command
+  } u;
+} Obj;
+
+
+//------------------------------------------------------------------------
+// Array
+//------------------------------------------------------------------------
+
+
+typedef struct Array {
+
+  Obj *elems;			// array of elements
+  long size;			// size of <elems> array
+  long length;			// number of elements in array
+  long ref;			// reference count
+
+} Array;
+
+
+//------------------------------------------------------------------------
+// Catalog
+//------------------------------------------------------------------------
+
+typedef struct Catalog {
+    VMFileHandle vmFile;	// vmFile with page array
+    VMBlockHandle pages;	// HugeArray of pages
+//  struct Page *pages;		// array of pages
+#ifdef KEEP_PAGE_REFS
+  Ref *pageRefs;		// object ID for each page
+#endif
+  long numPages;			// number of pages
+  Obj dests;			// named destination dictionary
+  Obj nameTree;			// name tree
+  GBool ok;			// true if catalog is valid
+
+} Catalog;
+
+
+//------------------------------------------------------------------------
+// Dict
+//------------------------------------------------------------------------
+
+typedef struct DictEntry {
+  char *key;
+  Obj val;
+} DictEntry;
+
+typedef struct Dict {
+  DictEntry *entries;		// array of entries
+  long size;			// size of <entries> array
+  long length;			// number of entries in dictionary
+  long ref;			// reference count
+
+} Dict;
+
+
+//------------------------------------------------------------------------
+// PageAttrs
+//------------------------------------------------------------------------
+
+typedef struct PageAttrs {
+
+#ifdef USE_FULL_PAGE_ATTRS
+  gdouble x1, y1, x2, y2;
+  gdouble cropX1, cropY1, cropX2, cropY2;
+  long rotate;
+#endif
+
+  Obj resources;
+}  PageAttrs;
+
+
+//------------------------------------------------------------------------
+// Page
+//------------------------------------------------------------------------
+
+typedef struct Page {
+  long num;			// page number
+  PageAttrs attrs;		// page attributes
+  Obj annots;			// annotations array
+  Obj contents;			// page contents
+  GBool ok;			// true if page is valid
+} Page;
+
+
+//------------------------------------------------------------------------
+// Parser
+//------------------------------------------------------------------------
+
+typedef struct Parser {
+  Obj buf1, buf2;		// next two tokens
+  long inlineImg;		// set when inline image data is encountered
+  struct Lexer *lexer;
+
+//  FStream fs;
+} Parser;
+
+
+//------------------------------------------------------------------------
+// XRef
+//------------------------------------------------------------------------
+
+typedef struct XRefEntry {
+  long offset;
+  long gen;
+  GBool used;
+} XRefEntry;
+
+
+typedef struct XRef {
+  FileHandle fHan;
+
+  long start;			// offset in file (to allow for garbage
+				//   at beginning of file)
+//  XRefEntry *entries;		// xref entries
+  MemHandle entries;
+  long size;			// size of <entries> array
+  long rootNum, rootGen;		// catalog dict
+  GBool ok;			// true if xref table is valid
+  Obj trailerDict;		// trailer dictionary
+
+} XRef;
+
+//------------------------------------------------------------------------
+// Lexer
+//------------------------------------------------------------------------
+
+//#define tokBufSize 128		// size of token buffer
+
+typedef struct Lexer {
+  Array *streams;		// array of input streams
+  long strPtr;			// index of current stream
+  Obj curStr;			// current stream
+  GBool freeArray;		// should lexer free the streams array?
+
+  XRef *xref;
+
+} Lexer;
+
+
+//------------------------------------------------------------------------
+// GfxState
+//------------------------------------------------------------------------
+
+/*
+ * Geos needs to be told when a path is starting, and when to set a clip path
+*/
+
+typedef enum PathType {
+    PATH_NONE,
+    PATH_NORMAL,
+    PATH_CLIP,
+    PATH_CLIP_EO,
+} PathType;
+
+
+typedef struct GfxState {
+//  double ctm[6];		// coord transform matrix
+//  double px1, py1, px2, py2;	// page corners (user coords)
+//  double pageWidth, pageHeight;	// page size (pixels)
+
+//  GfxColorSpace *fillColorSpace;   // fill color space
+//  GfxColorSpace *strokeColorSpace; // stroke color space
+//  GfxColor fillColor;		// fill color
+//  GfxColor strokeColor;		// stroke color
+
+//  double lineWidth;		// line width
+//  double *lineDash;		// line dash
+//  int lineDashLength;
+//  double lineDashStart;
+//  int flatness;			// curve flatness
+//  int lineJoin;			// line join style
+//  int lineCap;			// line cap style
+//  double miterLimit;		// line miter limit
+
+  struct GfxFont *font;		// font
+  gdouble fontSize;		// font size
+  gdouble textMat[6];		// text matrix
+  sdword charSpace;		// character spacing
+  gdouble wordSpace;		// word spacing
+  sdword horizScaling;		// horizontal scaling
+  gdouble leading;		// text leading
+  sdword rise;			// text rise
+  short render;			// text rendering mode
+
+//  GfxPath *path;		// array of path elements
+//  double curX, curY;		// current point (user coords)
+  gdouble lineX, lineY;		// start of current text line (text coords)
+  WWFixedAsDWord curTextX;	// current drawing position on x-axis
+
+  struct GfxState *saved;	// next GfxState on stack
+
+
+  Handle gstring;		/* gstring we're writing to */
+  PathType pathType;		/* whether there's a current path or clipping */
+
+
+//  GfxState(GfxState *state);
+} GfxState;
+
+//------------------------------------------------------------------------
+// GfxFontDict
+//------------------------------------------------------------------------
+
+typedef struct GfxFontDict {
+  struct GfxFont **fonts;	// list of fonts
+  long numFonts;		// number of fonts
+} GfxFontDict;
+
+//------------------------------------------------------------------------
+// GfxFont
+//------------------------------------------------------------------------
+
+#define fontFixedWidth (1L << 0)
+#define fontSerif      (1L << 1)
+#define fontSymbolic   (1L << 2)
+#define fontItalic     (1L << 6)
+#define fontBold       (1L << 18)
+
+typedef enum GfxFontType {
+  fontUnknownType,
+  fontType1,
+  fontType3,
+  fontTrueType,
+  fontType0
+} GfxFontType;
+
+typedef struct GfxFont {
+  GooString tag;		// PDF font tag
+  Ref id;			// reference (used as unique ID)
+  GooString name;		// font name
+  long flags;			// font descriptor flags
+  GfxFontType type;		// type of font
+  GooString embFontName;	// name of embedded font
+  Ref embFontID;		// ref to embedded font file stream
+  GooString extFontFile;	// external font file name
+//  gdouble fontMat[6];		// font matrix
+  GBool is16;			// set if font uses 16-bit chars
+  GBool hasCharSet;		/* true if font descriptor has 'charset' entry */
+  sdword fontWidthFactor;	/* Used to tweak font width based on char widths */
+
+  unsigned short widths[256];	/* char widths (x1000) */
+  unsigned char charMap[256];	// char encoding map
+  char *charNames[256];         // names in char encoding map
+
+//  union {
+//    GfxFontEncoding *encoding;	// 8-bit font encoding
+//    struct {
+//      GfxFontCharSet16 charSet;	// 16-bit character set
+//      GfxFontEncoding16 *enc;	// 16-bit encoding (CMap)
+//    } enc16;
+//  };
+//  union {
+//    double widths[256];		// width of each char for 8-bit font
+//    GfxFontWidths16 widths16;	// char widths for 16-bit font
+//  }u;
+} GfxFont;
+
+//------------------------------------------------------------------------
+// GfxFontEncoding
+//------------------------------------------------------------------------
+
+#define gfxFontEncHashSize 419
+
+typedef struct GfxFontEncoding {
+  char **encoding;		// code --> name mapping
+  GBool freeEnc;		// should we free the encoding array?
+  short				// name --> code hash table
+    hashTab[gfxFontEncHashSize];
+} GfxFontEncoding;
+
+typedef struct GfxResources {
+  GfxFontDict *fonts;
+  Obj xObjDict;
+  Obj colorSpaceDict;
+  struct GfxResources *next;
+} GfxResources;
+
+
+typedef struct Gfx {
+//  OutputDev *out;		// output device
+  GfxResources *res;		// resource stack
+
+  GfxState *state;		// current graphics state
+  GBool fontChanged;		// set if font or text matrix has changed
+//  GfxClipType clip;		// do a clip?
+  int ignoreUndef;		// current BX/EX nesting level
+
+    Parser *parser;		// parser for page content stream(s)
+    XRef *xref;			// current xref pointer
+    VMFileHandle vmFile;	// scratch VM file
+    word nImages;		// # of images drawn so far on this page
+} Gfx;
+
+//------------------------------------------------------------------------
+// Built-in font table.
+//------------------------------------------------------------------------
+
+typedef struct BuiltinFont {
+  char *name;
+  Gushort *widths;
+  struct GfxFontEncoding *encoding;
+}  BuiltinFont;
+
+
+//------------------------------------------------------------------------
+// GfxColor
+//------------------------------------------------------------------------
+
+typedef struct  GfxColor {
+  short r, g, b;
+}  GfxColor;
+
+//------------------------------------------------------------------------
+// GfxColorSpace
+//------------------------------------------------------------------------
+
+typedef enum GfxColorMode {
+  colorGray, colorCMYK, colorRGB
+} GfxColorMode;
+
+typedef struct GfxColorSpace {
+
+//  Function *sepFunc;		// separation tint transform function
+  GfxColorMode mode;		// color mode
+  GBool indexed;		// set for indexed colorspaces
+  short numComps;			// number of components in colors
+  short indexHigh;		// max pixel for indexed colorspace
+  Guchar (*lookup)[4];		// lookup table (only for indexed
+				//   colorspaces)
+  GBool ok;			// is color space valid?
+
+} GfxColorSpace;
+
+
+//------------------------------------------------------------------------
+// GfxImageColorMap
+//------------------------------------------------------------------------
+
+typedef struct GfxImageColorMap {
+
+  GfxColorSpace *colorSpace;	// the image colorspace
+  short bits;			// bits per component
+  short numComps;			// number of components in a pixel
+  GBool indexed;		// set for indexed color space
+  GfxColorMode mode;		// color mode
+  short (*lookup)[4];		// lookup table
+  gdouble decodeLow[4];		// minimum values for each component
+  gdouble decodeRange[4];	// max - min value for each component
+  GBool ok;
+
+} GfxImageColorMap;
+
+
+//------------------------------------------------------------------------
+// Stream (base class)
+//------------------------------------------------------------------------
+
+typedef enum StreamKind {
+  strFile,
+  strASCIIHex,
+  strASCII85,
+  strLZW,
+  strRunLength,
+  strCCITTFax,
+  strDCT,
+  strFlate,
+  strEOF,
+  strWeird,			// internal-use stream types
+  strSubStream
+} StreamKind;
+
+typedef struct Stream {
+  long ref;			// reference count
+
+  StreamKind kind;
+
+  struct Stream *str;		/* pointer to generic stream feeding this stream */
+
+  //----- image stuff
+  short predictor;		// predictor
+  short nComps;			// components per pixel
+  short nBits;			// bits per component
+  short pixBytes;		// bytes per pixel
+  long width;			// pixels per line
+  long nVals;			// components per line
+  long rowBytes;		// bytes per line
+  Guchar *rawLine;		// raw line buffer
+  Guchar *pixLine;		// pixel line buffer
+  long pixIdx;			// current index in line buffer
+
+  long buf;			// asciiHex data
+  Obj dict;			// SubStream data
+  GBool eof;
+
+    union {
+	struct FStream *fs;
+	struct LZWData *lzw;
+	struct FlateData *flate;
+	struct ASCII85Data *a85;
+	struct RunLengthData *runLength;
+	struct CCITTFaxData *fax;
+	struct DCTData *dct;
+    } u;
+
+} Stream;
+
+//------------------------------------------------------------------------
+// FileStream
+//------------------------------------------------------------------------
+
+typedef struct FStream {
+  FileHandle f;
+  long start;
+  long length;
+  char buf[256];
+  char *bufPtr;
+  char *bufEnd;
+  long bufPos;
+  long savePos;
+  Obj dict;
+} FStream;
+
+//------------------------------------------------------------------------
+// LZWStream
+//------------------------------------------------------------------------
+
+typedef struct LZWData {
+//  Stream *str;			// stream
+  long predictor;		// parameters
+  long columns;
+  long colors;
+  long bits;
+  long early;
+  long inputBuf;			// input buffer
+  long inputBits;		// number of bits in input buffer
+  long inCodeBits;		// size of input code
+  char buf[1024];		// buffer
+  char *bufPtr;			// next char to read
+  char *bufEnd;			// end of buffer
+  long htab[4094];
+  short codetab[4096];
+  long oldcode;
+  long free_ent;
+  long finchar;
+} LZWData;
+
+//------------------------------------------------------------------------
+// FlateStream
+//------------------------------------------------------------------------
+
+#define flateWindow          32768    // buffer size
+#define flateMask            (flateWindow-1)
+#define flateMaxHuffman         15    // max Huffman code length
+#define flateMaxCodeLenCodes    19    // max # code length codes
+#define flateMaxLitCodes       288    // max # literal codes
+#define flateMaxDistCodes       30    // max # distance codes
+
+// Huffman code table entry
+typedef struct FlateCode {
+  long len;			// code length in bits
+  long code;			// code word
+  long val;			// value represented by this code
+} FlateCode;
+
+// Huffman code table
+typedef struct FlateHuffmanTab {
+  long start[flateMaxHuffman+2];// indexes of first code of each length
+  FlateCode *codes;		// codes, sorted by length and code word
+} FlateHuffmanTab;
+
+// Decoding info for length and distance code words
+typedef struct FlateDecode {
+  long bits;			// # extra bits
+  long first;			// first length/distance
+} FlateDecode;
+
+typedef struct FlateData {
+
+  MemHandle bufhan;		// output data buffer
+  long index;			// current index into output buffer
+  long remain;			// number valid bytes in output buffer
+  long codeBuf;			// input buffer
+  long codeSize;		// number of bits in input buffer
+  FlateCode			// literal and distance codes
+    allCodes[flateMaxLitCodes + flateMaxDistCodes];
+  FlateHuffmanTab litCodeTab;	// literal code table
+  FlateHuffmanTab distCodeTab;	// distance code table
+  GBool compressedBlock;	// set if reading a compressed block
+  long blockLen;		// remaining length of uncompressed block
+  GBool endOfBlock;		// set when end of block is reached
+  GBool eof;			// set when end of stream is reached
+
+} FlateData;
+
+//------------------------------------------------------------------------
+// ASCII85Stream
+//------------------------------------------------------------------------
+
+typedef struct ASCII85Data {
+  long c[5];
+  long b[4];
+  short index, n;
+} ASCII85Data;
+
+//------------------------------------------------------------------------
+// RunLengthStream
+//------------------------------------------------------------------------
+
+typedef struct RunLengthData {
+  char buf[128];		// buffer
+  char *bufPtr;			// next char to read
+  char *bufEnd;			// end of buffer
+} RunLengthData;
+
+//------------------------------------------------------------------------
+// CCITTFaxStream
+//------------------------------------------------------------------------
+
+typedef struct CCITTFaxData {
+  long encoding;			// 'K' parameter
+  GBool byteAlign;		// 'EncodedByteAlign' parameter
+  long columns;			// 'Columns' parameter
+  long rows;			// 'Rows' parameter
+  GBool black;			// 'BlackIs1' parameter
+  GBool nextLine2D;		// true if next line uses 2D encoding
+  long inputBuf;			// input buffer
+  long inputBits;		// number of bits in input buffer
+  short *refLine;		// reference line changing elements
+  long b1;			// index into refLine
+  short *codingLine;		// coding line changing elements
+  long a0;			// index into codingLine
+  long outputBits;		// remaining ouput bits
+  long buf;			// character buffer
+} CCITTFaxData;
+
+//------------------------------------------------------------------------
+// DCTStream
+//------------------------------------------------------------------------
+
+// DCT component info
+typedef struct DCTCompInfo {
+  long id;			// component ID
+  GBool inScan;			// is this component in the current scan?
+  long hSample, vSample;		// horiz/vert sampling resolutions
+  long quantTable;		// quantization table number
+  long dcHuffTable, acHuffTable;	// Huffman table numbers
+  long prevDC;			// DC coefficient accumulator
+}  DCTCompInfo;
+
+// DCT Huffman decoding table
+typedef struct DCTHuffTable {
+  Guchar firstSym[17];		// first symbol for this bit length
+  Gushort firstCode[17];	// first code for this bit length
+  Gushort numCodes[17];		// number of codes of this bit length
+  Guchar sym[256];		// symbols
+} DCTHuffTable;
+
+typedef struct DCTData {
+  long width, height;		// image size
+  long mcuWidth, mcuHeight;	// size of min coding unit, in data units
+  DCTCompInfo compInfo[4];	// info for each component
+  short numComps;			// number of components in image
+  short colorXform;		// need YCbCr-to-RGB transform?
+  long restartInterval;		// restart interval, in MCUs
+  Guchar quantTables[4][64];	// quantization tables
+  short numQuantTables;		// number of quantization tables
+  DCTHuffTable dcHuffTables[4];	// DC Huffman tables
+  DCTHuffTable acHuffTables[4];	// AC Huffman tables
+  short numDCHuffTables;		// number of DC Huffman tables
+  short numACHuffTables;		// number of AC Huffman tables
+  Guchar *rowBuf[4][32];	// buffer for one MCU
+  long comp, x, y, dy;		// current position within image/MCU
+  long restartCtr;		// MCUs left until restart
+  long restartMarker;		// next restart marker
+  long inputBuf;			// input buffer for variable length codes
+  long inputBits;		// number of valid bits in input buffer
+} DCTData;

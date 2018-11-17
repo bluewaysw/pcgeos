@@ -1,0 +1,385 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+
+PROJECT:	PC GEOS
+MODULE:		Clr2
+FILE:		clr2Macro.def
+
+AUTHOR:		Joon Song, Oct 7, 1996
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	joon	10/7/96   	Initial revision
+
+DESCRIPTION:
+	This file contains macro for Clr2
+		
+	$Id: clr2Macro.def,v 1.1 97/04/18 11:43:10 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		InitDitherIndex
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Init bx and si to point into the ditherMatrix
+
+PASS:		bReg	- optional register to use for  base dither address.
+			  Uses si if none supplied.
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jim	2/11/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+InitDitherIndex		macro	bReg
+ifidn @CurSeg, <Clr2>
+	dgseg	=	cs
+else
+	dgseg	=	ss
+endif
+	mov	bl, dgseg:[ditherTopIndex]	; load index into dither
+	clr	bh
+ifb	<bReg>
+	mov	si, bx				; use si for base
+	add	si, offset dgseg:ditherMatrix	; cs:bx -> ditherMatrix scan
+else
+	mov	bReg, bx
+	add	bReg, offset dgseg:ditherMatrix
+endif
+	clr	bx				; no left index
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		NextDitherScan
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	bump pointers to next scan of ditherMatrix
+
+PASS:		bReg	- same register passed to InitDitherIndex (could
+			  be blank)
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jim	2/11/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+NextDitherScan		macro	bReg
+ifidn @CurSeg, <Clr2>
+	dgseg	=	cs
+else
+	dgseg	=	ss
+endif
+		local	haveDitherIndex
+		clr	bx			;no left index
+ifb	<bReg>
+		add	si, CLR2_DITHER_WIDTH	;increment pattern pointer
+		cmp	si, (offset ditherMatrix) + CLR2_DITHER_SIZE	
+		jb	haveDitherIndex
+		sub	si, CLR2_DITHER_SIZE
+else
+		add	bReg, CLR2_DITHER_WIDTH
+		cmp	bReg, (offset ditherMatrix) + CLR2_DITHER_SIZE
+		jb	haveDitherIndex
+		sub	bReg, CLR2_DITHER_SIZE
+endif		
+haveDitherIndex:
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		BumpDitherIndex
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	bump a register that holds a line index to a dither matrix
+
+PASS:		iReg	- register to bump
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jim	2/13/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+BumpDitherIndex		macro	iReg
+	local	haveNext
+	inc	iReg
+	cmp	iReg, CLR2_DITHER_WIDTH-1
+	jb	haveNext
+	clr	iReg
+haveNext:
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MapBitmapColor
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Map 4-bit colors to 2-bit colors
+
+PASS:		ax = 4 <4-bit> pixels
+		bh = 0
+
+RETURN:		dl = 4 <2-bit> pixels
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	joon	10/21/96   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+MapBitmapColor		macro
+EC <	tst	bh							>
+EC <	ERROR_NZ -1			;bh must be zero		>
+	mov	bl, ah
+	mov	dl, cs:[ColorConversionTable][bx]
+	shl	dl, 4
+	mov	bl, al
+	or	dl, cs:[ColorConversionTable][bx]
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MapPaletteBitmapColor
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Map 4-bit colors using palette to 2-bit color
+
+PASS:		ax = four 4-bit pixels (byte-swapped)
+
+RETURN:		dl = four 2-bit pixels
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	joon	10/22/96   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+MapPaletteBitmapColor		macro
+	push	es
+	les	bx, ss:[bmPalette]
+	xlat	es:[bx]			; map color using palette
+	xchg	al, ah
+	xlat	es:[bx]			; map color using palette
+	pop	es
+	clr	bx
+	mov	bl, ah
+	mov	dl, cs:[ColorConversionTable][bx]
+	shl	dl, 4
+	mov	bl, al
+	or	dl, cs:[ColorConversionTable][bx]
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		shld_bx_ax_cl
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	shld	bx, ax, cl
+
+PASS:		nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	joon	10/24/96   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+shld_bx_ax_cl		macro
+	.inst byte 0x0f, 0xa5, 0xc3	; shrd	bx, ax, cl
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		shld_bp_ax_cl
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	shld	bp, ax, cl
+
+PASS:		nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	joon	10/24/96   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+shld_bp_ax_cl		macro
+	.inst byte 0x0f, 0xa5, 0xc5	; shld	bp, ax, cl
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		shld_ax_bx_cl
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	shld	ax, bx, cl
+
+PASS:		nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	joon	10/24/96   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+shld_ax_bx_cl		macro
+	.inst byte 0x0f, 0xa5, 0xd8	; shld	ax, bx, cl
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		shld_ax_bp_cl
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	shld	ax, bp, cl
+
+PASS:		nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	joon	10/24/96   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+shld_ax_bp_cl		macro
+	.inst byte 0x0f, 0xa5, 0xe8	; shld	ax, bp, cl
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		shrd_bx_ax_cl
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	shrd	bx, ax, cl
+
+PASS:		nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	joon	10/24/96   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+shrd_bx_ax_cl		macro
+	.inst byte 0x0f, 0xad, 0xc3	; shrd	bx, ax, cl
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		shrd_bp_ax_cl
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	shrd	bp, ax, cl
+
+PASS:		nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	joon	10/24/96   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+shrd_bp_ax_cl		macro
+	.inst byte 0x0f, 0xad, 0xc5	; shrd	bp, ax, cl
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		shrd_ax_bx_cl
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	shrd	ax, bx, cl
+
+PASS:		nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	joon	10/24/96   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+shrd_ax_bx_cl		macro
+	.inst byte 0x0f, 0xad, 0xd8	; shrd	ax, bx, cl
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		shrd_bp_ax_cl
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	shrd	bp, ax, cl
+
+PASS:		nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	joon	10/24/96   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+shrd_ax_bp_cl		macro
+	.inst byte 0x0f, 0xad, 0xe8	; shrd	bp, ax, cl
+endm

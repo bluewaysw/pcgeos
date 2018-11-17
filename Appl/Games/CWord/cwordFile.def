@@ -1,0 +1,484 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Crossword
+MODULE:		File
+FILE:		cwordFile.def
+
+AUTHOR:		Jennifer Lew, May  6, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JL	5/ 6/94   	Initial revision
+
+
+DESCRIPTION:
+	This file contains constants, macros, and class definitions
+	that are realated to the File Module.
+		
+	$Id: cwordFile.def,v 1.1 97/04/04 15:13:47 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+MIN_ROW			equ	10
+MIN_COL			equ	10
+MAX_ROW			equ	25
+MAX_COL			equ	25
+
+VM_BLOCK_SIZE		equ	1400
+MAX_NUM_SAVED_PUZZLES	equ	20
+
+NEW_PUZZLE		equ	0
+USED_PUZZLE		equ	1
+
+SAVING_PUZZLE_DELAY	equ	120		; two seconds
+
+DIGITS_IN_BYTES		equ	5	; number of digits in number
+					; of bytes specification in the
+					; puzzle source file
+
+NUM_HEADERS		equ	6	; 6 header categories
+
+;--------------------------------------------------------------------------
+; 	Our own VM Block Header
+;--------------------------------------------------------------------------
+
+VMUserBlockHeader	struct
+	VMUBH_lMemBlockHeader		LMemBlockHeader
+	VMUBH_orderedPuzzleChunkHandle	lptr
+	VMUBH_completedPuzzleChunkHandle lptr
+VMUserBlockHeader	ends
+
+;--------------------------------------------------------------------------
+; 	Structure to store the ordered puzzle data
+;--------------------------------------------------------------------------
+
+PuzzleData	struct
+	PD_puzzleHandle	word		; block handle
+	PD_filePath	GenFilePath	; complete path of source file
+	PD_puzzleName	FileLongName	; puzzle name - 
+					;    name of puzzle source file 
+PuzzleData	ends
+
+;--------------------------------------------------------------------------
+; This Class manages the File Module's responsibilities.
+; It takes care of popping up the FileSelectorInteraction when
+; it is needed and makes sure that the file chosen is read in.
+;--------------------------------------------------------------------------
+
+CwordFileBoxClass	class	MetaClass
+
+MSG_CFB_FILE_SELECTED	message
+;
+; Context:	Handle the double click of a puzzle from the puzzle
+;		selector dialog box.
+;		
+; Source:	No restriction.
+; Destination:  Any CwordFileBox object.
+; Interception: Generally not intercepted.
+;
+; Pass:		*ds:si	= CwordFileBoxClass object
+;		ds:di	= CwordFileBoxClass instance data
+;		ds:bx	= CwordFileBoxClass object (same as *ds:si)
+;		es 	= segment of CwordFileBoxClass
+;		ax	= message #
+;
+; Return:	nothing
+;		nothing	- destroyed
+
+MSG_CFB_OK		message
+;
+; Context:	Save the current puzzle if there is one.
+;		If the new puzzle is different from the current puzzle:
+;			Read in the source file of the new puzzle.
+;			Read in the user document of the new puzzle.
+;			Tell the Board module to initialize itself.
+;
+; Source:	No restriction
+; Destination:  Any CwordFileBox object.
+; Interception: Generally not intercepted.
+;
+; Pass:		*ds:si	= CwordFileBoxClass object
+;		ds:di	= CwordFileBoxClass instance data
+;		ds:bx	= CwordFileBoxClass object (same as *ds:si)
+;		es 	= segment of CwordFileBoxClass
+;		ax	= message #
+;
+; Return:	nothing
+;		nothing	- destroyed
+
+MSG_CFB_SAVE	message
+;
+; Context:	Save the user's solution of the current puzzle to
+;		the user document.
+;
+; Source:	no restriction
+; Destination:  Any CwordFileBox object.
+; Interception: Generally not intercepted.
+;
+; Pass:		*ds:si	= CwordFileBoxClass object
+;		ds:di	= CwordFileBoxClass instance data
+;		ds:bx	= CwordFileBoxClass object (same as *ds:si)
+;		es 	= segment of CwordFileBoxClass
+;		ax	= message #
+;
+; Return:	nothing
+;		nothing	- destroyed
+
+MSG_CFB_SAVE_BUTTON	message
+;
+; Context:	The Save Trigger was pushed or the application is
+;		acting like it was pushed.  Display a dialog that
+;		tells that the puzzle is being saved and save the
+;		current puzzle.
+;
+; Source:	no restriction
+; Destination:  Any CwordFileBox object.
+; Interception: Generally not intercepted.
+;
+; Pass:		*ds:si	= CwordFileBoxClass object
+;		ds:di	= CwordFileBoxClass instance data
+;		ds:bx	= CwordFileBoxClass object (same as *ds:si)
+;		es 	= segment of CwordFileBoxClass
+;		ax	= message #
+;
+; Return:	nothing
+;		nothing	- destroyed
+
+MSG_CFB_PUZZLES_SAVE	message
+;
+; Context:	Save the user's current puzzle solution.  
+;		Display the puzzle selector box.
+;
+; Source:	no restriction
+; Destination:  Any CwordFileBox object
+; Interception: Generally not intercepted.
+;
+; Pass:		*ds:si	= CwordFileBoxClass object
+;		ds:di	= CwordFileBoxClass instance data
+;		ds:bx	= CwordFileBoxClass object (same as *ds:si)
+;		es 	= segment of CwordFileBoxClass
+;		ax	= message #
+;
+; Return:	nothing
+;		nothing	- destroyed
+
+
+MSG_CFB_PUZZLES_CHECK_DONE	message
+;
+; Context:	Check to see if the user may be done with puzzle. If
+;		all cells filled in then display the done choice box 
+;		else show the puzzle selector. Also remove the puzzle from the
+;		solution document if it is empty
+;
+; Source:	no restriction
+; Destination:  Any CwordFileBox object
+; Interception: Generally not intercepted.
+;
+; Pass:		*ds:si	= CwordFileBoxClass object
+;		ds:di	= CwordFileBoxClass instance data
+;		ds:bx	= CwordFileBoxClass object (same as *ds:si)
+;		es 	= segment of CwordFileBoxClass
+;		ax	= message #
+;
+; Return:	nothing
+;		nothing	- destroyed
+
+
+
+MSG_CFB_PUZZLES		message
+;
+; Context:	Display the puzzle selector box.
+;
+; Source:	no restriction
+; Destination:  Any CwordFileBox object
+; Interception: Generally not intercepted.
+;
+; Pass:		*ds:si	= CwordFileBoxClass object
+;		ds:di	= CwordFileBoxClass instance data
+;		ds:bx	= CwordFileBoxClass object (same as *ds:si)
+;		es 	= segment of CwordFileBoxClass
+;		ax	= message #
+;
+; Return:	nothing
+;		nothing	- destroyed
+
+
+MSG_CFB_DELETE	message
+;
+; Context:	Delete the source file for the current puzzle, remove
+;		users solution for the solutions document
+;
+; Source:	no restriction
+; Destination:  Any CwordFileBox object
+; Interception: Generally not intercepted.
+;
+; Pass:		*ds:si	= CwordFileBoxClass object
+;		ds:di	= CwordFileBoxClass instance data
+;		ds:bx	= CwordFileBoxClass object (same as *ds:si)
+;		es 	= segment of CwordFileBoxClass
+;		ax	= message #
+;
+; Return:	nothing
+;		nothing	- destroyed
+
+MSG_CFB_MARK_COMPLETED	message
+;
+; Context:	Remove puzzle from main array and store name in completed
+;		section of solutions document. Then bring up puzzle 
+;		selector.
+;
+; Source:	no restriction
+; Destination:  Any CwordFileBox object
+; Interception: Generally not intercepted.
+;
+; Pass:		*ds:si	= CwordFileBoxClass object
+;		ds:di	= CwordFileBoxClass instance data
+;		ds:bx	= CwordFileBoxClass object (same as *ds:si)
+;		es 	= segment of CwordFileBoxClass
+;		ax	= message #
+;
+; Return:	nothing
+;		nothing	- destroyed
+
+
+MSG_CFB_LOAD_LAST_PUZZLE_PLAYED	message
+;
+; Context:	This is called when a state file exists when the
+;		Cword App starts up.  This message handler will
+;		handle displaying the last puzzle that was played
+;		on the screen using the puzzle's source file and user
+;		document.
+;
+; Source:	FILE MODULE
+; Destination:  Any CwordFileBox object
+; Interception: Generally not intercepted.
+;
+; Pass:		*ds:si	= CwordFileBoxClass object
+;		ds:di	= CwordFileBoxClass instance data
+;		ds:bx	= CwordFileBoxClass object (same as *ds:si)
+;		es 	= segment of CwordFileBoxClass
+;		ax	= message #
+;
+; Return:	nothing
+;		nothing	- destroyed
+
+MSG_CFB_NOTIFY_ERROR	message
+;
+; Context:	Notify the File Module that an error has occurred and
+; 		it should take the necessary steps.
+;
+; Source:	FILE MODULE
+; Destination:  Any CwordFileBox object
+; Interception: Generally not intercepted.
+;
+; Pass:		*ds:si	= CwordFileBoxClass object
+;		ds:di	= CwordFileBoxClass instance data
+;		ds:bx	= CwordFileBoxClass object (same as *ds:si)
+;		es 	= segment of CwordFileBoxClass
+;		ax	= message #
+;
+; Return:	nothing
+;		nothing	- destroyed
+
+MSG_CFB_GET_SOURCE_FILE_PATH	message
+;
+; Context:	Copy the Source file path into the buffer provided.
+; Source:	
+; Destination:  
+; Interception: 
+;
+; Pass:		dx:bp	- buffer of GenFilePath to fill.
+; Return:	filled buffer
+;		nothing	- destroyed
+;
+
+MSG_CFB_OPEN_APPLICATION	message
+;
+; Context:	Creates the Crossword Puzzles directory if needed.
+;
+; Source:	FILE MODULE
+; Destination:  Any CwordFileBox object
+; Interception: Generally not intercepted.
+;
+; Pass:		nothing
+;			
+; Return:	nothing
+;		nothing	- destroyed
+
+
+;****************************************************************************
+MSG_CFB_LOAD_PUZZLE_FROM_APP_LAUNCH_BLOCK	message
+;
+;	Open the puzzle stored in the AppLaunchBlock
+;
+; Context:	User double clicked on data file
+; Source:	CwordOpenApplication
+; Destination:  CwordFileBoxClass
+; Interception: Unlikely
+;
+;PASS:		
+;	dx - handle of AppLaunchBlock
+;			
+;RETURN:	
+;	nothing
+;
+;DESTROYED:
+;	ax
+;
+
+MSG_CFB_LOAD_PUZZLE_FROM_LAUNCH_BLOCK_COPY	message
+;
+;	Open the puzzle stored in copy of AppLaunchBlock
+;
+; Context:	User double clicked on data file
+; Source:	CwordOpenApplication
+; Destination:  CwordFileBoxClass
+; Interception: Unlikely
+;
+;PASS:		
+;	dx - handle of copy AppLaunchBlock
+;			
+;RETURN:	
+;	copy of AppLaunchBlock freed
+;
+;DESTROYED:
+;	ax
+;
+
+
+
+	CFBI_engine	EngineTokenType	0	; engine token
+	CFBI_fileHandle	word	0		; file handle of
+						; current puzzle's
+						; source file
+	CFBI_sourceFile	FileLongName		; name of source file
+	CFBI_puzzleIsOpen	byte	FALSE
+
+	CFBI_filePath	GenFilePath		; complete path of source file
+
+CwordFileBoxClass	endc
+
+CwordFileSelectorInteractionClass	class	GenInteractionClass
+
+;****************************************************************************
+MSG_CFSLI_GET_USER_DOC_HANDLE	message
+;
+;	Returns the user doc handle from the instance data.
+;
+; Context:	Used by file selectors during the filter call back
+; Source:	FileSelectors
+; Destination:  objects of this class
+; Interception: Unlikely
+;
+;PASS:		
+;	nothing
+;		
+;RETURN:	
+;	cx - vm file handle or 0
+;
+;DESTROYED:
+;	nothing
+;
+
+	CFSII_userDocFileHandle	hptr	NULL
+
+CwordFileSelectorInteractionClass	endc
+
+CFFSType	etype	byte
+CFFST_IN_PROGRESS	enum CFFSType
+CFFST_NEVER_STARTED	enum CFFSType
+CFFST_COMPLETED		enum CFFSType
+
+
+CwordFilteredFileSelectorClass class GenFileSelectorClass
+
+;****************************************************************************
+MSG_CFFS_SET_DEFAULT_MODE	message
+;
+;	The default mode is the current mode unless the current mode is
+;	IN_PROGRESS, then the default mode is IN_PROGRESS with 
+;	auto switch to NEW enabled.
+;
+; Context:	Sent just before Puzzles selector is brought up when
+;		user chooses the Puzzles button
+; Source:	CwordFileBox
+; Destination:  CwordFilteredFileSelectorClass
+; Interception: Unlikely
+;
+;PASS:		
+;	nothing
+;			
+;RETURN:	
+;	nothing
+;
+;DESTROYED:
+;	ax
+;
+
+
+;****************************************************************************
+MSG_CFFS_SET_MODE	message
+;
+;	Set CFFSType and rescan if necessary
+;
+; Context:	User changes modes
+; Source:	ChoiceList
+; Destination:  object of this class
+; Interception: not likely
+;
+;PASS:		
+;	cl - mode
+;		
+;RETURN:	
+;	nothing
+;
+;DESTROYED:
+;	ax
+;
+
+
+;****************************************************************************
+MSG_CFFS_GET_MODE	message
+;
+;	Get the CFFSType 
+;
+; Context:	General
+; Source:	Unrestricted
+; Destination:  object of this class
+; Interception: not likely
+;
+;PASS:		
+;	nothing
+;		
+;RETURN:	
+;	cl - mode
+;
+;DESTROYED:
+;	ax
+;
+
+
+	CFFSI_numIns	word			;Mumber of files in progress
+						;in the last rescan
+	CFFSI_mode	CFFSType		;Puzzles currently being
+						;scanned for.
+	CFFSI_canAutoSwitchMode byte		;Can switch from in progress
+						;mode to another mode if
+						;no in progress files
+						;are found
+	
+CwordFilteredFileSelectorClass	endc
+
+
+idata	segment
+	CwordFileBoxClass
+	CwordFilteredFileSelectorClass
+	CwordFileSelectorInteractionClass
+idata	ends

@@ -1,0 +1,332 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1994 -- All Rights Reserved
+
+PROJECT:	Clavin
+MODULE:		Transport Media Tracking
+FILE:		mailboxMedia.def
+
+AUTHOR:		Adam de Boor, Apr  7, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	4/ 7/94		Initial revision
+
+
+DESCRIPTION:
+	Interface to the Media module, which tracks the available and
+	connected media.
+		
+GLOBAL FUNCTIONS:
+	MailboxNotifyMediumAvailable
+	MailboxNotifyMediumNotAvailable
+	MailboxCheckMediumAvailable
+	MailboxNotifyMediumConnected
+	MailboxNotifyMediumNotConnected
+	MailboxCheckMediumConnected
+	MailboxGetFirstMediumUnit
+
+	$Id: mailboxMedia.def,v 1.1 97/04/05 01:20:08 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+Init	segment	resource
+
+global	MediaInit:near
+;	Desc:	Initialize the transport media tracking system.
+;
+;	Pass:	bx	= VM file handle
+;		ax	= block handle of media status map (0 if none allocated)
+;		cx	= block handle of media transport map (0 if none
+;			  allocated)
+;	Return:	ax	= block handle of media status map
+;		cx	= block handle of media transport map
+;
+
+Init	ends
+
+Media	segment	resource
+
+global	MediaTransportNewMedium:far
+;	Desc:	Cope with a new medium entry being added to the status map
+;		by seeing if it's a type of media we've never ever seen. If
+;		it is, we must call all the known transport drivers to see
+;		if they handle the medium.
+;
+;	Pass:	cxdx	= MediumType
+;	Return:	nothing
+;
+
+global	MediaGetTransports:far
+;	Desc:	Retrieve the list of transport drivers that can work with
+;		a particular transport medium
+;
+;	Pass:	cxdx	= MediumType
+;		ds	= locked lmem block
+;	Return:	*ds:ax	= ChunkArray of MailboxTransport tokens for drivers
+;			  that support the medium
+;	
+
+global	MediaGetAllTransports:far
+;	Desc: 	Retrieve a list of all combinations transport option plus
+;		medium, where a transport option is considered available if
+;		a medium it usees has ever been available to the machine.
+;
+;   Old Desc:	Retrieve the list of available transports, where a transport is
+;		considered available if a medium it uses has ever been 
+;		available to the machine.
+;
+;		Used to build up the list of possible transports in various
+;		places (MailboxTransportListClass)
+;
+;	Pass:	ds	= locked lmem block (run by current thread, of course)
+;	Return:	*ds:ax	= ChunkArray of MailboxMediaTransport structures
+;
+
+global	MediaGetAllTransportCapabilities:far
+;	Desc:	Retrieves the union of the MailboxTransportCapabilities for
+;		all the transports that would be returned by
+;		MediaGetAllTransports. It is intended to allow someone to
+;		quickly determine whether certain functions (notably the
+;		sending of system/Poof messages and the retrieval of new
+;		messages) should be made available to the user.
+;
+;	Pass:	nothing
+;	Return:	ax	= union of all MailboxTransportCapabilities from
+;			  all available transports
+;
+
+global	MediaGetTransportMoniker:far
+;	Desc:	Retrieve the moniker for a particular transport+medium pair,
+;		as returned by the transport driver. Note this may be
+;		different from the "transport string"
+;
+;	Pass:
+;		ds	= locked lmem block (run by current thread, of course)
+;		ss:bp	= MediaGetTransportMonikerArgs
+;	Return: carry set if transport+medium combination is invalid
+;			ax	= destroyed
+;		carry clear if ok
+;			*ds:ax	= chunk holding selected moniker
+;
+
+MediaGetTransportMonikerArgs	struct
+    MGTMA_transport	MailboxTransport
+    MGTMA_transOption	MailboxTransportOption
+    MGTMA_medium	MediumType
+    MGTMA_searchFlags	VisMonikerSearchFlags
+    MGTMA_displayType	DisplayType
+    			even
+MediaGetTransportMonikerArgs	ends
+
+global	MediaGetTransportString:far
+;	Desc:	Retrieve the text string for a transport/medium combination.
+;
+;	Pass:	ds	= locked lmem block
+;		axbx	= MailboxTransport
+;		cxdx	= MediumType
+;		si	= MailboxTransportOption
+;	Return:	carry set if that combination is invalid
+;			ax	= destroyed
+;		carry clear if ok
+;			*ds:ax	= text chunk holding string.
+;
+
+global	MediaGetTransportVerb:far
+;	Desc:	Retrieve the text string for the verb that indicates a message
+;		is being sent through a medium via a transport driver
+;
+;	Pass:	ds	= locked lmem block
+;		axbx	= MailboxTransport
+;		cxdx	= MediumType
+;		si	= MailboxTransportOption
+;	Return:	carry set if that combination is invalid
+;			ax	= destroyed
+;		carry clear if ok
+;			*ds:ax	= text chunk holding verb.
+;
+
+global	MediaGetTransportAbbrev:far
+;	Desc:	Retrieve the text string for the abbreviation that indicates a
+;		message is being sent through a medium via a transport driver
+;
+;	Pass:	ds	= locked lmem block
+;		axbx	= MailboxTransport
+;		cxdx	= MediumType
+;		si	= MailboxTransportOption
+;	Return:	carry set if that combination is invalid
+;			ax	= destroyed
+;		carry clear if ok
+;			*ds:ax	= text chunk holding abbreviation
+;
+
+global	MediaGetTransportSigAddrBytes:far
+;	Desc:	Retrieve the number of bytes in an address for this medium /
+;		transport pair that are considered significant when comparing
+;		to another address for this pair. If an address has fewer than
+;		this many bytes, it and a longer address should be considered
+;		equal if the entire shorter address matches the equivalent
+;		bytes of the longer.
+;
+;	Pass:	axbx	= MailboxTransport
+;		cxdx	= MediumType
+;		si	= MailboxTransportOption
+;	Return:	carry set if that combination is invalid
+;			ax	= destroyed
+;		carry clear if ok
+;			ax	= number of significant bytes
+;
+
+global	MediaNewTransport:far
+;	Desc:	Take note of a new transport driver in the system by
+;		checking with it to see if it's able to support any of the
+;		media types that have ever been seen.
+;
+;	Pass:	ds:si	= driver name
+;		cxdx	= driver token (MailboxTransport)
+;		current dir is driver directory
+;	Return:	nothing
+;
+
+global	MediaNotifyMediumAvailable:far
+;	Desc:	Alerts the Mailbox library to the existence of a particular
+;		transmission medium.
+;
+;		Library takes possession of the passed memory block if
+;		al is MUT_MEM_BLOCK (also, remember to set SNT_BX_MEM in
+;		DI when you call SysSendNotification)
+;
+;	Pass:	cxdx	= MediumType
+;		bx	= unit number (ignored if MUT_NONE)
+;		al	= MediumUnitType
+;	Return:	nothing
+;
+
+global	MediaNotifyMediumNotAvailable:far
+;	Desc:	Alerts the Mailbox library to the absence of a particular
+;		transmission medium.
+;
+;		Library takes posession of the passed memory block if 
+;		al is MUT_MEM_BLOCK (also, remember to set SNT_BX_MEM in
+;		DI when you call SysSendNotification)
+;
+;	Pass:	cxdx	= MediumType
+;		bx	= unit number (ignored if MUT_NONE)
+;		al	= MediumUnitType
+;	Return:	nothing
+;
+
+global	MediaNotifyMediumConnected:far
+;	Desc:	Alerts the Mailbox library that a particular transmission
+;		medium is actually connected to another machine. The
+;		transport drivers that use the medium will determine the
+;		address (with the help of the driver that established the
+;		connection).
+;
+;		Library takes possession of the passed memory block if
+;		al is MUT_MEM_BLOCK (also, remember to set SNT_BX_MEM in
+;		DI when you call SysSendNotification)
+;
+;	Pass:	cxdx	= MediumType
+;		bx	= unit number (ignored if MUT_NONE)
+;		al	= MediumUnitType
+;	Return:	nothing
+;
+
+global	MediaNotifyMediumNotConnected:far
+;	Desc:	Alerts the Mailbox library to the severing of a connection
+;		over a particular transmission medium.
+;
+;		Library takes posession of the passed memory block if 
+;		al is MUT_MEM_BLOCK (also, remember to set SNT_BX_MEM in
+;		DI when you call SysSendNotification)
+;
+;	Pass:	cxdx	= MediumType
+;		bx	= unit number (ignored if MUT_NONE)
+;		al	= MediumUnitType
+;	Return:	nothing
+;
+
+global	MediaCheckMediumAvailableByPtr:far
+;	Desc:	Like MailboxCheckMediumAvailable, but accepts a pointer to a
+;		MailboxMediumDesc instead of the usual registers.
+;
+;	Pass:	es:di	= MailboxMediumDesc
+;	Return:	carry set if medium exists
+;		carry clear if medium is absent
+;
+
+global	MediaEnsureTransportInfo:far
+;	Desc:	Make sure that we have the goods on the combination of
+;		medium, transport, and transport option.
+;
+;	Pass:	axbx	= MailboxTransport
+;		cxdx	= MediumType
+;		si	= MailboxTransportOption
+;	Return:	nothing
+;
+
+global	MediaCheckSupportedFormat:far
+;	Desc:	Consults the list of formats recorded as acceptable to a
+;		particular transport option of a transport driver and see
+;		if it contains any of the passed list of creatable formats
+;
+;	Pass:	axbx	= MailboxTransport
+;		cx:dx	= array of MailboxDataFormat descriptors,
+;			  ending with a GEOWORKS/GMDFID_INVALID entry
+;		si	= MailboxTransportOption
+;	Return:	carry set if any of the passed formats is on the list of
+;			formats the transport driver supports for that option
+;		carry clear if none of the passed formats is acceptable
+;
+
+global	MediaRecordConnectionAddress:far
+;	Desc:	Record the address to which a particular unit of media is
+;		connected.
+;
+;	Pass:	^hbp	= MailboxDisplayByMediumData
+;		^hdx	= MailboxDisplayByTransportData
+;	Return:	nothing
+;
+
+global	MediaCheckConnectable:far
+;	Desc:	See if the indicated medium is available for transmission to
+;		the passed address. If the passed medium descriptor is for
+;		MUT_ANY, then all existing units of the medium will be checked
+;		and carry set will be returned if any unit is available.
+;
+;	Pass:	cx:dx	= MailboxMediumDesc
+;		es:di	= connection address for comparison. size of the
+;			  address is the first word (size does not include the
+;			  size word itself)
+;		bx	= size of the address (should not be larger than the
+;			  number of bytes that are significant for the medium
+;			  and transport)
+;	Return:	carry clear if medium is connected to something else or doesn't
+;			exist
+;		carry set if medium is available for the address,
+;			either because it's not connected at all, or
+;			because it's connected to the passed address
+;
+
+global 	MediaGetReason:far
+;	Desc:	If the passed medium unit isn't available, return any stored
+;		reason for why it's not available.
+;
+;	Pass:	cx:dx	= MailboxMediumDesc
+;		ds	= lmem block in which to allocate the reason string
+;	Return:	*ds:ax	= reason, ax = 0 if no reason stored (may be because
+;			  medium exists, or doesn't exist and no reason for
+;			  its unavailability was given)
+;
+
+global	MailboxCheckMediumAvailable:far
+global	MailboxCheckMediumConnected:far
+global	MailboxGetFirstMediumUnit:far
+
+Media	ends

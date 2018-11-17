@@ -1,0 +1,389 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Navigation Library
+MODULE:		Navigate controller
+FILE:		navigate.def
+
+AUTHOR:		Alvin Cham, Sep 26, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	AC	9/26/94   	Initial revision
+
+
+DESCRIPTION:
+	Definitions for navigate control class
+		
+	$Id: navigate.def,v 1.1 97/04/04 14:26:30 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef __NAVIGATE
+
+StartLibrary	navigate
+
+;*****************************************************************************
+;   Include files
+;*****************************************************************************
+include ui.def
+
+;*****************************************************************************
+;   Defines + constants
+;*****************************************************************************
+
+NAV_MAX_ENTRY_BUFFER_SIZE   	equ 	80
+NAV_ENTRY_BUFFER_SIZE	    	equ 	(NAV_MAX_ENTRY_BUFFER_SIZE+2)
+    	    	    	    	    	; allow for NULL, word-align
+
+NavEntryName	    type    NAV_ENTRY_BUFFER_SIZE dup (char)
+
+;*****************************************************************************
+;   Enums
+;*****************************************************************************
+;----------------------------------------------------------------------------
+; NavigatePrevTriggerStateType specifies the state we want to set the
+; "previous page" trigger 
+;----------------------------------------------------------------------------
+NavigatePrevTriggerStateType	etype	byte
+NPTST_ENABLE	enum	NavigatePrevTriggerStateType
+NPTST_DISABLE	enum	NavigatePrevTriggerStateType
+
+;----------------------------------------------------------------------------
+; NavigateNextTriggerStateType specifies the state we want to set the
+; "next page" trigger 
+;----------------------------------------------------------------------------
+NavigateNextTriggerStateType	etype	byte
+NNTST_ENABLE	enum	NavigateNextTriggerStateType
+NNTST_DISABLE	enum	NavigateNextTriggerStateType
+
+;*****************************************************************************
+;   Structures
+;*****************************************************************************
+
+;-----------------------------------------------------------------------------
+;   Information that the app needs to pass in for a history list entry
+;-----------------------------------------------------------------------------
+NavigateHistoryListInfo	    struct
+    NHLI_selector   	word
+    NHLI_moniker    	NavEntryName
+NavigateHistoryListInfo	    ends
+
+;-----------------------------------------------------------------------------
+;   Notification purposes
+;-----------------------------------------------------------------------------
+;   Description of data sent with GWNT_NAVIGATE_CONTEXT_CHANGE (send
+;   to GAGCNLT_NOTIFY_NAVIGATE_CONTEXT_CHANGE)
+NotifyNavContextChangeFlags 	record
+    :10
+    NNCCF_pageTriggerStateChanged:1 	; did the page triggers' state
+					; change? 
+    NNCCF_prevEnabled:1	    	    	; does page have a prev page?
+    NNCCF_nextEnabled:1	    	    	; does page have a next page?
+    NNCCF_updateHistory:1   	    	; clear: don't update history
+					; because NavControl already
+					; knows about the change
+    NNCCF_retnWithState:1   	    	; set: NavControl doesn't need
+					; to update history list,
+					; because the history list is
+					; restored from state
+    NNCCF_displayMain:1	    	    	; Set: main page is displayed
+NotifyNavContextChangeFlags 	end
+
+; Notification structure sent when the currently displayed context
+; changes 
+NotifyNavContextChange	    struct
+    NNCC_flags	    	    NotifyNavContextChangeFlags
+    NNCC_moniker    	    NavEntryName    ; entry name to link to
+    NNCC_selector   	    word     	    ; selector string
+    NNCC_counter    	    word    	    ; used to insure
+					    ; uniqueness
+NotifyNavContextChange	    ends
+
+
+
+;*****************************************************************************
+;   NavigateControlClass definitions
+;*****************************************************************************
+NavigateControlClass	class	GenControlClass
+
+;-----------------------------------------------------------------------------
+;   Messages
+;-----------------------------------------------------------------------------
+MSG_NC_GOTO_HISTORY	message
+;
+; Handler for displaying the page (text or menu) of a particular
+; history list entry
+;
+; Context:	Navigate history list, Navigate display
+; Source:	App UI
+; Destination:  Navigate control object
+; Interception: must be subclassed and it should handle the displaying
+;   	    	of the page.
+;
+; Pass:	    	cx = position of list entry to go to
+;			
+; Return:   	nothing
+; Destroyed:	nothing
+;
+
+MSG_NC_GOTO_HOME_PAGE	message
+;
+; Handler for displaying the home page 
+;
+; Context:	Navigate display
+; Source:	App UI
+; Destination:  Navigation control object
+; Interception: must be subclassed and it should handle the displaying
+;   	    	of the home page
+;
+; Pass:	    	nothing
+;			
+; Return:   	nothing
+; Destroyed:	nothing
+;
+
+MSG_NC_PREVIOUS_PAGE	message
+;
+; Handler for displaying the previous page 
+;
+; Context:	Navigate display 
+; Source:	App UI
+; Destination:  Navigate control object
+; Interception: must be subclassed and it should handle the displaying
+;   	    	of the page.
+;
+; Pass:	    	nothing
+;			
+; Return:   	nothing
+; Destroyed:	nothing
+;
+
+MSG_NC_NEXT_PAGE	message
+;
+; Handler for displaying the next page 
+;
+; Context:	Navigate display
+; Source:	App UI
+; Destination:  Navigate control object
+; Interception: must be subclassed and it should handle the displaying
+;   	    	of the page.
+;
+; Pass:	    	nothing
+;			
+; Return:   	nothing
+; Destroyed:	nothing 
+;
+
+MSG_NC_GO_BACK	message
+;
+; Go back to the previous entry in the history list 
+;
+; Context:	Navigate history list
+; Source:	App UI
+; Destination:  Navigate control object
+; Interception: unlikely to be subclassed
+;
+; Pass:	    	nothing
+;			
+; Return:   	nothing
+; Destoryed:	nothing
+;
+
+MSG_NC_GO_FORWARD	message
+;
+; Go forward to the next entry in the history list 
+;
+; Context:	Navigate history list
+; Source:	App UI
+; Destination:  Navigate control object
+; Interception: unlikely to be subclassed
+;
+; Pass:	    	nothing
+;			
+; Return:   	nothing
+; Destoryed:	nothing
+;
+
+MSG_NC_GET_HISTORY_LIST_MONIKER	message
+;
+; Get the moniker in the history list entry
+;
+; Context:	Navigate history list
+; Source:	App UI
+; Destination:  Navigate control object
+; Interception: unlikely
+;
+; Pass:	    	^lcx:dx	    = the OD of list requesting
+;   	    	bp  	    = the nth position of the list entry	
+;
+; Return:   	nothing
+; Destroyed:	nothing
+;
+
+MSG_NC_GET_STATE_BLOCK	message
+;
+; Gets the handle of the block holding the lists so that it can
+; be saved to state when the application shuts down to DOS
+;
+; Context:	Navigation lists
+; Source:	Any object -- from application
+; Destination:  Navigate control object
+; Interception: unlikely
+;
+; Pass:	    	nothing
+;
+; Return:   	cx = block handle
+; Destroyed:	nothing
+;
+
+MSG_NC_FREE_HISTORY_LIST	message
+;
+; Free the list and reinitialize the go back index
+;
+; Context:	Navigate history list
+; Source:	Internal
+; Destination:  Navigate control object
+; Interception: none
+;
+; Pass:	    	nothing
+;			
+; Return:   	nothing
+; Destroyed:	nothing
+;
+
+MSG_NC_INIT_HISTORY_LIST	message
+;
+; Initialize the lists interaction in response to user activating
+; the history list or hotlist features or tools
+;
+; Context:	Navigate history list
+; Source:	Internal
+; Destination:  Navigate control object
+; Interception: none
+;
+; Pass:	    	nothing
+;			
+; Return:   	nothing
+; Destroyed:	nothing
+;
+
+MSG_NC_INSERT_ENTRY	message
+;
+; Inserting an history list entry
+;
+; Context:	Navigate history list
+; Source:	App UI
+; Destination:  Navigate control object
+; Interception: unlikely
+;
+; Pass:	    	cx:dx	= moniker of entry (char *)
+;   	    	bp  	= ChunkHandle of selectorChunk
+; Return:   	nothing
+; 
+
+MSG_NC_SET_PREV_NEXT_TRIGGERS_STATE	message
+;
+; Enabling/Disabling both the "prev page" and/or the "next page" trigger.
+;
+; Context:	"Prev page" and "Next page" triggers
+; Source:	Application 
+; Destination:  Navigate control object
+; Interception: unlikely
+;
+; Pass:	    	cx  = NavigatePrevTriggerStateType
+;   	    	dx  = NavigateNextTriggerStateType
+;			
+; Return:   	nothing
+; 
+
+
+
+
+;-----------------------------------------------------------------------------
+;   Constants and structures
+;-----------------------------------------------------------------------------
+
+
+;*****************************************************************************
+; features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_UI)
+;
+; NOTE: Feature and tool records must be identical
+;
+; The NavigateFeatureFlags record expects these flags to be in this
+; order.  If you change here, you must change NavigateFeatureFlags
+; as well.
+; 
+;*****************************************************************************
+
+;-----------------------------------------------------------------------------
+;   Feature record
+;-----------------------------------------------------------------------------
+NCFeatures  record
+    :11
+    NCF_MAIN_PAGE:1 	    ; go to the main page
+    NCF_PREV_NEXT:1 	    ; prev/next page triggers
+    NCF_HISTORY:1 	    ; history list interaction
+    NCF_BACK:1 		    ; go back one history list entry
+    NCF_FORWARD:1      ; go forward one history list entry
+NCFeatures  end
+
+;-----------------------------------------------------------------------------
+;   Tool box feature record
+;-----------------------------------------------------------------------------
+NCToolBoxFeatures  record
+    :11
+    NCTBF_MAIN_PAGE:1 	    ; go to the main page tool
+    NCTBF_PREV_NEXT:1	    ; prev/next page tool
+    NCTBF_HISTORY:1 	    ; history list interaction tool
+    NCTBF_BACK:1    	    ; go back one history list entry tool
+    NCTBF_FORWARD:1 	    ; go forward one history list entry tool
+NCToolBoxFeatures  end
+
+;-----------------------------------------------------------------------------
+;   Default features for Navigate 
+;-----------------------------------------------------------------------------
+NC_DEFAULT_FEATURES equ	    mask NCF_MAIN_PAGE \
+    	    	    	    or mask NCF_PREV_NEXT \
+    	    	    	    or mask NCF_HISTORY \
+    	    	    	    or mask NCF_BACK \
+    	    	    	    or mask NCF_FORWARD \
+
+;-----------------------------------------------------------------------------
+;   Default tool box features for Navigate
+;-----------------------------------------------------------------------------
+NC_DEFAULT_TOOLBOX_FEATURES equ	    mask NCTBF_MAIN_PAGE \
+    	    	    	    	    or mask NCTBF_PREV_NEXT \
+    	    	    	    	    or mask NCTBF_HISTORY \
+    	    	    	    	    or mask NCTBF_BACK \
+    	    	    	    	    or mask NCTBF_FORWARD \
+
+;-----------------------------------------------------------------------------
+;   Internal vardata
+;-----------------------------------------------------------------------------
+
+TEMP_NAVIGATION_DETACH_RECEIVED	    	    vardata
+;
+; Internal only: If this exists, the controller has received
+; MSG_META_DETACH and will ignore any updates received after this
+
+;-----------------------------------------------------------------------------
+;   Instance data
+;-----------------------------------------------------------------------------
+
+    NCI_historyBlock	hptr	    	; handle of lists interaction
+    NCI_historyList 	hptr	    	; chunk offset for history list
+    NCI_index	    	word	    	; index into history list
+
+NavigateControlClass	endc
+
+EndLibrary  navigate
+
+

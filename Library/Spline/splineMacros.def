@@ -1,0 +1,808 @@
+ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS - Spline edit object
+MODULE:		
+FILE:		splineMacros.def	
+
+AUTHOR:		Chris Boyke
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CDB	5/91		Initial version
+
+ROUTINES:
+
+DESCRIPTION:	Herein lie the 101 macros that serve to make the
+		spline code a confusing mass of spaghetti.
+
+	$Id: splineMacros.def,v 1.1 97/04/07 11:10:04 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+TOGGLE	macro	bitField, bitMask
+	XORNF	bitField, mask bitMask
+endm
+
+;-----------------------------------------------------------------------------
+;	max - take the max of 2 values		
+;-----------------------------------------------------------------------------
+max	macro dest, source
+local	done
+	cmp	dest, source
+	jge	done
+	mov	dest, source
+done:
+endm
+ 
+
+;******************************************************************************
+; MemMov - move a word from one memory location to another
+;******************************************************************************
+MemMov	macro dest, source, useReg
+ifnb <useReg>
+	mov	useReg, source
+	mov	dest, useReg
+else
+	push	source
+	pop	dest
+endif
+endm
+
+
+;***************************************************************************
+;Diff - subtract and take the absolute value
+;***************************************************************************
+Diff	macro	dest, source
+local	done
+	sub	dest, source	; subtract
+	jge	done		; if greater or equal, we're done
+	neg	dest		; else, change sign
+done:
+endm
+
+
+;***************************************************************************
+;AbsVal	- take absolute value of a register
+;***************************************************************************
+AbsVal	macro	reg
+local	done
+	tst	reg
+	jns	done
+	neg	reg
+done:
+endm
+
+;******************************************************************************
+; SortRegs - sort the 2 registers in ascending order
+;******************************************************************************
+SortRegs 	macro	low, high
+local	done
+	cmp	low, high
+	jle	done
+	xchg	low, high
+done:
+endm
+
+
+;******************************************************************************
+; AddCXDXPoint	- adds (CX,DX) to the memory location, storing result in CX,DX
+;******************************************************************************
+AddCXDXPoint	macro	point
+	add	cx, point.P_x
+	add	dx, point.P_y
+endm
+
+;******************************************************************************
+; AddPointCXDX - add (cx,dx) to a point, storing result at the point.
+;******************************************************************************
+AddPointCXDX	macro	point
+	add	point.P_x, cx
+	add	point.P_y, dx
+endm
+
+;******************************************************************************
+; SubCXDXPoint	- subtract the Point from (cx, dx), result in CX, DX
+;******************************************************************************
+SubCXDXPoint	macro	point
+	sub	cx, point.P_x
+	sub	dx, point.P_y
+endm
+
+;***************************************************************************
+;MovPoint: Copy one Point structure in memory to another
+;***************************************************************************
+MovPoint	macro	dest, source, useReg
+irp field, <P_x, P_y>
+	MemMov	dest.field, source.field, useReg
+endm
+endm
+
+;***************************************************************************
+;MovPointWBFixed - Move a WBFixed point from one location to another
+;(trashes AX)
+;***************************************************************************
+MovPointWBFixed	macro	dest, source, useReg
+irp field, <PWBF_x, PWBF_y>
+	movwbf	dest.field, source.field, useReg
+endm
+endm
+	
+
+
+;***************************************************************************
+;WBFAverage	- take the arithmetic average of 2 WBFixed numbers,
+; stick it in dest.
+;
+; DESTROYED:		ax, bx, cx
+;***************************************************************************
+
+WBFAverage	macro	dest, num1, num2
+	mov	ax, num1.WBF_int
+	mov	bl, num1.WBF_frac
+	mov	cx, num2.WBF_int
+	mov	bh, num2.WBF_frac
+	add	bl, bh			;; Add fractions
+	adc	ax, cx			;; add integers
+	sar	ax		; divide ax.bx by 2
+	rcr	bl
+	mov	dest.WBF_int, ax
+	mov	dest.WBF_frac, bl
+endm
+
+;***************************************************************************
+;MidPointWBFixed	- take the midpoint between P1, P2, stick it in dest
+;all arguments are assumed to be PointWBFixed structs
+; 
+; DESTROYED:	ax, bx, cx
+;***************************************************************************
+MidPointWBFixed	macro  dest, P1, P2
+	WBFAverage  dest.PWBF_x, P1.PWBF_x, P2.PWBF_x
+	WBFAverage  dest.PWBF_y, P1.PWBF_y, P2.PWBF_y
+endm
+
+;***************************************************************************
+;RoundAXBL	- Round the WBFixed number AX.BL to int AX
+; if fractional part >= .5, then add one to the integer
+;***************************************************************************
+RoundAXBL	macro	
+local done
+	tst	bl		; test the high bit of BL
+	jns	done		; if high bit clear, no add
+	inc	ax		; above, round up
+done:
+endm
+
+;******************************************************************************
+; RoundDW	macro
+;******************************************************************************
+RoundDW	macro	source
+local regargs, done
+regargs = 0
+_CheckDWordOneArg	source, <RoundDW>
+_ParseDWordArg	source, regL, regH, regargs, <RoundDW>
+
+	tst	regL
+	jns	done
+	inc	regH
+done:
+endm
+
+
+;***************************************************************************
+; FixRange - widen the range to include the current value 
+; PASS: current - the current value to check
+; MIN and MAX - the current range
+;***************************************************************************
+FixRange	macro current, min, max
+local fixMax, end
+	cmp 	current, min	; compare current and min
+	je  	end		; EQUAL?  stop
+	jg  	fixMax		; greater? see if greater than max
+	mov 	min, current    ;  fixup MIN
+	jmp	end		; done.
+fixMax:
+	cmp	current, max    ; compare current and max
+	jle	end		; less or equal? DONE
+	mov	max, current	; fixup MAX
+end:
+endm
+
+
+	
+;******************************************************************************
+; FitWithinRange - change DEST to be in the range [min, max]
+;******************************************************************************
+FitWithinRange	macro	dest, min, max
+local fixMax, end
+	cmp	dest, min
+	je	end
+	jg	fixMax
+	mov	dest, min
+	jmp	end
+fixMax:
+	cmp	dest, max
+	jle	end
+	mov	dest, max
+end:
+endm
+
+;******************************************************************************
+; CallTable - call a routine whose address is in the given table,
+; offset by the passed register.  Register must be a base or index register.
+; Assume that the table is in the CS segment
+; Optional "max" value can be used for error-checking.
+;******************************************************************************
+CallTable macro reg, table, max
+ifnb	<max>
+EC <	cmp	reg, max	>
+EC <	ERROR_A	ILLEGAL_CALL_TABLE_VALUE	>
+endif
+	shl	reg, 1
+	call	{word} CS:[reg].table
+endm
+
+
+;******************************************************************************
+; JumpTable - same as CallTable, but do a JMP instead.
+;******************************************************************************
+JumpTable macro reg, table, max
+ifnb	<max>
+EC <	cmp, reg, max		>
+EC <	ERROR_A ILLEGAL_CALL_TABLE_VALUE	>
+endif
+	shl	reg, 1
+	jmp	{word} CS:[reg].table
+endm
+
+
+;******************************************************************************
+; Divide - divide NUM by DENOM - assume both are word integers
+; sets DX.AX as the WWFixed result.
+;******************************************************************************
+Divide	macro	num, denom
+if <num> ne <ax>
+	mov	ax, num
+endif
+	clr	dx
+	div	denom			;; result is ax:dx (dx is remainder)
+	push	ax			;; save integer portion
+
+	clr	ax			;; divide dx (remainder) by denominator
+	div	denom			;; result (in AX) is fractional part
+	pop	dx			;; restore integer portion
+endm
+	
+
+;******************************************************************************
+; DivideWBLine - Divide a line consisting of 2 PointWBFixeds by the given 
+; parameter -- store the result in "dest"
+; Param is assumed to be in AX
+;******************************************************************************
+; Macro is based on the following formula:
+;
+;	X = X1 + param(X2-X1)
+;
+; Param is treated as the fractional part of a WWFixed number
+
+DivideWBLine	macro	point1, point2, dest
+
+	clr 	bx
+
+    IRP field, <PWBF_x, PWBF_y>
+
+	mov	cl, bl
+	mov	ch, ds:[di].point2.field.WBF_frac
+	mov	dx, ds:[di].point2.field.WBF_int
+	
+	sub	ch, ds:[di].point1.field.WBF_frac
+	sbb	dx, ds:[di].point1.field.WBF_int
+	call	GrMulWWFixed	
+
+	add	ch, ds:[di].point1.field.WBF_frac
+	adc	dx, ds:[di].point1.field.WBF_int
+
+	mov	ds:[di].dest.field.WBF_frac, ch
+	mov	ds:[di].dest.field.WBF_int, dx
+    endm
+endm
+
+;******************************************************************************
+;		ERROR-CHECKING MACROS -  make sure they don't change
+;		any flags!!!!!!
+;******************************************************************************
+
+;******************************************************************************
+; Crash the system if the passed value is non-zero
+;******************************************************************************
+
+ECMakeSureZero	macro	param
+    if ERROR_CHECK
+	pushf
+	tst	param
+	ERROR_NZ	EXPECTED_ZERO_VALUE
+	popf
+    endif
+endm
+
+;******************************************************************************
+; SplitReg: divide a 16-bit register (ax,bx,cx, or dx) 
+; into its 8-bit components.  If it's actually an 8-bit register,
+; then set low to reg, and forget about "hi"
+;
+;******************************************************************************
+SplitReg	macro reg, hi, low
+
+	local	first, second
+first substr <&reg>, 1, 1
+second substr <&reg>, 2, 1
+
+	ifidn second, <x>
+		hi catstr first, <h>
+		low catstr first, <l>
+	else
+		low equ <reg>
+		hi equ <>
+	endif
+endm
+
+
+;******************************************************************************
+; GetEtypeFromRecord - pull an enumerated type out of a record
+; Optimized towards the case where the field is near the low-order
+; bits of the record.  Reg can  either be an 8-bit register or 
+; ax,bx,cx or dx
+;
+;******************************************************************************
+GetEtypeFromRecord	macro	reg, field, record
+	local regHi, regLo
+
+	SplitReg	reg, regHi, regLo
+	mov	regLo, record		;; 10/3 for reg=AL
+	
+	SHIFT	reg, <-(offset field)>	;; up to 6 bytes
+	andnf	reg, (mask field) shr (offset field)	;; 4/2  (al)
+endm
+
+;******************************************************************************
+; SmartShift - macro to optimize shifts for size.  Op can either be
+; "shl" or "shr".
+;******************************************************************************
+
+SmartShift	macro	op, reg, amt
+    if (amt) gt 0
+	if (amt) gt 3
+		push	cx		;; 1 / 15
+		mov	cl, (amt)	;; 2 / 
+		op	reg, cl		;; 2
+		pop	cx		;; 1 / 12
+	else
+		rept	(amt)
+			op reg, 1	;; 2 bytes per inst.
+		endm
+	endif
+    endif
+endm
+
+
+;******************************************************************************
+; SHIFT - shift a register by a constant value.  Positive values
+; indicate shift left, Negative values indicate shift right.
+;******************************************************************************
+SHIFT	macro	reg, amt
+
+    if (amt) gt 0
+	SmartShift	shl, reg, <amt>
+    else
+	SmartShift	shr, reg, <-(amt)>
+    endif
+endm
+
+;******************************************************************************
+; GetActionType
+;******************************************************************************
+GetActionType	macro	dest
+	GetEtypeFromRecord	dest, SES_ACTION, es:[bp].VSI_editState
+endm
+
+SetActionType	macro	source
+	SetEtypeInRecord	source, SES_ACTION, es:[bp].VSI_editState
+endm
+
+;****************************************************************************
+;	Mode
+;****************************************************************************
+GetMode	macro	dest
+	GetEtypeFromRecord	dest, SS_MODE, es:[bp].VSI_state
+endm
+
+SetMode	macro	source
+	SetEtypeInRecord	source, SS_MODE, es:[bp].VSI_state
+endm
+
+;******************************************************************************
+; SetEtypeInRecord - set the enumerated type in the currrent record:
+; 1) zero out the field in the record
+; 2) OR-in the etype value
+; 
+; PASS: source: either a register or a constant
+;	field - the destination within the record of the etype value
+;	record - the memory location of the record
+;
+; This macro is optimized for the case where the field is at the
+; low-order end of the record (where it belongs!)
+;
+; DESTROYED:	source
+;******************************************************************************
+SetEtypeInRecord	macro	source, field, record
+	andnf	record, not (mask field)
+    if (.type source) and 4
+	;; It's a constant, so use the SHL operator
+	if (source) gt 0
+		;; Only OR it in if nonzero!
+		ornf	record, source shl offset field
+	endif
+    else	
+	SHIFT	source, <offset field>
+	ornf	record, source
+    endif
+endm
+		
+
+;******************************************************************************
+; NearProc	- space allocation directive that assumes that its
+; argument is a NEAR procedure in the current segment
+;******************************************************************************
+NearProc  macro procName
+	.assert	segment procName eq @CurSeg, <procName not in @CurSeg>
+	.assert (TYPE (procName)) eq near, <procName is a FAR procedure>
+	word 	offset procName
+endm
+
+;FarProc	macro	procName
+;	.assert (TYPE (procName)) eq far, <procName is a NEAR procedure>
+;	word	handle	procName
+;	word	offset	procName
+;endm
+
+;******************************************************************************
+;SplineDerefScratchChunk - deref the "scratch chunk" of the spline
+; PASS: es:bp - VisSplineInstance data 
+;  	ds - segment wherein lies the scratch chunk
+;******************************************************************************
+SplineDerefScratchChunk macro reg
+	mov	reg, es:[bp].VSI_scratch
+	mov	reg, ds:[reg]
+endm
+
+
+;******************************************************************************
+; movHL - Move 2 bytes into a 16-bit register
+;******************************************************************************
+
+movHL	macro	dest, high, low
+	mov	dest, (high) shl 8 or low
+endm
+
+;******************************************************************************
+; movH - move a byte into the high byte of a register, clearing the
+; low byte.  
+;******************************************************************************
+
+movH	macro	dest, source
+	.assert	source LT 256
+	mov	dest, (source) shl 8
+endm
+
+;******************************************************************************
+; movL - move a byte into the low byte of a 16-bit register, clearing
+; the high byte.
+;******************************************************************************
+
+movL	macro	dest, source
+	.assert	source LT 256
+	mov	dest, source
+endm
+
+
+Mul32	macro	loc1, loc2
+	movdw	dxcx, loc1
+	movdw	bxax, loc2
+	call	MulDWords
+endm
+
+;******************************************************************************
+; MulAndPush	Multiply two 32-bit integers and push the result
+;******************************************************************************
+MulAndPush	macro	loc1, loc2
+	Mul32	loc1, loc2
+	pushdw	dxcx
+endm
+
+
+;******************************************************************************
+; PopAndAdd32		- pop a 32-bit number off the stack and add it
+; to the one stored in DX:CX
+;******************************************************************************
+
+PopAndAdd32	macro
+	popdw	bxax
+	adddw	dxcx, bxax
+endm
+
+;******************************************************************************
+; LoadNibbleFrac - Load the goofy "nibble fraction" thing into the 2
+; 8-bit registers provided.
+; PASS: regX, regY, source
+;******************************************************************************
+LoadNibbleFrac	macro	regX, regY, source
+	mov	regX, source
+	mov	regY, regX
+	andnf	regX, mask NPF_x
+    rept 4
+	shl	regY, 1
+    endm
+endm
+
+;******************************************************************************
+; LoadPointWWFixed - Load the spline point into registers DX:CX and
+; BX:AX, converting to WWFixed notation.
+;
+; PASS:	ds:di - current spline point
+; RETURN:	DX.CX - x coordinate, 
+;		BX.AX - y coordinate
+;******************************************************************************
+
+LoadPointWWFixed	macro
+	clr	al, cl
+	movwbf	dxch, ds:[di].SPS_point.PWBF_x
+	movwbf	bxah, ds:[di].SPS_point.PWBF_y
+endm
+ 
+;******************************************************************************
+;StorePointWWFixed - Store the registers
+; (DX.CX), (BX.AX) into the current point, rounding to 24-bit accuracy
+; PASS: (DX.CX) - x value
+; 	(BX.AX) - y-value
+;	DS:DI - location of spline point
+;******************************************************************************
+StorePointWWFixed	macro
+
+	rndwwbf	 bxax
+	rndwwbf	 dxcx
+	movwbf	ds:[di].SPS_point.PWBF_x, dxch
+	movwbf	ds:[di].SPS_point.PWBF_y, bxah
+endm
+		
+
+;******************************************************************************
+; StorePointAsInt	- store integer values into the spline point's
+; coordinates. 
+;******************************************************************************
+StorePointAsInt	macro	dest, regX, regY
+	mov	dest.PWBF_x.WBF_int, regX
+	mov	dest.PWBF_y.WBF_int, regY
+	clr	dest.PWBF_x.WBF_frac
+	clr	dest.PWBF_y.WBF_frac
+endm
+
+
+;******************************************************************************
+; Load a point into X and Y registers.  
+;******************************************************************************
+LoadPointAsInt	macro	regX, regY, source
+
+	rndwbf	source.PWBF_x, regX
+	rndwbf	source.PWBF_y, regY
+endm
+
+;******************************************************************************
+; MovBytes - move a (constant) number of bytes.  This only takes care
+; of the "mov cx" and the "rep mov.." parts.  Setting up es:di, ds:si,
+; and the direction flag should be done prior to calling this macro.
+;
+; PASS:	numBytes - number of bytes to move (must be a constant)
+;
+;******************************************************************************
+MovBytes	macro	numBytes
+	local	oddPart,  numWords
+	
+	oddPart = ((numBytes) AND 1)
+	numWords = (numBytes) / 2	 	;; rounding down (I hope!)
+
+	mov	cx, numWords	;; 4 / 3
+	rep	movsw		;; 9+25*numWords / 2
+	if ((oddPart) gt 0)
+		movsb		;; 18 / 1
+	endif
+endm
+
+
+
+;******************************************************************************
+; addNZ - add if non-zero.  Used when the (constant) amount to add is
+; believed to be zero.  If so, then do nothing, otherwise add.
+;******************************************************************************
+addNZ	macro	dest, source
+	if (.type source) AND 4
+		; source is a CONSTANT
+		if (source) ne 0
+			add dest, source
+		endif
+	endif
+endm
+
+
+
+;-----------------------------------------------------------------------------
+;	ERROR-CHECKING		
+;-----------------------------------------------------------------------------
+ 
+; Only do the error-check if the value passed in is NOT a constant.
+ECCheckEtype	macro	source, etype
+if ERROR_CHECK 
+	cmp	source, etype
+	ERROR_AE	ILLEGAL_VALUE
+endif
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+MACRO:		_ParsePointArg
+
+DESCRIPTION:	Parse an argument to a dword math macro
+
+PASS:
+	arg - argument passed to macro
+	regcount - # of register-pair arguments
+	op - string to emit for error-identification
+RETURN:
+	rx - x value
+	ry - y value
+	regcount - # of register-pair or constant arguments
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+_ParsePointArg	macro	arg, rx, ry, regcount, op
+
+alen	sizestr	<&arg>
+
+ifnb <arg>
+
+if (4 AND .TYPE (arg))
+    rx catstr <((arg) SHR 16)>
+    ry catstr <((arg) AND 0xffff)>
+    regcount=regcount+1
+else
+    if (alen eq 4)
+	rx substr <arg>, 1, 2
+	ry substr <arg>, 3, 2
+	ifidn rx, ry
+	    ErrMessage <op : register used twice in dword>
+	endif
+	regcount=regcount+1
+    else
+        rx catstr <arg>, <.P_x>
+        ry catstr <arg>, <.P_y>
+    endif
+endif
+
+else
+    ErrMessage <op : missing argument>
+endif
+
+endm
+
+
+
+;******************************************************************************
+;	MovP	- move Point.  Takes 2-register arguments similar to
+;	movdw, except registers are specified X first, ie
+;	movP ds:[di].point, cxdx  (cx is X, dx is Y)
+;******************************************************************************
+ 
+movP	macro	dest, source, trashreg
+	local	drx, dry, srx, sry, regargs
+
+regargs = 0
+_CheckDWordTwoArg	<dest>, <source>, <movP>
+_ParsePointArg	<dest>, drx, dry, regargs, <movP>
+_ParsePointArg	<source>, srx, sry, regargs, <movP>
+
+if (regargs gt 0)
+	mov	dry, sry
+	mov	drx, srx
+elseifnb <trashreg>
+	mov	trashreg, sry
+	mov	dry, trashreg
+	mov	trashreg, srx
+	mov	drx, trashreg
+else
+	ErrMessage <movP : need trash register to move mem, mem>
+endif
+
+endm
+
+
+;******************************************************************************
+;	addP	- add 2 points
+;******************************************************************************
+ 
+addP	macro	dest, source, trashreg
+	local	drx, dry, srx, sry, regargs
+
+regargs = 0
+_CheckDWordTwoArg	<dest>, <source>, <addP>
+_ParsePointArg	<dest>, drx, dry, regargs, <addP>
+_ParsePointArg	<source>, srx, sry, regargs, <addP>
+
+if (regargs gt 0)
+	add	dry, sry
+	add	drx, srx
+elseifnb <trashreg>
+	mov	trashreg, sry
+	add	dry, trashreg
+	mov	trashreg, srx
+	add	drx, trashreg
+else
+	ErrMessage <addP : need trash register to add mem, mem>
+endif
+endm
+
+;******************************************************************************
+;	subP	- sub 2 points
+;******************************************************************************
+ 
+subP	macro	dest, source, trashreg
+	local	drx, dry, srx, sry, regargs
+
+regargs = 0
+_CheckDWordTwoArg	<dest>, <source>, <subP>
+_ParsePointArg	<dest>, drx, dry, regargs, <subP>
+_ParsePointArg	<source>, srx, sry, regargs, <subP>
+
+if (regargs gt 0)
+	sub	dry, sry
+	sub	drx, srx
+elseifnb <trashreg>
+	mov	trashreg, sry
+	sub	dry, trashreg
+	mov	trashreg, srx
+	sub	drx, trashreg
+else
+	ErrMessage <subP : need trash register to subtract mem, mem>
+endif
+
+endm
+
+;******************************************************************************
+;	callbp	- call a spline procedure that expects es:bp to be
+;spline instance data, when ss:[bp] holds the address of the instance
+;data instead.  Fixup the instance ptr when we return, to deal with
+;changes to the lmem block
+;******************************************************************************
+ 
+callbp	macro	dest
+	push	bx
+	push	bp		; frame ptr
+	mov	bp, ss:[bp]
+	call	dest
+	pop	bx		; frame ptr
+	mov	ss:[bx], bp
+	mov	bp, bx
+	pop	bx
+callbp	endm
+	
+
+
+ECCheckFlags	macro	value, flagtype
+if ERROR_CHECK
+	pushf
+	test	value, not mask flagtype
+	ERROR_NZ	ILLEGAL_FLAGS
+	popf
+endif
+endm	

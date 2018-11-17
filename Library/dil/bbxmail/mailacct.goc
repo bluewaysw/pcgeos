@@ -1,0 +1,658 @@
+/**********************************************************************
+ *
+ *	Copyright (c) Designs in Light 2002 -- All Rights Reserved
+ *
+ * PROJECT:        Mail	
+ * MODULE:	   Mail
+ * FILE:	   mailacct.h
+ * 
+ * DESCRIPTION:
+ * 
+ ****************************************************************************/
+
+@include <stdapp.goh>
+@include <bbxmlib.goh>
+@include <socket.goh>
+#include <sockmisc.h>
+#include <Ansi/string.h>
+
+@include "mailfatals.goh"
+
+@extern chunk mailDirName;
+@extern chunk draftsDirName;
+@extern chunk inboxDirName;
+@extern chunk outboxDirName;
+@extern chunk sentDirName;
+@extern chunk trashDirName;
+@extern chunk attachSubDirName;
+@extern chunk accountInfoFileName;
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MailSendNotification
+ * DESCRIPTION:     Send a notification of a mail account change
+ *
+ * PASS:            notifType - MailDatabaseChangeType
+ *                  acctName - name of account added/deleted/changed
+ * RETURN:          none
+ ***************************************************************/
+
+void _pascal
+MailSendNotification(MailDatabaseChangeType notifType, TCHAR *acctName)
+{
+    EventHandle notifyEvent;
+    MemHandle data;
+    NotifyMailDatabaseChange *dPtr;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    /*
+     * allocate a notification block and fill it in
+     */
+    data = MemAlloc(sizeof(NotifyMailDatabaseChange), HF_DYNAMIC|HF_SHARABLE,
+		    HAF_STANDARD_NO_ERR);
+    dPtr = (NotifyMailDatabaseChange *)MemLock(data);
+    dPtr->NMDBC_change = notifType;
+    strcpy(dPtr->NMDBC_account, acctName);
+    MemUnlock(data);
+    MemInitRefCount(data, 1);
+
+    /*
+     * record the notification
+     */
+    notifyEvent = @record null::MSG_META_NOTIFY_WITH_DATA_BLOCK(MANUFACTURER_ID_GEOWORKS, GWNT_EMAIL_DATABASE_CHANGE, data);
+
+    /*
+     * send the notification (don't pass GCNLSF_SET_STATUS)
+     */
+    GCNListSend(MANUFACTURER_ID_GEOWORKS,
+		GCNSLT_EMAIL_DATABASE_CHANGE,
+		notifyEvent,
+		data,
+		0);
+
+    POPDS;
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MungePassword
+ * DESCRIPTION:     encrypt or decrypt a password
+ *
+ * PASS:            
+ * RETURN:          handle of block w/account name
+ ***************************************************************/
+
+void
+MungePassword(TCHAR *passwd)
+{
+    word i;
+
+    for (i = 0; passwd[i] != 0; i++) {
+	passwd[i] = passwd[i] ^ 0xea;
+    }
+}
+
+void
+CopyAcctText(TCHAR *dest, TCHAR *src)
+{
+    if (src) {
+	strcpy(dest, src);
+    }
+}
+
+
+word
+CreateStdDir(optr dirName)
+{
+    TCHAR *dirNameP = LMemDeref(dirName);
+
+    word err = FileCreateDir(dirNameP);
+    if (err == ERROR_FILE_EXISTS) {
+	err = 0;
+    }
+    return(err);
+}
+
+word
+CreateStdDirs(void)
+{
+    word aerr = 0;
+
+    aerr = CreateStdDir(@draftsDirName);
+    if (aerr) {
+	goto errorExit;
+    }
+    aerr = CreateStdDir(@inboxDirName);
+    if (aerr) {
+	goto errorExit;
+    }
+    aerr = CreateStdDir(@outboxDirName);
+    if (aerr) {
+	goto errorExit;
+    }
+    aerr = CreateStdDir(@sentDirName);
+    if (aerr) {
+	goto errorExit;
+    }
+    aerr = CreateStdDir(@trashDirName);
+    if (aerr) {
+	goto errorExit;
+    }
+errorExit:
+    return(aerr);
+}
+
+word
+CreateAttachDir(optr dirName)
+{
+    TCHAR *dirNameP;
+    word err;
+
+    FilePushDir();
+    dirNameP = LMemDeref(dirName);
+    FileSetCurrentPath(0, dirNameP);
+    err = CreateStdDir(@attachSubDirName);
+    if (err == ERROR_FILE_EXISTS) {
+	err = 0;
+    }
+    FilePopDir();
+    return(err);
+}
+
+MailAccountError
+CreateAcctInfo(TCHAR *login, TCHAR *password, TCHAR *mailAddr, TCHAR *realName, TCHAR *smtpServer, TCHAR *pop3Server, MailAppOptions appOptions)
+{
+    FileHandle fh;
+    MemHandle ach;
+    MailAccountStruct *acp;
+
+    ach = MemAlloc(sizeof(MailAccountStruct), HF_DYNAMIC, HAF_STANDARD|HAF_ZERO_INIT);
+    if (!ach) {
+	return(MAE_MEMORY_ERROR);
+    }
+    fh = FileCreate(LMemDeref(@accountInfoFileName), FCF_NATIVE|FILE_DENY_RW|FILE_ACCESS_RW|FILE_CREATE_NO_TRUNCATE, 0);
+    if (!fh) {
+	MemFree(ach);
+	return(MAE_FILE_ERROR);
+    }
+    /*
+     * write the user data into the buffer then the file
+     */
+    acp = MemLock(ach);
+    CopyAcctText(acp->MAS_account, login);
+    CopyAcctText(acp->MAS_password, password);
+    MungePassword(acp->MAS_password);
+    CopyAcctText(acp->MAS_returnAddr, mailAddr);
+    CopyAcctText(acp->MAS_realName, realName);
+    CopyAcctText(acp->MAS_smtp, smtpServer);
+    CopyAcctText(acp->MAS_pop3, pop3Server);
+    acp->MAS_messageOptions = MAIL_DEFAULT_MESSAGE_OPTIONS;
+    acp->MAS_startExitOptions = MAIL_DEFAULT_START_EXIT_OPTIONS;
+    acp->MAS_appOptions = appOptions;
+    acp->MAS_checkOptions = MAIL_DEFAULT_CHECK_OPTIONS;
+    acp->MAS_checkInterval = MAIL_DEFAULT_CHECK_INTERVAL;
+    FileWrite(fh, acp, sizeof(MailAccountStruct), FALSE);
+    FileClose(fh, FALSE);
+    MemFree(ach);
+    return(MAE_NO_ERROR);
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MailAddAccount
+ * DESCRIPTION:     add a new mail account
+ *
+ * PASS:            acctName - account name (must be valid dirname)
+ *                  login - login account
+ *                  password - login password
+ *                  mailAddr - return address
+ *                  realName - user's real name
+ *                  smtpServer - SMTP server name
+ *                  pop3Server - POP3 server name
+ *
+ * RETURN:          MailAccountError - error if any
+ ***************************************************************/
+
+MailAccountError _pascal
+MailAddAccount(TCHAR *acctName, TCHAR *login, TCHAR *password, TCHAR *mailAddr, TCHAR *realName, TCHAR *smtpServer, TCHAR *pop3Server, MailAppOptions appOptions)
+{
+    word aerr = 0;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    FilePushDir();
+    MemLock(OptrToHandle(@mailDirName));
+    FileSetStandardPath(SP_PRIVATE_DATA);
+    aerr = FileCreateDir(LMemDeref(@mailDirName));
+	 if (aerr && (aerr != ERROR_FILE_EXISTS)) {
+	goto errorExit;
+    }
+    FileSetCurrentPath(SP_PRIVATE_DATA, LMemDeref(@mailDirName));
+    /*
+     * create the account directory
+     */
+    aerr = FileCreateDir(acctName);
+    if (aerr) {
+	goto errorExit;
+    }
+
+	 /*
+     * create the standard folders
+     */
+    FileSetCurrentPath(0, acctName);
+    aerr = CreateStdDirs();
+    if (aerr) {
+	goto errorExit;
+    }
+    /*
+     * make an Attachments folder under Outbox for forwarded
+     * attachments
+     */
+    aerr = CreateAttachDir(@outboxDirName);
+    if (aerr) {
+	goto errorExit;
+    }
+    /*
+     * make an Attachments folder under Inbox for incoming
+     */
+    aerr = CreateAttachDir(@inboxDirName);
+
+errorExit:
+
+    switch (aerr) {
+    case 0:
+	/*
+	 * no error creating folders, create ACCTINFO file
+	 */
+	aerr = CreateAcctInfo(login, password, mailAddr, realName, smtpServer, pop3Server, appOptions);
+	break;
+    case ERROR_FILE_EXISTS:
+	aerr = MAE_ACCOUNT_EXISTS;
+	break;
+    default:
+	/*
+	 * error creating account -- delete it
+	 */
+	aerr = MAE_FILE_ERROR;
+	MailDeleteAccount(acctName);
+	break;
+    }
+
+    MemUnlock(OptrToHandle(@mailDirName));
+    FilePopDir();
+
+    POPDS;
+    return(aerr);
+}
+
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MailGetStdString
+ * DESCRIPTION:     get a standard string for the mail system
+ *
+ * PASS:            stdString - MailStdString enum
+ * RETURN:          TCHAR * - standard string
+ ***************************************************************/
+
+TCHAR * _pascal
+MailLockStdString(MailStdString stdString)
+{
+    optr stdStr;
+    TCHAR *strP;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    stdStr = @mailDirName + stdString;
+    MemLock(OptrToHandle(@mailDirName));
+    strP = LMemDeref(stdStr);
+
+    POPDS;
+    return(strP);
+}
+
+void _pascal
+MailUnlockStdString(MailStdString stdString)
+{
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    MemUnlock(OptrToHandle(@mailDirName));
+
+    POPDS;
+}
+
+
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MailDeleteAccount
+ * DESCRIPTION:     delete an account
+ *
+ * PASS:            
+ * RETURN:          none
+ ***************************************************************/
+
+
+TCHAR wildStr[] = _TEXT("*");
+
+#define MAX_FOLDER_ENUM 100
+
+MemHandle
+FolderGetCommon(FileEnumParams params, word *numMsgs)
+{
+    MemHandle bufHan;
+
+    params.FEP_returnAttrs = (void *) FESRT_NAME;
+    params.FEP_returnSize = sizeof(FileLongName);
+    params.FEP_matchAttrs = 0;
+
+    params.FEP_bufSize = MAX_FOLDER_ENUM;
+    params.FEP_callback = (void *) FESC_WILDCARD;
+    params.FEP_cbData1 = (dword) wildStr;
+    *numMsgs = FileEnum(&params, &bufHan, NULL);
+    return(bufHan);
+}
+
+word
+DeleteDir(TCHAR *folderName)
+{
+    MemHandle mh;
+    FileEnumParams params;
+    word err, i, count;
+    FileLongName *file, *dir;
+
+    /*
+     * save our current location and go into the folder
+     */
+    FilePushDir();
+    FileSetCurrentPath(0, folderName);
+    err = ThreadGetError();
+    if (err) {
+	goto popDirExit;
+    }
+
+    /*
+     * call ourselves on any subdirectories
+     */
+    params.FEP_skipCount = 0;
+    params.FEP_searchFlags = FESF_DIRS|FESF_CALLBACK;
+    while (1) {
+	mh = FolderGetCommon(params, &count);
+	if (mh) {
+	    dir = MemLock(mh);
+	    for (i = 0; i < count && !err; i++) {
+		err = DeleteDir(dir[i]);
+	    }
+	    MemFree(mh);
+	}
+	if (count < MAX_FOLDER_ENUM) {
+	    break;
+	} else {
+	    params.FEP_skipCount += MAX_FOLDER_ENUM;
+	}
+    }
+
+    /*
+     * delete our files
+     */
+    if (!err) {
+	params.FEP_skipCount = 0;
+	params.FEP_searchFlags = FILE_ENUM_ALL_FILE_TYPES|FESF_CALLBACK;
+	while (1) {
+	    mh = FolderGetCommon(params, &count);
+	    if (mh) {
+		file = MemLock(mh);
+		for (i = 0; i < count && !err; i++) {
+		    FileSetAttributes(file[i], FILE_ATTR_NORMAL);
+		    err = FileDelete(file[i]);
+		}
+		MemFree(mh);
+	    }
+	    if (count < MAX_FOLDER_ENUM) {
+		break;
+	    } else {
+		params.FEP_skipCount += MAX_FOLDER_ENUM;
+	    }
+	}
+    }
+
+    /*
+     * return to our parent and delete the folder
+     */
+popDirExit:
+    FilePopDir();
+    if (!err) {
+	err = FileDeleteDir(folderName);
+    }
+
+    return(err);
+}
+
+MailAccountError _pascal
+MailDeleteAccount(TCHAR *acctName)
+{
+    optr appObj;
+    word err = 0;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    appObj = GeodeGetAppObject(0);
+    @call appObj::MSG_GEN_APPLICATION_MARK_BUSY();
+
+    MemLock(OptrToHandle(@mailDirName));
+    FileSetCurrentPath(SP_PRIVATE_DATA, LMemDeref(@mailDirName));
+    MemUnlock(OptrToHandle(@mailDirName));
+
+    err = DeleteDir(acctName);
+    switch (err) {
+    case 0:
+@ifdef GPC_PORTAL_SUPPORT
+	MailSendNotification(MDBCT_ACCOUNT_DELETED, acctName);
+@endif
+	break;
+    case ERROR_PATH_NOT_FOUND:
+	err = MAE_NO_SUCH_ACCOUNT;
+	break;
+    default:
+	err = MAE_FILE_ERROR;
+	break;
+    }
+
+    @call appObj::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+    POPDS;
+    return(err);
+}
+
+MailAccountError _pascal
+MailChangeAccountPassword(TCHAR *acctName, TCHAR *password, TCHAR *newPassword)
+{
+    FileHandle fh;
+    MemHandle mh;
+    MailAccountStruct *acp;
+    MailAccountError mae = MAE_NO_ERROR;
+
+    FilePushDir();
+    MemLock(OptrToHandle(@mailDirName));
+    FileSetCurrentPath(SP_PRIVATE_DATA, LMemDeref(@mailDirName));
+    MemUnlock(OptrToHandle(@mailDirName));
+    FileSetCurrentPath(0, acctName);
+    if (ThreadGetError()) {
+	mae = MAE_NO_SUCH_ACCOUNT;
+    } else {
+	MemLock(OptrToHandle(@mailDirName));
+	fh = FileOpen(LMemDeref(@accountInfoFileName),
+		      ((newPassword && *newPassword) ?
+		       (FILE_ACCESS_RW|FILE_DENY_RW) :
+		       (FILE_ACCESS_R|FILE_DENY_W)));
+	MemUnlock(OptrToHandle(@mailDirName));
+	if (fh) {
+	    mh = MemAlloc(sizeof(MailAccountStruct), HF_DYNAMIC, HAF_STANDARD|HAF_ZERO_INIT);
+	    if (mh) {
+		acp = MemLock(mh);
+		if (acp) {
+		    FileRead(fh, acp, sizeof(MailAccountStruct), FALSE);
+		    if (ThreadGetError() == 0) {
+			MungePassword(acp->MAS_password);  /* decrypt */
+			if (strcmp(acp->MAS_password, password) == 0) {
+			    if (newPassword && *newPassword) {
+				CopyAcctText(acp->MAS_password, newPassword);
+				MungePassword(acp->MAS_password);  /* encrypt */
+				FilePos(fh, 0, FILE_POS_START);
+				if (ThreadGetError() == 0) {
+				    FileWrite(fh, acp, sizeof(MailAccountStruct), FALSE);
+				    if (ThreadGetError()) {
+					mae = MAE_FILE_ERROR;
+				    }
+				} else {
+				    mae = MAE_FILE_ERROR;
+				}
+			    } else {
+				/* no new password, just verify current one */
+				mae = MAE_NO_ERROR;
+			    }
+			} else {
+			    mae = MAE_BAD_PASSWORD;
+			}
+		    } else {
+			mae = MAE_FILE_ERROR;
+		    }
+		} else {
+		    mae = MAE_MEMORY_ERROR;
+		}
+		MemFree(mh);
+	    } else {
+		mae = MAE_MEMORY_ERROR;
+	    }
+	    FileClose(fh, FALSE);
+	} else {
+	    mae = MAE_FILE_ERROR;
+	}
+    }
+    FilePopDir();
+    /* if changed password, need rescan to update settings dialog? */
+    if ((mae == MAE_NO_ERROR) && newPassword && *newPassword) {
+	MailSendNotification(MDBCT_ACCOUNT_SELECTED, acctName);
+    }
+    return mae;
+}
+
+MailAccountError _pascal
+MailVerifyAccountPassword(TCHAR *acctName, TCHAR *password)
+{
+    return MailChangeAccountPassword(acctName, password, NULL);
+}
+
+MailAccountError _pascal
+MailDeleteAccountWithPassword(TCHAR *acctName, TCHAR *password)
+{
+    MailAccountError mae;
+    mae = MailVerifyAccountPassword(acctName, password);
+    if (mae == MAE_NO_ERROR) {
+	mae = MailDeleteAccount(acctName);
+    }
+    return mae;
+}
+
+MailAccountError _pascal
+MailChangeAccountInfo(TCHAR *acctName, TCHAR *password, TCHAR *newPassword, TCHAR *smtp, TCHAR *pop, TCHAR *realname)
+{
+    FileHandle fh;
+    MemHandle mh;
+    MailAccountStruct *acp;
+    MailAccountError mae = MAE_NO_ERROR;
+    Boolean needWrite = FALSE;
+
+    FilePushDir();
+    MemLock(OptrToHandle(@mailDirName));
+    FileSetCurrentPath(SP_PRIVATE_DATA, LMemDeref(@mailDirName));
+    MemUnlock(OptrToHandle(@mailDirName));
+    FileSetCurrentPath(0, acctName);
+    if (ThreadGetError()) {
+	mae = MAE_NO_SUCH_ACCOUNT;
+    } else {
+	MemLock(OptrToHandle(@mailDirName));
+	fh = FileOpen(LMemDeref(@accountInfoFileName),
+		      FILE_ACCESS_RW|FILE_DENY_RW);
+	MemUnlock(OptrToHandle(@mailDirName));
+	if (fh) {
+	    mh = MemAlloc(sizeof(MailAccountStruct), HF_DYNAMIC, HAF_STANDARD|HAF_ZERO_INIT);
+	    if (mh) {
+		acp = MemLock(mh);
+		if (acp) {
+		    FileRead(fh, acp, sizeof(MailAccountStruct), FALSE);
+		    if (ThreadGetError() == 0) {
+			MungePassword(acp->MAS_password);  /* decrypt */
+			if (strcmp(acp->MAS_password, password) == 0) {
+			    if (newPassword && *newPassword) {
+				CopyAcctText(acp->MAS_password, newPassword);
+				MungePassword(acp->MAS_password);  /* encrypt */
+				FilePos(fh, 0, FILE_POS_START);
+				if (ThreadGetError() == 0) {
+				    FileWrite(fh, acp, sizeof(MailAccountStruct), FALSE);
+				    if (ThreadGetError()) {
+					mae = MAE_FILE_ERROR;
+				    }
+				} else {
+				    mae = MAE_FILE_ERROR;
+				}
+			    }
+			    if (smtp && *smtp) {
+				CopyAcctText(acp->MAS_smtp, smtp);
+				needWrite = TRUE;
+			    }
+			    if (pop && *pop) {
+				CopyAcctText(acp->MAS_pop3, pop);
+				needWrite = TRUE;
+			    }
+			    if (realname && *realname) {
+				CopyAcctText(acp->MAS_realName, realname);
+				needWrite = TRUE;
+			    }
+			    if (needWrite) {
+				FilePos(fh, 0, FILE_POS_START);
+				if (ThreadGetError() == 0) {
+				    FileWrite(fh, acp, sizeof(MailAccountStruct), FALSE);
+				    if (ThreadGetError()) {
+					mae = MAE_FILE_ERROR;
+				    }
+				} else {
+				    mae = MAE_FILE_ERROR;
+				}
+			    }
+			} else {
+			    mae = MAE_BAD_PASSWORD;
+			}
+		    } else {
+			mae = MAE_FILE_ERROR;
+		    }
+		} else {
+		    mae = MAE_MEMORY_ERROR;
+		}
+		MemFree(mh);
+	    } else {
+		mae = MAE_MEMORY_ERROR;
+	    }
+	    FileClose(fh, FALSE);
+	} else {
+	    mae = MAE_FILE_ERROR;
+	}
+    }
+    FilePopDir();
+    /* if changed info, need rescan to update settings dialog? */
+    if (mae == MAE_NO_ERROR) {
+	MailSendNotification(MDBCT_ACCOUNT_SELECTED, acctName);
+    }
+    return mae;
+}

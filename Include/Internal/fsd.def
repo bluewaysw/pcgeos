@@ -1,0 +1,423 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Include/Internal
+FILE:		fsd.def
+
+AUTHOR:		Adam de Boor, Jul 23, 1991
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	7/23/91		Initial revision
+
+
+DESCRIPTION:
+	Utility routines exported by the kernel for use by FileSystem Drivers
+		
+	$Id: fsd.def,v 1.1 97/04/04 14:15:53 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__FSD
+
+include Internal/driveInt.def
+include Internal/diskInt.def
+include Internal/fileInt.def
+
+StartKernel
+
+;------------------------------------------------------------------------------
+;			Data Structures
+;------------------------------------------------------------------------------
+;
+; Structure describing a filesystem driver known to the system.
+;
+FSDFlags	record
+    FSDF_NETWORK:1,		; Set if FSD is interested in network paths
+				;  (ones that begin with \\ but no drive letter)
+    FSDF_PRIMARY:1,		; Set if FSD is a primary filesystem driver
+    FSDF_SKELETON:1,		; Set if FSD is the kernel's skeleton driver
+    FSDF_CAN_FORMAT:1,		; Set if FSD can format disks
+    FSDF_CAN_COPY:1,		; Set if FSD can copy disks.
+    :11
+FSDFlags	end
+
+FSDriver		struct
+    FSD_next		nptr.FSDriver	; Next known fs driver
+    FSD_flags		FSDFlags	; Status flags (of course)
+    FSD_strategy	fptr.far	; Strategy routine for the driver
+    FSD_handle		hptr		; The driver's core block, so its
+					;  FSDriverInfoStruct can be found.
+    FSD_diskPrivSize	word		; Number of bytes of private data
+					;  required for each disk registered
+					;  with this driver.
+    FSD_name		char GEODE_NAME_SIZE dup(?)
+					; Permanent name of the driver, for
+					;  use in DiskRestore, primarily
+FSDriver		ends
+
+;
+; Much of the file-related information in the system is tracked by a single
+; LMem resource within the kernel. The header of this block is described
+; below.  The resource uses no chunk handles, as information inside it is
+; expected to be created, but not freed very often, and when freed, a
+; similar-sized structure will be allocated again later.
+;
+FSInfoHeader	struct
+    FIH_common		LMemBlockHeader		; LMem administrative data
+    FIH_driveList	nptr.DriveStatusEntry	; Head of linked list of
+						;  defined drives (driveInt.def)
+    FIH_fsdList		nptr.FSDriver		; Head of linked list of
+						;  loaded FS drivers
+    FIH_primaryFSD	nptr.FSDriver		; Primary FSD, to deal with
+						;  character devices, etc.
+    FIH_diskList	nptr.DiskDesc		; Head of linked list of
+						;  known disks (diskInt.def)
+    FIH_dgroup		sptr			; Kernel's dgroup, where the
+						;  handle table resides.
+FSInfoHeader	ends
+
+;
+; Structure describing the data the system saves when saving a disk handle.
+; The FSD appends its own information, if there's room.
+; 
+FSSavedDisk	struct
+if DBCS_PCGEOS
+    FSSD_name		wchar	VOLUME_NAME_LENGTH+1 dup(?) ; name of the disk
+else
+    FSSD_name		char	VOLUME_NAME_LENGTH+1 dup(?) ; name of the disk
+endif
+							  ;  saved (null-term).
+    FSSD_flags		DiskFlags		; flags for the disk (used
+						;  mostly for DF_ALWAYS_VALID)
+    FSSD_media		MediaType		; media of the disk (for
+						;  creating the new disk handle)
+    FSSD_ifsName	char	GEODE_NAME_SIZE dup(?)	; permanent name of
+							;  IFS driver that
+							;  runs the disk. If
+							;  first byte is 0,
+							;  IFS driver was
+							;  primary, so current
+							;  primary must handle
+							;  it.
+    FSSD_id		dword			; 32-bit ID for the disk
+    FSSD_private 	word			; offset from base at which FSD
+						;  should store its private
+						;  data that will allow it to
+						;  restore the disk
+if DBCS_PCGEOS
+    FSSD_driveName	label	wchar		; start of null-terminated
+else
+    FSSD_driveName	label	char		; start of null-terminated
+endif
+						;  drive name (and ending with
+						;  ':').
+FSSavedDisk	ends
+
+FSSavedStdPath	struct
+if DBCS_PCGEOS
+    FSSSP_signature	wchar	0		; signature that indicates
+else
+    FSSSP_signature	char	0		; signature that indicates
+endif
+						;  this is a standard path, not
+						;  a regular saved disk handle.
+						;  since volume names are always
+						;  at least 1 char, there will
+						;  never be a 0 as the first
+						;  char of the name...
+    FSSSP_stdPath	StandardPath
+FSSavedStdPath	ends
+
+
+
+;------------------------------------------------------------------------------
+;			 FSD Utility Routines
+;------------------------------------------------------------------------------
+
+global	FSDRegister:far
+;
+;	Register another filesystem driver in the system.
+;
+;	Pass:	cx:dx	= strategy routine
+;		ax	= FSDFlags record
+;		bx	= handle of driver
+;		di	= number of bytes of private data driver needs to
+;			  store with each DiskDesc
+;	Return:	dx	= FSDriver offset
+;
+
+global	FSDUnregister:far
+;
+;	Unregister a filesystem driver in the system. All drives that use this
+;	driver must have been deleted before you can do this.
+;
+;	Pass:	dx	= FSDriver offset
+;	Return:	carry set on error (some drive still references the driver)
+;
+
+global	FSDGenNameless:far
+;
+;	Generate a false volume name for a disk that has no volume label.
+;
+;	Pass:	es:si	= DiskDesc for the disk being initialized
+;		ah	= FSDNamelessAction as passed by kernel.
+;	Return:	es:[si].DD_volumeLabel filled.
+;		es:[si].DD_flags has DF_NAMELESS bit set
+;	Destroyed:	nothing
+;
+
+FSDNamelessAction	etype	byte
+    FNA_ANNOUNCE	enum	FSDNamelessAction
+    ; Create a new name and tell the user of the association.
+
+    FNA_SILENT		enum	FSDNamelessAction
+    ; Create a new name, but don't tell the user, as s/he'll be told about
+    ; it soon by other means.
+
+    FNA_IGNORE		enum	FSDNamelessAction
+    ; Don't actually generate a new name. This is used by DiskReRegister if the
+    ; disk was already nameless.
+
+global	FSDAskForDisk:far
+;
+;	Ask the user to insert the given disk.
+;
+;	Pass:	es:si	= DiskDesc requested.
+;		al	= FILE_NO_ERRORS bit set if user is not allowed to
+;			  abort the disk lock.
+;	Return:	carry set if user aborted:
+;			ax	= ERROR_DISK_UNAVAILABLE
+;		carry clear if user said disk was there.
+;	Destroyed:	nothing
+;
+
+global	FSDAllocDisk:far
+;
+;	Create a new DiskDesc
+;
+;	Pass:	es	= FSInfoResource locked for exclusive access
+;		cx:dx	= 32-bit ID for the disk
+;		al	= DiskFlags for the disk
+;		ah	= MediaType for the disk
+;		si	= DriveStatusEntry offset of drive in which the
+;			  disk is located
+;	Return:	si	= DiskDesc offset
+;		ds	= fixed up if pointing to FSInfoResource on entry,
+;			  else destroyed.
+;		es	= fixed up
+;	Destroyed:	ax, bx, cx, dx
+;
+
+global	FSDLockInfoShared:far
+;
+;	Lock the FSInfoResource for shared access.
+;
+;	Pass:	nothing
+;	Return:	ax	= segment of locked FSInfoResource
+;	Destroyed:	nothing
+;
+
+global	FSDLockInfoExcl:far
+;
+;	Lock the FSInfoResource for exclusive access.
+;
+;	Pass:	nothing
+;	Return:	ax	= segment of locked FSInfoResource
+;	Destroyed:	nothing
+;
+
+global	FSDLockInfoExclToES:far
+;
+;	Lock the FSInfoResource for exclusive access and return its segment
+;	in ES.
+;
+;	Pass:	nothing
+;	Return:	es	= segment of locked FSInfoResource
+;	Destroyed:	nothing
+;
+
+global	FSDUnlockInfoShared:far
+;
+;	Release our shared lock on the FSIR.
+;
+;	Pass:	nothing
+;	Return:	nothing
+;	Destroyed:	any segment pointing to the FSIR
+
+global	FSDUnlockInfoExcl:far
+;
+;	Release our exclusive lock on the FSIR
+;
+;	Pass:	nothing
+;	Return:	nothing
+;	Destroyed:	any segment pointing to the FSIR
+
+global	FSDUpgradeSharedInfoLock:far
+;
+;	Change a previously-obtained shared lock on the FSInfoResource to
+;	an exclusive one.
+;
+;	Pass:	nothing
+;	Return:	ds, es	= fixed up if they were pointing to the FSInfoResource
+;			  on entry (it might have moved  while the thread was
+;			  waiting to obtain the exclusive lock)
+;	Destroyed:	nothing
+;
+
+global	FSDDowngradeExclInfoLock:far
+;
+;	Change a previously-obtained exclusive lock on the FSInfoResource to
+;	a shared one.
+;
+;	Pass:	nothing
+;	Return:	nothing
+;	Destroyed:	nothing (flags preserved)
+;
+
+global	FSDDerefInfo:far
+;
+;	Fetch the segment of the FSIR since the caller has misplaced it, but
+;	knows its thread has the FSIR locked...
+;
+;	Pass:	nothing
+;	Return:	ax	= segment of FSInfoResource
+;	Destroyed:	nothing
+;
+
+global	FSDInitDrive:far
+;
+;	Define another drive available to the system. Can also override
+;	settings for an existing drive.
+;
+;	Pass:	al	= drive number (-1 => assigned by DriveInitDrive)
+;		ah	= MediaType for default (highest-density) media
+;		cx	= DriveExtendedStatus
+;		dx	= FSDriver offset
+;		ds:si	= asciiz drive name.
+;	Return:	dx	= offset of DriveStatusEntry created
+;	Nuked:	ax, cx, si
+;
+
+global	FSDDeleteDrive:far
+;
+;	Remove a drive from the system.
+;
+;	Pass:	al	= drive number
+;	Return:	carry set if drive actively in use (a thread has a working
+;			  directory on the drive, or there's a file open
+;			  to the drive). The drive is not deleted in this
+;			  case.
+;
+
+global	FSDLockDriveExcl:far
+;
+;	Lock a drive for exclusive access
+;
+;	Pass:	si	= offset of DriveStatusEntry (use DriveLockExcl if
+;			  all you've got is a drive number)
+;	Return:	nothing
+;
+
+global	FSDUnlockDriveExcl:far
+;
+;	Release exclusive access to a drive
+;
+;	Pass:	si	= offset of DriveStatusEntry (use DriveLockExcl if
+;			  all you've got is a drive number)
+;	Return:	nothing
+;
+
+global	FSDInformOldFSDOfPathNukage:far
+;
+;	Inform the FSD that runs the drive on which the path in the passed
+;	path block resides that the block is changing owners and any
+;	private data that needs to be cleaned up should be cleaned up now.
+;
+;	Pass:	bx	= path block
+;	Return:	nothing
+;	Destroyed:	flags
+;
+
+global	FSDGetThreadPathDiskHandle:far
+;
+;	Fetch the disk handle for the current thread's current path.
+;
+;	Pass:	nothing
+;	Return:	bx	= disk handle, or standard path constant (test
+;			  against DISK_IS_STD_PATH_MASK)
+;	Destroyed:	flags
+;
+
+global	FSDCheckDestWritable:far
+;
+;	See if the destination of a file operation is writable, dealing with
+;	a write-protected disk having become un-write-protected.
+;
+;	Pass:	es:bx	= DiskDesc to check
+;	Return:	es	= possibly moved
+;
+
+global FSDRecordError:far
+;
+; 	Record a critical error as having happened and the operation as having
+;	been aborted. Required b/c DOS <= 3.0 don't allow failure response from
+;	critical error (remember, this is the system that just returned success
+;	or failure on all its file calls until 3.0...).
+;
+;	Pass:	ax 	= error code
+;		bx 	= 1 to return carry set, 0 to leave carry alone
+;	Return:	nothing
+; 
+
+global FSDAllocFileHandle:far
+;
+;	Allocate a PC/GEOS file handle for a newly-opened file.
+;
+;	Pass:	al	= SFN
+;		ah	= non-zero if open to device
+;		dx	= private data word for FSD
+;		di.low	= FileFullAccessFlags
+;		di.high	= FSAllocOpFunction. If FSAOF_OPEN, write access
+;			  requested, and disk non-writable, file will be
+;			  closed and ERROR_WRITE_PROTECTED returned.
+;		es:si	= DiskDesc of disk on which file was opened
+;		es	= FSIR locked shared
+;
+;	Return:	if no error:
+;			carry clear
+;			ax 	= new handle
+;		else
+;			carry set
+;			ax	= error code
+;			es	= new segment of FSIR, in case it moved while
+;				  the file was being closed
+;
+
+global FSDCheckOpenCloseNotifyEnabled:far
+;
+;	See if FCNT_OPEN/FCNT_CLOSE notification should be sent out.
+;
+;	Pass:	nothing
+;	Return:	carry set if notification enabled
+;	Destroyed:	nothing
+;
+
+global FSDGenerateNotify:far
+;
+;	Generate a file-change notification, coping with any requests
+;	to batch notifications for the current thread.
+;	Pass:	ax	= FileChangeNotificationType
+;		si	= disk handle
+;		cxdx	= ID to pass (either of affected file or containing
+;			  directory)
+;		ds:bx	= file name, if needed
+;	Return:	nothing
+;	Destroyed:	ax, bx, cx, dx
+;
+
+
+EndKernel

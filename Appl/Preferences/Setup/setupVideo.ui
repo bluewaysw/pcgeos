@@ -1,0 +1,348 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1990 -- All Rights Reserved
+ *
+ * PROJECT:	  PCGEOS
+ * MODULE:	  setupVideo.ui
+ * FILE:	  setupVideo.ui
+ *
+ * AUTHOR:  	  Adam de Boor: Oct  5, 1990
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	10/ 5/90  ardeb	    Initial version
+ *
+ * DESCRIPTION:
+ *	Screens and definitions for testing/setting the video driver.
+ *
+ *
+ * 	$Id: setupVideo.ui,v 1.2 98/02/01 21:40:44 gene Exp $
+ *
+ ***********************************************************************/
+
+#if DO_DBCS
+#define CHARS wchar
+#else
+#define CHARS char
+#endif
+
+class SetupColorBox = GenGadget, master {
+	static /* boxWidth */ wordComp : 0;
+	static /* boxHeight */ wordComp : 0;
+	isGradient = byteComp : 0;
+}
+
+start	Strings, notDetachable;
+
+chunk	noSuchDisplay = "Unable to locate requested video display.";
+chunk	cantLoadVidDriver="Unable to load driver for requested video display.";
+
+end	Strings;
+
+start	Interface;
+
+/*******************************************************************************
+
+	VideoTestScreen
+
+*******************************************************************************/
+
+VideoTestScreen = SetupScreen {
+	visibility = dialog;
+	children = VideoTestSpace, VideoTestText;
+	hints = {SETUP_FULL_SCREEN_HINTS}
+	enterAction = MSG_SETUP_SHOW_COLOR_SCREEN_IF_APPROPRIATE, process;
+	escapeAction = MSG_SETUP_SCREEN_DISMISS, VideoTestScreen;
+	f10Action = MSG_GEN_INTERACTION_INITIATE, VideoSelectScreen;
+	extraDrawAction = SetupDrawCornerArrows;
+	instructions = ENTERToContinue, ESCToReturnToPrev, F10ToChangeVideo;
+}
+
+VideoTestSpace = GenGlyph {
+	moniker = " ";
+}
+
+#ifdef GPC_VERSION
+VideoTestText = SetupTextDisplay {
+	text = data {
+		CHARS	"\r\r"
+		CHARS	"In each corner of the screen, you should see a small arrow, and this text should seem sharp and clear.\r"
+		CHARS	"\r"
+		CHARS	"If not, try adjusting the controls on your monitor.\r"
+		CHARS	"\r"
+		CHARS	"To make a new choice for the video system, press the F10 key now."
+		CHARS	0
+	}
+}
+#else
+VideoTestText = SetupTextDisplay {
+	text = data {
+		CHARS	"\r\r"
+		CHARS	"In each corner of the screen, you should see a small arrow, and this text should seem sharp and clear.\r"
+		CHARS	"\r"
+		CHARS	"If not, try adjusting the controls on your monitor.\r"
+		CHARS	"\r"
+		CHARS	"To make a new choice for the video system, press the F10 key now.\r"
+		CHARS	"\r"
+		CHARS	"If you are unsure about this option press ENTER to continue.\r"
+		CHARS	0
+	}
+}
+#endif
+
+/*******************************************************************************
+
+	VideoTestRevertScreen
+
+*******************************************************************************/
+
+VideoTestRevertScreen = SetupScreen {
+	visibility = dialog;
+	children = VideoTestRevertSpace,
+			VideoTestRevertText;
+	hints = {SETUP_FULL_SCREEN_HINTS}
+	enterAction = MSG_SETUP_SHOW_COLOR_SCREEN_IF_APPROPRIATE, process;
+#ifdef GPC_VERSION
+	escapeAction = MSG_SETUP_REVERT_VIDEO, process;
+#else
+	f10Action = MSG_SETUP_REVERT_VIDEO, process;
+#endif
+	extraDrawAction = SetupDrawCornerArrows;
+	instructions = ENTERToContinue, F10ToRevertVideo;
+}
+
+VideoTestRevertSpace = GenGlyph {
+	moniker = " ";
+
+}
+
+VideoTestRevertText = SetupTextDisplay {
+	text = data {
+		CHARS 	"\r\r"
+		CHARS	"In each corner of the screen, you should see a small arrow, and this text should seem sharp and clear.\r"
+		CHARS	"\r"
+#ifdef GPC_VERSION
+		CHARS	"If not, press the ESC key to return to your previous choice of video system."
+#else
+		CHARS	"If not, press the F10 key to return to your previous choice of video system."
+#endif
+		CHARS	0
+	}
+}
+
+
+/*******************************************************************************
+
+	ColorScreen
+
+*******************************************************************************/
+
+ColorTestScreen = SetupScreen {
+	visibility = dialog;
+	children = ColorText, ColorBox, GradientText, GradientBox;
+	hints = {SETUP_FULL_SCREEN_HINTS}
+#ifdef GPC_VERSION
+	yesAction = MSG_SETUP_VIDEO_TEST_COMPLETE, process;
+#else
+	enterAction = MSG_SETUP_VIDEO_TEST_COMPLETE, process;
+#endif GPC_VERSION
+	escapeAction = MSG_SETUP_SCREEN_DISMISS, ColorTestScreen;
+	f10Action = MSG_GEN_INTERACTION_INITIATE, VideoSelectScreen;
+#ifdef GPC_VERSION
+	instructions = YToContinue, ESCToReturnToPrev, F10ToChangeVideo;
+#else
+	instructions = ENTERToContinue, ESCToReturnToPrev, F10ToChangeVideo;
+#endif GPC_VERSION
+}
+
+ColorText = SetupTextDisplay {
+	text = data {
+	    CHARS    "Your video system should be able to show many colors or shades of gray.\r"
+	    CHARS    "\r"
+	    CHARS    "There are 16 different colors (or shades of gray) in the box below. If you don't see this many, or they don't all look distinct, try adjusting the controls on your monitor.\r"
+	    CHARS    0
+	}
+}
+
+#ifdef GPC_VERSION
+GradientText = SetupTextDisplay {
+	genStates = default -usable;
+	text = data {
+	    CHARS    "\r"
+	    CHARS    "The video display you selected supports many colors.  There are bands of red, green, blue and gray in the box below, going from dark to light.  If you don't see this, your display may not be capable of displaying as many colors as you selected.\r"
+	    CHARS    0
+	}
+}
+#else
+GradientText = SetupTextDisplay {
+	genStates = default -usable;
+	text = data {
+	    CHARS    "\r"
+	    CHARS    "The video display you selected supports many colors.  There are bands of red, green, blue and gray in the box below, going from dark to light.  If you don't see this, your display may not be capable of displaying as many colors as you selected.\r"
+	    CHARS    "\r"
+	    CHARS    "If you are unsure about this option press ENTER to continue."
+	    CHARS    0
+	}
+}
+#endif
+
+ColorBox = SetupColorBox {
+}
+
+GradientBox = SetupColorBox {
+	genStates = default -usable;
+	isGradient = 1;
+}
+
+/******************************************************************************
+
+	VideoSelectScreen
+
+******************************************************************************/
+
+VideoSelectScreen = SetupScreen {
+	visibility = dialog;
+	children = VideoSelectText, VideoSelectList;
+	enterAction = MSG_SETUP_VIDEO_SELECTED, process;
+	escapeAction = MSG_SETUP_SCREEN_DISMISS, VideoSelectScreen;
+#ifdef GPC_VERSION
+	instructions = ENTERToContinue, ESCToReturnToPrev;
+#else
+	instructions = ENTERToContinue, ESCToReturnToPrev, F3ToExitToDOS;
+#endif
+	hints = {SETUP_FULL_SCREEN_HINTS}
+
+}
+
+VideoSelectText = SetupTextDisplay {
+	text = data {
+	    CHARS    "What kind of video display do you have? Choose one from the following list.\r"
+	    CHARS    "\r"
+	    CHARS    "Press the UP and DOWN arrows to scroll through the list one item at a time. Press PgUp and PgDn to scroll more items at once.  Typing a letter will position the list at the first video display whose name begins with that letter."
+	    CHARS    0
+	}
+}
+
+VideoSelectList = SetupDeviceList {
+	tocFlags = default +extendedDeviceDrivers;
+	tokenChars = "'VIDD'";
+	hints = {
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_DEFAULT_FOCUS,
+		ATTR_GEN_INIT_FILE_CATEGORY {
+			char "screen0",0
+		},
+		/* driver key is hard-coded */
+		ATTR_GEN_INIT_FILE_KEY {
+			char "device",0
+		},
+		HINT_FIXED_SIZE {
+			SpecWidth  <SST_WIDE_CHAR_WIDTHS, 25>
+			SpecHeight <SST_LINES_OF_TEXT, 6>
+			word	6
+		},
+		ATTR_GEN_PATH_DATA {
+			GenFilePath <SP_VIDEO_DRIVERS, 0>
+		}
+	}
+}
+
+/******************************************************************************
+
+		VideoRestartScreen
+
+******************************************************************************/
+
+VideoRestartScreen = SetupScreen {
+	visibility = dialog;
+	children = VideoRestartText, VideoRestartContinueText_FullSetup,
+			VideoRestartContinueText_PMVideo;
+	hints = {SETUP_FULL_SCREEN_HINTS}
+	enterAction = MSG_SETUP_RESTART_FOR_VIDEO, process;
+	escapeAction = MSG_SETUP_SCREEN_DISMISS, VideoRestartScreen;
+	f10Action = MSG_SETUP_SCREEN_DISMISS, VideoRestartScreen;
+	instructions = ENTERToContinue, ESCToReturnToPrev, F10ToChangeVideo;
+}
+
+VideoRestartText = SetupTextDisplay {
+	hints = {
+		ATTR_GEN_TEXT_MULTIPLE_CHAR_ATTR_RUNS {
+			word VideoRestartCharAttrRuns
+		}
+	}
+	text = data {
+restartTextBase	label	CHARS
+	    CHARS    "In order to use the new video system you just selected, the system must restart. When it does, you'll be brought back to the video test screen with the four arrows.\r"
+	    CHARS    "\r"
+payAttentionToThis	label	CHARS
+	    CHARS    "If you cannot read the initial test screen,"
+youCanSleepAgain	label	CHARS
+#ifdef GPC_VERSION
+	    CHARS    " press ESC and the old video driver will be reloaded.\r"
+#else
+	    CHARS    " press F10 and the old video driver will be reloaded.\r"
+#endif
+	    CHARS    "\r"
+	    CHARS    0
+	}
+}
+
+VideoRestartContinueText_FullSetup = SetupTextDisplay {
+	genStates = default -usable;
+	text = "Once you're satisfied with your chosen video system, you can go on to specify what type of mouse you have.";
+}
+
+#ifdef GPC_VERSION
+VideoRestartContinueText_PMVideo = SetupTextDisplay {
+	genStates = default -usable;
+	text = "Once you're satisfied with your chosen video system, you can return to the desktop.";
+}
+#else
+VideoRestartContinueText_PMVideo = SetupTextDisplay {
+	genStates = default -usable;
+	text = "Once you're satisfied with your chosen video system, you can return to the Professional Workspace.";
+}
+#endif
+end	Interface;
+
+start	Interface;
+
+#define VRAE(label,type) TRAE(label, restartTextBase, VRSE_##type)
+
+chunk VideoRestartCharAttrRuns = data {
+    RUN_ARRAY_HEADER(4, VideoRestartStyleElements)
+    TextRunArrayElement \
+	VRAE(restartTextBase, Plain),
+	VRAE(payAttentionToThis, BoldItalic),
+	VRAE(youCanSleepAgain, Plain),
+	TRAE_END
+}
+
+
+#if DO_PIZZA
+
+chunk VideoRestartStyleElements = data {
+    CHAR_ATTR_ELEMENT_ARRAY_HEADER(2)
+VRSE_Plain	= 0
+    CHAR_ATTR_FONT_SIZE(FID_PIZZA_KANJI, STD_REGULAR_POINTSIZE)
+VRSE_BoldItalic	= 1
+    CHAR_ATTR_FONT_SIZE_STYLE(FID_PIZZA_KANJI, STD_REGULAR_POINTSIZE, \
+							mask TS_UNDERLINE)
+}
+
+#else
+
+chunk VideoRestartStyleElements = data {
+    CHAR_ATTR_ELEMENT_ARRAY_HEADER(2)
+VRSE_Plain	= 0
+    CHAR_ATTR_FONT_SIZE(FID_BERKELEY, STD_REGULAR_POINTSIZE)
+VRSE_BoldItalic	= 1
+    CHAR_ATTR_FONT_SIZE_STYLE(FID_BERKELEY, STD_REGULAR_POINTSIZE, \
+							mask TS_UNDERLINE)
+}
+
+#endif
+	
+end	Interface;
+

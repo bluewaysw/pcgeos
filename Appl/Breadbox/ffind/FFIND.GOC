@@ -1,0 +1,1387 @@
+/****************************************************************************
+* START OF FILE: FFIND.GOC
+****************************************************************************/
+
+/****************************************************************************
+*
+*        File Find program for desktop systems (VeryLargeTextClass systems)
+*
+*      Author:  Lysle E. Shields III and John Hise
+*      Date:    Aug. 6, 1994
+*
+*      Revision History:
+*      -----------------------------------------
+*      LES - 09/23/97 - Updated the code to be sent to NewDeal
+*
+****************************************************************************/
+
+/****************************************************************************
+*
+*  Notes:
+*    Much of this app is set to be swappable to keep memory usage at it's
+*      lowest.
+*
+****************************************************************************/
+
+@include <stdapp.goh>
+@include <Ansi/String.h>
+@include <gstring.h>
+@include <thread.h>
+@include <Objects/vLTextC.goh>    /* VisLargeText definitions */
+@include <initfile.h> /* for ini file maniplations */
+@include "art/fficons.goh"
+
+/***************************************************************************
+*        Defines
+**************************************************************************/
+
+#define NUM_FILES_PER_VIEW 50
+#define MAX_SIZE_PATH_NAME 250
+#define MAX_SIZE_FULL_NAME (MAX_SIZE_PATH_NAME+FILE_LONGNAME_BUFFER_SIZE)
+#define DOC_PATH 100
+#define ENS_PATH 101
+#define SET_PATH 102
+
+/***************************************************************************
+*        Macros
+**************************************************************************/
+
+@define StringsLock()     MemLock(OptrToHandle(@G_strings))
+@define StringsUnlock()   MemUnlock(OptrToHandle(@G_strings))
+@define StringDeref(o)    LMemDeref(o)
+
+/*
+***************************************************************************
+*        Ugly Global Variables & Prototypes
+***************************************************************************
+*/
+
+int          cancel = 0 ;
+char         current_path[MAX_SIZE_PATH_NAME] = {0};
+char         set_path[MAX_SIZE_PATH_NAME] = {0};
+char         copy_of_current_path[MAX_SIZE_PATH_NAME] = {0};
+char         fileMaskBuffer[200] = {0};
+word         dirStackSize = 0;
+word         old_selection = DOC_PATH ;
+word         drive_selection = DOC_PATH ;
+Boolean      minimized = FALSE; /* are we iconized? */
+DiskHandle   current_disk = SP_DOCUMENT ;
+ThreadHandle myThread ;
+
+/***************************************************************************
+*        Prototypes
+**************************************************************************/
+
+typedef word (*threadStartRoutine)(word valuePassed) ;
+word    SearchThread(word value) ;
+void    GotFiles(char *names);
+Boolean Search(word level);
+
+/*
+***************************************************************************
+*        Class & Message Definitions
+***************************************************************************
+*/
+
+    /*---------------------------------------------------------------------*/
+    @class    FileFindPrimaryClass, GenPrimaryClass ;
+    @endc
+
+    @classdecl    FileFindPrimaryClass ;
+    /*---------------------------------------------------------------------*/
+
+    /*---------------------------------------------------------------------*/
+    @class    FileFindProcessClass, GenProcessClass ;
+        @message void MSG_FILE_FIND_PROCESS_DO_FIND() ;
+        @message void MSG_FILE_FIND_PROCESS_DO_CANCEL() ;
+        @message (GEN_ITEM_GROUP_APPLY_MSG)
+                 MSG_FILE_FIND_PROCESS_DRIVE_SELECTED ;
+        @message (GEN_TRIGGER_ACTION)
+                 MSG_FILE_FIND_SET_PATH ;
+    @endc
+
+    @classdecl    FileFindProcessClass, neverSaved ;
+    /*---------------------------------------------------------------------*/
+
+
+
+    /*---------------------------------------------------------------------*/
+    @class FileFindVLTContentClass, GenContentClass ;
+    @endc
+
+    @classdecl FileFindVLTContentClass ;
+    /*---------------------------------------------------------------------*/
+
+
+
+
+    /*---------------------------------------------------------------------*/
+    @class FileFindVLTextClass, VisLargeTextClass ;
+    @endc
+
+    @classdecl FileFindVLTextClass;
+    /*---------------------------------------------------------------------*/
+
+
+
+/*
+***************************************************************************
+*        UI Objects
+***************************************************************************
+*/
+
+/*=========================================================================*/
+
+
+@start    AppResource ;
+    /*---------------------------------------------------------------------*/
+    @object GenApplicationClass FileFindApp = {
+        GI_visMoniker = list { @FileFindTextMoniker,
+                               @Moniker0,
+                               @Moniker1,
+                               @Moniker2,
+                                        @Moniker3,
+                                        @Moniker4 }
+        GI_comp = @FileFindPrimary;
+        gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) =
+            @FileFindPrimary;
+/* the help file for this application */
+        ATTR_GEN_HELP_FILE = "File Finder";
+    }
+    /*---------------------------------------------------------------------*/
+    @visMoniker FileFindTextMoniker = "File Finder" ;
+    /*---------------------------------------------------------------------*/
+@end    AppResource
+
+
+/*=========================================================================*/
+
+
+/*=========================================================================*/
+
+
+@start    Interface ;
+    /*---------------------------------------------------------------------*/
+    @object FileFindPrimaryClass FileFindPrimary  = {
+          GI_comp = @FileMenu,
+                        @FileFindMaskAndTrigger,
+                  @FileFindDrives,
+                  @FileFindPathNameAndPathDialog,
+                  @FileFindView,
+                  @FileFindStatus ;
+/* center everything */
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_SIZE_WINDOW_AS_DESIRED ;
+  //      HINT_PRIMARY_NO_FILE_MENU ;
+        ATTR_GEN_HELP_CONTEXT = "TOC";
+    }
+
+@object GenInteractionClass FileMenu = {
+    GI_comp = @AboutGroup;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+}
+
+@object GenInteractionClass AboutGroup = {
+    GI_comp = @AboutDBox;
+    GII_visibility = GIV_SUB_GROUP;
+}
+
+@include "art/bbxreg.goh"
+
+@object GenInteractionClass AboutDBox = {
+    GI_visMoniker = 'b', "About";
+    GI_comp = @AppName, @By, @BreadBoxLogo,
+                  @Visit, @Web, @AboutSpacer1,
+                  @Copyright, @BBoxLLC, @Rights, @AboutSpacer2;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_NOTIFICATION;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+@object GenTextClass AppName = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_text = "File Finder";
+    ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @AppNameCharAttrs;
+}
+@chunk VisTextCharAttr AppNameCharAttrs =
+    CHAR_ATTR_FONT_SIZE_STYLE(
+        FID_DTC_URW_SANS, 36, TS_BOLD);
+
+@object GenGlyphClass By = {
+  GI_visMoniker = "by";
+}
+@object GenGlyphClass BreadBoxLogo = {
+  GI_visMoniker = list { @BreadboxLogoMoniker}
+}
+@object GenGlyphClass Visit = {
+  GI_visMoniker = "Visit us at...";
+}
+@object GenGlyphClass Web = {
+  GI_visMoniker = "www.breadbox.com";
+}
+@object GenGlyphClass AboutSpacer1 = {
+  GI_visMoniker = "   ";
+}
+@object GenGlyphClass Copyright = {
+  GI_visMoniker = "Copyright 1994-2002";
+}
+@object GenGlyphClass BBoxLLC = {
+  GI_visMoniker = "Breadbox Computer Company LLC";
+}
+@object GenGlyphClass Rights = {
+  GI_visMoniker = "All Rights Reserved";
+}
+@object GenGlyphClass AboutSpacer2 = {
+  GI_visMoniker = "   ";
+}
+
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass FileFindPathNameAndPathDialog = {
+          GI_comp = @DrivePathName,
+                        @FilePathDialog ;
+    		GI_states = @default & ~GS_ENABLED;
+/* allow these to wrap on small screens or large path */
+/*
+        HINT_ALLOW_CHILDREN_TO_WRAP ;
+*/
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass FilePathDialog = {
+        GI_visMoniker = 'a', "Select path" ;
+        GI_comp = @FilePathFileSelector,
+                  @FilePathSelect,
+                  @FilePathClose;
+        GII_visibility  = GIV_DIALOG ;
+        GII_type        = GIT_ORGANIZATIONAL ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenFileSelectorClass FilePathFileSelector = {
+        GFSI_fileCriteria = FSFC_DIRS ;
+        GFSI_attrs = (@default) & (~(FSA_HAS_OPEN_DIR_BUTTON|
+                                   FSA_HAS_CLOSE_DIR_BUTTON)) ;
+/* make the default display the document dir */
+        ATTR_GEN_PATH_DATA = {SP_DOCUMENT, 0};
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass FilePathSelect = {
+        GI_visMoniker = 'S', "Set Path" ;
+        GTI_destination = process ;
+        GTI_actionMsg = MSG_FILE_FIND_SET_PATH ;
+        HINT_SEEK_REPLY_BAR ;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = (IC_OK);
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass FilePathClose = {
+        GI_visMoniker = 'C', "Close" ;
+        HINT_SEEK_REPLY_BAR ;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = (IC_DISMISS);
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass FileFindMaskAndTrigger = {
+        GI_comp = @FileFindMask, @FileFindTrigger ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass FileFindMask = {
+        GI_visMoniker = 'M', "File Mask: " ;
+        GTXI_text = "*" ; /* default: all files */
+        GTXI_stateFlags = @default | GTSF_MODIFIED ;
+        GTXI_attrs = @default |
+                         GTA_SINGLE_LINE_TEXT |
+                         GTA_NO_WORD_WRAPPING |
+                         GTA_ALLOW_TEXT_OFF_END ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_PRESERVE_FOCUS ;
+        HINT_DEFAULT_FOCUS ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass FileFindTrigger = {
+        GI_visMoniker = 'F', "Find!" ;
+        GTI_destination = process ;
+        GTI_actionMsg = MSG_FILE_FIND_PROCESS_DO_FIND ;
+        HINT_PRESERVE_FOCUS ;
+        HINT_DEFAULT_DEFAULT_ACTION;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenViewClass FileFindView = {
+        GVI_vertAttrs  = @default | GVDA_SCROLLABLE;
+        GVI_attrs = @default |
+                    GVA_DRAG_SCROLLING |
+                    GVA_WINDOW_COORDINATE_MOUSE_EVENTS |
+                    GVA_DONT_SEND_KBD_RELEASES | GVA_FOCUSABLE;
+        GVI_content = @FileContent;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+        HINT_DEFAULT_FOCUS;
+/* give the view a little bigger opening size then the default */
+        HINT_INITIAL_SIZE = {0,
+                             SST_PCT_OF_FIELD_HEIGHT | PCT_40,
+                             0};
+/* make it so you can't write or copy to the FileFindVLTextClass */
+        ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+    }
+    /*---------------------------------------------------------------------*/
+    @object FileFindVLTContentClass FileContent = {
+        GCI_genView = @FileFindView;
+        GCI_attrs = @default |
+                    VCNA_LARGE_DOCUMENT_MODEL |
+                    VCNA_WINDOW_COORDINATE_MOUSE_EVENTS |
+                    VCNA_SAME_WIDTH_AS_VIEW;
+    }
+    /*---------------------------------------------------------------------*/
+    @object FileFindVLTextClass FileFindText = {
+/* make it selectable so it works with quick copies */
+        VTI_state = @default | VTS_SELECTABLE;
+        VTI_output = process;
+        VLTI_displayMode = VLTDM_DRAFT_WITH_STYLES;
+        VLTI_attrs = VLTA_EXACT_HEIGHT;
+        VLTI_regionArray = @FileTextRegionArray;
+/* we'll use the Sans font size 12 */
+        VTI_charAttrRuns = ((VTDS_12 << VTDCA_SIZE_OFFSET) | VTDF_URW_SANS);
+/* this really never gets used since we're doing a plain report */
+        VTI_paraAttrRuns = ( (0*2) << VTDPA_LEFT_MARGIN_OFFSET ) |
+                           ( (0*2) << VTDPA_PARA_MARGIN_OFFSET ) |
+                           ( (0*2) << VTDPA_RIGHT_MARGIN_OFFSET ) |
+                           ( VTDDT_HALF_INCH << VTDPA_DEFAULT_TABS_OFFSET ) |
+                           ( J_LEFT << VTDPA_JUSTIFICATION_OFFSET );
+}
+
+    @chunk ChunkArrayHeader FileTextRegionArray = {
+        0,
+        sizeof(VisLargeTextRegionArrayElement),
+        0,
+        sizeof(ChunkArrayHeader)
+    };
+    /*---------------------------------------------------------------------*/
+    @object GenItemGroupClass FileFindDrives = {
+        GI_attrs = @default & (~GS_USABLE) ;
+        GI_comp = @DriveA, @DriveB, @DriveC, @DriveD, @DriveE,
+                  @DriveF, @DriveG, @DriveH, @DriveI, @DriveJ,
+                  @DriveK, @DriveL, @DriveM, @DriveN, @DriveO,
+                  @DriveP, @DriveQ, @DriveR, @DriveS, @DriveT,
+                  @DriveU, @DriveV, @DriveW, @DriveX, @DriveY,
+                  @DriveZ, @DriveDocument, @DriveGEOS, @DrivePath ;
+        GIGI_destination = process ;
+        GIGI_applyMsg = MSG_FILE_FIND_PROCESS_DRIVE_SELECTED ;
+        HINT_WRAP_AFTER_CHILD_COUNT = 12 ;
+        HINT_ALLOW_CHILDREN_TO_WRAP ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveA = {
+        GI_attrs = @default & (~(GS_USABLE|GS_ENABLED)) ;
+        GI_visMoniker = "A:" ;
+        GII_identifier = 1 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveB = {
+        GI_attrs = @default & (~(GS_USABLE|GS_ENABLED)) ;
+        GI_visMoniker = "B:" ;
+        GII_identifier = 2 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveC = {
+        GI_attrs = @default & (~(GS_USABLE|GS_ENABLED)) ;
+        GI_visMoniker = "C:" ;
+        GII_identifier = 3 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveD = {
+        GI_attrs = @default & (~(GS_USABLE|GS_ENABLED)) ;
+        GI_visMoniker = "D:" ;
+        GII_identifier = 4 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveE = {
+        GI_attrs = @default & (~(GS_USABLE|GS_ENABLED)) ;
+        GI_visMoniker = "E:" ;
+        GII_identifier = 5 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveF = {
+        GI_attrs = @default & (~(GS_USABLE|GS_ENABLED)) ;
+        GI_visMoniker = "F:" ;
+        GII_identifier = 6 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveG = {
+        GI_attrs = @default & (~(GS_USABLE|GS_ENABLED)) ;
+        GI_visMoniker = "G:" ;
+        GII_identifier = 7 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveH = {
+        GI_attrs = @default & (~(GS_USABLE|GS_ENABLED)) ;
+        GI_visMoniker = "H:" ;
+        GII_identifier = 8 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveI = {
+        GI_attrs = @default & (~(GS_USABLE|GS_ENABLED)) ;
+        GI_visMoniker = "I:" ;
+        GII_identifier = 9 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveJ = {
+        GI_attrs = @default & (~(GS_USABLE|GS_ENABLED)) ;
+        GI_visMoniker = "J:" ;
+        GII_identifier = 10 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveK = {
+        GI_attrs = @default & (~(GS_USABLE|GS_ENABLED)) ;
+        GI_visMoniker = "K:" ;
+        GII_identifier = 11 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveL = {
+        GI_attrs = @default & (~(GS_USABLE|GS_ENABLED)) ;
+        GI_visMoniker = "L:" ;
+        GII_identifier = 12 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveM = {
+        GI_attrs = @default & (~(GS_USABLE|GS_ENABLED)) ;
+        GI_visMoniker = "M:" ;
+        GII_identifier = 13 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveN = {
+        GI_attrs = @default & (~(GS_USABLE|GS_ENABLED)) ;
+        GI_visMoniker = "N:" ;
+        GII_identifier = 14 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveO = {
+        GI_attrs = @default & (~(GS_USABLE|GS_ENABLED)) ;
+        GI_visMoniker = "O:" ;
+        GII_identifier = 15 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveP = {
+        GI_attrs = @default & (~(GS_USABLE|GS_ENABLED)) ;
+        GI_visMoniker = "P:" ;
+        GII_identifier = 16 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveQ = {
+        GI_attrs = @default & (~(GS_USABLE|GS_ENABLED)) ;
+        GI_visMoniker = "Q:" ;
+        GII_identifier = 17 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveR = {
+        GI_attrs = @default & (~(GS_USABLE|GS_ENABLED)) ;
+        GI_visMoniker = "R:" ;
+        GII_identifier = 18 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveS = {
+        GI_attrs = @default & (~(GS_USABLE|GS_ENABLED)) ;
+        GI_visMoniker = "S:" ;
+        GII_identifier = 19 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveT = {
+        GI_attrs = @default & (~(GS_USABLE|GS_ENABLED)) ;
+        GI_visMoniker = "T:" ;
+        GII_identifier = 20 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveU = {
+        GI_attrs = @default & (~(GS_USABLE|GS_ENABLED)) ;
+        GI_visMoniker = "U:" ;
+        GII_identifier = 21 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveV = {
+        GI_attrs = @default & (~(GS_USABLE|GS_ENABLED)) ;
+        GI_visMoniker = "V:" ;
+        GII_identifier = 22 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveW = {
+        GI_attrs = @default & (~(GS_USABLE|GS_ENABLED)) ;
+        GI_visMoniker = "W:" ;
+        GII_identifier = 23 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveX = {
+        GI_attrs = @default & (~(GS_USABLE|GS_ENABLED)) ;
+        GI_visMoniker = "X:" ;
+        GII_identifier = 24 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveY = {
+        GI_attrs = @default & (~(GS_USABLE|GS_ENABLED)) ;
+        GI_visMoniker = "Y:" ;
+        GII_identifier = 25 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveZ = {
+        GI_attrs = @default & (~(GS_USABLE|GS_ENABLED)) ;
+        GI_visMoniker = "Z:" ;
+        GII_identifier = 26 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveDocument = {
+        GI_visMoniker = "Documents" ;
+        GII_identifier = DOC_PATH ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DriveGEOS = {
+		  GI_visMoniker = "Ensemble" ;
+        GII_identifier = ENS_PATH ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass DrivePath = {
+        GI_visMoniker = "Path" ;
+        GII_identifier = SET_PATH ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass DrivePathName = {
+/* will be filled in initially with opening of app */
+        GI_visMoniker = "Path: " ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass FileFindStatus = {
+        GI_visMoniker = "Ready to search." ;
+    }
+    /*---------------------------------------------------------------------*/
+@ifdef BREADBOX_VERSION
+    @object GenGlyphClass BreadboxLogo = {
+        GI_visMoniker = @list { @BlueBreadbox, @BlackBreadbox } ;
+    }
+@include "blackbb.goh"
+@include "bluebb.goh"
+@endif
+    /*---------------------------------------------------------------------*/
+@end Interface
+
+/*=========================================================================*/
+
+@start StringsResource ;
+    /*---------------------------------------------------------------------*/
+    @chunk char G_strings[] = "STRINGS" ;
+        @localize "Ignore this entry." ;
+    /*---------------------------------------------------------------------*/
+    /* Path related strings: */
+    @chunk char G_pathPrefix[] = "Path: " ;
+        @localize "Word 'Path' that appears on English version." ;
+    /*---------------------------------------------------------------------*/
+    /* INI related areas */
+    @chunk char G_iniCategory[] = "File Finder" ;
+        @localize "Category of the .INI file to use." ;
+    @chunk char G_iniPath[] = "pathPath" ;
+        @localize "Key in .INI for current path." ;
+    @chunk char G_iniDisk[] = "pathDisk" ;
+        @localize "Key in .INI for current disk." ;
+    /*---------------------------------------------------------------------*/
+    /* Text on the main trigger */
+    @visMoniker G_triggerFind = "Find!" ;
+        @localize "Trigger text to start a search." ;
+    @visMoniker G_triggerCancel = "CANCEL" ;
+        @localize "Trigger text to cancel a search." ;
+    /*---------------------------------------------------------------------*/
+    /* Status strings */
+    @visMoniker G_statusReady = "Ready to search." ;
+        @localize "Status message:  Waiting for a search to be started." ;
+    @visMoniker G_statusSearching = "Searching..." ;
+        @localize "Status message:  Currently searching drives." ;
+    @visMoniker G_statusCheckingDrive = "Checking drive ..." ;
+        @localize "Status message:  Checking to see if drive is available" ;
+    @visMoniker G_statusDriveNotReady = "Drive not ready." ;
+        @localize "Status message:  Drive error, drive is not available or ready." ;
+    @visMoniker G_statusStoppingSearch = "Stopping search..." ;
+        @localize "Status message:  Search is trying to stop." ;
+    @visMoniker G_statusIllegalPath = "Illegal path.  Enter new path." ;
+        @localize "Status message:  User enter bad path." ;
+    @visMoniker G_statusSearchCancelled =
+        "Search cancelled.  Ready to search." ;
+        @localize "Status message:  Search is finsihed being cancelled." ;
+    @visMoniker G_statusSearchComplete =
+        "Search complete.  Ready to search." ;
+        @localize "Status message:  Search is now complete." ;
+    /*---------------------------------------------------------------------*/
+    @chunk char G_dialogNeedMask[] = "You need to have a file mask." ;
+        @localize "Dialog:  Missing a file mask when attempt to search." ;
+    /*---------------------------------------------------------------------*/
+@end StringsResource
+
+/*=========================================================================*/
+
+/***************************************************************************
+*        ConstantData
+***************************************************************************/
+
+@start ConstantData, data;
+
+FileExtAttrDesc filterList[] = {
+{ FEA_NAME, 0, sizeof(FileLongName), NULL },
+{ FEA_FILE_ATTR, (void *)sizeof(FileLongName), sizeof(FileAttrs), NULL },
+{ FEA_END_OF_LIST, 0, 0, NULL}
+};
+
+@end ConstantData;
+
+/***************************************************************************
+*        OpenApplication
+***************************************************************************/
+
+@start OpenApplication;
+/*-------------------------------------------------------------------------*/
+@method FileFindProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+    word       i = 0, error = 0;
+    char       *ptr ;
+    char       *prefix ;
+    char       buffer[MAX_SIZE_FULL_NAME+7] = {0}; /* 7 is for prefix */
+    optr       child ;
+    dword      whole;
+    DiskHandle disk = NullHandle;
+
+    @StringsLock() ;
+
+    prefix = @StringDeref(@G_pathPrefix) ;
+
+/* find all drives on system and display them */
+    for (i=0; i<26; i++)
+        if (DriveGetStatus(i)&DS_PRESENT)  {
+            child = @call FileFindDrives::MSG_GEN_FIND_CHILD_AT_POSITION(i) ;
+            @send child::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+            @send child::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+        } else {
+            child = @call FileFindDrives::MSG_GEN_FIND_CHILD_AT_POSITION(i) ;
+            @send child::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+            @send child::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+        }
+    @call FileFindDrives::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+    @call FileFindDrives::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+
+    @callsuper() ;
+
+/* read the Set Path path from the ini file */
+    error = InitFileReadStringBuffer(@StringDeref(@G_iniCategory),
+                                     @StringDeref(@G_iniDisk),
+                                     &buffer[0],
+                                     ((IFCC_INTACT<<IFRF_CHAR_CONVERT_OFFSET) |
+                                     MAX_SIZE_FULL_NAME),
+                                     &i);
+    if (!error){
+      disk = DiskRegisterDisk((word)(buffer[0]-'A'));
+      if (!disk) error = 1;
+    }
+    if (!error){
+      error = InitFileReadStringBuffer(@StringDeref(@G_iniCategory),
+                                       @StringDeref(@G_iniPath),
+                                       buffer,
+                                       ((IFCC_INTACT<<IFRF_CHAR_CONVERT_OFFSET) |
+                                       MAX_SIZE_FULL_NAME),
+                                       &i);
+    }
+    if (!error){
+      error = @call FilePathFileSelector::
+                MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH(buffer, disk);
+    }
+    if (!error){
+      whole = @call FilePathFileSelector::
+                MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(buffer) ;
+      disk = (DiskHandle)(whole>>16);
+      disk = FileSetCurrentPath(disk, buffer);
+      if (!disk) error = 1;
+    }
+    if (!error){
+      strcpy(buffer, prefix) ;
+      ptr = buffer+(strlen(prefix));
+      disk = FileConstructFullPath(&ptr,
+                                   MAX_SIZE_PATH_NAME+7,
+                                   NullHandle,
+                                   ".",
+                                   TRUE) ;
+      if (!disk) error = 1;
+    }
+    if (!error){
+/* if there have been no errors update the Set Path path to the one we read
+from the ini file. */
+      @call DrivePathName::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(buffer,
+                             VUM_DELAYED_VIA_UI_QUEUE) ;
+    }else{
+/* there was an error somewhere so make the Documents path the default path
+for the Set Path path and the Set Path file selector */
+      FileSetCurrentPath(SP_DOCUMENT, ".");
+      strcpy(buffer, prefix);
+      ptr = buffer+(strlen(prefix));
+      /* get full path including drive */
+      FileConstructFullPath(&ptr,
+                            MAX_SIZE_PATH_NAME,
+                            NullHandle,
+                            ".",
+                            TRUE) ;
+/* set the path display to reflect default path */
+      @call DrivePathName::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(buffer,
+                             VUM_DELAYED_VIA_UI_QUEUE) ;
+/* make the Documents path the default path for the Set Path file selector */
+      ptr = buffer;
+      disk = FileConstructFullPath(&ptr,
+                                   MAX_SIZE_PATH_NAME,
+                                   NullHandle,
+                                   ".",
+                                   FALSE) ;
+      error = @call FilePathFileSelector::
+                MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH(buffer, disk);
+    }
+
+/* make the Documents path the default path for the app */
+    FileSetCurrentPath(SP_DOCUMENT, ".");
+/* set the drives display to reflect default path which is our default
+start directory for the app */
+    @call FileFindDrives::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(DOC_PATH, FALSE) ;
+
+/* incase we're coming back from a system susspend reenable everything */
+/* make sure the FileFindTrigger moniker says Find! */
+    @send FileFindTrigger::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@G_triggerFind,
+                               VUM_DELAYED_VIA_UI_QUEUE) ;
+/* make sure the FileFindTrigger msg says to start search */
+    @call FileFindTrigger::
+            MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_FILE_FIND_PROCESS_DO_FIND) ;
+/* enable the file mask setting */
+    @call FileFindMask::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+    /* Display a ready to search message */
+    @call FileFindStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@G_statusReady,
+                              VUM_NOW) ;
+/* enable the FileFindTrigger */
+	 @call FileFindTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+/* enable the FilePathSelectTrigger */
+    @call FilePathSelect::MSG_GEN_SET_ENABLED(VUM_NOW) ;
+/* give file mask focus when the app opens */
+    @call FileFindMask::MSG_META_GRAB_FOCUS_EXCL() ;
+
+    @StringsUnlock() ;
+}
+@end OpenApplication;
+
+/*-------------------------------------------------------------------------*/
+@method FileFindPrimaryClass, MSG_GEN_DISPLAY_SET_MINIMIZED
+/* Description: Intercept iconize so the VLText doesn't blank out */
+{
+  minimized = TRUE;
+  @callsuper();
+}
+/*-------------------------------------------------------------------------*/
+@method FileFindPrimaryClass, MSG_GEN_DISPLAY_SET_MAXIMIZED
+/* Description: Intercept uniconize so the VLText doesn't blank out */
+{
+  @callsuper();
+  minimized = FALSE;
+}
+/*-------------------------------------------------------------------------*/
+@method FileFindProcessClass, MSG_FILE_FIND_PROCESS_DO_FIND
+{
+  word wError = 0;
+
+  /* Get the file mask that we are going to use for this iteration */
+  wError = @call FileFindMask::MSG_VIS_TEXT_GET_ALL_PTR(fileMaskBuffer) ;
+/* check to make sure we actually got some data */
+  if (wError!=0){
+/* clear the text view */
+    @call FileFindText::MSG_VIS_TEXT_DELETE_ALL();
+
+    /* Make it modified so that future entries on an unchanged mask
+       will actually execute. */
+    @call FileFindMask::MSG_GEN_TEXT_SET_MODIFIED_STATE(TRUE) ;
+
+    /* Disable both trigger and text box */
+    @call FileFindTrigger::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_FILE_FIND_PROCESS_DO_CANCEL) ;
+    @send FileFindTrigger::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+        @G_triggerCancel, VUM_DELAYED_VIA_UI_QUEUE) ;
+	 @call FileFindDrives::MSG_GEN_SET_NOT_ENABLED(VUM_NOW) ;
+    @call FileFindMask::MSG_GEN_SET_NOT_ENABLED(VUM_NOW) ;
+    @call FilePathSelect::MSG_GEN_SET_NOT_ENABLED(VUM_NOW) ;
+
+    /* Display a searching message */
+    @call FileFindStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+              @G_statusSearching, VUM_NOW) ;
+
+    @call FileFindTrigger::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_FILE_FIND_PROCESS_DO_CANCEL) ;
+    myThread = ThreadCreate(PRIORITY_LOW,
+                            0,
+                            (threadStartRoutine)SearchThread,
+                            4000,
+                            GeodeGetProcessHandle()) ;
+  }else{
+/* file mask empty error notification */
+    UserStandardDialogOptr(
+                       NullHandle,
+                       NullHandle,
+                       NullHandle,
+                       NullHandle,
+                       @G_dialogNeedMask,
+                       (CDT_ERROR << CDBF_DIALOG_TYPE_OFFSET) |
+                       (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+/* give file mask focus so they can change it right away */
+    @call FileFindMask::MSG_META_GRAB_FOCUS_EXCL() ;
+  }
+}
+/*-------------------------------------------------------------------------*/
+@method FileFindProcessClass, MSG_FILE_FIND_PROCESS_DRIVE_SELECTED
+{
+    char       *ptr ;
+    char       *prefix ;
+    char       buffer[MAX_SIZE_FULL_NAME+7] = {0}; /* 7 is for prefix */
+    dword      whole ;
+    DiskHandle disk = NullHandle;
+
+    @StringsLock() ;
+    prefix = @StringDeref(@G_pathPrefix) ;
+
+    /* Display a message telling the user that the computer is working. */
+    @call FileFindStatus::
+          MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@G_statusCheckingDrive, VUM_NOW) ;
+
+	 /* set the path string & button disabled unless the path button was
+		 the selection */
+	 if (selection != SET_PATH)
+		 @send FileFindPathNameAndPathDialog::MSG_GEN_SET_NOT_ENABLED(
+																VUM_DELAYED_VIA_UI_QUEUE) ;
+	 else
+		 @send FileFindPathNameAndPathDialog::MSG_GEN_SET_ENABLED(
+																VUM_DELAYED_VIA_UI_QUEUE) ;
+
+
+	 /* Keep the user from trying additional requests */
+    if (selection == DOC_PATH)  {
+        /* If the selection was the document directory, set the path
+           and mark the disk variable so that the finish message below
+           will appear. */
+        current_disk = SP_DOCUMENT ;
+        strcpy(current_path, ".") ;
+        disk++ ;
+
+        /* Also, note that this was the last selection pressed on the
+           top bar. */
+		  old_selection = DOC_PATH ;
+    } else if (selection == ENS_PATH)  {
+        /* If the selection was the GEOS directory, set the path
+           and mark the disk variable so that the finish message below
+           will appear. */
+        current_disk = SP_TOP ;
+        strcpy(current_path, ".") ;
+        disk++ ;
+
+        /* Also, note that this was the last selection pressed on the
+           top bar. */
+		  old_selection = ENS_PATH ;
+	 } else if (selection == SET_PATH)  {
+        whole = @call FilePathFileSelector::
+                MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(buffer) ;
+        disk = (DiskHandle)(whole>>16);
+
+        ptr = current_path ;
+        disk = FileConstructFullPath(&ptr,
+                                     (word)MAX_SIZE_PATH_NAME,
+                                     disk,
+                                     buffer,
+                                     TRUE) ;
+
+        strcpy(buffer, prefix) ;
+        strcpy(buffer+(strlen(prefix)), current_path) ;
+
+        @call DrivePathName::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(buffer,
+                             VUM_DELAYED_VIA_UI_QUEUE) ;
+        @send FileFindDrives::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(SET_PATH, FALSE) ;
+
+        disk = DiskRegisterDisk(current_path[0]-'A') ;
+        FileSetCurrentPath(disk, current_path+2) ;
+        if (disk != NullHandle)  {
+            current_disk = disk ;
+
+            /* Also, note that this was the last selection pressed on the
+               top bar. */
+            old_selection = SET_PATH ;
+        } else {
+            strcpy(current_path, copy_of_current_path) ;
+
+            /* Otherwise, report an error about the disk drive */
+            @call FileFindStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@G_statusDriveNotReady, VUM_NOW) ;
+
+            /* and then go back to the original selection. */
+            @call FileFindDrives::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(old_selection, FALSE) ;
+        }
+    } else {
+        /* If a disk drive, try to register the drive's disk */
+        disk = DiskRegisterDisk(selection-1) ;
+
+        /* Check if the disk handle is NULL */
+        if (disk != NullHandle)  {
+            /* If it isn't, fine, go to the path directory. */
+            strcpy(current_path, "\\") ;
+
+            /* Note that this is the current disk and mark this
+               as the "new" old selection. */
+            current_disk = disk ;
+            old_selection = selection ;
+        } else {
+            /* Otherwise, report an error about the disk drive */
+            @call FileFindStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@G_statusDriveNotReady, VUM_NOW) ;
+
+            /* and then go back to the original selection. */
+            @call FileFindDrives::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(old_selection, FALSE) ;
+        }
+    }
+    if (disk != NullHandle)  {
+        /* If we have found a good diskette, put up the "ready" message. */
+        @call FileFindStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@G_statusReady, VUM_NOW) ;
+        }
+
+    strcpy(copy_of_current_path, current_path) ;
+    drive_selection = old_selection ;
+
+    @StringsUnlock() ;
+}
+/*-------------------------------------------------------------------------*/
+@method FileFindProcessClass, MSG_FILE_FIND_PROCESS_DO_CANCEL
+{
+    cancel = 1 ;
+
+    /* Report canceling message ... */
+    @call FileFindStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+              @G_statusStoppingSearch,
+              VUM_NOW) ;
+}
+/*-------------------------------------------------------------------------*/
+@method FileFindProcessClass, MSG_FILE_FIND_SET_PATH
+{
+    char       *ptr ;
+    char       *prefix ;
+    char       buffer[MAX_SIZE_FULL_NAME+7] = {0}; /* 7 is for prefix */
+    dword      whole ;
+    DiskHandle disk ;
+    char       pprefix[2] ;
+
+    whole = @call FilePathFileSelector::
+                MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(
+                    buffer) ;
+    disk = (DiskHandle)(whole>>16);
+
+    ptr = current_path ;
+    disk = FileConstructFullPath(&ptr,
+                                 (word)MAX_SIZE_PATH_NAME,
+                                 disk,
+                                 buffer,
+                                 TRUE) ;
+
+    @StringsLock() ;
+    prefix = @StringDeref(@G_pathPrefix) ;
+
+    strcpy(buffer, prefix) ;
+    strcpy(buffer+(strlen(prefix)), current_path) ;
+
+    @call DrivePathName::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(buffer,
+                           VUM_DELAYED_VIA_UI_QUEUE) ;
+    @send FileFindDrives::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(SET_PATH, FALSE) ;
+
+    current_disk = disk ;
+	 old_selection = SET_PATH ;
+
+    @call FileFindStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+              @G_statusReady,
+              VUM_NOW) ;
+
+    strcpy(copy_of_current_path, current_path) ;
+    strcpy(set_path, current_path) ;
+
+    drive_selection = old_selection ;
+
+    current_disk = DiskRegisterDisk(current_path[0]-'A') ;
+    FileSetCurrentPath(current_disk, current_path+2) ;
+
+/* write the Set Path path to the ini file */
+    pprefix[0]=current_path[0];
+    pprefix[1]='\0';
+    InitFileWriteString(
+        @StringDeref(@G_iniCategory),
+        @StringDeref(@G_iniDisk),
+        pprefix) ;
+    InitFileWriteString(
+        @StringDeref(@G_iniCategory),
+        @StringDeref(@G_iniPath),
+        current_path+2) ;
+
+    @StringsUnlock() ;
+}
+/***************************************************************************
+* MSG_META_CONTENT_VIEW_OPENING for FileFindVLTContentClass
+**************************************************************************/
+
+@method FileFindVLTContentClass, MSG_META_CONTENT_VIEW_OPENING
+{
+    VMFileHandle       fileHan;
+    VisContentInstance *vself;
+
+    @callsuper();
+/* check if we where just iconized before blanking */
+if (!minimized){
+    /*
+     * Set up the geometry for the content so that the geometry manager
+     * is not used.
+     */
+
+    vself = ObjDerefVis(oself);
+    vself->VI_attrs &= ~VA_MANAGED;
+    vself->VI_optFlags &= ~(VOF_GEOMETRY_INVALID | VOF_GEO_UPDATE_PATH);
+    vself->VI_geoAttrs |= VCGA_CUSTOM_MANAGE_CHILDREN;
+
+    /*
+     * Add the text object as a child of the content.  This must be done
+     * dynamically because the text object is a visual child, not a generic
+     * one.
+     */
+
+    @call FileContent::MSG_VIS_ADD_CHILD(@FileFindText, CCO_FIRST);
+
+    /*
+     * Set up the text object to be large
+     */
+
+    fileHan = ClipboardGetClipboardFile();
+    @call FileFindText::MSG_VIS_TEXT_SET_VM_FILE(fileHan);
+    @call FileFindText::MSG_VIS_LARGE_TEXT_CREATE_DATA_STRUCTURES();
+    @call FileFindText::MSG_VIS_NOTIFY_GEOMETRY_VALID();
+  }
+}
+
+/***************************************************************************
+* MSG_META_CONTENT_VIEW_CLOSING for FileFindVLTContentClass
+**************************************************************************/
+
+@method FileFindVLTContentClass, MSG_META_CONTENT_VIEW_CLOSING
+{
+    @callsuper();
+/* check if we are just iconizing before blanking */
+if (!minimized){
+    /*
+     * Free the large text data structures and make the text object small
+     * again.
+     */
+
+    @call FileFindText::MSG_VIS_TEXT_FREE_ALL_STORAGE(TRUE);
+    @call FileFindText::MSG_VIS_TEXT_SET_VM_FILE(NullHandle);
+    @call FileContent::MSG_VIS_REMOVE_CHILD(@FileFindText, CCO_FIRST);
+  }
+}
+/***************************************************************************
+* MSG_VIS_TEXT_FREE_ALL_STORAGE for FileFindVLTextClass
+**************************************************************************/
+
+@method FileFindVLTextClass, MSG_VIS_TEXT_FREE_ALL_STORAGE
+{
+    ChunkArrayHeader *cahp;
+    VisLargeTextInstance *vself;
+
+    @callsuper();
+    LMemReAlloc(@FileTextRegionArray, sizeof(ChunkArrayHeader));
+    cahp = LMemDeref(@FileTextRegionArray);
+    cahp->CAH_count = 0;
+    cahp->CAH_elementSize = sizeof(VisLargeTextRegionArrayElement);
+    cahp->CAH_curOffset = 0;
+    cahp->CAH_offset = sizeof(ChunkArrayHeader);
+
+    vself = ObjDerefVis(oself);
+    vself->VTI_storageFlags &= ~VTSF_LARGE;
+    vself->VI_optFlags |= VOF_GEOMETRY_INVALID;
+}
+
+/***************************************************************************
+* CODERESOURCE for SearchThread
+**************************************************************************/
+
+@start CodeResource;
+
+word SearchThread()
+{
+    DiskHandle validPath ;
+    Boolean ret = 0;
+
+  if (current_path[1] == ':'){
+    validPath = FileSetCurrentPath(current_disk, current_path+2) ;
+  }else{
+    validPath = FileSetCurrentPath(current_disk, current_path) ;
+  }
+  /* Check if a legal path name. */
+  if (validPath == NullHandle)  {
+    @call FileFindStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+              @G_statusIllegalPath,
+              VUM_NOW) ;
+    @send FileFindTrigger::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+              @G_triggerFind,
+              VUM_DELAYED_VIA_UI_QUEUE) ;
+/* set the FileFindTrigger to send the ...FIND message */
+    @call FileFindTrigger::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_FILE_FIND_PROCESS_DO_FIND) ;
+/* re-enable the file mask, string, set path and drives for next search */
+    @call FileFindDrives::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+    @call FileFindMask::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+    @call FilePathSelect::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+    return 0;
+  }
+  ret = Search(0);
+/* set the FileFindTrigger to send the ...FIND message */
+  @call FileFindTrigger::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_FILE_FIND_PROCESS_DO_FIND) ;
+  @send FileFindTrigger::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+            @G_triggerFind,
+            VUM_DELAYED_VIA_UI_QUEUE) ;
+/* re-enable the file mask, string, set path and drives for next search */
+  @call FileFindDrives::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+  @call FileFindMask::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+  @call FilePathSelect::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+  if (ret){
+    @call FileFindStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+              @G_statusSearchCancelled,
+              VUM_NOW) ;
+    cancel=0;
+  }else{
+/* announce search completed */
+    @call FileFindStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+              @G_statusSearchComplete,
+              VUM_NOW) ;
+  }
+/* give file mask focus */
+  @call FileFindMask::MSG_META_GRAB_FOCUS_EXCL() ;
+  return 0;
+}
+
+@end CodeResource;
+/*-------------------------------------------------------------------------*/
+@start RecursiveResource;
+/***************************************************************************
+* Search for RecursiveResource
+**************************************************************************/
+
+Boolean Search(word level)
+{
+char            *names;
+word            count = 0;
+word            numFilesNotHandled = 0;
+word            numFilesProcessed = 0;
+word            numFilesReturned = 0;
+word            numDirsNotHandled = 0;
+word            numDirsProcessed = 0;
+word            numDirsReturned = 0;
+MemHandle       fileBuffer = NullHandle;
+FileEnumParams  FF;
+FileExtAttrDesc *ptr;
+static dword  nextTime = 0 ;
+if (nextTime == 0)
+    nextTime = TimerGetCount() + 20 ;
+
+   if (level > 7)
+        return FALSE ;
+
+   if (level == 0)
+        @call FileFindText::MSG_META_SUSPEND();
+  do{
+    /* Set up the information to allow us to examine all the files
+       of a directory using the Wildcard search mask and limited
+       to the number of files that will fit our view. */
+    FF.FEP_searchFlags = FESF_NON_GEOS |
+                         FESF_GEOS_EXECS |
+                         FESF_GEOS_NON_EXECS |
+                         FESF_CALLBACK;
+    FF.FEP_returnAttrs = &(filterList[0]) ;
+    FF.FEP_returnSize = sizeof(FileLongName) + sizeof(FileAttrs) ;
+    FF.FEP_matchAttrs = NullHandle;
+    FF.FEP_bufSize = NUM_FILES_PER_VIEW;
+    FF.FEP_skipCount = numFilesProcessed;
+    FF.FEP_callback = (void *)FESC_WILDCARD;
+    FF.FEP_callbackAttrs = NullHandle ;
+    FF.FEP_headerSize = 0 ;
+        /* Declare the string to use and that we are searching
+           case insensitive. */
+    FF.FEP_cbData1 = (dword)fileMaskBuffer ;
+    FF.FEP_cbData2 = 1 ;
+    /* Another safety precaution.  If there was a block allocated,
+       unallocate it and declare that we don't know if there is
+       a block allocated. */
+    if (fileBuffer != NullHandle)
+       MemFree(fileBuffer) ;
+    fileBuffer = NullHandle ;
+    /* Search the current directory based on the above input
+       parameters. */
+    numFilesProcessed += FileEnum(&FF, &fileBuffer, &numFilesNotHandled) ;
+    /* If we have a block returned, figure out how many entries are
+       in that block.  If the block was not returned, then we must
+       have zero entries. */
+    if (fileBuffer != NullHandle)  {
+      numFilesReturned = (MemGetInfo(fileBuffer, MGIT_SIZE)/
+                              FF.FEP_returnSize) ;
+    } else {
+      numFilesReturned = 0 ;
+    }
+/* see if we actually got some files out of this dir. */
+    if (numFilesReturned)  {
+/* lock the buffer to the file names */
+      names = MemLock(fileBuffer) ;
+      for (count = 0; (count<numFilesReturned) && (cancel == 0) ; count++){
+/* call the text search passing the file name */
+        GotFiles(names);
+	if (TimerGetCount() > nextTime)  {
+		/* Allow the text to update */
+		nextTime = TimerGetCount() + 20 ;
+    		@call FileFindText::MSG_META_UNSUSPEND();
+//		TimerSleep(20) ;
+		@call FileFindText::MSG_META_SUSPEND();
+	}
+/* incremnt names to point to the next file entry */
+        names += sizeof(FileLongName) + sizeof(FileAttrs);
+      }
+/* unlock the buffer to the file names so it can drift */
+      MemUnlock(fileBuffer) ;
+    }
+    /* We want to keep memory at its lowest, therefore we will free
+       up the fileBuffer since we'll need a clean one later anyway. */
+    if (fileBuffer != NullHandle)
+      MemFree(fileBuffer) ;
+    fileBuffer = NullHandle ;
+
+  } while ((numFilesReturned != 0) && (cancel == 0));
+  /* If there was anything in the file buffer, clear it out. */
+  if (fileBuffer != NullHandle)
+     MemFree(fileBuffer);
+  fileBuffer = NullHandle;
+  /* We don't have any more files.  Let us get the next
+     directory and try that directory. */
+  if (cancel == 0){
+    do {
+        /* Search for only directories */
+        FF.FEP_searchFlags = FESF_DIRS ;
+        /* Declare that we only want names returned from FileEnum. */
+        FF.FEP_returnAttrs = &(filterList[0]) ;
+        /* Precautionary measure.  Declare size we want. */
+        FF.FEP_returnSize = sizeof(FileLongName) + sizeof(FileAttrs) ;
+        /* No match attrs needed */
+        FF.FEP_matchAttrs = NullHandle ;
+        /* Declare that we only want the next directory name (one). */
+        FF.FEP_bufSize = 1;
+        /* Skip how many we've already done. */
+        FF.FEP_skipCount = numDirsProcessed ;
+        /* Declare no call back and zero out its data.  Also, no header. */
+        FF.FEP_callback = NullHandle ;
+        FF.FEP_callbackAttrs = NullHandle ;
+        FF.FEP_headerSize = 0 ;
+        FF.FEP_cbData1 = 0 ;
+        FF.FEP_cbData2 = 0 ;
+        /* If there was anything in the file buffer, clear it out. */
+        if (fileBuffer != NullHandle)
+            MemFree(fileBuffer);
+        fileBuffer = NullHandle;
+        /* Find that next directory. */
+        numDirsProcessed += FileEnum(&FF, &fileBuffer, &numDirsNotHandled);
+        /* Check if we got a block. */
+        if (fileBuffer != NullHandle)  {
+        /* If we did, determine if there is 1 or no directory. */
+          numDirsReturned = (MemGetInfo(fileBuffer, MGIT_SIZE)/
+                                FF.FEP_returnSize) ;
+        } else {
+          /* Otherwise, none were returned. */
+          numDirsReturned = 0;
+        }
+/* check if we found any sub dirs */
+        if (numDirsReturned>0)  {
+          FileAttrs *p_attr ;
+/* lock down the fileBuffer */
+          ptr = MemLock(fileBuffer);
+          /* Only process if we are not a link */
+          p_attr = (FileAttrs *)(((char *)ptr)+sizeof(FileLongName)) ;
+          if ((*p_attr & FA_LINK) == 0)  {
+    /* move to the new dir */
+              FileSetCurrentPath(NULL, (char *)ptr) ;
+    /* increment our dir stack count */
+              dirStackSize++;
+    /* unlock the fileBuffer */
+              MemUnlock(fileBuffer);
+              /* We want to keep memory at its lowest, therefore we will free
+                 up the fileBuffer since we'll need a clean one later anyway. */
+              if (fileBuffer != NullHandle)
+                MemFree(fileBuffer) ;
+              fileBuffer = NullHandle ;
+    /* recursive: call self because we have found a sub dir. */
+              Search(level+1);
+            } else {
+              MemUnlock(fileBuffer);
+              /* We want to keep memory at its lowest, therefore we will free
+                 up the fileBuffer since we'll need a clean one later anyway. */
+              if (fileBuffer != NullHandle)
+                MemFree(fileBuffer) ;
+              fileBuffer = NullHandle ;
+            }
+        } else { /* we're done with this dir */
+         /* We want to keep memory at its lowest, therefore we will free
+           up the fileBuffer since we'll need a clean one later anyway. */
+          if (fileBuffer != NullHandle)
+            MemFree(fileBuffer) ;
+          fileBuffer = NullHandle ;
+/* make sure we don't go below the path we started at */
+          if (dirStackSize){
+/* move back down one dir */
+            FileSetCurrentPath(NULL, "..");
+/* decrement our dir stack count */
+            dirStackSize--;
+          }
+        }
+    } while ((numDirsReturned != 0) && (cancel == 0));
+    /* We want to keep memory at its lowest, therefore we will free
+       up the fileBuffer if it exists. */
+    if (fileBuffer != NullHandle)
+      MemFree(fileBuffer) ;
+    fileBuffer = NullHandle ;
+  }
+   if (level == 0)
+        @call FileFindText::MSG_META_UNSUSPEND();
+/* return if we canceled or finished properly */
+  if (cancel == 0){
+    return FALSE;
+  }else{
+    return TRUE;
+  }
+}
+
+@end RecursiveResource;
+
+@start GotFilesResource;
+/*-------------------------------------------------------------------------*/
+void GotFiles(char *names)
+{
+
+    char       *path_ptr = 0;
+    char       path[MAX_SIZE_FULL_NAME] = {0};
+
+/* check to see if it's a subdir */
+    if (*((FileAttrs *)(names + sizeof(FileLongName)))!=FA_SUBDIR) {
+      path_ptr = path ;
+      FileConstructFullPath(&path_ptr, MAX_SIZE_PATH_NAME, NullHandle, ".", TRUE) ;
+/* Check if the last character in tempPath is a back slash. */
+      if (path[strlen(path)-1] != '\\'){
+/* there isn't one so add a back slash */
+        strcat(path, "\\");
+      }
+      strcat(path, names);
+/* write the full filename to the view */
+      @call FileFindText::MSG_VIS_TEXT_APPEND_PTR(path, 0);
+      @call FileFindText::MSG_VIS_TEXT_APPEND_PTR("\r", 1);
+    } /* subdir so do nothing */
+}
+/*-------------------------------------------------------------------------*/
+@end GotFilesResource;
+
+/****************************************************************************
+*   END OF FILE: FFIND.GOC
+****************************************************************************/
+

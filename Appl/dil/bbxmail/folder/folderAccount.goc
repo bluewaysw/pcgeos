@@ -1,0 +1,1092 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Designs in Light -- All Rights Reserved
+ *
+ * PROJECT:	  Mail
+ * MODULE:	  Mail
+ * FILE:	  folderAccount.goc
+ *
+ * AUTHOR:  	  Gene Anderson
+ *
+ * DESCRIPTION:
+ *	AccountListClass for the Mail application
+ *
+ * 	$Id$
+ *
+ ***********************************************************************/
+
+@include "mail.goh"
+@include "class.goh"
+@include "global.goh"
+
+@classdecl AccountListClass;
+@classdecl AccountDialogClass;
+
+#ifdef __BORLANDC__
+#pragma codeseg InitCode
+#endif
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_ACCOUNT_LIST_FREE
+ * PASS:            none
+ * RETURN:          none
+ * DESCRIPTION:
+ *         we're shutting down
+ ***************************************************************/
+
+@method AccountListClass, MSG_ACCOUNT_LIST_FREE
+{
+    if (pself->ALI_accountArray) {
+	LMemFree(pself->ALI_accountArray);
+	pself->ALI_accountArray = 0;
+    }
+}
+
+#ifdef __BORLANDC__
+#pragma codeseg FolderCode
+#endif
+
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_ACCOUNT_LIST_GET_DIR
+ * DESCRIPTION:     get the directory for the current account
+ *
+ * PASS:            none
+ * RETURN:          handle of block w/top-level directory for account
+ *                  name is of form Mail/<user>
+ *                  NOTE: sizeof(block) = sizeof(PathName)
+ ***************************************************************/
+TCHAR backSlashStr2[] = "\\";
+
+@method AccountListClass, MSG_ACCOUNT_LIST_GET_DIR
+{
+        MemHandle mh, dh;
+	void *mp, *dp;
+	TCHAR *mdName;
+
+	mh = MemAlloc(sizeof(PathName), HF_DYNAMIC, HAF_STANDARD);
+	if (!mh) {
+	    return(mh);
+	}
+	mp = MemLock(mh);
+	/*
+	 * Get Mail/
+	 */
+	mdName = MailLockStdString(MSS_MAIL_DIR);
+	strcpy(mp, mdName);
+	MailUnlockStdString(MSS_MAIL_DIR);
+	strcat(mp, backSlashStr2);
+	/*
+	* Get Mail/<user>
+	*/
+	dh = @call oself::MSG_ACCOUNT_LIST_GET_ACCOUNT_NAME(pself->GIGI_selection);
+	dp = MemLock(dh);
+	strcat(mp, dp);
+	MemFree(dh);
+
+	MemUnlock(mh);
+	return(mh);
+}
+
+
+/***********************************************************************
+ *		MSG_ACCOUNT_LIST_GET_POP3 for AccountListClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    return the current account pop3 server
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ ***********************************************************************/
+@method AccountListClass, MSG_ACCOUNT_LIST_GET_POP3
+{
+    return @call PfPOP3Server::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+
+}	/* End of MSG_ACCOUNT_LIST_GET_POP3.	*/
+
+
+/***********************************************************************
+ *		MSG_ACCOUNT_LIST_GET_SMTP for AccountListClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    return the current account smtp server
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ ***********************************************************************/
+@method AccountListClass, MSG_ACCOUNT_LIST_GET_SMTP
+{
+    return @call PfSMTPServer::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+
+}	/* End of MSG_ACCOUNT_LIST_GET_SMTP.	*/
+
+
+/***********************************************************************
+ *		MSG_ACCOUNT_LIST_GET_USER_ACCOUNT for AccountListClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Return the current account user name
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ ***********************************************************************/
+@method AccountListClass, MSG_ACCOUNT_LIST_GET_USER_ACCOUNT
+{
+    return @call PfMailAccountText::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+
+}	/* End of MSG_ACCOUNT_LIST_GET_USER_ACCOUNT.	*/
+
+
+/***********************************************************************
+ *		MSG_ACCOUNT_LIST_GET_USER_PASSWORD for AccountListClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Return the current accounts password
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ ***********************************************************************/
+@method AccountListClass, MSG_ACCOUNT_LIST_GET_USER_PASSWORD
+{
+
+    return @call PfPasswordText::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+
+}	/* End of MSG_ACCOUNT_LIST_GET_USER_PASSWORD.	*/
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_ACCOUNT_LIST_QUERY_MONIKER
+ * DESCRIPTION:     get the moniker for the specified list entry
+ *
+ * PASS:            none
+ * RETURN:          handle of block w/top-level directory for account
+ ***************************************************************/
+@method AccountListClass, MSG_ACCOUNT_LIST_QUERY_MONIKER
+{
+    MemHandle bufHan;
+
+    TCHAR *acctName;
+
+    /*
+     * it would be nice to just use ChunkArrayElementToPtr() here,
+     * but ...LIST_REPLACE_ITEM_TEXT doesn't like having the source
+     * in same block as the destination if it is fixed.
+     */
+	 bufHan = @call oself::MSG_ACCOUNT_LIST_GET_ACCOUNT_NAME(item);
+	 acctName = MemLock(bufHan);
+	 @call oself::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, acctName);
+	 MemFree(bufHan);
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_ACCOUNT_LIST_GET_NUM_ACCOUNTS
+ * DESCRIPTION:     get the number of accounts
+ *
+ * PASS:            none
+ * RETURN:          word - number of accounts
+ ***************************************************************/
+@method AccountListClass, MSG_ACCOUNT_LIST_GET_NUM_ACCOUNTS
+{
+    if (pself->ALI_accountArray) {
+	return(ChunkArrayGetCount(pself->ALI_accountArray));
+    } else {
+	return(0);
+    }
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_ACCOUNT_LIST_GET_ACCOUNT_NAME
+ * DESCRIPTION:     get the name of specifed account
+ *
+ * PASS:            accountNum - index of account
+ * RETURN:          handle of block w/account name
+ ***************************************************************/
+@method AccountListClass, MSG_ACCOUNT_LIST_GET_ACCOUNT_NAME
+{
+    TCHAR *arrP, *buf;
+    MemHandle mh;
+//    word eSize;
+
+	 arrP = ChunkArrayElementToPtr(pself->ALI_accountArray, accountNum, /*&eSize*/0);
+    mh = MemAlloc(/*eSize*/FILE_LONGNAME_BUFFER_SIZE, HF_DYNAMIC, HAF_STANDARD|HAF_NO_ERR);
+    buf = MemLock(mh);
+    strcpy(buf, arrP);
+    MemUnlock(mh);
+    return(mh);
+}
+
+#ifdef __BORLANDC__
+#pragma codeseg RareCode
+#endif
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MungePassword
+ * DESCRIPTION:     encrypt or decrypt a password
+ *
+ * PASS:            
+ * RETURN:          handle of block w/account name
+ ***************************************************************/
+
+void
+MungePassword(TCHAR *passwd)
+{
+      word i;
+
+      for (i = 0; passwd[i] != 0; i++) {
+	  passwd[i] = passwd[i] ^ 0xea;
+      }
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        UpdateAccountUI()
+ * DESCRIPTION:     update account UI
+ *
+ * PASS:            none (CWD=account)
+ * RETURN:          non-zero for error
+ *                  appOpts - filled in
+ ***************************************************************/
+word
+UpdateAccountUI(MailAppOptions *appOpts)
+{
+        FileHandle fh;
+	MemHandle mh;
+	MailAccountStruct *acp;
+	word numBytes;
+        word opts;
+        TCHAR *acctInfoName;
+@ifdef MULTIPLE_ACCOUNT_SUPPORT
+	TCHAR defAcctName[FILE_LONGNAME_LENGTH];
+        word curAcct;
+	MemHandle acctHan;
+	TCHAR *acctName;
+	MailDefaultOptions defOpts;
+@endif
+
+	/*
+	 * open and read the file
+	 */
+        acctInfoName = MailLockStdString(MSS_ACCT_INFO_FILE);
+	fh = FileOpen(acctInfoName, FILE_ACCESS_R|FILE_DENY_W);
+	MailUnlockStdString(MSS_ACCT_INFO_FILE);
+	mh = MemAlloc(sizeof(MailAccountStruct), HF_DYNAMIC, HAF_STANDARD|HAF_ZERO_INIT|HAF_NO_ERR);
+	acp = MemLock(mh);
+	if (fh) {
+	    numBytes = FileRead(fh, acp, sizeof(MailAccountStruct), FALSE);
+	}
+	/*
+	 * if the file is not the right size, fill in defaults
+	 * (rest is already filled with zeros)
+	 */
+	if (numBytes != sizeof(MailAccountStruct)) {
+	    acp->MAS_messageOptions = MAIL_DEFAULT_MESSAGE_OPTIONS;
+	    acp->MAS_startExitOptions = MAIL_DEFAULT_START_EXIT_OPTIONS;
+	    acp->MAS_appOptions = MAIL_DEFAULT_APP_OPTIONS;
+            acp->MAS_checkInterval = MAIL_DEFAULT_CHECK_INTERVAL;
+		 acp->MAS_checkOptions = MAIL_DEFAULT_CHECK_OPTIONS;
+		 acp->MAS_smtpAuth = FALSE;
+	}
+	/*
+	 * return desired info
+	 */
+	*appOpts = acp->MAS_appOptions;
+	/*
+	 * fill in the text objects
+	 */
+	@call PfMailAccountText::MSG_VIS_TEXT_REPLACE_ALL_PTR(acp->MAS_account, 0);
+	@call PfReturnAddr::MSG_VIS_TEXT_REPLACE_ALL_PTR(acp->MAS_returnAddr, 0);
+	@call PfRealNameText::MSG_VIS_TEXT_REPLACE_ALL_PTR(acp->MAS_realName, 0);
+	@call PfSMTPServer::MSG_VIS_TEXT_REPLACE_ALL_PTR(acp->MAS_smtp, 0);
+	@call PfPOP3Server::MSG_VIS_TEXT_REPLACE_ALL_PTR(acp->MAS_pop3, 0);
+	@call PfSignature::MSG_VIS_TEXT_REPLACE_ALL_PTR(acp->MAS_signature, 0);
+	MungePassword(acp->MAS_password);
+	@call PfPasswordText::MSG_VIS_TEXT_REPLACE_ALL_PTR(acp->MAS_password, 0);
+	/*
+	 * Set the options
+	 */
+	@call PfMessageOptionList::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(acp->MAS_messageOptions & ~MMO_AUTO_SIGN, 0);
+@ifdef AUTO_SIGNATURE_OPTION
+        @call PfSigOptList::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(acp->MAS_messageOptions & MMO_AUTO_SIGN, 0);
+@endif
+        opts = acp->MAS_startExitOptions & ~MSEO_APP_START;
+	@call PfStartOptionList::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(opts, 0);
+@ifdef APP_START_OPTIONS
+	@call PfAppStartOptionList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(acp->MAS_startExitOptions & MSEO_APP_START, 0);
+@endif // APP_START_OPTIONS
+	@call PfSMTPAuthGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+		                                        SMTP_AUTH, acp->MAS_smtpAuth);
+
+	MemFree(mh);
+	if (fh) {
+	    FileClose(fh, FALSE);
+	}
+
+	/*
+	 * deal with the default account
+	 */
+@ifdef MULTIPLE_ACCOUNT_SUPPORT
+		  GetDefaultAccount(defAcctName);
+        curAcct = @call PfAccountList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+        acctHan = @call PfAccountList::MSG_ACCOUNT_LIST_GET_ACCOUNT_NAME(curAcct);
+	acctName = MemLock(acctHan);
+	defOpts = 0;
+	if (!strcmp(acctName, defAcctName)) {
+	    defOpts = MDO_IS_DEFAULT;
+	}
+	MemFree(acctHan);
+	@call PfDefaultAcctList::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(defOpts, 0);
+@endif // MULTIPLE_ACCOUNT_SUPPORT
+
+	return(FALSE);
+}
+
+@ifdef BCC_SUPPORT
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        UpdateBCCUI
+ * DESCRIPTION:     update the UI for BCC support
+ *
+ * PASS:            opts - current MailMessageOptions
+ * RETURN:          none
+ ***************************************************************/
+
+void
+UpdateBCCUI(MailMessageOptions opts)
+{
+    if (opts & MMO_SHOW_BCC) {
+	@call ComposeBccTrigger::MSG_GEN_SET_USABLE(VUM_DLYD);
+	@call ComposeBccField::MSG_GEN_SET_USABLE(VUM_DLYD);
+	@call ComposeCCField::MSG_MAIL_FIELD_TEXT_SET_NEXT_FIELD(@ComposeBccField);
+    } else {
+	@call ComposeBccTrigger::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+	@call ComposeBccField::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+	@call ComposeCCField::MSG_MAIL_FIELD_TEXT_SET_NEXT_FIELD(@ComposeSubjectField);
+    }
+}
+
+@endif
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        UpdatePrimaryMoniker
+ * DESCRIPTION:     update the moniker on the primary
+ *
+ * PASS:            none
+ * RETURN:          none
+ *
+ ***************************************************************/
+
+void
+UpdatePrimaryMoniker(void)
+{
+    MemHandle acctHan;
+
+    /*
+     * set the moniker of the primary to "TVK Mail - <addr@domain.com>"
+     */
+    acctHan = @call PfReturnAddr::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+    @call MailPrimary::MSG_GEN_PRIMARY_REPLACE_LONG_TERM_MONIKER(VUM_DLYD,
+								 0, 0, 0,
+								 VMDT_TEXT,
+								 VMST_HPTR,
+								 (dword) acctHan << 16);
+    MemFree(acctHan);
+}
+
+
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_ACCOUNT_LIST_ACCOUNT_SELECTED
+ * DESCRIPTION:     an account was selected
+ *
+ * PASS:            selection - item #
+ *                  numSelections - # of selections
+ *                  stateFlags - GenItemGroupStateFlags
+ * RETURN:          none
+ *
+ ***************************************************************/
+
+@method AccountListClass, MSG_ACCOUNT_LIST_ACCOUNT_SELECTED
+{
+@ifdef BCC_SUPPORT
+	 MailAppOptions opts;
+@endif
+    MailAppOptions appOpts;
+@ifdef MULTIPLE_ACCOUNT_SUPPORT
+    word defIndex;
+    FileLongName acctName;
+@endif
+
+    /*
+     * go to our directory
+     */
+    GotoMailDirectory(NULL);
+    /*
+     * update the accounts UI
+     */
+    UpdateAccountUI(&appOpts);
+@ifdef BCC_SUPPORT
+    opts = @call PfMessageOptionList::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    UpdateBCCUI(opts);
+@endif
+    /*
+     * rebuild the folder list
+     */
+    RebuildFolderList(MFID_DEFAULT, FALSE);
+    /*
+     * update other UI
+     */
+    EnableDisableForTrash();
+    EnableDisableForOutbox();
+    /*
+     * clear the prompt password so we don't try to use the password
+     * from a different account
+     */
+	 @call GPPassword::MSG_VIS_TEXT_DELETE_ALL();
+
+    /*
+     * if the default account is selected, disable "Delete"
+     * or if it is an account managed by the portal
+     */
+@ifdef MULTIPLE_ACCOUNT_SUPPORT
+    /*
+     * allow deleting the account as long as it isn't the default
+     */
+	 GetDefaultAccount(acctName);
+    defIndex = @call oself::MSG_ACCOUNT_LIST_GET_ACCOUNT_INDEX(acctName);
+    if (defIndex == selection) {
+		@call PfAccountDeleteTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+    } else {
+		@call PfAccountDeleteTrigger::MSG_GEN_SET_ENABLED(VUM_DLYD);
+    }
+@endif
+
+	 /*
+     * update the moniker on the primary to Mail - account@foo.com
+     */
+    UpdatePrimaryMoniker();
+    /*
+     * Make sure the message lists are built out for the folders in this new account
+     */
+	 @call TheFolderList::MSG_FOLDER_LIST_INIT_MSGLIST();
+
+	/* set the tab */
+	@call MainAccountsList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(selection, FALSE);
+
+}
+
+@ifdef MULTIPLE_ACCOUNT_SUPPORT
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_ACCOUNT_LIST_NEW_ACCOUNT
+ * DESCRIPTION:     create a new account
+ *
+ * PASS:            none
+ * RETURN:          none
+ *
+ ***************************************************************/
+@method AccountListClass, MSG_ACCOUNT_LIST_NEW_ACCOUNT
+{
+		  MemHandle ach;
+	TCHAR *acp;
+	word err;
+	word acctIndex;
+
+	ach = @call PfAccountsNewName::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+	acp = MemLock(ach);
+	GotoTopLevelDirectory();
+	err = MailAddAccount(acp, NULL, NULL, NULL, NULL, NULL, NULL, MAIL_DEFAULT_APP_OPTIONS);
+	switch (err) {
+	case MAE_NO_ERROR:
+	    /*
+	     * no error: dismiss the dialog and clear the text for next time
+	     */
+	    @call PfAccountNewDialog::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+	    @call PfAccountsNewName::MSG_VIS_TEXT_DELETE_ALL();
+	    /*
+	     * also set the focus back to the Preferences dialog
+	     */
+	    @call PfAccountsDialog::MSG_META_GRAB_FOCUS_EXCL();
+		 @call PfAccountList::MSG_ACCOUNT_LIST_INIT_NAME_ARRAY();
+		 acctIndex = @call PfAccountList::MSG_ACCOUNT_LIST_GET_ACCOUNT_INDEX(acp);
+		 @call PfAccountList::MSG_ACCOUNT_LIST_REBUILD(acctIndex);
+
+		 /* and update the tabs */
+		 @call self::MSG_ACCOUNT_LIST_UPDATE_TABS(UT_ADD);
+
+		 break;
+	case MAE_ACCOUNT_EXISTS:
+	    ReportError(@accountExistsErr, acp);
+	    break;
+	default:
+	    ReportError(@unableToCreateAccountErr, acp);
+	    break;
+	}
+	MemFree(ach);
+}
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_ACCOUNT_LIST_RENAME_ACCOUNT
+ * DESCRIPTION:     rename an account
+ *
+ * PASS:            none
+ * RETURN:          none
+ *
+ *			Need to rename the folder that the account lives in
+ *			then rebuild things
+ *			Fix the .ini if it's the default account
+ *
+ ***************************************************************/
+@method AccountListClass, MSG_ACCOUNT_LIST_RENAME_ACCOUNT
+{
+ MemHandle ach, dh;
+ TCHAR *acp, *acctName;
+ word acctIndex, index;
+ TCHAR mailCat[INI_CATEGORY_BUFFER_SIZE];
+ Boolean isDefault;
+
+
+	ach = @call PfAccountsRenameName::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+	acp = MemLock(ach);
+
+	if (strlen(acp))  {
+		/* close the message array file, so we can gain access to the folder */
+		@call TheMessageList::MSG_MAIL_LIST_CLOSE_MESSAGE_ARRAY();
+		isDefault = @call PfDefaultAcctList::
+							MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(MDO_IS_DEFAULT);
+		/* get the account's current name */
+		GotoTopLevelDirectory();
+		index = pself->GIGI_selection;
+		dh = @call oself::MSG_ACCOUNT_LIST_GET_ACCOUNT_NAME(index);
+		acctName = MemLock(dh);
+		FileRename(acctName, acp);
+		MemFree(dh);
+		/*
+		 * dismiss the dialog and clear the text for next time
+		 */
+		@call PfAccountRenameDialog::
+		                         MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+		@call PfAccountsRenameName::MSG_VIS_TEXT_DELETE_ALL();
+
+		/*
+		 * also set the focus back to the Preferences dialog
+		 */
+		@call PfAccountsDialog::MSG_META_GRAB_FOCUS_EXCL();
+		@call PfAccountList::MSG_ACCOUNT_LIST_INIT_NAME_ARRAY();
+		acctIndex = @call PfAccountList::MSG_ACCOUNT_LIST_GET_ACCOUNT_INDEX(acp);
+		@call PfAccountList::MSG_ACCOUNT_LIST_REBUILD(acctIndex);
+
+		/* and update the tabs */
+		@call self::MSG_ACCOUNT_LIST_UPDATE_TABS(UT_ADD);
+
+		/* see if we're the default account */
+		if (isDefault) {
+         /* need to change the .ini */
+			@call MailAppObj::MSG_META_GET_INI_CATEGORY(mailCat);
+			InitFileWriteString(mailCat, defKey, acp);
+			InitFileCommit();
+			}
+
+		/* update the UIs */
+		@call oself::MSG_ACCOUNT_LIST_ACCOUNT_SELECTED(acctIndex, 1, 0);
+
+
+		}
+	MemFree(ach);
+
+}
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_ACCOUNT_LIST_DELETE_ACCOUNT
+ * DESCRIPTION:     delete an account
+ *
+ * PASS:            none
+ * RETURN:          none
+ *
+ ***************************************************************/
+@method AccountListClass, MSG_ACCOUNT_LIST_DELETE_ACCOUNT
+{
+    word resp, index, err = 0;
+    TCHAR *acctName;
+    MemHandle dh;
+
+	 index = pself->GIGI_selection;
+	 dh = @call oself::MSG_ACCOUNT_LIST_GET_ACCOUNT_NAME(index);
+	 acctName = MemLock(dh);
+	 resp = DoYesNo(@deleteAccountStr, acctName);
+    if (resp == IC_YES) {
+	/*
+	 * close the message array file
+	 */
+	@call TheMessageList::MSG_MAIL_LIST_CLOSE_MESSAGE_ARRAY();
+	/*
+	 * delete all messages in each folder, then each folder
+	 */
+	err = MailDeleteAccount(acctName);
+	if (err) {
+	    /*
+	     * report any error
+	     */
+		 ReportError(@deleteAccountErr, acctName);
+	} else {
+		 @call PfAccountList::MSG_ACCOUNT_LIST_INIT_NAME_ARRAY();
+	    @call PfAccountList::MSG_ACCOUNT_LIST_REBUILD(-1);
+		 /* and update the tabs */
+		 @call self::MSG_ACCOUNT_LIST_UPDATE_TABS(UT_DELETE);
+	}
+    }
+    MemFree(dh);
+}
+
+
+@endif /* @ifdef MULTIPLE_ACCOUNT_SUPPORT */
+
+
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_ACCOUNT_LIST_SAVE_ACCOUNT
+ * DESCRIPTION:     save an account
+ *
+ * PASS:            none
+ * RETURN:          none
+ ***************************************************************/
+
+void
+GetPfText(optr textObj, TCHAR *buf)
+{
+    @call textObj::MSG_VIS_TEXT_GET_ALL_PTR(buf);
+}
+
+@method AccountListClass, MSG_ACCOUNT_LIST_SAVE_ACCOUNT
+{
+    MemHandle ach;
+    FileHandle fh;
+    MailAccountStruct *acp;
+    word opts;
+        TCHAR *acctInfoName;
+@ifdef MULTIPLE_ACCOUNT_SUPPORT
+        TCHAR mailCat[INI_CATEGORY_BUFFER_SIZE];
+        MemHandle acctHan;
+	TCHAR *acctName;
+	word curAcct;
+@endif
+
+
+    ach = MemAlloc(sizeof(MailAccountStruct), HF_DYNAMIC, HAF_STANDARD|HAF_ZERO_INIT);
+    if (!ach) {
+        ReportError(@unableToSaveAccountErr, NULL);
+        return;
+    }
+    /*
+     * create an ACCTINFO file in the appropriate directory
+     */
+    FilePushDir();
+    GotoMailDirectory(NULL);
+    acctInfoName = MailLockStdString(MSS_ACCT_INFO_FILE);
+    fh = FileCreate(acctInfoName, FCF_NATIVE|FILE_DENY_RW|FILE_ACCESS_RW|FILE_CREATE_TRUNCATE, 0);
+    MailUnlockStdString(MSS_ACCT_INFO_FILE);
+    FilePopDir();
+    if (!fh) {
+         MemFree(ach);
+         ReportError(@unableToSaveAccountErr, NULL);
+         return;
+    }
+    /*
+     * write the user data into the buffer then the file
+     */
+    acp = MemLock(ach);
+    GetPfText(@PfMailAccountText, acp->MAS_account);
+    GetPfText(@PfReturnAddr, acp->MAS_returnAddr);
+    GetPfText(@PfRealNameText, acp->MAS_realName);
+    GetPfText(@PfSMTPServer, acp->MAS_smtp);
+    GetPfText(@PfPOP3Server, acp->MAS_pop3);
+	 GetPfText(@PfSignature, acp->MAS_signature);
+	 acp->MAS_smtpAuth = @call PfSMTPAuthGroup::
+	                        MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(SMTP_AUTH);
+    /*
+     * get the password and do a simple encryption
+     */
+    GetPfText(@PfPasswordText, acp->MAS_password);
+    MungePassword(acp->MAS_password);
+    /*
+     * get the options
+     */
+    acp->MAS_messageOptions = @call PfMessageOptionList::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+@ifdef BCC_SUPPORT
+    UpdateBCCUI(acp->MAS_messageOptions);
+@endif
+@ifdef AUTO_SIGNATURE_OPTION
+        acp->MAS_messageOptions |= @call PfSigOptList::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+@endif
+    acp->MAS_startExitOptions = @call PfStartOptionList::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+@ifdef APP_START_OPTIONS
+    acp->MAS_startExitOptions |= @call PfAppStartOptionList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+@endif
+
+    opts = MAIL_DEFAULT_APP_OPTIONS;
+        acp->MAS_appOptions = opts;
+    /*
+     * write the new user data
+     */
+    FileWrite(fh, acp, sizeof(MailAccountStruct), FALSE);
+    /*
+     * clean up and report any error
+     */
+    FileClose(fh, FALSE);
+    MemFree(ach);
+
+@ifdef MULTIPLE_ACCOUNT_SUPPORT
+        /*
+	 * deal with default account setting
+	 */
+		  if (@call PfDefaultAcctList::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & MDO_IS_DEFAULT) {
+		 curAcct = @call PfAccountList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	    acctHan = @call PfAccountList::MSG_ACCOUNT_LIST_GET_ACCOUNT_NAME(curAcct);
+	    acctName = MemLock(acctHan);
+	    @call MailAppObj::MSG_META_GET_INI_CATEGORY(mailCat);
+		 InitFileWriteString(mailCat, defKey, acctName);
+       InitFileCommit();
+	    MemFree(acctHan);
+	}
+@endif 
+
+	 /*
+     * update the moniker on the primary to Mail - account@foo.com
+     */
+    UpdatePrimaryMoniker();
+}
+
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_ACCOUNT_LIST_DONE
+ * DESCRIPTION:     save an account and close the dialog
+ *
+ * PASS:            none
+ * RETURN:          none
+ ***************************************************************/
+
+@method AccountListClass, MSG_ACCOUNT_LIST_DONE
+{
+//    MailAppOptions appOpts = 0;
+
+    /*
+     * verify the return address looks OK
+     */
+    if (!ValidMailAddresses(@PfReturnAddr)) {
+	return;
+    }
+
+
+    @call oself::MSG_ACCOUNT_LIST_SAVE_ACCOUNT();
+    if (ThreadGetError()) {
+        ReportError(@unableToSaveAccountErr, NULL);
+    } else {
+      @call PfAccountsDialog::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+    }
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_ACCOUNT_LIST_GET_ACCOUNT_INDEX
+ * DESCRIPTION:     Get the list index of an account by name
+ *
+ * PASS:            account - ptr to account name
+ * RETURN:          list index # of account (GIGS_NONE if not found)
+ *
+ * NOTE:
+ *        This bit of ugliness is required because there is no
+ *        way to know where in the list any new account has been
+ *        added.  After creating a new account, we want to select it.
+ ***************************************************************/
+
+TCHAR wildAIStr[] = "*";
+
+@method AccountListClass, MSG_ACCOUNT_LIST_GET_ACCOUNT_INDEX
+{
+    optr arr = pself->ALI_accountArray;
+    TCHAR *arrP;
+	 word /*eSize,*/ numDirs;
+    sword acctIndex;
+
+    numDirs = ChunkArrayGetCount(arr);
+    for (acctIndex = 0; acctIndex < numDirs; acctIndex++) {
+	arrP = ChunkArrayElementToPtr(arr, acctIndex, /*&eSize*/0);
+	if (!strcmp(arrP, account)) {
+	    return(acctIndex);
+	}
+    }
+    return(GIGS_NONE);
+}
+
+
+/**************************************************************
+ *
+ * FUNCTION:        CompareAcctFoldersCB
+ * DESCRIPTION:     Callback to sort the account folder list
+ *
+ * PASS:            el1 - ptr to element #1
+ *                  el2 - ptr to element #2
+ * RETURN:          el1 < el2, el1 == el2, el1 > el2
+ ***************************************************************/
+sword
+_pascal CompareAcctFoldersCB (void *el1, void *el2, word fooType)
+{
+ char		*f1, *f2;
+
+
+	f1 = el1;
+	f2 = el2;
+
+	/* compare the names */
+	return(LocalCmpStrings(f1, f2, 0));
+
+}
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_ACCOUNT_LIST_INIT_NAME_ARRAY
+ * DESCRIPTION:     initialize the name array
+ *
+ * PASS:            none
+ * RETURN:          none
+ *
+ * 04/14/04		jfh	alphabetize the list of accounts - changed the
+ *							ChunkArray to fixed size to use the ChunkArraySort
+ *							routine
+ *
+ ***************************************************************/
+@method AccountListClass, MSG_ACCOUNT_LIST_INIT_NAME_ARRAY
+{
+ MemHandle		dirHan;
+ word				numDirs, i/*, eSize*/;
+ optr				arr;
+ ChunkHandle	chl;
+ FileLongName	*bufP, *arrP;
+
+
+	FilePushDir();
+	GotoTopLevelDirectory();
+	arr = pself->ALI_accountArray;
+
+	/* make sure there's a chunk array */
+	if (arr) {
+		ChunkArrayZero(arr);
+		}
+	else {
+		chl = ChunkArrayCreate(OptrToHandle(oself), FILE_LONGNAME_BUFFER_SIZE, 0, 0);
+		arr = ConstructOptr(OptrToHandle(oself), chl);
+		ObjDerefGen(oself);
+		pself->ALI_accountArray = arr;
+		}
+
+	/* get the directory names and build an array */
+	dirHan = GetDirNames(&numDirs);
+	bufP = MemLock(dirHan);
+	for (i = 0; i < numDirs; i++) {
+//		eSize = LocalStringSize(bufP[i])+sizeof(TCHAR);
+		arrP = ChunkArrayAppend(arr, /*eSize*/0);
+		strcpy(arrP, bufP[i]);
+		}
+	MemFree(dirHan);
+
+	/* alphabetize the array */
+	if (numDirs > 1)
+		ChunkArraySort(arr, 0, CompareAcctFoldersCB);
+
+	FilePopDir();
+
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_ACCOUNT_LIST_REBUILD
+ * DESCRIPTION:     rebuild the accounts list
+ *
+ * PASS:            selection - item to select (-1 for default)
+ * RETURN:          none
+ * DESCRIPTION:
+ *         
+***************************************************************/
+
+@method AccountListClass, MSG_ACCOUNT_LIST_REBUILD
+{
+    word numAccounts;
+    TCHAR acctName[FILE_LONGNAME_BUFFER_SIZE];
+
+    @call oself::MSG_ACCOUNT_LIST_INIT_NAME_ARRAY();
+
+    if (selection == -1) {
+	GetDefaultAccount(acctName);
+	selection = @call oself::MSG_ACCOUNT_LIST_GET_ACCOUNT_INDEX(acctName);
+	if (selection == GIGS_NONE) {
+	    selection = 0;
+	}
+    }
+
+    numAccounts = @call PfAccountList::MSG_ACCOUNT_LIST_GET_NUM_ACCOUNTS();
+    @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numAccounts);
+    @call oself::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(selection, 0);
+    @call oself::MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG(0);
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_GEN_INTERACTION_ACTIVATE_COMMAND
+ * DESCRIPTION:     reset options
+ *
+ * PASS:            command - InteractionCommand
+ * RETURN:          none
+ ***************************************************************/
+
+@method AccountDialogClass, MSG_GEN_INTERACTION_ACTIVATE_COMMAND
+{
+    MailAppOptions appOpts;
+
+    @callsuper();
+
+    if (command == IC_DISMISS) {
+	FilePushDir();
+	GotoMailDirectory(NULL);
+	UpdateAccountUI(&appOpts);
+	FilePopDir();
+    }
+}
+
+
+/**************************************************************
+ *
+ * FUNCTION:        MSG_ACCOUNT_DIALOG_OPTION_GROUP_SELECTED
+ * DESCRIPTION:     reset options
+ *
+ * PASS:            selection - item #
+ *                  numSelections - # of selections
+ *                  stateFlags - GenItemGroupStateFlags
+ * RETURN:          none
+ ***************************************************************/
+
+const optr groupObjs[] = {
+    @PfMessageGroup,
+    @PfStartExitGroup,
+    @PfSignatureGroup
+};
+
+@method AccountDialogClass, MSG_ACCOUNT_DIALOG_OPTION_GROUP_SELECTED
+{
+    word i;
+
+    for (i = 0; i < lengthof(groupObjs, optr); i++) {
+	if (i == selection) {
+	    @call groupObjs[i]::MSG_GEN_SET_USABLE(VUM_DLYD);
+	} else {
+	    @call groupObjs[i]::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+	}
+    }
+}
+
+/**************************************************************
+ *
+ * FUNCTION:        MSG_ACCOUNT_LIST_UPDATE_TABS
+ * DESCRIPTION:     update options
+ *
+ * PASS:            word which (UT_BUILD, UT_DELETE, UT_ADD)
+ * RETURN:          none
+ ***************************************************************/
+@method AccountListClass, MSG_ACCOUNT_LIST_UPDATE_TABS
+{
+char			*acctName;
+char			nameStr[MAX_ACCT_NAME_LENGTH + 5];
+MemHandle	newBlock, bufHan;
+optr			newTab;
+word			numKids, numAccts, i;
+
+
+	@call MainAccountsList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+
+	if (which == UT_ADD || which == UT_DELETE) {
+		/* since the accts may get shuffled in an add or delete since
+		 * they're sorted we'll just delete them all then start anew */
+		numKids = @call MainAccountsList::MSG_GEN_COUNT_CHILDREN();
+		for (i = numKids; i > 0; i--) {
+			newTab = @call MainAccountsList::MSG_GEN_FIND_CHILD_AT_POSITION(i - 1);
+			@call newTab::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+			@call MainAccountsList::MSG_GEN_REMOVE_CHILD(newTab, 0);
+			}
+		}
+
+	numAccts = @call oself::MSG_ACCOUNT_LIST_GET_NUM_ACCOUNTS();
+	for (i = 0; i < numAccts; i++) {
+		/* duplicate the menu item object and add it*/
+		newBlock = ObjDuplicateResource(OptrToHandle(@AcctTabTemplate), 0, -1);
+		newTab = ConstructOptr(newBlock, OptrToChunk(@AcctTabTemplate));
+		@call MainAccountsList::MSG_GEN_ADD_CHILD(newTab,
+					CCF_MARK_DIRTY | CCO_LAST);
+		/* find out what number child it is */
+		numKids = @call MainAccountsList::MSG_GEN_COUNT_CHILDREN();
+		numKids--;
+		/* add the trigger data var data */
+		@call newTab::MSG_GEN_ITEM_SET_IDENTIFIER(numKids--);
+		/* give it its moniker and make it usable */
+		bufHan = @call oself::MSG_ACCOUNT_LIST_GET_ACCOUNT_NAME(i);
+		acctName = MemLock(bufHan);
+		strcpy(nameStr, "  ");
+		strcat(nameStr, acctName);
+      strcat(nameStr, "  ");
+		MemFree(bufHan);
+		@call newTab::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+						 nameStr,
+					    VUM_DELAYED_VIA_APP_QUEUE);
+		@call newTab::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+
+	/* set the tab */
+	i = @call PfAccountList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	@send MainAccountsList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(i, FALSE);
+
+
+}
+
+/**************************************************************
+ *
+ * FUNCTION:        MSG_ACCOUNT_LIST_TAB_APPLY
+ * DESCRIPTION:     account tab clicked
+ *
+ * PASS:            (word selection, numSelections, flags)
+ * RETURN:          none
+ ***************************************************************/
+@method AccountListClass, MSG_ACCOUNT_LIST_TAB_APPLY
+{
+
+	/* tell the account list to do its thing */
+	@send PfAccountList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(selection, FALSE);
+	@send PfAccountList::MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG(TRUE);
+
+}
+

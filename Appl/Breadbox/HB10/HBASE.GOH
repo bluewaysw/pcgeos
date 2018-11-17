@@ -1,0 +1,230 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT:	Breadbox HomeBase
+ * FILE:	hbase.goh
+ * AUTHOR:	John F. Howard,   11/96
+ *
+ * DESCRIPTION:
+ *	This file has the global variables
+ *      and structures for the HomeBase application.
+ *
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+@include <gstring.h>
+#include <Ansi/string.h>
+#include <print.h>       /* These two for printing  */
+@include <spool.goh>
+#include <token.h>	/* for assigning doc token */
+@include <Objects/Text/tCtrlC.goh>  /* for controllers */
+@include <Objects/vLTextC.goh>    /* VisLargeText definitions */
+#include <math.h>
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+@class	HBaseProcessClass, GenProcessClass;
+
+    @message void MSG_OPEN_CHANGE_NAME();
+    @message void MSG_OPEN_CHANGE_NUMBER();
+    @message void MSG_CHANGE_NUMBER();
+    @message void MSG_CHANGE_NAME();
+    @message void MSG_DISPLAY_NAMES();
+    @message void MSG_DISPLAY_FIELDS(word number);
+
+    @message void MSG_ENTER_DATA();
+    @message void MSG_MODIFY_DATA(); 
+    @message void MSG_DELETE_DATA();
+    @message void MSG_NEW_RECORD(); 
+
+    @message void MSG_NAV_RECORDS(word whichWay);
+    @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_INDEX_DLIST_MONIKER_QUERY;
+    @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_INDEX_DLIST_APPLY; 
+
+    @message void MSG_OPEN_IMPORT();
+    @message void MSG_IMPORT_CSV();
+    @message (GEN_FILE_SELECTOR_NOTIFICATION_MSG) MSG_IMPORT_SELECTOR_ACTION;
+
+    @message void MSG_CREATE_REPORT();
+    @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_ALL_RECORDS_APPLY;
+    @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_FROM_TO_APPLY;
+    @message (GEN_VALUE_STATUS_MSG) MSG_FROM_VAL_STATUS;
+    @message (GEN_VALUE_STATUS_MSG) MSG_TO_VAL_STATUS;
+    @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_SUM_SELECT_APPLY;
+    @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_FIRST_ONLY_APPLY;
+
+    @message void MSG_OPEN_EXPORT();
+    @message void MSG_EXPORT_CSV(); 
+
+    @message void MSG_SEARCH_FIELDS(word whichSearch); 
+@endc
+
+
+/* This class handles import cancel */
+@class	HBaseApplicationClass, GenApplicationClass;
+    @message void MSG_CANCEL_IMPORT();
+@endc
+
+
+
+/* This class sets up repeating triggers */
+@class	HBaseTriggerClass, GenTriggerClass;
+	@instance TimerHandle HBTI_timer = NullHandle;
+        @instance word HBTI_timerId = 0;
+        @instance word HBTI_wait = 8;
+	@instance Boolean HBTI_held = FALSE;
+
+        @message void MSG_HB_TRIGGER_CLICK();
+@endc
+
+/* Prototypes */
+   void ShowData (void);
+
+   void ClearData (void);
+
+   void EnterField (word counter,
+		    char fieldString[50],
+		    word whichGroup,
+		    word whichGroupRec);
+
+   void UpdateNumRecords (void);
+
+   void UpdateCurRecord (void);
+
+   void GetGroupAndGrpRec (word record,
+		           word *curGroup,
+		           word *curGrpRec,
+			   word *curNumGrpRec);
+
+   void DeleteRecord (void);
+
+   word AckDBox (char* string1, optr ackMsg);
+
+   void NotifyDBox (optr notifyMsg);
+ /*
+ ***************************************************************************
+ *		Global variables and definitions
+ ***************************************************************************
+ */
+
+#define DATA_LEN   50
+#define FIELD_NAME_LEN   25
+#define MAX_FIELDS	10
+
+/* constants for ack dboxes */
+typedef ByteEnum AckDB;
+#define ACK_YES 1
+#define ACK_NO 2
+
+/* constants for navigating records */
+typedef ByteEnum PrevNext;
+#define FIRST 1
+#define PREV 2
+#define NEXT 3
+#define LAST 4
+
+/* constants for the reports selectons lists */
+typedef ByteEnum ReportsItems;
+#define R_TITLE		1
+#define R_DATE		2
+#define R_FNAME		3
+#define R_FIRST		4
+#define R_SUM		5
+#define R_ALL		6
+#define R_FROM		7
+
+#define E_FIELD 1
+
+#define S_CASE 1
+#define S_FIELD 2
+
+extern FileHandle  HBFile;  /* handle to the file that's open. */
+
+extern word  numRecords;
+extern word  numFields;
+extern word  firstGroup;
+extern word  lastGroup;
+extern word  currentRecord;
+extern Boolean isMod;
+extern Boolean isImport;
+extern Boolean canxImport;
+
+/* globals for the Search Next functionality */
+extern word SNChar;
+extern word SNField;
+extern word SNRecord;
+
+/*
+ ***************************************************************************
+ *		Structure Definitions
+ ***************************************************************************
+ */
+
+/* This is the structure of the DB mapblock  */
+typedef struct {
+
+    word	MS_numRecords;          /* the number of records */
+    word	MS_firstGroup;
+    word	MS_lastGroup;
+
+} DBMapStruct;
+
+/* This is the structure of the VM mapblock  */
+typedef struct {
+
+    word	VMS_numFields;           /* the number of fields */
+    char        VMS_fn1[FIELD_NAME_LEN]; /* name of field 1 */
+    char        VMS_fn2[FIELD_NAME_LEN]; 
+    char        VMS_fn3[FIELD_NAME_LEN]; 
+    char        VMS_fn4[FIELD_NAME_LEN]; 
+    char        VMS_fn5[FIELD_NAME_LEN]; 
+    char        VMS_fn6[FIELD_NAME_LEN]; 
+    char        VMS_fn7[FIELD_NAME_LEN]; 
+    char        VMS_fn8[FIELD_NAME_LEN]; 
+    char        VMS_fn9[FIELD_NAME_LEN]; 
+    char        VMS_fn10[FIELD_NAME_LEN];
+    word	VMS_reserved;
+
+} VMMapStruct;
+
+/*
+ * GroupStruct
+ *
+ * These structures contain pertinent information about a DB Group,
+ * 27 groups - 1 for each letter and one for misc
+ */
+
+typedef struct {
+
+    DBGroup     GS_group;               /* DB Group ID for this record */
+    DBItem      GS_indexStart;		/* start of item handles */
+    word	GS_numGroupRecs;	/* # of records in the group */
+    word	GS_reserved;  
+} GroupStruct;
+
+/*
+ * RecordStruct
+ *
+ * These structures are stored as individual DB items. The char 
+ * string contains all ten records separated by a tilde
+ *
+ */
+
+typedef struct {
+
+    char	  RS_data[(10 * DATA_LEN)];
+    word	  RS_reserved;
+
+} RecordStruct;
+
+

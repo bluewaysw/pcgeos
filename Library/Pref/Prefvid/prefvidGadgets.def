@@ -1,0 +1,158 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GlobalPC 1999.  All rights reserved.
+
+PROJECT:	GlobalPC
+MODULE:		Video Preferences
+FILE:		prefvidGadgets.def
+
+AUTHOR:		Allen Yuen, Aug 10, 1999
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ayuen	8/10/99   	Initial revision
+
+DESCRIPTION:
+
+	Definitions for changing video driver settings.
+		
+	$Id$
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+ifdef	GPC_VERSION
+
+TV_SIZING_INNER_BORDER_THICKNESS	equ	10
+TV_BORDER_MAX_THICKNESS			equ	50
+
+
+
+PrefVidTvPosInteractionClass	class	PrefInteractionClass
+
+MSG_PVTPI_CHANGE_POS		message
+; Change the horizontal or vertical TV position.
+;
+; Pass:		cx	= VidFunction or VidEscCode to change position
+;				PASS:		ax	- new value
+;				RETURN:		di	- unchanged if
+;							  supported, 0 if not
+;							  supported
+;				DESTROYS:	ax
+;		dx	= signed value to change by
+; Return:	nothing
+; Destroys:	ax, cx, dx, bp
+;
+
+PosStruct	struct
+	PS_orig	word
+	PS_cur	word
+	PS_max	word
+PosStruct	ends
+
+	; Horizontal and vertical positions.
+	PVTPII_horizPos		PosStruct
+	PVTPII_vertPos		PosStruct
+
+PrefVidTvPosInteractionClass	endc
+
+; Default values for horiz and vert positions.  These values *must*
+; correspond to the default values used in cyber16 video driver.  See
+; the algorithm in Cyber16GetHorizPosParams and Cyber16GetVertPosParams.
+HORIZ_POS_INIT_VALUE	equ	12
+VERT_POS_INIT_VALUE	equ	5
+
+
+
+PrefVidTvSizeInteractionClass	class	PrefInteractionClass
+
+MSG_PVTSI_CHANGE_HORIZ_SIZE	message
+MSG_PVTSI_CHANGE_VERT_SIZE	message
+; Change the horizontal or vertical TV size.
+;
+; Pass:		cx	= signed value to change by
+; Return:	nothing
+; Destroys:	ax, cx, dx, bp
+;
+
+PrefVidTvSizeInteractionClass	endc
+
+
+
+; PrefVidTvSizeBordersPrimaryClass.  It is used to draw the sizing borders
+; in a primay window behind the prefvid dialog.
+; This is not a "Pref" subclass.
+;
+PrefVidTvSizeBordersPrimaryClass	class	GenPrimaryClass
+PrefVidTvSizeBordersPrimaryClass	endc
+
+
+
+PrefVidBooleanGroupClass	class	PrefBooleanGroupClass
+
+MSG_PVBG_BOOLEAN_CHANGED	message
+; Status message sent by GenValue superclass to itself whenever the value is
+; changed.  Used for notifying the video driver of the new value.
+;
+; Pass:		dx.cx	= current value
+;		bp	= GenValueStateFlags
+; Return:	nothing
+; Destroys:	ax, cx, dx, bp
+;
+
+PrefVidBooleanGroupClass	endc
+
+
+
+PrefVidBooleanClass	class	PrefBooleanClass
+
+MSG_PVB_GET_VID_FUNC		message
+; Message to return the video function for which this boolean sets.
+;
+; Pass:		nothing
+; Return:	ax	= VidFunction or VidEscCode of video function
+;			PASS:		ax	- zero/non-zero boolean value
+;			RETURN:		di	- unchanged if supported
+;					di	- 0 if not supported
+;			DESTROYS:	ax
+; Destroys:	nothing
+;
+
+	; Video driver function to tell the driver about the new setting.
+	;
+	;	PASS:		ax	- zero/non-zero boolean value
+	;	RETURN:		di	- unchanged if supported
+	;			di	- 0 if not supported
+	;	DESTROYS:	ax
+	;
+	PVBI_setVidFunc	VidFunction	; or VidEscCode
+
+PrefVidBooleanClass	endc
+
+endif	; GPC_VERSION
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;	VARIABLES
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+ifdef	GPC_VERSION
+
+udata	segment
+
+	scrWidth		word
+	scrHeight		word
+
+	tvBorderOrigWidth	word	; width of left and right borders
+	tvBorderCurWidth	word
+	tvBorderOrigHeight	word	; height of top and bottom borders
+	tvBorderCurHeight	word
+
+udata	ends
+
+endif	; GPC_VERSION

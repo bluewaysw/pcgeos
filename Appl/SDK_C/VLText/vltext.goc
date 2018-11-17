@@ -1,0 +1,443 @@
+/********************************************************************
+ *
+ *	Copyright (c) Geoworks 1994 -- All Rights Reserved.
+ *
+ * PROJECT:	GEOS Sample Applications
+ * MODULE:	VisLargeText
+ * FILE:	vltext.goc
+ *
+ * AUTHOR:	Tony Requist: January 19, 1994
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      tony    1/19/94         Initial version
+ *      NF      3/26/97         Added comments, changed layout,
+ *                              made names consistent.
+ *
+ * DESCRIPTION:
+ *	This is a sample application that demonstrates the use of
+ *	the large text object.
+ *
+ *	The large text object allows for very large bodies of text of
+ *	be displayed and edited.  The data structures for the large
+ *	text object are stored in a VM file.  For a document based
+ *	application the VM file is normally the document file.
+ *      For non-document based applications a temporary VM file is
+ *      needed, and the clipboard VM file is commonly used for this
+ *      purpose (as is the case in this sample).
+ *
+ *	The application needs to do a little more work with a large
+ *	text object than with the small text object, partially because
+ *	their is no generic object equivalent of the large text object.
+ *
+ *	Using the large text object (VisLargeTextClass) requires:
+ *
+ *	* Attaching the text object to a VM file and initializing
+ *	  the object.
+ *
+ *	* Using a GenView and a GenContent, with the VisLargeText
+ *	  being a child of the GenContent.
+ *
+ * RCS STAMP:
+ *	$Id: vltext.goc,v 1.1 97/04/04 16:40:29 newdeal Exp $
+ *
+ *******************************************************************/
+
+/********************************************************************
+ *		Include Files
+ *******************************************************************/
+    @include <stdapp.goh>
+    @include <Objects/vLTextC.goh> /* VisLargeText definitions */
+
+/********************************************************************
+ *		Constants
+ *******************************************************************/
+    #define TEXT_APPEND_ITERATIONS 100
+
+/********************************************************************
+ *		Class Definitions
+ *******************************************************************/
+    @class VLTextProcessClass, GenProcessClass;
+    @message void MSG_VLTEXT_CLEAR_TEXT();
+    @message void MSG_VLTEXT_APPEND_TEXT();
+    @endc;
+
+      /*
+       * VLTextContentClass does the initialization work for
+       * the text object.
+       */
+    @class VLTextContentClass, GenContentClass;
+    @endc;
+
+      /*
+       * VLTextTextClass is needed to intercept and initialize
+       * a few things.
+       */
+    @class VLTextTextClass, VisLargeTextClass;
+    @endc;
+
+/********************************************************************
+ *		Class Declarations
+ *******************************************************************/
+    @classdecl VLTextProcessClass, neverSaved;
+    @classdecl VLTextContentClass;
+    @classdecl VLTextTextClass;
+
+/********************************************************************
+ *		UI Object Resources
+ *******************************************************************/
+
+/********************************************************************
+ *		AppResource Resource
+ *******************************************************************/
+@start AppResource;
+
+@object GenApplicationClass VLTextApp = {
+    GI_visMoniker = list { @VLTextTitle };
+    GI_comp = @VLTextPrimary;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) =
+        @VLTextPrimary;
+}
+
+@visMoniker VLTextTitle = "VLText Application";
+
+@end AppResource;
+
+/********************************************************************
+ *		Interface Resource
+ *******************************************************************/
+@start Interface;
+
+@object GenPrimaryClass VLTextPrimary  = {
+    GI_comp = @VLTextTestButton,
+              @VLTextTextDialog;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTriggerClass VLTextTestButton = {
+    GI_visMoniker = 'S', "Show dialog";
+    GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE;
+    GTI_destination = @VLTextTextDialog;
+}
+
+@object GenInteractionClass VLTextTextDialog = {
+    GI_visMoniker = "Dialog Box With Text";
+    GI_comp = @VLTextClearTrigger,
+              @VLTextAppendTrigger,
+              @VLTextView;
+    GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_ORGANIZATIONAL;
+    HINT_INTERACTION_MAKE_RESIZABLE;
+    HINT_DEFAULT_FOCUS;
+}
+
+@end Interface;
+
+/********************************************************************
+ *		DialogResource Resource
+ *******************************************************************/
+@start DialogResource;
+
+@object GenTriggerClass VLTextClearTrigger = {
+    GI_visMoniker = 'C', "Clear Text";
+    GTI_actionMsg = MSG_VLTEXT_CLEAR_TEXT;
+    GTI_destination = process;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass VLTextAppendTrigger = {
+    GI_visMoniker = 'A', "Append Text";
+    GTI_actionMsg = MSG_VLTEXT_APPEND_TEXT;
+    GTI_destination = process;
+    HINT_SEEK_REPLY_BAR;
+}
+
+  /*
+   * These objects are the heart of the sample application:
+   *   the view, content and large text object.
+   *
+   * Items of note in the view:
+   *
+   *  GVA_WINDOW_COORDINATE_MOUSE_EVENTS
+   *    Allows the view to send mouse events in window coordinates
+   *    as opposed to in view document coordinates.  The VisContent
+   *    then deals with these coordinates with in 32-bit coordinate
+   *    mode (which must be used with VisLargeText).
+   */
+@object GenViewClass VLTextView = {
+    GVI_vertAttrs  = @default | GVDA_SCROLLABLE;
+    GVI_attrs = @default | GVA_DRAG_SCROLLING
+	    	    	 | GVA_WINDOW_COORDINATE_MOUSE_EVENTS
+			 | GVA_DONT_SEND_KBD_RELEASES
+                         | GVA_FOCUSABLE;
+    GVI_content = @VLTextContent;
+    ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_DEFAULT_FOCUS;
+}
+
+  /*
+   * Items of note in the content:
+   *
+   * VCNA_LARGE_DOCUMENT_MODEL:
+   * VCNA_WINDOW_COORDINATE_MOUSE_EVENTS
+   *    VisLargeText requires using the large coordinate model,
+   *    meaning that 32-bit coordinates are passed for mouse events.
+   *    Bounds are larger than the graphics space under this model,
+   *    so the 16-bit. Visible bounds of this object are meaningless.
+   */
+@object VLTextContentClass VLTextContent = {
+    GCI_genView = @VLTextView;
+    GCI_attrs = @default | VCNA_LARGE_DOCUMENT_MODEL
+	    	    	 | VCNA_WINDOW_COORDINATE_MOUSE_EVENTS
+		    	 | VCNA_SAME_WIDTH_AS_VIEW;
+}
+
+  /*
+   * Items of note in the text object:
+   *
+   * VLTI_displayMode:
+   *    VLTDM_DRAFT_WITH_STYLES is handled specially in
+   *    VisLargeTextClass to automatically create and setup
+   *    regions in the region array. The other display modes
+   *    require significant application assistence.
+   *
+   * VLTI_attrs:
+   *    VLTA_EXACT_HEIGHT causes the text object to be the
+   *    exact size of the text.
+   *
+   * VLTI_regionArray:
+   *    This is an internal data structure.
+   */
+@object VLTextTextClass VLTextText = {
+    VTI_state = @default | VTS_SELECTABLE
+                         | VTS_EDITABLE;
+    VTI_output = process;
+    VTI_charAttrRuns = ( ( VTDS_9 << VTDCA_SIZE_OFFSET ) ||
+                         ( VTDF_BERKELEY << VTDCA_FONT_OFFSET ) );
+    VTI_paraAttrRuns = ( ( 0*2 ) << VTDPA_LEFT_MARGIN_OFFSET ) |
+                       ( ( 0*2 ) << VTDPA_PARA_MARGIN_OFFSET ) |
+                       ( ( 0*2 ) << VTDPA_RIGHT_MARGIN_OFFSET ) |
+                       ( VTDDT_HALF_INCH << VTDPA_DEFAULT_TABS_OFFSET ) |
+                       ( J_LEFT << VTDPA_JUSTIFICATION_OFFSET );
+    VLTI_displayMode = VLTDM_DRAFT_WITH_STYLES;
+    VLTI_attrs = VLTA_EXACT_HEIGHT;
+    VLTI_regionArray = @VLTextTextRegionArray;
+}
+
+@chunk ChunkArrayHeader VLTextTextRegionArray = {
+    0,
+    sizeof( VisLargeTextRegionArrayElement ),
+    0,
+    sizeof( ChunkArrayHeader )
+};
+
+@end DialogResource;
+
+/********************************************************************
+ *              Code for VLTextProcessClass
+ *******************************************************************/
+
+/********************************************************************
+ *              MSG_VLTEXT_CLEAR_TEXT
+ ********************************************************************
+ * SYNOPSIS:     Clear all of the text in the text object.
+ * CALLED BY:    VLTextClearTrigger
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Use the MSG_VIS_TEXT_DELETE_ALL message on the
+ *               text object.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      tony    1/19/94         Initial version
+ *******************************************************************/
+@method VLTextProcessClass, MSG_VLTEXT_CLEAR_TEXT
+{
+
+    @call VLTextText::MSG_VIS_TEXT_DELETE_ALL();
+} /* MSG_VLTEXT_CLEAR_TEXT */
+
+/********************************************************************
+ *              MSG_VLTEXT_APPEND_TEXT
+ ********************************************************************
+ * SYNOPSIS:     Add some text to the end of the text object.
+ * CALLED BY:    VLTextAppendTrigger
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Use the MSG_VIS_TEXT_APPEND_PTR message on the
+ *               text object, passing a null-terminated string as
+ *               the text to add.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      tony    1/19/94         Initial version
+ *******************************************************************/
+@method VLTextProcessClass, MSG_VLTEXT_APPEND_TEXT
+{
+
+    @call VLTextText::MSG_VIS_TEXT_APPEND_PTR( "Some appended text\r", 0 );
+} /* MSG_VLTEXT_APPEND_TEXT */
+
+/********************************************************************
+ *              Code for VLTextContentClass
+ *******************************************************************/
+
+/********************************************************************
+ *              MSG_META_CONTENT_VIEW_OPENING
+ ********************************************************************
+ * SYNOPSIS:     We use MSG_META_CONTENT_VIEW_OPENING as a convenient
+ *               place to initialize some things.
+ * CALLED BY:
+ * PARAMETERS:   optr view
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     First call the superclass. Then setup the content
+ *               object (ourself) so we don't use the geometry
+ *               manager (which will control the size of the content).
+ *               Add the large text object to ourselves and then
+ *               make it "large" by adding a VM file and creating
+ *               the "large" data structures.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      tony    1/19/94         Initial version
+ *******************************************************************/
+@method VLTextContentClass, MSG_META_CONTENT_VIEW_OPENING
+{
+      /*
+       * vself   - Pointer to our instance data.
+       * fileHan - Handle of the temporary file for the text
+       *           object to use to store the "large" data.
+       * i       - Used in a for loop.
+       */
+    VisContentInstance * vself;
+    VMFileHandle         fileHan;
+    word                 i;
+
+    @callsuper();
+
+      /*
+       * Set up the geometry for the content so that the
+       * geometry manager is not used.
+       */
+    vself = ObjDerefVis( oself );
+    vself->VI_attrs &= ~VA_MANAGED;
+    vself->VI_optFlags &= ~( VOF_GEOMETRY_INVALID | VOF_GEO_UPDATE_PATH );
+    vself->VCI_geoAttrs |= VCGA_CUSTOM_MANAGE_CHILDREN;
+
+      /*
+       * Add the text object as a child of the content.
+       * This must be done dynamically because the text
+       * object is a visual child, not a generic one.
+       */
+    @call VLTextContent::MSG_VIS_ADD_CHILD( @VLTextText, CCO_FIRST );
+
+      /*
+       * Set up the text object to be large.
+       */
+    fileHan = ClipboardGetClipboardFile();
+    @call VLTextText::MSG_VIS_TEXT_SET_VM_FILE( fileHan );
+    @call VLTextText::MSG_VIS_LARGE_TEXT_CREATE_DATA_STRUCTURES();
+    @call VLTextText::MSG_VIS_NOTIFY_GEOMETRY_VALID();
+
+      /*
+       * Add some text to the text object, to show that it is
+       * a large object.
+       */
+    @call VLTextText::MSG_META_SUSPEND();
+    for ( i = 0; i < TEXT_APPEND_ITERATIONS; i ++ ) {
+	@call VLTextText::MSG_VIS_TEXT_APPEND_PTR(
+            "Here is some text.\r", 0 );
+    }
+    @call VLTextText::MSG_META_UNSUSPEND();
+} /* MSG_META_CONTENT_VIEW_OPENING */
+
+/********************************************************************
+ *              MSG_META_CONTENT_VIEW_CLOSING
+ ********************************************************************
+ * SYNOPSIS:     We use MSG_META_CONTENT_VIEW_CLOSING as a convenient
+ *               place to clean up after ourselves.
+ * CALLED BY:
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     First call the superclass, then free the extra
+ *               "large" data structures of the text object. Then
+ *               clear out the VM file used to store the data.
+ *               Wrap up by removing the text object from the
+ *               content.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      tony    1/19/94         Initial version
+ *******************************************************************/
+@method VLTextContentClass, MSG_META_CONTENT_VIEW_CLOSING
+{
+
+    @callsuper();
+
+      /*
+       * Free the large text data structures and make the
+       * text object small again. Then remove it from ourselves.
+       */
+    @call VLTextText::MSG_VIS_TEXT_FREE_ALL_STORAGE( TRUE );
+    @call VLTextText::MSG_VIS_TEXT_SET_VM_FILE( NullHandle );
+    @call self::MSG_VIS_REMOVE_CHILD( @VLTextText, CCO_FIRST );
+} /* MSG_META_CONTENT_VIEW_CLOSING */
+
+/********************************************************************
+ *              MSG_VLTEXT_CLEAR_TEXT
+ ********************************************************************
+ * SYNOPSIS:     We must intercept FREE_STORAGE to do a little more
+ *               work so that the text object is left in the correct
+ *               state.
+ * CALLED BY:
+ * PARAMETERS:   Boolean removeElementArrays
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     First call the superclass. Then resize the text
+ *               region array to its default size, and reset the
+ *               values to their defaults. Finally, make ourselves
+ *               small again and mark our geometry invalid so we'll
+ *               be redrawn when the time comes.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      tony    1/19/94         Initial version
+ *******************************************************************/
+@method VLTextTextClass, MSG_VIS_TEXT_FREE_ALL_STORAGE
+{
+      /*
+       * cahp  - Pointer to the text region array.
+       * vself - Pointer to our instance data.
+       */
+    ChunkArrayHeader *     cahp;
+    VisLargeTextInstance * vself;
+
+    @callsuper();
+
+      /*
+       * Resize the text region array back to its default size.
+       * Then reset the values back to the default.
+       */
+    LMemReAlloc( @VLTextTextRegionArray, sizeof( ChunkArrayHeader ) );
+    cahp = LMemDeref( @VLTextTextRegionArray );
+    cahp->CAH_count = 0;
+    cahp->CAH_elementSize = sizeof( VisLargeTextRegionArrayElement );
+    cahp->CAH_curOffset = 0;
+    cahp->CAH_offset = sizeof( ChunkArrayHeader );
+
+      /*
+       * Make ourselves not large and mark our geometry invalid.
+       */
+    vself = ObjDerefVis( oself );
+    vself->VTI_storageFlags &= ~VTSF_LARGE;
+    vself->VI_optFlags |= VOF_GEOMETRY_INVALID;
+} /* MSG_VIS_TEXT_FREE_ALL_STORAGE */
+

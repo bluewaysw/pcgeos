@@ -1,0 +1,163 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1994 -- All Rights Reserved
+ *
+ * PROJECT:	  Condo viewer
+ * MODULE:	  main - view and text
+ * FILE:	  mainContent.ui
+ *
+ * AUTHOR:  	  Jonathan Magasin, Apr 11, 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	JM	4/11/94   	Initial version
+ *
+ * DESCRIPTION:
+ *	UI template for content library.
+ *
+ *
+ * 	$Id: mainContent.ui,v 1.1 97/04/04 17:49:30 newdeal Exp $
+ *
+ ***********************************************************************/
+#define	_JEDI	0
+
+#define	_NIKE	0
+
+
+
+start		ContentTemplate, notDetachable;
+
+ContentDocTemplate = ContentDoc {
+	visCompGeoAttrs = customManageChildren; 
+	viewHeight = "CONTENT_GEN_VIEW_INITIAL_HEIGHT";
+	viewWidth = "CONTENT_GEN_VIEW_INITIAL_WIDTH";
+	children =
+		ContentTextTemplate;
+}
+
+ContentTextTemplate = ContentText {
+	optFlags = default -geometryInvalid;
+	text = "";
+	states = selectable, targetable;
+	left = 0;			/*Arbitrary.*/
+	top = 0;
+	right = "CONTENT_GEN_VIEW_INITIAL_HEIGHT";
+	bottom = "CONTENT_GEN_VIEW_INITIAL_WIDTH";
+	/*
+	 * Setting the left/right margin is a hack to avoid the dropping
+	 * characters problem on the zoomer. See bug: 31666 
+	 */
+	lrMargin = 1;
+	hints = {
+		HINT_DEFAULT_TARGET
+	}
+}
+
+end		ContentTemplate;
+
+
+
+start		BookFileSelectorTemplate, notDetachable;
+
+/*
+ * The CGView uses the following template in its META_ATTACH 
+ * handler to create a file selector.  The view records the
+ * block of the created file selector so that it can initiate
+ * it later on.  For example, the nav controller can tell the
+ * view to bring up its file selector via the nav's "Goto" button.
+ */
+ 
+BookFileDialog = GenInteraction {
+	genStates = default -usable;
+	moniker = "Book Reader";
+ 	type = command; 
+	visibility = dialog;
+	attributes = default +modal, +notUserInitiatable;
+	children =
+		BookFileText,
+		BookFileSelector,
+		BookFileSelectorOK,
+	    	BookFileSelectorDelete;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_KEEP_ENTIRELY_ONSCREEN,
+		ATTR_GEN_HELP_CONTEXT {
+			char "dbOpenBook",0
+		}
+	}
+}
+
+
+BookFileText = GenText {
+	text = "Please select a book to open: ";
+	genAttributes = default +readOnly;
+}
+
+BookFileSelector = GenFileSelector {
+	fileCriteria = dirs, geosNonExecutables;
+	genAttributes = default +initiatesInputHoldUp,+initiatesBusyState;
+/*#if _NDO2000 */
+	attributes = default -useVirtualRoot, 
+			+hasChangeDriveList, 
+			+hasDocumentButton,
+			+hasChangeDirectoryList;
+/*#else
+	attributes = default +useVirtualRoot, 
+			-hasChangeDriveList, 
+			-hasDocumentButton,
+			-hasChangeDirectoryList;  */
+/*#endif */
+	action = MSG_CGV_EVAL_FILE_SELECTOR_PRESS, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+	    	HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+/*		ATTR_GEN_PATH_DATA {
+			GenFilePath <SP_DOCUMENT, "eBooks">
+		},
+
+/*		ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT {
+			GenFilePath <SP_DOCUMENT,"">
+		},
+*/
+		ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH {
+			GeodeToken <"cntv", MANUFACTURER_ID_GEOWORKS>
+		},
+		ATTR_GEN_FILE_SELECTOR_TOKEN_MATCH {
+			GeodeToken <"cntb", MANUFACTURER_ID_GEOWORKS>
+		},
+	}
+}
+
+BookFileSelectorOK = GenTrigger {
+	moniker = "Open";
+	genStates = default -enabled;
+	genAttributes = default +signalInteractionComplete,
+			+initiatesInputHoldUp, +initiatesBusyState;
+	action = MSG_CGV_LOAD_BOOK, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		HINT_DEFAULT_DEFAULT_ACTION,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {
+			word	IC_OK
+		}
+	}
+}
+
+BookFileSelectorDelete = GenTrigger {
+    	moniker = 'D', "Delete...";
+	genStates = default -enabled;
+	genAttributes = default +initiatesBusyState,+signalInteractionComplete;
+	action = MSG_CGV_DELETE_BOOK, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+
+end		BookFileSelectorTemplate;
+
+/**********************************************************************
+ 	Book Delete Confirmation Dialog 
+ **********************************************************************/
+
+

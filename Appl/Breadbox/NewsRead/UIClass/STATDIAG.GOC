@@ -1,0 +1,369 @@
+/**********************************************************************
+ * FILE:  STATDIAG.GOC - Animated Glpyh class
+ * Started 10/05/98
+ **********************************************************************/
+
+@include <stdapp.goh>
+@include "UIClass/statdiag.goh"
+
+#define CHILDREF(child)    (ConstructOptr(OptrToHandle(oself), pself->child))
+
+/**********************************************************************
+ * Class Declarations                                                 *
+ **********************************************************************/
+
+@classdecl StatusDialogClass;
+
+/*-------------------------------------------------------------------------
+ | Method:  StatusDialogClass::MSG_STATUS_DIALOG_OPEN
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Turns on the button on the dialog before starting up the dialog.
+ |
+ | Inputs:
+ |    Boolean allowCancel         -- TRUE if show Stop button.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/07/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method StatusDialogClass, MSG_STATUS_DIALOG_OPEN
+{
+    pself->SDI_allowCancel = allowCancel ;
+    if (allowCancel)  {
+        if (pself->SDI_button)  {
+            @call (CHILDREF(SDI_button))::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+            @call (CHILDREF(SDI_button))::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+        }
+    } else {
+        @call (CHILDREF(SDI_button))::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+        @call (CHILDREF(SDI_button))::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+    }
+
+    if (animIcon)  {
+        if (pself->SDI_anim)  {
+            @call (CHILDREF(SDI_anim))::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+        }
+    } else {
+        if (pself->SDI_anim)  {
+            @call (CHILDREF(SDI_anim))::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+        }
+    }
+
+    if (showProgress)  {
+        if (pself->SDI_progress)  {
+            @call (CHILDREF(SDI_progress))::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+        }
+    } else {
+        if (pself->SDI_progress)  {
+            @call (CHILDREF(SDI_progress))::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+        }
+    }
+
+    @call oself::MSG_GEN_SET_USABLE(VUM_NOW) ;
+    
+    /* set the title */
+    if(dialogTitle)
+        @call oself::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(dialogTitle, VUM_NOW);
+    else
+        @call oself::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("", VUM_NOW);
+
+    @call oself::MSG_GEN_INTERACTION_INITIATE() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  StatusDialogClass::MSG_STATUS_DIALOG_CLOSE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Close the dialog.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/07/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method StatusDialogClass, MSG_STATUS_DIALOG_CLOSE
+{
+    if ((pself->SDI_button) && (pself->SDI_allowCancel))
+        @call CHILDREF(SDI_button)::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+    @call oself::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS) ;
+    @call oself::MSG_GEN_SET_NOT_USABLE(VUM_NOW) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  StatusDialogClass::MSG_STATUS_DIALOG_SET_ANIMATION
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Changes the animation on the status dialog.
+ |
+ | Inputs:
+ |    optr animation              -- Location of T_animationList
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/07/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method StatusDialogClass, MSG_STATUS_DIALOG_SET_ANIMATION
+{
+//    if (pself->SDI_anim)
+//        @call CHILDREF(SDI_anim)::MSG_ANIMATED_GLYPH_SET(animation) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  StatusDialogClass::MSG_STATUS_DIALOG_GET_ANIMATION
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Changes the animation on the status dialog.
+ |
+ | Ouputs:
+ |    optr animation              -- Location of T_animationList
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/07/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method StatusDialogClass, MSG_STATUS_DIALOG_GET_ANIMATION
+{
+    optr anim = NullHandle ;
+
+//    if (pself->SDI_anim)
+//        anim = @call CHILDREF(SDI_anim)::MSG_ANIMATED_GLYPH_GET() ;
+
+    return anim ;
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  StatusDialogClass::MSG_STATUS_DIALOG_SET_TEXT_OPTR
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Changes the text on the status dialog.
+ |
+ | Inputs:
+ |    optr text                   -- Text to use
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/07/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method StatusDialogClass, MSG_STATUS_DIALOG_SET_TEXT_OPTR
+{
+    char *p_text;
+
+    if (pself->SDI_text)
+//        @call CHILDREF(SDI_text)::MSG_VIS_TEXT_REPLACE_ALL_OPTR(text, 0);
+    {
+        MemLock(HandleOf(text));
+        p_text = LMemDeref(text);
+        
+        @call CHILDREF(SDI_text)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+                                    p_text, VUM_NOW);
+
+        MemUnlock(HandleOf(text));
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  StatusDialogClass::MSG_STATUS_DIALOG_SET_TEXT_PTR
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Changes the text on the status dialog. (via pointer to text)
+ |
+ | Inputs:
+ |    char *p_text                -- Text to use
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/07/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method StatusDialogClass, MSG_STATUS_DIALOG_SET_TEXT_PTR
+{
+    if (pself->SDI_text)
+//        @call CHILDREF(SDI_text)::MSG_VIS_TEXT_REPLACE_ALL_PTR(p_text, 0);
+        @call CHILDREF(SDI_text)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+                                    p_text, VUM_NOW);
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  StatusDialogClass::MSG_STATUS_DIALOG_SET_TITLE_OPTR
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Changes the text on the status dialog.
+ |
+ | Inputs:
+ |    optr text                   -- Text to use
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    FR   12/27/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method StatusDialogClass, MSG_STATUS_DIALOG_SET_TITLE_OPTR
+{
+    char *p_text;
+
+    if (pself->SDI_title)
+    {
+        MemLock(HandleOf(text));
+        p_text = LMemDeref(text);
+        
+        @call CHILDREF(SDI_title)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+                                    p_text, VUM_NOW);
+
+        MemUnlock(HandleOf(text));
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  StatusDialogClass::MSG_STATUS_DIALOG_SET_TITLE_PTR
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Changes the text on the status dialog. (via pointer to text)
+ |
+ | Inputs:
+ |    char *p_text                -- Text to use
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    FR   12/27/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method StatusDialogClass, MSG_STATUS_DIALOG_SET_TITLE_PTR
+{
+    if (pself->SDI_title)
+        @call CHILDREF(SDI_title)::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+                                    p_text, VUM_NOW);
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  StatusDialogClass::MSG_STATUS_DIALOG_SET_BUTTON_MONIKER
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Changes the status dialogs main look.
+ |
+ | Inputs:
+ |    optr buttonMoniker          -- New moniker to use
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/07/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method StatusDialogClass, MSG_STATUS_DIALOG_SET_BUTTON_MONIKER
+{
+    if (pself->SDI_button)
+        @call CHILDREF(SDI_button)::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+              buttonMoniker,
+              VUM_DELAYED_VIA_UI_QUEUE) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  StatusDialogClass::MSG_STATUS_DIALOG_IS_CANCELLED
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Determines if the user has requested a cancel.
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE if cancelled, else FALSE
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/07/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method StatusDialogClass, MSG_STATUS_DIALOG_IS_CANCELLED
+{
+    Boolean isCancelled = TRUE ;
+
+    if (!pself->SDI_allowCancel)  {
+        isCancelled = FALSE ;
+    } else  {
+        if (pself->SDI_button)
+            if (@call CHILDREF(SDI_button)::MSG_GEN_CHECK_IF_FULLY_ENABLED())
+                isCancelled = FALSE ;
+    }
+
+    return isCancelled ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  StatusDialogClass::MSG_STATUS_DIALOG_CANCEL
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    User has hit the cancel button.
+ |
+ | Inputs:
+ |    optr trigger                -- Trigger pressed to cause cancel
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/23/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method StatusDialogClass, MSG_STATUS_DIALOG_CANCEL
+{
+    /* Turn off the button to make it recognized that the button was
+       pressed */
+    /* Doing this also makes the rest of the system recognize the */
+    /* cancelation */
+    if ((pself->SDI_button) && (pself->SDI_allowCancel))
+        @call CHILDREF(SDI_button)::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  StatusDialogClass::MSG_STATUS_DIALOG_CANCEL
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Updates the progress indicator.
+ |
+ | Inputs:
+ |    word progress               -- value to set
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    FR   10/23/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method StatusDialogClass, MSG_STATUS_DIALOG_SET_PROGRESS {
+
+    if (pself->SDI_progress)  {
+        @call (CHILDREF(SDI_progress))::
+                    MSG_GEN_VALUE_SET_INTEGER_VALUE(progress, FALSE) ;
+    }
+}
+
+
+/**********************************************************************
+ * END OF FILE:  STATDIAG.GOC - Animated Glyph class
+ **********************************************************************/
+

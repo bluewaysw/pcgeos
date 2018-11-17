@@ -1,0 +1,42 @@
+HomeBase for GPC
+Overview 12/11/98
+
+
+This version of Breadbox's HomeBase was written for GPC based on specs dated 11/13/98.  It is a combination of Breadbox's HomeBase desktop application, the NBase2 Nokia N9000(series) version, and GPC UI and feature requests.
+
+
+HomeBase started out as an easy to use alternative to GeoFile which has intimidated a lot of Ensemble/New Deal users.  The primary design factor was ease of use and user flexibility.  The database consisted of records with from one to 10 fields.  Each field was entirely character base and limited to 50 characters in length.  The field names were user definable (25 character limit.)  The database was automatically sorted on the first character of the first field with no other sorting available.  The user moved through the database using arrow buttons and/or a dynamic list which displayed the first field of each record.  Additional features included .CSV ImpEx, string search, and report generation.  These design factors led to a database design using the Geos DBGroup and DBItem functionality.  All the fields of a record were concatinated into one string using the tilde character as a field separator.  Each record was stored in a DBItem and that DBItem was stored in the DBGroup which corresponded with the first character of the first field.  There were 37 DBGroups, one for each letter and numeral plus one for all other characters.
+
+
+NBase2 for the N9000(series) SmartPhone added a sorting feature which allowed the user to sort the database on any given field using an alphabetic, numeric or date sort.  The sorted order of the database was stored in a ChunkArray which kept pointers to the DBGroup and DBItem of the record.  The records themselves were not sorted, just the sort index array.  The primary sort mechanism was a binary sort.   
+
+
+In addition to numerous user interface modifications for this version, GPC requested an enhanced sort selection, greatly enhanced report generation, and setting of data types for each field.  Also the methodology for entering data into and modifying data already in the database was changed.  The scope of the above changes was not of sufficient magnitude to force a re-write of the database engine, so this version retains the underlying database of NBase2 for data storage and retrieval.  The field separator was changed from a tilde to the non-printing character 0xA6.  However, the addition of field types, enhanced sort selection and report generation required significant code re-write.
+
+It is important to note that the above three significant changes were handled as follows:
+
+ * Field Types - The user selection of field type effects the data entry filters and the display of the data.  All data are stored as ASCII strings.
+  ** General - Data entry has only one filter applied.  The user may not use the tilde character.  Tildes are converted to dashes during import.
+  ** Numeric - Data entry is filtered to allow only signed decimal characters.  There is no filtering (other than tilde conversion) applied during import.
+  ** Date - Data entry is filtered to allow only short date characters.  There is an aditional layer of date validity checking (to ensure the day and month numbers are legitimate) applied before the date is stored as a yyyymmdd character string in the database.  The yyyymmdd format allows dates to be sorted as numeric (no additional sort algorithm required) and allows for dates to be entered and displayed in the user selected (preferences module) short date format.  Data imported into date type fields are validity checked as well as tilde converted.
+
+ * Sorting - The concept of a single sort index array was retained from earlier versions.  The array is sorted only when the user initiates a sort.  All new entries are placed at the end of the sort index.  If the user selects a numeric field as one of the three sorts, the ASCII string is converted to a floating point number and sorted accordingly.  If the conversion to floating point fails, that element is sorted alphabetically and the user is notified.  As noted above all dates are sorted as numeric.
+
+ * Reports - The user selected information sent to the VisLargeText Report Window is displayed in the order of the sort index array.  The user can select which records to show, to show or not show field names, which fields to show, and which - if any - numeric fields to total.
+
+
+The source code for GPCBase is broken into the following files:
+ * GPCBASE.GOH - The header file containing class definitions, function prototypes, constant and global variable definitions, and structure definitions.
+ * GBAS_UI.GOC - Has the user interface for the application plus the methods for printing and opening and closing of the report dialog box.
+ * DOC_MTDS.GOC - Has the application opening and closing methods, GenDocument handling methods, plus various functions used throughout the application.
+ * DTA_MTDS.GOC - Has the methods for managing the database entry, deletion, modification, etc.
+ * FLD_MTDS.GOC - Has the methods for user assignment of the number of fields, field names and field types.
+ * NAV_MTDS.GOC - Has the methods for changing the display from one record to another, either from arrow button clicks or dynamic list selection.
+ * SCH_MTDS.GOC - Has the methods for responding to the user's search input.
+ * SRT_MTDS.GOC - Has the methods for sorting the database based on the user's selections.
+ * RPT_MTDS.GOC - Has the methods to generate reports based on teh user's selections.
+ * IMP_MTDS.GOC - Has the methods for importing CSV files into a new or existing database.
+ * EXP_MTDS.GOC - Has the methods for exporting the database to a user named CSV file.
+ * TXT_STRS.GOC - Contains all the localizable character strings used by the above methods files.
+ * BTNS.GOH - holds the arrow button icon data.
+ * BREADBOX.GOH - holds the Breadbox logo icon data.

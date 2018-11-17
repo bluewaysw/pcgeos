@@ -1,0 +1,2007 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1992 -- All Rights Reserved
+ *
+ * PROJECT:	  PC/GEOS
+ * MODULE:	  Flat file database library
+ * FILE:	  ffExprBuilderr.goc
+ *
+ * AUTHOR:  	  Jeremy Dashe : Jan 22, 1992
+ *
+ * DESCRIPTION:
+ *	The Flat File Expression Builder UI controller definitions and
+ *	code.
+ *
+ * RCS STAMP:
+ *	$Id: ffExprBuilder.goc,v 1.1 97/04/04 18:03:16 newdeal Exp $
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+#include <geoworks.h>
+#include <char.h>
+#include <parse.h>
+
+#include <Ansi/ctype.h>
+#include <Ansi/string.h>
+
+@include <ffile.goh>
+#include <ffFatal.h>
+@include <Objects/FlatFile/ffileC.goh>
+#include <Objects/FlatFile/ffExBld.h>
+
+/*
+ ***************************************************************************
+ *		Constants and structures
+ ***************************************************************************
+ */
+
+
+/*
+typedef struct {
+    int KMWH_ohBoy;
+    char KMWH_xxx;
+} KeepMetaWareHappy;
+*/
+
+/*
+ * Here are the operator strings and IDs for the scropping operator lists.
+ */
+
+/* Math operators */
+@define MODULO_STRING	    	_TEXT("%")
+@define EXPONENT_STRING	    	_TEXT("^")
+@define MULTIPLY_STRING	    	_TEXT("*")
+@ifdef DO_DBCS
+@define DIVISION_STRING	    	_TEXT("\xf7") 
+@else
+@define DIVISION_STRING	    	_TEXT("\326") 
+@endif
+@define PLUS_STRING 	    	_TEXT("+")
+@define MINUS_STRING	    	_TEXT("-")
+@define LEFT_PARENS_STRING    	_TEXT("\050")
+@define RIGHT_PARENS_STRING 	_TEXT(")")
+
+/* Logical operators */
+@define AMPERSAND_STRING     	_TEXT("&")
+@define EQUALS_STRING 	    	_TEXT("=")
+@ifdef DO_DBCS
+/* not used because we can't figure out how to define wchar arrays with
+   elements greater than 255 in BorlandC */
+@define	NOTEQUAL_STRING	    	_TEXT(" ")
+@else
+@define	NOTEQUAL_STRING	    	_TEXT("\255")
+@endif
+@define LESSTHAN_STRING     	_TEXT("<")
+@define GREATERTHAN_STRING  	_TEXT(">")
+@ifdef DO_DBCS
+/* not used */
+@define	LESSEQUAL_STRING    	_TEXT(" ")
+@define	GREATEREQUAL_STRING 	_TEXT(" ")
+@else
+@define	LESSEQUAL_STRING    	_TEXT("\262")
+@define	GREATEREQUAL_STRING 	_TEXT("\263")
+@endif
+
+/* Math operators */
+@define MODULO_MONIKER_STRING	    	"%"
+@define EXPONENT_MONIKER_STRING	    	"^"
+@define MULTIPLY_MONIKER_STRING	    	"*"
+@ifdef DO_DBCS
+@define DIVISION_MONIKER_STRING	    	"\xf7" 
+@else
+@define DIVISION_MONIKER_STRING	    	"\326" 
+@endif
+@define PLUS_MONIKER_STRING 	    	"+"
+@define MINUS_MONIKER_STRING	    	"-"
+@define LEFT_PARENS_MONIKER_STRING    	"\050"
+@define RIGHT_PARENS_MONIKER_STRING 	")"
+
+/* Logical operators */
+@define AMPERSAND_MONIKER_STRING     	"&"
+@define EQUALS_MONIKER_STRING 	    	"="
+@ifdef DO_DBCS
+/* not used */
+@define	NOTEQUAL_MONIKER_STRING	    	"\000"
+@else
+@define	NOTEQUAL_MONIKER_STRING	    	"\255"
+@endif
+@define LESSTHAN_MONIKER_STRING     	"<"
+@define GREATERTHAN_MONIKER_STRING  	">"
+@ifdef DO_DBCS
+/* not used */
+@define	LESSEQUAL_MONIKER_STRING    	"\000"
+@define	GREATEREQUAL_MONIKER_STRING 	"\000"
+@else
+@define	LESSEQUAL_MONIKER_STRING    	"\262"
+@define	GREATEREQUAL_MONIKER_STRING 	"\263"
+@endif
+
+
+/*
+ * Set up the context array of supported functions.  The function
+ * IDs are defined in the parse library.
+ */
+FFEBFunctionContext FFEBContextArray[] = {
+    /* FUNCTION_ID_ABS */   	FFEBFC_ALL,
+    /* FUNCTION_ID_ACOS */   	FFEBFC_ALL,
+    /* FUNCTION_ID_ACOSH */   	FFEBFC_ALL,
+    /* FUNCTION_ID_AND */   	FFEBFC_ALL,
+    /* FUNCTION_ID_ASIN */   	FFEBFC_ALL,
+    /* FUNCTION_ID_ASINH */   	FFEBFC_ALL,
+    /* FUNCTION_ID_ATAN */   	FFEBFC_ALL,
+    /* FUNCTION_ID_ATAN2 */   	FFEBFC_ALL,
+    /* FUNCTION_ID_ATANH */   	FFEBFC_ALL,
+    /* FUNCTION_ID_AVG */   	FFEBFC_ALL,
+    /* FUNCTION_ID_CHAR */   	FFEBFC_ALL,
+    /* FUNCTION_ID_CHOOSE */   	FFEBFC_ALL,
+    /* FUNCTION_ID_CLEAN */   	FFEBFC_ALL,
+    /* FUNCTION_ID_CODE */   	FFEBFC_ALL,
+    /* FUNCTION_ID_COLS */   	FFEBFC_NONE,
+    /* FUNCTION_ID_COS */   	FFEBFC_ALL,
+    /* FUNCTION_ID_COSH */   	FFEBFC_ALL,
+    /* FUNCTION_ID_COUNT */   	FFEBFC_ALL,
+    /* FUNCTION_ID_CTERM */   	FFEBFC_ALL,
+    /* FUNCTION_ID_DATE */   	FFEBFC_ALL,
+    /* FUNCTION_ID_DATEVALUE */ FFEBFC_ALL,
+    /* FUNCTION_ID_DAY */   	FFEBFC_ALL,
+    /* FUNCTION_ID_DDB */   	FFEBFC_ALL,
+    /* FUNCTION_ID_ERR */   	FFEBFC_ALL,
+    /* FUNCTION_ID_EXACT */   	FFEBFC_ALL,
+    /* FUNCTION_ID_EXP */   	FFEBFC_ALL,
+    /* FUNCTION_ID_FACT */   	FFEBFC_ALL,
+    /* FUNCTION_ID_FALSE */   	FFEBFC_ALL,
+    /* FUNCTION_ID_FIND */   	FFEBFC_ALL,
+    /* FUNCTION_ID_FV */   	FFEBFC_ALL,
+    /* FUNCTION_ID_HLOOKUP */   FFEBFC_NONE,
+    /* FUNCTION_ID_HOUR */   	FFEBFC_ALL,
+    /* FUNCTION_ID_IF */   	FFEBFC_ALL,
+    /* FUNCTION_ID_INDEX */   	FFEBFC_NONE,
+    /* FUNCTION_ID_INT */   	FFEBFC_ALL,
+    /* FUNCTION_ID_IRR */   	FFEBFC_NONE,
+    /* FUNCTION_ID_ISERR */   	FFEBFC_ALL,
+    /* FUNCTION_ID_ISNUMBER */  FFEBFC_ALL,
+    /* FUNCTION_ID_ISSTRING */  FFEBFC_ALL,
+    /* FUNCTION_ID_LEFT */   	FFEBFC_ALL,
+    /* FUNCTION_ID_LENGTH */   	FFEBFC_ALL,
+    /* FUNCTION_ID_LN */   	FFEBFC_ALL,
+    /* FUNCTION_ID_LOG */   	FFEBFC_ALL,
+    /* FUNCTION_ID_LOWER */   	FFEBFC_ALL,
+    /* FUNCTION_ID_MAX */   	FFEBFC_ALL,
+    /* FUNCTION_ID_MID */   	FFEBFC_ALL,
+    /* FUNCTION_ID_MIN */   	FFEBFC_ALL,
+    /* FUNCTION_ID_MINUTE */   	FFEBFC_ALL,
+    /* FUNCTION_ID_MOD */   	FFEBFC_ALL,
+    /* FUNCTION_ID_MONTH */   	FFEBFC_ALL,
+    /* FUNCTION_ID_N */   	FFEBFC_NONE,
+    /* FUNCTION_ID_NA */   	FFEBFC_ALL,
+    /* FUNCTION_ID_NOW */   	FFEBFC_ALL,
+    /* FUNCTION_ID_NPV */   	FFEBFC_NONE,
+    /* FUNCTION_ID_OR */   	FFEBFC_ALL,
+    /* FUNCTION_ID_PI */   	FFEBFC_ALL,
+    /* FUNCTION_ID_PMT */   	FFEBFC_ALL,
+    /* FUNCTION_ID_PRODUCT */   FFEBFC_ALL,
+    /* FUNCTION_ID_PROPER */   	FFEBFC_ALL,
+    /* FUNCTION_ID_PV */   	FFEBFC_ALL,
+    /* FUNCTION_ID_RANDOM_N */  FFEBFC_ALL,
+    /* FUNCTION_ID_RANDOM */   	FFEBFC_ALL,
+    /* FUNCTION_ID_RATE */   	FFEBFC_ALL,
+    /* FUNCTION_ID_REPEAT */   	FFEBFC_ALL,
+    /* FUNCTION_ID_REPLACE */   FFEBFC_ALL,
+    /* FUNCTION_ID_RIGHT */   	FFEBFC_ALL,
+    /* FUNCTION_ID_ROUND */   	FFEBFC_ALL,
+    /* FUNCTION_ID_ROWS */   	FFEBFC_NONE,
+    /* FUNCTION_ID_SECOND */   	FFEBFC_ALL,
+    /* FUNCTION_ID_SIN */   	FFEBFC_ALL,
+    /* FUNCTION_ID_SINH */   	FFEBFC_ALL,
+    /* FUNCTION_ID_SLN */   	FFEBFC_ALL,
+    /* FUNCTION_ID_SQRT */   	FFEBFC_ALL,
+    /* FUNCTION_ID_STD */   	FFEBFC_ALL,
+    /* FUNCTION_ID_STDP */   	FFEBFC_ALL,
+    /* FUNCTION_ID_STRING */   	FFEBFC_ALL,
+    /* FUNCTION_ID_SUM */   	FFEBFC_ALL,
+    /* FUNCTION_ID_SYD */   	FFEBFC_ALL,
+    /* FUNCTION_ID_TAN */   	FFEBFC_ALL,
+    /* FUNCTION_ID_TANH */   	FFEBFC_ALL,
+    /* FUNCTION_ID_TERM */   	FFEBFC_ALL,
+    /* FUNCTION_ID_TIME */   	FFEBFC_ALL,
+    /* FUNCTION_ID_TIMEVALUE */ FFEBFC_ALL,
+    /* FUNCTION_ID_TODAY */   	FFEBFC_ALL,
+    /* FUNCTION_ID_TRIM */   	FFEBFC_ALL,
+    /* FUNCTION_ID_TRUE */   	FFEBFC_ALL,
+    /* FUNCTION_ID_TRUNC */   	FFEBFC_ALL,
+    /* FUNCTION_ID_UPPER */   	FFEBFC_ALL,
+    /* FUNCTION_ID_VALUE */   	FFEBFC_ALL,
+    /* FUNCTION_ID_VAR */   	FFEBFC_ALL,
+    /* FUNCTION_ID_VARP */   	FFEBFC_ALL,
+    /* FUNCTION_ID_VLOOKUP */   FFEBFC_NONE,
+    /* FUNCTION_ID_WEEKDAY */   FFEBFC_ALL,
+    /* FUNCTION_ID_YEAR */   	FFEBFC_ALL,
+    /* FUNCTION_ID_FILENAME */  FFEBFC_NONE,
+    /* FUNCTION_ID_PAGE */   	FFEBFC_NONE,
+    /* FUNCTION_ID_PAGES */ 	FFEBFC_NONE,
+    /* FUNCTION_ID_DEGREES */	FFEBFC_NONE, 
+    /* FUNCTION_ID_RADIANS */	FFEBFC_NONE
+
+};
+
+#ifdef DO_DBCS
+TCHAR *notequalString = L"x";	/* dummy wchar */
+TCHAR *lessequalString = L"x";	/* dummy wchar */
+TCHAR *greaterequalString = L"x";	/* dummy wchar */
+#endif
+
+TCHAR *operatorList[] = {
+    @MODULO_STRING,
+    @EXPONENT_STRING,
+    @MULTIPLY_STRING,
+    @DIVISION_STRING,
+    @PLUS_STRING,
+    @MINUS_STRING,	
+    @LEFT_PARENS_STRING,
+    @RIGHT_PARENS_STRING,
+    @AMPERSAND_STRING,
+    @EQUALS_STRING,
+    @NOTEQUAL_STRING,
+    @LESSTHAN_STRING,
+    @GREATERTHAN_STRING,
+    @LESSEQUAL_STRING,
+    @GREATEREQUAL_STRING
+};    
+
+/*
+ ***************************************************************************
+ *		Forward Declarations
+ ***************************************************************************
+ */
+
+MemHandle   GetChildHandle(optr obj);
+
+word	    FFExpressionBuilderBuildFunctionList(FFExpressionBuilderInstance
+						    *pself);
+
+void	    FFExpressionBuilderSetTitle(FFEBFunctionContext context,
+					MemHandle childBlock);
+
+void	    FFExpressionBuilderInsertCommaIfNecessary(MemHandle childBlock);
+
+Boolean	    FFExpressionBuilderCursorWithinAFunction(TCHAR *expression,
+						     dword cursorPos);
+
+Boolean	    FFExpressionBuilderFieldNameToLeft(TCHAR *curText, dword cursorPos);
+
+void	    FFExpressionBuilderGrabStringFromTextEditBox(MemHandle childBlock,
+						      MemHandle *curTextHandle,
+						      VisTextRange *cursorPos);
+
+void	    FFEBUpdateList(MemHandle childBlock,
+			   FieldID index,
+			   FFFieldListChangeStatus change);
+
+static _pascal void FFExpressionBuilderSetUserMessage
+				(FFEBFunctionContext context,
+				 MemHandle childBlock);
+
+static _pascal void FFEBDatabaseListStatusChange
+		(FFDListStatusChangeMessageBlock *lscmbPtr,
+		 optr oself,
+		 MemHandle childBlock);
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+@classdecl	FFExpressionBuilderClass ;
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+@start FFExpressionBuilderUI, notDetachable ;
+
+@object GenInteractionClass FFExpressionBuilderDialog = {
+    GI_states = @default & ~GS_USABLE;
+    GI_comp = @FFExpressionBuilderTextEditor,
+	      @FFExpressionBuilderLists,
+	      @FFExpressionBuilderTextMessage,
+    	      @FFExpressionBuilderApplyTrigger,
+    	      @FFExpressionBuilderResetTrigger;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_PROPERTIES;
+    GII_attrs = GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+    HINT_INTERACTION_COMPLEX_PROPERTIES;
+    ATTR_GEN_HELP_CONTEXT = "dbExprBld";
+}
+
+@object GenTextClass FFExpressionBuilderTextEditor = {
+    GTXI_destination = (TO_OBJ_BLOCK_OUTPUT);
+    ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *) &FFExpressionBuilderClass};
+    HINT_DEFAULT_FOCUS;
+    HINT_DEFAULT_TARGET;
+}
+
+@object	GenInteractionClass FFExpressionBuilderLists = {
+    GI_comp = @FFExpressionBuilderFieldList,
+    	      @FFExpressionBuilderFunctionList,
+    	      @FFExpressionBuilderArithmeticOpsList,
+    	      @FFExpressionBuilderLogicalOpsList;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass FFExpressionBuilderTextMessage =
+{
+	GI_attrs = GA_READ_ONLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass FFExpressionBuilderApplyTrigger = {
+    GTI_actionMsg = MSG_FFEB_APPLY_CHANGE;
+    GTI_destination = (TO_OBJ_BLOCK_OUTPUT);
+    ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *) &FFExpressionBuilderClass};
+    HINT_SEEK_REPLY_BAR;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_APPLY };
+}
+
+@object GenTriggerClass FFExpressionBuilderResetTrigger = {
+    GTI_actionMsg = MSG_FFEB_RESET_CHANGE;
+    GTI_destination = (TO_OBJ_BLOCK_OUTPUT);
+    ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *) &FFExpressionBuilderClass};
+    HINT_SEEK_REPLY_BAR;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_RESET };
+}
+
+@object GenTriggerClass FFExpressionBuilderCancelTrigger = {
+    GTI_actionMsg = MSG_FFEB_CANCEL_CHANGE;
+    GTI_destination = (TO_OBJ_BLOCK_OUTPUT);
+    ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *) &FFExpressionBuilderClass};
+    HINT_SEEK_REPLY_BAR;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+}
+
+/*********************************************************
+ * 	    	    List definitions	    	    	 *
+ *********************************************************/
+
+@object GenDynamicListClass FFExpressionBuilderFunctionList = {
+    GI_visMoniker = "Functions";
+
+    /*
+     * We don't use GIGI_applyMsg becuase this dialog is in DELAYED mode.
+     * Instead, we need to use the ..._GROUP_STATUS_MSG to get user
+     * actions.
+     */
+    ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_FFEB_ADD_FUNCTION_STRING;
+
+    GIGI_destination = (TO_OBJ_BLOCK_OUTPUT);
+    GIGI_behaviorType = GIGBT_NON_EXCLUSIVE;
+    ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *) &FFExpressionBuilderClass};
+    ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS = 0;
+
+    GDLI_queryMsg = MSG_FFEB_FUNCTION_LIST_MONIKER_QUERY;
+
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_DRAW_IN_BOX;
+}
+
+/*******************/
+
+/* The field name list is dynamic. */
+
+@object GenDynamicListClass FFExpressionBuilderFieldList = {
+    GI_visMoniker = "Field names";
+
+    /*
+     * We don't use GIGI_applyMsg becuase this dialog is in DELAYED mode.
+     * Instead, we need to use the ..._GROUP_STATUS_MSG to get user
+     * actions.
+     */
+    ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_FFEB_ADD_FIELD_STRING;
+
+    GIGI_destination = (TO_OBJ_BLOCK_OUTPUT);
+    GIGI_behaviorType = GIGBT_NON_EXCLUSIVE;
+    ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *) &FFExpressionBuilderClass};
+    ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS = 0;
+
+    GDLI_queryMsg = MSG_FFEB_FIELD_LIST_MONIKER_QUERY;
+
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_DRAW_IN_BOX;
+}
+
+/*******************/
+@define DEFINE_FFEB_ITEM(LABEL, MONIKER, IDENTIFIER) \
+    @object GenItemClass LABEL = { \
+        GI_visMoniker =  @MONIKER; \
+	GII_identifier = IDENTIFIER; \
+    }
+
+@DEFINE_FFEB_ITEM(MPlus,     	PLUS_MONIKER_STRING, 	    FFEB_PLUS_ID)
+@DEFINE_FFEB_ITEM(MMinus,    	MINUS_MONIKER_STRING, 	    FFEB_MINUS_ID)
+
+@DEFINE_FFEB_ITEM(MMultiply, 	MULTIPLY_MONIKER_STRING,    FFEB_MULTIPLY_ID)
+@DEFINE_FFEB_ITEM(MDivide,   	DIVISION_MONIKER_STRING,    FFEB_DIVISION_ID)
+@DEFINE_FFEB_ITEM(MModulo,   	MODULO_MONIKER_STRING, 	    FFEB_MODULO_ID)
+@DEFINE_FFEB_ITEM(MExponent, 	EXPONENT_MONIKER_STRING,    FFEB_EXPONENT_ID)
+@DEFINE_FFEB_ITEM(MLeftParens, LEFT_PARENS_MONIKER_STRING, FFEB_LEFT_PARENS_ID)
+@DEFINE_FFEB_ITEM(MRightParens,RIGHT_PARENS_MONIKER_STRING,FFEB_RIGHT_PARENS_ID)
+
+@object GenItemGroupClass FFExpressionBuilderArithmeticOpsList = {
+    GI_visMoniker = "Math";
+    GI_comp = @MPlus, @MMinus, @MMultiply, @MDivide, @MLeftParens, 
+	@MRightParens, @MModulo, @MExponent;
+    /*
+     * We don't use GIGI_applyMsg becuase this dialog is in DELAYED mode.
+     * Instead, we need to use the ..._GROUP_STATUS_MSG to get user
+     * actions.
+     */
+    ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_FFEB_ADD_OP_STRING;
+
+    GIGI_destination = (TO_OBJ_BLOCK_OUTPUT);
+    GIGI_behaviorType = GIGBT_NON_EXCLUSIVE;
+    ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *) &FFExpressionBuilderClass};
+    ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS = 0;
+
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_DRAW_IN_BOX;
+}
+
+/*******************/
+
+@DEFINE_FFEB_ITEM(LOAmpersand, 	    AMPERSAND_MONIKER_STRING,  	FFEB_AMPERSAND_ID)
+@DEFINE_FFEB_ITEM(LOEquals,  	    EQUALS_MONIKER_STRING,  	FFEB_EQUALS_ID)
+@DEFINE_FFEB_ITEM(LONotEquals,	    NOTEQUAL_MONIKER_STRING, 	FFEB_NOTEQUAL_ID)
+@DEFINE_FFEB_ITEM(LOLessThan, 	    LESSTHAN_MONIKER_STRING, 	FFEB_LESSTHAN_ID)
+@DEFINE_FFEB_ITEM(LOLessThanOrEquals,LESSEQUAL_MONIKER_STRING,	FFEB_LESSEQUAL_ID)
+@DEFINE_FFEB_ITEM(LOGreaterThan,     GREATERTHAN_MONIKER_STRING,FFEB_GREATERTHAN_ID)
+@DEFINE_FFEB_ITEM(LOGreaterThanOrEquals,GREATEREQUAL_MONIKER_STRING,FFEB_GREATEREQUAL_ID)
+
+@object GenItemGroupClass FFExpressionBuilderLogicalOpsList = {
+    GI_visMoniker = "Logic";
+    GI_comp = @LOAmpersand, @LOEquals, @LONotEquals,
+    	      @LOLessThan, @LOGreaterThan,
+    	      @LOLessThanOrEquals, @LOGreaterThanOrEquals;
+    /*
+     * We don't use GIGI_applyMsg becuase this dialog is in DELAYED mode.
+     * Instead, we need to use the ..._GROUP_STATUS_MSG to get user
+     * actions.
+     */
+    ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_FFEB_ADD_OP_STRING;
+
+    GIGI_destination = (TO_OBJ_BLOCK_OUTPUT);
+    GIGI_behaviorType = GIGBT_NON_EXCLUSIVE;
+    ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *) &FFExpressionBuilderClass};
+    ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS = 0;
+
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_DRAW_IN_BOX;
+}
+
+@end FFExpressionBuilderUI
+
+/*
+ * Toolbox UI
+ */
+
+/* (NONE) */
+
+/*
+ * Strings for controllers
+ */
+
+@extern chunk @FFExpressionBuilderName;
+@extern chunk @FFEBComputedField;
+@extern chunk @FFEBSearchExpression;
+@extern	chunk @FFEBSubtotalField;
+@extern	chunk @FFEBTotalField;
+@extern chunk @FFEBSubsets;
+@extern	chunk @FFEBDefaults;
+
+@extern	chunk @FFEBComputedFieldsMessage;
+@extern	chunk @FFEBSearchesMessage;
+@extern	chunk @FFEBSubtotalsMessage;
+@extern	chunk @FFEBTotalsMessage;
+@extern	chunk @FFEBSubsetsMessage;
+@extern	chunk @FFEBDefaultsMessage;
+
+/*
+ ***************************************************************************
+ *		Code for FFExpressionBuilderControlClass
+ ***************************************************************************
+ */
+
+
+/***********************************************************************
+ *
+ * MESSAGE: 	MSG_GEN_CONTROL_GET_INFO for FFExpressionBuilderControlClass
+ *
+ * DESCRIPTION:	Return information for building the controller
+ *
+ * PARAMETERS:
+ *	(GenControlBuildInfo *info)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	1/22/92		Initial revision
+ *
+ ***********************************************************************/
+@method FFExpressionBuilderClass, MSG_GEN_CONTROL_GET_INFO
+{
+
+#ifdef __HIGHC__
+_pragma_const_in_code;
+#endif
+
+    static const GCNListType FFEB_gcnList[] = {
+	{MANUFACTURER_ID_GEOWORKS,
+	 GAGCNLT_APP_TARGET_NOTIFY_FLAT_FILE_FIELD_LIST_CHANGE}
+    };
+
+    static const NotificationType FFEB_notifyTypeList[] = {
+	{MANUFACTURER_ID_GEOWORKS,
+	 GWNT_FLAT_FILE_FIELD_LIST_CHANGE}
+    };
+
+    /* --- */
+
+    static const GenControlChildInfo FFEB_childList[] = {
+	{@FFExpressionBuilderDialog,
+	 FFEB_TEXTEDIT_BOX, GCCF_IS_DIRECTLY_A_FEATURE}
+    };
+
+    /*
+     * Careful, this table is in the *opposite* order as the record which
+     * it corresponds to.
+     */
+
+    static const GenControlFeaturesInfo FFEB_featuresList[] = {
+	{@FFExpressionBuilderDialog, @FFExpressionBuilderName, 0}
+    };
+
+    /* The ## denote fields filled in dynamically */
+
+    static const GenControlBuildInfo FFEB_dupInfo = {
+	0,				    /* GCBI_flags */
+	NULL,				    /* GCBI_initFileKey */
+	FFEB_gcnList,			    /* GCBI_gcnList */
+	ARRAY_LEN(FFEB_gcnList,GCNListType),/* GCBI_gcnCount */
+	FFEB_notifyTypeList,		    /* GCBI_notificationList */
+	ARRAY_LEN(FFEB_notifyTypeList, NotificationType),
+					    /* GCBI_notificationCount */
+	@FFExpressionBuilderName,	    /* GCBI_controllerName */
+
+	/* ## */ NullHandle,		    /* GCBI_dupBlock */
+	FFEB_childList,			    /* GCBI_childList */
+	ARRAY_LEN(FFEB_childList, GenControlChildInfo),
+					    /* GCBI_childCount */
+	FFEB_featuresList,		    /* GCBI_featuresList */
+	ARRAY_LEN(FFEB_featuresList, GenControlFeaturesInfo),
+					    /* GCBI_featuresCount */
+	FFEB_DEFAULT_FEATURES,		    /* GCBI_features */
+
+	NullHandle,			    /* GCBI_toolBlock */
+	0,				    /* GCBI_toolList */
+	0,				    /* GCBI_toolCount */
+	0,				    /* GCBI_toolFeaturesList */
+	0,				    /* GCBI_toolFeaturesCount */
+	0,				    /* GCBI_toolFeatures */
+	"dbExprBldr"	    	    	    /* GCBI_helpContext */
+    };
+
+#ifdef __HIGHC__
+_pragma_end_const_in_code;
+#endif
+
+#ifdef DO_DBCS
+    /*
+     * I love DBCS C!
+     */
+    notequalString[0] = C_NOT_EQUAL_TO;
+#ifdef DO_PIZZA
+    lessequalString[0] = C_LESS_THAN_OVER_EQUAL_TO;
+    greaterequalString[0] = C_GREATER_THAN_OVER_EQUAL_TO;
+#else
+    lessequalString[0] = C_LESS_THAN_OR_EQUAL_TO;
+    greaterequalString[0] = C_GREATER_THAN_OR_EQUAL_TO;
+#endif
+#endif
+
+    /*
+     * Copy our structure which contains most of the correct
+     * fields (everything that can be correct given compiler limitations)
+     */
+    memcpy(info, MemLockFixedOrMovable(&FFEB_dupInfo),
+	   sizeof(GenControlBuildInfo));
+    MemUnlockFixedOrMovable(&FFEB_dupInfo);
+
+    /*
+     * Fill in the rest of the fields by hand
+     */
+    info->GCBI_dupBlock = HandleOf(@FFExpressionBuilderDialog);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_CONTROL_GENERATE_UI for FFExpressionBuilderClass
+ *
+ * DESCRIPTION:	Enable the UI for the expression builder.
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	1/30/92		Initial version
+ *
+ ***********************************************************************/
+@method FFExpressionBuilderClass, MSG_GEN_CONTROL_GENERATE_UI
+{
+    MemHandle childBlock;
+
+#if ERROR_CHECK
+    /*
+     * Make sure the context instance data is filled out for this expression
+     * builder.
+     */
+    if (!(pself->FFEB_context & FFEBFC_ALL)) {
+	EC_ERROR(BAD_EXPRESSION_BUILDER_CONTEXT);
+    }
+#endif /* ERROR_CHECK */
+
+    @callsuper();  	/* the superclass must be called first. */
+    
+    /*
+     * Update our self-pointer, since the @callsuper might have moved
+     * our chunk.
+     */
+    pself = ObjDerefGen(oself);
+
+    /*
+     * Update the Apply and Reset buttons.
+     */
+    childBlock = GetChildHandle(oself);
+
+    /*
+     * Figure out and set the title for this expression builder.
+     */
+    FFExpressionBuilderSetTitle(pself->FFEB_context, childBlock);
+
+    /* Figure out and set the message for this expression builder.	*/
+    FFExpressionBuilderSetUserMessage (pself->FFEB_context, childBlock);
+
+#ifdef DO_DBCS
+    /*
+     * Argh! -- set monikers of certain logic operators
+     */
+    @call childBlock, (ChunkHandle) @LONotEquals::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(notequalString, VUM_NOW);
+    @call childBlock, (ChunkHandle) @LOLessThanOrEquals::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(lessequalString, VUM_NOW);
+    @call childBlock, (ChunkHandle) @LOGreaterThanOrEquals::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(greaterequalString, VUM_NOW);
+#endif
+
+    /*
+     * Create the internal list of available functions for this context.
+     */
+    @call childBlock, (ChunkHandle) @FFExpressionBuilderFunctionList::
+    	MSG_GEN_DYNAMIC_LIST_INITIALIZE(
+	    FFExpressionBuilderBuildFunctionList(pself));
+}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		FFExpressionBuilderSetUserMessage
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set the user message field of the expression builder
+		appropriately for the given context.
+
+CALLED BY:	MSG_GEN_CONTROL_GENERATE_UI.
+
+PASS:		FFEBFunctionContext	context	= Context of the given
+						  Expression builder.
+		MemHandle	childBlock	= Block containing the
+						  expression builder's
+						  UI objects.
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Figure out which user message to use.
+	Lock down the block containing the user message.
+	Replace the text of the given expression builder's user message
+	display with the appropriate user message.
+	Unlock the block containing the user message.
+
+REQUIRES:	????
+
+ASSERTS:	????
+
+CHECKS:		Validates the given Expression Builder function context.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	????
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.08.17	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+static _pascal void FFExpressionBuilderSetUserMessage
+				(FFEBFunctionContext context,
+				 MemHandle childBlock)
+  {
+  optr	userMessageObject;
+  TCHAR	*userMessagePtr;
+
+  /* Figure out which message to use.	*/
+  switch (context)
+    {
+    case FFEBFC_COMPUTED_FIELDS:
+	{
+	userMessageObject = @FFEBComputedFieldsMessage;
+	break;
+	}
+    case FFEBFC_SEARCHES:
+	{
+	userMessageObject = @FFEBSearchesMessage;
+	break;
+	}
+    case FFEBFC_SUBTOTALS:
+	{
+	userMessageObject = @FFEBSubtotalsMessage;
+	break;
+	}
+    case FFEBFC_TOTALS:
+	{
+	userMessageObject = @FFEBTotalsMessage;
+	break;
+	}
+    case FFEBFC_SUBSETS:
+	{
+	userMessageObject = @FFEBSubsetsMessage;
+	break;
+	}
+    case FFEBFC_DEFAULTS:
+	{
+	userMessageObject = @FFEBDefaultsMessage;
+	break;
+	}
+#ifdef ERROR_CHECK
+    default:
+	{
+	EC_ERROR (BAD_EXPRESSION_BUILDER_CONTEXT);
+	}
+#endif
+    }	/* End of switch context.	*/
+    
+  /* Get ahold of the actual message.	*/
+  MemLock (OptrToHandle (userMessageObject));
+  userMessagePtr = LMemDeref (userMessageObject);
+
+  /* Set the text of the expression builder's user messege display.	*/
+  @call childBlock, OptrToChunk (@FFExpressionBuilderTextMessage)::
+		MSG_VIS_TEXT_REPLACE_ALL_PTR (userMessagePtr, 0);
+
+  /* Get rid of the string block.	*/
+  MemUnlock (OptrToHandle (userMessageObject));
+  }	/* End of FFExpressionBuilderSetUserMessage().	*/
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	FFExpressionBuilderSetTitle
+ *
+ * DESCRIPTION:	Change the title for this expression builder according
+ *	        to its type.
+ *
+ * PARAMETERS:  context -- the expression builder's type
+ *	        childBlock -- the childBlock for this UI controller
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	2/18/92		Initial Revision
+ *
+ ***********************************************************************/
+void
+FFExpressionBuilderSetTitle(FFEBFunctionContext context,
+			    MemHandle childBlock)
+{
+    optr titleChunk;
+    TCHAR *titleBar;
+
+    switch (context) {
+	case	FFEBFC_COMPUTED_FIELDS:
+	    	    titleChunk = @FFEBComputedField;
+	    	    break;
+	case	FFEBFC_SEARCHES:
+	    	    titleChunk = @FFEBSearchExpression;
+	    	    break;
+	case	FFEBFC_SUBTOTALS:
+	    	    titleChunk = @FFEBSubtotalField;
+	    	    break;
+	case	FFEBFC_TOTALS:
+	    	    titleChunk = @FFEBTotalField;
+	    	    break;
+	case	FFEBFC_SUBSETS:
+	    	    titleChunk = @FFEBSubsets;
+	    	    break;
+	case	FFEBFC_DEFAULTS:
+	    	    titleChunk = @FFEBDefaultsMessage;
+	    	    break;
+        default:
+		    EC_ERROR(BAD_EXPRESSION_BUILDER_CONTEXT);
+		    break;
+    }
+
+    (void) MemLock(OptrToHandle(titleChunk));
+    titleBar = LMemDeref(titleChunk);
+
+    @send childBlock, (ChunkHandle) @FFExpressionBuilderDialog::
+	MSG_GEN_REPLACE_VIS_MONIKER_TEXT(titleBar, VUM_MANUAL);
+
+    MemUnlock(OptrToHandle(titleChunk));
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	FFExpressionBuilderBuildFunctionList
+ *
+ * DESCRIPTION:	This function dynamically builds a function list from the
+ *	    	available functions in the parse library.  An array
+ *	    	describing which functions belong in a specific
+ *	    	expression builder is defined in
+ *	    	CInclude/Objects/FlatFile/ffExBld.h.
+ *	    	The total number of appropriate functions is returned.
+ *	    	
+ * PARAMETERS:  pself - pointer to an FFExpressionBuilderInstance.
+ *	
+ * CALLED BY:	INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	2/ 5/92		Initial Revision
+ *	jeremy	5/6/92	    	Updated to use the new dynamic lists.
+ *
+ ***********************************************************************/
+word
+FFExpressionBuilderBuildFunctionList(FFExpressionBuilderInstance *pself)
+{
+    word    curFuncID, numberOfFunctions, totalNumberOfFunctions;
+
+    /* Find out how many functions there are. */
+    totalNumberOfFunctions = ParserGetNumberOfFunctions(FT_ALL);
+    numberOfFunctions = 0;
+
+    /* Now instantiate a list item for every function in the parse library. */
+    for (curFuncID = 0; curFuncID < totalNumberOfFunctions; curFuncID++) {
+
+	/* Is this function appropriate for this expression builder? */
+	if (!(FFEBContextArray[curFuncID] & pself->FFEB_context)) {
+	    /* Bail if not. */
+	    continue;
+	}
+
+#ifdef DO_PIZZA
+	/* HACK:  Insert DB() function for Pizza */
+	if (curFuncID == FUNCTION_ID_DB) {
+	    continue;
+	}
+	/* Insert DB() before DDB() */
+	if (curFuncID == FUNCTION_ID_DDB) {
+	    pself->availableFunctions[numberOfFunctions++] = FUNCTION_ID_DB;
+	}
+#endif
+	/* This function is appropriate.  Add it to the list. */
+	pself->availableFunctions[numberOfFunctions++] = curFuncID;
+
+    }
+
+#if ERROR_CHECK
+    if (numberOfFunctions > MAX_NUMBER_OF_FUNCTIONS) {
+	EC_ERROR(NUMBER_OF_APPROPRIATE_FUNCTIONS_TOO_BIG);
+    }
+#endif /* ERROR_CHECK */
+
+    pself->numberOfFunctions = numberOfFunctions;
+    return (numberOfFunctions);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFEB_FIELD_LIST_MONIKER_QUERY for
+ *	    	    FFExpressionBuilderClass
+ *
+ * DESCRIPTION:	The dynamic list has requested a moniker for a specific
+ *	    	entry.
+ *
+ * PARAMETERS:
+ *	void (optr list, word item)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	2/27/92		Initial version
+ *
+ ***********************************************************************/
+@method FFExpressionBuilderClass, MSG_FFEB_FIELD_LIST_MONIKER_QUERY
+{
+    EventHandle msg;
+
+    msg = @record FlatFileDatabaseClass::
+	MSG_FFD_REQUEST_FIELD_MONIKER(list, item, DATABASE_NAME_LIST);
+
+    @send self::MSG_GEN_OUTPUT_ACTION(msg, pself->GCI_output);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFEB_FUNCTION_LIST_MONIKER_QUERY for
+ *	    	    FFExpressionBuilderClass
+ *
+ * DESCRIPTION:	The dynamic list has requested a moniker for a specific
+ *	    	entry.
+ *
+ * PARAMETERS:
+ *	void (optr list, word item)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	2/27/92		Initial version
+ *
+ ***********************************************************************/
+@method FFExpressionBuilderClass, MSG_FFEB_FUNCTION_LIST_MONIKER_QUERY
+{
+    TCHAR text[MAX_FUNCTION_STRING_LENGTH];
+
+    /* Get the function moniker based on the list of appropriate functions. */
+    (void) ParserGetFunctionMoniker(pself->availableFunctions[item],
+				    FT_ALL,
+				    text);
+
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, text);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFEB_EDIT_EXPRESSION for FFExpressionBuilderClass
+ *
+ * DESCRIPTION:	
+ *	This message is sent when someone wants an expression edited.
+ *	Given a string to parse, the expression builder will allow
+ *	the string to be edited and send a "done" message when the
+ *	user hits Apply.
+ *
+ *	There are quite a few arguments for your general use pleasure:
+ *
+ *	    textHandle - handle to a string to be edited.  THIS WILL
+ *	    	    	BE FREED WITHIN THE EXPRESSION BUILDER!
+ *	    highlightStart, highlightEnd - offsets into the string to
+ *	    	    	select when the text is first displayed.
+ *	    	    	Very handy for highlighting problem areas in the
+ *	    	    	string.
+ *	    resultDestination - optr to whomever should be notified
+ *	    	    	that the user hit the "Apply" trigger.
+ *	    resultMessage - Message to be sent to the resultDestination.
+ *	    	    	The arguments to the resultMessage must be as follows:
+ *	    	    	       (MemHandle resultTextHandle,
+ *	    	    	    	optr expressionBuilderOptr);
+ *	    	    	The resultTextHandle is to be freed by the result-
+ *	    	    	Destination.  The expressionBuilderOptr is an optr to
+ *	    	    	the expression builder.
+ *
+ * PARAMETERS:
+ *	void   	MSG_FFEB_EDIT_EXPRESSION(MemHandle textHandle,
+ *					 dword highlightStart,
+ *					 dword highlightEnd,
+ *					 optr resultDestination,
+ *					 Message resultMessage);
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	4/14/92		Initial version
+ *
+ ***********************************************************************/
+@method FFExpressionBuilderClass, MSG_FFEB_EDIT_EXPRESSION
+{
+    MemHandle childBlock;
+    MemHandle *resetText;
+    FFEBFunctionContext context;
+
+    /* Put the args into instance data for later use. */
+    pself->resultDestination = resultDestination;
+    pself->resultMessage = resultMessage;
+
+    context = pself->FFEB_context;
+
+    /*
+     * Copy the new text into our own text edit object, then keep the
+     * handle around in case the user wants to RESET.
+     */
+    childBlock = GetChildHandle(oself);
+    @call childBlock, (ChunkHandle)@FFExpressionBuilderTextEditor::
+	MSG_VIS_TEXT_REPLACE_ALL_BLOCK(textHandle, 0);
+
+    /*
+     * Copy the text handle into vardata in case the user wants to RESET.
+     */
+    resetText = (MemHandle *)ObjVarAddData(oself,
+					   FFEB_RESET_TEXT,
+					   sizeof(MemHandle));
+    *resetText = textHandle;
+    
+    /*
+     * Select some of the text, if necessary.
+     */
+    if (highlightStart != highlightEnd) {
+#ifdef ERROR_CHECK
+	if (highlightStart > highlightEnd ||
+	    highlightStart > MAX_TEXT_FIELD_LENGTH ||
+	    highlightEnd   > MAX_TEXT_FIELD_LENGTH) {
+	    EC_ERROR(BAD_HIGHLIGHT_RANGE);
+	}
+#endif /* ERROR_CHECK */
+	@call childBlock, (ChunkHandle)@FFExpressionBuilderTextEditor::
+	    MSG_VIS_TEXT_SELECT_RANGE(highlightEnd, highlightStart);
+    }
+
+    /*
+     * If this is not a subset expression builder, 
+     * set the text object not modified so the apply/reset buttons
+     * will enable when they should.
+     */
+    if (context != FFEBFC_SUBSETS) {
+	@call childBlock, (ChunkHandle)@FFExpressionBuilderTextEditor::
+	    MSG_GEN_TEXT_SET_MODIFIED_STATE(0);
+
+	/*
+	 * Since this is the latest value for the field, make the
+	 * Apply/Reset buttons not enabled.
+	 */
+	@call childBlock, (ChunkHandle)@FFExpressionBuilderDialog::
+	    MSG_GEN_MAKE_NOT_APPLYABLE();
+    } else {
+	/*
+	 * This is a subset definition expression builder, so always make
+	 * the apply/reset buttons available.
+	 */
+	@call childBlock, (ChunkHandle)@FFExpressionBuilderDialog::
+	    MSG_GEN_MAKE_APPLYABLE();
+    }
+
+    /*
+     * Make self visible, if necessary.
+     */
+    @send childBlock, (ChunkHandle)@FFExpressionBuilderDialog::
+    	MSG_GEN_INTERACTION_INITIATE();
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_INTERACTION_INITIATE for FFExpressionBuilderClass
+ *
+ * DESCRIPTION:	We intercept this to set how many fields will be in the
+ *	    	field list.
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	4/23/92		Initial version
+ *
+ ***********************************************************************/
+@method FFExpressionBuilderClass, MSG_GEN_INTERACTION_INITIATE
+{
+    EventHandle msg;
+    MemHandle childBlock;
+
+    childBlock = GetChildHandle(oself);
+
+    msg = @record FlatFileDatabaseClass::
+	MSG_FFD_GET_NUMBER_OF_FIELDS(ConstructOptr(childBlock,
+	     (ChunkHandle)@FFExpressionBuilderFieldList), DATABASE_NAME_LIST);
+
+    @send self::MSG_GEN_OUTPUT_ACTION(msg, pself->GCI_output);
+
+    @callsuper();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFEB_CLOSE_DOWN for FFExpressionBuilderClass
+ *
+ * DESCRIPTION:	This message tells the expression builder to go away.
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	4/21/92		Initial version
+ *
+ ***********************************************************************/
+@method FFExpressionBuilderClass, MSG_FFEB_CLOSE_DOWN
+{
+    MemHandle childBlock;
+
+    childBlock = GetChildHandle(oself);
+    @send childBlock, (ChunkHandle)@FFExpressionBuilderDialog::
+	MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFEB_APPLY_CHANGE for FFExpressionBuilderClass
+ *
+ * DESCRIPTION:	Handle when the "Apply" button is pressed.
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	1/92	    	Initial version
+ *
+ ***********************************************************************/
+@method FFExpressionBuilderClass, MSG_FFEB_APPLY_CHANGE
+{
+    MemHandle childBlock;	    /* <- used to get to a UI item. */
+    MemHandle textHandle, *resetText;
+
+    @callsuper();
+
+    /* Get the block of our UI items. */
+    childBlock = GetChildHandle(oself);
+
+    /* Grab the text from the text edit box. */
+    textHandle = @call childBlock,
+    	    	 (ChunkHandle) @FFExpressionBuilderTextEditor::
+		     MSG_VIS_TEXT_GET_ALL_BLOCK((word) 0);
+
+    @send childBlock, (ChunkHandle) @FFExpressionBuilderTextEditor::
+	MSG_GEN_TEXT_SET_MODIFIED_STATE(0);
+
+    pself = ObjDerefGen(oself);
+
+#if ERROR_CHECK
+    ECCheckOD(pself->resultDestination);
+    pself = ObjDerefGen(oself);
+#endif /* ERROR_CHECK */
+
+    @send {MSG_FFEB_RETURN_MSG_TEMPLATE} pself->resultDestination::
+	(pself->resultMessage)(textHandle);
+
+    pself->resultDestination = NullOptr;
+
+    /*
+     * Nuke the reset text.
+     */
+    resetText = ObjVarFindData(oself, FFEB_RESET_TEXT);
+
+    #if ERROR_CHECK
+    if (!resetText) {
+	EC_ERROR(BAD_RESET_TEXT_HANDLE_HOW_DID_THIS_EVER_HAPPEN);
+    }
+    #endif
+
+    MemFree(*resetText);
+    ObjVarDeleteData(oself, FFEB_RESET_TEXT);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFEB_RESET_CHANGE for FFExpressionBuilderClass
+ *
+ * DESCRIPTION:	Handle when the "Reset" button is pressed.  We recopy
+ *	    	the original text into the editing area.
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	3/17/93	    	Initial version
+ *
+ ***********************************************************************/
+@method FFExpressionBuilderClass, MSG_FFEB_RESET_CHANGE
+{
+    MemHandle childBlock;	    /* <- used to get to a UI item. */
+    MemHandle *resetText;
+
+    /* Get the block of our UI items. */
+    childBlock = GetChildHandle(oself);
+
+    /*
+     * Grab the original text.
+     */
+    resetText = ObjVarFindData(oself, FFEB_RESET_TEXT);
+    #if ERROR_CHECK
+    if (!resetText) {
+	EC_ERROR(BAD_RESET_TEXT_HANDLE_HOW_DID_THIS_EVER_HAPPEN);
+    }
+    #endif
+
+    /* Blast the text into the text edit box. */
+    @call childBlock, (ChunkHandle)@FFExpressionBuilderTextEditor::
+	MSG_VIS_TEXT_REPLACE_ALL_BLOCK(*resetText, 0);
+
+    @send childBlock, (ChunkHandle) @FFExpressionBuilderTextEditor::
+	MSG_GEN_TEXT_SET_MODIFIED_STATE(0);
+
+    @callsuper();
+}
+
+MemHandle
+GetChildHandle(optr obj)
+{
+    TempGenControlInstance *tptr;
+
+    tptr = ObjVarDerefData(obj, TEMP_GEN_CONTROL_INSTANCE);
+    return (tptr->TGCI_childBlock);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_FFEB_CANCEL_CHANGE for FFExpressionBuilderClass
+ *
+ * DESCRIPTION:	Handle when the "Cancel" button is pressed.  We free up the
+ *	    	resetText here.
+ *
+ * PARAMETERS:
+ *	void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	3/17/93	    	Initial version
+ *
+ ***********************************************************************/
+@method FFExpressionBuilderClass, MSG_FFEB_CANCEL_CHANGE
+{
+    MemHandle *resetText;
+
+    /*
+     * Nuke the reset text.
+     */
+    resetText = ObjVarFindData(oself, FFEB_RESET_TEXT);
+
+    #if ERROR_CHECK
+    if (!resetText) {
+	EC_ERROR(BAD_RESET_TEXT_HANDLE_HOW_DID_THIS_EVER_HAPPEN);
+    }
+    #endif
+
+    MemFree(*resetText);
+    ObjVarDeleteData(oself, FFEB_RESET_TEXT);
+
+    @callsuper();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_CONTROL_UPDATE_UI for FFExpressionBuilderClass
+ *
+ * DESCRIPTION:	Handle notification of attributes change
+ *
+ * PARAMTERS:
+ *	void (MemHandle childBlock, word toolboxFeatures, word features,
+ *	      optr toolTree, MemHandle data, word changeID,
+ *	      ManufacturerID manufID)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	1/23/92		Initial version
+ *	jeremy	4/24/92	    	Changed notification type to deal with
+ *	    	    	    	field list changes.
+ *	JDM	92.09.01	Rewrote due to notification changes.
+ *
+ ***********************************************************************/
+@method FFExpressionBuilderClass, MSG_GEN_CONTROL_UPDATE_UI
+{
+    FFDListStatusChangeMessageBlock	*lscmbPtr;
+
+    /* Get ahold of the status message block.	*/
+    lscmbPtr = MemLock(data);
+
+    /* Update the database fields list.	*/
+    @send (lscmbPtr->databaseOptr):: MSG_FFD_GET_NUMBER_OF_FIELDS
+	(ConstructOptr (childBlock, @FFExpressionBuilderFieldList),
+	 DATABASE_NAME_LIST);
+
+    /* All done.	*/
+    MemUnlock(data);
+}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		FFEBDatabaseListStatusChange
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Update the Expression Builder's lists which correspond to
+		the database's Database name list.
+
+CALLED BY:	Internel --	MSG_GEN_CONTROL_UPDATE_UI.
+
+PASS:		FFDListStatusChangeMessageBlock	*lscmbPtr
+						= Message status block
+						  containing field list
+						  change information.
+		optr		oself		= The Expression builder.
+		MemHandle	childBlock	= Memory block containing
+						  the UI children.
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	????
+
+	Asserts:	????
+
+CHECKS:		None.
+
+PSEUDO CODE/STRATEGY:
+	Update the field name list in the Expression Builder to mimic the
+	database's Database name list.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	????
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.09.01	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+static _pascal void FFEBDatabaseListStatusChange
+		(FFDListStatusChangeMessageBlock *lscmbPtr,
+		 optr oself,
+		 MemHandle childBlock)
+{
+    /* Update the list appropriately for the specified action.	*/
+    switch (lscmbPtr->changeType)
+	{
+	case RESET:
+	    {
+	    @call (lscmbPtr->databaseOptr)::MSG_FFD_GET_NUMBER_OF_FIELDS
+		(ConstructOptr(childBlock, @FFExpressionBuilderFieldList),
+		 DATABASE_NAME_LIST);
+	    break;
+	    }
+	case ADDED:
+	case DELETED:
+	    {
+	    FFEBUpdateList (childBlock,
+			    lscmbPtr->fieldIndex,
+			    lscmbPtr->changeType);
+	    break;
+	    }
+	case CHANGED:
+	    {
+	    @send oself::MSG_FFEB_FIELD_LIST_MONIKER_QUERY
+		(ConstructOptr (childBlock,
+				OptrToChunk
+				    (@FFExpressionBuilderFieldList)),
+		 lscmbPtr->fieldIndex);
+	    break;
+	    }
+	case SHOW_NOTES:
+	    {
+	    /* Nothing to do!	*/
+	    break;
+	    }
+	}
+}	/* End of FFEBDatabaseListStatusChange().	*/
+
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFEBUpdateList
+ *
+ * DESCRIPTION: This function updates the field list.
+ *
+ * PARAMETERS:  childBlock - the handle of this instnace of ourselves
+ *              index - index of the list the change occurred.
+ *              change - What type of change happened to this field.
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  4/27/92         Initial Revision
+ *
+ ***********************************************************************/
+void
+FFEBUpdateList(MemHandle childBlock,
+               FieldID index,
+               FFFieldListChangeStatus change)
+{
+    switch (change) {
+        case ADDED:
+            @send childBlock, (ChunkHandle) @FFExpressionBuilderFieldList::
+                MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(index, 1);
+            break;
+        case DELETED:
+            @send childBlock, (ChunkHandle) @FFExpressionBuilderFieldList::
+                MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(index, 1);
+            break;
+    }
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	FFExpressionBuilder --
+ *		MSG_FFEB_ADD_FUNCTION_STRING for FFExpressionBuilderClass
+ *
+ * DESCRIPTION: This mesage is called when the user clicks on a function
+ * 	    	in the function list.  The function string is requested
+ *		from the parse library, and is placed in the expression
+ *		builder text edit box.
+ *
+ * PARAMETERS:
+ *	void (word selection,
+ *	      word numSelections,
+ *	      byte stateFlags)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	2/ 4/92		Initial version
+ *
+ ***********************************************************************/
+@method FFExpressionBuilderClass, MSG_FFEB_ADD_FUNCTION_STRING
+{
+    TCHAR textBuffer[100];
+    word numChars;
+    VisTextRange cursorPos;
+    MemHandle childBlock;
+
+    @callsuper();
+
+    /* Get the block of our UI items. */
+    childBlock = GetChildHandle(oself);
+
+    /* Turn off the selection, because we want to act like a trigger. */
+    @call childBlock, (ChunkHandle) @FFExpressionBuilderFunctionList::
+	MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+
+    /* Get the function name for this item. */
+    pself = ObjDerefGen(oself);
+    numChars = ParserGetFunctionMoniker(pself->availableFunctions[selection],
+					FT_ALL, textBuffer);
+
+    /*
+     * Add parens to the end of the function.  Note that the buffer is NOT
+     * null-terminated.
+     */
+    textBuffer[numChars++] = _TEXT('(');
+    textBuffer[numChars++] = _TEXT(')');
+
+    /*
+     * If we're within a function, prefix a comma and a space if need
+     * be.
+     */
+    FFExpressionBuilderInsertCommaIfNecessary(childBlock);
+
+    /* Add the new function to the text edit box. */
+    @call childBlock, (ChunkHandle) @FFExpressionBuilderTextEditor::
+    	    	MSG_VIS_TEXT_REPLACE_SELECTION_PTR(textBuffer, numChars);
+
+    /* Figure out where the cursor is. */
+
+    cursorPos.VTR_start = VIS_TEXT_RANGE_SELECTION;
+
+    @call childBlock, (ChunkHandle) @FFExpressionBuilderTextEditor::
+    	    	MSG_VIS_TEXT_GET_RANGE(&cursorPos, 0);
+
+    /* Now put the cursor back one character. */
+    if (cursorPos.VTR_start == cursorPos.VTR_end) {
+	cursorPos.VTR_start--;
+	@call childBlock, (ChunkHandle) @FFExpressionBuilderTextEditor::
+    	    	MSG_VIS_TEXT_SELECT_RANGE(cursorPos.VTR_start,
+					      cursorPos.VTR_start);
+    }
+
+    /* Tell the text object to grab the target again. */
+    @call childBlock, (ChunkHandle) @FFExpressionBuilderTextEditor::
+	MSG_META_GRAB_FOCUS_EXCL();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	FFExpressionBuilder --
+ *		MSG_FFEB_ADD_FIELD_STRING for FFExpressionBuilderClass
+ *
+ * DESCRIPTION: This mesage is called when the user clicks on a field name
+ * 	    	in the field list.  The field name is placed in the expression
+ *		builder text edit box.
+ *
+ * PARAMETERS:
+ *	void (word selection,
+ *	      word numSelections,
+ *	      byte stateFlags)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	2/ 4/92		Initial version
+ *
+ ***********************************************************************/
+@method FFExpressionBuilderClass, MSG_FFEB_ADD_FIELD_STRING
+{
+    MemHandle childBlock;	    /* <- used to get to a UI item. */
+    EventHandle msg;
+
+    childBlock = GetChildHandle(oself);
+
+    /* Turn off the selection, because we want to act like a trigger. */
+    @call childBlock, (ChunkHandle) @FFExpressionBuilderFieldList::
+	MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+
+    /*
+     * If the cursor is within a function, then we might need to insert
+     * a comma and a space before the field name.  Do it here.
+     */
+    FFExpressionBuilderInsertCommaIfNecessary(childBlock);
+
+    /* Now request the field's name from the application. */
+    msg = @record FlatFileDatabaseClass::
+	    MSG_FFD_EXPRESSION_BUILDER_GET_FIELD_NAME(childBlock,
+	        (ChunkHandle)@FFExpressionBuilderTextEditor,
+		selection);
+    @send self::MSG_GEN_OUTPUT_ACTION(msg, pself->GCI_output);
+
+    /* Tell the text object to grab the target again. */
+    @call childBlock, (ChunkHandle) @FFExpressionBuilderTextEditor::
+	MSG_META_GRAB_FOCUS_EXCL();
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	FFExpressionBuilder --
+ *		MSG_FFEB_ADD_OP_STRING for FFExpressionBuilderClass
+ *
+ * DESCRIPTION:	This message is called when the user clicks on a
+ *	    	logical operator in the operator lists.  Spaces are placed
+ *	    	around the operator, if there aren't some already.
+ *
+ * PARAMETERS:
+ *	void (word selection,
+ *	      word numSelections,
+ *	      byte stateFlags)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	2/25/92		Initial version
+ *
+ ***********************************************************************/
+@method FFExpressionBuilderClass, MSG_FFEB_ADD_OP_STRING
+{
+    MemHandle	childBlock;
+    VisTextRange cursorPos;
+    MemHandle curTextHandle;
+    TCHAR *curText;
+    TCHAR operatorText[MAX_OPERATOR_LENGTH + 2];
+
+    childBlock = GetChildHandle(oself);
+
+    /* Turn off the selection, because we want to act like a trigger. */
+    @call childBlock, (ChunkHandle) @FFExpressionBuilderArithmeticOpsList::
+	MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+    @call childBlock, (ChunkHandle) @FFExpressionBuilderLogicalOpsList::
+	MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+
+    /* Grab the text from the text edit box. */
+    FFExpressionBuilderGrabStringFromTextEditBox(childBlock,
+						 &curTextHandle,
+						 &cursorPos);
+    curText = MemLock(curTextHandle);
+
+    /* Initialize the operator string. */
+    operatorText[0] = _TEXT('\0');
+
+    /*
+     * Special case: if the operator is a left or right parens, then 
+     * no spaces are needed.
+     */
+    if (selection == FFEB_LEFT_PARENS_ID || selection ==FFEB_RIGHT_PARENS_ID){
+	strcat(operatorText, operatorList[selection]);
+    } else {
+
+	/* Put a space before and after the operator, if needed. */
+	if (!isspace(curText[cursorPos.VTR_start - 1])) {
+	    strcat(operatorText, _TEXT(" "));
+	}
+    
+	/* Blast in the operator */
+#ifdef DO_DBCS
+	switch (selection) {
+	    case FFEB_NOTEQUAL_ID:
+	    	{
+		    strcat(operatorText, notequalString);
+		    break;
+		}
+	    case FFEB_LESSEQUAL_ID:
+		{
+		    strcat(operatorText, lessequalString);
+		    break;
+		}
+	    case FFEB_GREATEREQUAL_ID:
+		{
+		    strcat(operatorText, greaterequalString);
+		    break;
+		}
+	    default:
+		{
+		    strcat(operatorText, operatorList[selection]);
+		    break;
+		}
+	}
+#else
+	strcat(operatorText, operatorList[selection]);
+#endif
+	
+	if (!isspace(curText[cursorPos.VTR_start])) {
+	    strcat(operatorText, _TEXT(" "));
+	}
+    }
+
+    /* Now blast the whole string into the current cursor position. */
+    @call childBlock, (ChunkHandle) @FFExpressionBuilderTextEditor::
+	MSG_VIS_TEXT_REPLACE_SELECTION_PTR(operatorText, strlen(operatorText));
+
+    MemFree(curTextHandle);
+
+    /* Tell the text object to grab the target again. */
+    @call childBlock, (ChunkHandle) @FFExpressionBuilderTextEditor::
+	MSG_META_GRAB_FOCUS_EXCL();
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	FFExpressionBuilderInsertCommaIfNecessary
+ *
+ * DESCRIPTION:	Blast a comma and a space at the current cursor position
+ *	    	if we're in a function's parens.
+ *
+ * PARAMETERS:	childBlock - childBlock of this UI controller's UI.
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	2/24/92		Initial Revision
+ *
+ ***********************************************************************/
+void
+FFExpressionBuilderInsertCommaIfNecessary(MemHandle childBlock)
+{
+    VisTextRange cursorPos;
+    MemHandle curTextHandle;
+    TCHAR *curText;
+    LocalNumericFormat formatBuf;
+    TCHAR separator[3];	    	    
+    
+    /*
+     * Grab the entire text object and determine if we need to blast a
+     * comma and a space before the next argument.
+     *
+     * The rule goes like this: if we're inside a function and there
+     * is an alpha-numeric character immediately before the cursor,
+     * then blast away.
+     */
+
+    /* Get text from the edit box. */
+    FFExpressionBuilderGrabStringFromTextEditBox(childBlock,
+						 &curTextHandle,
+						 &cursorPos);
+
+    curText = MemLock(curTextHandle);
+
+    /*
+     * If the cursor is within a function, then we have a special
+     * case.
+     */
+    if (FFExpressionBuilderCursorWithinAFunction(curText,cursorPos.VTR_start)&&
+	FFExpressionBuilderFieldNameToLeft(curText, cursorPos.VTR_start)) {
+	/*
+	 * We're in a function and there's a field to the left!
+	 * Get the list separator as set in preferences, add a space.
+	 */
+	LocalGetNumericFormat(&formatBuf);
+	separator[0] = formatBuf.listSeparator;
+	strcpy(&(separator[1]), _TEXT(" "));
+
+	/*
+	 * Add the list separtor.
+	 */
+	@call childBlock, (ChunkHandle) @FFExpressionBuilderTextEditor::
+	    MSG_VIS_TEXT_REPLACE_SELECTION_PTR(_TEXT(", "), 2);
+    }
+
+    /* Free up the old expression string. */
+    MemFree(curTextHandle);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	FFExpressionBuilderGrabStringFromTextEditBox
+ *
+ * DESCRIPTION:	This function copies the text from the text edit box,
+ *	    	clears any selected region, and returns the current
+ *	    	cursor position.
+ *
+ * PARAMETERS:	childBlock - childBlock of this UI controller's UI.
+ *	    	curTextHandle - set to point to the copied text.
+ *	    	cursorPos  - set to the current cursor position.
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	2/25/92		Initial Revision
+ *
+ ***********************************************************************/
+void
+FFExpressionBuilderGrabStringFromTextEditBox(MemHandle childBlock,
+					     MemHandle *curTextHandle,
+					     VisTextRange *cursorPos)
+{
+    /* Grab the text from the text edit box. */
+    *curTextHandle = @call childBlock,
+    	    	       (ChunkHandle) @FFExpressionBuilderTextEditor::
+			   MSG_VIS_TEXT_GET_ALL_BLOCK((word) 0);
+
+    /* Figure out where the cursor is. */
+    cursorPos->VTR_start = VIS_TEXT_RANGE_SELECTION;
+    @call childBlock, (ChunkHandle) @FFExpressionBuilderTextEditor::
+    	    	MSG_VIS_TEXT_GET_RANGE(cursorPos, 0);
+
+    /* If there is a selected range, nuke it. */
+    if (cursorPos->VTR_start != cursorPos->VTR_end) {
+	@call childBlock, (ChunkHandle) @FFExpressionBuilderTextEditor::
+    	    	MSG_VIS_TEXT_DELETE_SELECTION();
+
+	/* Update the cursor position. */
+	cursorPos->VTR_end = cursorPos->VTR_start;
+    }
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	FFExpressionBuilderCursorWithinAFunction
+ *
+ * DESCRIPTION:	This function determines whether or not the cursor is
+ *	        positioned within a function's parentheses.
+ *	        
+ *
+ * PARAMETERS:	expression   - ptr to the expression
+ *	        cursorPos    - cursor position within the expression
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * STRATEGY:	1) Check for balanced parens, first to the right, then
+ *	           to the left.
+ *	    	2) If the parens balance out, then check the character
+ *	           to the immediate left of the left parens.  If it's
+ *	           an alphanumeric, then it's assumed to be a function.
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	2/24/92		Initial Revision
+ *
+ ***********************************************************************/
+Boolean
+FFExpressionBuilderCursorWithinAFunction(TCHAR *expression,
+					 dword cursor)
+{
+    dword i;
+    int parensToRight, parensToLeft;
+    dword leftParensOffset;
+
+    parensToRight = parensToLeft = 0;
+ 
+#if ERROR_CHECK
+    if (cursor > strlen(expression)) {
+	EC_ERROR(BAD_CURSOR_POSITION_WITHIN_EXPRESSION);
+    }
+#endif /* ERROR_CHECK */
+
+    /*
+     * Count right parens to the right.  This means whenever a left
+     * parens is encountered, decrement the right parens count by one.
+     */
+    for (i = cursor; i < strlen(expression); i++) {
+	switch (expression[i]) {
+	    case    _TEXT(')'):    parensToRight++;
+	    	    	    break;
+	    case    _TEXT('('):    parensToRight--;
+	    	    	    break;
+	}
+
+	if (parensToRight == 1) {
+	    break;  /* out of loop */
+	}
+    }
+    if (parensToRight != 1) {
+	return FALSE;
+    }
+
+    /*
+     * Count left parens to the left.  This means whenever a right
+     * parens is encountered, decrement the left parens count by one.
+     */
+    for (i = cursor - 1; i >= 0; i--) {
+	switch (expression[i]) {
+	    case    _TEXT('('):    parensToLeft++;
+	    	    	    break;
+	    case    _TEXT(')'):    parensToLeft--;
+	    	    	    break;
+	}
+
+	if (parensToLeft == 1) {
+	    /* Remember where the left parens is, and get out of here. */
+	    /* Check if we're at the start of the string, first... */
+	    if ((leftParensOffset = i) == 0) {
+		return FALSE;
+	    }
+	    break;
+	}
+    }
+    if (parensToLeft != 1) {
+	return FALSE;
+    }
+
+    /*
+     * Ok, we're inside a balanced set of parens.  Is the first non-blank
+     * character to the left of the left parens a legal function character?
+     */
+
+    /* Skip over whitespace first. */
+    for (i = leftParensOffset - 1; i >= 0; i--) {
+	if (!isspace(expression[i])) {
+	    break;
+	}
+    }
+
+    /*
+     * Well, don't try very hard: if it's a legal character,
+     * then assume it's a function and scoot.
+     */
+    return (i < 0 ? FALSE : (isalphanum(expression[i]) ? TRUE : FALSE));
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	FFExpressionBuilderFieldNameToLeft
+ *
+ * DESCRIPTION: This function checks if there is an alphanumeric
+ *	    	character to the left of the current cursor position.
+ *	    	If there is, TRUE is returned; otherwise, FALSE.
+ *
+ *	    	Note: whitespace is ignored.
+ *	    	
+ * PARAMETERS:	expression - pointer to the expression string
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * STRATEGY:	Skip over whitespace to the left, then look at the
+ *	    	first char.  Simple.
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jeremy	2/24/92		Initial Revision
+ *
+ ***********************************************************************/
+Boolean
+FFExpressionBuilderFieldNameToLeft(TCHAR *expression, dword cursorPos)
+{
+    dword i;
+ 
+#if ERROR_CHECK
+    if (cursorPos >= strlen(expression)) {
+	EC_ERROR(BAD_CURSOR_POSITION_WITHIN_EXPRESSION);
+    }
+#endif /* ERROR_CHECK */
+
+    if (!cursorPos) {
+	return FALSE;
+    }
+
+    /* Skip over whitespace to the left */
+    for (i = cursorPos - 1; i >= 0; i--) {
+	if (!isspace(expression[i])) {
+	    break;
+	}
+    }
+
+    /*
+     * Well, don't try very hard: if it's a legal character,
+     * then assume it's an argument and scoot.
+     */
+    return (i < 0 ? FALSE :
+	   (expression[i] == _TEXT(')') ? TRUE :
+	   (isalphanum(expression[i]) ? TRUE : FALSE)));
+}

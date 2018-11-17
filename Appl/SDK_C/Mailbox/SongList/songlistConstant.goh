@@ -1,0 +1,140 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Sample Applications
+MODULE:		Mailbox Library Samples
+FILE:		songlistConstant.goh
+
+AUTHOR:		Chung Liu, Dec  9, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CL	12/ 9/94   	Initial version.
+
+DESCRIPTION:
+	
+
+	$Id: songlistConstant.goh,v 1.1 97/04/04 16:40:17 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+@include <mailbox.goh>
+#include <Mailbox/vmtree.h>
+
+#define SL_MAX_NAME_LENGTH 50
+
+/* Name of VM file in SP_PRIVDATA where data is stored. */
+#define SL_DATA_FILE_NAME "Song List Data"
+
+/*
+ * VM ID for our blocks.
+ */
+#define SL_MAP_ID 7776
+#define SL_ARTIST_ID 7777
+#define SL_RECORD_ID 7778
+#define SL_SONG_ID 7779
+
+/* 
+ * The map block is the head of the data tree.  All children of the map
+ * block are artist blocks.
+ */
+typedef struct {
+    VMChainTree SLMB_treeHeader;
+} SLMapBlock;
+
+/* 
+ * Artist, Record, and Song blocks are all SLDataBlocks.  
+ * An SLDataBlock starts with a VMChainTree structure.  VMCT_offset, which
+ * indicates the start of dword links to children blocks, points to right 
+ * after SLDB_notesOffset.  SLDB_nameOffset and SLDB_notesOffset point to
+ * the immediately following the dword child links.
+ */
+typedef struct {
+    VMChainTree SLDB_treeHeader;
+    word SLDB_nameOffset;       /* offset from start of struct. */
+    word SLDB_notesOffset;      /* offset from start of struct. */
+} SLDataBlock;
+
+@class SLProcessClass, GenProcessClass;
+
+/* parameters for GEN_DYNAMIC_LIST_QUERY_MSG:
+ * void (optr list, word item)
+ */
+@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_SLP_ARTIST_MONIKER_QUERY;
+@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_SLP_RECORD_MONIKER_QUERY;
+@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_SLP_SONG_MONIKER_QUERY;
+
+/* parameters for GEN_ITEM_GROUP_APPLY_MSG:
+ * void (word selection, word numSelections, word flags)
+ */
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_SLP_ARTIST_APPLY;
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_SLP_RECORD_APPLY;
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_SLP_SONG_APPLY;
+
+/* parameters for GEN_TRIGGER_ACTION:
+ * void (optr trigger)
+ */
+@message (GEN_TRIGGER_ACTION) MSG_SLP_ARTIST_EDIT;
+@message (GEN_TRIGGER_ACTION) MSG_SLP_ARTIST_REALLY_EDIT;
+@message (GEN_TRIGGER_ACTION) MSG_SLP_ARTIST_ADD;
+@message (GEN_TRIGGER_ACTION) MSG_SLP_ARTIST_REALLY_ADD;
+@message (GEN_TRIGGER_ACTION) MSG_SLP_ARTIST_DELETE;
+@message (GEN_TRIGGER_ACTION) MSG_SLP_ARTIST_REALLY_DELETE;
+@message (GEN_TRIGGER_ACTION) MSG_SLP_RECORD_EDIT;
+@message (GEN_TRIGGER_ACTION) MSG_SLP_RECORD_REALLY_EDIT;
+@message (GEN_TRIGGER_ACTION) MSG_SLP_RECORD_ADD;
+@message (GEN_TRIGGER_ACTION) MSG_SLP_RECORD_REALLY_ADD;
+@message (GEN_TRIGGER_ACTION) MSG_SLP_RECORD_DELETE;
+@message (GEN_TRIGGER_ACTION) MSG_SLP_RECORD_REALLY_DELETE;
+@message (GEN_TRIGGER_ACTION) MSG_SLP_SONG_EDIT;
+@message (GEN_TRIGGER_ACTION) MSG_SLP_SONG_REALLY_EDIT;
+@message (GEN_TRIGGER_ACTION) MSG_SLP_SONG_ADD;
+@message (GEN_TRIGGER_ACTION) MSG_SLP_SONG_REALLY_ADD;
+@message (GEN_TRIGGER_ACTION) MSG_SLP_SONG_DELETE;
+@message (GEN_TRIGGER_ACTION) MSG_SLP_SONG_REALLY_DELETE;
+
+@endc
+
+@class SLSendControlClass, MailboxSendControlClass;
+@endc;
+
+/* 
+ * We define our own custom MailboxObjectTypes, because our application
+ * deals with data that does not fall withing pre-existing MailboxObjectTypes.
+ */
+typedef enum {
+    /* The enum values for our custom MOTs start at the beginning of the 
+     * message number range for our subclass of the send control.  
+     * This is done to spread out MOT numbers so that they don't conflict
+     * with MOTs from other applications.
+     */
+    MOT_CURRENT_SONG = _FIRST_SLSendControlClass,
+    MOT_CURRENT_RECORD,
+    MOT_CURRENT_ARTIST,
+    MOT_ALL_ARTISTS,
+} SLMailboxObjectType;
+
+/* This application uses its own data format for transmitting messages.
+ * SDKMailboxDataFormatID is an enum for data formats under 
+ * MANUFACTURER_ID_SDK.  The manufacturer id mechanism keeps definitions
+ * unique. */
+typedef enum {
+    SMDFID_INVALID = 0x0,
+    SMDFID_SONGLIST_TREE,
+} SDKMailboxDataFormatID;
+
+/*
+ * These are the choices the user has when merging notes.
+ */
+typedef enum {
+    SLMII_APPEND_ITEM_IDENTIFIER = 0x0,
+    SLMII_DELETE_ITEM_IDENTIFIER, 
+    SLMII_USE_ITEM_IDENTIFIER, 
+} SLMergeItemIdentifier;

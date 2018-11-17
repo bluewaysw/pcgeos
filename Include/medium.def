@@ -1,0 +1,164 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	GEOS
+MODULE:		Medium
+FILE:		medium.def
+
+AUTHOR:		Chung Liu, Aug  8, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CL	8/ 8/94   	Initial revision
+
+
+DESCRIPTION:
+	Medium definition file.
+		
+	$Id: medium.def,v 1.1 97/04/04 14:26:03 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__MEDIUM
+
+MediumUnitType	etype	byte
+	MUT_NONE		enum	MediumUnitType	
+	; medium has no units
+
+	MUT_INT		enum	MediumUnitType	
+	; unit is an unsigned 16-bit number
+
+	MUT_MEM_BLOCK	enum	MediumUnitType	
+	; unit is the handle of a memory block  allocated with
+	; HAF_ZERO_INIT set.  The called routine (e.g., in the Mailbox
+	; Library) *always* takes possession of the block.
+
+	MUT_ANY		enum	MediumUnitType
+	; Used in certain cases (e.g., when the Mailbox Library talks
+	; to the transport drivers) to indicate that any unit of the
+	; particular medium is satisfactory.
+
+	MUT_REASON_ENCLOSED enum MediumUnitType
+	; Used only for MESN_MEDIUM_NOT_AVAILABLE, indicates the
+	; unit number contains a structure of type MediumUnitAndReason
+	; to say why the medium isn't available.
+
+GeoworksMediumID		etype	word, 0			
+    	GMID_INVALID		enum 	GeoworksMediumID
+
+    	GMID_SERIAL_CABLE	enum	GeoworksMediumID	
+	; unit is SerialPortNum
+
+	GMID_INFRARED		enum	GeoworksMediumID	
+	; unit is SerialPortNum
+
+    	GMID_DATA_MODEM		enum	GeoworksMediumID	
+	; unit is SerialPortNum
+
+    	GMID_FAX_MODEM		enum	GeoworksMediumID	
+	; unit is SerialPortNum
+
+    	GMID_PRINTER		enum	GeoworksMediumID	
+	; unit is printer name in mem block.
+
+    	GMID_PARALLEL_PORT	enum	GeoworksMediumID	
+	; unit is ParallelPortNum.
+
+    	GMID_NETWORK		enum	GeoworksMediumID	
+	; unit is NetID.
+
+	GMID_LOOPBACK		enum	GeoworksMediumID
+	; no units
+
+	GMID_SM			enum	GeoworksMediumID
+	; Small Message - no units
+
+	GMID_CELL_MODEM		enum	GeoworksMediumID
+	; A wireless modem of some sort. Can have fax and data capability.
+	; no unit (assumed to be one/machine and everyone knows where it is)
+
+MediumType		struct
+	MET_id		word
+    	MET_manuf	ManufacturerID
+MediumType		ends
+
+MediumAndUnit		struct
+	MU_medium	MediumType
+	MU_unitType	MediumUnitType
+	MU_unit		word
+MediumAndUnit		ends
+
+MediumUnitAndReason	struct
+	MUAR_type	MediumUnitType
+	MUAR_size	word			; size of unit data
+	MUAR_unit	label	byte
+	; the reason follows the unit data as a null-terminated string
+MediumUnitAndReason	ends
+
+;------------------------------------------------------------------------------
+;
+;		    SST_ Notification Types
+;
+;------------------------------------------------------------------------------
+
+MediumSubsystemNotification	etype	word, 0
+MESN_MEDIUM_AVAILABLE		enum	MediumSubsystemNotification
+;	Desc:	Alerts the Mailbox library to the existence of a particular
+;		transmission medium.
+;
+;		Library takes possession of the passed memory block if
+;		al is MMUT_MEM_BLOCK (also, remember to set SNT_BX_MEM in
+;		DI when you call SysSendNotification)
+;
+;	Pass:	cxdx	= MediumType
+;		bx	= unit number (ignored if MMUT_NONE)
+;		al	= MediumUnitType
+;
+
+MESN_MEDIUM_NOT_AVAILABLE	enum	MediumSubsystemNotification
+;	Desc:	Alerts the Mailbox library to the absence of a particular
+;		transmission medium.
+;
+;		Library takes posession of the passed memory block if 
+;		al is MMUT_MEM_BLOCK (also, remember to set SNT_BX_MEM in
+;		DI when you call SysSendNotification)
+;
+;	Pass:	cxdx	= MediumType
+;		bx	= unit number (ignored if MMUT_NONE)
+;		al	= MediumUnitType
+;
+
+MESN_MEDIUM_CONNECTED		enum	MediumSubsystemNotification
+;	Desc:	Alerts the Mailbox library that a particular transmission
+;		medium is actually connected to another machine. The
+;		transport drivers that use the medium will determine the
+;		address (with the help of the driver that established the
+;		connection).
+;
+;		Library takes possession of the passed memory block if
+;		al is MMUT_MEM_BLOCK (also, remember to set SNT_BX_MEM in
+;		DI when you call SysSendNotification)
+;
+;	Pass:	cxdx	= MediumType
+;		bx	= unit number (ignored if MMUT_NONE)
+;		al	= MediumUnitType
+;
+
+MESN_MEDIUM_NOT_CONNECTED	enum	MediumSubsystemNotification
+;	Desc:	Alerts the Mailbox library to the severing of a connection
+;		over a particular transmission medium.
+;
+;		Library takes posession of the passed memory block if 
+;		al is MMUT_MEM_BLOCK (also, remember to set SNT_BX_MEM in
+;		DI when you call SysSendNotification)
+;
+;	Pass:	cxdx	= MediumType
+;		bx	= unit number (ignored if MMUT_NONE)
+;		al	= MediumUnitType
+;

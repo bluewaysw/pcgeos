@@ -1,0 +1,736 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1994 -- All Rights Reserved
+ *
+ * PROJECT:	  socket
+ * MODULE:	  socket preference module
+ * FILE:	  prefsock.ui
+ *
+ * AUTHOR:  	  Steve Jang, Nov  8, 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	SJ	11/ 8/94   	Initial version
+ *
+ * DESCRIPTION:
+ *	Preference module UI for socket library and its drivers
+ *
+ * 	$Id: prefsock.ui,v 1.1 97/04/05 01:43:11 newdeal Exp $
+ *
+ ***********************************************************************/
+
+#include "generic.uih"
+#include "config.uih"
+#include "Art/mkrPrefSocket.ui"
+
+class PrefSocketDialog = PrefDialog {
+}
+
+class PrefSocketEdit = PrefInteraction {
+	prefControl = wordComp : 0;
+}
+
+start	PrefSocketUI;
+
+/*
+--------------------------------------------------------------------------
+			   Main Panel
+--------------------------------------------------------------------------
+*/
+
+PrefSocketTitleGroup = GenInteraction {
+	children = PrefSocketTitle, PrefSocketDescription;
+	hints = {HINT_ORIENT_CHILDREN_HORIZONTALLY}
+}
+
+PrefSocketTitle = TitledGlyph {
+	moniker = list {
+		PrefSocketTextMoniker,
+		PrefSocketLCMoniker,
+		PrefSocketLMMoniker,
+		PrefSocketLCGAMoniker
+	}
+}
+
+PrefSocketDescription = GenText {
+	genAttributes = readOnly;
+	text = "Use these options to set parameters for socket transport layer and its datalink level drivers.";
+	hints = {
+		  HINT_MINIMUM_SIZE {
+			SpecWidth <SST_PIXELS, 375>
+			SpecHeight <>
+		  },
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+PrefSocketRoot = PrefSocketDialog {
+	moniker = "Socket";
+	attributes = default +modal, +notUserInitiatable;
+	visibility = dialog;
+	type = properties;
+	genStates = default -usable;
+	children = PrefSocketTitleGroup,
+		   PrefSocketDriverList,
+		   PrefSocketEditButton,
+		   PrefSocketEditDialog;
+	hints = {
+		ATTR_GEN_INIT_FILE_CATEGORY {
+			char	"socket", 0
+		}
+	}
+}
+
+PrefSocketDriverList = PrefTocList {
+	moniker = "Available Drivers";
+	applyMsg = MSG_PREF_SOCKET_DRIVER_SELECTED;
+	destination = PrefSocketRoot;
+	tokenChars = "'SKDR'";
+	hints = {
+		ATTR_GEN_PATH_DATA {
+			GenFilePath <SP_SYSTEM, <C_BACKSLASH, "SOCKET", 0>>
+		},
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_DRAW_IN_BOX
+	}
+}
+
+PrefSocketEditButton = GenTrigger {
+	moniker = "Edit";
+	genStates = default -enabled;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {word IC_APPLY}
+	}
+}
+
+/*
+--------------------------------------------------------------------------
+			   Edit Options
+--------------------------------------------------------------------------
+*/
+
+PrefSocketEditDialog = PrefSocketEdit {
+	prefInteractionAttrs = loadOptionsOnInitiate,
+			       saveOptionsOnApply,
+			       completeInteractionOnApply;
+	moniker = "Generic Edit Options";
+	attributes = default +modal, +notUserInitiatable;
+	visibility = dialog;
+	type = properties;
+	children = PrefSocketTypeOption,
+		   PrefSocketAddressOption,
+		   PrefSocketSublayerOption,
+		   PrefSocketUnitGroup,
+		   PrefSocketSerialPortOption,
+		   SerialPortOption;
+	hints = {
+		HINT_INTERACTION_COMPLEX_PROPERTIES
+	}
+}
+
+PrefSocketTypeOption = PrefItemGroup {
+	moniker = "Type";
+	initFileFlags = useItemStrings;
+	children = PrefSocketTransportType, PrefSocketDatalinkType;
+	hints = {
+		ATTR_GEN_INIT_FILE_KEY {
+			char "type", 0	; will be replaced
+		}
+	}
+}
+	PrefSocketTransportType = PrefStringItem {
+		moniker = "Transport Layer";		/* in socketInt.def */
+		initFileString = "0";			/* = SDT_DATA */
+		identifier = 0;
+	}
+
+	PrefSocketDatalinkType = PrefStringItem {
+		moniker = "Datalink Layer";
+		initFileString = "1";			/* = SDT_LINK */
+		identifier = 1;
+	}
+
+PrefSocketAddressOption = PrefText {
+	moniker = "Address";
+	textDisplayAttributes = default +singleLineText;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_WIDE_CHAR_WIDTHS, 15>
+			SpecHeight <>
+		},
+		ATTR_GEN_INIT_FILE_KEY {
+			char	"address", 0
+		}
+	}
+}
+
+PrefSocketSublayerOption = PrefInteraction {
+	children = PrefSocketSublayerMoniker, PrefSocketSublayerList;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+
+PrefSocketSublayerMoniker = GenGlyph {
+	moniker = "Sublayer";
+}
+
+PrefSocketSublayerList = PrefTocList {
+	moniker = "Sublayer";
+	tokenChars = "'SKDR'";
+	hints = {
+		ATTR_GEN_PATH_DATA {
+			GenFilePath <SP_SYSTEM, <C_BACKSLASH, "SOCKET", 0>>
+		},
+		ATTR_GEN_INIT_FILE_KEY {
+			char	"sublayer", 0
+		},
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_ITEM_GROUP_TOOLBOX_STYLE,
+		HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_WIDE_CHAR_WIDTHS, 14>
+			SpecHeight <>
+		},
+		HINT_ITEM_GROUP_MINIMIZE_SIZE,
+	}
+}
+
+PrefSocketUnitGroup = PrefInteraction {
+	children = PrefSocketUnitList,
+		   PrefSocketSubunitGroup;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+	}
+}
+
+/*
+	Integer is stored for port data.  The driver should know whether it
+	can support serial or parallel medium.  Since ParallelPortNum and
+	SerialPortNum share same values, the drivers that use parallel port
+	must subtract 100 in order to extract ParallelPortNum.
+*/
+PrefSocketUnitList = PrefItemGroup {
+	moniker = "Port";
+	initFileFlags = useItemStrings;
+	children = PrefSocketLPT1Unit, PrefSocketLPT2Unit, PrefSocketLPT3Unit, 
+		   PrefSocketCOM1Unit, PrefSocketCOM2Unit, PrefSocketCOM3Unit, 
+		   PrefSocketCOM4Unit;
+	destination = PrefSocketEditDialog;
+	hints = {
+		ATTR_GEN_ITEM_GROUP_STATUS_MSG {
+			word MSG_PREF_SOCKET_PORT_SELECTED
+		},
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_WIDE_CHAR_WIDTHS, 8>
+			SpecHeight <>
+		},
+		ATTR_GEN_INIT_FILE_KEY {
+		char	"port", 0
+		},
+	}
+}
+	PrefSocketLPT1Unit = PrefStringItem {
+		moniker = "LPT1(Parallel)";	/* in parallDr.def */
+		initFileString = "100";		/* = PARALLEL_LPT1 */
+		identifier = 0;
+	}
+	PrefSocketLPT2Unit = PrefStringItem {
+		moniker = "LPT2(Parallel)";
+		initFileString = "102";		/* = PARALLEL_LPT2 */
+		identifier = 1;
+	}
+	PrefSocketLPT3Unit = PrefStringItem {
+		moniker = "LPT3(Parallel)";
+		initFileString = "104";		/* = PARALLEL_LPT3 */
+		identifier = 2;
+	}
+	PrefSocketCOM1Unit = PrefStringItem {
+		moniker = "COM1(Serial)";	/* in serialDr.def */
+		initFileString = "0";		/* = SERIAL_COM1 */
+		identifier = 3;
+	}
+	PrefSocketCOM2Unit = PrefStringItem {
+		moniker = "COM2(Serial)";
+		initFileString = "2";		/* = SERIAL_COM2 */
+		identifier = 4;
+	}
+	PrefSocketCOM3Unit = PrefStringItem {
+		moniker = "COM3(Serial)";
+		initFileString = "4";		/* = SERIAL_COM3 */
+		identifier = 5;
+	}
+	PrefSocketCOM4Unit = PrefStringItem {
+		moniker = "COM4(Serial)";
+		initFileString = "8";		/* = SERIAL_COM4 */
+		identifier = 6;
+	}
+	
+
+PrefSocketSubunitGroup = PrefInteraction {
+	children = PrefSocketMediaOption,
+		   PrefSocketBaudrateOption,
+		   PrefSocketMaxPktSize;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_WIDE_CHAR_WIDTHS, 14>
+			SpecHeight <>
+		}
+	}
+}
+
+/*
+	In order to use this information, the driver needs to parse a
+	string of media that is  stored.
+*/
+PrefSocketMediaOption = PrefItemGroup {
+	moniker = "Media Support";
+	behaviorType = nonExclusive;
+	initFileFlags = useItemStrings;
+	children = PrefSocketSerialMedia,
+		   PrefSocketParallelMedia,
+		   PrefSocketIRMedia,
+		   PrefSocketModemMedia,
+		   PrefSocketNetworkMedia;
+	hints = {
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_ALLOW_CHILDREN_TO_WRAP,
+		ATTR_GEN_INIT_FILE_KEY {
+			char	"media", 0
+		}
+	}
+}
+	PrefSocketSerialMedia = PrefStringItem {
+		moniker = "Serial";		/* in medium.def */
+		initFileString = "1";
+		identifier = 0;
+	}
+	PrefSocketParallelMedia = PrefStringItem {
+		moniker = "Parallel";
+		initFileString = "6";
+		identifier = 1;
+	}
+	PrefSocketIRMedia = PrefStringItem {
+		moniker = "IR";
+		initFileString = "2";
+		identifier = 2;
+	}
+	PrefSocketModemMedia = PrefStringItem {
+		moniker = "Modem";
+		initFileString = "3";
+		identifier = 3;
+	}
+	PrefSocketNetworkMedia = PrefStringItem {
+		moniker = "Network";
+		initFileString = "7";
+		identifier = 4;
+	}
+
+PrefSocketBaudrateOption = PrefInteraction {
+	children = PrefSocketBaudrateMoniker, PrefSocketBaudrateList;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+
+PrefSocketBaudrateMoniker = GenGlyph {
+	moniker = "Sublayer";
+}
+
+PrefSocketBaudrateList = PrefItemGroup {
+	moniker = "Baudrate";
+	children = PrefSocket115200bps,
+		   PrefSocket57600bps,
+		   PrefSocket38400bps,
+		   PrefSocket19200bps,
+		   PrefSocket14400bps,
+		   PrefSocket9600bps,
+		   PrefSocket7200bps,
+		   PrefSocket4800bps,
+		   PrefSocket3600bps,
+		   PrefSocket2400bps,
+		   PrefSocket2000bps,
+		   PrefSocket1800bps,
+		   PrefSocket1200bps,
+		   PrefSocket600bps,
+		   PrefSocket300bps;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_ITEM_GROUP_TOOLBOX_STYLE,
+		HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 10>
+			SpecHeight <>
+		},
+		HINT_ITEM_GROUP_MINIMIZE_SIZE,
+		ATTR_GEN_INIT_FILE_KEY {
+			char	"baudrate", 0
+		},
+	}
+}
+	PrefSocket115200bps = GenItem {
+		moniker = "115200bps";
+		identifier = SB_115200;
+	}
+	PrefSocket57600bps = GenItem {
+		moniker = "57600bps";
+		identifier = SB_57600;
+	}
+	PrefSocket38400bps = GenItem {
+		moniker = "38400bps";
+		identifier = SB_38400;
+	}
+	PrefSocket19200bps = GenItem {
+		moniker = "19200bps";
+		identifier = SB_19200;
+	}
+	PrefSocket14400bps = PrefStringItem {
+		moniker = "14400bps";
+		identifier = SB_14400;
+	}
+	PrefSocket9600bps = PrefStringItem {
+		moniker = "9600bps";
+		identifier = SB_9600;
+	}
+	PrefSocket7200bps = PrefStringItem {
+		moniker = "7200bps";
+		identifier = SB_7200;
+	}
+	PrefSocket4800bps = PrefStringItem {
+		moniker = "4800bps";
+		identifier = SB_4800;
+	}
+	PrefSocket3600bps = PrefStringItem {
+		moniker = "3600bps";
+		identifier = SB_3600;
+	}
+	PrefSocket2400bps = PrefStringItem {
+		moniker = "2400bps";
+		identifier = SB_2400;
+	}
+	PrefSocket2000bps = PrefStringItem {
+		moniker = "2000bps";
+		identifier = SB_2000;
+	}
+	PrefSocket1800bps = PrefStringItem {
+		moniker = "1800bps";
+		identifier = SB_1800;
+	}
+	PrefSocket1200bps = PrefStringItem {
+		moniker = "1200bps";
+		identifier = SB_1200;
+	}
+	PrefSocket600bps = PrefStringItem {
+		moniker = "600bps";
+		identifier = SB_600;
+	}
+	PrefSocket300bps = PrefStringItem {
+		moniker = "300bps";
+		identifier = SB_300;
+	}
+
+PrefSocketMaxPktSize = PrefValue {
+	moniker = "Pkt size";
+	hints = {
+		ATTR_GEN_INIT_FILE_KEY {
+			char	"frameSize", 0
+		}
+	}
+}
+
+PrefSocketSerialPortOption = GenTrigger {
+	moniker = "Port options";
+	action = MSG_GEN_INTERACTION_INITIATE, SerialPortOption;
+	genStates = default -enabled;
+	hints = {
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+
+/*
+--------------------------------------------------------------------------
+			   Serial Port Options
+--------------------------------------------------------------------------
+*/
+
+SerialPortOption = PrefInteraction {
+	moniker = "Serial Port Options";
+	prefInteractionAttrs = loadOptionsOnInitiate,
+			       saveOptionsOnApply,
+			       completeInteractionOnApply;
+	attributes = default +modal, +notUserInitiatable;
+	visibility = dialog;
+	type = properties;
+	children = ComPortOptions,
+		   HardwareHandshakeGroup;
+	hints = {
+		HINT_INTERACTION_SINGLE_USAGE,
+		HINT_INTERACTION_COMPLEX_PROPERTIES,
+		HINT_INTERACTION_RELATED_PROPERTIES,
+	}
+}
+
+ComPortOptions = PrefInteraction {
+	children = ParityList,
+		   WordLengthList, 
+		   StopBitsList, 
+		   HandshakeList;
+	hints = {HINT_CENTER_CHILDREN_ON_MONIKERS}
+}
+
+ParityList = PrefItemGroup {
+	initFileFlags = default +useItemStrings;
+	numSelections  = 1;
+	moniker = "Parity:";
+	children = ParityEvenEntry, 
+		   ParityOddEntry, 
+		   ParitySpaceEntry, 
+		   ParityMarkEntry, 
+		   ParityNoneEntry;
+	selection = "SP_NONE shl offset SF_PARITY";
+	hints = {
+		ATTR_GEN_INIT_FILE_KEY {
+			char	"parity",0
+		}
+	}
+}
+
+ParityEvenEntry = PrefStringItem {
+	moniker = "Even";
+	identifier = "SP_EVEN shl offset SF_PARITY";
+	initFileString = "even";
+}
+
+ParityOddEntry = PrefStringItem {
+	moniker = "Odd";
+	identifier = "SP_ODD shl offset SF_PARITY";
+	initFileString = "odd";
+}
+
+ParitySpaceEntry = PrefStringItem {
+	moniker = "Space";
+	identifier = "SP_SPACE shl offset SF_PARITY";
+	initFileString = "space";
+}
+
+ParityMarkEntry = PrefStringItem {
+	moniker = "Mark";
+	identifier = "SP_MARK shl offset SF_PARITY";
+	initFileString = "mark";
+}
+
+ParityNoneEntry = PrefStringItem {
+	moniker = "None";
+	identifier = "SP_NONE shl offset SF_PARITY";
+	initFileString = "none";
+}
+
+WordLengthList = PrefItemGroup {
+	initFileFlags = default +useItemMonikers;
+	numSelections  = 1;
+	moniker = "Word Length:";
+	children = WordLen5Entry, 
+		   WordLen6Entry, 
+		   WordLen7Entry, 
+		   WordLen8Entry;
+	selection = "SL_8BITS";
+	hints = {
+		ATTR_PREF_ITEM_GROUP_ENABLE {
+			PrefEnableData <SL_5BITS,
+					StopBits1_5Entry>
+		},
+		ATTR_PREF_ITEM_GROUP_ENABLE {
+			PrefEnableData <SL_5BITS,
+					StopBits2Entry,
+					mask PEF_DISABLE_IF_SELECTED>
+		},
+		ATTR_GEN_INIT_FILE_KEY {
+			char	"wordLength",0
+		}
+
+	}
+}
+
+WordLen5Entry = GenItem {
+	moniker = "5";
+	identifier = "SL_5BITS";
+}
+
+WordLen6Entry = GenItem {
+	moniker = "6";
+	identifier = "SL_6BITS";
+}
+
+WordLen7Entry = GenItem {
+	moniker = "7";
+	identifier = "SL_7BITS";
+}
+
+WordLen8Entry = GenItem {
+	moniker = "8";
+	identifier = "SL_8BITS";
+}
+
+StopBitsList = PrefItemGroup {
+	initFileFlags = default +useItemMonikers;
+	numSelections  = 1;
+	moniker = "Stop Bits:";
+	children = StopBits1Entry, StopBits1_5Entry, StopBits2Entry;
+	selection = 0;
+	hints = {
+		ATTR_GEN_INIT_FILE_KEY {
+			char	"stopBits",0
+		}
+	}
+
+}
+
+StopBits1Entry = GenItem {
+	moniker = "1";
+	identifier = 1;
+}
+
+StopBits1_5Entry = GenItem {
+	moniker = "1.5";
+	genStates = default -enabled;
+	identifier = 15;
+}
+
+StopBits2Entry = GenItem {
+	moniker = "2";
+	identifier = 2;
+}
+
+HandshakeList = PrefItemGroup {
+	initFileFlags = default +useItemStrings;
+	moniker = "Handshake:";
+	children = HandshakeNoneEntry,
+		HandshakeHardwareEntry, 
+		HandshakeSoftwareEntry; 
+	hints = {
+		ATTR_PREF_ITEM_GROUP_OVERRIDE {
+			word 0
+		},
+		ATTR_GEN_INIT_FILE_KEY {
+			char	"handshake",0
+		},
+		ATTR_PREF_ITEM_GROUP_ENABLE {
+			PrefEnableData <mask SFC_HARDWARE,
+					HardwareHandshakeGroup>
+		}
+	}
+	selection = 0;
+	numSelections = 1;
+	behaviorType = nonExclusive;	
+}
+
+HandshakeHardwareEntry = PrefStringItem {
+	moniker = "Hardware";
+	identifier = "mask SFC_HARDWARE";
+	initFileString = "hardware";
+}
+
+HandshakeSoftwareEntry = PrefStringItem {
+	moniker = "Software (XON/XOFF)";
+	identifier = "mask SFC_SOFTWARE";
+	initFileString = "software";
+}
+
+HandshakeNoneEntry = PrefStringItem {
+	moniker = "None";
+	identifier = 0;
+	initFileString = "none";
+}
+
+HardwareHandshakeGroup = PrefInteraction {
+	genStates = default -enabled;
+	children = HardwareHandshakeTitle, StopRemoteList, StopLocalList;
+	hints = {HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_ON_MONIKERS,
+		HINT_DO_NOT_USE_MONIKER}
+}
+
+HardwareHandshakeTitle = GenText {
+	genAttributes = readOnly;
+	text = "Hardware Handshaking Options:";
+}
+
+StopRemoteList = PrefItemGroup {
+	initFileFlags = default +useItemStrings;
+	behaviorType = nonExclusive;
+	moniker = "Stop Remote:";
+	children = DTREntry, RTSEntry;
+	hints = {
+		ATTR_GEN_INIT_FILE_KEY {
+			char	"stopRemote",0
+		}
+	}
+}
+
+DTREntry = PrefStringItem {
+	moniker = "DTR";
+	identifier = "mask SMC_DTR";
+	initFileString = "dtr";
+}
+
+RTSEntry = PrefStringItem {
+	moniker = "RTS";
+	identifier = "mask SMC_RTS";
+	initFileString = "rts";
+}
+
+StopLocalList = PrefItemGroup {
+	initFileFlags = default +useItemStrings;
+	behaviorType = nonExclusive;
+	moniker = "Stop Local:";
+	children = CTSEntry, DCDEntry, DSREntry;
+	hints = {
+		ATTR_GEN_INIT_FILE_KEY {
+			char	"stopLocal",0
+		}
+	}
+}
+
+CTSEntry = PrefStringItem {
+	moniker = "CTS";
+	identifier = "mask SMS_CTS";
+	initFileString = "cts";
+}
+
+DCDEntry = PrefStringItem {
+	moniker = "DCD";
+	identifier = "mask SMS_DCD";
+	initFileString = "dcd";
+}
+
+DSREntry = PrefStringItem {
+	moniker = "DSR";
+	identifier = "mask SMS_DSR";
+	initFileString = "dsr";
+}
+
+end	PrefSocketUI;
+
+start	Strings, data;
+
+visMoniker PrefSocketTextMoniker = "Socket";
+
+visMoniker PrefSocketMonikerList = list {
+		PrefSocketTextMoniker,
+		PrefSocketLCMoniker,
+		PrefSocketLMMoniker,
+		PrefSocketLCGAMoniker
+}
+
+/*
+/* Error strings 
+*/
+chunk	LoadDriverErrorString = {Unable to load the requested driver.}
+	
+end	Strings;

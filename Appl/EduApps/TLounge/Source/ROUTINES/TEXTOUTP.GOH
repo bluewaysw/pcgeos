@@ -1,0 +1,138 @@
+/***************************************************************************
+ *  FILE:  SOURCE\ROUTINES\TEXTOUTP.GOH
+ ***************************************************************************/
+
+/*-------------------------------------------------------------------------
+ | Project:  Lysle's IRC Chat program
+ | Module:   Text Output Routines
+ |           Copyright (c) 1998 Breadbox Computer Company
+ |
+ | Description:
+ |    Various routines to handle Text Output to the main output display
+ |    which is specifically the IRCText object.
+ |
+ | Glossary of terms:
+ |    text: Any string of characters ending with '\0'
+ |    message/msg:  Same as text, but output with a carriage return.
+ |    Error:  16 bit error number output as a number
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/01/98  Created.
+ |                   (LES = Lysle Shields)
+ *-----------------------------------------------------------------------*/
+
+ @extern chunk ErrorStr;
+
+/*-------------------------------------------------------------------------
+ | Routine:  DisplayText
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Displays any text to the IRCText object after cleaning it (keeping out
+ |    illegal double byte characters).
+ |
+ | Inputs:
+ |    char *p_msg                 -- Null terminated text
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/01/98  Created.
+ |    jfh  06/10/99  added Latin code page
+ |
+ *-----------------------------------------------------------------------*/
+
+void DisplayText(char *p_msg)
+{
+ /*   CleanText((byte *)p_msg) ;  */
+
+    LocalCodePageToGeos(p_msg, strlen(p_msg), CODE_PAGE_LATIN_1, '.');
+    @call IRCText::MSG_VIS_TEXT_APPEND_PTR(p_msg, 0) ;
+
+
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  DisplayMsg
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Displays a message to the IRCText object.  Adds a carriage return
+ |    to the text.
+ |
+ | Inputs:
+ |    char *p_msg                 -- Null terminated message
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/01/98  Created.
+ |    jfh  06/10/99  added Latin code page
+ |
+ *-----------------------------------------------------------------------*/
+
+void DisplayMsg(char *p_msg)
+{
+    /* Clense the text */
+  /*  CleanText((byte *)p_msg) ; */
+
+    LocalCodePageToGeos(p_msg, strlen(p_msg), CODE_PAGE_LATIN_1, '.');
+
+    @call IRCText::MSG_VIS_TEXT_APPEND_PTR("\r", 1) ;
+    @call IRCText::MSG_VIS_TEXT_APPEND_PTR(p_msg, 0) ;
+
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  DisplayError
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Displays the global error state (in G_ircError) to the IRCText object.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/01/98  Created.
+ |
+ *-----------------------------------------------------------------------*/
+
+void DisplayError(void)
+{
+    char buffer[80] ;
+
+	 MemLock(OptrToHandle(@ErrorStr));
+	 sprintf(buffer, LMemDeref(@ErrorStr), G_ircError) ;
+	 MemUnlock(OptrToHandle(@ErrorStr));
+	 DisplayMsg(buffer) ;
+
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  OutputTextPastColon
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Displays message to the display past the colon (if any).
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  05/01/98  Created.
+ |
+ *-----------------------------------------------------------------------*/
+
+void OutputTextPastColon(char *p_msg)
+{
+    p_msg = strchr(p_msg, ':') ;
+    if ((p_msg) && (p_msg[1]))  {
+	   DisplayText(p_msg+1) ;
+    }
+}
+
+/***************************************************************************
+ *  FILE:  SOURCE\ROUTINES\TEXTOUTP.GOH
+ ***************************************************************************/
+

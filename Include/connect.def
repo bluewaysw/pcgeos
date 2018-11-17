@@ -1,0 +1,3069 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Connect Library
+FILE:		connect.def
+
+AUTHOR:		Jonathan Magasin, Nov  6, 1995
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jmagasin 11/ 6/95   	Initial revision
+
+
+DESCRIPTION:
+	Definitions for the connect library.
+	** Don't forget to update connect.goh correspondingly.
+
+	$Id: connect.def,v 1.1 97/04/04 14:22:03 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef __CONNECT
+
+StartLibrary	connect
+
+include Internal/im.def				; for Monitor struct
+include Internal/ctXlatDr.def
+
+UseLib	foam.def
+
+;----------------------------------------------------------------------------
+;  Constants and Structures
+;----------------------------------------------------------------------------
+
+;
+; Desktop Connectivity Library Token Chars
+; These token chars are used in inter-application communication.
+;
+CONNECT_LIB_TOKEN			equ	"DTCL"
+
+; 
+; Size of the Drive, Directory Path, and File Path setting strings 
+; with null termination.
+; These are defined here so applications know how big to make their
+; buffers.
+;
+CONNECT_SETTINGS_DRIVE_LENGTH_ZT	equ	3
+; 1 char for drive + 1 char for colon + 1 for the NULL
+;
+
+CONNECT_SETTINGS_PATH_LENGTH_ZT		equ	(3 + DOS_STD_PATH_LENGTH + 1)
+; 1 char for drive + 1 for colon + 1 for backslash
+;	      + path length + 1 for NULL
+;
+
+; 
+; Maximum length of a format name string, including null.
+; The format name string is always SBCS so its length = its size.
+;
+FILE_FORMAT_NAME_SIZE			equ	CTLD_FORMAT_NAME_SIZE
+
+CONNECT_OPEN_CONNECTION_TIME_OUT	equ	600	; 10 seconds
+
+
+;
+; The MultiFileArrayHeader and MultiFileArrayEntry structures are used by
+; the messages of ConnectMultiFileClass to form a chunk array of source and
+; destination paths for files to be uploaded or downloaded in a batch.
+;
+MultiFileArrayHeader	struct
+	MFAH_CAH	ChunkArrayHeader
+	MFAH_synopsis	byte	81 dup (0)
+	MFAH_size	dword
+MultiFileArrayHeader	ends
+
+MultiFileArrayEntry	 struct
+	MFAE_localDisk		word
+	MFAE_remotePathOffset	byte
+	MFAE_localFormat	byte	FILE_FORMAT_NAME_SIZE	dup (0)
+	MFAE_remoteFormat	byte	FILE_FORMAT_NAME_SIZE	dup (0)
+	MFAE_paths		byte	1 dup (0)
+MultiFileArrayEntry	ends
+
+MAX_PRODUCT_ARRAY_ELEMENT_SIZE	equ	((size MultiFileArrayEntry) + \
+					(2 * PATH_BUFFER_SIZE))
+
+;
+; The PackageDescriptorArrayEntry structure is used by
+; ConnectMultiFileActionClass to form a chunk array of descriptive
+; information for different packages.
+;
+; Likely maximum sizes for package information.
+;
+MAX_PACKAGE_NAME_LENGTH			equ	80
+MAX_PACKAGE_SYNOPSIS_LENGTH		equ	80
+MAX_PACKAGE_SIZE_LENGTH			equ	14
+
+
+MAX_PACKAGE_NAME_LENGTH_ZT	equ	(MAX_PACKAGE_NAME_LENGTH + 1)
+MAX_PACKAGE_SYNOPSIS_LENGTH_ZT	equ	(MAX_PACKAGE_SYNOPSIS_LENGTH + 1)
+MAX_PACKAGE_SIZE_LENGTH_ZT      equ	(MAX_PACKAGE_SIZE_LENGTH + 1)
+MAX_PACKAGE_INFO_LENGTH	        equ	(MAX_PACKAGE_NAME_LENGTH_ZT + \
+					MAX_PACKAGE_SYNOPSIS_LENGTH_ZT + \
+					MAX_PACKAGE_SIZE_LENGTH_ZT)
+
+PackageDescriptorArrayEntry	struct
+    PDAE_synopsisOffset		byte
+    PDAE_sizeOffset		byte
+    PDAE_packageFilePathOffset	byte
+    PDAE_data			byte	1 dup (0)
+				; for: package name '/0'
+				; package synopsis '/0'
+				; package size '/0'
+				; server absolute path to package file '/0'
+				;
+PackageDescriptorArrayEntry	ends
+
+;
+; Passed to ConnectGetPackageDescriptorData routine to indicate what
+; information to return.
+;
+PackageDescriptorDataType	etype	word, 0
+	PDDT_NAME		enum	 PackageDescriptorDataType
+	; package name
+
+	PDDT_SYNOPSIS		enum	PackageDescriptorDataType
+	; package synopsis
+
+	PDDT_SIZE		enum	PackageDescriptorDataType
+	; package size
+
+	PDDT_PATH		enum	PackageDescriptorDataType
+	; path to package's package file
+
+PackageProgressArrayEntry	struct
+	PPAE_unused		dword
+	PPAE_standardPath	StandardPath
+	PPAE_filePath		byte 1 dup (0) ; for: local path to file '/0'
+PackageProgressArrayEntry	ends
+
+;
+; State variables for the process of forcing a geode to quit.
+;
+ConnectQuitGeodeState struct
+	CQGS_isApp		sword ; Boolean
+	; TRUE - if CONNECT_FORCE_GEODE is quitting an application geode.
+
+	CQGS_geodesArray	dword ; optr
+	; The chunk array of app-geode handles to force to quit.
+
+	CQGS_arrayIndex		word
+	; Current app (index into the gAppGeodesArray) to quit.
+
+	CQGS_numApps		word
+	; The number of running applications.
+
+ifdef DO_DBCS
+	CQGS_geodeName	TCHAR (GEODE_NAME_SIZE+GEODE_NAME_EXT_SIZE+1) dup (0)
+else
+	CQGS_geodeName	byte (GEODE_NAME_SIZE+GEODE_NAME_EXT_SIZE+1) dup (0)
+endif
+	; Permanent name of the geode and ext and null-terminator.
+
+	CQGS_geode		word
+	; Geode to quit.
+
+	CQGS_appCompletionMsg	word
+	; Message to send when the geode finally quits.
+
+	CQGS_appCompletionOptr	dword ; optr
+	; Object to receive the completion message.
+
+	CQGS_libCompletionMsg	word
+	; Message to send when the library geode finally quits.
+
+	CQGS_libCompletionOptr	dword ; optr
+	; Object to receive the library completion message.
+
+	CQGS_excluded		word
+	; Don't remove this app, when removing the library.
+ConnectQuitGeodeState ends
+
+;
+; Magic structure whose address you must pass to
+; ConnectDisableAppLaunchKeys.  Must agree with structure
+; definition in connect.goh.
+;
+ConnectDisableAppLaunchKeysMonitor struct
+	CDALKM_monitor    Monitor
+	; Monitor so we can establish callback
+
+	CDALKM_notifyOptr	optr	
+	; Object to notify when if user tries to launch while it's
+	; prohibited to do so (i.e. this should probably bring up a
+	; dialog telling them what's up).
+
+	CDALKM_notifyMsg	word
+	; Message to send to above object.  MUST NOT EXPECT ANY
+	; ARGUMENTS.
+	 
+ConnectDisableAppLaunchKeysMonitor ends
+
+;
+; These strings are passed to MSG_CONNECT_GET/SEND_FILE to 
+; specify source and destination file formats.  
+;
+FAX_FORMAT			equ	"fax"
+TIFF_FORMAT			equ	"tiff"
+NOTES_FORMAT			equ	"notes"
+ASCII_FORMAT			equ	"ascii"
+
+
+
+;------------------------------------------------------------------------------
+;		.INI File Categories and Keys			 
+;------------------------------------------------------------------------------
+CONNECT_INI_MAIN_CATEGORY	equ	"connect"
+
+CONNECT_INI_SERIAL_PORT_KEY	equ	"serialPort"
+CONNECT_INI_SERIAL_BAUD_KEY	equ	"serialBaud"
+CONNECT_INI_INFRARED_PORT_KEY	equ	"infraredPort"
+CONNECT_INI_INFRARED_BAUD_KEY	equ	"infraredBaud"
+
+;
+; The ConnectSettingsControl object sends itself a 
+; MSG_META_GET_INI_CATEGORY to get the ini category to use when 
+; saving and reading the settings from the init file.
+; 
+; So, each app using a ConnectSettingsControlClass object should 
+; have a 
+;     ATTR_GEN_INIT_FILE_CATEGORY = "someCategoryNameString";
+; in its application object to specify the category string
+; to use when saving and reading the settings.
+;
+CONNECT_INI_CONNECTION_TYPE_KEY		equ	"connectionTypeSetting"
+CONNECT_INI_DATA_GROUP_KEY		equ	"dataGroupSetting"
+CONNECT_INI_DRIVE_KEY			equ	"driveSetting"
+CONNECT_INI_DIRECTORY_PATH_KEY		equ	"directoryPathSetting"
+CONNECT_INI_FILE_PATH_KEY		equ	"filePathSetting"
+
+
+
+;------------------------------------------------------------------------------
+;  		Type defs
+;------------------------------------------------------------------------------
+
+ifdef DO_DBCS
+PathAndFileName	type	(PATH_BUFFER_SIZE+FILE_LONGNAME_BUFFER_SIZE)/2 dup (TCHAR)
+else
+PathAndFileName	type	PATH_BUFFER_SIZE+FILE_LONGNAME_BUFFER_SIZE	dup (char)
+endif
+
+;------------------------------------------------------------------------------
+;		Enumerated types
+;------------------------------------------------------------------------------
+
+;
+; Connection Types
+;
+ConnectionType		etype	word, 0
+	CT_SERIAL	enum	ConnectionType
+	CT_INFRARED	enum	ConnectionType
+
+;
+; Data Groups
+;
+DataGroup		etype	word, 0
+	DG_CONTACTS	enum	DataGroup
+	DG_DOCUMENTS	enum	DataGroup
+	DG_ALL_DATA	enum	DataGroup
+	DG_CALENDAR	enum	DataGroup
+
+
+
+
+;
+; Connect Errors
+; 
+; NOTE: If you add/remove/change any of the ConnectError enums, be sure 
+;	 to make the same change to connect.goh.
+;
+CE_DIALOG_DISPLAYED	equ	0x8000
+; If this bit is set in a ConnectError and the ConnectError has been 
+; returned by the completion message for one of the messages listed 
+; below, it means that the connect library has already displayed an 
+; error dialog for the error. This is useful when the caller wants to 
+; know if it should display an error dialog itself.
+;
+; The following messages display error dialogs for ConnectErrors with 
+; the CE_DIALOG_DISPLAYED bit set:
+;	MSG_CONNECT_GET_FILE, MSG_CONNECT_SEND_FILE
+;	MSG_CMF_GET_FILE_ARRAY, MSG_CMF_SEND_FILE_ARRAY
+;	MSG_CMFA_LIST_PACKAGES
+;	MSG_CMFA_GET_PACKAGE
+;	MSG_CMFA_GET_PACKAGE_GIVEN_PACKAGE_FILE
+
+ConnectError	etype word, 0
+
+	CE_SUCCESS					enum	ConnectError
+	CE_NOT_ENOUGH_MEMORY			enum	ConnectError
+	; There was not enough memory to perform the operation.
+
+	CE_MISC_FILE_ERROR				enum	ConnectError
+	; Some file error occurred.  See ConnectFindGeodeFromLongName.
+
+	CE_NOT_ENOUGH_DISK_SPACE_TO_START		enum	ConnectError
+	; There was not enough disk space to start the operation.
+
+	CE_NOT_ENOUGH_DISK_SPACE_TO_COMPLETE	enum	ConnectError
+	; There was not enough disk space to complete the  operation, 
+	; which may have started.
+
+	CE_OPERATION_FAILED				enum	ConnectError
+	; The operation failed for some reason.
+	; The library does NOT put up a dialog for this error.
+
+	CE_USER_CANCELED				enum	ConnectError
+	; The user canceled the operation.
+
+	CE_FILE_TRANSFER_OPERATION_ALREADY_IN_PROGRESS	enum	ConnectError
+
+	CE_DEST_DIRECTORY_DOES_NOT_EXIST		enum	ConnectError
+	; Tried to put file in directory but the directory did not exist.
+
+	;
+	; errors for ConnectSetServerPath
+	;
+	CE_CANNOT_SET_SERVER_PATH			enum	ConnectError
+	; Returned by ConnectSetServerPath if it was unable to set the path 
+	; on the server. 
+	; The library does NOT put up a dialog for this error.
+
+	;
+	; errors for ConnectGetServerPath
+	;
+	CE_CANNOT_GET_SERVER_PATH			enum	ConnectError
+	; Returned by ConnectGetServerPath if it was unable to get the path 
+	; from the server. 
+	; The library does NOT put up a dialog for this error.
+
+	; 
+	; errors for MSG_CONNECT_OPEN_CONNECTION
+	;
+	CE_CONNECTION_MEDIUM_IN_USE			enum	ConnectError
+	; There is some other app using the connection medium. 
+	; The user should have the other app quit using the connection 
+	; medium and try opening the connection again.
+
+	CE_CANNOT_START_CLIENT_SIDE_CONNECTION	enum	ConnectError
+	; Unable to start the client side part of the connection.
+
+	CE_CANNOT_CONTACT_SERVER			enum	ConnectError
+	; Unable to contact the server part of the connection.
+	; The user should check that the server software is running.
+
+	; 
+	; errors for MSG_CONNECT_CLOSE_CONNECTION
+	; 
+	CE_CANNOT_CLOSE_CONNECTION			enum	ConnectError
+	; The connection was opened by a different application than the one
+	; trying to close the connection. 
+	; This would only happen if ConnectCloseConnection is called after
+	; ConnectOpenConnection has failed, which would be undesirable.
+
+
+	CE_NO_PACKAGES_FOUND			enum	ConnectError
+	; No packages could be found and listed.
+
+	CE_PACKAGE_FILE_INVALID			enum	ConnectError
+	; Returned by MSG_CMFA_GET_PACKAGE or 
+	; MSG_CMFA_GET_PACKAGE_GIVEN_PACKAGE_FILE.
+	; The library does NOT put up a dialog for this error.
+	; The package file for the chosen package is invalid.
+
+	CE_PACKAGE_INSTALLED_BUT_MUST_REBOOT_TO_USE	enum	ConnectError
+	; The package has been installed, almost.  The user must reboot the
+	; device to finish installation.  (Rebooting will overwrite some
+	;  geodes that were in use at install time with newer versions.
+
+	CE_FILE_PROTOCOL_TOO_LOW			enum	ConnectError
+	; Internal ConnectError used by the get-package mechanism.
+	; The new file has a lower protocol than the preexisting file
+	;  it would replace.
+
+	CE_UNABLE_TO_LOAD_TRANSFER_DRIVER		enum	ConnectError
+	; Returned if unable to load the transfer driver set via
+	; MSG_CONNECT_SET_TRANSFER_DRIVER.
+
+	CE_FILE_OPEN_BY_ANOTHER_APP			enum	ConnectError
+	; Another application has this local file opened.
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+; The following connect errors are mapped from the PCCom library.
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	CE_FILE_NOT_FOUND    			enum	ConnectError
+	; PCCom cannot locate specified file.  Check filename spelling?
+
+	CE_PATH_NAME_INVALID    			enum	ConnectError
+	; PCCom doesn't like the pathname.  Check for invalid characters
+	; and formatting.
+
+	CE_ACCESS_DENIED    			enum	ConnectError
+	; PCCom couldn't modify the file and no details are given.
+
+	CE_FILE_NAME_INVALID    			enum	ConnectError
+	; PCCom doesn't like the filename.  Check for invalid characters
+	; and formatting.
+
+	CE_VOLUME_UNAVAILABLE    			enum	ConnectError
+	; PCCom can't access the volume medium; eg. disk drive doesn't
+	; have a disk in it.
+
+	CE_FILE_READ_ONLY    			enum	ConnectError
+	; Target file has read-only status so we can't write to it.
+
+	CE_SHORT_READ_WRITE    			enum	ConnectError
+	; While reading/writing a file, PCCom ran across this problem and
+	; has no explanation for it.
+
+	CE_VOLUME_WRITE_PROTECTED  			enum	ConnectError
+	; PCCom was unable to modify the medium on the volume so assumes
+	; that it's write-protected.
+
+	;
+	; The following reported errors occurred on the REMOTE end.
+	; These errors are analogous to the local errors as listed above.
+	; 
+
+	CE_REMOTE_FILE_NOT_FOUND			enum	ConnectError
+	; PCCom cannot locate specified file.  Check filename spelling?
+
+	CE_REMOTE_PATH_NAME_INVALID			enum	ConnectError
+	; PCCom doesn't like the pathname.  Check for invalid characters
+	; and formatting. 
+
+	CE_REMOTE_ACCESS_DENIED			enum	ConnectError
+	; PCCom couldn't modify the file and no details are given. 
+
+	CE_REMOTE_FILE_NAME_INVALID			enum	ConnectError
+	; PCCom doesn't like the filename.  Check for invalid characters
+	; and formatting. 
+
+	CE_REMOTE_FILE_OPEN_BY_ANOTHER_APP		enum	ConnectError
+	; A remote application has this remote file opened.
+
+	CE_REMOTE_FILE_READ_ONLY			enum	ConnectError
+	; Target file has read-only status so we can't write to it. 
+
+	CE_REMOTE_SHORT_READ_WRITE			enum	ConnectError
+	; While reading/writing a file, PCCom ran across this problem and
+	; has no explanation for it. 
+
+	CE_REMOTE_VOLUME_WRITE_PROTECTED		enum	ConnectError
+	; PCCom was unable to modify the medium on the volume so assumes
+	; that it's write-protected. 
+
+	CE_REMOTE_USER_CANCELED			enum	ConnectError
+	; PCCom received an abort directive that did not originated from
+	; within the PCCom library. 
+
+;---------------------------------------------------------------------------
+; The following errors are available on Communicator products shipped
+; after April 1997.  (Does not include those errors starting from
+; CE_DIALOG_DISPLAYED.)
+;---------------------------------------------------------------------------
+	CE_OVERWRITE_CANCELLED			enum	ConnectError
+	; Used to distinguish between user cancelling a single overwrite
+	; and a transfer operation which may consist of many files
+	; being transferred at once.
+;
+; Start of ConnectErrors for which the main connect library messages
+; display error dialogs. Seee the CE_DIALOG_DISPLAYED documentation
+; for more details.
+;
+	CE_OPERATION_ABORTED	enum	ConnectError, CE_DIALOG_DISPLAYED
+	; The operation was aborted for some reason.
+	; This error is returned when an operation has been started but aborts
+	; before it's done. The user should check the connection, etc.
+
+	CE_CANNOT_TRANSLATE_FILE			enum	ConnectError
+	; Some error occured when trying translate the file from one format to 
+	; another. This could be an error trying to load the translation driver
+	; or an error during the translation. 
+
+	CE_CANNOT_CREATE_DIRECTORY			enum	ConnectError
+	; Tried to create directory but failed.   (Remote or local drive.)
+
+	CE_CONNECTION_LOST    			enum	ConnectError
+	; PCCom has lost connection after retrying many times. Please check 
+	; the physical connection then try again.
+
+	CE_PATH_NOT_FOUND    			enum	ConnectError
+	; PCCom cannot locate the specified path.  Check pathname spelling?
+
+	CE_DRIVE_INVALID    			enum	ConnectError
+	; Target drive doesn't exist.
+
+	CE_SOURCE_FILE_OPEN_BY_ANOTHER_APP		enum	ConnectError
+	; Returned if the local source file is in use by another app
+	; and the CTF_NO_TRANSFER_IF_FILE_OPEN ConnectTransferFlags 
+	; was passed.
+
+	CE_DEST_FILE_OPEN_BY_ANOTHER_APP		enum	ConnectError
+	; Returned if the local destination file is in use by another app
+	; and the CTF_NO_TRANSFER_IF_FILE_OPEN ConnectTransferFlags 
+	; was passed.
+
+	CE_REMOTE_OPERATION_ABORTED			enum	ConnectError
+	; PCCom doesn't have a a reason for the abortion on the remote.
+
+	CE_REMOTE_PATH_NOT_FOUND			enum	ConnectError
+	; PCCom cannot locate the specified path.  Check pathname spelling?
+
+	CE_REMOTE_DRIVE_INVALID			enum	ConnectError
+	; Target drive doesn't exist. 
+
+	CE_REMOTE_NOT_ENOUGH_DISK_SPACE_TO_COMPLETE	enum	ConnectError
+	; PC disk is out of space.
+
+	CE_REMOTE_VOLUME_UNAVAILABLE		enum	ConnectError
+	; PCCom can't access the volume medium; eg. disk drive doesn't
+	; have a disk in it. 
+
+	CE_PACKAGE_OLD_SO_NOT_INSTALLED		enum	ConnectError
+	; Returned by MSG_CMFA_GET_PACKAGE or 
+	; MSG_CMFA_GET_PACKAGE_GIVEN_PACKAGE_FILE.
+	; The library puts up a dialog for this error.
+	; No files in the package were installed because they had lower 
+	; protocols than versions already existing on the device.
+
+	CE_PACKAGE_NOT_COMPATIBLE			enum	ConnectError
+	; Returned by MSG_CMFA_GET_PACKAGE or 
+	; MSG_CMFA_GET_PACKAGE_GIVEN_PACKAGE_FILE.
+	; The library puts up a dialog for this error.
+	; The package was not installed because it contains files that are not
+	; compatible with the software existing on the device.
+
+	CE_CANNOT_USE_INSTALL_BATCH_FILE_FOR_MORE_THAN_ONE_INSTALL	enum	ConnectError
+	; Returned by SetupNewFileToBeMovedOnReboot if the last installation
+	; changed the install batch file (install.bat), and the current
+	; installation will do so as well.  We can't allow this because if
+	; the current installation fails, the batch file is deleted which 
+	; would wipe out the previous, successful install.
+
+	CE_COULD_NOT_PREPARE_FOR_TRANSFER		enum	ConnectError
+	; Returned by MSG_CONNECT_PREPARE_FOR_TRANSFER if virtual serial
+	; port could not be reserved or other error is encountered.  
+	; Error ialog will have been displayed by the connect library. 
+	; MSG_CONNECT_RESET_AFTER_TRANSFER must NOT be called if this
+	; error has been returned because none of the set up actions were 
+	; effected.
+
+;
+; NOTE: If you add/remove/change any of the ConnectError enums, be sure 
+;	 to a make the same change to connect.def.
+;
+
+;
+; If you change ConnectSoundType, update connect.goh too.
+;
+ConnectSoundType	etype word, 0, 2
+	CST_SUCCESS		enum ConnectSoundType
+	; sound to play when operation is successful
+
+
+;
+; ConnectStandardDialogBoxType
+;
+; NOTES:
+;
+; The dialog can be of any CustomDialogType: CDT_QUESTION, CDT_WARNING, 
+;				              CDT_NOTIFICATION, CDT_ERROR
+;
+; Possible GenInteractionType's are: GIT_PROPERTIES, GIT_PROGRESS, 
+;				      GIT_COMMAND, GIT_NOTIFICATION,
+;				      GIT_AFFIRMATION
+;
+; Only GIT_NOTIFICATION and GIT_PROPERTIES interactions can have a custom
+; reply trigger.
+; 
+; The GIT_PROPERTIES dialogs return either IC_APPLY or IC_DISMISS.
+; The GIT_NOTIFICATION dialogs return IC_OK.
+;
+; To add a new type:
+;	1) Add an enumerated constant here.
+; 	2) Add a string for the body text (CSDS_???) in UI\uiStrings.goc.
+;	3) Add a string for title text, and/or trigger text if appropriate.
+;	4) Add a bitmap for the title icon if appropriate.
+;	5) Add extern's for the string and bitmap chunks to UI\uiDialogs.goc.
+;	5) Add an entry to the ConnectStdDialogEntryTable table in 
+;	   UI\uiDialogs.goc.
+;
+ConnectStandardDialogBoxType	etype	word, 0
+	;
+	; Common dialogs.
+	;
+	CSDBT_FILE_OVERWRITE_WARNING	enum	ConnectStandardDialogBoxType
+	; Trying to create file but file already exists. 
+	; Ask user if we should overwrite it. 
+	; CDT_QUESTION, GIT_PROPERTIES, arg1 = file name
+
+	CSDBT_CANNOT_COPY_TO_FILE	enum	ConnectStandardDialogBoxType
+	; Trying to copy(transfer) a file but can't for some reason. 
+	; Display the reason if it's known. 
+	; CDT_NOTIFICATION, GIT_NOTIFICATION, arg1 = file name, arg2 = reason
+
+	CSDBT_CANNOT_COPY_FROM_FILE	enum	ConnectStandardDialogBoxType
+	; Trying to copy(transfer) a file but can't for some reason. 
+	; Display the reason if it's known. 
+	; CDT_NOTIFICATION, GIT_NOTIFICATION, arg1 = file name, arg2 = reason
+
+	CSDBT_DEST_FILE_OPEN_BY_ANOTHER_AP	enum	ConnectStandardDialogBoxType
+	; Destination file can not be overwriten because it's 
+	; open by another application. 
+	; CDT_NOTIFICATION, GIT_NOTIFICATION, arg1 = file name
+
+	CSDBT_CANNOT_FIND_DRIVE		enum	ConnectStandardDialogBoxType
+	; Trying to change to drive but can't. 
+	; CDT_NOTIFICATION, GIT_NOTIFICATION, arg1 = drive
+    
+	CSDBT_CANNOT_FIND_DIRECTORY	enum	ConnectStandardDialogBoxType
+	; Trying to change to directory but can't. 
+	; CDT_NOTIFICATION, GIT_NOTIFICATION, arg1 = directory path
+    
+	CSDBT_CANNOT_FIND_DISK_IN_REMOTE_DRIVE	enum	ConnectStandardDialogBoxType
+	; Tried accessing the remote drive, but there wasn't a disk.
+	; CDT_NOTIFICATION, GIT_NOTIFICATION, arg1 = drive
+
+	CSDBT_DIRECTORY_DOES_NOT_EXIST_CREATE_IT	enum	ConnectStandardDialogBoxType
+	; Trying to do something with directory but directory does not
+	; exits. Ask user if we should create the directory.
+	; CDT_QUESTION, GIT_PROPERTIES, arg1 = directory path
+
+	CSDBT_DIRECTORY_CREATE_ERROR	enum	ConnectStandardDialogBoxType
+	; Trying to create directory but can't. 
+	; CDT_NOTIFICATION, GIT_NOTIFICATION, arg1 = directory path
+
+	CSDBT_CANNOT_ESTABLISH_CONNECTION	enum	ConnectStandardDialogBoxType
+	; Trying to establish connection to PC but can't.
+	; CDT_NOTIFICATION, GIT_NOTIFICATION
+
+	CSDBT_CONNECTION_MEDIUM_ALREADY_IN_USE	enum	ConnectStandardDialogBoxType
+	; Trying to switch to connection medium but it's already in use. 
+	; CDT_NOTIFICATION, GIT_NOTIFICATION
+    
+	CSDBT_OPERATION_ABORTED		enum	ConnectStandardDialogBoxType
+	; An operation was aborted.
+	; CDT_NOTIFICATION, GIT_NOTIFICATION
+
+	CSDBT_TRANSLATION_ERROR		enum	ConnectStandardDialogBoxType
+	; Error during file translation.
+	; CDT_NOTIFICATION, GIT_NOTIFICATION, arg1 = reason for error
+
+	CSDBT_ILLEGAL_SETTING		enum	ConnectStandardDialogBoxType
+	; The user gave an illegal setting to the settings controller.
+	; CDT_NOTIFICATION, GIT_NOTIFICATION, arg1 = setting name,
+	; arg2 = illegal setting text
+
+	CSDBT_CONNECTION_LOST		enum	ConnectStandardDialogBoxType
+	; The connection was dropped after a number of failed attempts to
+	; re-connect.
+	; CDT_NOTIFICATION, GIT_NOTIFICATION
+
+	;
+	; Dialogs used by Get Package code.
+	;
+	CSDBT_REPLACE_EXISTING_SOFTWARE	enum	ConnectStandardDialogBoxType
+	; A new package will replace some existing file with a 
+	; newer version.
+	; Ask user if we should replace it. 
+	; CDT_QUESTION, GIT_PROPERTIES, arg1 = package name
+
+	CSDBT_REPLACE_UNRELATED_SOFTWARE	enum	ConnectStandardDialogBoxType
+	; A new package will replace some unrelated existing file.
+	; Ask user if we should replace it.
+	; CDT_QUESTION, GIT_PROPERTIES, arg1 = package name
+
+	CSDBT_REPLACE_EXISTING_DOCUMENT		enum	ConnectStandardDialogBoxType
+	; A new package will replace an existing document.
+	; Ask user if we should replace it.
+	; CDT_QUESTION, GIT_PROPERTIES, arg1 = package name,
+	;			     arg2 = existing document name
+
+	CSDBT_WILL_NEED_TO_REBOOT	enum	ConnectStandardDialogBoxType
+	; After the package is installed, the device will need to 
+	; be rebooted for it to be usable.
+	; Tell the user what's going on and ask if we should continue.
+	; CDT_QUESTION, GIT_PROPERTIES, arg1 = package name
+
+	CSDBT_PACKAGE_OLD_SO_NOT_INSTALLED	enum	ConnectStandardDialogBoxType
+	; No files in the package were installed because they had lower 
+	; protocols than versions already existing on the device.
+	; CDT_NOTIFICATION, GIT_NOTIFICATION, arg1 = package name
+
+	CSDBT_PACKAGE_NOT_COMPATIBLE	enum	ConnectStandardDialogBoxType
+	; The package is not compatible with software existing on the 
+	; device. For example, the package contains a library with a major
+	; protocol different than the existing version on the device.
+	; CDT_NOTIFICATION, GIT_NOTIFICATION, arg1 = package name
+
+	CSDBT_CANNOT_USE_INSTALL_BATCH_FILE_FOR_MORE_THAN_ONE_INSTALL	enum	ConnectStandardDialogBoxType
+	; The install batch file, used at reboot to copy files that were
+	; part of an installation, can only be used for one installation
+	; at a time.  This is because a *failed* installation that modified
+	; the batch file causes the batch file to be deleted.  But deletion
+	; would wipe out the work of any previous, successful installation.
+	; CDT_NOTIFICATION, GIT_NOTIFICATION
+
+	CSDBT_SOURCE_FILE_OPEN_BY_ANOTHER_APP	enum	ConnectStandardDialogBoxType
+	; Source file can not be sent because it's open by another
+	; application.  
+	; CDT_NOTIFICATION, GIT_NOTIFICATION, arg1 = file name
+    
+	CSDBT_NULL_SETTING		enum	ConnectStandardDialogBoxType
+	; The user gave a blank setting to the settings controller.
+	; CDT_NOTIFICATION, GIT_NOTIFICATION, arg1 = setting name
+
+	CSDBT_REMOTE_NOT_ENOUGH_DISK_SPACE_TO_COMPLETE	enum	ConnectStandardDialogBoxType
+	; PC disk is out of space.
+	; CDT_NOTIFICATION, GIT_NOTIFICATION
+
+	CSDBT_OUT_OF_MEMORY		enum	ConnectStandardDialogBoxType
+	;Insufficient memory (heap space memory, that is) to perform operation.
+	; CDT_NOTIFICATION, GIT_NOTIFICATION.
+
+	CSDBT_DATA_CALL_IN_PROGRESS	enum	ConnectStandardDialogBoxType
+	; Connectivity operations are not allowed when a data call is in progress.
+	; CDT_NOTIFICATION, GIT_NOTIFICATION
+
+	CSDBT_THIS_IS_THE_LAST_ONE	enum	ConnectStandardDialogBoxType
+	; This is just a dummy entry used for error checking.
+	; It must remain at the end of the list.
+
+;
+; Force geode to quit return value for completion message.
+;
+ConnectQuitGeodeStatus		etype	word, 0
+	CQGS_BUSY			enum	ConnectQuitGeodeStatus
+	; 
+	; The geode will not quit because it has one or more 
+	; APP_MODE_CONNECTIONS.
+	;
+
+	CQGS_FAILED_IACP_CONNECTION	enum	ConnectQuitGeodeStatus
+	;
+	; Couldn't establish an IACP_CONNECTION with the geode; the geode may
+	; not be running.
+	;
+
+	CQGS_FAILED			enum	ConnectQuitGeodeStatus
+	;
+	; Failed due to memory allocation error or other misc errors.
+	;
+
+	CQGS_SUCCESS			enum	ConnectQuitGeodeStatus
+	; The geode has quit.
+
+;
+; Return values for the ConnectCheckLegalDos* routines.
+;
+ConnectCheckLegalError		etype	word, 0
+	CCLE_LEGAL			enum	ConnectCheckLegalError
+	CCLE_STRING_NULL		enum	ConnectCheckLegalError
+	CCLE_STRING_TOO_LONG		enum	ConnectCheckLegalError
+	CCLE_DOS_DEVICE_NAME_CONFLICT	enum	ConnectCheckLegalError
+	CCLE_ONE_LETTER_DRIVE_NAME	enum	ConnectCheckLegalError
+	CCLE_ILLEGAL_DOS_DRIVE_NAME	enum	ConnectCheckLegalError
+	CCLE_ILLEGAL_DOS_DIR_PATH	enum	ConnectCheckLegalError
+	CCLE_ILLEGAL_DOS_FILE_PATH	enum	ConnectCheckLegalError
+	CCLE_ILLEGAL_DOS_FILE_NAME	enum	ConnectCheckLegalError
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Connect Class
+
+
+Notes on the ConnectClass
+ 
+An application that wishes to use the Connect library to transfer 
+files needs to include a connect object and send messages telling
+it to transfer files.
+
+
+Detaching, Quitting, and Lazarus:
+
+The connect object prevents the application from being transparently
+detached while an operation is in progress by setting and 
+clearing the application's AS_AVOID_TRANSPARENT_DETACH flag.
+
+If an application using a connect object is forced to detach while
+a connect operation is in progress (someone calls SysShutdown or something
+similar), the application should cancel the operation and delay passing the
+MSG_META_DETACH to the application object's superclass until the operation
+completion message has been received and handled. 
+Applications should use the ConnectSubApplicationClass, which provides a
+mechanism for doing this. Please refer to the ConnectSubApplicationClass
+for more information.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ConnectClass	class	MetaClass
+
+;----------------------------------------------------------------------------
+;		Messages
+;----------------------------------------------------------------------------
+MSG_CONNECT_OPEN_CONNECTION			message
+;
+; Desc:		Establish a connection to the server.
+;
+;		The connect library will display error dialogs for
+;		all errors that can occur while trying to establish 
+;		a connection.
+;
+; Context:	connect connection management
+; Source:	any object 
+; Destination:	any ConnectClass object
+; Interception:	unlikely
+;
+; Pass:
+;	ss:bp	= ConnectOpenConnectionParams
+;	dx	= size ConnectOpenConnectionParams
+;	
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+; Refer to message documentation in connect.goh for description of
+; parameters
+ConnectOpenConnectionParams	struct
+	COCP_completionMsg	word
+	COCP_completionOptr	optr
+	COCP_timeOut		sword
+	COCP_cType		ConnectionType
+ConnectOpenConnectionParams	ends
+
+; 
+; Message prototype for return message sent back from
+; MSG_CONNECT_OPEN_CONNECTION with the result of the attempt to 
+; open a connection.
+;
+; @prototype void CONNECT_OPEN_CONNECTION_COMPLETION_MSG(ConnectError error);
+;
+; Pass:
+;  	cx	- ConnectError
+; Return:
+;	nothing
+;
+
+MSG_CONNECT_CLOSE_CONNECTION			message
+;
+; Desc:		Close the connection to the server.
+;
+; Context:	connect connection management
+; Source:	any object 
+; Destination:	any ConnectClass object
+; Interception:	unlikely
+;
+; Pass:
+;	nothing
+;
+; Return:
+;	ax  -	CE_SUCCESS
+;		CE_CANNOT_CLOSE_CONNECTION
+;	cx, dx, bp - destroyed
+;
+
+
+
+;
+; Message prototype to be used by applications when defining a 
+; completion message to pass to the send and get messages.
+;
+; @prototype void CONNECT_COMPLETION_MSG(ConnectError error);
+;
+; Pass:
+;  	cx	- ConnectError
+; Return:
+;	nothing
+;
+
+
+ConnectTransferFlags	record
+	:3
+
+	CTF_MULTIPLE_TRANSFER:1
+	; If set, connect library will return different errors when
+	; user cancels file specific queries.  Useful when doing a
+	; multiple file transfer.
+	; (e.g. cancelling overwrite does not mean user cancelled 
+	; file transfer)
+	; Available in Communicator products shipped after April 1997.
+	
+	CTF_DONT_RESERVE_VIRTUAL_SERIAL_PORT:1
+	; If set, the connect object will NOT reserve the virtual
+	; serial port during connectivity operations.
+
+	CTF_NO_TRANSFER_IF_FILE_OPEN:1
+	; If set, the connect object will NOT try to get/send a file 
+	; if it is open locally by another app.
+
+	CTF_CREATE_DEST_PATH_DIRECTORY:1
+	; If set, an attempt will be made to create the destination path 
+	; if it does not exist.
+
+	CTF_QUERY_ON_OVERWRITE:1
+	; If set, check for overwriting an existing file and put up dialog 
+	; asking the user if we should overwrite.
+ConnectTransferFlags	end
+
+
+
+MSG_CONNECT_SEND_FILE				message
+;
+; Desc:		Send a file to the server. 
+;
+;		Will translate the file format if localFormat and 
+;		remoteFormat are non null. After the file is translated
+;		the connect object will send the progress dialog, if any,
+;		a MSG_CONNECT_PROGRESS_DIALOG_SET_TRANSFER_SIZE with the 
+;		size of the translated file so the progress dialog will 
+;		display the correct total transfer size.
+;
+;		Note: This message does not support the use of transfer 
+;		      drivers.
+;
+; Context:	connect file transfer
+; Source:	any object 
+; Destination:	any ConnectClass object
+; Interception:	unlikely
+;
+; Pass:
+;	ss:bp	= ConnectGetSendFileParams
+;	dx	= size ConnectGetSendFileParams
+;	
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+MSG_CONNECT_GET_FILE				message
+;
+; Desc:		Get a file from the server.
+;
+;		Will translate the file format if localFormat and 
+;		remoteFormat are non null. 
+;
+;		Note: This message supports the use of a ConnectTransferDrivers
+;		      which may be set with the
+;		      MSG_CONNECT_SET_TRANSFER_DRIVER message.
+;	
+; Context:	connect file transfer
+; Source:	any object 
+; Destination:	any ConnectClass object
+; Interception:	unlikely
+;
+; Pass:
+;	ss:bp	= ConnectGetSendFileParams
+;	dx	= size ConnectGetSendFileParams
+;	
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+; Refer to message documentation in connect.goh for description of
+; parameters
+ConnectGetSendFileParams	struct
+	CGSFP_completionMsg	word
+	CGSFP_completionOptr	optr
+	CGSFP_flags		ConnectTransferFlags 
+	CGSFP_padding		byte ; padding to keep fields word aligned
+	CGSFP_progressDialog	optr
+	CGSFP_remoteFormat	fptr.char
+	CGSFP_localFormat	fptr.char
+	CGSFP_remoteFilePath	fptr.TCHAR
+	CGSFP_localFilePath	fptr.TCHAR
+	CGSFP_localDiskHandle	word
+ConnectGetSendFileParams	ends
+
+
+MSG_CONNECT_CANCEL_TRANSFER				message
+;
+; Desc:		Cancel the current GET or SEND operation.
+;
+; Context:	connect file transfer
+; Source:	any object 
+; Destination:	any ConnectClass object
+; Interception:	unlikely
+;
+; Pass:
+;	nothing
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+
+MSG_CONNECT_SET_TRANSFER_DRIVER				message
+;
+; Desc:		Set a ConnectTransferDriver to use instead of the PCCom library.
+;		Currently only MSG_CONNECT_GET_FILE supports the use of
+;		a ConnectTransferDriver; MSG_CONNECT_SEND_FILE does not.
+;		You can switch back to using the PCCom library by calling
+;		MSG_CONNECT_SET_TRANSFER_DRIVER passing NULL.
+;
+; Context:	connect file transfer
+; Source:	any object 
+; Destination:	any ConnectClass object
+; Interception:	unlikely
+;
+; Pass:
+;	dx:cx	- fptr to long name of the ConnectTransferDriver to use
+;
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+MSG_CONNECT_FORCE_GEODE_TO_QUIT				message
+;
+; Forces the given geode (library or app) to quit.  This is necessary
+; in certain cases like deinstallation.  This message does not guarantee
+; that the app/library will quit -- the completionOptr should check the 
+; error value of the completion message to be sure.  The completion message 
+; should be defined  using the CONNECT_QUIT_GEODE_COMPLETION_MSG prototype.
+;
+; Context:	deinstallation process or similar situations
+; Source:	any object
+; Destination:	any ConnectClass object
+; Interception:	unlikely
+;
+; Pass:
+;	ss:bp	= ConnectForceGeodeToQuitParams
+;	dx	= size ConnectForceGeodeToQuitParams
+;	
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+; Refer to message documentation in connect.goh for description of
+; parameters
+ConnectForceGeodeToQuitParams	struct
+	CFGTQP_exceptThisApp	hptr
+	CFGTQP_completionOptr	optr
+	CFGTQP_completionMsg	word
+	CFGTQP_geode		hptr
+ConnectForceGeodeToQuitParams	ends
+
+
+
+;----------------------------------------------------------------------------
+;		Internal Messages
+;
+; Refer to connect.goh for message and parameter descriptions.
+;
+;----------------------------------------------------------------------------
+
+MSG_CONNECT_CONTACT_SERVER			message
+MSG_CONNECT_CONTINUE_SEND_AFTER_TRANSLATION	message
+MSG_CONNECT_FINISH_SEND_AFTER_TRANSFER		message
+MSG_CONNECT_CONTINUE_GET_AFTER_TRANSFER		message
+MSG_CONNECT_FINISH_GET_AFTER_TRANSLATION	message
+MSG_CONNECT_HANDLE_ERROR			message
+MSG_CONNECT_START_TRANSLATION			message
+MSG_CONNECT_TRANSLATION_DONE			message
+MSG_CONNECT_PCCOM_TRANSFER_STATUS		message
+MSG_CONNECT_TRANSFER_DRIVER_TRANSFER_STATUS	message
+MSG_CONNECT_ALLOCATE_VARDATA_PATH_BUFFERS	message
+MSG_CONNECT_DELETE_VARDATA_PATH_BUFFERS		message
+MSG_CONNECT_CONTINUE_FORCE_LIBRARY_TO_QUIT	message
+MSG_CONNECT_PREPARE_FOR_TRANSFER		message
+MSG_CONNECT_RESET_AFTER_TRANSFER		message
+
+
+;----------------------------------------------------------------------------
+;		Instance data and defaults
+;----------------------------------------------------------------------------
+
+
+;
+; Status of the current GET or SEND operation.
+;
+ConnectGetSendStatus	record
+	:7
+
+	CGSS_USING_TRANSFER_DRIVER:1		
+	; Set when a ConnectTransferDriver is being used instead of
+	; the PCCom library.
+
+	CGSS_USER_CANCELED:1			
+	; Set when the user has canceled the operation.
+
+	CGSS_SEND_REMOVE_TEMP_FILE:1		
+	; Set when doing a file SEND and translation was done.
+	; The source file was translated into a temporary file
+	; and the temporary file is being transferred to the PC. 
+	; The Connect object will remove the temporary file when 
+	; the transfer has completed.
+
+	CGSS_SEND_IN_PROGRESS:1			
+	; Set when the connect object is in the process of SEND'ing a file.
+
+	CGSS_GET_DEST_FILE_EXISTS:1		
+	; Set when there is an existing destination file
+	; during a GET operation.
+
+	CGSS_GET_MOVE_TEMP_TO_DEST:1		
+	; Set when doing a file GET and an existing destination file 
+	; will be overwritten and there is room for a temp file.
+	; The source file is being transferred into a temporary file
+	; and the Connect object will move the temporary file to
+	; the dest file when the transfer has completed.
+
+	CGSS_GET_TRANSFER_INTO_TEMP:1		
+	; Set when doing a file GET and the source file is 
+	; being transfered into a temp file.
+
+	CGSS_GET_NEED_TRANSLATION:1		
+	; Set when doing a file GET and a translation is needed.
+	; The source file is being transferred into a temporary file
+	; and the Connect object will translate the temporary file 
+	; into the dest file when the transfer has completed.
+
+	CGSS_GET_IN_PROGRESS:1			
+	; Set when the connect object is in the process of GET'ing a file.
+ConnectGetSendStatus	end
+
+
+;
+; Context:	Status of the current transfer.
+; Usage:	Used by the connect object to check if an operation is 
+;		currently in progress before starting a new one.
+;		Also used by the connect object to remember what it
+;		needs to do when a GET or SEND transfer is completed 
+;		(ie, move the temp file to the destination or translate 
+;		the temp file to the destination or remove the temp file.)
+;		Also used by the connect object to figure out what needs
+;		to be cleaned up when a GET or SEND operation is canceled.
+;
+CI_connectGetSendStatus		ConnectGetSendStatus 0x0000
+
+;
+; Context:	Optr and message to send upon transfer completion.
+; Usage:	Used by the Connect object to remember where and what
+;		message to send when the GET/SEND operation completes 
+;		or is canceled.
+;
+CI_notifyOnCompletionOptr	optr	NullOptr
+CI_notifyOnCompletionMsg	word	0
+
+;
+; Context:	Optr of progress dialog for transfer progress updates.
+; Usage:	Used by the Connect object to send progress updates 
+;		during file transfers.
+;
+CI_progressDialogOptr		optr	NullOptr
+
+;
+; Context:	Path and filename of temp file.
+; Usage:	Used when translating a file or GET'ing a file to 
+;		to a temporary file before overwriting the destination.
+;		Also used by the send operation to save the source file
+;		path between stage 1 and 2 when there is no translation.
+;
+CI_tempDiskHandle		word		0
+TEMP_CONNECT_TEMP_FILE_PATH	vardata		PathAndFileName
+
+;
+; Context:	Path and filename of transfer destination, and
+;              file handle of already existing destination.
+; Usage:	This data is used by the connect object when the 
+;		GET transfer completes to move the temp file to the 
+;		destination.
+;		The CI_destFilePath is also used by the SEND operation
+;		to save the destination file path between stage 1 and 2
+;		of the send operation.
+;		
+;		If the GET operation is overwriting an existing destination 
+;		file, we try to open the existing file for exclusive access
+;		to prevent another app from opening it while the GET is in
+;		progress. If the open is successful, the file handle is
+;		stored in the CI_originalDestFile instance data.
+;
+CI_destDiskHandle		word		0
+TEMP_CONNECT_DEST_FILE_PATH	vardata		PathAndFileName
+CI_originalDestFile		word		0
+
+;
+; Context:	Source and destination file formats.
+;		Only for a GET operation.
+; Usage:	This data is used by the connect object when the 
+;		GET transfer completes to translate the temp file 
+;		to the destination. 
+;
+CI_sourceFormat		char	FILE_FORMAT_NAME_SIZE	dup (0)
+CI_destFormat		char	FILE_FORMAT_NAME_SIZE	dup (0)
+
+;
+; Context:	Handle of data block used for the get operation.
+;		Only for a GET operation.
+; Usage:	
+;	
+CI_getSourceDataBlock	word	0
+
+;
+; Instance data for file format translation.
+;
+; Context:	Handle of translation thread.
+;
+CI_xlateThread		word	0
+
+;
+; Context:	Handle of translation driver geode.
+;
+CI_xlateDrvHandle	word	0
+
+;
+;Context:	fptr to translation driver strategy routine.
+;
+CI_xlateDrvStratRoutine	fptr	0
+
+;
+; Instance data for open connection operation.
+;
+CI_openConnectionDialog		optr	NullOptr
+CI_openConnectionReturnObj	optr	NullOptr
+CI_openConnectionReturnMsg	word	0
+CI_openConnectionTimeOutTime	dword	
+
+ConnectOpenConnectionTimeOutFlags	record
+	:6
+
+	COCTOF_INFINITE:1
+	; Set if the user wants an infinite time out. 
+
+	COCTOF_OVERFLOW:1
+	;Internally used to indicate that the system tic counter will overflow.
+ConnectOpenConnectionTimeOutFlags	end
+
+
+CI_openConnectionTimeOutFlags		ConnectOpenConnectionTimeOutFlags
+
+
+;
+; Instance data for using a ConnectTransferDriver.
+;
+; Context:	Name of ConnectTransferDriver to use.
+;		If NULL, PCCom is used.
+;
+CI_xferDriverName		FileLongName
+
+; Context:	Handle of ConnectTransferDriver geode.
+CI_xferDrvHandle		word		NULL
+
+;
+;Context:	fptr to ConnectTransferDriver strategy routine.
+;
+CI_xferDrvStratRoutine		fptr		0
+
+TEMP_CONNECT_QUIT_VARS		vardata		ConnectQuitGeodeState
+
+;
+; Context:	Counter for ALLOW/PREVENT transparent detach mechanism
+; Usage:	Used by MSG_CONNECT_(ALLOW|PREVENT)_APP_TRANSPARENT_DETACH
+;
+CI_avoidDetachCount		word		0
+
+;
+; Status of the connection to the server.
+;
+ConnectConnectionStatus		record
+	:6
+	CCS_VIRTUAL_SERIAL_PORT_RESERVED:1
+	; Set when the connect object has the virtual serial 
+	; port reserved.
+
+	CCS_CONNECTION_OPEN:1
+	; Set when the connect object has an open connection
+	; to the server.
+ConnectConnectionStatus		end
+
+;
+; Context:	Status of the connection to the server.
+; Usage:	Used by the connect object to store the 
+;		connection status.
+;
+CI_connectionStatus		ConnectConnectionStatus	0x00
+
+
+;
+; Context:	INTERNAL: IACP Connection token of the connection to 
+;			  a document server.
+; Usage:	This vardata is used by the get file code to store 
+;		the token for the connection to the document server when 
+;		it tries to gain access to an existing file. The file
+;		access is released when MSG_CONNECT_HANDLE_ERROR calls
+;		UtilReleaseFileAccess.
+;
+TEMP_CONNECT_IACP_CONNECTION_TOKEN	vardata	IACPConnection
+
+ConnectClass	endc	; ConnectClass
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	ConnectMultiFileClass
+
+ConnectMultiFileClass is subclassed from ConnectClass to provide
+synchronization for cases where files are batch transferred.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+ConnectMultiFileClass	class	ConnectClass
+
+MSG_CMF_GET_FILE_ARRAY				message
+MSG_CMF_SEND_FILE_ARRAY				message
+;
+; Desc:		Gets (sends) a bunch of file from (to) the server.
+;		May also translate the file format.
+;
+; Context:	connect file transfer
+; Source:	any object 
+; Destination:	any ConnectMultiFileClass object
+; Interception:	unlikely
+;
+; Pass:
+;	ss:bp	= CMFGetSendFileArrayParams
+;	dx	= size CMFGetSendFileArrayParams
+;	
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+; Refer to message documentation in connect.goh for description of
+; parameters
+CMFGetSendFileArrayParams	struct
+	CMFGSFAP_completionMsg	word
+	CMFGSFAP_completionOptr	optr
+	CMFGSFAP_progressDialog	optr
+	CMFGSFAP_flags		ConnectTransferFlags
+	CMFGSFAP_padding	byte ; padding to keep fields word aligned
+	CMFGSFAP_array		optr
+CMFGetSendFileArrayParams	ends
+
+MSG_CMF_SEND_NEXT_FILE				message
+MSG_CMF_GET_NEXT_FILE				message
+;
+; Desc:		Gets (sends) a file from (to) the server, as specified
+;  	    	by the MultiFileArray in the object's instance data.
+;
+; Context:	connect file transfer
+; Source:	any object 
+; Destination:	any ConnectClass object
+; Interception: Subclass this message to perform any file-by-file functions
+;  	    	 during a batch transfer.
+;
+; Pass:
+;  	cx	- ConnectError
+;  	    
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+MSG_CMF_FINISH_FILE_ARRAY				message
+;
+; Desc:		Deals with various clean-up issues once the file array has
+;  	    	been transferred. Frees the chunk array and the block it
+;		resides in and then sends the completion AD, etc.
+;
+; Pass:
+;	cx	- ConnectError to pass on to the completion message.
+;
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+
+
+;----------------------------------------------------------------------------
+;		Instance data and defaults
+;----------------------------------------------------------------------------
+
+;
+; Status of the current GET or SEND operation.
+;
+ConnectMFGetSendStatus	record
+	:14
+
+	CMFGSS_DO_NOT_ALLOCATE_OR_DELETE_PATH_BUFFERS:1
+	; Set when the subclassed messages 
+	; MSG_CONNECT_(ALLOCATE|DELETE)_VARDATA_PATH_BUFFERS 
+	; should not allocate/delete the vardata path buffers.
+
+	CMFGSS_TRANSFER_CANCELED:1
+	; Set when the multi-file transfer in progress has been 
+	; cancelled by the user.
+ConnectMFGetSendStatus	end
+
+;
+; CMFI_fileArray keeps track of the MultiFileArray during successive calls
+; to MSG_CMF_GET(SEND)_NEXT_FILE. This field is set by
+; MSG_CMF_GET(SEND)_FILE_ARRAY.
+;
+CMFI_fileArray			optr	NullOptr
+
+;
+; CMFI_nextFile is an index into CMFI_fileArray, specifying which file
+; should be sent or retrieved next.
+;
+CMFI_nextFile			word	0
+
+CMFI_progressDialog		optr	NullOptr
+
+;
+; CMFI_completionOptr and CMFI_completionMsg store the AD to send
+; once the entire array has been transferred.
+;
+CMFI_completionOptr		optr	NullOptr
+CMFI_completionMsg		word	0
+
+;
+; Status of the multi-file transfer in progress is kept in this
+; field.
+;
+CMFI_connectmfGetSendStatus	ConnectMFGetSendStatus	0
+
+;
+; Context:	INTERNAL: Temporary vardata storage used to pass the
+;			  ConnectTransferFlags from
+;			  MSG_CMF_(GET|SEND)_FILE_ARRAY to 
+;			  MSG_CMF_(GET|SEND)_NEXT_FILE.
+;
+; Usage:	This vardata is allocated and set by the 
+;		MSG_CMF_(GET|SEND)_FILE_ARRAY, used by
+;		MSG_CMF_(GET|SEND)_NEXT_FILE, and deleted by
+;		MSG_CMF_FINISH_FILE_ARRAY.
+;
+TEMP_CMF_CONNECT_TRANSFER_FLAGS		vardata	ConnectTransferFlags
+
+ConnectMultiFileClass	endc	; ConnectMultiFileClass
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ConnectMultiFileActionClass
+
+ConnectMultiFileActionClass is subclassed from ConnectMultiFileClass
+to allow the sending of a message to deal with each file in a batch
+file transfer upon its receipt.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ConnectMultiFileActionClass	class	ConnectMultiFileClass
+
+MSG_CMFA_SET_FILE_ACTION			message
+;
+; Desc:		Sets the action to take upon receipt of a file
+;
+; Context:	Caller wants to do something with each file in the
+;		course of a multi-file get.
+; Source:	any object
+; Destination:	any ConnectMultiFileActionClass object
+; Interception:	unlikely
+;
+; Pass:
+;  	bp:dx	- fileActionOptr
+;  	cx	- fileActionMsg
+;		Message to send upon receipt of a file and the optr to
+;		which it will be sent. The message should be defined
+;		using the CMFA_FILE_ACTION_MSG prototype. The optr may 
+;		be NULL if no file action message is desired. 
+;
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+
+;
+; Message prototype to be used when defining a file action 
+; message to pass to MSG_CMFA_SET_FILE_ACTION.
+; The completionOptr and completionMsg will be filled in by 
+; the ConnectMultiFileActionClass when it sends off the file
+; action message. 
+;
+; @prototype void CMFA_FILE_ACTION_MSG(optr completionOptr, 
+;				       Message completionMsg);
+; Pass:
+;  	bp:dx	- completion optr
+;  	cx	- completion message
+; Return:
+;	nothing
+;
+
+MSG_CMFA_GET_FILE_DETAILS_BLOCK			message
+;
+; Desc:		Gets the block detailing the file transfer just completed
+;
+; Context:	Caller has received the CMFAI_fileActionMsg in the course of
+;		a multi-file get, and needs to find out what file to handle.
+; Source:	any object
+; Destination:	any ConnectMultiFileActionClass object
+; Interception:	unlikely
+;
+; Pass:
+;	nothing
+;		
+; Return:
+;	ax	- handle of the CMFAI_fileDetailsBlock
+;	cx, dx, bp - destroyed
+;  	    
+
+MSG_CMFA_ALLOCATE_PACKAGE_ARRAY			message
+;
+; Desc:		Allocates CMFAI_packageArray.
+;
+; Context:	Caller wants to start using the array
+; Source:	any object
+; Destination:	any ConnectMultiFileActionClass object
+; Interception:	unlikely
+;
+; Pass:
+;	cx	- size of header to allocate
+;		
+; Return:
+;  	nothing    
+;	ax, cx, dx, bp - destroyed
+;
+
+
+; Message prototype to be used by applications when defining a 
+; completion message to pass to MSG_CMFA_LIST_PACKAGES.
+;
+; @prototype void CMFA_LIST_PACKAGES_COMPLETION_MSG(ConnectError error,
+;						    optr packageArray);
+; Pass:
+;  	bp	- ConnectError
+;  	dx:cx	- package array optr
+; Return:
+;	nothing
+;
+
+MSG_CMFA_LIST_PACKAGES				message
+;
+; Desc:		Initiates the process of getting a list of the software
+;		packages available on the specified drive of the server.
+;
+; Context:	Caller needs to display a list of downloadable packages
+; Source:	any object
+; Destination:	any ConnectMultiFileActionClass object
+; Interception:	unlikely
+;
+; Pass:
+;	ss:bp	= CMFAListPackagesParms
+;	dx	= size CMFAListPackagesParms
+;	
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+; Refer to message documentation in connect.goh for description of
+; parameters
+CMFAListPackagesParms	struct
+	CMFALPP_completionMsg	word
+	CMFALPP_completionOptr	optr
+	CMFALPP_progressDialog	optr
+	CMFALPP_flags		ConnectTransferFlags
+	CMFALPP_padding		byte ; padding to keep fields word aligned
+	CMFALPP_remotePath	fptr.TCHAR
+CMFAListPackagesParms	ends
+
+
+;
+; Message prototype to be used by applications when defining a 
+; completion message to pass to MSG_CMFA_GET_PACKAGE or 
+; MSG_CMFA_GET_PACKAGE_GIVEN_PACKAGE_FILE.
+;
+; @prototype void CMFA_GET_PACKAGE_COMPLETION_MSG(ConnectError error);
+;
+; Pass:
+;  	cx	- ConnectError
+; Return:
+;	nothing
+;
+
+MSG_CMFA_GET_PACKAGE				message
+;
+; Desc:		Downloads the package specified by the passed index
+;		into the passed PackageDescriptorArray.
+; Context:	Caller wants to download selected package
+; Source:	anyone
+; Destination:	any ConnectMultiFileActionClass object
+; Interception:	unlikely
+;
+; Pass:
+;	ss:bp	= CMFAGetPackageParams
+;	dx	= size CMFAGetPackageParams
+;	
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+; Refer to message documentation in connect.goh for description of
+; parameters
+CMFAGetPackageParams	struct
+	CMFAGPP_completionMsg	word
+	CMFAGPP_completionOptr	optr
+	CMFAGPP_progressDialog	optr
+	CMFAGPP_flags		ConnectTransferFlags
+	CMFAGPP_padding		byte ; padding to keep fields word aligned
+	CMFAGPP_n		word
+	CMFAGPP_packageArray	optr
+CMFAGetPackageParams	ends
+
+
+MSG_CMFA_GET_PACKAGE_GIVEN_PACKAGE_FILE		message
+;
+; Desc:		Downloads the package specified by the passed
+;		local package file path and remote package path
+; Context:	Caller already has the package file locally, knows where
+;		the package is, and wants to download it
+; Source:	anyone
+; Destination:	any ConnectMultiFileActionClass object
+; Interception:	unlikely
+;
+; Pass:
+;	ss:bp	= CMFAGetPackageGivenPackageFileParams
+;	dx	= size CMFAGetPackageGivenPackageFileParams
+;	
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+; Refer to message documentation in connect.goh for description of
+; parameters
+CMFAGetPackageGivenPackageFileParams	struct
+	CMFAGPGPFP_completionMsg	word
+	CMFAGPGPFP_completionOptr	optr
+	CMFAGPGPFP_progressDialog	optr
+	CMFAGPGPFP_flags		ConnectTransferFlags
+	CMFAGPGPFP_padding		byte ; padding to keep fields word aligned
+	CMFAGPGPFP_remotePackagePath	fptr.TCHAR
+	CMFAGPGPFP_localPackageFilePath	fptr.TCHAR
+	CMFAGPGPFP_localDiskHandle	hptr
+CMFAGetPackageGivenPackageFileParams	ends
+
+
+MSG_CMFA_CANCEL_GET_PACKAGE				message
+;
+; Desc:		Cancels current transfer and deletes all files so far
+;		downloaded. 
+;
+; Context:	Caller wants to cancel and clean up.
+; Source:	anyone
+; Destination:	any ConnectMultiFileActionClass object
+; Interception:	unlikely
+;
+; Pass:
+;	nothing
+;	
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+
+;----------------------------------------------------------------------------
+;		Internal Messages
+;
+; Refer to connect.goh for message and parameter descriptions.
+;
+;----------------------------------------------------------------------------
+
+MSG_CMFA_FINISH_LIST_PACKAGES				message
+MSG_CMFA_CONTINUE_GET_PACKAGE				message
+MSG_CMFA_FINISH_GET_PACKAGE				message
+MSG_CMFA_UPDATE_PACKAGE_DESCRIPTOR_ARRAY		message
+MSG_CMFA_FILE_ACTION_FOR_GET_PACKAGE			message
+MSG_CMFA_FILE_ACTION_FOR_GET_PACKAGE_STAGE_2		message
+MSG_CMFA_CONTINUE_GET_NEXT_FILE				message
+
+
+;----------------------------------------------------------------------------
+;		Instance data and defaults
+;----------------------------------------------------------------------------
+
+;
+; CMFAI_packageArray stores the OD for the chunk array of
+; PackageDescriptorArrayEntries created when listing packages,
+; or for the array of PackageProgressArrayEntries created when
+; getting a package.
+;
+CMFAI_packageArray		optr	 NullOptr
+
+;
+; CMFAI_fileDetailsBlock stores the MultiFileArrayEntry for the file just 
+; received.
+;
+CMFAI_fileDetailsBlock		word	0
+
+;
+; CMFAI_fileActionOptr and CMFAI_fileActionMsg store the AD to call
+; upon receipt of each file.
+;
+CMFAI_fileActionOptr		optr	NullOptr
+CMFAI_fileActionMsg		word	0
+
+;
+; CMFAI_completionOptr and CMFAI_completionMsg store the AD to send
+; once the whole transfer operation has completed.
+;
+CMFAI_completionOptr		optr	NullOptr
+CMFAI_completionMsg		word	0
+
+;
+; Status of the current get package operation if any.
+;
+ConnectMFAGetPackageStatus	record
+	:6
+
+	CMFAGPS_REPLACE_DOCUMENT_DIALOG_DISPLAYED:1
+	;
+	; Set if the "replacing existing document" dialog 
+	; has been displayed for this particular file being
+	; downloaded from a package.
+	;
+	; This flag is cleared by MSG_CMFA_FILE_ACTION_FOR_GET_PACKAGE
+	; and checked/set by DisplayReplaceExistingDocumentDialog.
+	;
+
+	CMFAGPS_REBOOT_DIALOG_DISPLAYED:1
+	CMFAGPS_EXISTING_DIALOG_DISPLAYED:1
+	CMFAGPS_UNRELATED_DIALOG_DISPLAYED:1
+	;
+	; These flags are set if the corresponding dialog 
+	; has already been displayed during the current 
+	; package install. 
+	;
+
+	:1
+	; unused
+
+	CMFAGPS_FILE_INSTALLED_FROM_PACKAGE:1
+	;
+	; Set if at least one file from the current 
+	; package has been installed. This flag is
+	; used to determine if the "package not installed"
+	; dialog should be displayed.
+	;
+
+	CMFAGPS_NEED_TO_REBOOT:1
+	;
+	; Set if the device needs to be re-booted in order 
+	; for the package just install to be usable.
+	;
+
+	CMFAGPS_NEW_FILE_IS_GEOS_FILE:1
+	;
+	; Set if the file being downloaded from the package
+	; is a GEOS file.
+	;
+	CMFAGPS_EXISTING_LOCAL_DEST_FILE:1
+	;
+	; Set when the file being downloaded from a package
+	; will overwrite an existing local destination file.
+	; By local is meant that the file exists in directory 
+	; under the primary tree.
+	;
+	CMFAGPS_DOWNLOADING_FILES_IN_PACKAGE:1
+	;
+	; Set when downloading the files in a package.
+	; This flag is set by MSG_CMFA_CONTINUE_GET_PACKAGE 
+	; and cleared by MSG_CMFA_FINISH_GET_PACKAGE.
+	;
+ConnectMFAGetPackageStatus	end
+
+;
+; INTERNAL: Status of the get-package operation in progress is kept 
+;           in this field.
+;
+CMFAI_getPackageStatus		ConnectMFAGetPackageStatus	0x0000
+
+;
+; Context:	INTERNAL: Completion optr and message for the get 
+;			  package file action message.
+; Usage:	Used by MSG_CMFA_FILE_ACTION_FOR_GET_PACKAGE and siblings 
+;		to store the completion optr and message.
+;
+MFAI_getPackageFileActionCompletionOptr		optr	NullOptr
+MFAI_getPackageFileActionCompletionMsg		word	0
+
+;
+; Context:	INTERNAL: File path of destination file during package get.
+; Usage:	This vardata is used by the get package code to store 
+;		the destination file path since it modifies the 
+;		MultiFileArrayEntry to download the new file into a 
+;		a temporary place so we can do protocol and file name 
+;		checks before moving it to its final destination.
+;		The vardata is allocated by MSG_CMFA_CONTINUE_GET_PACKAGE 
+;		and deleted by MSG_CMFA_FINISH_GET_PACKAGE.
+;
+TEMP_CMFA_DEST_FILE_PATH		vardata		PathAndFileName
+
+;
+; Context:	INTERNAL: GEOS file name of new file if it's a GEOS file.
+; Usage:	This vardata is used by the get package code to store 
+;		the GEOS file name of the new file if it's a GEOS file.
+;		The vardata is allocated and set by
+;		CheckForAndDealWithOverwriteConflicts and deleted
+;		by MSG_CMFA_FILE_ACTION_FOR_GET_PACKAGE_STAGE_3.
+;
+TEMP_CMFA_NEW_FILE_GEOS_FILE_NAME	vardata		FileLongName
+
+;
+; Context:	INTERNAL: Package name of the package being gotten.
+; Usage:	This vardata is used by the get package code to store 
+;		the package name. The vardata is allocated and set by 
+;		MSG_CMFA_GET_PACKAGE or
+;		MSG_CMFA_GET_PACKAGE_GIVEN_PACKAGE_FILE. The vardata 
+;		is deleted by MSG_CMFA_FINISH_GET_PACKAGE.
+;		The get package file action message uses the vardata	
+;		when it puts up dialogs.
+;
+TEMP_CMFA_PACKAGE_NAME			vardata		char
+
+;
+; Context:	INTERNAL: Package filename of the package being gotten.
+; Usage:	This vardata is used by the get package code to store 
+;		the DOS package file name. The vardata is allocated and 
+;		set by MSG_CMFA_GET_PACKAGE or
+;		MSG_CMFA_GET_PACKAGE_GIVEN_PACKAGE_FILE. The vardata 
+;		used and deleted by MSG_CMFA_CONTINUE_GET_PACKAGE.
+;
+TEMP_CMFA_PACKAGE_FILENAME		vardata		TCHAR
+
+;
+; Context:	INTERNAL: Absolute remote directory path with drive
+;			  specifier to package.
+; Usage:	This vardata is used by the get package code to store 
+;		the remote package directory path. The vardata is 
+;		allocated and set by MSG_CMFA_GET_PACKAGE or
+;		MSG_CMFA_GET_PACKAGE_GIVEN_PACKAGE_FILE. The vardata 
+;		used and deleted by MSG_CMFA_CONTINUE_GET_PACKAGE.
+;
+TEMP_CMFA_REMOTE_PACKAGE_PATH		vardata		TCHAR
+
+;
+; Context:	INTERNAL: IACP Connection token of the connection to 
+;			  a document server.
+; Usage:	This vardata is used by the get package code to store 
+;		the token for the connection to the document sever when 
+;		it tries to gain access to a document.
+;		The vardata is allocated and set by FreeUpDestFile.
+;		The vardata used and deleted by
+;		MSG_CMFA_FILE_ACTION_FOR_GET_PACKAGE_STAGE_3.
+;
+TEMP_CMFA_IACP_CONNECTION_TOKEN		vardata	IACPConnection
+
+;
+; Context:	INTERNAL: Temporary vardata storage used to pass the
+;			  ConnectTransferFlags from MSG_CMFA_GET_PACKAGE
+;			  and MSG_CMFA_GET_PACKAGE_GIVEN_PACKAGE_FILE
+;			  to MSG_CMFA_CONTINUE_GET_PACKAGE.
+;			  
+; Usage:	This vardata is allocated and set by the 
+;		CommonGetPackageCode() routine which is called by
+;		MSG_CMFA_GET_PACKAGE and
+;		MSG_CMFA_GET_PACKAGE_GIVEN_PACKAGE_FILE.  
+;		It's used and deleted by MSG_CMFA_CONTINUE_GET_PACKAGE.
+;
+TEMP_CMFA_CONNECT_TRANSFER_FLAGS	vardata	ConnectTransferFlags
+
+ConnectMultiFileActionClass	endc	; ConnectMultiFileActionClass
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Connect Settings Controller
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;
+; Notes on the ConnectSettingsControlClass:
+;
+; The ConnectSettingsControlClass stores the current connect settings 
+; in the inti file. It sends itself a MSG_META_GET_INI_CATEGORY to 
+; get the ini category to use when saving and reading the settings.
+; Applications will generally have ATTR_GEN_INIT_FILE_CATEGORY attr 
+; in their application object specifying the category string.
+;
+; The ConnectSettingsControlClass also provides messages that the
+; application can use to get the current settings.
+;	
+ConnectSettingsControlClass	class	GenControlClass 
+
+;----------------------------------------------------------------------------
+;		Messages
+;----------------------------------------------------------------------------
+
+MSG_CONNECT_SETTINGS_CONTROL_INITIATE_DIALOG		message
+;
+; Bring the settings dialog on screen.
+;
+; Context:	settings dialog opening
+; Source:	any object (most likely a trigger in the application)
+; Destination:	any ConnectSettingsControl object
+; Interception:	unlikely
+;
+; Pass:
+;	nothing
+;
+; Return:
+;	nothing
+;
+
+MSG_CONNECT_SETTINGS_CONTROL_GET_CONNECTION_TYPE_SETTING	message
+MSG_CONNECT_SETTINGS_CONTROL_GET_DATA_GROUP_SETTING		message
+;
+; Get the current value for a particular setting.
+;
+; These messages are used by the application to get the current settings.
+;
+; Context:	ConnectSettingsControl setting fetching
+; Source:	any object
+; Destination:	any ConnectSettingsControl object
+; Interception:	unlikely
+;
+; MSG_CONNECT_SETTINGS_CONTROL_GET_CONNECTION_TYPE_SETTING
+; Pass:
+;	nothing
+; Return:
+;	ax	- ConnectionType
+;	cx, dx, bp - destroyed
+;
+; MSG_CONNECT_SETTINGS_CONTROL_GET_DATA_GROUP_SETTING
+; Pass:
+;	nothing
+; Return:
+;	ax	- DataGroup
+;	cx, dx, bp - destroyed
+;
+
+CONNECTION_TYPE_TEXT_BUFFER_LENGTH		equ	80
+
+MSG_CONNECT_SETTINGS_CONTROL_GET_CONNECTION_TYPE_TEXT	message
+;
+; Pass:
+;	bp:dx	- fptr.TCHAR to the buffer
+;	cx	- buffer length (word)
+;
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+DATA_GROUP_TEXT_BUFFER_LENGTH			equ	80
+
+MSG_CONNECT_SETTINGS_CONTROL_GET_DATA_GROUP_TEXT	message
+;
+; Pass:
+;	bp:dx	- fptr.TCHAR to the buffer
+;	cx	- buffer length (word)
+;
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+MSG_CONNECT_SETTINGS_CONTROL_GET_DRIVE_TEXT		message
+MSG_CONNECT_SETTINGS_CONTROL_GET_DIRECTORY_PATH_TEXT	message
+MSG_CONNECT_SETTINGS_CONTROL_GET_FILE_PATH_TEXT		message
+;
+; Get the entire text of the setting into a buffer referenced by a pointer.
+; Pass:
+;	bp:dx	- fptr.TCHAR to the buffer
+;	cx	- buffer length (word)
+;
+;	Note: Use CONNECT_SETTINGS_DRIVE_LENGTH_ZT and
+;	      and CONNECT_SETTINGS_PATH_LENGTH_ZT for buffer lengths.
+;
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+
+;----------------------------------------------------------------------------
+;		Internal Messages
+;
+; Refer to connect.goh for message and parameter descriptions.
+;
+;----------------------------------------------------------------------------
+
+MSG_CONNECT_SETTINGS_CONTROL_CLOSE_DIALOG		message
+MSG_CONNECT_SETTINGS_CONTROL_WRITE_SETTINGS		message
+MSG_CONNECT_SETTINGS_CONTROL_READ_SETTINGS		message
+MSG_CONNECT_SETTINGS_CONTROL_CHECK_LEGAL_SETTINGS	message
+
+CheckLegalSettingsFlags		record
+	:7
+	CLSF_WARN:1
+	;If set, display a dialog for illegal settings.
+CheckLegalSettingsFlags		end
+
+MSG_CONNECT_SETTINGS_CONTROL_SAVE_GIG_SETTINGS		message
+
+
+;----------------------------------------------------------------------------
+;		Vardata
+;----------------------------------------------------------------------------
+;
+; Help file for this controller object.  If this is not present then GenClass
+; queries up the tree.
+; eg:
+; ATTR_CONNECT_SETTINGS_CONTROL_HELP_FILE {
+;      char "contax  ", 0
+; }
+;
+ATTR_CONNECT_SETTINGS_CONTROL_HELP_FILE		vardata	char
+
+;
+; Specifies the help context for this controller object.
+; eg:
+; ATTR_CONNECT_SETTINGS_CONTROL_HELP_CONTEXT {
+;      char "Settings", 0
+; }
+; Placed on an object of GenControlClass windowed GenInteraction, 
+; although it doesn't have to be. 
+;
+ATTR_CONNECT_SETTINGS_CONTROL_HELP_CONTEXT	vardata	char
+
+;
+; Vardata to hold default settings.
+; 
+; If the app wants to provide a default setting, it should add the
+; appropriate ATTR to it's ConnectSettingsControl object.
+;
+ATTR_CONNECT_SETTINGS_CONTROL_DEFAULT_CONNECTION_TYPE	vardata	ConnectionType
+ATTR_CONNECT_SETTINGS_CONTROL_DEFAULT_DATA_GROUP	vardata	DataGroup
+;
+; FIXME: These should be using TCHAR[] but GOC produces invalid objects if 
+;   TCHAR[] is used and a statically defined object contains the vardata. 
+;   See goc bug #48345
+ATTR_CONNECT_SETTINGS_CONTROL_DEFAULT_DRIVE		vardata	char
+ATTR_CONNECT_SETTINGS_CONTROL_DEFAULT_DIRECTORY_PATH	vardata	char
+ATTR_CONNECT_SETTINGS_CONTROL_DEFAULT_FILE_PATH		vardata	char
+
+
+;----------------------------------------------------------------------------
+;		Instance data and defaults
+;----------------------------------------------------------------------------
+ConnectSettingsControllerMiscFlags	record
+	:7
+	CSCMF_GENERATING_UI:1
+	; Set when the settings controller is generating its UI.
+	;   Set and cleared by our subclass of MSG_GEN_CONTROL_GENERATE_UI.
+	;   If this flag is set, we can ignore the apply messages sent by the 
+	;   GenItemGroups and not save thier settings to the init file.
+	;
+ConnectSettingsControllerMiscFlags	end
+
+;
+; Context:	Miscellaneous flags.
+; Usage:	INTERNAL
+;
+CSCI_miscFlags		ConnectSettingsControllerMiscFlags	0x00
+
+;
+; Context:	Title of the settings dialog.
+; Usage:	When the settings dialog is built, this text chunk is
+;		used to set its complex moniker.
+;
+CSCI_dialogTitle	lptr		0
+
+;
+; Context:	Settings changed notification mechanism.
+; Usage:	If the app has a ConnectSettingsDisplay controller that is 
+;		displaying the settings set by this controller, this 
+;		optr shouild be set to that ConnectSettingsDisplay 
+;		controller so it gets send a 
+;		MSG_CONNECT_SETTINGS_DISPLAY_CONTROL_UPDATE_UI when 
+;		our setting dialog closes.
+;
+CSCI_settingsDisplayController		optr	NullOptr
+
+
+;----------------------------------------------------------------------------
+;              Feature Sets
+;----------------------------------------------------------------------------
+ConnectSettingsControlFeatures	record
+	:11
+	CSCF_CONNECTION_TYPE:1
+	CSCF_DATA_GROUP:1
+	CSCF_DRIVE:1
+	CSCF_DIRECTORY_PATH:1
+	CSCF_FILE_PATH:1
+ConnectSettingsControlFeatures	end
+
+CSC_DEFAULT_FEATURES	equ	(mask CSCF_CONNECTION_TYPE or \
+					mask CSCF_DATA_GROUP or \
+					mask CSCF_DRIVE or \
+					mask CSCF_DIRECTORY_PATH or \
+					mask CSCF_FILE_PATH)
+
+; NOTE: This controller has no toolbox features.
+
+ConnectSettingsControlClass	endc	; ConnectSettingsControlClass
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Connect Settings Display Controller
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;
+; Notes on the ConnectSettingsDisplayControlClass:
+;
+; The ConnectSettingsDisplayControlClass is used to display the current 
+; connect settings. It will be used in the main screens of the Responder
+; Connectivity Applications.
+;	
+ConnectSettingsDisplayControlClass	class	GenControlClass
+
+;----------------------------------------------------------------------------
+;		Messages
+;----------------------------------------------------------------------------
+
+MSG_CONNECT_SETTINGS_DISPLAY_CONTROL_UPDATE_UI		message
+;
+; Fetch the current connect settings from the ConnectSettings controller
+; and update our UI to display them.
+;
+; Context:	settings update
+; Source:	any object (probably either ourself or a ConnectSettings
+;		controller)
+; Destination:	any ConnectSettingsDisplayControl object
+; Interception:unlikely
+;
+; Pass:
+;	nothing
+;
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+
+;----------------------------------------------------------------------------
+;		Instance data and defaults
+;----------------------------------------------------------------------------
+
+;
+; Context:	settings update mechanism
+; Usage:	This is the optr of the ConnectSettings controller which 
+;		sets the settings that we are displaying. The default
+;		MSG_CONNECT_SETTINGS_DISPLAY_CONTROL_UPDATE_UI handler
+;		uses this optr to fetch the current connect settings.
+;
+CSDCI_settingsController	optr	NullOptr
+
+
+;----------------------------------------------------------------------------
+;              Feature Sets
+;----------------------------------------------------------------------------
+ConnectSettingsDisplayControlFeatures	record
+	:11
+	CSDCF_CONNECTION_TYPE:1
+	CSDCF_DATA_GROUP:1
+	CSDCF_DRIVE:1
+	CSDCF_DIRECTORY_PATH:1
+	CSDCF_FILE_PATH	:1
+ConnectSettingsDisplayControlFeatures	end
+
+CSDC_DEFAULT_FEATURES	equ	(mask CSDCF_CONNECTION_TYPE or \
+					mask CSDCF_DATA_GROUP or \
+					mask CSDCF_DRIVE or \
+					mask CSDCF_DIRECTORY_PATH or \
+					mask CSDCF_FILE_PATH)
+
+; NOTE: This controller has no toolbox features.
+
+ConnectSettingsDisplayControlClass	endc	; ConnectSettingsDisplayControlClass
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Connect Progress Dialog
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+;
+; Notes on the ConnectProgressDialogClass
+; 
+; This is what a progress dialog looks like. 
+;
+;	 --------------------------------------------------------
+;	 |<text describing what is happening>            	|
+;	 |                                               	|
+;	 |             <xxx bytes transfered.>			|
+;	 |                     or                          	|
+;	 |          <xxx bytes of yyy transfered.>		|
+;	 |                                               	|
+;	 |                   <bitmap>                    	|
+;	 |                                               Cancel	|
+;	 --------------------------------------------------------
+;
+; Here is a sample usage of a progress dialog:
+;
+; dialog = ConnectCreateProgressDialog(cancellationOptr, cancellationMsg);
+;
+; Use MSG_FOAM_PROGRESS_DIALOG_*_DESCRIPTION_TEXT* messages to set 
+; the description text.
+;
+; @call dialog::
+;   MSG_CONNECT_PROGRESS_DIALOG_INITIATE_DIALOG(ConnectProgressDialogFlags);
+;
+; Use the connect object to do some file transfer operations, and the 
+; connect object will automatically update the progress dialog with 
+; the current byte count.
+;
+; @call connectObject::MSG_CONNECT_GET_FILE(..., dialog, ...);
+; [...]
+; @call connectObject::MSG_CONNECT_GET_FILE(..., dialog, ...);
+;
+; @call dialog::MSG_CONNECT_PROGRESS_DIALOG_DISMISS_DIALOG();
+; @call dialog::MSG_CONNECT_PROGRESS_DIALOG_DESTROY_DIALOG();
+; 
+;
+
+ConnectProgressDialogClass	class	FoamProgressDialogClass
+
+
+;----------------------------------------------------------------------------
+;		Messages
+;----------------------------------------------------------------------------
+
+ConnectProgressDialogFlags	record
+	:3
+	CPDF_INHIBIT_CANCELLATION:1
+	; Internal only: Set if pressing cancel trigger should not
+	; result in cancellation.
+
+	CPDF_IGNORE_STATUS_UPDATES:1
+	; Set to leave the status text the same, regardless of updates from
+	;   MSG_CONNECT_PROGRESS_DIALOG_REPORT_PROGRESS. 
+	;   This flag does not prevent the status text from being reset with
+	;   MSG_FOAM_PROGRESS_DIALOG_SET_STATUS_TEXT.
+
+	CPDF_CANCELLING:1		
+	; Set if the operation is being cancelled.
+
+	CPDF_DISPLAY_TOTAL_TRANSFER_SIZE:1
+	; Set if the total transfer size should be displayed 
+	;   in the status string.
+
+	CPDF_DISPLAY_CUMULATIVE_BYTE_TALLY:1
+	; Set if the progress dialog should display the cumulative 
+	;   tally of bytes for all files transfered since the progress 
+	;   dialog was initiated.
+
+ConnectProgressDialogFlags	end
+
+MSG_CONNECT_PROGRESS_DIALOG_INITIATE_DIALOG		message
+;
+; Initiate the progress dialog.
+;
+; Context:	progress dialog initiation
+; Source:	any object
+; Destination:	any ConnectProgressDialog object
+; Interception:	unlikely
+;
+; Pass:
+;	cl	- ConnectProgressDialogFlags
+;
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+MSG_CONNECT_PROGRESS_DIALOG_DISMISS_DIALOG		message
+;
+; Dismiss the progress dialog.  Has no effect if dialog has already
+; been dismissed, i.e., the user cancelled the operation.
+;
+; Context:	progress dialog dismissal
+; Source:	any object
+; Destination:	any ConnectProgressDialog object
+; Interception:	unlikely
+;
+; Pass:
+;	nothing
+;
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+MSG_CONNECT_PROGRESS_DIALOG_DESTROY_DIALOG		message
+;
+; Destroy the progress dialog.
+;
+; Context:	progress dialog management
+; Source:	any object
+; Destination:	any ConnectProgressDialog object
+; Interception:	unlikely
+;
+; Pass:
+;	nothing
+;
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+MSG_CONNECT_PROGRESS_DIALOG_SET_TRANSFER_SIZE		message
+;
+; Set the total transfer size.
+;
+; If the CPDF_DISPLAY_TOTAL_TRANSFER_SIZE flag is set, the
+; status string will be displayed as 
+; "xxx bytes of <total transfer size>".
+;
+; Context:     progress dialog management
+; Source:      any object
+; Destination: any ConnectProgressDialog object
+; Interception:unlikely
+;
+; Pass:
+;	dx:cx	- size (dword)
+;
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+;----------------------------------------------------------------------------
+;		Internal Messages
+;
+; Refer to connect.goh for message and parameter descriptions.
+;
+;----------------------------------------------------------------------------
+
+;
+; Connect Progress Types
+;
+ConnectProgressType		etype	word, 0
+	CPT_BYTE_COUNT		enum	ConnectProgressType
+
+MSG_CONNECT_PROGRESS_DIALOG_REPORT_PROGRESS		message
+MSG_CONNECT_PROGRESS_DIALOG_STARTING_NEW_FILE		message
+MSG_CONNECT_PROGRESS_DIALOG_CANCEL			message
+
+; 
+; Message prototype for cancellation message sent from
+; MSG_CONNECT_PROGRESS_DIALOG_CANCEL after internal cancellation
+; matters have been handled.
+;
+; @prototype void CONNECT_PROGRESS_DIALOG_CANCELLATION_MSG();
+;
+; Pass:
+;  	nothing
+; Return:
+;	nothing
+;
+
+MSG_CONNECT_PROGRESS_DIALOG_SET_CANCEL_ACTION		message
+MSG_CONNECT_PROGRESS_DIALOG_GET_FLAGS			message
+
+MSG_CONNECT_PROGRESS_DIALOG_SUSPEND_CANCEL		message
+MSG_CONNECT_PROGRESS_DIALOG_RESUME_CANCEL		message
+;
+; Used to insure that the progress dialog cannot send the cancellation
+; message for the duration of some operation.  Pairs of calls to
+; IGNORE/RESUME may not be nested.
+;
+; Pass:
+;	nothing
+; Return:
+;	ax = ConnectProgressDialogFlags
+;		(MSG_CONNECT_PROGRESS_DIALOG_SUSPEND_CANCEL only)
+
+
+;----------------------------------------------------------------------------
+;		Instance data and defaults
+;----------------------------------------------------------------------------
+
+;
+; Context:	flag storage
+; Usage:	
+;
+CPDI_flags		ConnectProgressDialogFlags
+
+;
+; Context:	Cumulative tally of bytes for all files transfered 
+;		since the progress dialog was initiated, not including 
+;		the current file.
+; Usage:	
+;
+CPDI_cumulativeTally	dword
+
+;
+; Context:	bytes transferred so far for the current file
+; Usage:	
+;
+CPDI_bytesCurrentFile	dword
+
+;
+; Context:	Total transfer size used in the status string 
+;		if the CPDF_DISPLAY_TOTAL_TRANSFER_SIZE flag 
+;		is set.
+; Usage:	Set by MSG_CONNECT_PROGRESS_DIALOG_SET_TRANSFER_SIZE.
+;              
+;
+CPDI_transferSize	dword	0
+
+;
+; Context:	CPDI_cancellationOptr and CPDI_cancellationMsg store the AD
+; 		specified by the creator of the progress dialog to send on
+;		cancellation.
+; Usage:	Sent by handler for MSG_CONNECT_PROGRESS_DIALOG_CANCEL
+;		after CPDF_CANCELLING has first been set in CPDI_flags.
+;
+CPDI_cancellationOptr	optr	NullOptr
+CPDI_cancellationMsg	word	0
+
+;
+; Context:     CPDI_cancelDialog stores a dialog which notifies
+;              that connect operation is being cancelled.  When the
+;              user presses cancel, this dialog comes up.
+; Usage:       In MSG_CONNECT_PROGRESS_CANCEL, this dialog is created
+;              and displayed.  In MSG_CONNECT_PROGRESS_DIALOG_DESTROY_DIALOG,
+;              this dialog is nuked.
+;
+CPDI_cancelDialog	optr	NullOptr
+
+ConnectProgressDialogClass	endc	; ConnectProgressDialogClass
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ConnectSubApplicationClass
+
+This class should be used for applications that are using a 
+Connect object. It provides a mechanism for delaying the 
+application from detaching if there is a connect operation in 
+progress when the application is asked to detach.
+
+Note that ConnectSubApplicationClass is a subclass of the
+FoamSubApplicationClass so it is not appropriate for applications 
+that should not use the FoamSubApplicationClass.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;
+;The application needs to follow these steps:
+; 
+;1) Use the ConnectSubApplicationClass.
+;
+;2) Set the CSAI_connectObj instance data to the optr of the 
+;application's connect object.
+;
+;3) Call the application with
+;MSG_CSA_SET_FLAGS(CSAF_WAITING_FOR_COMPLETION_MSG, NULL) right before 
+;sending the connect object a message starting a connect operation.
+;
+;Have the completion message do the following:
+;4) Call the application with MSG_CSA_SET_FLAGS(NULL, 
+;CSAF_WAITING_FOR_COMPLETION_MSG) at the start of the
+;completion message handler.
+;
+;7) Check the ConnectSubApplicationFlags returned by MSG_CSA_SET_FLAGS 
+;and if the application is waiting to continue a detach, don't put up 
+;any dialogs.
+;
+;8) If the application is waiting to continue a detach, send the application
+;a MSG_CSA_CONTINUE_DETACH at the end of the completion message handler.
+;
+;
+;Example completion message handler:
+;{
+;    ConnectSubApplicationFlags csaFlags;
+;
+   ; The completion message is being handled, so clear the 
+   ; CSAF_WAITING_FOR_COMPLETION_MSG flag. This needs to be done 
+   ; at the start of the completion message handler.
+   ;
+   ; At the same time, get the current ConnectSubApplicationFlags 
+   ; so we can check if the application object is waiting to continue
+   ; an application detach when we're done handling the completion
+   ; message.
+;    csaFlags = @call app::
+;	MSG_CSA_SET_FLAGS(NULL, CSAF_WAITING_FOR_COMPLETION_MSG);
+;
+;    if (!(csaFlags & CSAF_WAITING_TO_DETACH)) {
+	; Code that should only be executed if we're not about to 
+	; detach. For example: putting up error dialogs.
+;	[insert code here]
+;    }
+;
+    ; Code that should be executed even if we're about to detach.
+    ; For example: Freeing memory, deleting temp files, etc.
+;    [insert code here]
+;
+;
+    ; If the app is waiting to detach, tell it to continue the detach.
+    ; This needs to be at the end of the completion message handler.
+;    if (csaFlags & CSAF_WAITING_TO_DETACH) {
+;	@send app::MSG_CSA_CONTINUE_DETACH();
+;    }
+;}
+;
+
+ConnectSubApplicationClass	class	FoamSubApplicationClass
+
+ConnectSubApplicationFlags	record
+	:6
+
+	CSAF_WAITING_TO_DETACH:1			
+	; This flag is set if the application has received a MSG_META_DETACH
+	; and is waiting for the completion message to send it a
+	; MSG_CSA_CONTINUE_DETACH before continuing the application detach.
+	;
+
+	CSAF_WAITING_FOR_COMPLETION_MSG:1		
+	; This flag is set if the application has started a connect operation
+	; but has not yet received and handled the completion message for the
+	; operation. 
+	;
+ConnectSubApplicationFlags	end
+
+;----------------------------------------------------------------------------
+;		Messages
+;----------------------------------------------------------------------------
+
+MSG_CSA_GET_FLAGS					message
+;
+; Desc:		Get the current ConnectSubApplicationFlags.
+;
+; Context:	ConnectSubApplicationClass flags
+; Source:	any object 
+; Destination:	any ConnectSubApplicationClass object
+; Interception:	unlikely
+;
+; Pass:
+;	nothing
+;
+; Return:
+;	al	- current ConnectSubApplicationFlags
+;	cx, dx, bp - destroyed
+;
+
+MSG_CSA_SET_FLAGS					message
+;
+; Desc:		Set and clear some ConnectSubApplicationFlags.
+;
+; Context:	ConnectSubApplicationClass flags
+; Source:	any object 
+; Destination:	any ConnectSubApplicationClass object
+; Interception:	unlikely
+;
+; Pass:
+;	dl	- ConnectSubApplicationFlags flags to set
+;	cl	- ConnectSubApplicationFlags flags to clear
+;
+; Return:
+;	al	- current ConnectSubApplicationFlags after requested 
+;		  flags have been set and cleared.
+;	cx, dx, bp - destroyed
+;
+
+MSG_CSA_CONTINUE_DETACH					message
+;
+; Desc:		Continues the application detach by sending the superclass
+;		a MSG_META_DETACH.
+;
+; Context:	mechanism to delay application detach
+; Source:	the ConnectSubApplicationClass MSG_META_DETACH handler or
+;		one of the application's connect completion message handlers
+; Destination:	any ConnectMultiFileActionClass object
+; Interception:This message should be intercepted if the application needs
+;		to do anything before the application really detaches.
+;		Here is a good place to prepare for the lazarus case.
+;
+; Pass:
+;	nothing
+;
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+;----------------------------------------------------------------------------
+;		Instance data and defaults
+;----------------------------------------------------------------------------
+
+;
+; Context:	ConnectSubApplicationClass flags
+; Usage:	The flags can be set with MSG_CSA_SET_FLAGS and 
+;		retrieved with MSG_CSA_GET_FLAGS.
+;
+CSAI_flags		ConnectSubApplicationFlags	0x00
+
+;
+; Context:	mechanism to delay application detach
+; Usage:	Contains the optr of the connect object to which to send a 
+;		MSG_CONNECT_CANCEL_TRANSFER if there is an operation in
+;		progress when the ConnectSubApplicationClass receives 
+;		a MSG_META_DETACH. 
+;	
+;		Assuming the application has one static connect object, 
+;		this instance data should be set in the application 
+;		object declaration.
+;
+CSAI_connectObj		optr			NullOptr
+
+;
+; Context:	mechanism to delay application detach
+; Usage:	This vardata is used to store the callerID and ackOD 
+;		passed with MSG_META_DETACH to ConnectSubApplicationClass. 
+;		The vardata is later used and deleted by the 
+;		ConnectSubApplicationClass MSG_CSA_CONTINUE_DETACH handler 
+;		when it sends a MSG_META_DETACH to our superclass to
+;		continue the detach.
+;
+ConnectSubAppDetachData	struct
+	CSADD_callerID		word
+	CSADD_ackOD		dword	; optr
+ConnectSubAppDetachData	ends
+
+TEMP_CONNECT_SUB_APP_DETACH_DATA	vardata	ConnectSubAppDetachData
+
+ConnectSubApplicationClass	endc	; ConnectSubApplicationClass
+
+;----------------------------------------------------------------------------
+;  EXPORTED ROUTINES
+;
+;
+;  Most of these exported routines are writen in C and have the C calling
+;  convention. Under the C calling convention, the caller needs to push the
+;  parameters on the stack from right to left and then pop the parameters
+;  off the stack after calling the routine.
+;
+;  Here is an example of calling a routine with the C calling convention:
+;
+;  ;extern InteractionCommand _cdecl
+;  ;ConnectDoStandardDialogWithReason(ConnectError error,
+;  ;				      ConnectStandardDialogBoxType dbType,
+;  ;				      TCHAR *arg );
+;
+;  ; push parameters right to left
+;	mov	ax, <segment of arg>
+;	push	ax				; push segment of arg
+;	mov	ax, <offset to arg>		
+;	push	ax				; push offset of arg
+;	mov	ax, CSDBT_CANNOT_COPY_FROM_FILE
+;	push	ax				; push dbType
+;	mov	ax, CE_FILE_NOT_FOUND
+;	push	ax				; push error
+;	call	ConnectDoStandardDialogWithReason
+;	add	sp, 8				; pop the parameters
+;			; ax <- InteractionCommand
+;
+;  
+;  A couple of the routines use the Pascal calling convention in which case
+;  the caller needs to push the parameters on the stack from left to right 
+;  and does NOT need to pop the parameters off the stack since the called 
+;  routine will pop the stack.
+;
+;  Here is an example of calling a routine with the Pascal calling convention:
+;
+;  ;extern ConnectError _far _pascal
+;  ;CONNECTGEODEFINDFROMLONGNAME(const char _far *name,
+;  ;			         GeodeAttrs attrMatch,
+;  ;			         GeodeAttrs attrNoMatch,
+;  ;			         GeodeHandle _far *geodeHan);
+;
+;	sub	sp, 2
+;	mov	bp, sp				; ss:bp - buffer for GeodeHandle
+;
+;  ; push parameters left to right
+;	mov	ax, <segment of geode name>	; name segment
+;	push	ax
+;	mov	ax, <offset to geode name>	; name offset
+;	push	ax				
+;	mov	ax, mask GA_LIBRARY		; attrMatch
+;	push	ax
+;	mov	ax, mask GA_REQUIRES_COPROC	; attrNoMatch
+;	push	ax
+;	push	ss				; push buffer segment
+;	push	bp				; push buffer offset
+;	call	CONNECTGEODEFINDFROMLONGNAME	; pops parameters off stack
+;			; ax <- ConnectError
+;			; ss:[bp] <- GeodeHandle if ax = CE_SUCCESS
+;	add	sp, 2				; nuke buffer for GeodeHandle
+;
+;----------------------------------------------------------------------------
+
+
+global	ConnectCreateProgressDialog:far
+;
+; Desc:		Create a basic progress dialog using UserCreateDialog, 
+;		and set the cancellation action to be taken by
+;		MSG_CONNECT_PROGRESS_DIALOG_CANCEL.
+;
+;		Generally, set the cancellationOptr to the Connect
+;		object and the cancellationMsg to
+;		MSG_CONNECT_CANCEL_TRANSFER.
+;
+; Return: 	optr of created dialog or NULL if couldn't create dialog.
+;
+;extern optr _cdecl 
+;ConnectCreateProgressDialog(optr cancellationOptr, Message cancellationMsg);
+;
+
+global	ConnectCreateProgressDialogFromTemplate:far
+;
+; Desc:		Create a subclassed progress dialog using UserCreateDialog, 
+;		and set the cancellation action to be taken by
+;		MSG_CONNECT_PROGRESS_DIALOG_CANCEL.
+;
+;		Generally, set the cancellationOptr to the Connect
+;               object and the cancellationMsg to
+;		MSG_CONNECT_CANCEL_TRANSFER.
+;
+; Return: 	optr of created dialog or NULL if couldn't create dialog.
+;
+;extern optr _cdecl 
+;ConnectCreateProgressDialogFromTemplate(optr progressDialogTemplate,
+;					optr cancellationOptr,
+;					Message cancellationMsg);
+;
+
+global	ConnectDoStandardDialog:far
+;
+; SYNOPSIS:	Put up a standard Connect dialog box.
+;
+;extern InteractionCommand _cdecl ConnectDoStandardDialog(
+;				   ConnectStandardDialogBoxType dialogType,
+;				   TCHAR *arg1,
+;				   TCHAR *arg2);
+;
+
+global	ConnectSetServerPath:far
+;
+; Desc:		Set the server's current directory.
+;
+;		The path may be relative to the server's current 
+;		directory or absolute with a drive specification.
+;
+;		For example: a relative path would be "temp\dir1"
+;			     an absolute path would be "c:\foo\temp\dir1"
+;			     "a:" goes to the root dir of the A drive
+;
+;extern ConnectError _cdecl ConnectSetServerPath(TCHAR *path);
+;
+
+global	ConnectGetServerPath:far
+;
+; Desc:		Get the server's current path.
+;
+;		The server's absolute path with drive specifier is
+;		copied into the buffer.	
+;
+;		The buffer must be PATH_BUFFER_SIZE.
+;
+;extern ConnectError _cdecl ConnectGetServerPath(TCHAR *buffer);
+;
+
+global ConnectDisplayServerPath:far
+;
+; Desc:		Tell the server to display its current absolute 
+;		directory path.
+;
+; Return: 	ConnectError 
+;
+;extern ConnectError _cdecl ConnectDisplayServerPath(void);
+;
+
+global	ConnectGetPackageDescriptorData:far
+;
+; Desc:		Fill the passed buffer with the requested information.
+;
+;		pkgArray = optr of locked chunk array. Each entry is a
+;                         PackageDescriptorArrayEntry.
+;              n        = index of element about which to get info
+;              pddt     = PackageDescriptorDataType: kind of info desired
+;              retBuf   = buffer in which to return requested info
+;              bufLength   = number of chars (not bytes) to read into retBuf,
+;                            BUT the last position is nulled.  (If data is
+;                            less than bufLength chars, then the extra space
+;                            is null padded.)
+;
+; 
+;
+;extern ConnectError _cdecl
+;ConnectGetPackageDescriptorData(optr pkgDescArray, word n,
+;				PackageDescriptorDataType pddt,
+;				TCHAR *retBuf, word bufLength );
+;
+
+global	ConnectAbridgePath:far
+;
+; Desc:		Abridge the path so it fits in the passed number of
+;		points minus the width of the includedInWidth string, if any.
+;
+;		includedInWidth is a pointer to a string whose width
+;		will be subtracted from the maxWidth before the path
+;		is abridged. includedInWidth may be NULL.
+;
+;		The includedInWidth argument is useful for cases where you
+;		know the total width available for a string like 
+;		"to <file path>" and want to abridge the file path to fit 
+;		in the total width minus the width of the "to " sub-string.
+;
+;		Pass 0 for the fontID and/or pointSize to use the
+;		default (whatever that is).
+;
+;extern void _cdecl
+;ConnectAbridgePath(char *thePath, word maxWidth, 
+;		   char *includedInWidth,
+;		   FontID fontID, WWFixedAsDWord pointSize);
+;
+
+global	ConnectCheckLegalDosDriveName:far
+;
+; Desc:		Check if the passed string is a legal DOS drive name.
+;
+;		Legal drive names look like "X:" or "X:\", where X is 
+;		an upper or lower case letter between A and Z.
+;
+; Return: 	ConnectCheckLegalError -
+;			CCLE_LEGAL
+;			CCLE_STRING_NULL
+;			CCLE_STRING_TOO_LONG
+;			CCLE_ONE_LETTER_DRIVE_NAME
+;			CCLE_ILLEGAL_DOS_DRIVE_NAME
+;
+;extern ConnectCheckLegalError _cdecl
+;ConnectCheckLegalDosDriveName (const TCHAR *driveName);
+
+global	ConnectCheckLegalDosDirPath:far
+;
+; Desc:		Check if the passed string is a legal absolute DOS 
+;		directory path.
+;
+;              "." and ".." may appear in the directory path.
+;
+;		Note: This routine does not check if the characters
+;		      are legal DOS path characters.
+;
+; Return: 	ConnectCheckLegalError -
+;			CCLE_LEGAL
+;			CCLE_STRING_NULL
+;			CCLE_STRING_TOO_LONG
+;			CCLE_ONE_LETTER_DRIVE_NAME
+;			CCLE_ILLEGAL_DOS_DRIVE_NAME
+;			CCLE_DOS_DEVICE_NAME_CONFLICT
+;			CCLE_ILLEGAL_DOS_DIR_PATH
+;
+;extern ConnectCheckLegalError _cdecl
+;ConnectCheckLegalDosDirPath (const TCHAR *dirPath);
+;
+
+global	ConnectCheckLegalDosFilePath:far
+;
+; Desc:		Check if the passed string is a legal absolute DOS 
+;		file path.
+;
+;              "." and ".." may appear in the file path.
+;		Note: This routine does not check if the characters
+;		      are legal DOS path characters.
+;
+; Return: 	ConnectCheckLegalError -
+;			CCLE_LEGAL
+;			CCLE_STRING_NULL
+;			CCLE_STRING_TOO_LONG
+;			CCLE_ILLEGAL_DOS_DRIVE_NAME
+;			CCLE_DOS_DEVICE_NAME_CONFLICT
+;			CCLE_ILLEGAL_DOS_FILE_NAME
+;			CCLE_ILLEGAL_DOS_FILE_PATH
+;
+;extern ConnectCheckLegalError _cdecl
+;ConnectCheckLegalDosFilePath (TCHAR *filePath);
+;
+
+global	ConnectCheckLegalDosFileName:far
+;
+; Desc:		Check if the passed string is a legal DOS file name.
+;
+;		Note: This routine does not check if the characters
+;		      are legal DOS file name characters.
+;
+; Return: 	ConnectCheckLegalError -
+;			CCLE_LEGAL
+;			CCLE_STRING_NULL
+;			CCLE_STRING_TOO_LONG
+;			CCLE_DOS_DEVICE_NAME_CONFLICT
+;			CCLE_ILLEGAL_DOS_FILE_NAME
+;
+;extern ConnectCheckLegalError _cdecl
+;ConnectCheckLegalDosFileName (const TCHAR *fileName);
+;
+
+global	ConnectCreatePathOnServer:far
+;
+; Desc:        Creates the passed path on the server, if the path
+;              does not exist.
+;
+;ConnectError _cdecl
+;ConnectCreatePathOnServer (TCHAR *serverPath);
+;
+
+global	ConnectWarnIfOutOfSpace:far
+;
+; Desc:        Routine called in completion messages.  Puts up a warning 
+;              or error dialog if:
+;               - the passed error message is CE_NOT_ENOUGH_DISK_SPACE
+;                 _TO_{START,COMPLETE}, as returned by 
+;		   MSG_CONNECT_(GET|SEND)_FILE or MSG_CMFA_GET_PACKAGE.
+;               - the amount of space left (after a successful transfer)
+;                 is below the warning or critical level.
+;              Returns TRUE if warning/error dialog was displayed.
+;
+;Boolean _cdecl
+;ConnectWarnIfOutOfSpace ( ConnectError error );
+;
+
+global	CONNECTGEODEFINDFROMLONGNAME:far
+;
+; Desc:        The following routines will retrieve the geode handle
+;              given the long name.
+;              If CE_SUCCESS is returned, then geodeHan is the GeodeHandle of 
+;              the first-found running geode of specified name, or NullHandle 
+;              if geode not found running.
+;              CE_MISC_FILE_ERROR returned if some error occurred while trying
+;              to find the geode.
+;
+;extern ConnectError _far _pascal
+;CONNECTGEODEFINDFROMLONGNAME(const char _far *name,
+;			      GeodeAttrs attrMatch,
+;			      GeodeAttrs attrNoMatch,
+;			      GeodeHandle _far *geodeHan);
+;
+
+global	CONNECTPLAYSOUND:far
+ConnectPlaySound		equ	CONNECTPLAYSOUND
+;
+; Desc:        Play custom sound with UserStandardSound
+;
+;extern void
+;_far _pascal ConnectPlaySound( ConnectSoundType soundToPlay );
+;
+
+global	ConnectMapPCCFRTToConnectError:far
+;
+; Desc: 	Maps PCComFullReturnType to ConnectError.  The
+; 		default error code is used when the mapping fails.
+;	    	Okay to pass PCCRT_NO_ERROR.
+;       
+;
+;extern ConnectError _cdecl
+;ConnectMapPCCFRTToConnectError( ConnectError defaultErr, 
+;			        PCComFullReturnType pccomErr );
+;
+
+global	ConnectDoStandardDialogWithReason:far
+;
+; Desc:        Displays an abort error message in the following format:
+;			"[Error msg body] [arg][ - reason str]!"
+;			eg. "Cannot copy to file foo.txt - file is read-only!"
+;              The error message body is determined by dbType.
+;	       The reason string is determined by error.
+;
+;extern InteractionCommand _cdecl
+;ConnectDoStandardDialogWithReason( ConnectError error,
+;				   ConnectStandardDialogBoxType dbType,
+;				   TCHAR *arg );
+;
+
+global	ConnectDoStandardErrorDialog:far
+;
+; Desc:		Displays error dialogs for common case ConnectErrors,
+;		that is, ConnectErrors with the CE_DIALOG_DISPLAYED
+;		bit set.
+;
+;	These are the cases that the dialog will be displayed. "*" means
+;	the argument passed in isn't important.
+;
+;	ConnectError			arg1			arg2
+;	-----------			----			----
+;	CE_CANNOT_TRANSLATE_FILE	*			*
+;	CE_OPERATION_ABORTED		*			*
+;	CE_REMOTE_OPERATION_ABORTED	*			*
+;	CE_CONNECTION_LOST		*			*
+;	CE_PATH_NOT_FOUND		dir path w/o filename	*
+;	CE_REMOTE_PATH_NOT_FOUND	dir path w/o filename	*
+;	CE_DRIVE_INVALID		arg1[0] = drive letter	*
+;	CE_REMOTE_DRIVE_INVALID		arg1[0] = drive letter	*
+;	CE_REMOTE_VOLUME_UNAVAILABLE	arg1[0] = drive letter	*
+;	CE_CANNOT_CREATE_DIRECTORY	dir path w/o filename	*
+;	CE_REMOTE_NOT_ENOUGH...COMPLETE	  *			*
+;	CE_SOURCE_FILE_OPEN_BY_ANOTHER_APP file name or file path *
+;	CE_DEST_FILE_OPEN_BY_ANOTHER_APP   file name or file path *
+;	CE_PACKAGE_OLD_SO_NOT_INSTALLED package name		*
+;	CE_PACKAGE_NOT_COMPATIBLE	package name		*
+;	CE_CANNOT_USE_INSTALL_BATCH_
+;	 FILE_FOR_MORE_THAN_ONE_INSTALL	*			*
+;	
+; Return: 	TRUE - if a dialog was displayed.
+;
+;extern Boolean _cdecl
+;ConnectDoStandardErrorDialog( ConnectError error, TCHAR *arg1, TCHAR *arg2 );
+;
+
+global CONNECTDISABLEAPPLAUNCHKEYS:far
+ConnectDisableAppLaunchKeys equ CONNECTDISABLEAPPLAUNCHKEYS
+;
+; Desc:		Prevents the keys F5-F12 from launching an app.
+;
+;extern void _far _pascal
+;ConnectDisableAppLaunchKeys(ConnectDisableAppLaunchKeysMonitor *monitor);
+;
+
+global	CONNECTENABLEAPPLAUNCHKEYS:far
+ConnectEnableAppLaunchKeys		equ	CONNECTENABLEAPPLAUNCHKEYS
+;
+; Desc:		Allows the keys F5-F12 to launch apps again, after
+;		having called ConnectDisableAppLaunchKeys().
+; Pass:		Pointer to same monitor you passed to 
+;		ConnectDisableAppLaunchKeys().
+;
+;extern void _far _pascal
+;ConnectEnableAppLaunchKeys(ConnectDisableAppLaunchKeysMonitor *monitor);
+;
+
+;---------------------------------------------------------------------------
+;		Any API below this line is not available for
+;	Communicator devices shipped before January 1997.
+;---------------------------------------------------------------------------
+
+global CONNECTCOMPRESSFILE:far
+ConnectCompressFile			equ	CONNECTCOMPRESSFILE
+;
+; Desc:		Compress the source file into the destination file.
+;
+; Return:	number of bytes written out (0 if error)
+;
+; extern word _far _pascal
+; ConnectCompressFile (FileHandle srcFileHan, FileHandle destFileHan);
+;
+
+global CONNECTDECOMPRESSFILE:far
+ConnectDecompressFile			equ	CONNECTDECOMPRESSFILE
+;
+; Desc:		Decompress the source file into the destination file.
+;
+; Return:	number of bytes written out (0 if error)
+;
+; extern word _far _pascal
+; ConnectDecompressFile (FileHandle srcFileHan, FileHandle destFileHan);
+;
+
+EndLibrary	connect
+

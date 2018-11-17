@@ -1,0 +1,440 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+ *
+ * PROJECT:	PC GEOS
+ * FILE:	gFSelC.goh
+ * AUTHOR:	Tony Requist: February 12, 1991
+ *
+ * DECLARER:	UI
+ *
+ * DESCRIPTION:
+ *	This file defines GenFileSelectorClass
+ *
+ *	$Id: gFSelC.goh,v 1.1 97/04/04 15:51:45 newdeal Exp $
+ *
+ ***********************************************************************/
+
+@optimize
+@deflib ui
+
+#include <file.h>
+#include <geode.h>
+@include <ui.goh>
+@include <Objects/genC.goh>
+#include <fileEnum.h>		/* for DosFileInfoStruct */
+
+@class GenFileSelectorClass, GenClass;
+
+typedef WordFlags FileSelectorFileCriteria;
+
+#define FSFC_DIRS			0x8000
+#define FSFC_NON_GEOS_FILES		0x4000
+#define FSFC_GEOS_EXECUTABLES		0x2000
+#define FSFC_GEOS_NON_EXECUTABLES	0x1000
+#define FSFC_MASK_CASE_INSENSITIVE	0x0800
+#define FSFC_FILE_FILTER		0x0400
+#define FSFC_FILTER_IS_C		0x0200
+#define FSFC_TOKEN_NO_ID		0x0100
+#define FSFC_USE_MASK_FOR_DIRS		0x0080
+#define FSFC_USE_FAKE_FILE_SYSTEM	0x0040
+
+/*
+ *	general attributes for FileSelector
+ */
+typedef WordFlags FileSelectorAttrs;
+
+#define FSA_ALLOW_CHANGE_DIRS		0x8000
+/* note skipped bit here */
+#define FSA_SHOW_FIXED_DISKS_ONLY	0x2000
+#define FSA_SHOW_FILES_DISABLED		0x1000
+#define FSA_HAS_CLOSE_DIR_BUTTON	0x0800
+#define FSA_HAS_OPEN_DIR_BUTTON		0x0400
+#define FSA_HAS_DOCUMENT_BUTTON		0x0200
+#define FSA_HAS_CHANGE_DIRECTORY_LIST	0x0100
+#define FSA_HAS_CHANGE_DRIVE_LIST	0x0080
+#define FSA_HAS_FILE_LIST		0x0040
+#define FSA_USE_VIRTUAL_ROOT		0x0020
+#define FSA_SHOW_WRITABLE_DISKS_ONLY	0x0010
+
+/*
+ *	flags sent to AD as notification of new selection
+ */
+
+typedef ByteEnum GenFileSelectorEntryType;
+#define GFSET_FILE 0
+#define GFSET_SUBDIR 1
+#define GFSET_VOLUME 2
+
+typedef WordFlags GenFileSelectorEntryFlags;
+
+#define GFSEF_TYPE		0xc000
+#define GFSEF_OPEN		0x2000
+#define GFSEF_NO_ENTRIES	0x1000
+#define GFSEF_ERROR		0x0800
+#define GFSEF_TEMPLATE		0x0400
+#define GFSEF_SHARED_MULTIPLE	0x0200
+#define GFSEF_SHARED_SINGLE	0x0100
+#define GFSEF_READ_ONLY		0x0080
+#define GFSEF_PARENT_DIR	0x0040
+#define GFSEF_DISABLED          0x0020 /* set if cur. selection is disabled */
+
+#define GFSEF_TYPE_OFFSET	14
+
+#define GFS_GET_ENTRY_TYPE(A) (((A) & GFSEF_TYPE) >> GFSEF_TYPE_OFFSET)
+
+
+/* common types */
+
+typedef FileLongName GenFileSelectorMask;
+typedef VolumeName GenFileSelectorVolume;
+typedef FileLongName GenFileSelectorSelection;
+
+#define GFS_GET_ENTRY_NUMBER(A) ((word) ((A) >> 16))
+#define GFS_GET_ENTRY_FLAGS(A)	((word) (A))
+
+@message dword MSG_GEN_FILE_SELECTOR_GET_SELECTION(
+				char *selection = cx:dx) = ax.bp;
+
+@message Boolean MSG_GEN_FILE_SELECTOR_SET_SELECTION(
+				char *selection = cx:dx) = carry;
+
+#define GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(A) ((DiskHandle) ((A) >> 16))
+
+@message dword MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(
+				char *selection = cx:dx) = ax.bp;
+
+@message Boolean MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH(
+				char *selection = cx:dx,
+					DiskHandle diskHandle = bp) = carry;
+
+@message void MSG_GEN_FILE_SELECTOR_GET_MASK(char *mask = cx:dx);
+
+@message void MSG_GEN_FILE_SELECTOR_SET_MASK(char *mask = cx:dx);
+
+#define GET_MATCH_FILE_ATTRS(attr)	((byte) (attr))
+#define GET_MISMATCH_FILE_ATTRS(attr)	((byte) ((attr) >> 8))
+@message word MSG_GEN_FILE_SELECTOR_GET_FILE_ATTRS() = cx;
+
+@message void MSG_GEN_FILE_SELECTOR_SET_FILE_ATTRS(
+    	    	    	    	FileAttrs setAttrs = cl,
+    	    	    	    	FileAttrs clearAttrs = ch);
+
+typedef struct {
+    GeodeToken	GTP_token;
+    word	GTP_unused;
+} GetTokenCreatorParams;
+
+@message void MSG_GEN_FILE_SELECTOR_GET_TOKEN(		/* XXX */
+			GetTokenCreatorParams *retValue = cxdxbpax);
+
+/*
+ *	use SET_TOKEN_CHARS macro to define "tokenChars" to pass
+ *	example usage:
+ *	@call myObj::MSG_GEN_FILE_SELECTOR_SET_TOKEN(
+ *				SET_TOKEN_CHARS('D','E','S','K'),
+ *				MANUFACTURER_ID_GEOWORKS);
+ */
+#define SET_TOKEN_CHARS(A, B, C, D) ((A) | ((B) << 8) | ((C) << 16) | ((D) << 24))
+
+@message void MSG_GEN_FILE_SELECTOR_SET_TOKEN(dword tokenChars = cx:dx,
+					ManufacturerID manufacturerID = bp); /* XXX */
+
+@message void MSG_GEN_FILE_SELECTOR_GET_CREATOR(	/* XXX */
+			GetTokenCreatorParams *retValue = cxdxbpax);
+
+@message void MSG_GEN_FILE_SELECTOR_SET_CREATOR(dword tokenChars = cx:dx,
+					ManufacturerID manufacturerID = bp); /* XXX */
+
+#define GET_MATCH_ATTRS(attr) (((attr) >> 16) & 0xffff)
+#define GET_MISMATCH_ATTRS(attr) ((attr) & 0xffff)
+@message dword MSG_GEN_FILE_SELECTOR_GET_GEODE_ATTRS() = cx:dx; /* XXX */
+
+@message void MSG_GEN_FILE_SELECTOR_SET_GEODE_ATTRS(	/* XXX */
+				    GeodeAttrs matchGeodeAttrs = cx,
+				    GeodeAttrs mismatchGeodeAttrs = dx);
+
+typedef struct {
+    Message		GAP_message;
+    word		GAP_unused;
+    optr		GAP_output;
+} GetActionParams;
+
+@message void MSG_GEN_FILE_SELECTOR_GET_ACTION(		/* XXX */
+				    GetActionParams *retValue = bpaxdxcx);
+
+@message void MSG_GEN_FILE_SELECTOR_SET_ACTION(
+    	    	    	    	    optr actionOD = cx:dx,
+				    Message actionMessage = bp); /* XXX */
+
+@message FileSelectorAttrs MSG_GEN_FILE_SELECTOR_GET_ATTRS() = cx; /* XXX */
+
+@message void MSG_GEN_FILE_SELECTOR_SET_ATTRS(
+			FileSelectorAttrs attributes = cx); /* XXX */
+
+@message FileSelectorFileCriteria
+	 MSG_GEN_FILE_SELECTOR_GET_FILE_CRITERIA() = cx;	/* XXX */
+
+@message void MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA(
+			FileSelectorFileCriteria fileCriteria = cx); /* XXX */
+
+@message void MSG_GEN_FILE_SELECTOR_RESCAN();
+
+@message void MSG_GEN_FILE_SELECTOR_UP_DIRECTORY();
+
+@message void MSG_GEN_FILE_SELECTOR_UNUSED();	/* REMOVE */
+
+@message Boolean MSG_GEN_FILE_SELECTOR_OPEN_ENTRY(word entryNumber = cx) = carry;
+
+@message Boolean MSG_GEN_FILE_SELECTOR_SUSPEND() = carry;
+
+@message Boolean MSG_GEN_FILE_SELECTOR_END_SUSPEND() = carry;
+
+@message Boolean MSG_GEN_FILE_SELECTOR_GET_DESTINATION_PATH(char *buffer = dx:bp, word bufSize = cx) = carry;
+
+typedef Boolean GenFileSelectorFilterRoutine (optr oself,
+					      FileEnumCallbackData *fecd,
+					      word frame);
+typedef struct {
+	GenFileSelectorFilterRoutine *filterRoutine;
+	const FileExtAttrDesc	*filterAttrs;
+} GenFileSelectorGetFilterRoutineResults;
+				
+@message void MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE(GenFileSelectorGetFilterRoutineResults *filter = axcxdxbp);
+
+@prototype void GEN_FILE_SELECTOR_NOTIFICATION_MSG(
+    	    	    	    	word entryNum = cx,
+				GenFileSelectorEntryFlags entryFlags = bp);
+
+
+@protominor	NewForJediAndBeyond
+
+@message void MSG_GEN_FILE_SELECTOR_DELETE_SELECTION();
+
+@protoreset
+
+@protominor	UINewForResponder
+
+@message vfptr MSG_GEN_FILE_SELECTOR_GET_FILE_ENUM_ROUTINE() = cx:ax;
+
+@message void MSG_GEN_FILE_SELECTOR_FAKE_PATH_GET(char *buffer = cx:dx);
+/*
+ * Context:	Sent when we need the path of a fake FS..  mostly for
+ * 		moniker purposes.
+ *
+ *		Will return a dummy volume name, "[Dummy]", for a
+ *		RESPONDER pccom fake file selector.
+ *
+ * Source:	OLFileSelectorRequestMoniker
+ * Destination: GenFileSelector object using fake file system
+ * Interception:Don't call super class
+ *
+ * Pass:	buffer of size PATH_BUFFER_SIZE buffer
+ *			
+ * Return:	buffer, null-terminated, includes full path and volume name
+ *		
+ */
+
+@message word MSG_GEN_FILE_SELECTOR_FAKE_VOLUME_NAME_GET(word drive number = cx,
+							 char *buffer = dx:bp) = ax;
+/*
+ *
+ * Context:	Sent when we need the volume name for a given drive
+ *		either for the change drive popup or for the top
+ *		moniker, mostly.
+ *
+ *		Will return a dummy string, "C:[Dummy]", for a
+ *		RESPONDER pccom fake file selector.
+ *
+ * Source:	Global
+ * Destination: GenFileSelector object using fake file system
+ * Interception:Don't call super class
+ *
+ * Pass:	drive number or zero for current
+ *		buffer to write it to
+ *
+ * Return:	non-zero on error
+ *    		buffer, null-terminated, filled with drive and volume name
+ */
+
+@message word MSG_GEN_FILE_SELECTOR_FAKE_ASSERT_HAVE_VOLUME_DATA() = ax;
+
+@message word MSG_GEN_FILE_SELECTOR_FAKE_DRIVE_CHANGE(word driveNumber = cx,
+						      char *buffer = bp:dx ) = ax;
+@message void MSG_GEN_FILE_SELECTOR_FAKE_FLUSH_CACHES();
+
+@message void MSG_GEN_FILE_SELECTOR_GET_SELECTION_TOKEN(GeodeToken *token = cx:dx);
+/*
+ *
+ * Context:	Returns the GeodeToken of the selected file.  If the file is
+ *              a DOS file the dos extension (including the dot) is returned.
+ *
+ * Source:	Global
+ * Destination: GenFileSelector object
+ * Interception:Don't call super class
+ *
+ * Pass:	GeodeToken buffer
+ *
+ * Return:	buffer, filled with GeodeToken or DOS extension.
+ */
+
+@protoreset
+
+/*
+ * 	VarData
+ */
+    @vardata void TEMP_GEN_FILE_SELECTOR_DATA; /* Not to be used in .goc file */
+
+    @vardata GeodeToken	ATTR_GEN_FILE_SELECTOR_TOKEN_MATCH;
+    @vardata GeodeToken	ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH;
+
+    typedef struct {
+	FileAttrs GFSFA_match;
+	FileAttrs GFSFA_mismatch;
+    } GenFileSelectorFileAttrs;
+    @vardata GenFileSelectorFileAttrs ATTR_GEN_FILE_SELECTOR_FILE_ATTR;
+
+    typedef struct {
+	GeodeAttrs GFSGA_match;
+	GeodeAttrs GFSGA_mismatch;
+    } GenFileSelectorGeodeAttrs;
+    @vardata GenFileSelectorGeodeAttrs ATTR_GEN_FILE_SELECTOR_GEODE_ATTR;
+
+    @vardata GenFileSelectorMask ATTR_GEN_FILE_SELECTOR_NAME_MASK;
+
+    @vardata GenFilePath ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT;
+ 
+    @vardata word HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW;
+
+typedef ByteEnum GenFileSelectorScalableUICommand;
+#define GFSSUIC_SET_FEATURES_IF_APP_FEATURE_ON 0
+#define GFSSUIC_SET_FEATURES_IF_APP_FEATURE_OFF 1
+#define GFSSUIC_ADD_FEATURES_IF_APP_FEATURE_ON 2
+#define GFSSUIC_SET_FEATURES_IF_APP_LEVEL 3
+#define GFSSUIC_ADD_FEATURES_IF_APP_LEVEL 4
+
+typedef struct {
+    GenFileSelectorScalableUICommand	GFSSUIE_command;
+    WordFlags				GFSSUIE_appFeature;
+    FileSelectorAttrs			GFSSUIE_fsFeatures;
+} GenFileSelectorScalableUIEntry;
+
+#define FLEXIBLE_ARRAY_SIZE 100
+ 
+/*
+ * Hints declared as taking arrays of FLEXIBLE_ARRAY_SIZE can
+ * take any number of array elements up to 100.
+ */
+typedef GenFileSelectorScalableUIEntry  
+		GenFileSelectorScalableUIEntryArray[FLEXIBLE_ARRAY_SIZE];
+
+    @vardata GenFileSelectorScalableUIEntryArray
+					HINT_FILE_SELECTOR_SCALABLE_UI_DATA;
+/*
+ * Hints declared as taking arrays of FLEXIBLE_ARRAY_SIZE can
+ * take any number of array elements up to 100.
+ */
+typedef FilePathID FilePathIDArray[FLEXIBLE_ARRAY_SIZE];
+
+    @vardata FilePathIDArray TEMP_GEN_FILE_SELECTOR_DIR_IDS;
+
+    @vardata word HINT_FILE_SELECTOR_FILE_LIST_WIDTH;
+
+    @vardata void HINT_FILE_SELECTOR_USE_DESKTOP_HOME;
+
+    @vardata PathName TEMP_GEN_FILE_SELECTOR_HOME_DIRECTORY;
+
+    @vardata void HINT_FILE_SELECTOR_SINGLE_ACTION;
+
+    @vardata void HINT_FILE_SELECTOR_SHOW_FILE_SIZE;
+
+@protominor UINewForNike
+    typedef struct {
+	GeosFileHeaderFlags GFSFHF_match;
+	GeosFileHeaderFlags GFSFHF_mismatch;
+    } GenFileSelectorFileHeaderFlags;
+
+    @vardata GenFileSelectorFileHeaderFlags ATTR_GEN_FILE_SELECTOR_FILE_HEADER_FLAGS;
+@protoreset
+
+@protominor UINewForResponder_2
+
+/*
+ * Scrolling lists in some UI's (namely Rudy) don't show the selection
+ * when the focus is not on the list.   This hint forces the selection 
+ * to be shown for some unusual cases, where objects take the focus from
+ * the FS list, but the FS list still appears to the user to have the focus
+ * and be navigable.
+ */
+    @vardata void HINT_FILE_SELECTOR_SHOW_SELECTION_EVEN_WHEN_NOT_FOCUS;
+
+/*
+ * Some specific (e.g., Rudy) UI's columnate file selector entries,
+ * making entries too wide for some applications.  Use this hint to
+ * keep entry widths minimal.
+ */
+    @vardata void HINT_FILE_SELECTOR_MINIMIZE_WIDTH;
+
+@protoreset
+
+@protominor UINewForResponder_3
+
+/*
+ * Some specific UI's (e.g., Rudy) cause file selectors to sort entries
+ * based on date/time or other criteria.  This hint will ensure that
+ * entries are alphabetically sorted (with directories appearing before
+ * files).
+ */
+    @vardata void HINT_FILE_SELECTOR_ALWAYS_SORT_ALPHABETICALLY;
+
+/*
+ * Sometimes the user might not want any default sorting to be done by
+ * the file selector.  For example, Motif defaults to sorting alpha-
+ * betically.  Use this hint to avoid sorting at all.  Also, file
+ * selectors using a fake file system (FSFC_USE_FAKE_FILE_SYSTEM) can
+ * use this hint if they do some kind of sorting that they don't want 
+ * the regular file selector code to mess with.
+ */
+    @vardata void HINT_FILE_SELECTOR_DONT_SORT;
+
+/*
+ * Used to reverse the default sort order.  Directories remain at the top of
+ * the list, reverse sorted.  Used only when sorting.
+ */
+    @vardata void HINT_FILE_SELECTOR_REVERSE_SORT;
+
+@protoreset
+
+@protominor UINewForGPC
+
+/*
+ * alternate way of filtering files instead of subclassing and handling
+ * MSG_GEN_FILE_SELECTOR_GET_FILE_ENUM_ROUTINE
+ */
+    @vardata dword ATTR_GEN_FILE_SELECTOR_FILE_ENUM_FILTER;
+
+@protoreset
+
+
+
+/*
+ *	Instance Data
+ */
+
+    @instance GenFileSelectorSelection	GFSI_selection = {0};
+
+    @instance FileSelectorFileCriteria  GFSI_fileCriteria = 
+    		FSFC_DIRS|FSFC_NON_GEOS_FILES|
+	   	FSFC_GEOS_EXECUTABLES|FSFC_GEOS_NON_EXECUTABLES;
+
+    @instance FileSelectorAttrs 	GFSI_attrs =
+    		 FSA_ALLOW_CHANGE_DIRS|FSA_HAS_CLOSE_DIR_BUTTON|
+		 FSA_HAS_OPEN_DIR_BUTTON|FSA_HAS_DOCUMENT_BUTTON|
+		 FSA_HAS_CHANGE_DIRECTORY_LIST|FSA_HAS_CHANGE_DRIVE_LIST|
+		 FSA_HAS_FILE_LIST;
+
+    @instance optr			GFSI_destination;
+    @instance Message			GFSI_notificationMsg;
+@endc
+
+@endlib

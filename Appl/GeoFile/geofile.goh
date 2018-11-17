@@ -1,0 +1,908 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	GEOS
+MODULE:		GeoFile
+FILE:		geofile.goh
+
+AUTHOR:		John D. Mitchell
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.05.21	Initial version.
+	JDM	92.06.15	Added uiModify.goc support.
+	JDM	92.07.01	Moved Record Control Panel to FlatFile.
+	JDM	92.10.17	Added User Interface Level support.
+	JDM	92.11.23	Added EC/NEC FatalError support.
+	JDM	92.12.17	Added FieldOrganizer class.
+	JDM	92.12.18	Added Graphics Layer UI features.
+	JDM	93.01.11	Marked Records shme.
+
+DESCRIPTION:
+	This file contains all of the various global and external object
+	declarations for GeoFile.
+
+	Since GOC doesn't allow @extern object XXX in the file that
+	defines 'XXX', each file's externs are protected by an #ifndef.
+	You'll know that you forgot to #define the appropriate name if you
+	get an error about 'XXX' being multiply defined.
+
+	$Id: geofile.goh,v 1.1 97/04/04 15:54:23 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Includes
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#include <geos.h>
+#include <ec.h>
+@include <Objects/FlatFile/ffDbaseC.goh>
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Global Constant & Type Definitions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#define ZOOM_MINIMUM	25
+#define ZOOM_MAXIMUM	200
+
+#define DOCUMENT_PROTOCOL_MAJOR 10
+#define DOCUMENT_PROTOCOL_MINOR 0
+
+#define DOCUMENT_WIDTH          (72 * 8)
+#define DOCUMENT_HEIGHT         (72 * 10.5)
+
+#define MAX_NUM_CHARS_TO_EXPRESS_MAX_RECORD_IN_ASCII 5
+
+/*
+ * The following enums are used as arguments to MSG_GF_INSERT_DATA
+ * They indicate whether we're updating an existing field, or
+ * creating a new one
+ */
+typedef enum {
+    INSERT_EXISTING,
+    CREATE_NEW 
+} RecordInsertType;
+
+/*
+ * Typedefs for the menu item/boolean groups
+ */
+typedef enum /* word */ {
+    ZOOM_25,  ZOOM_50,  ZOOM_75,  ZOOM_NORMAL,
+    ZOOM_125, ZOOM_150, ZOOM_175, ZOOM_200
+} ScaleListTypes;
+
+typedef WordFlags AspectRatioTypes;
+#define ADJUST_FOR_ASPECT_RATIO	0x0001
+
+typedef WordFlags DisplayOptionsListTypes;
+#define SHOW_HORIZ_SCROLLBAR	0x0001
+#define SHOW_VERT_SCROLLBAR	0x0002
+#define SHOW_TOOLBOX		0x0004
+
+typedef WordFlags ShowGraphicObjectsListTypes;
+#define SHOW_GRID_LINES		0x0001
+#define SHOW_GRAPHICS		0x0002
+
+typedef enum /* word */ {
+    REQUIRED_YES, REQUIRED_NO
+} FieldRequiredListTypes;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Marked Records (Subsets)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#define GF_MAX_QUICK_MARK_MATCH_TEXT_LENGTH	(255)
+#define	GF_QUICK_MARK_CASE_INSENSITIVITY_TOGGLE	(0x01)
+#define	GF_QUICK_MARK_HOL_ONLY_MATCH_TOGGLE	(0x02)
+#define GF_QUICK_MARK_DEFAULT_OPTIONS		(0)
+
+#define	GF_SUBSET_AUTO_APPLY_MARK	(0x01)
+#define	GF_SUBSET_CLEAR_MARKS_FIRST	(0x02)
+#define	GF_SUBSET_OPTIONS_DEFAULT	(GF_SUBSET_CLEAR_MARKS_FIRST)
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Sorting
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*
+ * SortInfoSpecifiers indicates which direction to sort the data.
+ */
+typedef	enum
+{
+	SORT_ASCENDING,
+	SORT_DESCENDING
+} SortInfoSpecifiers;
+
+
+/* Default sort options for each sort box.	*/
+@define	GFSO_QUICK_SORT_DEFAULT_OPTIONS		(0)
+@define	GFSO_SORT_DEFAULT_OPTIONS		(0)
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GenItemClass Definition Macros
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@define	DEFINE_ITEM( LABEL, MNEMONIC, MONIKER, IDENTIFIER)	\
+	@object	GenItemClass LABEL =	\
+	{				\
+		GI_visMoniker	= MNEMONIC, MONIKER;	\
+		GII_identifier	= IDENTIFIER;		\
+	}
+
+@define	DEFINE_ITEM_NO_MNEMONIC( LABEL, MONIKER, IDENTIFIER)	\
+	@object	GenItemClass LABEL =	\
+	{				\
+		GI_visMoniker	= MONIKER;	\
+		GII_identifier	= IDENTIFIER;	\
+	}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		User Interface Levels
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*
+ * GeoFileLevelsFeatures is used to control which UI features are active.
+ *
+ * !!!!! NOTE !!!!! !!!!! NOTE !!!!! !!!!! NOTE !!!!! !!!!! NOTE !!!!!
+ * Note:
+ *	These values *MUST* be packed from the Most Significant Bit to
+ *	the Least Significant Bit due to the way that the low-level
+ *	generic UI handling code for updating the features shifts things
+ *	leftward rather than right.
+ * !!!!! NOTE !!!!! !!!!! NOTE !!!!! !!!!! NOTE !!!!! !!!!! NOTE !!!!!
+ *	
+ * Note:
+ *	Be sure to create values for each level (duplicate them if
+ *	necessary) even if your application doesn't support all of the
+ *	levels.
+ *
+ */
+typedef	WordFlags GeoFileLevelsFeatures;
+
+@define	GFLF_DESIGN_MODE		(0x8000)
+@define	GFLF_GRAPHICS_LAYER		(0x4000)
+@define	GFLF_FIELD_ORGANIZER		(0x2000)
+@define	GFLF_MULTI_RECORD_LAYOUT	(0x1000)
+@define	GFLF_ADVANCED_FIELD_PROPERTIES	(0x0800)
+@define	GFLF_FIELD_TAB_ORDER		(0x0400)
+@define	GFLF_RECORD_ORDER		(0x0200)
+@define	GFLF_MARK_FEATURES		(0x0100)
+@define	GFLF_ADVANCED_SORT		(0x0080)
+@define	GFLF_ADVANCED_MARK		(0x0040)
+@define	GFLF_ADVANCED_GRAPHICS		(0x0020)
+
+@define	GFLF_NO_FEATURES	(0)
+@define	INTRODUCTORY_FEATURES	(@GFLF_NO_FEATURES)
+
+@define	BEGINNING_FEATURES	(@INTRODUCTORY_FEATURES		| \
+				 @GFLF_MARK_FEATURES		| \
+				 @GFLF_ADVANCED_SORT		| \
+				 @GFLF_ADVANCED_MARK)
+
+@define	INTERMEDIATE_FEATURES	(@BEGINNING_FEATURES		| \
+				 @GFLF_DESIGN_MODE		| \
+				 @GFLF_FIELD_ORGANIZER		| \
+				 @GFLF_GRAPHICS_LAYER           | \
+				 @GFLF_FIELD_TAB_ORDER		| \
+				 @GFLF_RECORD_ORDER)
+
+@define	ADVANCED_FEATURES	(@INTERMEDIATE_FEATURES		| \
+				 @GFLF_MULTI_RECORD_LAYOUT	| \
+				 @GFLF_ADVANCED_GRAPHICS	| \
+				 @GFLF_ADVANCED_FIELD_PROPERTIES)	
+
+@define	GFLF_ALL_FEATURES	(@ADVANCED_FEATURES)
+				 
+@define	DEFAULT_FEATURES	(@ADVANCED_FEATURES)
+
+
+/*
+ * LevelsSettingEntry is used to map the current system default user
+ * level to the appropriate application specific features.
+ */
+typedef struct
+{
+	GeoFileLevelsFeatures	GFLSE_features;
+} LevelsSettingsEntry;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Fatal Errors
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*
+ * Note that they are in alphabetical order (try to keep them that way :-).
+ */
+typedef enum
+{
+	MODES_INVALID_APP_MODE_ARGUMENT,
+	MODES_INVALID_APP_MODE_VALUE,
+	MODES_INVALID_LAYOUT_MODE_TYPE_VALUE,
+	MODES_INVALID_TABLE_ENTRY_LAYOUT_N_DATA_ENTRY,
+	MODES_INVALID_TABLE_ENTRY_NULL_LEVELS_ENTRY,
+	MODES_INVALID_TABLE_ENTRY_NULL_MODES_ENTRY,
+	MODES_NULL_OBJECT_IN_UI_CHANGES_TABLE_GET_A_CLUE,
+	MODES_SILLY_TABLE_ENTRY_ALL_LAYOUTS_SHOULD_BE_NONE,
+	SORT_QUICK_SORT_INVALID_SORT_KEY_COUNT,
+	SORT_QUICK_SORT_MUST_HAVE_SORT_KEY_LIST_SELECTION
+} FatalErrors;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		File Specific Information
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MainProcess
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef	__GF_MAIN_PROCESS_GOC
+@define	__GF_MAIN_PROCESS_GOC
+
+extern optr GetTargetDatabaseObject();
+
+/*
+ * Have to instantiate a frivolous instance of this or some compilers
+ * will complain about FatalErrors being unused.
+ */
+extern FatalErrors shmeFatalErrors;
+
+@endif	/* __GF_MAIN_PROCESS_GOC	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MainFieldOrder
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef	__GF_MAIN_FIELD_ORDER_GOC
+@define	__GF_MAIN_FIELD_ORDER_GOC
+
+@endif	/* __GF_MAIN_FIELD_ORDER_GOC	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MainLayouts
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef	__GF_MAIN_LAYOUTS_GOC
+@define	__GF_MAIN_LAYOUTS_GOC
+
+@endif	/* __GF_MAIN_LAYOUTS_GOC	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MainModes
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef	__GF_MAIN_MODES_GOC
+@define	__GF_MAIN_MODES_GOC
+
+@endif	/* __GF_MAIN_MODES_GOC	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MainSubsets
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef	__GF_MAIN_SUBSETS_GOC
+@define	__GF_MAIN_SUBSETS_GOC
+
+@endif	/* __GF_MAIN_SUBSETS_GOC	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MainSorting
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef	__GF_MAIN_SORTING_GOC
+@define	__GF_MAIN_SORTING_GOC
+
+@endif	/* __GF_MAIN_SORTING_GOC	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Document
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef	__GF_DOCUMENT_GOC
+@define	__GF_DOCUMENT_GOC
+
+extern void GFDSetUIForDocument(optr currentDatabase,
+				GeoFileLevelsFeatures selection,
+				UIInterfaceLevel closestLevel);
+
+extern void GFResetPrintControllerSizes(optr ffile);
+
+@endif	/* __GF_DOCUMENT_GOC	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DocumentGroup
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef	__GF_DOCUMENT_GROUP_GOC
+@define	__GF_DOCUMENT_GROUP_GOC
+
+/*
+ *	External Objects
+ */
+@extern object @GeoFileDocumentGroup;
+@extern object @DisplayView;
+
+
+@endif	/* __GF_DOCUMENT_GROUP_GOC	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		UILayouts
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef	__GF_UI_LAYOUTS_GOC
+@define	__GF_UI_LAYOUTS_GOC
+
+/*
+ *	External Objects
+ */
+@extern	object @LayoutMenu;
+@extern object @ChooseLayoutDialog;
+@extern object @EditLayoutNotes;
+@extern object @CurrentLayoutName;
+@extern object @SelectedLayoutNotesName;
+@extern object @SelectedLayoutNotes;
+@extern	object @ChooseLayout;
+@extern	object @EditLayoutNotesInteraction;
+@extern	object @LayoutNameList;
+@extern	object @ChooseLayoutTrigger;
+@extern	object @RenameLayoutTrigger;
+@extern	object @DeleteLayoutTrigger;
+@extern	object @CreateNewLayoutTrigger;
+@extern	object @ChooseLayoutBoxTrigger;
+@extern object @RenameLayoutDialog;
+@extern object @RenameLayoutOldName;
+@extern object @RenameLayoutNewName;
+@extern	object @RecordNavigationOrderTrigger;
+@extern object @InsertPageNumberTrigger;
+
+/* Field Navigation Order.	*/
+@extern	object @FieldNavigationOrderTrigger;
+@extern	object @FieldNavigationOrderBox;
+@extern	object @FNOBFieldsInDBList;
+@extern	object @FNOBPriorityList;
+@extern	object @OBPLIncreasePriority;
+@extern	object @OBPLDecreasePriority;
+@extern	object @FNOBApplyTrigger;
+@extern	object @FNOBResetTrigger;
+@extern	object @FNOBCancelTrigger;
+
+@extern	object @RecordNavigationOrderBox;
+@extern	object @RNOBOptionsList;
+@extern	object @RNOBOKTrigger;
+
+@extern	object @LMFormulaTrigger;
+
+
+@endif	/* __GF_UI_LAYOUTS_GOC	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		UIMain
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef	__GF_UI_MAIN_GOC
+@define	__GF_UI_MAIN_GOC
+
+/*
+ *	External Objects
+ */
+@extern	object @ComputedFieldEBController;
+@extern	object @CreateNewFieldUIController;
+@extern	object @DataMenu;
+@extern	object @DefaultValueEBController;
+@extern	object @EditRecordGroup;
+@extern	object @DeleteMarkedTrigger;
+@extern	object @FieldPropUIController;
+@extern object @GeoFileDocumentControl;
+@extern object @GFDisplayGroup;
+@extern object @GFToolbar;
+@extern object @GFLeftSideToolbar;
+@extern	object @GFGrObjTools;
+@extern	object @NewLayout;
+@extern	object @TreasureChest;
+@extern	object @RCPController;
+@extern	object @GFDisplayControl;
+@extern	object @GFViewControl;
+@extern	object @GFInstructionControl;
+@extern	object @GFSearchControl;
+
+@extern object @ffGrObjBody;
+@extern object @ffGrObjHead;
+@extern object @ffGrObjAM;
+
+@extern	object @QuickSortDialog;
+@extern	object @QuickSortFieldsInDBList;
+@extern	object @QuickSortDirectionList;
+@extern	object @AscendingQuickSort;
+@extern	object @DescendingQuickSort;
+@extern	object @QuickSortOptionsList;
+@extern	object @QuickSortIgnoreCaseNAccents;
+@extern	object @QuickSortIgnoreSpacesNPunctuation;
+@extern	object @QuickSortApplyTrigger;
+@extern	object @QuickSortCancelTrigger;
+
+@extern	object @SortDialogTrigger;
+@extern	object @SortDialog;
+@extern	object @FieldsInDBList;
+@extern	object @TransferFDBToSK;
+@extern	object @TransferSKToFDB;
+@extern	object @FieldsSortKeyList;
+@extern	object @SortOrderList;
+@extern	object @SortPriorityList;
+@extern	object @IncreaseSortPriority;
+@extern	object @DecreaseSortPriority;
+@extern	object @SortOptionsList;
+@extern	object @SortIgnoreCaseNAccents;
+@extern	object @SortIgnoreSpacesNPunctuation;
+@extern	object @SortFieldNotes;
+@extern	object @SortApplyTrigger;
+@extern	object @SortClearTrigger;
+@extern	object @SortCancelTrigger;
+
+@extern object @ModeList;
+@extern object @Design;
+@extern object @DesignSubMenu;
+@extern object @DataEntry;
+@extern	object @NewDocumentMessage;
+@extern	object @GeoFilePrimary;
+@extern	object @GeoFileApp;
+
+@extern object @GFDatafileMonikerList;
+
+@extern object @GFRecordHeight;
+@extern object @GFRecordWidth;
+@extern object @GFPrintControl;
+@extern object @GFPageSizeControl;
+
+@extern	object @GeoFileImportControl;
+@extern	object @GeoFileExportControl;
+@extern	object @GeoFileExportGadget;
+@extern object @ExportChoices;
+@extern object @ExportFileMark;
+@extern object @ExportClipboard;
+@extern	object @ExportFrom;
+@extern	object @ExportTo;
+
+@extern	object @OptionsMenu;
+@extern	object @SetUserLevelDialog;
+@extern	chunk  @ResetOptionsQueryString;
+@extern	object @FineTuneTrigger;
+@extern	object @FeaturesList;
+@extern	object @UserLevelList;
+@extern	object @FineTuneDialog;
+@extern object @DesignOptionsList;
+@extern object @PageDesignItem;
+
+@endif	/* __GF_UI_MAIN_GOC	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		UIMarked
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef	__GF_UI_MARKED_GOC
+@define	__GF_UI_MARKED_GOC
+
+/*
+ *	External Objects
+ */
+@extern	object @MarkMenu;
+@extern	object @QuickMarkDialog;
+@extern	object @SubsetExpressionBuilder;
+@extern	object @MMQuickMarkTrigger;
+@extern	object @MMQuickMarkDialog;
+@extern	object @QMFieldsGroup;
+@extern	object @QMFGFieldsList;
+@extern	object @QMFGButtonGroup;
+@extern	object @FGBGIgnoreCaseEntry;
+@extern	object @FGBGMatchHOLEntry;
+@extern	object @QMMatchText;
+@extern	object @QMApplyTrigger;
+@extern	object @QMClearTrigger;
+@extern	object @QMCancelTrigger;
+@extern	object @MMFormulaTrigger;
+@extern	object @MMMarkAll;
+@extern	object @MMUnmarkAll;
+@extern	object @MMInvertMarks;
+@extern	object @MMDisplayGroup;
+@extern	object @DGShowAll;
+@extern	object @DGShowMarked;
+@extern	object @MMMarkOptions;
+@extern	object @MarkOptionsTrigger;
+@extern	object @MarkOptionsDialog;
+@extern	object @MODOptionsList;
+@extern	object @AutoApplyMarkButton;
+@extern	object @ClearMarksFirstButton;
+@extern	object @MODCancelTrigger;
+
+@endif	/* __GF_UI_MARKED_GOC	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		UIModify
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef	__GF_UI_MODIFY_GOC
+@define	__GF_UI_MODIFY_GOC
+
+/*
+ *	External Objects
+ */
+@extern object @GraphicsMenu;
+@extern object @PropertiesMenu;
+@extern object @GFCreateGraphicsMenu;
+@extern object @GFCreateControl;
+@extern object @GFCustomShapeControl;
+@extern object @GFDuplicateControl;
+@extern object @GFPasteInsideControl;
+@extern object @GFMoveInsideControl;
+@extern object @GFHandleControl;
+@extern object @GFTransformMenu;
+@extern object @GFFlipControl;
+@extern object @GFGraphicOptionsMenu;
+@extern object @GFAttributesMenu;
+@extern object @GFScaleControl;
+@extern object @GFRotateMenu;
+@extern object @GFRotateControl;
+@extern object @GFSkewControl;
+@extern object @GFTransformControl;
+@extern object @GFArrangeMenu;
+@extern object @GFDepthControl;
+@extern object @GFNudgeControl;
+@extern object @GFAlignDistributeControl;
+@extern object @GFGroupControl;
+@extern object @GFBackgroundColorSelector;
+@extern object @GFBackgroundAttributesControl;
+@extern object @GFGradientAttributes;
+@extern object @GFStartingGradientColorSelector;
+@extern object @GFEndingGradientColorSelector;
+@extern object @GFGradientFillControl;
+@extern object @GFArcsControl;
+@extern object @GFAreaAttributes;
+@extern object @GFAreaColorSelector;
+@ifdef DO_PIZZA
+@else
+@extern object @GFAreaAttributesControl;
+@endif
+@extern object @GFLineAttributes;
+@extern object @GFLineColorSelector;
+@extern object @GFLineAttributesControl;
+@extern object @GFFontControl;
+@extern object @GFStyleControl;
+@extern object @GFTextSizeControl;
+@extern object @GFTextJustificationControl;
+@extern object @GFTextColorControl;
+@extern object @GFTextAttributesControl;
+@extern object @GFTextParagraphSubmenu;
+@extern object @GFParagraphSubmenu;
+@extern object @GFNumberFormatControl;
+@extern object @GFFieldEdgeControl;
+@extern object @GFMultiDuplicateControl;
+@extern object @GFCustomDuplicateControl;
+@extern object @GFHideShowControl;
+@extern object @GFDraftModeControl;
+@extern object @GFSplinePointControl;
+@extern object @GFSplineOpenCloseControl;
+@extern object @GFSplineSmoothnessControl;
+@extern object @GFConvertControl;
+@extern object @GFGrObjStyleSheetControl;
+@extern object @GFBitmapFormatControl;
+@extern object @GFGrObjObscureAttrControl;
+@extern object @GFGrObjLocksControl;
+@extern object @GFDefaultAttributesControl;
+@extern object @GFLineSpacingControl;
+@extern object @GFParaSpacingControl;
+@extern object @GFParaBGColorControl;
+@extern object @GFTextStyleSheetControl;
+@extern object @GFMarginControl;
+@extern object @GFTabControl;
+@extern object @GFDefaultTabsControl;
+@extern object @GFBorderControl;
+@extern object @GFTextBackgroundColorControl;
+
+
+@endif	/* __GF_UI_MODIFY_GOC	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		UITemplate
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef	__GF_UI_TEMPLATE_GOC
+@define	__GF_UI_TEMPLATE_GOC
+
+/*
+ *	External Objects
+ */
+@extern object @TemplateFlatFile;
+
+@endif	/* __GF_UI_TEMPLATE_GOC	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Class Specific Stuff
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GeoFileFieldOrganizerClass Definition
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@if (defined (__GF_UI_MAIN_GOC) ||	\
+     defined (__GF_MAIN_FIELD_ORGANIZER_GOC))
+
+@include <Objects/FlatFile/ffTChstC.goh>
+
+/*
+ * The FFTreasureChest class is sub-classed so as to support user
+ * interface levels (we have to handle the MSG_GEN_ENABLE_DISABLE so that
+ * we can properly enable/disable the controller).
+ */
+@class	GeoFileFieldOrganizerClass, FFTreasureChestClass;
+@endc;
+
+
+@endif	/* End if mainFieldOrganizer or uiMain.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GeoFileApplicationClass Definition
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@if (defined (__GF_UI_MAIN_GOC) ||	\
+     defined (__GF_MAIN_APPLICATION_GOC))
+
+@include <Objects/gItemGC.goh>	     /* For GEN_ITEM_GROUP_STATUS_MSG.	*/
+
+/*
+ * The GenApplication class is sub-classed so as to support user
+ * interface levels.
+ */
+@class	GeoFileApplicationClass, GenApplicationClass;
+
+/* Message declarations.	*/
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_GF_APPLICATION_SET_USER_LEVEL;
+@message void MSG_GF_APPLICATION_INITIATE_FINE_TUNE ();
+@message void MSG_GF_APPLICATION_FINE_TUNE ();
+@message void MSG_GF_APPLICATION_CHANGE_USER_LEVEL ();
+@message void MSG_GF_APPLICATION_CANCEL_USER_LEVEL ();
+@message void MSG_GF_APPLICATION_QUERY_RESET_OPTIONS ();
+@message (GEN_ITEM_GROUP_STATUS_MSG) MSG_GF_APPLICATION_USER_LEVEL_STATUS;
+
+/* Default inherited attributes values.	*/
+@default	GAI_appFeatures	= @DEFAULT_FEATURES;
+
+@endc;
+
+
+@endif	/* End if mainApplication or uiMain.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GeoFileProcessClass Definition
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@if (defined (__GF_MAIN_PROCESS_GOC) ||	\
+     defined (__GF_UI_LAYOUTS_GOC) || \
+     defined (__GF_MAIN_MODES_GOC) || \
+     defined (__GF_MAIN_APPLICATION_GOC))
+
+/*
+ * Here we define "GeoFileProcessClass" as a subclass of the system
+ * provided "GenProcessClass". As this application is launched, an
+ * instance of this class will be created, and will handle all
+ * application-related events (messages).  The application thread will
+ * be responsible for running this object, meaning that whenever this
+ * object handles a method, we will be executing in the application
+ * thread.
+ */
+
+@class  GeoFileProcessClass, GenProcessClass;
+
+@message (GEN_ITEM_GROUP_STATUS_MSG) MSG_GF_SET_MODE_MENUS;
+@message void MSG_GF_PROCESS_CALL_FIELD_PROPERTIES();
+@message void MSG_GF_FIELD_CREATION();
+
+/* Simple Subsets/Marked Records.	*/
+@message void MSG_GF_QUICK_MARK_DIALOG_INITIATE ();
+@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_GF_QUICK_MARK_FIELDS_LIST_QUERY;
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_GF_QUICK_MARK_FIELD_SELECTED;
+@message void MSG_GF_QUICK_MARK_MARK ();
+@message void MSG_GF_QUICK_MARK_CANCEL();
+
+/* Advanced Subsets/Marked Records.	*/
+@message void MSG_GF_SUBSET_FORMULA_INITIATE ();
+@message (MSG_FFD_PARSE_RETURN_TEMPLATE) MSG_GF_SUBSET_FORMULA_CALLBACK;
+@message void MSG_GF_SUBSET_MARK_ALL ();
+@message void MSG_GF_SUBSET_UNMARK_ALL ();
+@message void MSG_GF_SUBSET_INVERT_MARKS ();
+@message void MSG_GF_SUBSET_DISPLAY_ALL ();
+@message void MSG_GF_SUBSET_DISPLAY_MARKED ();
+@message void MSG_GF_SUBSET_DELETE_ALL_MARKED ();
+@message void MSG_GF_SUBSET_OPTIONS_DIALOG_INITIATE ();
+@message (GEN_BOOLEAN_GROUP_APPLY_MSG)
+			MSG_GF_SUBSET_OPTIONS_SELECTED;
+@message void MSG_GF_SUBSET_OPTIONS_CANCEL ();
+
+/* Simple/Quick Sort.	*/
+@message void MSG_GF_QUICK_SORT_DIALOG_INITIATE ();
+@message void MSG_GF_QUICK_SORT_SORT ();
+@message void MSG_GF_QUICK_SORT_CANCEL ();
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_GF_QUICK_SORT_DIRECTION_CHANGED;
+@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_GF_QUICK_SORT_FIELDS_LIST_QUERY;
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_GF_QUICK_SORT_FIELD_SELECTED;
+
+/* Advanced Sort.	*/
+@message void MSG_GF_SORT_DIALOG_INITIATE ();
+@message void MSG_GF_SORT_SORT ();
+@message void MSG_GF_SORT_CLEAR ();
+@message void MSG_GF_SORT_CANCEL ();
+@message void MSG_GF_SORT_FDB_TO_SK ();
+@message void MSG_GF_SORT_SK_TO_FDB ();
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_GF_SORT_DIRECTION_CHANGED;
+@message void MSG_GF_SORT_INCREASE_PRIORITY ();
+@message void MSG_GF_SORT_DECREASE_PRIORITY ();
+@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_GF_SORT_FIELDS_LIST_QUERY;
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_GF_SORT_FIELD_SELECTED;
+@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_GF_SORT_KEY_LIST_QUERY;
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_GF_SORT_KEY_SELECTED;
+@message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_GF_SORT_SET_SORT_OPTIONS;
+
+/* Layouts.	*/
+@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_GF_LAYOUT_NAME_LIST_QUERY;
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_GF_LAYOUT_NAME_SELECTED;
+@message void MSG_GF_NEW_LAYOUT();
+@message void MSG_GF_RENAME_LAYOUT();
+@message void MSG_GF_DELETE_LAYOUT();
+@message void MSG_GF_BRING_UP_RENAME_LAYOUT_BOX();
+@message void MSG_GF_CHOOSE_LAYOUT();
+@message void MSG_GF_EDIT_LAYOUT_NOTES();
+@message void MSG_GF_SAVE_LAYOUT_NOTES();
+@message void MSG_GF_CHOOSE_LAYOUT_INITIATE();
+@message void MSG_GF_CHANGE_LAYOUT_TYPE_INITIATE();
+@message void MSG_GF_CHANGE_LAYOUT_TYPE();
+@message (GEN_ITEM_GROUP_STATUS_MSG) MSG_GF_SWITCH_LAYOUT_DISPLAY;
+
+/* Field Navigation Order (FNO).	*/
+@message void MSG_GF_FIELD_NAVIGATION_ORDER_INITIATE ();
+@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_GF_FNO_FIELDS_LIST_QUERY;
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_GF_FNO_ITEM_SELECTED;
+@message void MSG_GF_FNO_INCREASE_PRIORITY ();
+@message void MSG_GF_FNO_DECREASE_PRIORITY ();
+@message void MSG_GF_FNO_APPLY ();
+@message void MSG_GF_FNO_RESET ();
+@message void MSG_GF_FNO_CANCEL ();
+
+/* Record Navigation Order */
+@message void MSG_GF_RECORD_NAVIGATION_ORDER_INITIATE();
+@message void MSG_GF_CHANGE_RECORD_ORDER();
+@message void MSG_GF_CANCEL_RECORD_ORDER_CHANGE();
+@message (GEN_ITEM_GROUP_STATUS_MSG) MSG_GF_ENABLE_RECORD_ORDER_OK;
+
+@message void MSG_GF_SET_TREASURE_CHEST_VIS_MONIKER(optr currentDatabase);
+@message void MSG_GF_SET_RECORD_CONTROL_PANEL_VIS_MONIKER(optr currentDatabase);
+
+/* ImpEx.	*/
+@message void MSG_GF_EXPORT_TRANSFER_FILE
+		(ImpexTranslationParams *itParams = ss:bp);
+@message void MSG_GF_EXPORT_TO_CLIPBOARD();
+@message (GEN_ITEM_GROUP_STATUS_MSG) MSG_GF_EXPORT_SET_PAGE_SELECTION;
+@message (GEN_VALUE_STATUS_MSG) MSG_GF_EXPORT_SET_PAGE_FROM;
+@message (GEN_VALUE_STATUS_MSG) MSG_GF_EXPORT_SET_PAGE_TO;
+
+/* Application Mode Changing.	*/
+@message void MSG_GF_SET_UI (ModeType	*appMode,
+			     optr	modeGroup,
+			     optr	layoutGroup,
+			     LayoutType	*layoutType,
+			     GeoFileLevelsFeatures userFeatures,
+			     UIInterfaceLevel userLevel);
+
+/* new message to recalc all calculated fields - jfh */
+@message void MSG_GF_DATA_RECALCULATE();
+
+@endc   
+
+@endif	/* if mainProcess or uiMenus	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GeoFileDocControlClass Definition
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@if (defined (__GF_UI_MAIN_GOC) ||	\
+     defined (__GF_DOCUMENT_GOC))
+
+@class	GeoFileDocControlClass, GenDocumentControlClass ;
+@endc
+
+@endif
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GeoFileDocumentClass Definition
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@if (defined (__GF_UI_MAIN_GOC) ||	\
+     defined (__GF_DOCUMENT_GOC) ||	\
+     defined (__GF_DOCUMENT_GROUP_GOC))
+
+@class	GeoFileDocumentClass, GenDocumentClass ;
+
+/*
+ * MSG_GFD_REPORT_PSZ_CHANGE --
+ *	This message is sent when a page size controller's UI
+ *	changes (like the page size spin gadget, for example).
+ */
+@message (PAGE_SIZE_UI_CHANGES_MSG) MSG_GFD_REPORT_PSZ_CHANGE;
+ 	
+/*
+ * MSG_GFD_REPORT_RECORD_HEIGHT/MSG_GFD_REPORT_RECORD_WIDTH --
+ *	These messages are sent when the user modifies the single record
+ *	height/width spin gadgets in the page setup dialog box.
+ */
+@message void MSG_GFD_REPORT_RECORD_WIDTH(WWFixedAsDWord width = dx:cx,
+					  GenValueStateFlags flags = bp);
+@message void MSG_GFD_REPORT_RECORD_HEIGHT(WWFixedAsDWord height = dx:cx,
+					   GenValueStateFlags flags = bp);
+
+/*
+ * MSG_GFD_SET_UI_FOR_DOCUMENT --
+ *	Given the user features and user level, this sets up the
+ * 	appropriate UI for the document
+ */
+@message void MSG_GFD_SET_UI_FOR_DOCUMENT(GeoFileLevelsFeatures selection,
+ 				    	  UIInterfaceLevel closestLevel);
+ 
+/*
+ * MSG_GFD_INITIATE_DOCUMENT_CLASS --
+ *	This message is sent when the export controller's UI needs to
+ *	be updated.
+ */
+@message void MSG_GFD_INITIATE_EXPORT_DOC();
+
+
+/* 
+ * DB map block for GeoFile data file
+ */
+typedef struct {
+    VMBlockHandle GFMB_spreadsheetMap;  /* VM handle of ssheet map block */
+    VMBlockHandle GFMB_flatfileMap;	/* VM handle of flatfile map block */
+    VMBlockHandle GFMB_grobjAMMap;      /* VM handle of GrObjAttributeManager
+							map block */
+} GeoFileMapBlock;    
+
+    @instance word	GFDI_spreadsheet;	/* handle of associated */
+			    			/*  spreadsheet block */
+
+@endc   /* end of class definition */
+
+@endif
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GeoFileFlatFileClass Definition
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@if (defined (__GF_UI_MAIN_GOC) ||	\
+     defined (__GF_UI_TEMPLATE_GOC))
+
+@class  GeoFileFlatFileClass, FlatFileDatabaseClass ;
+@endc
+
+@endif

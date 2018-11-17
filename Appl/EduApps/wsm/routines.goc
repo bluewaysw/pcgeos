@@ -1,0 +1,1041 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT:	Breadbox Word Search Maker
+ * FILE:		routines.goc
+ * AUTHOR:	Dave Hunter   6/99
+ *
+ *
+ * DESCRIPTION:
+ *	          
+ *
+ ***********************************************************************/
+
+@include "wsm.goh"
+@include "externs.goh"
+
+/***************************************************************************
+ * WSMInitializeWordSearch
+ ***************************************************************************
+ * SYNOPSIS:    Initialize the word search and answers array.
+ *
+ * STRATEGY:    Reinitialize the chunk array to the correct size and fill
+ *              with spaces.
+ *              Zero the answers chunk array.
+ *
+ * NOTE:        This function can cause the LMem heap to grow and relocate,
+ *                so pointers to it may not be valid after returning.
+ *
+ **************************************************************************/
+void WSMInitializeWordSearch(optr ows, optr oans)
+{
+    WordSearchHeader *pwsh = LMemDeref(ows);
+    word nCols = pwsh->WSH_width, nRows = pwsh->WSH_height;
+    word nRow, nCol;
+    char *pRow;
+    
+    /* Empty the chunk arrays. */
+    ChunkArrayZero(ows);
+    ChunkArrayZero(oans);
+    
+    /* Append each column-sized row to the word search array. */
+    for (nRow = 0; nRow < nRows; nRow ++)
+    {
+        pRow = ChunkArrayAppend(ows, nCols);
+        /* Initialize the row with spaces. */
+        for (nCol = 0; nCol < nCols; nCol ++)
+            *(pRow++) = GRID_SPACE;
+    }
+
+    bWSInitialized = TRUE;
+}
+
+/***************************************************************************
+ * WSMClearWordSearch
+ ***************************************************************************
+ * SYNOPSIS:    Clear the word search and redraw the view.  This should
+ *              be done whenever a change is made to the document which
+ *              causes the word search to be invalid.
+ *
+ * STRATEGY:    Initialize the word search.
+ *              Redraw the view.
+ *
+ **************************************************************************/
+void WSMClearWordSearch(void)
+{
+    MemHandle mhHeap;
+
+    if (!bWSInitialized)
+    {
+        /* Ensure that no handles are null. */
+        if (fhDocument != NullHandle && bhDocHeap != NullHandle
+          && chDocWordSearch != NullChunk && chDocAnswers != NullChunk)
+        {
+            /* Lock the document. */
+            VMLock(fhDocument, bhDocHeap, &mhHeap);
+
+            /* Initialize the word search. */
+            WSMInitializeWordSearch(ConstructOptr(mhHeap, chDocWordSearch),
+                ConstructOptr(mhHeap, chDocAnswers));
+    
+            /* Redraw the view. */
+            @send, forceQueue, checkDuplicate, replace
+              WSMDocumentView::MSG_GEN_VIEW_REDRAW_CONTENT();
+    
+            /* Mark dirty and unlock the document. */
+            VMDirty(mhHeap);
+            VMUnlock(mhHeap);
+        }
+    }
+}
+
+/***************************************************************************
+ * WSMSetLetter
+ ***************************************************************************
+ * SYNOPSIS:    Set a letter in the word search.
+ *
+ **************************************************************************/
+void WSMSetLetter(optr ows, word x, word y, char c)
+{
+    char *pRow;
+    word dummy;
+    
+    EC_ERROR_IF(x >= ((WordSearchHeader *)LMemDeref(ows))->WSH_width, -1);    
+    EC_ERROR_IF(y >= ((WordSearchHeader *)LMemDeref(ows))->WSH_height, -1);
+    pRow = ChunkArrayElementToPtr(ows, y, &dummy);
+    EC_ERROR_IF(dummy != ((WordSearchHeader *)LMemDeref(ows))->WSH_width, -1);
+    pRow[x] = c;
+}
+
+/***************************************************************************
+ * WSMGetLetter
+ ***************************************************************************
+ * SYNOPSIS:    Get a letter from the word search.
+ *
+ **************************************************************************/
+char WSMGetLetter(optr ows, word x, word y)
+{
+    char *pRow;
+    word dummy;
+    
+    EC_ERROR_IF(x >= ((WordSearchHeader *)LMemDeref(ows))->WSH_width, -1);    
+    EC_ERROR_IF(y >= ((WordSearchHeader *)LMemDeref(ows))->WSH_height, -1);
+    pRow = ChunkArrayElementToPtr(ows, y, &dummy);
+    EC_ERROR_IF(dummy != ((WordSearchHeader *)LMemDeref(ows))->WSH_width, -1);
+    return pRow[x];
+}
+
+/***************************************************************************
+ * WSMCalculateWordSearch
+ ***************************************************************************
+ * SYNOPSIS:    Calculates the word search.
+ *
+ * RETURNS:     TRUE if successfully placed all words.
+ *
+ * STRATEGY:    Wipe clean the word search.
+ *              Attempt to place each word from the word list at most
+ *                GRID_NUM_RANDOM_PLACE_TRIES randomly, then try to fit it
+ *                in any valid space.
+ *              Fill remaining spaces with random letters.
+ *              Locate all of the possible answers.
+ *              Attempt to successfully place all words at most
+ *                GRID_NUM_CALC_TRIES times before failing.
+ *
+ **************************************************************************/
+Boolean WSMCalculateWordSearch(void)
+{
+    MemHandle mhHeap;
+    optr oWordSearch, oWordList, oAnswers;
+    WordSearchHeader *pwsh;
+    word nCount, nItem;
+    char *pWord;
+    word dummy;
+    Boolean bSkipped, bPlaced;
+    word nTryCount = GRID_NUM_CALC_TRIES;
+    word x, y, d, n;
+    word nWidth, nHeight, nDirs;
+    WordSearchLevel eLevel;
+    Boolean bIntersect;
+    
+    /* Lock things. */
+    VMLock(fhDocument, bhDocHeap, &mhHeap);
+    oWordList = ConstructOptr(mhHeap, chDocWordList);
+    oWordSearch = ConstructOptr(mhHeap, chDocWordSearch);
+    oAnswers = ConstructOptr(mhHeap, chDocAnswers);
+
+    /* Read the UI settings. */
+/*  WSMReadSettingsUI(oWordSearch);*/
+
+    nCount = ChunkArrayGetCount(oWordList);
+
+    /* Try to place all of the words at most GRID_NUM_CALC_TRIES times. */
+    bSkipped = TRUE;
+    while (nTryCount-- && bSkipped)
+    {
+        bSkipped = FALSE;
+        /* Initialize the word search and answers arrays. */
+        WSMInitializeWordSearch(oWordSearch, oAnswers);
+
+        /* Get the settings for the word search. */
+        pwsh = LMemDeref(oWordSearch);
+        nWidth = pwsh->WSH_width;
+        nHeight = pwsh->WSH_height;
+        eLevel = pwsh->WSH_level;
+        bIntersect = (pwsh->WSH_settings & WSMS_INTERSECT) != 0;
+        nDirs = WSMGetNumDirections(eLevel);
+
+        /* Try to place all of the words. */
+        for (nItem = 0; nItem < nCount; nItem++)
+        {
+            /* Get the word. */
+            pWord = ChunkArrayElementToPtr(oWordList, nItem, &dummy);
+
+            /* Try to place the word randomly a few times. */
+            bPlaced = FALSE;
+            for (n = 0; n < GRID_NUM_RANDOM_PLACE_TRIES && !bPlaced; n++)
+            {
+                /* Choose a random location and direction. */
+                x = MyRandom(nWidth);
+                y = MyRandom(nHeight);
+                d = MyRandom(nDirs);
+
+                /* Attempt to place the word. */
+					 if (WSMPlaceWord(pWord, oWordSearch, oAnswers, eLevel, nHeight,
+                  nWidth, nDirs, x, y, d, FALSE, !bIntersect))
+                    bPlaced = TRUE;
+            }
+            /* If that fails, attempt to place the word in all possible
+               locations. */
+            if (!bPlaced)
+                if (!WSMPlaceWord(pWord, oWordSearch, oAnswers, eLevel, nHeight, 
+                  nWidth, nDirs, x, y, d, TRUE, !bIntersect))
+                    /* Flag if the word cannot be placed. */
+                    bSkipped = TRUE;
+        }
+
+        /* Fill each blank space in the word search with a random letter. */
+        WSMFillBlankSpaces(oWordSearch);
+
+		  /* The word search is (most likely) no longer initialized. */
+        bWSInitialized = FALSE;
+        
+        /* Mark our changes. */
+        VMDirty(mhHeap);
+    }
+    /* Redraw the document view. */
+    @send WSMDocumentView::MSG_GEN_VIEW_REDRAW_CONTENT();
+
+    VMUnlock(mhHeap);
+    return (!bSkipped);
+}
+
+/***************************************************************************
+ * WSMPlaceWord
+ ***************************************************************************
+ * SYNOPSIS:    Attempt to place a word in the word search.
+ *
+ * RETURNS:     TRUE if word was placed.
+ *
+ * STRATEGY:    Test if the word can be placed with the initial settings.
+ *              Repeat the test with all remaining locations and directions.
+ *       >>     If bSpacesOnly is TRUE, then words are guaranteed to not
+ *       >>       cross, and the answer can be computed here.
+ * 10/19/01 jfh - I don't understand why this should matter...
+ *          I'm gonna try to add the answers to the ans array and see what
+ *          happens...  It doesn't seem to cause a problem so we add them
+ *          here if and when they fit.
+ *          *** This also solves a couple of problems for WSP now that I
+ *              can add a test here for overlapping words and same first
+ *              letter, same grid square, different direction which also
+ *              gums up WSP.
+ *
+ * NOTE:        This function can cause the LMem heap to grow and relocate,
+ *                so pointers to it may not be valid after returning.
+ *
+ **************************************************************************/
+Boolean WSMPlaceWord(char *pWord, optr ows, optr oans, WordSearchLevel eLevel,
+							word nRows, word nCols, word nDirs, word x, word y, word d,
+                     Boolean bTestEntireGrid, Boolean bSpacesOnly)
+{
+    word nd, nLocs = nRows * nCols;
+    sword tx = x, ty = y, td = d;
+    Boolean bFits = FALSE;
+    byte len = (byte)strlen(pWord);
+	 WordSearchAnswerElement *pAns;
+
+
+    if (!bTestEntireGrid)
+        /* Test only the passed position/direction. */
+        bFits = WSMTestWordPlacement(pWord, ows, eLevel, nRows, nCols, 
+			 tx, ty, td, bSpacesOnly, oans);
+    else
+    {
+    /* Try each location in the grid. */
+        while (nLocs-- && !bFits)
+        {
+            nd = nDirs;
+            /* Try each possible direction. */
+            while (nd-- && !bFits)
+            {
+                if (WSMTestWordPlacement(pWord, ows, eLevel, nRows, nCols, 
+						tx, ty, td, bSpacesOnly, oans))
+                    bFits = TRUE;
+                else
+                    if (++td >= nDirs)
+                        td = 0;
+            }
+            if (!bFits)
+            {
+                if (++tx >= nCols)
+                {
+                    tx = 0;
+                    if (++ty >= nRows)
+                        ty = 0;
+                }
+            }
+        }
+    }
+    /* If a fit is found, place the word. */
+    if (bFits)
+    {
+        sword dx, dy;
+        
+        /* Save position/direction temporarily. */
+        x = tx; y = ty; d = td; 
+
+		  WSMGetDirectionOffsets(eLevel, td, &dx, &dy);
+        while (*pWord != '\0')
+        {
+            WSMSetLetter(ows, tx, ty, *(pWord++));
+            tx += dx; ty += dy;
+        }
+        /* If bSpacesOnly is TRUE, add the answer here. */
+//        if (bSpacesOnly)
+//        {
+            /*WordSearchAnswerElement **/pAns = ChunkArrayAppend(oans, 0);
+				pAns->WSAE_row = (byte)y;
+				pAns->WSAE_column = (byte)x;
+				pAns->WSAE_direction = (byte)d;
+            pAns->WSAE_length = len;
+//        }
+    }
+    return bFits;
+}
+
+/***************************************************************************
+ * WSMTestWordPlacement
+ ***************************************************************************
+ * SYNOPSIS:    Test if a word can be placed in the word search.
+ *              Also used as a test for locating answers.
+ *
+ * RETURNS:     TRUE if word can be placed.
+ *
+ * STRATEGY:    Start at the passed location.
+ *              Check each location in the word search against each letter
+ *              in the word.
+ *              Abort if the boundaries of the word search are passed or
+ *              if a space cannot be filled or matched.
+ *
+ * 10/22/01 jfh - Added oans parameter to do checks for same starting
+ *                letter and overlapping words
+ *
+ **************************************************************************/
+Boolean WSMTestWordPlacement(char *pWord, optr ows, WordSearchLevel eLevel,
+                             word rows, word cols, sword x, sword y, word d,
+									  Boolean bSpacesOnly, optr oans)
+{
+	 sword dx, dy, oppDX, oppDY;
+    Boolean bFits = TRUE;
+	 char c;
+    Boolean firstLetter = TRUE;
+	 word numAnswers, i, j, k, testLen, oppDir;
+	 WordSearchAnswerElement *pAns;
+	 sword startX, startY;
+
+
+	 startX = x;
+	 startY = y;
+	 testLen = strlen(pWord);
+	 WSMGetDirectionOffsets(eLevel, d, &dx, &dy);
+	 while (*pWord != '\0' && bFits)
+    {
+        /* Check if the space is blank or matches. */
+        c = WSMGetLetter(ows, x, y);
+
+/* jfh - in here test for overlapping words and for same starting letter in
+			same grid square....  */
+		  if (firstLetter) {
+			  /* if it's a space we're cool - otherwise do some checking */
+			  if (c != ' ')  {
+				  if (bSpacesOnly)  {
+					  /* can't cross - so no good */
+					  bFits = FALSE;
+					  }
+				  else {
+					  if (c != *pWord) {
+						  /* the letter doesn't match so no good */
+						  bFits = FALSE;
+						  }
+					  else {
+						  /* OK, the letter matches and we can cross so now we
+							  check to see if this cell is also the start of an
+							  existing word.  */
+						  numAnswers = ChunkArrayGetCount(oans);
+						  for (i = 0; i < numAnswers; i++) {
+							  pAns = ChunkArrayElementToPtr(oans, i, 0);
+							  if ((pAns->WSAE_row == (byte)y) &&
+										 (pAns->WSAE_column == (byte)x))  {
+								  /* sorry this is the start of an existing answer */
+								  bFits = FALSE;
+								  break;
+								  }
+							  } /* end of check answers for */
+						  }  /* end of letter matches else */
+					  }  /* end of can cross else  */
+				  }  /* end of not a space if */
+			  firstLetter = FALSE;
+			  }  /* end of firstLetter if */
+		  else {
+			  /* check the following letters */
+			  if (c != ' ' && (bSpacesOnly || (!bSpacesOnly && c != *pWord)))
+				  bFits = FALSE;
+			  }
+
+        /* Advance to next letter in word. */
+        pWord++;
+        /* Go to next space unless the end of the word was reached. */
+        if (*pWord != '\0')
+        {
+            x += dx;
+            y += dy;
+            /* Check if we've passed the boundaries. */
+            if (x < 0 || x >= cols || y < 0 || y >= rows)
+                bFits = FALSE;
+        }
+	 } /* end of while */
+
+    /* so far so good - but, one last check */
+	 if (bFits)  {
+		 /* - Check here for overlapping words
+			 - To be overlapping the direction has to be either
+				the same or 180 */
+		 numAnswers = ChunkArrayGetCount(oans);
+		 for (i = 0; i < numAnswers; i++) {
+			 pAns = ChunkArrayElementToPtr(oans, i, 0);
+			 /* check for same diretion */
+			 if (pAns->WSAE_direction == (byte)d) {
+				 for (j = 0; j < pAns->WSAE_length; j++) {
+					 /* check out the cells for the length of the
+						 current answer to see if we overlap */
+					 for (k = 0; k < testLen; k++) {
+						 if (((sword)(pAns->WSAE_row) + (j*dy) == startY + (k*dy)) &&
+							((sword)(pAns->WSAE_column) + (j*dx) == startX + (k*dx))) {
+							 bFits = FALSE;
+							 break;
+							 }
+						 }  /* end of test word for */
+					 }  /* end of answer for  */
+				 }  /* end of same direction if */
+			 /* check opposite direction - if applicable */
+	       oppDir = d;
+			 if (WSMGetOppositeDirection(eLevel, &oppDir))  {
+				 /* OK - it has an opposite */
+				 if (pAns->WSAE_direction == (byte)oppDir) {
+					 WSMGetDirectionOffsets(eLevel, pAns->WSAE_direction, &oppDX, &oppDY);
+					 for (j = 0; j < pAns->WSAE_length; j++) {
+						 /* check out the cells for the length of the
+							 current answer to see if we overlap */
+						 for (k = 0; k < testLen; k++) {
+							 if (((sword)(pAns->WSAE_row) + (j*oppDY) == startY + (k*dy)) &&
+								((sword)(pAns->WSAE_column) + (j*oppDX) == startX + (k*dx))) {
+								 bFits = FALSE;
+								 break;
+								 }
+							 }  /* end of test word for */
+						 }  /* end of answer for  */
+					 }  /* end of opposite direction if */
+				 }  /* end of has an opposite if */
+			 }  /* end of check answers for */
+		 }  /* end if it fits so far if */
+
+
+	 return bFits;
+}
+
+
+/***************************************************************************
+ * WSMFillBlankSpaces
+ ***************************************************************************
+ * SYNOPSIS:    Fill each remaining blank space in the grid with a randomly
+ *              chosen letter.
+ *
+ **************************************************************************/
+void WSMFillBlankSpaces(optr ows)
+{
+    WordSearchHeader *pwsh = LMemDeref(ows);
+    word x, y;
+    
+    for (y = 0; y < pwsh->WSH_height; y ++)
+        for (x = 0; x < pwsh->WSH_width; x ++)
+            if (WSMGetLetter(ows, x, y) == GRID_SPACE)
+                WSMSetLetter(ows, x, y, 'A' + MyRandom('Z' - 'A' + 1));
+}
+
+/***************************************************************************
+ * WSMGetNumDirections
+ ***************************************************************************
+ * SYNOPSIS:    Return how many directions a word can be placed, given the
+ *              difficultly level.
+ *
+ **************************************************************************/
+word WSMGetNumDirections(WordSearchLevel eLevel)
+{
+    word nDirs;
+    
+    switch (eLevel)
+    {
+        case WSL_EASY:      nDirs = 2; break;
+        case WSL_MEDIUM:    nDirs = 4; break;
+        case WSL_HARD:      nDirs = 8; break;
+        default:            nDirs = 0; EC_ERROR(-1); break;
+    }
+    return nDirs;
+}
+
+/***************************************************************************
+ * WSMGetOppositeDirection
+ ***************************************************************************
+ * SYNOPSIS:    Return the direction opposite to the passed direction.
+ *              For some levels, the passed direction may not have a valid
+ *              opposite.
+ *
+ * RETURNS:     TRUE if opposite direction is valid.
+ *
+ **************************************************************************/
+Boolean WSMGetOppositeDirection(WordSearchLevel eLevel, word *peDir)
+{
+    Boolean bValid = TRUE;
+    switch (eLevel)
+    {
+        /* Oppsites are not possible on easy level. */
+        case WSL_EASY:      bValid = FALSE; break;
+        case WSL_MEDIUM:    *peDir = (*peDir + 2) % 4; break;
+        case WSL_HARD:      *peDir = (*peDir + 4) % 8; break;
+    }
+    return bValid;
+}
+
+/***************************************************************************
+ * WSMGetDirectionOffsets
+ ***************************************************************************
+ * SYNOPSIS:    Calculate the x and y offsets for word placement, given
+ *              the difficulty level and a direction value.
+ *
+ **************************************************************************/
+void WSMGetDirectionOffsets(WordSearchLevel eLevel, word nDir, 
+                            sword *pndx, sword *pndy)
+{
+    /* These are the offsets that are repeatedly added to a coordinate pair
+       to progress in a certain diagonal along the word search.  The
+       first is right, the second is right and up, and so on, 
+       counterclockwise around the compass. */
+    static const sword dx[8] = { 1,  1,  0, -1, -1, -1, 0, 1 };
+    static const sword dy[8] = { 0, -1, -1, -1,  0,  1, 1, 1 };
+    
+    EC_ERROR_IF(nDir >= WSMGetNumDirections(eLevel), -1);
+        
+    /* Upconvert directions for lower difficulty levels to the hardest,
+       since that one maps directly to the dx/dy arrays. */
+    switch (eLevel)
+    {
+        case WSL_EASY:      nDir *= 6;
+                            break;
+        case WSL_MEDIUM:    nDir *= 2;
+                            break;
+        case WSL_HARD:      break;
+        default:            EC_ERROR(-1); break;
+    }
+    
+    /* Set the offsets. */
+    EC_ERROR_IF(nDir >= 8, -1);
+    *pndx = dx[nDir];
+    *pndy = dy[nDir];
+}
+
+/***************************************************************************
+ * WSMDirectionToAngle
+ ***************************************************************************
+ * SYNOPSIS:    Calculate the physical angle for word placement, given
+ *              the difficulty level and a direction value.  Zero degrees
+ *              translates to the positive x-axis.
+ *
+ **************************************************************************/
+WWFixedAsDWord WSMDirectionToAngle(WordSearchLevel eLevel, word nDir)
+{
+    switch (eLevel)
+    {
+        case WSL_EASY:      nDir *= 6;
+                            break;
+        case WSL_MEDIUM:    nDir *= 2;
+                            break;
+        case WSL_HARD:      break;
+        default:            EC_ERROR(-1); break;
+    }
+    EC_ERROR_IF(nDir >= 8, -1);
+
+    return MakeWWFixed(nDir * 45);
+}
+
+/***************************************************************************
+ * WSMGetDocBounds
+ ***************************************************************************
+ * SYNOPSIS:    Determine the document bounds of the word search grid so
+ *              that the view properly scales-to-fit the entire grid.
+ *
+ **************************************************************************/
+void WSMGetDocBounds(WordSearchHeader *pwsh, RectDWord *pr)
+{
+    pr->RD_left = pr->RD_top = 0;
+    pr->RD_right = DRAW_GRID_MARGINS * 2
+      + pwsh->WSH_width * DRAW_GRID_SPACE_SIZE;
+    pr->RD_bottom = DRAW_GRID_MARGINS * 2
+      + pwsh->WSH_height * DRAW_GRID_SPACE_SIZE;
+}
+
+
+        
+/***************************************************************************
+ * WSMDrawHeader
+ ***************************************************************************
+ * SYNOPSIS:    Called to draw the word search header.
+ *
+ * STRATEGY:    Calculate the position for drawing the file name centered
+ *                horizontally within the header bounds.
+ *              Draw the file name.
+ *
+ **************************************************************************/
+void WSMDrawHeader(GStateHandle gstate, Boolean drawNameBlock)
+{
+	 char szFileName[FILE_LONGNAME_BUFFER_SIZE];
+    sword x;
+    
+    if (oDocument != NullOptr)
+    {
+        GrSetFont(gstate, PRINT_HEADER_TEXT_FONT, PRINT_HEADER_TEXT_SIZE);
+        GrSetTextColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+        GrSetDefaultTransform(gstate);
+
+        @call oDocument::MSG_GEN_DOCUMENT_GET_FILE_NAME(szFileName);
+
+        x = (PRINT_HEADER_BOUNDS_LEFT + PRINT_HEADER_BOUNDS_RIGHT -
+          GrTextWidth(gstate, szFileName, sizeof(szFileName))) / 2;
+        GrDrawText(gstate, x, PRINT_HEADER_BOUNDS_TOP, szFileName, 
+			 sizeof(szFileName));
+
+		  if (drawNameBlock) {
+				GrSetFont(gstate, PRINT_WORD_TEXT_FONT, MakeWWFixed(12));
+				GrSetTextStyle(gstate, TS_BOLD, 0);
+				MemLock (OptrToHandle(@PrintNameLine));
+				strcpy(szFileName, LMemDeref(@PrintNameLine));
+				GrDrawText(gstate,
+								.25*72,
+								.25*72,
+								szFileName,
+								sizeof(szFileName) );
+				strcpy(szFileName, LMemDeref(@PrintDateLine));
+				GrDrawText(gstate,
+								.25*72,
+								.25*72 + 14,
+								szFileName,
+								sizeof(szFileName) );
+				MemUnlock (OptrToHandle(@PrintNameLine));
+				}
+	 }
+}
+
+/***************************************************************************
+ * WSMDrawWordSearch
+ ***************************************************************************
+ * SYNOPSIS:    Called to draw the word search.
+ *
+ * STRATEGY:    Draw all of the letters in the word search.
+ *              If the answers are to be drawn, draw them as well.
+ *              If printing, scaling must be applied for the passed bounds.
+ *
+ **************************************************************************/
+void WSMDrawWordSearch(GStateHandle gstate, word nLeftBound, word nTopBound, 
+                       word nRightBound, word nBottomBound, Boolean bPrinting)
+{
+    MemHandle mhHeap;
+    optr oWordSearch;
+    WordSearchHeader *pwsh;
+    word row, col, x, y, xoff;
+    char c;
+    
+    /* Ensure that no handles are null. */
+    if (fhDocument != NullHandle && bhDocHeap != NullHandle
+      && chDocWordSearch != NullChunk)
+    {
+        /* Lock things. */
+        VMLock(fhDocument, bhDocHeap, &mhHeap);
+        oWordSearch = ConstructOptr(mhHeap, chDocWordSearch);
+        pwsh = LMemDeref(oWordSearch);
+
+        /* Setup the gstate. */
+        GrSetFont(gstate, DRAW_GRID_TEXT_FONT, 
+          MakeWWFixed(DRAW_GRID_TEXT_SIZE));
+        GrSetTextColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+        GrSetDefaultTransform(gstate);
+        GrApplyTranslation(gstate, MakeWWFixed(nLeftBound), 
+          MakeWWFixed(nTopBound));
+        
+        /* Determine the scaling factor to use. */
+        if (bPrinting)
+        {
+            word nLargestDimension;
+            WWFixedAsDWord fScale, fHeight, fWidth, fLeft, fTop;
+
+            if (pwsh->WSH_width > pwsh->WSH_height)
+                nLargestDimension = pwsh->WSH_width * DRAW_GRID_SPACE_SIZE;
+            else
+                nLargestDimension = pwsh->WSH_height * DRAW_GRID_SPACE_SIZE;
+            fScale = GrUDivWWFixed(MakeWWFixed(nRightBound - nLeftBound), 
+              MakeWWFixed(nLargestDimension));
+            if (fScale > DRAW_GRID_MAX_SCALE_FACTOR)
+                fScale = DRAW_GRID_MAX_SCALE_FACTOR;
+            fHeight = GrMulWWFixed(
+              MakeWWFixed(pwsh->WSH_height * DRAW_GRID_SPACE_SIZE), fScale);
+            fWidth = GrMulWWFixed(
+              MakeWWFixed(pwsh->WSH_width * DRAW_GRID_SPACE_SIZE), fScale);
+            fLeft = (MakeWWFixed(nRightBound - nLeftBound) - fWidth) / 2;
+            fTop = (MakeWWFixed(nBottomBound - nTopBound) - fHeight) / 2;
+            GrApplyTranslation(gstate, fLeft, fTop);
+            GrApplyScale(gstate, fScale, fScale);
+        }
+            
+        /* Draw all of the letters. */
+        y = (DRAW_GRID_SPACE_SIZE - DRAW_GRID_TEXT_SIZE) / 2;
+        for (row = 0; row < pwsh->WSH_height; row++)
+        {
+            x = 0;
+            for (col = 0; col < pwsh->WSH_width; col++)
+            {
+                c = WSMGetLetter(oWordSearch, col, row);
+                xoff = (DRAW_GRID_SPACE_SIZE - 
+                  IntegerOf(GrCharWidth(gstate, c))) / 2;
+                GrDrawChar(gstate, x + xoff, y, c);
+                x += DRAW_GRID_SPACE_SIZE;
+            }
+            y += DRAW_GRID_SPACE_SIZE;
+        }
+        
+        /* Locate and highlight the answers. */
+        if ((pwsh->WSH_settings & WSMS_ANSWERS) && chDocAnswers != NullChunk)
+            WSMDrawAnswers(gstate, ConstructOptr(mhHeap, chDocAnswers), pwsh);
+
+        /* Unlock things. */
+        VMUnlock(mhHeap);
+    }
+}
+
+/***************************************************************************
+ * WSMDrawAnswers
+ ***************************************************************************
+ * SYNOPSIS:    Called to draw the word search answers.
+ *
+ * STRATEGY:    Call appropriate drawing functions.
+ *
+ **************************************************************************/
+void WSMDrawAnswers(GStateHandle gstate, optr oans, WordSearchHeader *pwsh)
+{
+    word nAnswers, n;
+    WordSearchAnswerElement *pAns;
+    sword sx, sy, ex, ey, tx, ty, len, dx, dy;
+    WWFixedAsDWord angle;
+    word dummy;
+
+    GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+    GrSetAreaMaskSys(gstate, SDM_0);
+
+    nAnswers = ChunkArrayGetCount(oans);
+    for (n = 0; n < nAnswers; n++)
+    {
+        pAns = ChunkArrayElementToPtr(oans, n, &dummy);
+        /* (sx,sy)-(ex,ey) are the bounds of the rectangle, with the origin
+           being the center of the first grid square. */
+        sx = -DRAW_GRID_ANSWER_OUTLINE;
+        sy = -DRAW_GRID_ANSWER_OUTLINE;
+        len = (pAns->WSAE_length - 1) * DRAW_GRID_SPACE_SIZE;
+        ey = DRAW_GRID_ANSWER_OUTLINE;
+        tx = pAns->WSAE_column * DRAW_GRID_SPACE_SIZE
+          + (DRAW_GRID_SPACE_SIZE / 2);
+        ty = pAns->WSAE_row * DRAW_GRID_SPACE_SIZE
+          + (DRAW_GRID_SPACE_SIZE / 2);
+        angle = WSMDirectionToAngle(pwsh->WSH_level, pAns->WSAE_direction);
+        WSMGetDirectionOffsets(pwsh->WSH_level, pAns->WSAE_direction, &dx, &dy);
+        if (dx != 0 && dy != 0)
+        {
+            /* Answer is angled diagonally, must compensate length
+               and shrink size. */
+            len = IntegerOf(GrMulWWFixed(MakeWWFixed(len), WWFIXED_SQRT_TWO));
+        }
+        ex = len + DRAW_GRID_ANSWER_OUTLINE;
+
+        GrSaveTransform(gstate);
+        GrApplyTranslation(gstate, MakeWWFixed(tx), MakeWWFixed(ty));
+        GrApplyRotation(gstate, angle);
+        GrDrawRoundRect(gstate, sx, sy, ex, ey, DRAW_GRID_ANSWER_CORNER_RADIUS);
+        GrRestoreTransform(gstate);
+    }
+}
+
+/***************************************************************************
+ * WSMDrawWordList
+ ***************************************************************************
+ * SYNOPSIS:    Called to print the word list.
+ *
+ * STRATEGY:    Calculate the text size, column width, number of columns,
+ *                and number of rows.
+ *              Call appropriate drawing functions.
+ *
+ **************************************************************************/
+void WSMDrawWordList(GStateHandle gstate)
+{
+    MemHandle mhHeap;
+    optr owl;
+    word n, nCount, nIndex, nLargestWord, nLargestWordIdx, nColWidth;
+    word nNumCols, nNumRows, nCol, nRow, nPrintCount;
+    sword x;
+    WWFixedAsDWord fFontSize;
+    word dummy;
+    Boolean bFits = FALSE;
+    
+    /* Ensure that no handles are null. */
+    if (fhDocument != NullHandle && bhDocHeap != NullHandle
+      && chDocWordList != NullChunk)
+    {
+        /* Lock things. */
+        VMLock(fhDocument, bhDocHeap, &mhHeap);
+        owl = ConstructOptr(mhHeap, chDocWordList);
+        
+        nCount = ChunkArrayGetCount(owl);
+        /* No point in continuing if there are no words. */
+        if (nCount == 0)
+            return;
+            
+        /* Find the longest word.  This will determine the column width. */
+        GrSetFont(gstate, PRINT_WORD_TEXT_FONT, PRINT_WORD_MAX_TEXT_SIZE);
+        nLargestWord = 0;
+        nLargestWordIdx = 0;
+        for (nIndex = 0; nIndex < nCount; nIndex++)
+        {
+            n = GrTextWidth(gstate, ChunkArrayElementToPtr(owl, nIndex, &dummy),
+              0);
+            if (n > nLargestWord)
+            {
+                nLargestWord = n;
+                nLargestWordIdx = nIndex;
+            }
+        }
+        /* Add a small amount for spacing. */
+        nLargestWord += PRINT_WORD_COLUMN_SPACING;
+        
+        /* Start with the largest font size. */
+        for (fFontSize = PRINT_WORD_MAX_TEXT_SIZE;
+          !bFits && fFontSize >= PRINT_WORD_MIN_TEXT_SIZE; 
+          fFontSize -= PRINT_WORD_STEP_TEXT_SIZE)
+        {
+            /* Determine how many columns can be fit. */
+            GrSetFont(gstate, PRINT_WORD_TEXT_FONT, fFontSize);
+            nColWidth = GrTextWidth(gstate, ChunkArrayElementToPtr(
+              owl, nLargestWordIdx, &dummy), 0) + PRINT_WORD_COLUMN_SPACING;
+            nNumCols = PRINT_WORD_TEXT_BOX_WIDTH / nColWidth;
+                        
+            /* Determine how many rows can be fit. */
+            nNumRows = IntegerOf(GrUDivWWFixed(
+              MakeWWFixed(PRINT_WORD_TEXT_BOX_HEIGHT), fFontSize));
+            
+            /* If all of the words fit, keep this font size; otherwise,
+               shrink the font and try again. */
+            if (nNumCols * nNumRows >= nCount)
+                bFits = TRUE;
+        }
+        
+        /* Enforce the minimum font size even if all the words won't fit. */
+        if (!bFits)
+            fFontSize = PRINT_WORD_MIN_TEXT_SIZE;
+            
+        /* Calculate column width to fill the text box. */
+        nColWidth = PRINT_WORD_TEXT_BOX_WIDTH / nNumCols;
+        
+        /* Calculate how many rows will be used for printing row by row. */
+        nPrintCount = nCount;
+        if (nPrintCount > nNumCols * nNumRows)
+            nPrintCount = nNumCols * nNumRows;
+        nNumRows = (nPrintCount + nNumCols - 1) / nNumCols;
+
+        /* Setup the remainder of the GState. */
+        GrSetTextColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+        GrSetDefaultTransform(gstate);
+
+	   /* Print all words, column by column. */
+        x = PRINT_WORD_TEXT_BOX_LEFT;
+        nIndex = 0;
+        for (nCol = 0; nCol < nNumCols && nIndex < nCount; nCol++)
+        {
+            for (nRow = 0; nRow < nNumRows && nIndex < nCount; nRow++)
+            {
+                GrDrawText(gstate, x, PRINT_WORD_TEXT_BOX_TOP + 
+                  IntegerOf(GrMulWWFixed(MakeWWFixed(nRow), fFontSize)), 
+                  ChunkArrayElementToPtr(owl, nIndex, &dummy), 0);
+                nIndex ++;
+            }
+            x += nColWidth;
+        }
+        VMUnlock(mhHeap);
+
+    }
+}
+
+/***************************************************************************
+ * XWMAddWord
+ ***************************************************************************
+ * SYNOPSIS:    Called by MSG_WSM_PROCESS_ADD_WORD &
+ *                        MSG_WSM_IMPORT_WORD_LIST
+ *
+ * PARAMETERS:  char* wordToAdd
+ *					 Returns: position in list if word added successfully,
+ *                       error code if not
+ *
+ * STRATEGY:    Add the provided word to
+ *              the word list, update the UI, and clear the text object.
+ *              The word list is case-insensitive and is maintained 
+ *              alphabetically.  Duplicates are prevented.
+ *
+ **************************************************************************/
+word WSMAddWord(char* wordToAdd)
+{
+ optr oWordList = NullOptr;
+ MemHandle mhHeap;
+ char *pszWord;
+ word dummy, retVal;
+ word nStart = 0, nEnd, nMid, nSize;
+ sword nResult;
+ Boolean bFound = FALSE;
+
+	/* Ensure that no handles are null. */
+	if (fhDocument != NullHandle && bhDocHeap != NullHandle
+										  && chDocWordList != NullChunk)  {
+
+		LocalUpcaseString(wordToAdd, 0);
+
+		/* Lock the word list. */
+		VMLock(fhDocument, bhDocHeap, &mhHeap);
+		oWordList = ConstructOptr(mhHeap, chDocWordList);
+
+		/* Ensure that the list hasn't reached its maximum length. */
+		if (ChunkArrayGetCount(oWordList) < WORD_LIST_MAX_SIZE) {
+			/* Use a binary search method to locate the insertion point. */
+			nSize = ChunkArrayGetCount(oWordList);
+			nEnd = nSize - 1;
+			while (nStart <= nEnd && nEnd != (word)(-1) && !bFound) {
+				/* Compare to the element midway between the endpoints. */
+				nMid = nStart + (nEnd - nStart) / 2;
+				pszWord = ChunkArrayElementToPtr(oWordList, nMid, &dummy);
+				nResult = LocalCmpStringsNoCase(wordToAdd, pszWord, 0);
+				if (nResult == 0)
+					/* The strings are equal; the word is in the list. */
+					bFound = TRUE;
+				else if (nResult > 0)
+					/* The new word should come after the midpoint. */
+					nStart = nMid + 1;
+				else if (nResult < 0)
+					/* The new word should come before the midpoint. */
+					nEnd = nMid - 1;
+				} /* end of while */
+			/* Ensure that the word was not found to prevent duplicates. */
+			if (!bFound) {
+				/* nStart is the proper insertion point. Insert the word
+					into the chunk array there. */
+				if (nStart < nSize)
+					/* Insert a new element within the array. */
+					ChunkArrayInsertAt(oWordList,
+						ChunkArrayElementToPtr(oWordList, nStart, &dummy), 0);
+				else
+					/* Append a new element to the array. */
+					ChunkArrayAppend(oWordList, 0);
+
+				retVal = nStart;
+
+				/* Copy the new word into the new element. */
+				strcpy(ChunkArrayElementToPtr(oWordList, nStart, &dummy),
+							  wordToAdd);
+
+				VMDirty(mhHeap);           
+				}  /* end of not found if */
+			else {
+				NotifyDBox(wordToAdd, @DupeWordMsg);
+				retVal = ADD_WORD_DUPE;
+				}
+			}  /* end of list size if */
+		else {
+			NotifyDBox(0, @ListTooLongMsg);
+			retVal = ADD_WORD_LIST_FULL;
+			}
+
+		VMUnlock(mhHeap);
+		}   /* end of handles if */
+
+	return (retVal);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	NotifyDBox  (char* string1, optr notifyMsg)
+ *
+ * CALLED BY:
+ *
+ *
+ * STRATEGY:    Puts up selected notification box
+ *
+ *
+ ***********************************************************************/
+void NotifyDBox (char* string1, optr notifyMsg)
+{
+
+    /* put up a notification box */
+	 MemLock (OptrToHandle(@WSFolderTxt));
+    UserStandardDialog((char*)0,
+			  (char*)0,
+			  (char*)0,
+			  string1,
+			  LMemDeref(notifyMsg),
+			  ((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+			  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+	 MemUnlock (OptrToHandle(@WSFolderTxt));
+
+}
+
+
+word MyRandom(word range)
+{
+    static word rand1 = 0xf32d ;
+    static word rand2 = 0x0103 ;
+    static word rand3 = 0x4326 ;
+    static word rand4 = 0x4878 ;
+    TimerDateAndTime dateAndTime ;
+    word old ;
+    WWFixed work;
+
+    TimerGetDateAndTime(&dateAndTime) ;
+    old = rand1 ;
+    rand1 = rand2 ;
+    rand2 = rand3 ;
+    rand3 = rand4 ;
+    rand4 ^= old^rand1^rand2^rand3 ;
+    rand3 += rand1+rand2+rand4 ;
+    rand4 += TimerGetCount() ;
+
+    work.WWF_frac = old; work.WWF_int = 0;
+    return IntegerOf(GrMulWWFixed(*((WWFixedAsDWord*)&work), MakeWWFixed(range)));
+}

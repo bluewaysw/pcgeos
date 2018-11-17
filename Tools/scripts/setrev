@@ -1,0 +1,67 @@
+#!/bin/sh -
+##############################################################################
+#
+# 	Copyright (c) GeoWorks 1996 -- All Rights Reserved
+#
+# PROJECT:	
+# MODULE:	
+# FILE: 	setrev
+# AUTHOR: 	Adam de Boor, Apr 25, 1996
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	ardeb	4/25/96		Initial Revision
+#
+# DESCRIPTION:
+#	A script to change the .rev files for a branch to all have the same
+#	major and minor number for the release. It also arranges to have
+#	everything in the branch relinked by removing a couple strategic object
+#	files
+#
+# USAGE:
+#	setrev <branch> <major>.<minor> [<log message>]
+#
+#	<branch> is "trunk" to work on the trunk
+#
+#	$Id$
+#
+###############################################################################
+b=$1
+rev=$2
+shift
+shift
+msg="$*"
+
+IFS="."
+set - $rev
+IFS=
+if [ $# -ne 2 ]; then
+	echo $rev is not in major.minor form
+	exit 1
+fi
+
+if [ $b = trunk ]; then
+   	bdir=/staff/pcgeos/Installed
+	bflag=
+else
+	bdir=/staff/pcgeos/$b/Installed
+	bflag=-B$b
+fi
+
+if [ ! -d $bdir ]; then
+	echo $b does not seem to be a branch
+	exit 1
+fi
+
+cd /staff/pcgeos
+find Appl Library Driver DOSAppl -name \*.rev -print |
+	while read rfile; do
+		grev $bflag -S newrev $rfile $rev.0 "$msg"
+		if [ $? -ne 0 ]; then
+			echo $rfile >> /tmp/errs
+		fi
+	done
+
+rm -f $bdir/Library/Kernel/Boot.obj $bdir/Library/Kernel/Boot.eobj
+find $bdir/Loader -name main.\*obj -exec rm -f {} \;

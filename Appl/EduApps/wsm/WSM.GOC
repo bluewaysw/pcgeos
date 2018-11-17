@@ -1,0 +1,461 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT:	Breadbox Word Search Maker
+ * FILE:		wsm.goc
+ * AUTHOR:	Dave Hunter   6/99
+ *
+ *
+ * DESCRIPTION:
+ *	          This is the Word Search Maker
+ *
+ * WHATS NEW:   comments in .rev file
+ *
+ *		10/19/01	jfh	- updated about box & help file
+ *                   - cleaned up some probs with the answer array
+ *                     and word placement that cause probs with WSP
+ *    07/01/02 jfh	- broke into mutiple files
+ *							- added word list import
+ *    07/16/02 jfh	- added copy to clipboard
+ *    07/16/02 jfh	- added name/date block on printed puzzle
+ *
+ ***********************************************************************/
+
+@include "wsm.goh"
+@include "bboxreg.goh"
+
+/***************************************************************************
+ * Application resource
+ **************************************************************************/
+
+@start AppResource;
+
+@object GenApplicationClass WSMApp =
+{
+    GI_visMoniker = list { @WSMGraphicAppMoniker,
+					  @WSMTinyAppMoniker,
+					  @WSMTextMoniker };
+    GI_comp = @WSMPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = @WSMPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) = 
+      @WSMDocumentControl, @WSMPrintControl;
+    gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_APP_STARTUP) = 
+      @WSMDocumentControl;
+    gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST) = 
+      @WSMDocumentControl;
+    ATTR_GEN_APPLICATION_PRINT_CONTROL = @WSMPrintControl;
+    ATTR_GEN_HELP_FILE = "WSM Help";  /* jfh */
+}
+
+@visMoniker WSMTextMoniker = "Word Search Maker";
+
+@end AppResource;
+
+/***************************************************************************
+ * Moniker Resource
+ **************************************************************************/
+
+@start WSMMonikerResource, data;
+
+@include "wsmicon.goh"
+
+@visMoniker WSMDocIconList = list { @WSMGraphicDocMoniker,
+                                    @WSMTinyDocMoniker };
+
+@end WSMMonikerResource;
+
+/***************************************************************************
+ * Document Group Resource
+ **************************************************************************/
+
+@start DocGroupResource;
+
+@object GenDocumentGroupClass WSMDocumentGroup =
+{
+    GDGI_untitledName = "Word Search Untitled";
+    GDGI_output = process;
+    GDGI_documentControl = WSMDocumentControl;
+    GDGI_protocolMajor = WSM_DOCUMENT_PROTOCOL_MAJOR;
+    GDGI_protocolMinor = WSM_DOCUMENT_PROTOCOL_MINOR;
+    GDGI_attrs = @default;
+}
+
+@end    DocGroupResource;
+
+/***************************************************************************
+ * Interace resource
+ **************************************************************************/
+
+@start Interface;
+
+@object GenPrimaryClass WSMPrimary =
+{
+	GI_visMoniker = "Word Search Maker";
+	GI_comp = @WSMFileGroup, @WSMEditGroup, @WSMSettingsGroup,
+				 @WSMDocumentGroups;
+	ATTR_GEN_HELP_CONTEXT = "TOC";  /* jfh */
+}
+
+@object GenInteractionClass WSMDocumentGroups =
+{
+    GI_comp = @WSMDocumentUIGroup, @WSMDocumentViewGroup;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+/***** File Group *****/
+
+@object GenInteractionClass WSMFileGroup =
+{
+	 GI_comp = @WSMDocumentControl, @WSMImportDialog, @WSMPrintControl,
+			 @AboutSubGroup;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+}
+
+@object WSMDocumentControlClass WSMDocumentControl =
+{
+    GDCI_documentToken = {"WSMD", MANUFACTURER_ID_BREADBOX };
+    GDCI_noNameText = "No Document";
+    GDCI_documentGroup = @WSMDocumentGroup;
+    GDCI_features = @default & ~(GDCF_SUPPORTS_TEMPLATES
+       | GDCF_SUPPORTS_USER_SETTABLE_EMPTY_DOCUMENT
+       | GDCF_SUPPORTS_USER_SETTABLE_DEFAULT_DOCUMENT);
+}
+
+@object PrintControlClass WSMPrintControl =
+{
+    GI_states = @default | GS_ENABLED;
+    PCI_attrs = (@default & ~(PCA_PAGE_CONTROLS | PCA_VERIFY_PRINT)); 
+    PCI_startUserPage = 1;
+    PCI_endUserPage = 1;
+    PCI_output = process;
+    PCI_docNameOutput = @WSMDocumentGroup;
+    PCI_docSizeInfo = { (8.5 * 72), (11 * 72), 0,
+      {1 * 72, 1 * 72, 1 * 72, 1 * 72} };
+}
+
+
+/* jfh */
+
+@object GenInteractionClass AboutSubGroup = {
+    GI_comp = @AboutDBox;
+    GII_visibility = GIV_SUB_GROUP;
+}
+
+/* ---------------------------------------------------------------- */
+@object GenInteractionClass AboutDBox = {
+	 GI_visMoniker = 't', "About";
+    GI_comp = @AppName, @Beta, @By, @BreadBoxLogo, @Visit,
+		    @Web, @Copyright;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_NOTIFICATION;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass AppName = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "Word Search Maker";
+	 ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @AppNameCharAttrs;
+}
+
+@chunk VisTextCharAttr AppNameCharAttrs =
+	CHAR_ATTR_FONT_SIZE_STYLE(
+		FID_DTC_URW_SANS, 24, TS_BOLD);
+
+@object GenGlyphClass Beta = {
+  GI_visMoniker = "An Educational Product";
+}
+
+@object GenGlyphClass By = {
+  GI_visMoniker = "from";
+}
+
+@object GenGlyphClass BreadBoxLogo = {
+  GI_visMoniker = list { @BreadboxLogoMoniker}
+}
+
+@object GenGlyphClass Copyright = {
+  GI_visMoniker = "Copyright 1994-2001 Breadbox Computer Company LLC";
+}
+
+@object GenGlyphClass Visit = {
+  GI_visMoniker = "Visit us at...";
+}
+
+@object GenGlyphClass Web = {
+  GI_visMoniker = "www.breadbox.com";
+}
+
+/*---------------------------------------------------------------------*/
+@object GenInteractionClass WSMEditGroup = {
+	GI_visMoniker   = 'E', "Edit" ;
+	GI_attrs = @default | GA_KBD_SEARCH_PATH ;
+	GI_comp        = @WSMCopyToClipboard ;
+	GII_visibility = GIV_POPUP ;
+}
+
+@object GenTriggerClass WSMCopyToClipboard = {
+	GI_visMoniker   = 'C', "Copy Puzzle" ;
+	GTI_destination = process ;
+	GTI_actionMsg   = MSG_META_CLIPBOARD_COPY ;
+}
+
+
+/***** Document UI Group *****/
+
+@object GenInteractionClass WSMDocumentUIGroup = 
+{
+    GI_comp = @WSMWordListGroup;
+    GI_states = @default & ~GS_ENABLED;
+	 HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+/***** Word List Group *****/
+
+@object GenInteractionClass WSMWordListGroup =
+{
+    GI_visMoniker = "Word List";
+    GI_comp = @WSMWordList, @WSMWordListAddText, @WSMWordListDeleteTrigger;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_DRAW_IN_BOX;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenDynamicListClass WSMWordList =
+{
+    GDLI_queryMsg = MSG_WSM_PROCESS_QUERY_WORD_LIST;
+    GIGI_destination = process;
+    GIGI_behaviorType = GIGBT_EXCLUSIVE;
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenTextClass WSMWordListAddText =
+{
+    GI_visMoniker = 'A', "Add word";
+    GI_attrs = GA_INITIATES_INPUT_HOLD_UP;
+    GTXI_maxLength = WORD_MAX_SIZE;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_destination = process;
+	 GTXI_applyMsg = MSG_WSM_PROCESS_ADD_WORD;
+    ATTR_GEN_TEXT_ALPHA;
+    ATTR_GEN_TEXT_NO_SPACES;
+	 HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object GenTriggerClass WSMWordListDeleteTrigger =
+{
+    GI_visMoniker = 'D', "Delete word";
+    GTI_actionMsg = MSG_WSM_PROCESS_DELETE_WORD;
+    GTI_destination = process;
+}
+
+/***** Settings Group *****/
+
+@object GenInteractionClass WSMSettingsGroup =
+{
+    GI_visMoniker = 'S', "Settings";
+    GI_comp = @WSMSettingsLevelGroup, @WSMSettingsSize, @WSMSettingsOther;
+    GI_states = @default & ~GS_ENABLED;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_PROPERTIES;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_SEEK_MENU_BAR;
+    ATTR_GEN_HELP_CONTEXT = "Settings"; /* jfh */
+}
+
+@object GenInteractionClass WSMSettingsLevelGroup =
+{
+    GI_comp = @WSMSettingsLevelMoniker, @WSMSettingsLevel;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenGlyphClass WSMSettingsLevelMoniker =
+{
+    GI_visMoniker = "Difficulty level";
+}
+
+@object GenItemGroupClass WSMSettingsLevel =
+{
+    GI_comp = @WSMSettingsLevelEasy, @WSMSettingsLevelMedium, 
+      @WSMSettingsLevelHard;
+    GIGI_selection = GIGS_NONE;
+    GIGI_stateFlags = GIGSF_INDETERMINATE;
+    GIGI_behaviorType = GIGBT_EXCLUSIVE;
+    GIGI_destination = process;
+    GIGI_applyMsg = MSG_WSM_PROCESS_APPLY_SETTINGS_LEVEL;
+    HINT_ITEM_GROUP_MINIMIZE_SIZE;
+    HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+}
+
+@object GenItemClass WSMSettingsLevelEasy =
+{
+    GI_visMoniker = "Easy";
+    GII_identifier = WSL_EASY;
+}
+
+@object GenItemClass WSMSettingsLevelMedium =
+{
+    GI_visMoniker = "Medium";
+    GII_identifier = WSL_MEDIUM;
+}
+
+@object GenItemClass WSMSettingsLevelHard =
+{
+    GI_visMoniker = "Hard";
+    GII_identifier = WSL_HARD;
+}
+
+@object GenInteractionClass WSMSettingsSize =
+{
+    GI_comp = @WSMSettingsSizeWidth, @WSMSettingsSizeHeight;
+}
+
+@object GenValueClass WSMSettingsSizeWidth =
+{
+    GI_visMoniker = "Grid width";
+    GVLI_minimum = MakeWWFixed(GRID_MIN_SIZE);
+    GVLI_maximum = MakeWWFixed(GRID_MAX_SIZE);
+    GVLI_increment = MakeWWFixed(1);
+    GVLI_stateFlags = GVSF_INDETERMINATE;
+    GVLI_destination = process;
+    GVLI_applyMsg = MSG_WSM_PROCESS_APPLY_SETTINGS_WIDTH;
+    ATTR_GEN_VALUE_STATUS_MSG = MSG_WSM_PROCESS_STATUS_WIDTH;
+}
+
+@object GenValueClass WSMSettingsSizeHeight =
+{
+    GI_visMoniker = "Grid height";
+    GVLI_minimum = MakeWWFixed(GRID_MIN_SIZE);
+    GVLI_maximum = MakeWWFixed(GRID_MAX_SIZE);
+    GVLI_increment = MakeWWFixed(1);
+    GVLI_stateFlags = GVSF_INDETERMINATE;
+    GVLI_destination = process;
+    GVLI_applyMsg = MSG_WSM_PROCESS_APPLY_SETTINGS_HEIGHT;
+    ATTR_GEN_VALUE_STATUS_MSG = MSG_WSM_PROCESS_STATUS_HEIGHT;
+}
+
+@object GenBooleanGroupClass WSMSettingsOther =
+{
+    GI_comp = @WSMSettingsSquare, @WSMSettingsShowAnswers, 
+      @WSMSettingsIntersect;
+    GBGI_indeterminateBooleans = WSMS_SQUARE | WSMS_ANSWERS | WSMS_INTERSECT;
+    GBGI_destination = process;
+    GBGI_applyMsg = MSG_WSM_PROCESS_APPLY_SETTINGS_OTHER;
+    ATTR_GEN_BOOLEAN_GROUP_STATUS_MSG = MSG_WSM_PROCESS_SETTINGS_OTHER_CHANGED;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenBooleanClass WSMSettingsSquare =
+{
+    GI_visMoniker = "Keep grid square";
+    GBI_identifier = WSMS_SQUARE;
+}
+
+@object GenBooleanClass WSMSettingsShowAnswers =
+{
+    GI_visMoniker = "Show answers";
+    GBI_identifier = WSMS_ANSWERS;
+}
+
+@object GenBooleanClass WSMSettingsIntersect =
+{
+    GI_visMoniker = "Allow words to cross";
+    GBI_identifier = WSMS_INTERSECT;
+}
+
+/***** Document View Group *****/
+
+@object GenInteractionClass WSMDocumentViewGroup = 
+{
+    GI_comp = @WSMCalculateTrigger, @WSMDocumentView;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTriggerClass WSMCalculateTrigger =
+{
+    GI_visMoniker = 'C', "Calculate word search";
+/*  GI_attrs = GA_INITIATES_BUSY_STATE | GA_INITIATES_INPUT_HOLD_UP;*/
+    GTI_actionMsg = MSG_WSM_PROCESS_CALCULATE;
+    GTI_destination = process;
+}
+
+@object GenViewClass WSMDocumentView =
+{
+    GVI_content = process;
+    GVI_docBounds = { 0, 0, 0, 0 };
+    GVI_attrs = @default & ~GVA_FOCUSABLE;
+    GVI_horizAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT;
+    GVI_vertAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+/* -------------------------------------------------------------- */
+@object GenInteractionClass WSMImportDialog = {
+	 GI_visMoniker = "Read Word List";
+	 GI_states = @default & ~GS_ENABLED;
+	 GI_comp = @WSMImpFileSel, @WSMImportButton, @WSMImpCanx;
+    GII_visibility = GIV_DIALOG;
+    ATTR_GEN_HELP_CONTEXT = "ImpDB";
+}
+
+@object GenFileSelectorClass WSMImpFileSel = {
+    GFSI_fileCriteria = FSFC_MASK_CASE_INSENSITIVE |
+				    FSFC_DIRS |
+				    FSFC_NON_GEOS_FILES;
+	 GFSI_destination = process;
+	 GFSI_notificationMsg = MSG_WSM_IMPORT_SELECTOR_ACTION;
+	 ATTR_GEN_PATH_DATA = {SP_DOCUMENT, "."};
+	 HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 8;
+	 HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 40;
+}
+
+@object GenTriggerClass WSMImportButton = {
+	 GI_visMoniker = "Read";
+	 GI_states = @default & ~GS_ENABLED;
+    GTI_destination = process;
+	 GTI_actionMsg = MSG_WSM_IMPORT_WORD_LIST;
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass WSMImpCanx = {
+	 GI_visMoniker = "Cancel";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@end Interface;
+
+@start Strings;
+/* jfh */
+@chunk char WSFolderTxt[] = "Word Search Puzzles";
+@chunk char WSNoFitTxt[] = "Not all of the words fit in the word search. Try increasing the size of the grid or decreasing the number of words.";
+@chunk char WordTooShortMsg[] = "The word \"\001\" needs to be at least three letters long.";
+@localize "do not translate the @1";
+@chunk char WordTooLongMsg[] = "The word \"\001\" needs to be less than 31 letters long.";
+@localize "do not translate the @1";
+@chunk char WordInvalidCharMsg[] = "The word \"\001\" can have letters only.";
+@localize "do not translate the @1";
+@chunk char DupeWordMsg[] = "The word \"\001\" is already in your list.";
+@localize "do not translate the @1";
+@chunk char ListTooLongMsg[] = "You may have only 50 words in the list.";
+@chunk char ImpOpenErrMsg[] = "There was an error opening the word list file.";
+@chunk char ImpBadTypeErrMsg[] = "Not a valid word list file.";
+@chunk char ImpCloseErrMsg[] = "There was an error closing the word list file.";
+@chunk char ImpReadErrMsg[] = "There was an error reading the word list file.";
+@chunk char PrintNameLine[] = "Name: _______________________";
+@chunk char PrintDateLine[] = "Date: _______________________";
+@end Strings;
+
+
+

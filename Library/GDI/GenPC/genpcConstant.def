@@ -1,0 +1,292 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	
+MODULE:		
+FILE:		genpcConstant.def
+
+AUTHOR:		Todd Stumpf, May  1, 1996
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	TS	5/ 1/96   	Initial revision
+
+
+DESCRIPTION:
+	
+		
+	$Id: genpcConstant.def,v 1.1 97/04/04 18:04:01 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+;
+;	Keyboard-related constants
+SetDef _GENPC_CONST
+
+MAX_HOTKEYS		equ	16 
+;
+; Scancode for left ctrl and caplock, used for swapping keydef.
+;
+ScanCodes		etype	byte
+SCANCODE_LEFT_CTRL	enum	ScanCodes, 0x1d
+SCANCODE_CAPS_LOCK	enum	ScanCodes, 0x3a
+SCANCODE_RIGHT_ALT	enum	ScanCodes, 0x76
+SCANCODE_ILLEGAL	enum	ScanCodes, 0xff
+
+KBD_DATA_PORT		equ	60h
+KBD_PC_CTRL_PORT	equ	61h
+KBD_STATUS_PORT		equ	64h
+
+KeyboardStatusBits	record
+   KSB_PARITY_ERROR:1		;bit 7 = 1 : last byte had even parity
+   KSB_RECEIVE_TIME_OUT:1	;bit 6 = 1 : reception timed out
+   KSB_TRANSMIT_TIME_OUT:1	;bit 5 = 1 : transmite timed out
+   KSB_INHIBIT:1		;bit 4 = 0 : keyboard inhibited
+   KSB_COMMAND_DATA_FLAG:1	;bit 3 = 0 : data ; = 1 : command
+   KSB_SYSTEM_FLAG:1		;bit 2 = 0 : reset caused by power on
+   KSB_INPUT_BUFFER_FULL:1	;bit 1 = 1 : input buffer full (DATA & CMD)
+   KSB_OUTPUT_BUFFER_FULL:1	;bit 0 = 1 : output buffer full (DATA only)
+KeyboardStatusBits	end
+
+					;	(not used in mode we use)
+KBD_RESP_ACK		equ	0fah	; command acknowledged
+KBD_RESP_FAILURE	equ	0fdh	; diagnostic failure
+KBD_RESP_RESEND		equ	0feh	; resend last transmission
+KBD_RESP_OVERRUN	equ	00h	; commands sent to keyboard overran
+
+
+XTPort61	record	; I/O port 61h for XT
+    XP61_KBD_STROBE:1		; Write 1 to clear keyboard latch. Write 0
+				;  immediately following.
+    XP61_KBD_DISABLE:1		; Write 0 to hold keyboard clock low, thus
+				;  disabling the keyboard
+    XP61_ENABLE_IOCHK:1		; Write 0 to enable IOCHK
+    XP61_ENABLE_PARITY:1	; Write 0 to enable parity check
+    XP61_READ_LOW_SWITCHES:1	; Write 0 to read low switches (?)
+    :1
+    XP61_SPEAKER_ENABLE:1	; Enable speaker data (1 = enable)
+    XP61_TIMER_2_GATE:1		; Enable timer 2 (1 = enable)
+XTPort61	end
+
+KBD_ACKNOWLEDGE		equ	mask XP61_KBD_STROBE
+				; for every keypress, need to acknowledge it
+
+
+
+BIOS_SEG		=40h		; Segment of BIOS data area
+BIOS_KBD_STATE		=17h		; Word containing BiosKbdState
+
+BIOS_KEYBOARD_BUFFER_HEAD_POINTER = 1ah	; offset of keyboard buffer head ptr
+BIOS_KEYBOARD_BUFFER_TAIL_POINTER = 1ch ; offset of keyboard buffer tail ptr
+
+BiosKbdState	record
+    BKS_INSERT:1		; Ins key down
+    BKS_CAPS_LOCK:1		; Caps Lock key down
+    BKS_NUM_LOCK:1		; Num Lock key down
+    BKS_SCROLL_LOCK:1		; Scroll Lock key down
+    BKS_PAUSE:1			; Pause mode active
+    BKS_SYS_REQ:1		; SysReq key down
+    BKS_LEFT_ALT:1		; Left ALT key down
+    BKS_LEFT_CTRL:1		; Left CTRL key down
+    BKS_INSERT_ACTIVE:1		; Insert mode active
+    BKS_CAPS_LOCK_ACTIVE:1	; Caps Lock mode active
+    BKS_NUM_LOCK_ACTIVE:1	; Num Lock mode active
+    BKS_SCROLL_LOCK_ACTIVE:1	; Scroll Lock mode active
+    BKS_ALT_ACTIVE:1		; Left or Right ALT down
+    BKS_CTRL_ACTIVE:1		; Left or Right CTRL down
+    BKS_LEFT_SHIFT:1		; Left shift key down
+    BKS_RIGHT_SHIFT:1		; Right shift key down
+BiosKbdState	end
+
+BIOS_ALT_KBD_STATE	=97h		; Byte containing extra state added
+					;  when extended keyboards came into
+					;  vogue...
+BiosAltKbdState	record
+    BAKS_ID_READ:1		; Kbd ID read in progress
+    BAKS_FIRST_ID_RECVD:1	; First char of Kbd ID received
+    BAKS_FORCE_NUM_LOCK:1	; Force Num Lock always
+    BAKS_EXTENDED:1		; Set if 101/102 key kbd installed
+    BAKS_RIGHT_ALT:1		; Right ALT key down
+    BAKS_RIGHT_CTRL:1		; Right CTRL key down
+    BAKS_E0_RECVD:1		; Last code was E0 hidden key (extended shift)
+    BAKS_E1_RECVD:1		; Last code was E1 hidden key (extended ctrl)
+BiosAltKbdState	end
+
+BIOS_LED_STATE		=98h		; Byte describing state of LEDs and
+					;  setting there of.
+BiosLEDState	record
+    BLS_XMIT_ERR:1		; Error transmitting to keyboard
+    BLS_MODE_UPDATE:1		; Now updating LED indicators
+    BLS_RESEND_RECVD:1		; RESEND command received
+    BLS_ACK_RECVD:1		; ACK received
+    :1=0
+    BLS_LEDS:3			; Current LED state
+BiosLEDState	end
+
+BIOS_KBD_SCROLL_LOCK_OFFSET= 4		; Bit offset for toggle state
+KeyboardOptions	record
+	:2
+	KO_FORCE_XT:1		;TRUE: force XT mode
+	KO_FORCE_AT:1		;TRUE: force AT mode
+	KO_DOES_LEDS:1		; Non-zero if we think the keyboard
+				;  can handle the SET_LED command
+				;  that first came into existence
+				;  on the AT with the 8042 controller.
+				;  Thought up by a deranged engineer
+				;  at IBM, this sequence has been
+				;  emulated in a few PCs, but we won't
+				;  go into that here...
+	KO_ALT_GR:1		;TRUE: right <Alt> is <Alt Gr>
+	KO_SHIFT_RELEASE:1	;TRUE: <Shift> release <Caps Lock>
+	KO_SWAP_CTRL:1		;TRUE: swap <Ctrl> and <Caps Lock>
+KeyboardOptions	end
+
+
+;
+; Controller commands understood by controller via writes to KBD_COMMAND_PORT
+;
+KBD_CMD_GET_CCB		equ	20h
+				; Get controller command byte. After sending
+				; this command, the controller command byte
+				; can be read from KBD_DATA_PORT.  Format is
+				; the same as that used to set the command
+				; byte using KBD_CMD_SET, below.
+
+KBD_CMD_SET_CCB		equ	60h
+				; Set controller command byte.  After sending
+				; this command, send the desired command
+				; byte to KBD_DATA_PORT, in the following
+				;  format:
+				;
+				; bit 7:  RESERVED: should be written as 0
+				; bit 6:  PC compatibility mode (?)
+				; bit 5:  PC mode (?)
+				; bit 4:  Disable Keyboard (active high)
+				; bit 3:  Inhibit Override (active high)
+				;	  -- forces override of 
+				;	  "Disable Keyboard" function
+				; bit 2:  System Flag (?) The value written
+				;	  here is placed in the system flag bit
+				;	  of the controller's status register
+				; bit 1:  RESERVED: should be written as 0
+				; bit 0:  Enable Output-Buffer-Full Interrupt
+				;	  (active high)
+KbdCommandBits	record
+    :1=0			; reserved
+    KCB_XLATE_SCAN_CODES:1	; translate from AT scan codes to XT scan codes
+    KCB_XT_KEYBOARD:1		; support XT-style keyboard
+    KCB_DISABLE_KEYBOARD:1	; prevent keyboard from sending anything
+    KCB_OVERRIDE_DISABLE:1	; allows sending of data, but non-response
+				;  bytes (i.e. scan codes) received are
+				;  discarded.
+    KCB_SYSTEM_FLAG:1		; see above
+    KCB_AUX_IEN:1		; enable interrupts for auxiliary port
+    KCB_INTERRUPT_ENABLE:1	; enable output-buffer-full interrupt
+KbdCommandBits end
+
+KbdHotkeyFlags	record		; flags to keep track of hotkeys
+	:5
+	KHF_ALL_HOTKEY:1
+	KHF_HOTKEY_PENDING:1
+	KHF_HAVE_HOTKEY:1
+KbdHotkeyFlags	end
+
+
+KBD_CMD_DISABLE_INTERFACE	equ	0adh
+				; Disables the interface between an AT
+				;  controller and its keyboard. Data
+				;  can be neither sent nor received.
+
+KBD_CMD_ENABLE_INTERFACE	equ	0aeh
+				; Enables the interface between an AT
+				;  controller and its keyboard.
+
+KBD_COMMAND_PORT	equ	64h
+				; keyboard controller command port.
+
+; Scan codes of extended shift & ctrl keys. These keys do not
+; really exist, but are generated by some extended keyboards.
+;
+EXT_LSHIFT_PRESS	equ	0xe02a
+EXT_LSHIFT_RELEASE	equ	0xe0aa
+EXT_RSHIFT_PRESS	equ	0xe036
+EXT_RSHIFT_RELEASE	equ	0xe0b6
+
+EXT_LCTRL_PRESS		equ	0xe11d
+EXT_LCTRL_RELEASE	equ	0xe19d
+EXT_RCTRL_PRESS		equ	0xe177
+EXT_RCTRL_RELEASE	equ	0xe1f7
+
+;
+;
+;	Mouse Things
+;
+
+MouseFuncs	etype	byte
+    MF_RESET			enum	MouseFuncs
+    MF_SHOW_CURSOR		enum	MouseFuncs
+    MF_HIDE_CURSOR		enum	MouseFuncs
+    MF_GET_POS_AND_BUTTONS	enum	MouseFuncs
+    MF_SET_POS			enum	MouseFuncs
+    MF_GET_BUTTON_PRESS_INFO	enum	MouseFuncs
+    MF_GET_BUTTON_RELEASE_INFO	enum	MouseFuncs
+    MF_SET_X_LIMITS		enum	MouseFuncs
+    MF_SET_Y_LIMITS		enum	MouseFuncs
+    MF_DEFINE_GRAPHICS_CURSOR	enum	MouseFuncs
+    MF_DEFINE_TEXT_CURSOR	enum	MouseFuncs
+    MF_READ_MOTION		enum	MouseFuncs
+    MF_DEFINE_EVENT_HANDLER	enum	MouseFuncs
+    MF_ENABLE_LIGHT_PEN		enum	MouseFuncs
+    MF_DISABLE_LIGHT_PEN	enum	MouseFuncs
+    MF_SET_ACCELERATOR		enum	MouseFuncs
+    MF_CONDITIONAL_HIDE_CURSOR	enum	MouseFuncs
+    MF_SET_ACCEL_THRESHOLD	enum	MouseFuncs
+
+MouseEvents	record
+    ME_MIDDLE_RELEASE:1
+    ME_MIDDLE_PRESS:1
+    ME_RIGHT_RELEASE:1
+    ME_RIGHT_PRESS:1
+    ME_LEFT_RELEASE:1
+    ME_LEFT_PRESS:1
+    ME_MOTION:1
+MouseEvents	end
+
+ifdef WIN32
+	NT_DRIVER = -1
+else
+	NT_DRIVER = 0
+endif
+
+	RESP_NT_DRIVER = 0
+	DO_EXTENDED_CHARACTER_SET	equ	FALSE
+
+if NT_DRIVER
+GeosVDDFuncs	etype	word
+VDD_FUNC_DRAW_SCANLINE   enum GeosVDDFuncs, 102
+VDD_FUNC_GET_LAST_KEY	enum GeosVDDFuncs, 103
+VDD_FUNC_MOUSE_MOVE	enum GeosVDDFuncs, 104
+VDD_FUNC_MOUSE_FUNC	enum GeosVDDFuncs, 105
+VDD_FUNC_DISPATCH_MESSAGES enum GeosVDDFuncs, 106
+VDD_FUNC_GET_EVENT_TYPE enum GeosVDDFuncs, 107
+
+EVENT_KEYBD equ 1
+EVENT_MOUSE equ 2
+
+;
+; These are the bits expected by MouseSendEvents for the current state of
+; the mouse buttons. A 1 implies the button is up. This record is in the
+; "wrong" order because of historical inertia.
+
+MouseButtonBits record MB_DELTA:1=1, MOUSE_B3:1=1, MOUSE_B0:1=1, MOUSE_B1:1=1, MOUSE_B2:1=1
+; use for a digitizer pen
+PEN_UP   equ (mask MOUSE_B0 or mask MOUSE_B1 or mask MOUSE_B2 or mask MOUSE_B3)
+PEN_DOWN equ (mask MOUSE_B1 or mask MOUSE_B2 or mask MOUSE_B3)
+
+endif
+

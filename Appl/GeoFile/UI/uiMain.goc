@@ -1,0 +1,1787 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC/GEOS
+MODULE:		GeoFile/UI
+FILE:		uiMain.goc
+
+AUTHOR:		John D. Mitchell
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.05.20	Initial version.
+	JDM	92.06.15	Broke out Modify menu to separate file.
+	JDM	92.07.01	Moved Record Navigator to FlatFile.
+	JDM	92.10.27	Broke out Marked Records and Layout stuff
+				to separate files due to MetaBlam.  Added
+				User Interface Level support.
+
+DESCRIPTION:
+	This file contains most of GeoFile's main-line UI code.
+
+	$Id: uiMain.goc,v 1.3 98/04/28 12:31:25 joon Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Include Files
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>		/* PC/GEOS Standard Applications.	*/
+
+#include <Ansi/string.h>	/* Standard C.	*/
+
+@include <gcnlist.goh>		/* PC/GEOS Libraries.	*/
+@include <grobj.goh>
+@include <spool.goh>
+#include <graphics.h>
+#include <gstring.h>
+@include <Objects/genC.goh>
+#include <Objects/FlatFile/ffExBld.h>
+@include <Objects/FlatFile/ffExBldC.goh>
+@include <Objects/FlatFile/ffFldPr.goh>
+@include <Objects/FlatFile/ffFldPrC.goh>
+@include <Objects/FlatFile/ffTChstC.goh>
+@include <Objects/FlatFile/ffDbaseC.goh>
+@include <Objects/FlatFile/ffRecC.goh>
+@include <Objects/FlatFile/ffGrObjC.goh>
+@include <Objects/gValueC.goh>
+@include <Objects/gViewCC.goh>
+@include <Objects/Text/tCtrlC.goh>
+@include <impex.goh>
+@include <gfButton.goh>
+
+@define	__GF_UI_MAIN_GOC	/* Don't over-define.	*/
+@include <geofile.goh>		/* GeoFile Application.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Icons
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@start	AppIconAreaCMonikerResource, data;
+
+/* Miscellaneous.	*/
+@include <Art/RASC.goh>
+@include <Art/RASM.goh>
+@include <Art/RASCGA.goh>
+@include <Art/LtArSC.goh>
+@include <Art/LtArSM.goh>
+@include <Art/LtArSCGA.goh>
+
+/* Sorting/Marked Records.	*/
+@include <Art/ASSC.goh>
+@include <Art/ASSM.goh>
+@include <Art/ASSCGA.goh>
+@include <Art/DSSC.goh>
+@include <Art/DSSM.goh>
+@include <Art/DSSCGA.goh>
+@include <Art/DPSC.goh>
+@include <Art/DPSM.goh>
+@include <Art/DPSCGA.goh>
+@include <Art/IPSC.goh>
+@include <Art/IPSM.goh>
+@include <Art/IPSCGA.goh>
+
+@include "Art/dmicon.goh"
+@include "Art/demicon.goh"
+@include "Art/srmicon.goh"
+@include "Art/mrmicon.goh"
+
+@end	AppIconAreaCMonikerResource;
+
+/*
+ * Miscellaneous.
+ */
+@include <Art/SrtOrAr.goh>
+@include <Art/GeoFile.goh>   	/* app icon */
+@include <Art/GeoFileT.goh>   	/* tiny app icon */
+@include <Art/GeoFileD.goh>   	/* document icons */
+
+
+/*
+ *              Application Object
+ *
+ * The very top-level generic object of an application MUST be a GenApplication
+ * object. The geofile.gp file contains "appobj" statement which indicates
+ * that this "GeoFileApp" object is in fact the top-level UI object.
+ * This object should be in its own resource so that GeoManager can load it
+ * quickly to grab the icon for this application. GeoManager will store this
+ * icon in its "Token Database", so that the icon image can be reused quickly.
+ */
+
+@start  ApplicationUI ;
+
+@object GeoFileApplicationClass GeoFileApp = {
+    GI_visMoniker = list { 
+			@GeoFileTextMoniker,
+			@GeoFileLCMoniker,
+			@GeoFileLMMoniker,
+			@GeoFileSCMoniker,
+			@GeoFileSMMoniker,
+			@GeoFileYCMoniker,
+			@GeoFileYMMoniker,
+			@GeoFileSCGAMoniker,
+			@GeoFileTinyTCMoniker,
+			@GeoFileTinyTMMoniker,
+			@GeoFileTinyTCGAMoniker
+			}
+
+    /*
+     * The GenApplication object only has one child: the main application
+     * window.
+     */
+
+    GI_comp = @GeoFilePrimary;
+
+    /*
+     * The main window should appear on-screen when the application is
+     * launched.
+     */
+
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) =
+		@GeoFilePrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) =
+		@GeoFileDocumentControl;
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) =
+		@GeoFileDocumentControl,
+		@GFDisplayControl,
+		@GFViewControl,
+		@GFTabControl;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_STARTUP_LOAD_OPTIONS) =
+		@UserLevelList;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+		@GeoFileDocumentControl,
+		@GeoFileImportControl,
+		@GeoFileExportControl,
+	    	@GFPrintControl,
+	    	@GFPageSizeControl,
+		@GFEditControl,
+		@GFDisplayControl,
+		@GFGrObjTools,
+		@GFSearchControl,
+	    	@TreasureChest,
+    	    	@ComputedFieldEBController,
+    	    	@DefaultValueEBController,
+		@CreateNewFieldUIController,
+		@FieldPropUIController,
+		@RCPController,
+		@GFViewControl,
+	        @GFInstructionControl;
+    ATTR_GEN_INIT_FILE_CATEGORY	= "geofile";
+    ATTR_GEN_APPLICATION_PRINT_CONTROL = @GFPrintControl;
+ /*   ATTR_GEN_APPLICATION_SAVE_OPTIONS_TRIGGER = @SaveOptionsTrigger; */
+}
+
+@visMoniker GeoFileTextMoniker = "GeoFile";
+
+@end	ApplicationUI;
+
+
+@start	APPSCMONIKERRESOURCE, data;
+
+@visMoniker GFDatafileMonikerList = list {
+    	    	    	    	@GeoFileDocLCMoniker,
+				@GeoFileDocLMMoniker,
+				@GeoFileDocSCMoniker,
+				@GeoFileDocSMMoniker,
+				@GeoFileDocYCMoniker,
+				@GeoFileDocYMMoniker,
+				@GeoFileDocSCGAMoniker,
+				@GeoFileDocTCMoniker
+}
+
+@end	APPSCMONIKERRESOURCE;
+
+/*
+ *		Primary window
+ *
+ */
+
+@start	Interface;
+
+@object GenPrimaryClass GeoFilePrimary  = {
+
+    /*
+     * NOTE:	Do *not* change the order of these children unless you also
+     *		change the MSG_GEN_PROCESS_OPEN_APPLICAITON handler!  The
+     *		offset commented entries are the items that are actually
+     *		contained in different files and linked into the the tree
+     *		dynamically.
+     */
+    GI_comp = 	@FileMenu,
+		@EditMenu,
+		@GFViewControl,
+    	    	@OptionsMenu,
+	/* LayoutMenu		*/
+	/* MarkMenu		*/
+	/* GraphicsMenu		*/
+	/* PropertiesMenu	*/
+		@DataMenu,
+		@GFDisplayControl,
+		@GFToolbar,
+    	    	@TreasureChest,
+		@GFDisplayArea,
+		@GFGrObjTools,
+    	    	@FieldPropUIController,
+    	    	@ComputedFieldEBController,
+    	    	@DefaultValueEBController,
+    	    	@CreateNewFieldUIController,
+		@RCPController,
+		@ModalIconsArea,
+		@DelAllMarkedProgDBox;     /* this needs to be #20 - jfh */
+	/* MarkOptionsDialog		*/
+	/* QuickMarkDialog		*/
+	/* RenameLayoutDialog		*/
+	/* ChooseLayoutDialog		*/
+	/* RecordNavigationOrderBox	*/
+	/* FieldnavigationOrderBox	*/
+	/* SubsetExpressionBuilder	*/
+
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+
+    HINT_PRIMARY_FULL_SCREEN;
+    ATTR_GEN_HELP_CONTEXT = "TOC";
+    ATTR_GEN_WINDOW_KBD_OVERRIDE = KO_KEYBOARD_REQUIRED;
+}
+
+@end	Interface;
+
+/***************************************/
+
+
+/*
+ *      File menu and Window menu
+ */
+
+@start Interface;
+
+/* gotta add it somewhere and this is easiest - jfh */
+@object GenInteractionClass DelAllMarkedProgDBox = {
+	 GI_visMoniker = "Delete Status";
+	 GI_comp = @IPCount;
+	 GII_visibility = GIV_DIALOG;
+//    GII_type = GIT_NOTIFICATION;
+	 GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+    HINT_WINDOW_NO_SYS_MENU;
+}
+
+@object GenTextClass IPCount = {
+	 GI_visMoniker = "  Records deleted:";
+	 GI_attrs	= GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_text = "0";
+    @localize not;
+    HINT_MINIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 7, 0, 0};
+    HINT_TEXT_NO_FRAME;
+}
+/* ---------------------------------------- */
+
+@object GenInteractionClass FileMenu = {
+    GI_comp = @GeoFileDocumentControl,
+	      @GeoFileExportGroup,
+	      @GeoFileImportControl,
+	      @GFPrintSubgroup;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+}
+
+@end Interface;
+
+@start FileEditViewMenuUI;
+
+@object GenInteractionClass GFPrintSubgroup = {
+    GI_comp = @GFPrintControl, @GFPageSizeControl;
+    GII_visibility =  GIV_SUB_GROUP;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+}
+
+@object PrintControlClass GFPrintControl = {
+    PCI_attrs = @default | PCA_SHOW_PROGRESS | PCA_PROGRESS_PAGE |
+	PCA_MARK_APP_BUSY;
+    GCI_output = (TO_APP_MODEL);
+    PCI_output = (TO_APP_MODEL);
+    PCI_docNameOutput = (TO_APP_MODEL);
+    GI_states	= @default | GS_ENABLED;
+    ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *) &GeoFileDocumentClass};
+    HINT_SAME_CATEGORY_AS_PARENT;
+    ATTR_GEN_CONTROL_DO_NOT_USE_LIBRARY_NAME_FOR_HELP;
+}
+
+@object PageSizeControlClass GFPageSizeControl = {
+    GI_visMoniker = 'z', "Page Size";
+    GI_states	= @default | GS_ENABLED;
+    GCI_output = (TO_APP_MODEL);
+    ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *) &GeoFileDocumentClass};
+    ATTR_PAGE_SIZE_CONTROL_UI_CHANGES = {(TO_APP_MODEL),
+					 MSG_GFD_REPORT_PSZ_CHANGE};
+    ATTR_GEN_CONTROL_REQUIRE_UI = (word) PSIZECF_MARGINS;
+    ATTR_GEN_CONTROL_APP_UI = (@GFRecordSize);
+    HINT_SAME_CATEGORY_AS_PARENT;
+}
+
+@object GenInteractionClass GFRecordSize = {
+    GI_visMoniker = "Single record size";
+    GI_states = @default & ~GS_USABLE;
+    GI_comp = @GFRecordWidth, @GFRecordHeight /*, GFRecordApplyTrigger*/;
+    GII_visibility = GIV_SUB_GROUP;
+    HINT_SAME_CATEGORY_AS_PARENT;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_DRAW_IN_BOX;
+    HINT_PLACE_MONIKER_ABOVE;
+}
+
+@end FileEditViewMenuUI
+
+@start Interface;
+
+@object GenDisplayControlClass GFDisplayControl =
+{
+    	GII_visibility = GIV_POPUP;
+	GI_attrs = @default | GA_KBD_SEARCH_PATH;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_WINDOW_MENU);
+	HINT_DISPLAY_CONTROL_NO_FEATURES_IF_TRANSPARENT_DOC_CTRL_MODE;
+	HINT_GEN_CONTROL_SCALABLE_UI_DATA [2] =
+	{
+		{
+		GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		UIIL_INTRODUCTORY,
+		GDCTF_DISPLAY_LIST
+		},
+		{
+		GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		UIIL_INTERMEDIATE,
+		GDC_DEFAULT_FEATURES
+		}
+	};
+}
+
+@end Interface
+
+
+/*
+ *	Edit menu
+ */
+@start Interface;
+
+@object GenInteractionClass EditMenu =
+{
+	GI_comp		= @GFEditControl,
+			  @EditRecordGroup;
+	GII_visibility	= GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_EDIT_MENU);
+        GI_attrs = @default | GA_KBD_SEARCH_PATH;
+
+}
+
+@end Interface
+
+@start FileEditViewMenuUI;
+
+@object GenEditControlClass GFEditControl =
+{
+	GII_visibility = GIV_SUB_GROUP;
+	ATTR_GEN_CONTROL_PROHIBIT_UI =
+		{
+		~(GECF_CUT | GECF_COPY | GECF_PASTE |
+		  GECF_SELECT_ALL | GECF_DELETE)
+		};
+	ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI =
+		{
+		~(GECF_CUT | GECF_COPY | GECF_PASTE |
+		  GECF_SELECT_ALL | GECF_DELETE)
+		};
+}
+
+@object GenInteractionClass EditRecordGroup =
+{
+	GI_comp		= @DeleteMarkedTrigger;
+}
+
+@object	GenTriggerClass DeleteMarkedTrigger =
+{
+	GI_visMoniker	= 'M', "Delete All Marked";
+	GI_attrs	= @default | GA_INITIATES_INPUT_IGNORE;
+	GTI_actionMsg	= MSG_GF_SUBSET_DELETE_ALL_MARKED;
+	GTI_destination	= process;
+}
+
+@end	FileEditViewMenuUI;
+
+/*
+ *      View menu
+ */
+@start	Interface;
+
+@object GenViewControlClass GFViewControl =
+{
+	GII_visibility	= GIV_POPUP;
+@ifdef	BULLET
+	ATTR_GEN_CONTROL_PROHIBIT_UI	= { GVCF_APPLY_TO_ALL };
+@endif
+	ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI	= { GVCTF_SCALE_TO_FIT };
+	ATTR_GEN_INTERACTION_GROUP_TYPE	= (GIGT_VIEW_MENU);
+	HINT_GEN_CONTROL_SCALABLE_UI_DATA [4] =
+	{
+		{
+		GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		UIIL_INTRODUCTORY,
+		GVC_SUGGESTED_INTRODUCTORY_FEATURES &
+			~(GVCF_MAIN_SCALE_TO_FIT | GVCF_SCALE_TO_FIT)
+		},
+		{
+		GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		UIIL_BEGINNING,
+		(GVC_SUGGESTED_BEGINNING_FEATURES &
+			~(GVCF_MAIN_SCALE_TO_FIT | GVCF_SCALE_TO_FIT))
+		},
+		{
+		GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		UIIL_INTERMEDIATE,
+		(GVC_DEFAULT_FEATURES &
+			~(GVCF_MAIN_SCALE_TO_FIT | GVCF_SCALE_TO_FIT))
+		},
+		{
+		GCSUIC_SET_TOOLBOX_FEATURES_IF_APP_LEVEL,
+		UIIL_ADVANCED,
+		(GVC_DEFAULT_TOOLBOX_FEATURES &
+			~GVCF_SCALE_TO_FIT)
+		}
+	};
+}
+
+@end	Interface;
+
+/*
+ *      Options menu
+ */
+@start	Interface;
+
+@object	GenInteractionClass OptionsMenu =
+{
+	GI_comp	        = @SetUserLevelDialog,
+	    	    	  @GFInstructionInteraction,
+			  @SaveResetGroup;
+	GII_visibility	= GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE	= GIGT_OPTIONS_MENU;
+}
+
+@end	Interface;
+
+/*
+ * SetUserLevelDialog and it's attendents are generated by setting up the
+ * following constant definitions and including "usrLevel.goh".
+ *
+ * Note that following are already set:
+ *		INTRODUCTORY_FEAUTURES,
+ *		BEGINNING_FEATURES,
+ *		INTERMEDIATE_FEATURES,
+ *		ADVANCED_FEATURES,
+ *		DEFAULT_FEATURES.
+ */
+@define RESOURCE_FOR_USER_LEVEL_DIALOG_TOP	OptionsMenuUI
+@define RESOURCE_FOR_USER_LEVEL_DIALOG_INSIDES	UserLevelUI
+@define USER_LEVEL_APPLICATION_OBJECT	GeoFileApp
+@define USER_LEVEL_FEATURES_LIST_OBJECT	@FeaturesList
+@define USER_LEVEL_SET_USER_LEVEL_MSG		\
+			MSG_GF_APPLICATION_SET_USER_LEVEL
+@define USER_LEVEL_INITIATE_FINE_TUNE_MSG	\
+			MSG_GF_APPLICATION_INITIATE_FINE_TUNE
+@define USER_LEVEL_FINE_TUNE_MSG		\
+			MSG_GF_APPLICATION_FINE_TUNE
+@define USER_LEVEL_CHANGE_USER_LEVEL_MSG		\
+			MSG_GF_APPLICATION_CHANGE_USER_LEVEL
+@define USER_LEVEL_CANCEL_USER_LEVEL_MSG		\
+			MSG_GF_APPLICATION_CANCEL_USER_LEVEL
+@define USER_LEVEL_STATUS_MSG	\
+			MSG_GF_APPLICATION_USER_LEVEL_STATUS
+@define USER_LEVEL_FINE_TUNE_TEXT	"Fine Tune GeoFile Features"
+
+
+@define	USER_LEVEL_INTRODUCTORY_TEXT \
+    "Simple Data Entry And Viewing. Create New Databases Based On Templates."
+
+@define	USER_LEVEL_BEGINNING_TEXT	\
+    "Advanced Data Entry And Viewing. Create New Databases Based On Templates."
+
+@define	USER_LEVEL_INTERMEDIATE_TEXT	\
+    "Basic Form Design And Layout. Advanced Data Entry And Viewing."
+
+@define	USER_LEVEL_ADVANCED_TEXT	\
+    "Advanced Form Design And Layout. Advanced Data Entry And Viewing." 
+
+
+@include <usrLevel.goh>
+
+
+@start	UserLevelUI;
+
+@object	GenBooleanGroupClass FeaturesList =
+{
+	GI_comp		= @DesignModeEntry,
+			  @GraphicsLayerEntry,
+			  @FieldOrganizerEntry,
+			  @MultiRecordEntry,
+			  @AdvancedFieldPropEntry,
+			  @FieldTabOrderEntry,
+			  @RecordOrderEntry,
+			  @MarkFeaturesEntry,
+			  @AdvancedSortEntry,
+			  @AdvancedMarkEntry,
+			  @AdvancedGraphicsEntry;
+	GBGI_selectedBooleans	= @DEFAULT_FEATURES;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object	GenBooleanClass DesignModeEntry =
+{
+	GI_visMoniker	= 'D', "Design Mode";
+	GBI_identifier	= @GFLF_DESIGN_MODE;
+}
+
+@object	GenBooleanClass GraphicsLayerEntry =
+{
+	GI_visMoniker	= 'G', "Graphics Layer";
+	GBI_identifier	= @GFLF_GRAPHICS_LAYER;
+}
+
+@object	GenBooleanClass FieldOrganizerEntry =
+{
+	GI_visMoniker	= 'O', "Field Organizer";
+	GBI_identifier	= @GFLF_FIELD_ORGANIZER;
+}
+
+@object	GenBooleanClass MultiRecordEntry =
+{
+	GI_visMoniker	= 'M', "Multi-Record Layout";
+	GBI_identifier	= @GFLF_MULTI_RECORD_LAYOUT;
+}
+
+@object	GenBooleanClass AdvancedFieldPropEntry =
+{
+	GI_visMoniker	= 'F', "Advanced Field Properties";
+	GBI_identifier	= @GFLF_ADVANCED_FIELD_PROPERTIES;
+}
+
+@object	GenBooleanClass FieldTabOrderEntry =
+{
+	GI_visMoniker	= 'T', "Field Tab Order";
+	GBI_identifier	= @GFLF_FIELD_TAB_ORDER;
+}
+
+@object	GenBooleanClass RecordOrderEntry =
+{
+	GI_visMoniker	= 'R', "Record Order";
+	GBI_identifier	= @GFLF_RECORD_ORDER;
+}
+
+@object	GenBooleanClass MarkFeaturesEntry =
+{
+	GI_visMoniker	= 'k', "Mark Records";
+	GBI_identifier	= @GFLF_MARK_FEATURES;
+}
+
+@object	GenBooleanClass AdvancedSortEntry =
+{
+	GI_visMoniker	= 'A', "Advanced Sort";
+	GBI_identifier	= @GFLF_ADVANCED_SORT;
+}
+
+@object	GenBooleanClass AdvancedMarkEntry =
+{
+	GI_visMoniker	= 'b', "Mark by Formula";
+	GBI_identifier	= @GFLF_ADVANCED_MARK;
+}
+
+@object	GenBooleanClass AdvancedGraphicsEntry =
+{
+	GI_visMoniker	= 'v', "Advanced Graphics and Text";
+	GBI_identifier	= @GFLF_ADVANCED_GRAPHICS;
+}
+
+@end	UserLevelUI;
+
+@start	OptionsMenuUI;
+
+@object GenInteractionClass GFInstructionInteraction = {
+    	GI_comp = @GFInstructionControl;
+	GII_visibility = GIV_SUB_GROUP;
+}	
+						       
+@object GrObjInstructionControlClass GFInstructionControl =
+{
+	GI_visMoniker = 'A', "Annotations";
+	GII_visibility = GIV_POPUP;
+}
+
+@object GenInteractionClass SaveResetGroup =
+{
+	GI_comp	    	= @SaveOptionsTrigger, @ResetOptionsTrigger;
+}
+
+@object	GenTriggerClass SaveOptionsTrigger =
+{
+	GI_visMoniker	= 'v', "Save Configuration";
+	GTI_actionMsg	= MSG_META_SAVE_OPTIONS;
+	GTI_destination	= GeoFileApp;
+}
+
+@object	GenTriggerClass ResetOptionsTrigger =
+{
+	GI_visMoniker	= 'e', "Reset Configuration";
+	GTI_actionMsg	= MSG_GF_APPLICATION_QUERY_RESET_OPTIONS;
+	GTI_destination	= GeoFileApp;
+}
+
+@end	OptionsMenuUI;
+
+/*
+ *      Mode menu
+ */
+@start	Interface;
+
+@object GenItemGroupClass ModeList =
+{
+    GI_comp =	@DesignItem, 
+		@DataEntryItem;
+    GIGI_selection = MT_DESIGN;
+    GIGI_numSelections	= 1;
+    GIGI_behaviorType = GIGBT_EXCLUSIVE;
+    GIGI_destination = process;
+    /*ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_GF_SET_MODE_MENUS;*/
+    GIGI_applyMsg = MSG_GF_SET_MODE_MENUS;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_ITEM_GROUP_TOOLBOX_STYLE;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH | GA_INITIATES_INPUT_IGNORE;
+    GI_states = @default & ~GS_USABLE;
+    ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS = 0;
+}
+
+@object /*Titled*/GenItemClass DesignItem =
+{
+ //   TGI_title = "Design";
+  //  TGI_pictureNumber = PN_DESIGN;
+	 GI_visMoniker = list {@DesignModeLCMoniker, @DesignModeButtonText};
+	 GII_identifier = MT_DESIGN;
+    GI_kbdAccelerator = control shift 'd';
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {ITMF_POSITION_ICON_ABOVE_TEXT, 0};
+}
+@visMoniker DesignModeButtonText = "Design";
+
+@object /*Titled*/GenItemClass DataEntryItem =
+{
+ //   TGI_title = "Data Entry";
+ //   TGI_pictureNumber = PN_DATA_ENTRY;
+	 GI_visMoniker = list {@DataEntryModeLCMoniker, @DataEntryModeButtonText};
+	 GII_identifier = MT_DATA_ENTRY;
+    GI_kbdAccelerator = control shift 'e';
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+	 HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {ITMF_POSITION_ICON_ABOVE_TEXT, 0};
+}
+@visMoniker DataEntryModeButtonText = "Data Entry";
+
+@object GenItemGroupClass DesignOptionsList = {
+    GI_comp = 	@RecordDesignItem,
+		@PageDesignItem;
+    GIGI_selection = LT_SINGLE_RECORD;
+    GIGI_numSelections	= 1;
+    GIGI_behaviorType = GIGBT_EXCLUSIVE;
+    GIGI_destination = process;
+    GIGI_applyMsg = MSG_GF_SWITCH_LAYOUT_DISPLAY;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_ITEM_GROUP_TOOLBOX_STYLE;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH | GA_INITIATES_INPUT_IGNORE;
+    GI_states = @default & ~GS_USABLE;
+    ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS = 0;
+}
+
+@object /*Titled*/GenItemClass RecordDesignItem =
+{
+ //   TGI_title = "Single-Record";
+ //   TGI_pictureNumber = PN_SINGLE_RECORD;
+	 GI_visMoniker = list {@SingleRecModeLCMoniker, @SingleRecModeButtonText};
+	 GII_identifier = LT_SINGLE_RECORD;
+    GI_kbdAccelerator = control shift 'r';
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+	 HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {ITMF_POSITION_ICON_ABOVE_TEXT, 0};
+}
+@visMoniker SingleRecModeButtonText = "Single-Record";
+
+@object /*Titled*/GenItemClass PageDesignItem =
+{
+  //  TGI_title = "Multi-Record";
+ //   TGI_pictureNumber = PN_MULTI_RECORD;
+	 GI_visMoniker = list {@MultiRecModeLCMoniker, @MultiRecModeButtonText};
+	 GII_identifier = LT_MULTI_RECORD;
+    GI_kbdAccelerator = control shift 'm';
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+	 HINT_USE_ICON_TEXT_COMBINATION_MONIKER = {ITMF_POSITION_ICON_ABOVE_TEXT, 0};
+}
+@visMoniker MultiRecModeButtonText = "Multi-Record";
+
+@end	Interface;
+
+/***************************************/
+
+/*
+ * Commented out for the prototype
+ */
+@if 0
+
+@object GenBooleanGroupClass ShowGraphicObjectsList = {
+    GI_comp =	ShowGridLinesEntry;
+    GBGI_selectedBooleans = SHOW_GRID_LINES | SHOW_GRAPHICS;
+}
+
+@object GenBooleanClass ShowGridLinesEntry = {
+    GI_visMoniker = 'S', "Show Grid Lines";
+    GBI_identifier = SHOW_GRID_LINES;
+}
+
+@object GenBooleanClass DatabaseAdvancedFieldCreationEntry = {
+    GI_visMoniker = 'A", "Advanced Field Creation";
+    GBI_identifier = DATABASE_ADVANCED_FIELD_CREATION;
+}
+@endif
+
+@start	ToolUI;
+
+@chunk TCHAR GFToolbarName[] = _TEXT("Toolbar");
+
+@object GenInteractionClass GFToolbar = {
+    HINT_TOOLBOX;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_ALLOW_CHILDREN_TO_WRAP;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    GI_comp = @GFCutCopyPasteDeleteToolGroup,
+    	      @GFTextJustificationToolGroup,
+    	      @GFTextFontToolGroup,
+    	      @GFTextStyleToolGroup,
+    	      @GFTextSizeToolGroup;
+    GI_states = @default & ~GS_USABLE;
+}
+
+
+@object GenInteractionClass GFLeftSideToolbar = {
+    HINT_TOOLBOX;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_ALLOW_CHILDREN_TO_WRAP;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    GI_comp = @GFGrObjToolToolGroup;
+    GI_states = @default & ~GS_USABLE;
+}
+
+@object GenToolGroupClass GFGrObjToolToolGroup = {
+    GTGI_controller = GFGrObjTools;
+    HINT_SAME_ORIENTATION_AS_PARENT;
+    HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass GFTextJustificationToolGroup = {
+    GTGI_controller = GFTextJustificationControl;
+    HINT_SAME_ORIENTATION_AS_PARENT;
+    HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass GFTextFontToolGroup = {
+    GTGI_controller = GFFontControl;
+    HINT_SAME_ORIENTATION_AS_PARENT;
+    HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass GFTextStyleToolGroup = {
+    GTGI_controller = GFStyleControl;
+    HINT_SAME_ORIENTATION_AS_PARENT;
+    HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass GFTextSizeToolGroup = {
+    GTGI_controller = GFTextSizeControl;
+    HINT_SAME_ORIENTATION_AS_PARENT;
+    HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenToolGroupClass GFCutCopyPasteDeleteToolGroup = {
+    GTGI_controller = GFEditControl;
+    HINT_SAME_ORIENTATION_AS_PARENT;
+    HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GrObjToolControlClass GFGrObjTools = {
+    HINT_GEN_CONTROL_SCALABLE_UI_DATA [2] =
+    {
+	{
+	GCSUIC_SET_TOOLBOX_FEATURES_IF_APP_FEATURE_ON,
+	@GFLF_GRAPHICS_LAYER,
+	GOTCF_PTR | GOTCF_TEXT | GOTCF_LINE | GOTCF_ROTATE_PTR | 
+	GOTCF_RECT | GOTCF_ROUNDED_RECT
+	},
+	{
+	GCSUIC_SET_TOOLBOX_FEATURES_IF_APP_FEATURE_ON,
+	@GFLF_ADVANCED_GRAPHICS,
+	GOTC_DEFAULT_TOOLBOX_FEATURES
+	},
+    };
+}
+
+@end	ToolUI;
+
+/*
+ *      Field menu
+ */
+@start	MenuUI;
+
+@object FFFieldPropertiesClass CreateNewFieldUIController = {
+    FFFP_context = FFFPC_CREATE_NEW_FIELD;
+    FFFP_computedFieldExpressionBuilderOptr = @ComputedFieldEBController;
+    FFFP_defaultValueExpressionBuilderOptr = @DefaultValueEBController;
+
+    HINT_GEN_CONTROL_SCALABLE_UI_DATA [3] =
+    {
+	{
+	GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+	UIIL_INTERMEDIATE,
+	FFFP_INTERMEDIATE_FEATURES
+	},
+	{
+	GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+	UIIL_ADVANCED,
+	FFFP_ADVANCED_FEATURES
+	},
+	{
+	GCSUIC_ADD_NORMAL_FEATURES_IF_APP_FEATURE_ON,
+	@GFLF_ADVANCED_FIELD_PROPERTIES,
+	FFFP_DATA_TYPE_FEATURE | FFFP_DATA_ATTRS_FEATURE | 
+		FFFP_COMPUTED_DATA_TYPE_FEATURE | FFFP_FIELD_ATTRS_FEATURE
+	},
+    };
+    HINT_FFFP_MAKE_MODAL;
+}
+
+@object FFFieldPropertiesClass FieldPropUIController = {
+    FFFP_context = FFFPC_FIELD_PROPERTIES;
+    FFFP_computedFieldExpressionBuilderOptr = @ComputedFieldEBController;
+    FFFP_defaultValueExpressionBuilderOptr = @DefaultValueEBController;
+    GII_type = GIT_PROPERTIES;
+    HINT_GEN_CONTROL_SCALABLE_UI_DATA [3] =
+    {
+	{
+	GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+	UIIL_INTERMEDIATE,
+	FFFP_EDIT_FIELD_INTERMEDIATE_FEATURES
+	/*FFFP_EDIT_FIELD_DEFAULT_FEATURES,*/
+	},
+	{
+	GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+	UIIL_ADVANCED,
+	FFFP_EDIT_FIELD_ADVANCED_FEATURES
+	},
+	{
+	GCSUIC_ADD_NORMAL_FEATURES_IF_APP_FEATURE_ON,
+	@GFLF_ADVANCED_FIELD_PROPERTIES,
+	FFFP_DATA_TYPE_FEATURE | FFFP_DATA_ATTRS_FEATURE 
+		| FFFP_COMPUTED_DATA_TYPE_FEATURE | FFFP_FIELD_ATTRS_FEATURE
+	},
+    };
+}
+
+@object FFExpressionBuilderClass ComputedFieldEBController = {
+    GII_attrs = GIA_NOT_USER_INITIATABLE;
+    FFEB_context = FFEBFC_COMPUTED_FIELDS;
+}
+
+@object FFExpressionBuilderClass DefaultValueEBController = {
+    GII_attrs = GIA_NOT_USER_INITIATABLE;
+    FFEB_context = FFEBFC_DEFAULTS;
+}
+
+@end	MenuUI;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Data Menu
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@start	Interface;
+
+@object GenInteractionClass DataMenu =
+{
+	GI_visMoniker	= 'D',"Data";
+	GI_comp		= @GFSearchControl,
+			  @QuickSortDialogTrigger,
+			  @SortDialogTrigger,
+			  @RecalcTrigger;
+	GII_visibility	= GIV_POPUP;
+	GI_states	= @default & ~GS_USABLE;
+}
+
+@end Interface;
+
+@start MenuUI;
+
+@object SearchReplaceControlClass GFSearchControl =
+{
+	GI_visMoniker	= 'F',"Find";
+	GII_visibility	= GIV_DIALOG;
+	ATTR_GEN_DESTINATION_CLASS =
+		{(ClassStruct *) &FlatFileDatabaseClass};
+	ATTR_GEN_CONTROL_PROHIBIT_UI =
+		~ (SRCF_FIND_NEXT | SRCF_FIND_PREV |
+		   SRCF_PARTIAL_WORDS | SRCF_IGNORE_CASE |
+		   SRCF_WILDCARDS | SRCF_CLOSE);
+	HINT_GEN_CONTROL_SCALABLE_UI_DATA [2] =
+	{
+		{
+		GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		UIIL_BEGINNING,
+		SRC_SUGGESTED_BEGINNING_FEATURES
+		},
+		{
+		GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		UIIL_INTERMEDIATE,
+		SRC_DEFAULT_FEATURES
+		}
+	};
+	ATTR_GEN_HELP_CONTEXT = "dbFind";
+}
+
+@object	GenTriggerClass RecalcTrigger =
+{
+	GI_visMoniker	= 'R',"Recalculate";
+	GTI_actionMsg	= MSG_GF_DATA_RECALCULATE;
+	GTI_destination	= process;
+}
+
+@end	MenuUI;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Quick Sorting
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@start	MenuUI;
+
+@object	GenTriggerClass QuickSortDialogTrigger =
+{
+	GI_visMoniker	= 'S', "Sort";
+	GI_attrs	= @default |
+			  GA_INITIATES_INPUT_IGNORE |
+			  GA_INITIATES_BUSY_STATE;
+	GTI_actionMsg	= MSG_GF_QUICK_SORT_DIALOG_INITIATE;
+	GTI_destination	= process;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+	HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@end	MenuUI;
+
+
+@start	QuickSortUI,  notDetachable;
+
+@visMoniker SortOrderArrowMoniker = list
+{
+	@SortOrderArrowsSCMoniker,
+	@SortOrderArrowsSMMoniker,
+	@SortOrderArrowsSCGAMoniker
+}
+
+@object	GenInteractionClass QuickSortDialog =
+{
+	GI_comp		= @QuickSortFieldsInDBList,
+			  @QuickSortDirectionList,
+			  @QuickSortOptionsList,
+			  @QuickSortApplyTrigger,
+			  @QuickSortCancelTrigger;
+	GI_link	    	= @GeoFilePrimary;
+	GII_type	= GIT_COMMAND;
+	GII_attrs	= @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+	GII_visibility	= GIV_DIALOG;
+	HINT_INTERACTION_DISCARD_WHEN_CLOSED;
+	ATTR_GEN_HELP_CONTEXT = "dbQuickSort";
+}
+
+@object	GenDynamicListClass QuickSortFieldsInDBList =
+{
+	GI_visMoniker		= "Select Sort Field:";
+	GI_attrs		= @default | GA_INITIATES_INPUT_IGNORE;
+	GIGI_applyMsg		= MSG_GF_QUICK_SORT_FIELD_SELECTED;
+	GIGI_behaviorType	= GIGBT_EXCLUSIVE;
+	GIGI_numSelections	= 1;
+	GIGI_selection		= 0;
+	GIGI_destination	= process;
+	GDLI_queryMsg		= MSG_GF_QUICK_SORT_FIELDS_LIST_QUERY;
+	ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS	= MSG_GF_SORT_FDB_TO_SK;
+	HINT_FIXED_SIZE	=
+		{
+		SST_AVG_CHAR_WIDTHS | 25,
+		SST_LINES_OF_TEXT | 6, 6
+		};
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object	GenItemGroupClass QuickSortDirectionList =
+{
+	GI_visMoniker		= "Sort Direction:";
+	GI_comp			= @AscendingQuickSort,
+				  @DescendingQuickSort;
+	GIGI_applyMsg		= MSG_GF_QUICK_SORT_DIRECTION_CHANGED;
+	GIGI_destination	= process;
+	GIGI_numSelections	= 1;
+	GIGI_selection		= SORT_ASCENDING;
+	ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS	= 0;
+	HINT_ITEM_GROUP_TOOLBOX_STYLE;
+}
+
+@object GenItemClass AscendingQuickSort =
+{
+     	GI_visMoniker = list
+		{
+		@AscendingSortSCMoniker,
+		@AscendingSortSMMoniker,
+		@AscendingSortSCGAMoniker
+		};
+	GII_identifier = SORT_ASCENDING;
+}
+
+@object GenItemClass DescendingQuickSort =
+{
+     	GI_visMoniker = list
+		{
+		@DescendingSortSCMoniker,
+		@DescendingSortSMMoniker,
+		@DescendingSortSCGAMoniker
+		};
+	GII_identifier = SORT_DESCENDING;
+}
+
+@object	GenBooleanGroupClass QuickSortOptionsList=
+{
+	GI_visMoniker		= "Sort Options:";
+	GI_comp			= @QuickSortIgnoreCaseNAccents,
+				  @QuickSortIgnoreSpacesNPunctuation;
+	GBGI_applyMsg		= MSG_GF_SORT_SET_SORT_OPTIONS;
+	GBGI_destination	= process;
+	GBGI_selectedBooleans	= @GFSO_QUICK_SORT_DEFAULT_OPTIONS;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object	GenBooleanClass QuickSortIgnoreCaseNAccents =
+{
+@ifdef DO_PIZZA
+	GI_visMoniker	= 'W', "Ignore Case/Width";
+@else
+	GI_visMoniker	= 'A', "Ignore Case/Accents";
+@endif
+	GBI_identifier	= @FFDSO_IGNORE_CASE_AND_ACCENTS;
+}
+
+@object	GenBooleanClass QuickSortIgnoreSpacesNPunctuation =
+{
+	GI_visMoniker	= 'P', "Ignore Spaces/Punctuation";
+	GBI_identifier	= @FFDSO_IGNORE_SPACES_AND_PUNCTUATION;
+}
+
+@object	GenTriggerClass QuickSortApplyTrigger =
+{
+	GI_visMoniker	= 'S', "Sort";
+	GI_attrs	= @default |
+			  GA_INITIATES_INPUT_IGNORE |
+			  GA_SIGNAL_INTERACTION_COMPLETE;
+	GI_states	= @default & ~GS_ENABLED;
+	GTI_actionMsg	= MSG_GF_QUICK_SORT_SORT;
+	GTI_destination	= process;
+	HINT_SEEK_REPLY_BAR;
+	HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object	GenTriggerClass QuickSortCancelTrigger =
+{
+	GI_attrs	= @default |
+			  GA_INITIATES_INPUT_IGNORE |
+			  GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_actionMsg	= MSG_GF_QUICK_SORT_CANCEL;
+	GTI_destination	= process;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+	HINT_SEEK_REPLY_BAR;
+}
+
+@end	QuickSortUI;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Advanced Sorting
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@start	MenuUI;
+
+@object	GenTriggerClass SortDialogTrigger =
+{
+	GI_visMoniker	= 'A', "Advanced Sort";
+	GI_attrs	= @default |
+			  GA_INITIATES_INPUT_IGNORE |
+			  GA_INITIATES_BUSY_STATE;
+	GTI_actionMsg	= MSG_GF_SORT_DIALOG_INITIATE;
+	GTI_destination	= process;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@end	MenuUI;
+
+
+@start	AdvancedSortUI, notDetachable;
+
+@object	GenInteractionClass SortDialog =
+{
+	GI_comp		= @SortFieldsSubGroup,
+			  @SortAttrsGroup,
+			  @SortFieldNotes,
+			  @SortApplyTrigger,
+			  @SortClearTrigger,
+			  @SortCancelTrigger;
+	GI_link	    	= @GeoFilePrimary;
+	GII_type	= GIT_COMMAND;
+	GII_attrs	= @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+	GII_visibility	= GIV_DIALOG;
+	ATTR_GEN_HELP_CONTEXT = "dbAdvSort";
+	HINT_INTERACTION_DISCARD_WHEN_CLOSED;
+}
+
+@object	GenInteractionClass SortFieldsSubGroup =
+{
+	GI_comp		= @FieldsInDBList,
+			  @FieldsTransferButtonsInteraction,
+			  @FieldsSortKeyList;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object	GenDynamicListClass FieldsInDBList =
+{
+	GI_visMoniker	   = "Fields in Database";
+	GI_attrs	   = @default | GA_INITIATES_INPUT_IGNORE;
+	GIGI_applyMsg	   = MSG_GF_SORT_FIELD_SELECTED;
+	GIGI_behaviorType  = GIGBT_EXCLUSIVE;
+	GIGI_numSelections = 1;
+	GIGI_selection	   = 0;
+	GIGI_destination   = process;
+	GDLI_queryMsg	   = MSG_GF_SORT_FIELDS_LIST_QUERY;
+	ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS	= MSG_GF_SORT_FDB_TO_SK;
+	HINT_DRAW_IN_BOX;
+	HINT_FIXED_SIZE	   =
+		{
+		SST_AVG_CHAR_WIDTHS | 23,
+		SST_LINES_OF_TEXT | 6,
+		6
+		};
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object	GenInteractionClass FieldsTransferButtonsInteraction =
+{
+	GI_comp		= @TransferFDBToSK,
+			  @TransferSKToFDB;
+	HINT_CENTER_CHILDREN_VERTICALLY;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object	GenTriggerClass TransferFDBToSK =
+{
+	GI_visMoniker	= list
+		{
+		@RightArrowSCMoniker,
+		@RightArrowSMMoniker,
+		@RightArrowSCGAMoniker
+		};
+	GI_attrs	= @default | GA_INITIATES_INPUT_IGNORE;
+	GI_states	= @default & ~GS_ENABLED;
+	GTI_actionMsg	= MSG_GF_SORT_FDB_TO_SK;
+	GTI_destination	= process;
+	ATTR_GEN_TRIGGER_CUSTOM_DOUBLE_PRESS	= 0;
+}
+
+@object	GenTriggerClass TransferSKToFDB =
+{
+	GI_visMoniker	= list
+		{
+		@LeftArrowSCMoniker,
+		@LeftArrowSMMoniker,
+		@LeftArrowSCGAMoniker
+		};
+	GI_attrs	= @default | GA_INITIATES_INPUT_IGNORE;
+	GI_states	= @default & ~GS_ENABLED;
+	GTI_actionMsg	= MSG_GF_SORT_SK_TO_FDB;
+	GTI_destination	= process;
+	ATTR_GEN_TRIGGER_CUSTOM_DOUBLE_PRESS	= 0;
+}
+
+@object	GenDynamicListClass FieldsSortKeyList =
+{
+	GI_visMoniker	= "Sort Keys";
+	GI_attrs	= @default | GA_INITIATES_INPUT_IGNORE;
+	GIGI_applyMsg	= MSG_GF_SORT_KEY_SELECTED;
+	GIGI_behaviorType	= GIGBT_EXCLUSIVE;
+	GIGI_numSelections	= 1;
+	GIGI_selection		= 0;
+	GIGI_destination	= process;
+	GDLI_queryMsg	= MSG_GF_SORT_KEY_LIST_QUERY;
+	ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS	= MSG_GF_SORT_SK_TO_FDB;
+	HINT_DRAW_IN_BOX;
+	HINT_FIXED_SIZE	=
+		{
+		SST_AVG_CHAR_WIDTHS | 23,
+		SST_LINES_OF_TEXT | 6,
+		6
+		};
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object	GenInteractionClass SortAttrsGroup =
+{
+	GI_comp		= @SortKeyAttrsGroup,
+			  @SortOptionsList;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object	GenBooleanGroupClass SortOptionsList =
+{
+	GI_visMoniker	= "Sort Options";
+	GI_comp		= @SortIgnoreCaseNAccents,
+			  @SortIgnoreSpacesNPunctuation;
+	GBGI_applyMsg		= MSG_GF_SORT_SET_SORT_OPTIONS;
+	GBGI_destination	= process;
+	GBGI_selectedBooleans	= @GFSO_SORT_DEFAULT_OPTIONS;
+	HINT_CENTER_MONIKER;
+	HINT_DRAW_IN_BOX;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object	GenBooleanClass SortIgnoreCaseNAccents =
+{
+@ifdef DO_PIZZA
+	GI_visMoniker	= 'W', "Ignore Case/Width";
+@else
+	GI_visMoniker	= 'A', "Ignore Case/Accents";
+@endif
+	GBI_identifier	= @FFDSO_IGNORE_CASE_AND_ACCENTS;
+}
+
+@object	GenBooleanClass SortIgnoreSpacesNPunctuation =
+{
+	GI_visMoniker	= 'P', "Ignore Spaces/Punctuation";
+	GBI_identifier	= @FFDSO_IGNORE_SPACES_AND_PUNCTUATION;
+}
+
+@object	GenInteractionClass SortKeyAttrsGroup =
+{
+	GI_comp		= @SortOrderList,
+			  @SortPriorityList;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object	GenItemGroupClass SortOrderList =
+{
+	GI_visMoniker	= "Sort Direction:";
+	GI_comp		= @AscendingSort,
+			  @DescendingSort;
+	GIGI_applyMsg	= MSG_GF_SORT_DIRECTION_CHANGED;
+	GIGI_destination	= process;
+	GIGI_numSelections	= 1;
+	GIGI_selection	= SORT_ASCENDING;
+	ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS	= 0;
+	HINT_ITEM_GROUP_TOOLBOX_STYLE;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenItemClass AscendingSort =
+{
+     	GI_visMoniker = list
+		{
+		@AscendingSortSCMoniker,
+		@AscendingSortSMMoniker,
+		@AscendingSortSCGAMoniker
+		};
+	GII_identifier = SORT_ASCENDING;
+}
+
+@object GenItemClass DescendingSort =
+{
+     	GI_visMoniker = list
+		{
+		@DescendingSortSCMoniker,
+		@DescendingSortSMMoniker,
+		@DescendingSortSCGAMoniker
+		};
+	GII_identifier = SORT_DESCENDING;
+}
+
+@object GenInteractionClass SortPriorityList =
+{
+	GI_visMoniker	= "Sort Key Priority:";
+	GI_comp		= @IncreaseSortPriority,
+			  @DecreaseSortPriority;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object	GenTriggerClass IncreaseSortPriority =
+{
+	GI_visMoniker	= list
+		{
+		@IncPrioritySCMoniker,
+		@IncPrioritySMMoniker,
+		@IncPrioritySCGAMoniker
+		};
+	GI_attrs	= @default | GA_INITIATES_INPUT_IGNORE;
+	GI_states	= @default & ~GS_ENABLED;
+	GTI_actionMsg	= MSG_GF_SORT_INCREASE_PRIORITY;
+	GTI_destination	= process;
+}
+
+@object	GenTriggerClass DecreaseSortPriority =
+{
+	GI_visMoniker	= list
+		{
+		@DecPrioritySCMoniker,
+		@DecPrioritySMMoniker,
+		@DecPrioritySCGAMoniker
+		};
+	GI_attrs	= @default | GA_INITIATES_INPUT_IGNORE;
+	GI_states	= @default & ~GS_ENABLED;
+	GTI_actionMsg	= MSG_GF_SORT_DECREASE_PRIORITY;
+	GTI_destination	= process;
+}
+
+@object	GenTextClass SortFieldNotes =
+{
+        GI_attrs	= GA_READ_ONLY;
+	GI_visMoniker	= "Notes:";
+        GTXI_attrs	= @default | GTA_SINGLE_LINE_TEXT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_PLACE_MONIKER_TO_LEFT;
+}
+
+@object	GenTriggerClass SortApplyTrigger =
+{
+	GI_visMoniker	= 'S', "Sort";
+	GI_attrs	= @default |
+			  GA_INITIATES_INPUT_IGNORE |
+			  GA_SIGNAL_INTERACTION_COMPLETE;
+	GI_states	= @default & ~GS_ENABLED;
+	GTI_actionMsg	= MSG_GF_SORT_SORT;
+	GTI_destination	= process;
+	HINT_SEEK_REPLY_BAR;
+	HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object	GenTriggerClass SortClearTrigger =
+{
+	GI_visMoniker	= 'C', "Clear";
+	GI_attrs	= @default | GA_INITIATES_INPUT_IGNORE;
+	GI_states	= @default & ~GS_ENABLED;
+	GTI_actionMsg	= MSG_GF_SORT_CLEAR;
+	GTI_destination	= process;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object	GenTriggerClass SortCancelTrigger =
+{
+	GI_attrs	= @default |
+			  GA_INITIATES_INPUT_IGNORE |
+			  GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_actionMsg	= MSG_GF_SORT_CANCEL;
+	GTI_destination	= process;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+	HINT_SEEK_REPLY_BAR;
+}
+
+@end	AdvancedSortUI;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Record Control Panel UI Controller
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@start	MenuUI;
+
+@object	FFRecordControlClass RCPController =
+{
+	GI_visMoniker	= "Record Control Panel";
+	GII_attrs	= @default | GIA_NOT_USER_INITIATABLE & ~GIA_MODAL;
+	GII_visibility	= GIV_DIALOG;
+	ATTR_GEN_DESTINATION_CLASS =
+		{
+		(ClassStruct *) &FlatFileDatabaseClass
+		};
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT =
+		{
+		SWSS_RATIO | PCT_25,
+		SWSS_RATIO | PCT_60
+		};
+	HINT_GEN_CONTROL_SCALABLE_UI_DATA [1] =
+	{
+		{
+		GCSUIC_ADD_NORMAL_FEATURES_IF_APP_FEATURE_ON,
+		@GFLF_MARK_FEATURES,
+		FFRCPF_MARK_RECORDS
+		}
+	};
+}
+
+@end	MenuUI;
+
+
+/*
+ * GrObjAttrManager is the resource to duplicate to get a GrObjBody.
+ */
+@start	GrObjAttrManager, notDetachable;
+
+@object GrObjAttributeManagerClass ffGrObjAM = {
+	/* GOAMI_bodyList = ffGOAMBodyList;*/
+}
+
+@end	GrObjAttrManager;
+
+@start	GrObjBody, notDetachable;
+
+/*
+ * BodyGOAMRuler is the resource to duplicate to get a GrObjBody.
+ * It is notDetachable because it is never written to state, it 
+ * is only a template.
+ */
+
+@object FFGrObjBodyClass ffGrObjBody = {
+    /* 
+     * Set the bounds of the GrObjBody  
+    GBI_bounds = {0, 0, DOCUMENT_WIDTH * 6 * 72, DOCUMENT_HEIGHT * 6 * 72};
+     */
+    GBI_bounds = {0, 0, DOCUMENT_WIDTH, DOCUMENT_HEIGHT};
+
+    /* 
+     * Have GrObjBody automatically grab the target and focus
+     * when it gets a MSG_VIS_OPEN
+     */
+    GBI_flags = (GBF_DEFAULT_TARGET | GBF_DEFAULT_FOCUS);
+
+    /* 
+     * Temporary: Set the scale factor
+     */
+    GBI_curScaleFactor = {1, 0};
+
+    /* 
+     * Set the GrObjAttributeManager
+     */
+    GBI_goam = ffGrObjAM;
+}
+
+/*
+ * NOTE: Only Bodies in the same block as the attribute manager may be
+ * initialized in the bodyList in the .goc file. Bodies in another block
+ * will not be relocated into the duplicate of the template.
+ *
+
+@chunkArray optr ffGOAMBodyList = {@ffGrObjBody};
+ */
+
+@end GrObjBody
+
+@start Head ;
+
+@object GrObjHeadClass ffGrObjHead = {
+    GH_currentTool = (ClassStruct *) &PointerClass;
+    GH_initializeFloaterData = 0;
+}
+
+@end Head
+
+@start RecordSizeUI;
+
+@object GenValueClass GFRecordWidth = {
+    GI_visMoniker = "Width:";
+    GVLI_minimum = MakeWWFixed(9);  	    /* 1/8 inch */
+    GVLI_maximum = MakeWWFixed(72 * 45);    /* 45 inches */
+    GVLI_increment = MakeWWFixed(36.0);
+    GVLI_displayFormat = GVDF_INCHES_OR_CENTIMETERS;
+    GVLI_destination = (TO_APP_MODEL);
+    ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *) &GeoFileDocumentClass};
+    ATTR_GEN_VALUE_STATUS_MSG = MSG_GFD_REPORT_RECORD_WIDTH;
+}
+
+@object GenValueClass GFRecordHeight = {
+    GI_visMoniker = "Height:";
+    GVLI_minimum = MakeWWFixed(9);  	    /* 1/8 inch */
+    GVLI_maximum = MakeWWFixed(72 * 45);    /* 45 inches */
+    GVLI_increment = MakeWWFixed(36.0);
+    GVLI_displayFormat = GVDF_INCHES_OR_CENTIMETERS;
+    GVLI_destination = (TO_APP_MODEL);
+    ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *) &GeoFileDocumentClass};
+    ATTR_GEN_VALUE_STATUS_MSG = MSG_GFD_REPORT_RECORD_HEIGHT;
+}
+
+/*
+@object GenTriggerClass GFRecordApplyTrigger = {
+	 GTI_actionMsg = MSG_GFD_APPLY_RECORD_SIZE;
+	 GTI_destination = (TO_APP_MODEL);
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *) &GeoFileDocumentClass};
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_APPLY };
+    HINT_SEEK_REPLY_BAR;
+}
+*/
+    
+@end RecordSizeUI
+
+@start Interface ;
+
+@object GenInteractionClass ModalIconsArea = {
+    GI_comp = 	@ModeList,
+		@DesignOptionsList;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+/*    HINT_INCLUDE_ENDS_IN_CHILD_SPACING; */
+/*
+ *	Nuked HINT_CENTER_CHILDREN_HORIZONTALLY, as this could override
+ *	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY.
+ */
+    HINT_ALLOW_CHILDREN_TO_WRAP;
+    HINT_TOOLBOX;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+}
+
+@object GeoFileFieldOrganizerClass TreasureChest = {
+	GI_visMoniker	= "Field Organizer";
+	FFTC_createNewFieldOptr = @CreateNewFieldUIController;
+	FFTC_editFieldOptr = @FieldPropUIController;
+	GII_attrs	= @default | GIA_NOT_USER_INITIATABLE & ~GIA_MODAL;
+	GII_visibility	= GIV_DIALOG;
+	GII_type    	= GIT_MULTIPLE_RESPONSE;
+	ATTR_GEN_DESTINATION_CLASS =
+		{
+		(ClassStruct *) &FlatFileDatabaseClass
+		};
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT =
+		{
+		SWSS_RATIO | PCT_25,
+		SWSS_RATIO | PCT_60
+		};
+	ATTR_GEN_HELP_CONTEXT = "dbFieldOrg";
+}
+
+@end	Interface;
+
+/*
+ ***************************************************************************
+ *		Display/Document Control
+ ***************************************************************************
+ */
+
+@start Interface;
+
+@object GenInteractionClass GFDisplayArea = {
+    GII_visibility = GIV_SUB_GROUP;
+    GI_comp = 	@GFLeftSideToolbar,
+		@GFDisplayGroup;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenDisplayGroupClass GFDisplayGroup = {
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *) &GeoFileDocumentClass};
+	HINT_INITIAL_SIZE = {
+	    SST_PCT_OF_FIELD_WIDTH | PCT_70,
+	    SST_PCT_OF_FIELD_HEIGHT | PCT_55,
+	    0
+	};
+	HINT_DEFAULT_TARGET;
+	HINT_DEFAULT_FOCUS;
+	HINT_DISPLAY_GROUP_FULL_SIZED_IF_TRANSPARENT_DOC_CTRL_MODE;
+}
+@end Interface;
+
+/*
+ ***************************************************************************
+ *		UI Document Control
+ ***************************************************************************
+ */
+
+
+@start FileEditViewMenuUI;
+
+@object GeoFileDocControlClass GeoFileDocumentControl = {
+	GDCI_documentToken = {"GFDa", MANUFACTURER_ID_GEOWORKS };
+	GDCI_noNameText = "No Document";	/* new document name */
+@ifdef DO_DBCS
+	GDCI_templateDir = "GeoFile";
+@else
+	GDCI_templateDir = "GeoFile Templates";
+@endif
+	GDCI_documentGroup = GeoFileDocumentGroup;
+	GDCI_attrs = @default | GDCA_MULTIPLE_OPEN_FILES;
+	GDCI_features = @default & ~GDCF_NAME_ON_PRIMARY;
+	GDCI_enableDisableList = GFUIEnableList;
+	GDCI_importGroup = GeoFileImportControl;
+	GDCI_exportGroup = GeoFileExportGroup;
+	GDCI_userLevelGroup = SetUserLevelDialog;
+	GDCI_dialogImportText = "Import:\rImport data from another database to create a new document.";
+	GDCI_dialogUserLevelText = "Change Program Level:\rChange how simple or complex you would like GeoFile to be.";
+
+	ATTR_GEN_DOCUMENT_CONTROL_NO_EMPTY_DOC_IF_NOT_ABOVE =
+							UIIL_BEGINNING;
+	HINT_GEN_CONTROL_SCALABLE_UI_DATA [4] =
+	{
+		{
+		GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		UIIL_INTRODUCTORY,
+		GDC_SUGGESTED_INTRODUCTORY_FEATURES
+		},
+		{
+		GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		UIIL_BEGINNING,
+		GDC_SUGGESTED_BEGINNING_FEATURES
+		},
+		{
+		GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		UIIL_INTERMEDIATE,
+		GDC_SUGGESTED_INTERMEDIATE_FEATURES
+		},
+		{
+		GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		UIIL_ADVANCED,
+		GDC_SUGGESTED_ADVANCED_FEATURES
+		}
+	};
+}
+
+/*
+ ***************************************************************************
+ *		Import/Export Control
+ ***************************************************************************
+ */
+
+@object ImportControlClass GeoFileImportControl = {
+	GI_visMoniker = "Import Document";
+	GI_attrs = @default | GA_NOTIFY_VISIBILITY;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+	ICI_dataClasses = IDC_SPREADSHEET;
+	ICI_destination = GeoFileDocumentControl;
+	ICI_message = MSG_GEN_DOCUMENT_CONTROL_OPEN_IMPORT_SELECTED;
+	ATTR_IMPORT_CONTROL_CANCEL_DESTINATION  = @GeoFileDocumentControl;
+	ATTR_IMPORT_CONTROL_CANCEL_MESSAGE =
+	    	    	    MSG_GEN_DOCUMENT_CONTROL_IMPORT_CANCELLED;
+}
+
+@object GenInteractionClass GeoFileExportGroup = {
+	GI_comp = @GeoFileExportControl, 
+		  @GeoFileExportGadget,
+		  @ExportClipboard;
+	GII_visibility = GIV_DIALOG;
+	GII_type = GIT_COMMAND;
+	GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object ExportControlClass GeoFileExportControl = {
+	GII_visibility = GIV_SUB_GROUP;
+	GII_type = GIT_ORGANIZATIONAL;
+	ECI_dataClasses = IDC_SPREADSHEET;
+	ECI_destination = process;
+	ECI_message = MSG_GF_EXPORT_TRANSFER_FILE;
+	HINT_GEN_CONTROL_DESTROY_CHILDREN_WHEN_NOT_INTERACTABLE;    
+}
+
+@object GenInteractionClass GeoFileExportGadget = { 
+	GI_visMoniker = "Export Options:";
+	GI_comp = @ExportFileSubGadget;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_DRAW_IN_BOX;
+}
+
+@object GenInteractionClass ExportFileSubGadget = { 
+	GI_comp = @ExportChoices, @ExportFrom, @ExportTo ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenItemGroupClass ExportChoices = {
+	GI_comp = @ExportAllEntry, @ExportSelectedEntry;
+        GIGI_selection  = 0;
+        GIGI_numSelections = 1;
+        GIGI_destination = process;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_GF_EXPORT_SET_PAGE_SELECTION;
+}
+
+@object GenItemClass ExportAllEntry =
+{
+    GI_visMoniker = "All";
+    GII_identifier = 0;
+}
+
+@object GenItemClass ExportSelectedEntry =
+{
+    GI_visMoniker = "From";
+    GII_identifier = 1;
+}
+
+@object GenValueClass ExportFrom = {
+	GVLI_value = MakeWWFixed(1.0);
+	GVLI_minimum = MakeWWFixed(1.0);
+	GVLI_maximum = MakeWWFixed(10.0);   
+	GVLI_destination = process;
+	ATTR_GEN_VALUE_STATUS_MSG = MSG_GF_EXPORT_SET_PAGE_FROM;
+}
+
+@object GenValueClass ExportTo = {
+        GI_visMoniker = "to";
+	GVLI_value = MakeWWFixed(1.0);
+	GVLI_minimum = MakeWWFixed(1.0);
+	GVLI_maximum = MakeWWFixed(10.0);   
+	GVLI_destination = process;
+	ATTR_GEN_VALUE_STATUS_MSG = MSG_GF_EXPORT_SET_PAGE_TO;
+}
+@object GenTriggerClass ExportClipboard = {
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        GI_visMoniker = "Export to Clipboard";
+        GTI_actionMsg = MSG_GF_EXPORT_TO_CLIPBOARD;
+		  GTI_destination = process;
+	HINT_SEEK_REPLY_BAR;
+}
+
+/*
+@object GenBooleanGroupClass ExportClipboard = {
+	GI_comp = ExportClipboardFormat;
+	GBGI_destination = process;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenBooleanClass ExportClipboardFormat = {
+    GI_visMoniker = "Export to Clipboard";
+    GBI_identifier = 1;
+}
+*/
+
+@chunk optr GFUIEnableList[] = {
+    	@GFSearchControl
+};
+
+@end FileEditViewMenuUI;

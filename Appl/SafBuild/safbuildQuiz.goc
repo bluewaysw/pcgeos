@@ -1,0 +1,250 @@
+/***********************************************************************
+ *
+ *	Copyright (c) NewDeal 1999 -- All Rights Reserved
+ *
+ * PROJECT:	  GeoSafari Builder
+ *
+ * AUTHOR:  	  Gene Anderson
+ *
+ *	$Id$
+ *
+ ***********************************************************************/
+
+@include "safbuild.goh"
+@include "global.goh"
+
+@classdecl      QuizDialogClass;
+@classdecl      SBFileChooseClass;
+
+#ifdef __BORLANDC__
+#pragma codeseg UICode
+#endif
+
+
+/***********************************************************************
+ *	MSG_SB_FILE_CHOOSE_PLAY_WAV
+ ***********************************************************************
+ * SYNOPSIS:	    Play the current WAV file
+ * PASS:            none
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	6/24/99		Initial Revision
+ *
+ ***********************************************************************/
+
+/*@method SBFileChooseClass, MSG_SB_FILE_CHOOSE_PLAY_WAV
+{
+    PathName pname;
+    FileLongName fname;
+    TCHAR *p;
+
+    /*
+     * get the name of the file and path
+     */
+/*    @call FileChooseSelector::MSG_GEN_FILE_SELECTOR_GET_SELECTION(fname);
+    @call FileChooseSelector::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(pname);
+    p = strrchr(pname, C_BACKSLASH);
+    if (p) {
+	p[0] = 0;
+    } else {
+	pname[0] = 0;
+    }
+    /*
+     * play the sound in the process thread
+     */
+/*    @call process::MSG_SAFBUILD_PROCESS_PLAY_SOUND(fname, pname);
+}
+
+ */
+
+
+/***********************************************************************
+ *	MSG_SB_FILE_CHOOSE_SET_TYPE
+ ***********************************************************************
+ * SYNOPSIS:	    Set the type for the dialog to choose
+ * PASS:            fileType - SBFileType
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	6/24/99		Initial Revision
+ *
+ ***********************************************************************/
+
+typedef WordFlags FileChooseOptions;
+#define FCO_SAFARI_FILES    0x0001
+#define FCO_NON_GEOS_FILES  0x0002
+#define FCO_WAV_MASK        0x0004
+#define FCO_SET_DIR         0x0008
+
+static const FileChooseOptions fileChooseOpts[] = {
+	 /*FCO_NON_GEOS_FILES,
+	 FCO_NON_GEOS_FILES|FCO_SET_DIR, */
+    FCO_NON_GEOS_FILES|FCO_SET_DIR,
+	 /*FCO_NON_GEOS_FILES|FCO_WAV_MASK,
+	 FCO_NON_GEOS_FILES|FCO_WAV_MASK,*/
+    FCO_SAFARI_FILES
+};
+
+static const optr fileChooseObjs[] = {
+	 /*@LogoFileName 0,
+	 /*@Color16FileName 0,*/
+	 @Color256FileName,
+	 /*@QQSound  0,
+	 /*@QASound  0, */
+    @QuizNextFileName
+};
+    
+
+/*TCHAR wavMask[] = "*.WAV"; */
+
+@method SBFileChooseClass, MSG_SB_FILE_CHOOSE_SET_TYPE
+{
+    optr obj;
+    FileLongName fname;
+    FileChooseOptions opts;
+    GeodeToken *gtp;
+    TCHAR *fmp;
+    FileSelectorFileCriteria crit;
+
+	 /* open the file selector in Document */
+	 @call FileChooseSelector::MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH(
+		  "GeoExplorer", SP_DOCUMENT);  
+
+	 pself->SBFCI_type = fileType;
+    opts = fileChooseOpts[pself->SBFCI_type];
+	 obj = fileChooseObjs[pself->SBFCI_type];
+    /*
+     * set and clear token match
+     */
+	 if (opts & FCO_SAFARI_FILES) {  /* this is the next quiz stuff */
+		gtp = ObjVarAddData(@FileChooseSelector,
+	              ATTR_GEN_FILE_SELECTOR_TOKEN_MATCH,
+	              sizeof(GeodeToken));
+		gtp->GT_chars[0] = 'G';
+		gtp->GT_chars[1] = 'E';
+		gtp->GT_chars[2] = 'D';
+		gtp->GT_chars[3] = 'O';
+		gtp->GT_manufID = 16431;
+		crit = FSFC_GEOS_NON_EXECUTABLES|FSFC_DIRS;
+    } else {
+		ObjVarDeleteData(@FileChooseSelector,
+	              ATTR_GEN_FILE_SELECTOR_TOKEN_MATCH);
+		crit = FSFC_NON_GEOS_FILES|FSFC_DIRS; /* look for graphics files */
+		}
+    /*
+     * set FileSelectorFileCriteria
+     */
+    @call FileChooseSelector::MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA(crit);
+    /*
+     * set or clear WAV mask
+     */
+/*    if (opts & FCO_WAV_MASK) {
+	fmp = ObjVarAddData(@FileChooseSelector,
+	              ATTR_GEN_FILE_SELECTOR_NAME_MASK,
+	              strlen(wavMask)+1);
+	strcpy(fmp, wavMask);
+    } else {
+	ObjVarDeleteData(@FileChooseSelector,
+	                 ATTR_GEN_FILE_SELECTOR_NAME_MASK);
+    }
+    /*
+     * set the selection to the current file, if any
+     */
+    if (@call obj::MSG_VIS_TEXT_GET_TEXT_SIZE() ) {
+		@call obj::MSG_VIS_TEXT_GET_ALL_PTR(fname);
+		@call FileChooseSelector::MSG_GEN_FILE_SELECTOR_SET_SELECTION(fname);
+    } else {
+		@call FileChooseSelector::MSG_GEN_FILE_SELECTOR_SET_SELECTION("");
+    	}
+    /*
+     * if a WAV file, set Play usable
+     */
+ /*   if (opts & FCO_WAV_MASK) {
+	@call FileChoosePlay::MSG_GEN_SET_USABLE(VUM_NOW);
+    } else {
+	@call FileChoosePlay::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	 } */
+	 /*
+     * bring ourselves on screen
+     */
+    @call oself::MSG_GEN_INTERACTION_INITIATE();
+}
+
+
+
+/***********************************************************************
+ *	MSG_SB_FILE_CHOOSE_CHANGE_FILE
+ ***********************************************************************
+ * SYNOPSIS:	    Set the file
+ * PASS:            entryNum - entry #
+ *                  entryFlags - GenFileSelectorEntryFlags
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	6/24/99		Initial Revision
+ *
+ ***********************************************************************/
+
+@method SBFileChooseClass, MSG_SB_FILE_CHOOSE_CHANGE_FILE
+{
+    FileLongName fname;
+    PathName pname;
+    TCHAR *p;
+    DiskHandle diskHan;
+    optr obj;
+
+    /*
+     * get the name of the file
+     */
+    @call FileChooseSelector::MSG_GEN_FILE_SELECTOR_GET_SELECTION(fname);
+    /*
+     * get the path
+     */
+    diskHan = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(@call FileChooseSelector::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(pname));
+    /*
+     * strip off the filename
+     */
+    p = strrchr(pname, C_BACKSLASH);
+    if (p) {
+	p[0] = 0;
+    } else {
+	pname[0] = 0;
+    }
+    /*
+     * if a file, enable OK else disable
+     */
+    if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE) {
+	@call FileChooseOK::MSG_GEN_SET_ENABLED(VUM_NOW);
+  /*	@call FileChoosePlay::MSG_GEN_SET_ENABLED(VUM_NOW); */
+    } else {
+	@call FileChooseOK::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+  /*	@call FileChoosePlay::MSG_GEN_SET_NOT_ENABLED(VUM_NOW); */
+    }
+    /*
+     * if a file, figure out what to do with the name
+     */
+	if (GFS_GET_ENTRY_TYPE(entryFlags) == GFSET_FILE) {
+		obj = fileChooseObjs[pself->SBFCI_type];
+		if (fileChooseOpts[pself->SBFCI_type] & FCO_SET_DIR) {
+			@call TheGameCard::MSG_GAME_CARD_SET_PATH(pname, diskHan);
+			}
+	/*
+	 * if opening the file, get the text and close the dialog
+	 */
+		if (entryFlags & GFSEF_OPEN) {
+			@call obj::MSG_VIS_TEXT_REPLACE_ALL_PTR(fname, 0);
+			@call obj::MSG_META_TEXT_USER_MODIFIED(obj);
+			@call oself::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+			}
+	  /*	@call FileChoosePlay::MSG_GEN_SET_ENABLED(VUM_NOW);
+			} else {
+		@call FileChoosePlay::MSG_GEN_SET_NOT_ENABLED(VUM_NOW); */
+		}
+}

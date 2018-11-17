@@ -1,0 +1,1369 @@
+/***************************************************************************
+ *                                                                         *
+ *  Paddle                                                                 *
+ *                                                                         *
+ ***************************************************************************/
+
+
+/***************************************************************************
+ *		Include files
+ ***************************************************************************/
+@include <stdapp.goh>
+@include <game.goh>
+@include <Objects/ColorC.goh>
+#include <stdlib.h>
+#include <gstring.h>
+#include <graphics.h>
+#include <file.h>
+#include <sound.h>
+#include <initfile.h>
+@include <art/icon.goh>
+@include <art/ball.goh>
+
+#define maxX					580
+#define maxY					280
+
+#define SHOW_ON_STARTUP 		1
+#define ENABLE_KEY_REPEATING	1
+#define COMPUTER_LEFT_OPPONENT	1
+#define COMPUTER_RIGHT_OPPONENT	1
+
+#define SOUND_ON				1
+#define SOUND_OFF				2
+#define SOUND_SYSTEM			3
+
+#define DIRECTION_NO			0
+#define DIRECTION_UP			1
+#define DIRECTION_DOWN			2
+
+#define START_LEFT				1
+#define START_RIGHT				2
+
+byte		batSpeed1 	= 10;
+byte		batSpeed2	= 10;
+const 		word bat1 	= 15;
+const 		word bat2	= maxX - 20;
+int			ballX 		= 100;
+int			ballY		= 150;
+int			dirX  		= 2;
+int			dirY		= 2;
+int			pos1		= 10;
+int			pos2		= 10;
+byte		laenge1		= 50;
+byte		laenge2		= 50;
+byte		punkte1		= 0;
+byte		punkte2		= 0;
+byte		input1		= 0;
+byte		input2 		= 0;
+byte		maxPunkte	= 9;
+
+char 		paddle_state_file[25] 	= "Paddle Challenge State" ;
+char 		paddle_path[20]       	= "Game" ;
+char 		paddle_relativePath[] 	= "." ;
+word 		paddle_drive 			= SP_PUBLIC_DATA ;
+
+char		repeatRightDirection  	= DIRECTION_NO;
+char		repeatLeftDirection   	= DIRECTION_NO;
+
+word		startPos				= START_LEFT;
+
+ColorQuad	color					= {C_BLACK,CF_INDEX,0,0};
+word		sound 					= SOUND_SYSTEM;
+Boolean		repeating 				= TRUE;
+Boolean		leftOpponent 			= FALSE;
+Boolean		rightOpponent		 	= FALSE;
+Boolean		gameEnd					= TRUE;
+Boolean		ball_not_locked			= FALSE;
+Boolean		g_paused					= FALSE;
+
+MemHandle			hit;
+MemHandle			goal;
+MemHandle			winSound;
+MemHandle			loseSound;
+
+GStateHandle 		myGstate;
+WindowHandle 		winHan;
+
+TimerHandle			HTimer			= NullHandle;
+word				timerid;
+TimerHandle			HBTimer			= NullHandle;
+word				bTimerid;
+
+const word winSoundBuf[] = {     /* from blackjack win sound */
+	SSE_CHANGE,             0, IP_ACOUSTIC_GRAND_PIANO, IT_STANDARD_TABLE,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, MIDDLE_C, DYNAMIC_F,
+	SSDTT_TICKS,            10,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, MIDDLE_E, DYNAMIC_F,
+	SSDTT_TICKS,            10,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, MIDDLE_G, DYNAMIC_F,
+	SSDTT_TICKS,            10,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, HIGH_C, DYNAMIC_F,
+	SSDTT_TICKS,            15,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, MIDDLE_G, DYNAMIC_F,
+	SSDTT_TICKS,            8,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, HIGH_C, DYNAMIC_F,
+	SSDTT_TICKS,            25,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_GENERAL,            GE_END_OF_SONG};
+
+const word loseSoundBuf[] = {     /* from blackjack lose sound */
+	SSE_CHANGE,             0, IP_ACOUSTIC_GRAND_PIANO, IT_STANDARD_TABLE,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, LOW_D, DYNAMIC_F,
+	SSDTT_TICKS,            20,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            1,
+	SSE_VOICE_ON,           0, LOW_D, DYNAMIC_F,
+	SSDTT_TICKS,            20,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            1,
+	SSE_VOICE_ON,           0, LOW_D, DYNAMIC_F,
+	SSDTT_TICKS,            7,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            1,
+	SSE_VOICE_ON,           0, LOW_D, DYNAMIC_F,
+	SSDTT_TICKS,            20,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, LOW_F, DYNAMIC_F,
+	SSDTT_TICKS,            20,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, LOW_E, DYNAMIC_F,
+	SSDTT_TICKS,            7,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            1,
+	SSE_VOICE_ON,           0, LOW_E, DYNAMIC_F,
+	SSDTT_TICKS,            20,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, LOW_D, DYNAMIC_F,
+	SSDTT_TICKS,            7,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            1,
+	SSE_VOICE_ON,           0, LOW_D, DYNAMIC_F,
+	SSDTT_TICKS,            20,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, LOW_D_b, DYNAMIC_F,
+	SSDTT_TICKS,            7,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, LOW_D, DYNAMIC_F,
+	SSDTT_TICKS,            20,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_GENERAL,            GE_END_OF_SONG};
+
+
+/***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************/
+
+    /*---------------------------------------------------------------------*/
+	 @class PaddleProcessClass, GenProcessClass ;
+
+			@message void MSG_PADDLE_NEW_GAME();
+			@message void MSG_PADDLE_PAUSE();
+			@message void MSG_PADDLE_CONTINUE();
+
+			@message void MSG_PADDLE_LEFT_PLAYER_OPTIONS();
+			@message void MSG_PADDLE_RIGHT_PLAYER_OPTIONS();
+			@message void MSG_PADDLE_GOALS_OPTIONS();
+
+			@message void MSG_PADDLE_NEW_LEFT_PLAYER_OPTIONS();
+			@message void MSG_PADDLE_CANCEL_LEFT_PLAYER_OPTIONS();
+			@message void MSG_PADDLE_NEW_RIGHT_PLAYER_OPTIONS();
+			@message void MSG_PADDLE_CANCEL_RIGHT_PLAYER_OPTIONS();
+			@message void MSG_PADDLE_NEW_GOALS_OPTIONS();
+			@message void MSG_PADDLE_CANCEL_GOALS_OPTIONS();
+
+			@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_PADDLE_COLOR_CHOICE_CHANGED;
+			@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_PADDLE_SOUND_CHOICE_CHANGED;
+			@message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_PADDLE_REPEAT_MODIFIED;
+
+			@message void MSG_PADDLE_START_BALLTIMER();
+			@message void MSG_PADDLE_BALLTIMER();
+
+			@message void MSG_TIMER_RANG();
+			@message void MSG_REDRAW_GAMEBOARD();
+
+			@message void MSG_SPONG_1UP();
+			@message void MSG_SPONG_1DOWN();
+			@message void MSG_SPONG_2UP();
+			@message void MSG_SPONG_2DOWN();
+    @endc
+
+	 @classdecl PaddleProcessClass, neverSaved ;
+
+/***************************************************************************
+ *		UI Objects
+ ***************************************************************************/
+
+/*=========================================================================*/
+
+@start	AppResource ;
+    /*---------------------------------------------------------------------*/
+    @object GenApplicationClass PaddleApp = {
+        GI_visMoniker = list {@PaddleTextMoniker,
+                              @Moniker0,
+                              @Moniker1,
+                              @Moniker2 }
+	    GI_comp       = @PaddlePrimary;
+        gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) =
+                        @PaddlePrimary;
+        gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) =
+				        @PaddleColorControl;
+        gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+				        @PaddleColorControl;
+        gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_STARTUP_LOAD_OPTIONS) =
+                        @PaddleColorControl ;
+    }
+    /*---------------------------------------------------------------------*/
+    @visMoniker PaddleTextMoniker = "Paddle Challenge" ;
+    /*---------------------------------------------------------------------*/
+@end	AppResource
+
+/*=========================================================================*/
+
+@start	Interface		/* this resource is for misc UI objects */ ;
+    /*---------------------------------------------------------------------*/
+    @object GenPrimaryClass PaddlePrimary  = {
+        GI_attrs = @default | GA_KBD_SEARCH_PATH;
+        GI_comp             = @PaddleWholeGroup,
+                              @PaddleGameMenu,
+							  @PaddleOptionsMenu,
+							  @QTipsDialogBox;
+	    HINT_SIZE_WINDOW_AS_DESIRED;
+        HINT_PRIMARY_NO_FILE_MENU;
+        HINT_CENTER_WINDOW;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+		HINT_CENTER_CHILDREN_VERTICALLY ;
+		ATTR_GEN_HELP_CONTEXT = "TOC";
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenInteractionClass PaddleWholeGroup = {
+	    GI_comp = @PaddleScoreGroup,
+	              @PaddleViewOwner ;
+	    HINT_CENTER_CHILDREN_VERTICALLY ;
+	    HINT_CENTER_CHILDREN_HORIZONTALLY ;
+	    HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+	    HINT_DEFAULT_FOCUS ;
+	    HINT_DEFAULT_TARGET ;
+	    HINT_DEFAULT_MODEL;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenInteractionClass PaddleScoreGroup = {
+		 GI_comp = @PaddleNewGame,
+	              @PaddlePlayerLeftScore,
+	              @PaddlePlayToValue,
+	              @PaddlePlayerRightScore;
+		 HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+		 HINT_CENTER_CHILDREN_VERTICALLY ;
+		 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+		 HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenTriggerClass PaddleNewGame = {
+		 GI_visMoniker = 'N', "New";
+	    GTI_destination = process ;
+		GTI_actionMsg   = MSG_PADDLE_NEW_GAME;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenValueClass PaddlePlayerLeftScore = {
+	    GI_visMoniker = "Left Player:";
+	    GVLI_displayFormat = GVDF_INTEGER;
+	    GVLI_value = MakeWWFixed(0.0);
+	    HINT_VALUE_NOT_INCREMENTABLE;
+	    HINT_VALUE_DIGITAL_DISPLAY;
+	    HINT_VALUE_NOT_DIGITALLY_EDITABLE;
+    }
+   	/*---------------------------------------------------------------------*/
+	@object GenValueClass PaddlePlayToValue = {
+	    GI_visMoniker = "Play to:";
+	    GVLI_displayFormat = GVDF_INTEGER;
+	    GVLI_value = MakeWWFixed(0.0);
+	    HINT_VALUE_NOT_INCREMENTABLE;
+	    HINT_VALUE_DIGITAL_DISPLAY;
+	    HINT_VALUE_NOT_DIGITALLY_EDITABLE;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenValueClass PaddlePlayerRightScore = {
+	    GI_visMoniker = "Right Player:";
+	    GVLI_displayFormat = GVDF_INTEGER;
+	    GVLI_value = MakeWWFixed(0.0);
+	    HINT_VALUE_NOT_INCREMENTABLE;
+	    HINT_VALUE_DIGITAL_DISPLAY;
+	    HINT_VALUE_NOT_DIGITALLY_EDITABLE;
+    }
+    /*---------------------------------------------------------------------*/
+	 @object GenViewClass PaddleViewOwner = {
+	    GVI_horizAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT | GVDA_NO_SMALLER_THAN_CONTENT | GVDA_KEEP_ASPECT_RATIO;
+	    GVI_vertAttrs  = @default | GVDA_NO_LARGER_THAN_CONTENT | GVDA_NO_SMALLER_THAN_CONTENT | GVDA_KEEP_ASPECT_RATIO;
+	    GVI_color = {C_WHITE, CF_INDEX, 0, 0};
+	    GVI_content = process;
+	    GVI_docBounds = {0, 0, maxX, maxY};
+	    HINT_DEFAULT_TARGET;
+		HINT_DEFAULT_FOCUS;
+        HINT_DEFAULT_MODEL;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenInteractionClass PaddleGameMenu = {
+		GI_attrs = @default | GA_KBD_SEARCH_PATH;
+		GI_comp = @PaddleGameMenuHolder;
+		GI_visMoniker = 'G', "Game" ;
+        GII_visibility = GIV_POPUP ;
+        ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+    }
+	/*---------------------------------------------------------------------*/
+	@object GenInteractionClass PaddleGameMenuHolder = {
+		GI_attrs = @default | GA_KBD_SEARCH_PATH;
+		GI_comp = @PaddleNewGameTrigger,
+				  @PaddleQTipsTrigger,
+			      @PaddlePauseTrigger,
+			      @PaddleContTrigger;
+		  GII_visibility = GIV_SUB_GROUP ;
+	 }
+	/*---------------------------------------------------------------------*/
+	@object GenTriggerClass PaddleNewGameTrigger = {
+		GI_visMoniker   = 'N', "New Game" ;
+		GTI_destination = process ;
+		GTI_actionMsg   = MSG_PADDLE_NEW_GAME;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenTriggerClass PaddleQTipsTrigger = {
+		GI_visMoniker   = 'Q', "Quick Tips" ;
+		GTI_destination = @QTipsDialogBox ;
+		GTI_actionMsg   = MSG_GEN_INTERACTION_INITIATE ;
+		HINT_TRIGGER_BRINGS_UP_WINDOW;
+    }
+	/*---------------------------------------------------------------------*/
+	@object GenTriggerClass PaddlePauseTrigger = {
+		GI_attrs = @default | GA_KBD_SEARCH_PATH;
+		GI_visMoniker   = 'a', "Pause";
+		GI_states = @default & (~GS_ENABLED);
+		GI_kbdAccelerator = control 'P';
+		GTI_destination = process;
+		GTI_actionMsg   = MSG_PADDLE_PAUSE;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenTriggerClass PaddleContTrigger = {
+		GI_attrs = @default | GA_KBD_SEARCH_PATH;
+		GI_visMoniker   = 'o', "Continue" ;
+		GI_states = @default & (~GS_ENABLED);
+		GI_kbdAccelerator = control 'c';
+		GTI_destination = process;
+		GTI_actionMsg   = MSG_PADDLE_CONTINUE;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenInteractionClass PaddleOptionsMenu = {
+	    GI_attrs = @default | GA_KBD_SEARCH_PATH ;
+	    GI_comp        = @PaddleLeftPlayerTrigger,
+						 @PaddleRightPlayerTrigger,
+						 @PaddleGoalsTrigger,
+						 @PaddleSpeed,
+						 @PaddleColorDialog,
+						 @PaddleSoundGroup;
+	    GII_visibility = GIV_POPUP ;
+	    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU) ;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenTriggerClass PaddleLeftPlayerTrigger = {
+	    GI_visMoniker   = 'L', "Left Player" ;
+        GTI_destination = process;
+        GTI_actionMsg =   MSG_PADDLE_LEFT_PLAYER_OPTIONS;
+        HINT_TRIGGER_BRINGS_UP_WINDOW;
+    }
+    /*---------------------------------------------------------------------*/
+	@object GenTriggerClass PaddleRightPlayerTrigger = {
+	    GI_visMoniker   = 'R', "Right Player" ;
+	    GTI_destination = process;
+	    GTI_actionMsg =   MSG_PADDLE_RIGHT_PLAYER_OPTIONS;
+        HINT_TRIGGER_BRINGS_UP_WINDOW;
+    }
+   	/*---------------------------------------------------------------------*/
+	@object GenTriggerClass PaddleGoalsTrigger = {
+	    GI_visMoniker   = 'P', "Play to" ;
+	    GTI_destination = process;
+	    GTI_actionMsg =   MSG_PADDLE_GOALS_OPTIONS;
+	    HINT_TRIGGER_BRINGS_UP_WINDOW;
+    }
+    /*---------------------------------------------------------------------*/
+	@object GenBooleanGroupClass PaddleSpeed = {
+	    GI_comp = @PaddleSpeedBoolean;
+	    GBGI_destination = process;
+	    GBGI_applyMsg	= MSG_PADDLE_REPEAT_MODIFIED;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenBooleanClass PaddleSpeedBoolean = {
+        GI_visMoniker = 'e', "Repeating Key";
+        GBI_identifier = ENABLE_KEY_REPEATING;
+    }
+	/*---------------------------------------------------------------------*/
+	@object GenInteractionClass PaddleColorDialog = {
+	    GI_visMoniker   = 'C', "Color Change" ;
+	    GII_visibility  = GIV_DIALOG ;
+	    GI_comp         = @PaddleColorAll ;
+    }
+   	/*---------------------------------------------------------------------*/
+	@object GenInteractionClass PaddleSoundGroup = {
+		GI_visMoniker = 'S', "Sound";
+		GI_comp = @PaddleSoundList;
+		GII_visibility = GIV_POPUP;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenItemGroupClass PaddleSoundList = {
+		GI_comp          = @PaddleSoundOn,
+						   @PaddleSoundOff,
+						   @PaddleSystemPref ;
+		GIGI_selection   = SOUND_SYSTEM ;
+	    GIGI_destination = process ;
+		GIGI_applyMsg = MSG_PADDLE_SOUND_CHOICE_CHANGED;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenItemClass PaddleSoundOn = {
+		GI_visMoniker = 'S', "Sound On" ;
+		GII_identifier = SOUND_ON ;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenItemClass PaddleSoundOff = {
+		GI_visMoniker = 'O', "Sound Off" ;
+		GII_identifier = SOUND_OFF ;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenItemClass PaddleSystemPref = {
+		GI_visMoniker = 'P', "Use System Preference" ;
+		GII_identifier = SOUND_SYSTEM ;
+	}
+    /*---------------------------------------------------------------------*/
+	@object GenInteractionClass PaddleRightPlayerWin = {
+		GI_visMoniker   = "We have a winner!" ;
+		GI_link         = @PaddlePrimary;
+		GII_visibility  = GIV_DIALOG ;
+		GII_type        = GIT_NOTIFICATION ;
+		GII_attrs       = @default                         |
+						  GIA_INITIATED_VIA_USER_DO_DIALOG |
+						  GIA_MODAL                        |
+						  GIA_NOT_USER_INITIATABLE         ;
+		GI_comp         = @RightGlyph;
+		HINT_CENTER_CHILDREN_HORIZONTALLY ;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenGlyphClass RightGlyph = {
+		 GI_visMoniker = "The Right Player is our winner!";
+       }
+	/*---------------------------------------------------------------------*/
+	@object GenInteractionClass PaddleLeftPlayerWin = {
+	    GI_visMoniker   = "We have a winner!";
+	    GI_link         = @PaddlePrimary;
+		GII_visibility  = GIV_DIALOG ;
+		GII_type        = GIT_NOTIFICATION ;
+		GII_attrs       = @default                         |
+						  GIA_INITIATED_VIA_USER_DO_DIALOG |
+						  GIA_MODAL                        |
+						  GIA_NOT_USER_INITIATABLE         ;
+		GI_comp         = @LeftGlyph;
+		HINT_CENTER_CHILDREN_HORIZONTALLY ;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenGlyphClass LeftGlyph = {
+		 GI_visMoniker = "The Left Player is our winner";
+	}
+    /*---------------------------------------------------------------------*/
+	@chunk char PaddleNewGameMsg[] = "Changing this option will end the current game and begin a new one.  Are you sure you want to do this?";
+	@chunk char PauseStr[] = "Paused";
+
+
+@end Interface;
+
+/*=========================================================================*/
+
+@start InterfaceOption;
+    /*---------------------------------------------------------------------*/
+	@object GenInteractionClass PaddleRightPlayerOptions = {
+	    GI_visMoniker = "Right Player Settings";
+	    GI_link = @PaddlePrimary;
+	    GI_comp = @PaddlePlayerRightSize,
+	              @PaddlePlayerRightSpeed,
+	              @PaddlePlayerRightOpponent,
+	              @PaddlePlayerRightTriggerOk,
+	              @PaddlePlayerRightTriggerCancel;
+	    GII_visibility = GIV_DIALOG ;
+		GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+		HINT_RIGHT_JUSTIFY_CHILDREN;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenValueClass PaddlePlayerRightSize = {
+	    GI_visMoniker = 'S', "Paddle Size";
+	    GVLI_displayFormat = GVDF_INTEGER;
+		GVLI_minimum = MakeWWFixed(10.0);
+		GVLI_maximum = MakeWWFixed(50.0);
+    	HINT_VALUE_DIGITAL_DISPLAY;
+	}
+	/*---------------------------------------------------------------------*/
+	 @object GenValueClass PaddlePlayerRightSpeed = {
+        GI_visMoniker = 'e', "Paddle Speed";
+        GVLI_displayFormat = GVDF_INTEGER;
+		GVLI_value = MakeWWFixed(5.0);
+		GVLI_minimum = MakeWWFixed(2.0);
+		GVLI_maximum = MakeWWFixed(30.0);
+    	HINT_VALUE_DIGITAL_DISPLAY;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenBooleanGroupClass PaddlePlayerRightOpponent = {
+	    GI_comp = @PaddlePlayerRightOpponentBoolean;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenBooleanClass PaddlePlayerRightOpponentBoolean = {
+	    GI_visMoniker = 'C', "Computer player";
+	    GBI_identifier = COMPUTER_RIGHT_OPPONENT;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenTriggerClass PaddlePlayerRightTriggerOk = {
+	    GTI_destination = process;
+	    GTI_actionMsg   = MSG_PADDLE_NEW_RIGHT_PLAYER_OPTIONS;
+	    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_APPLY };
+	    HINT_SEEK_REPLY_BAR;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenTriggerClass PaddlePlayerRightTriggerCancel = {
+	    GTI_destination = process;
+	    GTI_actionMsg   = MSG_PADDLE_CANCEL_RIGHT_PLAYER_OPTIONS;
+	    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+	    HINT_SEEK_REPLY_BAR;
+    }
+    /*---------------------------------------------------------------------*/
+	@object GenInteractionClass PaddleLeftPlayerOptions = {
+	    GI_visMoniker = "Left Player Settings";
+		GI_link = @PaddlePrimary;
+	    GI_comp = @PaddlePlayerLeftSize,
+	              @PaddlePlayerLeftSpeed,
+	              @PaddlePlayerLeftOpponent,
+	              @PaddlePlayerLeftTriggerOk,
+	              @PaddlePlayerLeftTriggerCancel;
+	    GII_visibility = GIV_DIALOG ;
+		GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+		HINT_RIGHT_JUSTIFY_CHILDREN;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenValueClass PaddlePlayerLeftSize = {
+	    GI_visMoniker = 'S', "Paddle Size";
+		GVLI_displayFormat = GVDF_INTEGER;
+		GVLI_minimum = MakeWWFixed(10.0);
+		GVLI_maximum = MakeWWFixed(50.0);
+    	HINT_VALUE_DIGITAL_DISPLAY;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenValueClass PaddlePlayerLeftSpeed = {
+	    GI_visMoniker = 'e', "Paddle Speed";
+	    GVLI_displayFormat = GVDF_INTEGER;
+		GVLI_value = MakeWWFixed(5.0);
+		GVLI_minimum = MakeWWFixed(2.0);
+		GVLI_maximum = MakeWWFixed(30.0);
+    	HINT_VALUE_DIGITAL_DISPLAY;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenBooleanGroupClass PaddlePlayerLeftOpponent = {
+	    GI_comp = @PaddlePlayerLeftOpponentBoolean;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenBooleanClass PaddlePlayerLeftOpponentBoolean = {
+	    GI_visMoniker = 'C', "Computer player";
+	    GBI_identifier = COMPUTER_LEFT_OPPONENT;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenTriggerClass PaddlePlayerLeftTriggerOk = {
+	    GTI_destination = process;
+	    GTI_actionMsg   = MSG_PADDLE_NEW_LEFT_PLAYER_OPTIONS;
+	    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_APPLY };
+	    HINT_SEEK_REPLY_BAR;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenTriggerClass PaddlePlayerLeftTriggerCancel = {
+	    GTI_destination = process;
+	    GTI_actionMsg   = MSG_PADDLE_CANCEL_LEFT_PLAYER_OPTIONS;
+	    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+	    HINT_SEEK_REPLY_BAR;
+    }
+    /*---------------------------------------------------------------------*/
+	@object GenInteractionClass PaddleColorAll = {
+	    GI_comp = @PaddleColorText,
+				  @PaddleColorControl;
+		HINT_CENTER_CHILDREN_HORIZONTALLY ;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenGlyphClass PaddleColorText = {
+	    GI_visMoniker = "Select Background  Color";
+	}
+    /*---------------------------------------------------------------------*/
+    @object ColorSelectorClass PaddleColorControl = {
+        GCI_output = process;
+        ATTR_GEN_CONTROL_PROHIBIT_UI = (
+					CSF_RGB |
+					CSF_OTHER |
+					CSF_PATTERN |
+					CSF_DRAW_MASK);
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass PaddleGoalsOptions = {
+	    GI_visMoniker = "Goals to win";
+		GI_link = @PaddlePrimary;
+	    GI_comp = @PaddleGoalsValue,
+	              @PaddleGoalsTriggerOk,
+	              @PaddleGoalsTriggerCancel;
+	    GII_visibility = GIV_DIALOG ;
+		GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+		HINT_RIGHT_JUSTIFY_CHILDREN;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenValueClass PaddleGoalsValue = {
+		GI_visMoniker = 'P', "Play to:";
+    	GVLI_displayFormat = GVDF_INTEGER;
+    	GVLI_minimum = MakeWWFixed(1.0);
+    	GVLI_maximum = MakeWWFixed(50.0);
+    	HINT_VALUE_DIGITAL_DISPLAY;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenTriggerClass PaddleGoalsTriggerOk = {
+	    GTI_destination = process;
+	    GTI_actionMsg   = MSG_PADDLE_NEW_GOALS_OPTIONS;
+	    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_APPLY };
+	    HINT_SEEK_REPLY_BAR;
+	}
+	/*---------------------------------------------------------------------*/
+	@object GenTriggerClass PaddleGoalsTriggerCancel = {
+		 GTI_destination = process;
+	    GTI_actionMsg   = MSG_PADDLE_CANCEL_GOALS_OPTIONS;
+	    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+	    HINT_SEEK_REPLY_BAR;
+    }
+
+
+@end InterfaceOption;
+
+
+/*=========================================================================*/
+
+@start QTipsResource;
+@include "art/QTip1.goh"
+
+	 @object GenInteractionClass QTipsDialogBox = {
+		  GI_visMoniker = "Paddle Challenge Quick Tips";
+		  GI_comp = @GoalText,
+					@QuickTipsGroup,
+					@ShowOnStartupGroup,
+					@OKTipsButton;
+		  GII_visibility = GIV_DIALOG ;
+		  GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY ;
+		  ATTR_GEN_HELP_CONTEXT = "TOC";
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenTextClass GoalText = {
+		  GI_attrs = @default | GA_READ_ONLY;
+		  GTXI_text = "The object of the game is to score a goal by hitting the wall behind your opponent's paddle.";
+		  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenBooleanGroupClass ShowOnStartupGroup = {
+		  GI_comp = @ShowOnStartupBoolean;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenBooleanClass ShowOnStartupBoolean = {
+		  GI_visMoniker = 'S', "Show this Dialog box when Paddle Challenge starts";
+		  GBI_identifier = SHOW_ON_STARTUP;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenTriggerClass OKTipsButton = {
+		  GI_visMoniker   = 'O', "OK";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+		  HINT_SEEK_REPLY_BAR;
+		  HINT_DEFAULT_DEFAULT_ACTION;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass QuickTipsGroup = {
+		  GI_comp = @QTip1;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass QTip1 = {
+		  GI_comp = @QTip1GlyphHolder, @QTip1Text ;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+		  HINT_CENTER_CHILDREN_VERTICALLY;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass QTip1GlyphHolder = {
+		  GI_comp = @QTip1Glyph;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY;
+		  HINT_CENTER_CHILDREN_VERTICALLY;
+		  HINT_FIXED_SIZE = {SST_PIXELS | 80, 0,0};
+		  /* ^^^ is based on the width of the widest icon */
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenGlyphClass QTip1Glyph = {
+		  GI_visMoniker = list { @QTip1Moniker };
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenTextClass QTip1Text = {
+		  GI_attrs = @default | GA_READ_ONLY;
+		  GTXI_text = "Move the paddle to protect your wall and to shoot at your opponent's wall. The Left Player will use the Q and A keys, the Right Player will use the Up and Down arrow keys on the keyboard.";
+		  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+		  HINT_MINIMUM_SIZE = {SST_PIXELS | 325, 0, 0};
+	 }
+
+
+@end QTipsResource;
+
+/*-------------------------------------------------------------------------*/
+void SPongDraw(GStateHandle gstate)          /* GState to draw to */
+{
+
+    /* draw background */
+ 	@call PaddleViewOwner::MSG_GEN_VIEW_SET_COLOR(color.CQ_redOrIndex,
+										color.CQ_info, (color.CQ_blue << 8) | color.CQ_green);
+
+	/* draw ball */
+	MemLock(OptrToHandle(@BallPic));
+	 GrDrawBitmap(gstate, ballX, ballY, LMemDeref(@BallPic), NULL);
+    MemUnlock(OptrToHandle(@BallPic));
+
+    /* Draw the left bat */
+    GrSetLineColor(gstate, CF_INDEX, C_LIGHT_CYAN, 0, 0);
+    GrDrawLine(gstate,bat1+0,pos1,bat1+0,pos1+laenge1);
+    GrSetLineColor(gstate, CF_INDEX, C_LIGHT_BLUE, 0, 0);
+    GrDrawLine(gstate,bat1+1,pos1,bat1+1,pos1+laenge1);
+    GrDrawLine(gstate,bat1+2,pos1,bat1+2,pos1+laenge1);
+    GrDrawLine(gstate,bat1+3,pos1,bat1+3,pos1+laenge1);
+    GrSetLineColor(gstate, CF_INDEX, C_BLUE, 0, 0);
+    GrDrawLine(gstate,bat1+4,pos1,bat1+4,pos1+laenge1);
+    GrDrawLine(gstate,bat1+5,pos1,bat1+5,pos1+laenge1);
+
+	/* Draw the right bat */
+    GrSetLineColor(gstate, CF_INDEX, C_WHITE, 0, 0);
+    GrDrawLine(gstate,bat2+0,pos2,bat2+0,pos2+laenge2);
+    GrDrawLine(gstate,bat2+1,pos2,bat2+1,pos2+laenge2);
+    GrSetLineColor(gstate, CF_INDEX, C_YELLOW, 0, 0);
+    GrDrawLine(gstate,bat2+2,pos2,bat2+2,pos2+laenge2);
+    GrDrawLine(gstate,bat2+3,pos2,bat2+3,pos2+laenge2);
+    GrDrawLine(gstate,bat2+4,pos2,bat2+4,pos2+laenge2);
+    GrSetLineColor(gstate, CF_INDEX, C_BROWN, 0, 0);
+	 GrDrawLine(gstate,bat2+5,pos2,bat2+5,pos2+laenge2);
+
+	if (g_paused)
+	{
+		word	width;
+
+		MemLock (OptrToHandle(@PauseStr));
+		GrSetTextColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+		GrSetFont(gstate, FID_DTC_URW_ROMAN, MakeWWFixed(36));
+		width = GrTextWidth(gstate, LMemDeref(@PauseStr), 0);
+		GrDrawText(gstate, (maxX/2)-(width/2)+3, maxY/2+3-10, LMemDeref(@PauseStr), 0);
+		GrSetTextColor(gstate, CF_INDEX, C_WHITE, 0, 0);
+		GrDrawText(gstate, maxX/2-width/2, maxY/2-10, LMemDeref(@PauseStr), 0);
+		MemUnlock (OptrToHandle(@PauseStr));
+	}
+
+}
+/*-------------------------------------------------------------------------*/
+void PaddlePlaySound(MemHandle soundHandle)
+{
+  word 		tempo = 8;
+
+  SoundStopMusicNote(hit);
+  SoundStopMusicNote(goal);
+  SoundStopMusic(winSound);
+  SoundStopMusic(loseSound);
+
+  if (sound == SOUND_SYSTEM) {
+    UserStandardSound(SST_CUSTOM_SOUND, soundHandle, 1);
+  } else {
+    if (sound == SOUND_OFF) {
+      return;
+    } else {
+      SoundPlayMusic(soundHandle, SP_GAME, tempo, EOSF_UNLOCK);
+	}
+  }
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_META_EXPOSED
+{
+    GrBeginUpdate(myGstate);
+    SPongDraw(myGstate);
+    GrEndUpdate(myGstate);
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_META_KBD_CHAR
+{
+
+	switch(character & 255) {
+		case 'Q':
+		case 'q':
+			if(!(rightOpponent) && (flags & CF_FIRST_PRESS)) {
+				@send self::MSG_SPONG_1UP();
+				repeatLeftDirection = DIRECTION_UP;
+			} else if (flags & CF_RELEASE) {
+				repeatLeftDirection = DIRECTION_NO;
+			}
+			break ;
+		case 'A':
+		case 'a':
+			if(!(rightOpponent) && (flags & CF_FIRST_PRESS)) {
+				@send self::MSG_SPONG_1DOWN();
+				repeatLeftDirection = DIRECTION_DOWN;
+			} else if (flags & CF_RELEASE) {
+  				repeatLeftDirection = DIRECTION_NO;
+			}
+		break ;
+		case 0x90:
+		case '8':
+			if(!(leftOpponent) && (!(flags & CF_RELEASE))) {
+				@send self::MSG_SPONG_2UP();
+				repeatRightDirection = DIRECTION_UP;
+			} else if (flags & CF_RELEASE) {
+  				repeatRightDirection = DIRECTION_NO;
+			}
+		break ;
+		case 0x91:
+		case '2':
+			if(!(leftOpponent) && (!(flags & CF_RELEASE))){
+				@send self::MSG_SPONG_2DOWN();
+				repeatRightDirection = DIRECTION_DOWN;
+			} else if (flags&CF_RELEASE) {
+  				repeatRightDirection = DIRECTION_NO;
+			}
+		break ;
+		default:
+			@callsuper() ;
+			break ;
+  	}
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_META_CONTENT_VIEW_WIN_OPENED
+{
+	winHan = viewWindow;
+	myGstate = GrCreateState(winHan);
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+    FileHandle fHandle;
+    Boolean		initError, tips;
+
+	@callsuper() ;
+
+	@call PaddleApp::MSG_GEN_APPLICATION_INSTALL_TOKEN();
+
+	/* check for quick tips */
+	initError = InitFileReadBoolean("Paddle", "showTips", &tips);
+	if (initError) tips = TRUE;
+	if (tips) {
+		 @send ShowOnStartupGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+														 SHOW_ON_STARTUP, TRUE);
+		 @send QTipsDialogBox::MSG_GEN_INTERACTION_INITIATE();
+	 } else
+		 @send ShowOnStartupGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+														 SHOW_ON_STARTUP, FALSE);
+
+	FilePushDir() ;
+    FileSetCurrentPath(paddle_drive, paddle_relativePath) ;
+    FileCreateDir(paddle_path) ;
+    FileSetCurrentPath(paddle_drive, paddle_path) ;
+    fHandle = FileOpen(paddle_state_file, FILE_ACCESS_R|FILE_DENY_W) ;
+
+    if (fHandle!=NullHandle)  {
+	  FileRead(fHandle,&laenge1, sizeof(laenge1),FALSE);
+	  FileRead(fHandle,&laenge2, sizeof(laenge2),FALSE);
+	  FileRead(fHandle,&maxPunkte, sizeof(maxPunkte),FALSE);
+	  FileRead(fHandle,&batSpeed1, sizeof(batSpeed1),FALSE);
+	  FileRead(fHandle,&batSpeed2, sizeof(batSpeed2),FALSE);
+	  FileRead(fHandle,&input1, sizeof(input1) ,FALSE);
+	  FileRead(fHandle,&input2, sizeof(input2),FALSE);
+	  FileRead(fHandle,&repeating, sizeof(repeating), FALSE);
+	  FileRead(fHandle,&sound, sizeof(sound),FALSE);
+	  FileRead(fHandle,&color, sizeof(color), FALSE);
+	  FileRead(fHandle,&leftOpponent, sizeof(Boolean), FALSE);
+	  FileRead(fHandle,&rightOpponent, sizeof(Boolean), FALSE);
+	  FileClose(fHandle,FALSE);
+    }
+
+	@call PaddlePlayerLeftSize::MSG_GEN_VALUE_SET_INTEGER_VALUE(laenge1,FALSE);
+	@call PaddlePlayerRightSize::MSG_GEN_VALUE_SET_INTEGER_VALUE(laenge2,FALSE);
+	@call PaddlePlayToValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(maxPunkte,FALSE);
+	@call PaddleGoalsValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(maxPunkte,FALSE);
+	@call PaddlePlayerLeftSpeed::MSG_GEN_VALUE_SET_INTEGER_VALUE(batSpeed1,FALSE);
+	@call PaddlePlayerRightSpeed::MSG_GEN_VALUE_SET_INTEGER_VALUE(batSpeed2,FALSE);
+    @send PaddlePlayerLeftOpponent::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+	  										COMPUTER_RIGHT_OPPONENT, rightOpponent);
+	@send PaddlePlayerRightOpponent::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+	  										COMPUTER_LEFT_OPPONENT, leftOpponent);
+    @send PaddleSoundList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(sound, FALSE);
+    @send PaddleSpeed::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(ENABLE_KEY_REPEATING, repeating);
+	@send PaddleColorControl::MSG_COLOR_SELECTOR_SET_COLOR(color, FALSE) ;
+	@send process::MSG_REDRAW_GAMEBOARD() ;
+
+	FilePopDir() ;
+	@send PaddleColorControl::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+
+	SoundAllocMusicNote (IP_ACOUSTIC_GRAND_PIANO, 0, HIGH_A,
+		    DYNAMIC_FFFF, SSDTT_TEMPO, WHOLE, &hit);
+	SoundAllocMusicNote (IP_ACOUSTIC_GRAND_PIANO, 0, LOW_C,
+		    DYNAMIC_FFFF, SSDTT_TEMPO, WHOLE, &goal);
+    SoundAllocMusic(winSoundBuf, 1, &winSound);
+	SoundAllocMusic(loseSoundBuf, 1, &loseSound);
+
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+	FileHandle fHandle ;
+	Boolean		tips;
+
+    @call self::MSG_PADDLE_PAUSE();
+
+    FilePushDir() ;
+    FileSetCurrentPath(paddle_drive, paddle_relativePath) ;
+    FileCreateDir(paddle_path) ;
+    FileSetCurrentPath(paddle_drive, paddle_path) ;
+    FileDelete(paddle_state_file) ;
+
+    fHandle = FileCreate(paddle_state_file,
+              FILE_CREATE_TRUNCATE |
+              FILE_ACCESS_RW |
+              FILE_DENY_NONE,
+              FILE_ATTR_NORMAL) ;
+
+    if (fHandle!=NullHandle)  {
+	  FileWrite(fHandle,&laenge1, sizeof(laenge1),FALSE);
+	  FileWrite(fHandle,&laenge2, sizeof(laenge2),FALSE);
+	  FileWrite(fHandle,&maxPunkte, sizeof(maxPunkte),FALSE);
+	  FileWrite(fHandle,&batSpeed1, sizeof(batSpeed1),FALSE);
+ 	  FileWrite(fHandle,&batSpeed2, sizeof(batSpeed2),FALSE);
+ 	  FileWrite(fHandle,&input1, sizeof(input1),FALSE);
+ 	  FileWrite(fHandle,&input2, sizeof(input2),FALSE);
+ 	  FileWrite(fHandle,&repeating, sizeof(repeating), FALSE);
+ 	  FileWrite(fHandle,&sound, sizeof(sound), FALSE);
+ 	  FileWrite(fHandle,&color, sizeof(color), FALSE);
+ 	  FileWrite(fHandle,&leftOpponent, sizeof(Boolean), FALSE);
+	  FileWrite(fHandle,&rightOpponent, sizeof(Boolean), FALSE);
+ 	  FileClose(fHandle,FALSE);
+    }
+    FilePopDir();
+
+    /* set the quick tips if not default */
+	tips = @call ShowOnStartupGroup::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(SHOW_ON_STARTUP);
+	InitFileWriteBoolean("Paddle", "showTips", tips);
+
+    if (myGstate) GrDestroyState(myGstate);
+
+    SoundStopMusicNote(hit);
+    SoundFreeMusicNote(hit);
+    SoundStopMusicNote(goal);
+    SoundFreeMusicNote(goal);
+    SoundStopMusic(winSound);
+	SoundFreeMusic(winSound);
+	SoundStopMusic(loseSound);
+	SoundFreeMusic(loseSound);
+
+    return(@callsuper());
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_REDRAW_GAMEBOARD
+{
+    if (myGstate) GrInvalRect(myGstate, 0, 0, maxX, maxY);
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_SPONG_1UP
+{ int oldPos=pos1;
+  if (pos1>0) pos1-=batSpeed1;
+  if (pos1<=1) pos1=1;
+  if (myGstate) GrBitBlt(myGstate, bat1, oldPos, bat1, pos1, 6, laenge1+1, BLTM_MOVE);
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_SPONG_1DOWN
+{ int oldPos=pos1;
+  if (pos1+laenge1<maxY-1) pos1+=batSpeed1;
+  if (pos1+laenge1>maxY-2) pos1=maxY-2-laenge1;
+  if (myGstate) GrBitBlt(myGstate, bat1, oldPos, bat1, pos1, 6, laenge1+1, BLTM_MOVE);
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_SPONG_2UP
+{ int oldPos=pos2;
+  if (pos2>0) pos2-=batSpeed2;
+  if (pos2<=1) pos2=1;
+  if (myGstate) GrBitBlt(myGstate, bat2, oldPos, bat2, pos2, 6, laenge2+1, BLTM_MOVE);
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_SPONG_2DOWN
+{ int oldPos=pos2;
+  if (pos2+laenge2<maxY-1) pos2+=batSpeed2;
+  if (pos2+laenge2>maxY-2) pos2=maxY-2-laenge2;
+  if (myGstate) GrBitBlt(myGstate, bat2, oldPos, bat2, pos2, 6, laenge2+1, BLTM_MOVE);
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_PADDLE_NEW_GAME
+{
+  /* stop game, if needed */
+  if (HTimer) {
+    TimerStop (HTimer, timerid);
+    HTimer = NullHandle;
+  }
+
+   punkte1 = 0;
+   punkte2 = 0;
+   pos1    = 10;
+   pos2    = 10;
+
+   gameEnd = FALSE;
+   ball_not_locked = FALSE;
+
+   repeatRightDirection  	= DIRECTION_NO;
+   repeatLeftDirection   	= DIRECTION_NO;
+
+   if (startPos == START_LEFT) {
+     ballX = 100;
+     ballY = 150;
+     dirX = 2;
+     dirY = 2;
+   } else {
+     ballX = maxX - 100;
+     ballY = maxY - 150;
+     dirX = -2;
+     dirY = -2;
+   }
+
+   @call PaddlePlayToValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(maxPunkte, FALSE);
+   @call PaddlePlayerLeftScore::MSG_GEN_VALUE_SET_INTEGER_VALUE(punkte1,FALSE);
+   @call PaddlePlayerRightScore::MSG_GEN_VALUE_SET_INTEGER_VALUE(punkte2,FALSE);
+
+   @call self::MSG_PADDLE_CONTINUE();
+   @call self::MSG_PADDLE_START_BALLTIMER();
+   @call self::MSG_REDRAW_GAMEBOARD();
+
+   @call PaddleViewOwner::MSG_META_GRAB_FOCUS_EXCL();
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_PADDLE_PAUSE
+{
+
+	g_paused = TRUE;
+	 if ((HTimer != NullHandle) && !gameEnd) {
+        TimerStop (HTimer, timerid);
+        HTimer = NullHandle;
+
+		@call PaddlePauseTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	    @call PaddleContTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	}
+    if (myGstate) GrInvalRect(myGstate, 0, 0, maxX, maxY);
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_PADDLE_CONTINUE
+{
+
+	g_paused = FALSE;
+  if ((HTimer == NullHandle) && !(gameEnd)) {
+    /*if (!HTimer)*/ HTimer=TimerStart(TIMER_EVENT_CONTINUAL, oself, 10,
+										MSG_TIMER_RANG, 1, &timerid);
+
+    @call PaddlePauseTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    @call PaddleContTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    if (myGstate) GrInvalRect(myGstate, 0, 0, maxX, maxY);
+  }
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_PADDLE_LEFT_PLAYER_OPTIONS
+{
+    @call self::MSG_PADDLE_PAUSE();
+
+    @call PaddleLeftPlayerOptions::MSG_GEN_INTERACTION_INITIATE();
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_PADDLE_RIGHT_PLAYER_OPTIONS
+{
+    @call self::MSG_PADDLE_PAUSE();
+
+    @call PaddleRightPlayerOptions::MSG_GEN_INTERACTION_INITIATE();
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_PADDLE_GOALS_OPTIONS
+{
+    @call self::MSG_PADDLE_PAUSE();
+
+    @call PaddleGoalsOptions::MSG_GEN_INTERACTION_INITIATE();
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_PADDLE_NEW_LEFT_PLAYER_OPTIONS
+{
+    word	answer;
+
+    answer = UserStandardDialogOptr(
+                NullOptr,
+                NullOptr,
+                NullOptr,
+                NullOptr,
+		        @PaddleNewGameMsg,
+		        (CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
+		        (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET));
+
+  if (answer == IC_YES) {
+    laenge1 = @call PaddlePlayerLeftSize::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    batSpeed1 = @call PaddlePlayerLeftSpeed::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+    rightOpponent = @call PaddlePlayerLeftOpponent::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(
+										COMPUTER_LEFT_OPPONENT);
+    @call self::MSG_PADDLE_NEW_GAME();
+  } else {
+    @call PaddlePlayerLeftSize::MSG_GEN_VALUE_SET_INTEGER_VALUE(laenge1, FALSE);
+    @call PaddlePlayerLeftSpeed::MSG_GEN_VALUE_SET_INTEGER_VALUE(batSpeed1, FALSE);
+    @call PaddlePlayerLeftOpponent::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+										COMPUTER_LEFT_OPPONENT, rightOpponent);
+    @call self::MSG_PADDLE_CONTINUE();
+  }
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_PADDLE_CANCEL_LEFT_PLAYER_OPTIONS
+{
+    @call PaddlePlayerLeftSize::MSG_GEN_VALUE_SET_INTEGER_VALUE(laenge1, FALSE);
+    @call PaddlePlayerLeftSpeed::MSG_GEN_VALUE_SET_INTEGER_VALUE(batSpeed1, FALSE);
+    @call PaddlePlayerLeftOpponent::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+										COMPUTER_RIGHT_OPPONENT, rightOpponent);
+    @call self::MSG_PADDLE_CONTINUE();
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_PADDLE_NEW_RIGHT_PLAYER_OPTIONS
+{
+    word	answer;
+
+    answer = UserStandardDialogOptr(
+                NullOptr,
+                NullOptr,
+                NullOptr,
+                NullOptr,
+		        @PaddleNewGameMsg,
+		        (CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
+		        (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET));
+
+    if (answer == IC_YES) {
+        laenge2 = @call PaddlePlayerRightSize::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+        batSpeed2 = @call PaddlePlayerRightSpeed::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+        leftOpponent = @call PaddlePlayerRightOpponent::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(
+        								COMPUTER_RIGHT_OPPONENT);
+        @call self::MSG_PADDLE_NEW_GAME();
+    } else {
+        @call PaddlePlayerRightSize::MSG_GEN_VALUE_SET_INTEGER_VALUE(laenge2, FALSE);
+        @call PaddlePlayerRightSpeed::MSG_GEN_VALUE_SET_INTEGER_VALUE(batSpeed2, FALSE);
+        @call PaddlePlayerRightOpponent::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+        								COMPUTER_RIGHT_OPPONENT, leftOpponent);
+        @call self::MSG_PADDLE_CONTINUE();
+    }
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_PADDLE_CANCEL_RIGHT_PLAYER_OPTIONS
+{
+        @call PaddlePlayerRightSize::MSG_GEN_VALUE_SET_INTEGER_VALUE(laenge2, FALSE);
+        @call PaddlePlayerRightSpeed::MSG_GEN_VALUE_SET_INTEGER_VALUE(batSpeed2, FALSE);
+        @call PaddlePlayerRightOpponent::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+        								COMPUTER_RIGHT_OPPONENT, leftOpponent);
+        @call self::MSG_PADDLE_CONTINUE();
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_PADDLE_NEW_GOALS_OPTIONS
+{
+    word	answer;
+
+    answer = UserStandardDialogOptr(
+                NullOptr,
+                NullOptr,
+                NullOptr,
+                NullOptr,
+		        @PaddleNewGameMsg,
+		        (CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
+		        (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET));
+
+    if (answer == IC_YES) {
+        maxPunkte = @call PaddleGoalsValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+        @call PaddlePlayToValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(maxPunkte, FALSE);
+        @call self::MSG_PADDLE_NEW_GAME();
+    } else {
+        @call PaddleGoalsValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(maxPunkte, FALSE);
+        @call self::MSG_PADDLE_CONTINUE();
+    }
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_PADDLE_CANCEL_GOALS_OPTIONS
+{
+	@call PaddleGoalsValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(maxPunkte, FALSE);
+	@call self::MSG_PADDLE_CONTINUE();
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_PADDLE_COLOR_CHOICE_CHANGED
+{
+    @send PaddleColorControl::MSG_COLOR_SELECTOR_SET_COLOR(color, FALSE) ;
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_META_COLORED_OBJECT_SET_COLOR
+{
+    color = colorQuad;
+    @call PaddleViewOwner::MSG_GEN_VIEW_SET_COLOR(color.CQ_redOrIndex,
+ 	                           color.CQ_info, (color.CQ_blue << 8) | color.CQ_green);
+    if (myGstate) GrInvalRect(myGstate, 0, 0, maxX, maxY);
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_PADDLE_SOUND_CHOICE_CHANGED
+{
+  sound = selection;
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_PADDLE_REPEAT_MODIFIED
+{
+  repeating = selectedBooleans & ENABLE_KEY_REPEATING;
+
+  repeatRightDirection  	= DIRECTION_NO;
+  repeatLeftDirection   	= DIRECTION_NO;
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_PADDLE_START_BALLTIMER
+{
+  if (!HBTimer) {
+    HBTimer = TimerStart(TIMER_EVENT_ONE_SHOT, oself, 50,
+                         MSG_PADDLE_BALLTIMER, 1, &bTimerid);
+    ball_not_locked=FALSE;
+  }
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_PADDLE_BALLTIMER
+{
+  ball_not_locked=TRUE;
+
+  if (HBTimer) {
+    TimerStop (HBTimer, bTimerid);
+    HBTimer = NullHandle;
+  }
+}
+/*-------------------------------------------------------------------------*/
+@method PaddleProcessClass, MSG_TIMER_RANG
+{
+  static int	delay = 0;
+  int 			oldX = ballX;
+  int			oldY = ballY;
+
+  if (!(gameEnd) && ball_not_locked) {
+    ballX += dirX;
+    ballY += dirY;
+
+    /* check for goals*/
+    if ((ballX<=5) && (dirX<0)) {
+      @call PaddlePlayerRightScore::MSG_GEN_VALUE_SET_INTEGER_VALUE(++punkte2,FALSE);
+
+      ballX = maxX - 100;
+      ballY = maxY - 150;
+      dirX  = -(GameRandom(5) + 1);
+      dirY  = -2;
+      @call self::MSG_PADDLE_START_BALLTIMER();
+      @call self::MSG_REDRAW_GAMEBOARD();
+      if ((punkte1<maxPunkte) && (punkte2<maxPunkte)) PaddlePlaySound(goal);
+    }
+
+    if ((ballX>=maxX-11) && (dirX>0)){
+      @call PaddlePlayerLeftScore::MSG_GEN_VALUE_SET_INTEGER_VALUE(++punkte1,FALSE);
+      ballX = 100;
+      ballY = 150;
+      dirX  = GameRandom(5) + 1;
+      dirY  = 2;
+      @call self::MSG_PADDLE_START_BALLTIMER();
+      @call self::MSG_REDRAW_GAMEBOARD();
+      if ((punkte1<maxPunkte) && (punkte2<maxPunkte)) PaddlePlaySound(goal);
+    }
+
+    /* check for bats*/
+    if (((ballX<=bat1+11) && (dirX<0)) && (ballX>=bat1+5))
+      if ((ballY+6>pos1) && (ballY<pos1+laenge1)) {
+        dirX= GameRandom(5) + 1;/*reflect x*/
+        if (ballX<=bat1+7) ballX=bat1+7;
+        PaddlePlaySound(hit);
+      }                /*<-Links*/
+    if (((ballX+6>=bat2-10) && (dirX>0)) && (ballX+10<=bat2))
+      if ((ballY+6>pos2) && (ballY<pos2+laenge2)) {
+		dirX= -(GameRandom(5) + 1);/*reflect x*/
+		if (ballX+7>=bat2) ballX=bat2-7;
+	    PaddlePlaySound(hit);
+      }                /*<-Rechts*/
+
+    /* check for y-reflections*/
+    if (ballY<=5) {
+      ballY=6; dirY=-dirY;/*reflect x*/
+    } /*oben*/
+    if (ballY>=maxY-11) {
+      ballY=maxY-12; dirY=-dirY;/*reflect x*/
+    } /*unten*/
+
+    if (myGstate) GrBitBlt(myGstate, oldX, oldY, ballX, ballY, 10, 10, BLTM_MOVE);
+
+    if (((rightOpponent) && (dirX<0)) && (ballX<maxX/2)) { /*player1 = computer*/
+      if ((GameRandom(5) + 1) >2) {
+        if (pos1 >= ballY) @call self::MSG_SPONG_1UP();
+        if (pos1+laenge1 <= ballY) @call self::MSG_SPONG_1DOWN();
+      }
+    }
+
+    if (((leftOpponent) && (dirX>0)) && (ballX>maxX/2)) { /*player2 = computer*/
+      if ((GameRandom(5) + 1) >2) {
+        if (pos2 >= ballY) @call self::MSG_SPONG_2UP();
+        if (pos2+laenge2 <= ballY) @call self::MSG_SPONG_2DOWN();
+      }
+    }
+
+    if (repeating) {
+      delay++;
+      if (delay == 3) {
+        if(repeatRightDirection == DIRECTION_UP)   @send self::MSG_SPONG_2UP();
+        if(repeatRightDirection == DIRECTION_DOWN) @send self::MSG_SPONG_2DOWN();
+        if(repeatLeftDirection == DIRECTION_UP)    @send self::MSG_SPONG_1UP();
+        if(repeatLeftDirection == DIRECTION_DOWN)  @send self::MSG_SPONG_1DOWN();
+        delay = 0;
+      }
+    }
+
+    /*end game*/
+    if ((punkte1>=maxPunkte) || (punkte2>=maxPunkte)) {
+      if (HTimer) {
+        TimerStop (HTimer, timerid);
+        HTimer = NullHandle;
+      }
+
+      gameEnd = TRUE;
+
+      if (punkte1 > punkte2) {
+        if (rightOpponent) PaddlePlaySound(loseSound);
+        else               PaddlePlaySound(winSound);
+        UserDoDialog(@PaddleLeftPlayerWin);
+        startPos = START_LEFT;
+      } else {
+        if (leftOpponent) PaddlePlaySound(loseSound);
+        else              PaddlePlaySound(winSound);
+        UserDoDialog(@PaddleRightPlayerWin);
+        startPos = START_RIGHT;
+      }
+
+      @call PaddlePauseTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+      @call PaddleContTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    }
+  }
+}
+
+

@@ -1,0 +1,287 @@
+/*
+ **************************************************************************
+ *  FILE:			document.goc
+ *  PROJECT:		Breadbox Kid Numbers
+ *  DESCRIPTION:    added 8/18 - 20 by jfh
+ *			     deleted all the original file handling
+ **************************************************************************
+ */
+//@include <stdapp.goh>
+@define __NUMBERS_DOCUMENT_GOC
+@include "numbers.goh"
+@include "password.goh"
+#include <ansi/string.h>
+#include <math.h>
+
+@classdecl KNDocCtrlClass;
+@classdecl KNDocumentClass;
+
+Boolean g_newDoc;
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE
+ *                                              for KNDocumentClass
+ *
+ * DESCRIPTION:	Creates the new file and opens the editor
+ *
+ *
+ ***********************************************************************/
+@method KNDocumentClass, MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE
+{
+DBGroupAndItem  mapitem;
+PageStruct      *ps;
+
+
+    /* check for proper password */
+    if(!PwdCheckPasswordInINI(
+		  "Numbers",
+		  "pword",
+		  TRUE,
+		  TRUE)) return(TRUE);
+
+
+    g_dbFileHan = pself->GDI_fileHandle;
+
+    /* Create the DB map item. */
+    mapitem = DBAllocUngrouped(g_dbFileHan, sizeof(PageStruct));
+    DBSetMapUngrouped(g_dbFileHan, mapitem);
+    ps = (PageStruct *) DBLockUngrouped(g_dbFileHan, mapitem);
+    ps->VME_size = 0;
+    ps->VME_head = 0;
+
+    /* Create the one and only DB group */
+    ps->VME_group = DBGroupAlloc(g_dbFileHan);
+
+    DBDirty(ps);
+    DBUnlock(ps);
+    	
+    g_newDoc = TRUE;
+
+    return (FALSE);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT for KNDocumentClass
+ *
+ * DESCRIPTION:	Opens the selected file
+ *
+ *
+ ***********************************************************************/
+@method KNDocumentClass, MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT
+{
+DBGroupAndItem          mapitem;
+PageStruct              *ps;
+DBItem                  pageitem;
+DBGroup                 ourgroup;
+ListNode                *tmp;
+int                     i;
+optr							myContent;
+
+
+    /* assign our file handle */
+    g_dbFileHan = pself->GDI_fileHandle;
+    strcpy(g_fileName, pself->GDI_fileName);
+
+    mapitem = DBGetMap(g_dbFileHan);  /*get the VM file*/
+    	
+    /*now extract the number of records, the first DBItem and the DBGroup */
+    ps = (PageStruct *) DBLockUngrouped(g_dbFileHan, mapitem);
+	 g_numPages = ps->VME_size;
+    pageitem = ps->VME_head;
+    ourgroup = ps->VME_group;
+    DBUnlock(ps);
+        	
+    /* randomize the pages */
+    if (g_numPages) {
+	  ShufflePages();
+
+	  /* go to the first shuffled page */
+	  for (i=0; i < g_shuffledPages[0]; i++) {
+		tmp = DBLock(g_dbFileHan, ourgroup, pageitem);
+		pageitem = tmp->LN_next;
+		DBUnlock(tmp);
+		}
+	  }
+
+    if (!g_newDoc) {
+	  /* lock the VM file, then get the random record and extract the info into global vars*/
+	  tmp = DBLock(g_dbFileHan, ourgroup, pageitem);
+	  strcpy(g_dbWord1, tmp->word1);
+	  strcpy(g_dbDef1, tmp->def1);
+	  strcpy(g_dbWord2, tmp->word2);
+	  strcpy(g_dbDef2, tmp->def2);
+	  strcpy(g_dbWord3, tmp->word3);
+	  strcpy(g_dbDef3, tmp->def3);
+	  strcpy(g_dbWord4, tmp->word4);
+	  strcpy(g_dbDef4, tmp->def4);
+	  strcpy(g_dbWord5,tmp->word5);
+	  strcpy(g_dbDef5, tmp->def5);
+	  strcpy(g_dbWord6, tmp->word6);
+	  strcpy(g_dbDef6, tmp->def6);
+	  strcpy(g_dbWord7, tmp->word7);
+	  strcpy(g_dbDef7, tmp->def7);
+	  DBUnlock(tmp);
+	  }
+    else {
+	  g_dbWord1[0] = 0;
+	  g_dbDef1[0] = 0;
+	  g_dbWord2[0] = 0;
+	  g_dbDef2[0] = 0;
+	  g_dbWord3[0] = 0;
+	  g_dbDef3[0] = 0;
+	  g_dbWord4[0] = 0;
+	  g_dbDef4[0] = 0;
+	  g_dbWord5[0] = 0;
+	  g_dbDef5[0] = 0;
+	  g_dbWord6[0] = 0;
+	  g_dbDef6[0] = 0;
+	  g_dbWord7[0] = 0;
+	  g_dbDef7[0] = 0;
+	  }
+
+    /* Reset the game variables. */
+	 g_appOpening = TRUE;
+        	
+	 /* Start the game. */
+	 myContent = @call NumbersView::MSG_GEN_VIEW_GET_CONTENT();
+	 @send myContent::MSG_VIS_CONTENT_BEGIN_GAME();
+
+    if(g_newDoc) {
+       VMELoadFileCommon();
+	  @send VMEEditor::MSG_GEN_INTERACTION_INITIATE();
+	  g_newDoc = FALSE;
+	  }
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT for KNDocumentClass
+ *
+ * DESCRIPTION:	Called when the doc is closed.
+ *              
+ *
+ ***********************************************************************/
+@method KNDocumentClass, MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT
+{
+ optr		myContent;
+
+
+	 myContent = @call NumbersView::MSG_GEN_VIEW_GET_CONTENT();
+	 @send myContent::MSG_VIS_CONTENT_END_GAME();
+
+	 g_dbFileHan = NullHandle;
+    g_fileName[0] = 0;
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_DOCUMENT_SAVE_AS_COMPLETED for KNDocumentClass
+ *
+ * DESCRIPTION:	Called on Save As.
+ *
+ *
+ ***********************************************************************/
+@method KNDocumentClass, MSG_GEN_DOCUMENT_SAVE_AS_COMPLETED
+{
+
+	 g_dbFileHan = pself->GDI_fileHandle;
+    strcpy(g_fileName, pself->GDI_fileName);
+
+}
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_DOCUMENT_CONTROL_CONFIGURE_FILE_SELECTOR
+ *                                             for KNDocCtrlClass
+ *
+ * DESCRIPTION:	To direct opens & saves to KN folder.
+ *              
+ *
+ ***********************************************************************/
+@method KNDocCtrlClass, MSG_GEN_DOCUMENT_CONTROL_CONFIGURE_FILE_SELECTOR
+{
+ DiskHandle	drive;
+ Boolean		notThere;
+
+
+    @callsuper();
+
+    MemLock (OptrToHandle(@KNFolderTxt));
+
+    if (!g_onYago) {  /* on a PC */
+	  notThere = @call fileSelector::MSG_GEN_PATH_SET
+					 (LMemDeref(@KNFolderTxt),
+					 SP_DOCUMENT);
+	  if(notThere)  @call fileSelector::MSG_GEN_PATH_SET(".", SP_DOCUMENT);
+	  }
+
+    else  { /* on a yago */
+	  drive = DiskRegisterDiskSilently(5); /* drive F */
+	  notThere = @call fileSelector::MSG_GEN_PATH_SET
+					    (LMemDeref(@YagoKNFolder),
+					    drive);
+	  if (notThere) @call fileSelector::MSG_GEN_PATH_SET
+					    (LMemDeref(@YagoDocFolder),
+					    drive);
+	  }
+    MemUnlock (OptrToHandle(@KNFolderTxt));
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	ShufflePages
+ *
+ * CALLED BY:  MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT
+ *
+ *
+ * STRATEGY:    shuffles the pages and puts the numbers into the global
+ *					 array
+ *
+ *
+ ***********************************************************************/
+void ShufflePages()
+{
+byte			unShuffled[MAX_PAGES];
+word			i, j, max, randNum;
+long double	randomX;
+
+
+    /* initialize the unshuffled array */
+	 for (i = 0; i < g_numPages; i++)  {
+	  unShuffled[i] = (byte)i;
+	  }
+
+	 max = g_numPages - 1;
+    /* initialize randomizer using TimerGetCount as a seed (dword) */
+    FloatRandomize(RGIF_USE_SEED, TimerGetCount());
+    
+	 for (i = 0; i < g_numPages; i++)  {
+		 /* is it the last one to shuffle? */
+		 if (i == g_numPages - 1)  g_shuffledPages[i] = unShuffled[0];
+		 else {
+			 /* get a random # between 0(incl) and max(excl) */
+			 randomX = max + 1;   /* the 1 is to include max */
+			 FloatPushNumber(&randomX);
+			 FloatRandomN();
+			 FloatPopNumber(&randomX);
+			 randNum = (word) randomX;
+			 /* get the ith shuffled page */
+			 g_shuffledPages[i] = unShuffled[randNum];
+			 /* now remove that element from unshuffled array */
+			 if (randNum < max)  {
+				 for (j = randNum; j < max; j++)  {
+					 unShuffled[j] = unShuffled[j + 1];
+					 }
+				 }
+			 }
+		 max--;
+       }
+
+}
+

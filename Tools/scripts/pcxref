@@ -1,0 +1,299 @@
+#!/bin/sh -
+##############################################################################
+#
+# 	Copyright (c) Berkeley Softworks 1989 -- All Rights Reserved
+#
+# PROJECT:	PC GEOS
+# MODULE:	Tools/scripts -- Assembly-language cross-reference
+# FILE: 	pcxref
+# AUTHOR: 	Tony
+#
+#	Usage: pcxref [-o] [-r] <files>
+#
+#   	    -o	    produce old-style output, like this:
+#   	    	    	shortroutine: calledby, calledby, calledby, calledby, calledby, calledby
+#   	    	    rather than this:
+#   	    	    	shortroutine	 : calledby, calledby, calledby,
+#					   calledby, calledby, calledby
+#   	    	    	longerroutinename: calledby, calledby, calledby
+#
+#   	    -r	    produce reverse cross-reference listing, showing all
+#		    routines and the routines they call.
+#
+#	$Id: pcxref,v 1.10 98/04/24 08:53:59 cthomas Exp $
+#
+###############################################################################
+#
+#
+#set -x
+#
+trap "rm -f /tmp/pcxref.[123456]" 0 1 2 3 15
+
+notify() {
+    if [ "$verbose" ]; then
+    	echo $@ 1>&2
+    fi
+}
+
+# Separate switches and files from list
+
+files="" oldStyle=0 reverse=0 symfile="" verbose=yes
+for i in "$@"; do
+    case $i in
+	-o)	oldStyle=1
+		;;
+	-r)	reverse=1
+		;;
+    	-s*) 	symfile=`expr x$i : 'x-s\(.*\)$'`
+    	    	;;
+	*)  	files="$files $i"
+	    	;;
+    esac
+done
+
+# trash comments, line-inclusion macros & go through each file,
+# building up a list of
+#	procedure starts: "S <name>"
+#	calls : "C <name>"
+notify -n Locating calls...
+sed -n -e '
+    /COMMENT @.*/btrash
+    s/^[a-zA-Z_][a-zA-Z0-9_]*[	 ]*<\(.*\)/\1/
+    /.*;.*/{
+	    s/\(.*\);.*/\1/p
+	    b
+    }
+    P
+    b
+    :trash
+	g
+	N
+	/.*@/!btrash
+' $files | sed -n -e '
+	s/\([a-zA-Z][a-zA-Z0-9_?]*\)[ 	][ 	]*proc[ 	][ 	]*near.*/S \1/p
+	s/\([a-zA-Z][a-zA-Z0-9_?]*\)[ 	][ 	]*proc[ 	][ 	]*far.*/S \1/p
+	s/\([a-zA-Z][a-zA-Z0-9_?]*\)[ 	][ 	]*method[ 	][ 	]*.*Class.*/S \1/p
+	s/[ 	][ 	]*call[ 	][ 	]*\([a-zA-Z][a-zA-Z0-9_?]*\).*/C \1/p
+	s/[ 	][ 	]*GOTO[ 	][ 	]*\([a-zA-Z][a-zA-Z0-9_?]*\).*/C \1/p
+	s/[ 	][ 	]*FALL_THRU[ 	][ 	]*\([a-zA-Z][a-zA-Z0-9_?]*\).*/C \1/p
+	s/[ 	][ 	]*CallMod[ 	][ 	]*\([a-zA-Z][a-zA-Z0-9_?]*\).*/C \1/p
+    ' > /tmp/pcxref.2
+
+notify done.
+
+# convert to lines containing two words: <routine> <called from> and sort
+# this list to get all calls to a routine together
+
+notify -n Processing calls...
+if [ $reverse = 1 ]; then
+    awk '
+	$1 == "S" {
+	    proc = $2
+	}
+	$1 == "C" {
+	    if (length($2) > plen) plen=length($2)
+	    print proc " " $2
+	}
+	END {
+	    print plen > "/tmp/pcxref.4"
+	}
+    ' /tmp/pcxref.2
+else
+    awk '
+	$1 == "S" {
+	    proc = $2
+	    if (length(proc) > plen) plen=length(proc)
+	}
+	$1 == "C" {
+	    print $2 " " proc
+	}
+	END {
+	    print plen > "/tmp/pcxref.4"
+	}
+    ' /tmp/pcxref.2
+fi | sort > /tmp/pcxref.3
+notify done.
+
+if [ "$symfile" ]; then
+    notify -n Fetching routine segments...
+    #
+    # Produce a sorted file with lines of the format
+    # <procName> <segment>
+    #
+    printobj $symfile | egrep '(^Segment|procedure)' | tr ',:' ' ' |
+    	awk '
+    	    /^Segment/ {seg = $4}
+    	    /procedure/ {print $1 " " seg}
+    	' | sort > /tmp/pcxref.5
+    #
+    # Sort the call list by calling routine first so we can add the segment
+    # of the calling routine to each line in the call list, sort that
+    # back into ascending order by procedure so we can add the segment of
+    # the called routine to each line in the call list. The resulting
+    # file has lines of the form:
+    # <calledRoutine> <callingRoutine> <callingSeg> <calledSeg>
+    #
+    sort +1 -2 /tmp/pcxref.3 |
+    	join -j1 2 -o 1.1 1.2 2.2 - /tmp/pcxref.5 |
+	sort |
+    	join - /tmp/pcxref.5 > /tmp/pcxref.6
+    notify done.
+fi
+
+notify -n Creating report...
+if [ "$symfile" ]; then
+    awk '
+    BEGIN {
+    	# Initialize counter to 0 to avoid strangeness in upcoming patterns
+	num = 0
+    }
+    procname == $1 && caller == $2 {
+    	# Same procedure, same caller, so up counter
+	num = num + 1
+    }
+    procname == $1 && caller != $2 {
+    	# Same procedure, different caller, only 1 call from previous caller,
+	# so no extra output needed for it.
+    	if (num > 1) {
+	    printf " (%d)", num
+    	}
+	num = 1
+	caller = $2
+	if ($3 != $4) {
+	    printf "\n\t%s [%s]", $2, $3
+    	} else {
+    	    printf "\n\t%s", $2
+    	}
+    }
+    procname != $1 {
+    	# New procedure, only 1 call for final caller of previous proc, so
+	# no additional info needed for that one
+    	if (num > 1) {
+    	    printf " (%d)", num
+    	}
+	procname = $1
+	caller = $2
+	num = 1
+	if (procname != "") {
+    	    printf "\n"
+    	}
+	printf "\n%s [%s]", $1, $4
+	if ($3 != $4) {
+	    printf "\n\t%s [%s]", $2, $3
+    	} else {
+    	    printf "\n\t%s", $2
+    	}
+    }
+    ' /tmp/pcxref.6
+    echo
+
+elif [ $oldStyle = 1 ]; then
+
+    # concatenate all calls to a routine on one line
+
+    awk '
+    BEGIN {
+	num = 0
+    }
+    procname == $1 && caller == $2 {
+	num = num + 1
+    }
+    procname == $1 && caller != $2 {
+    	if (num > 1) {
+    	    printf "(%d)", num
+    	}
+	num = 1
+	caller = $2
+	printf ", %s", $2
+    }
+    procname != $1 {
+    	if (num > 1) {
+	    printf "(%d)", num
+    	}
+	procname = $1
+	caller = $2
+	num = 1
+	if (procname != "") {
+	    printf "\n"
+    	}
+	printf "%s: %s", $1, $2
+    }
+    ' /tmp/pcxref.3
+    echo
+
+else
+    # concatenate all calls to a routine on one line
+
+    cat /tmp/pcxref.4 /tmp/pcxref.3 | awk '
+    BEGIN {
+	num = 0
+    }
+    NR == 1 {
+	plen=$1
+	newline = sprintf("%%-%ds:", plen)
+	contline = sprintf("%%%ds  %%s", plen)
+	next
+    }
+    proc == $1 && caller == $2 {
+	num = num + 1
+    }
+    proc == $1 && caller != $2 {
+	if (num >= 2) {
+		x1=sprintf("%s(%d)", caller, num)
+	} else {
+		x1=caller
+	}
+	num = 1
+	caller = $2
+	x=prefix " " x1
+	if (length(line)+length(x) > 78) {
+		print line ","
+		line=sprintf(contline, "", x1)
+	} else {
+		line=line x
+	}
+	prefix=","
+    }
+    proc != $1 {
+	if (line != "") {
+		if (num >= 2) {
+			x1=sprintf("%s(%d)", caller, num)
+		} else {
+			x1=caller
+		}
+		x=prefix " " x1
+		if (length(line)+length(x) > 78) {
+			print line ","
+			line=sprintf(contline, "", x1)
+		} else {
+			line=line x
+		}
+		print line
+	}
+	line=sprintf(newline, $1)
+	prefix=""
+	proc = $1
+	caller = $2
+	num = 1
+    }
+    END {
+	if (line != "") {
+		if (num >= 2) {
+			x1=sprintf("%s(%d)", caller, num)
+		} else {
+			x1=caller
+		}
+		x=prefix " " x1
+		if (length(line)+length(x) > 78) {
+			print line ","
+			line=sprintf(contline, "", x1)
+		} else {
+			line=line x
+		}
+		print line
+	}
+    }
+    '
+    echo
+fi
+notify done.

@@ -1,0 +1,152 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Designs in Light 2002 -- All Rights Reserved
+ *
+ * PROJECT:	  Mail
+ * MODULE:	  Mail
+ * FILE:	  mainProcess.goc
+ *
+ * AUTHOR:  	  Gene Anderson
+ *
+ * DESCRIPTION:
+ *	Catch-all for misc. classes
+ ***********************************************************************/
+
+@include "mail.goh"
+@include "class.goh"
+@include "global.goh"
+@include "initfile.h"
+
+@classdecl ShowToolbarClass;
+@classdecl PasswordTextClass;
+@classdecl EnableTextClass;
+
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_SHOW_TOOLBAR_SHOW_TOOLBAR
+* PASS:            none
+* RETURN:          none
+* DESCRIPTION:     show the associated toolbar
+***************************************************************/
+@method ShowToolbarClass, MSG_SHOW_TOOLBAR_SHOW_TOOLBAR
+{
+    optr *vd, oslf, mkr = @hideToolbarMoniker;
+
+    @call pself->STI_toolbar::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    oslf = oself;
+    vd = ObjVarFindData(oslf, ATTR_SHOW_TOOLBAR_HIDE_MONIKER);
+    if (vd) {
+	mkr = *vd;
+    }
+    @call oself::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(mkr,
+                                                  VUM_DELAYED_VIA_APP_QUEUE);
+    @call oself::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_SHOW_TOOLBAR_HIDE_TOOLBAR);
+}
+
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_SHOW_TOOLBAR_HIDE_TOOLBAR
+* PASS:            none
+* RETURN:          none
+* DESCRIPTION:     show the associated toolbar
+***************************************************************/
+@method ShowToolbarClass, MSG_SHOW_TOOLBAR_HIDE_TOOLBAR
+{
+    optr *vd, oslf, mkr = @showToolbarMoniker;
+
+    @call pself->STI_toolbar::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    oslf = oself;
+    vd = ObjVarFindData(oslf, ATTR_SHOW_TOOLBAR_SHOW_MONIKER);
+    if (vd) {
+	mkr = *vd;
+    }
+    @call oself::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(mkr,
+                                                  VUM_DELAYED_VIA_APP_QUEUE);
+    @call oself::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_SHOW_TOOLBAR_SHOW_TOOLBAR);
+}
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_GEN_LOAD_OPTIONS
+* PASS:            params - GenOptionsParams *
+* RETURN:          none
+* DESCRIPTION:     load options to get starting state
+***************************************************************/
+@method ShowToolbarClass, MSG_GEN_LOAD_OPTIONS
+{
+    word err, state;
+
+    err = InitFileReadInteger(params->GOP_category,
+			      params->GOP_key,
+			      &state);
+    if (err || (state & pself->STI_mask)) {
+	@call oself::MSG_SHOW_TOOLBAR_SHOW_TOOLBAR();
+    } else {
+	@call oself::MSG_SHOW_TOOLBAR_HIDE_TOOLBAR();
+    }
+}
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_GEN_SAVE_OPTIONS
+* PASS:            params - GenOptionsParams *
+* RETURN:          none
+* DESCRIPTION:     save options to record current state
+***************************************************************/
+@method ShowToolbarClass, MSG_GEN_SAVE_OPTIONS
+{
+    word state, newState;
+
+    InitFileReadInteger(params->GOP_category,
+			params->GOP_key,
+			&state);
+    if (@call pself->STI_toolbar::MSG_GEN_GET_USABLE()) {
+	newState = state|pself->STI_mask;
+    } else {
+	newState = state&~(pself->STI_mask);
+    }
+    InitFileWriteInteger(params->GOP_category,
+			 params->GOP_key,
+			 newState);
+}
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_META_START_MOVE_COPY
+* PASS:            none
+* RETURN:          retVal->flags = MRF_PROCESSED
+* DESCRIPTION:     don't allow quick copy from password fields
+***************************************************************/
+
+@method PasswordTextClass, MSG_META_START_MOVE_COPY
+{
+    /*
+     * do nothing
+     */
+    retVal->flags = MRF_PROCESSED;
+}
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_META_TEXT_EMPTY_STATUS_CHANGED
+* PASS:            object - optr of object
+*                  hasTextFlag - TRUE if has text
+* RETURN:          none
+* DESCRIPTION:     save options to record current 
+***************************************************************/
+@method EnableTextClass, MSG_META_TEXT_EMPTY_STATUS_CHANGED
+{
+    if (hasTextFlag) {
+	@call pself->ETI_object::MSG_GEN_SET_ENABLED(VUM_DLYD);
+    } else {
+	@call pself->ETI_object::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+    }
+}

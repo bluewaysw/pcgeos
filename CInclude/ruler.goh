@@ -1,0 +1,896 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+ *
+ * PROJECT:     PC GEOS
+ * FILE:        ruler.goh
+ * AUTHOR:      Anna Lijphart: January, 1992
+ *
+ * DESCRIPTION:
+ *	C version of ruler.def
+ *
+ *      $Id: ruler.goh,v 1.1 97/04/04 15:58:34 newdeal Exp $
+ *
+ ***********************************************************************/
+@optimize
+#ifndef __RULERC_GOH
+#define __RULERC_GOH
+
+@deflib    ruler
+
+#include <geos.h>
+#include <graphics.h>
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ %		Types and Constants
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+ /* default # of pixels within which guidelines are active */
+#define DEFAULT_GUIDE_INFLUENCE	10
+
+#define VIS_RULER_HEIGHT	10
+#define MAX_TICK_HEIGHT		8
+
+ /* = 65536/2 * root 2 */
+#define HALF_ROOT_2		46341
+
+typedef ByteFlags GridOptions;					/* XXX */
+#define GO_SHOW_GRID	0x80
+#define GO_SNAP_TO_GRID	0x40
+/* 6 bits unused */
+
+typedef ByteFlags VisRulerAttributes;				/* XXX */
+#define VRA_IGNORE_ORIGIN	0x80
+#define VRA_SHOW_GUIDES		0x40 
+#define VRA_SHOW_GRID 		0x20 
+#define VRA_SHOW_MOUSE 		0x10 
+#define VRA_HORIZONTAL 		0x08 
+#define VRA_MASTER 		0x04 
+/* 2 bits unused */
+
+typedef WordFlags VisRulerConstrainStrategy;			/* XXX */
+#define VRCS_OVERRIDE				0x8000 
+/* 1 bit unused */
+#define VRCS_SET_REFERENCE			0x2000 
+#define VRCS_SNAP_TO_GRID_X_ABSOLUTE		0x1000 
+#define VRCS_SNAP_TO_GRID_Y_ABSOLUTE		0x0800 
+#define VRCS_SNAP_TO_GRID_X_RELATIVE		0x0400 
+#define VRCS_SNAP_TO_GRID_Y_RELATIVE		0x0200 
+#define VRCS_SNAP_TO_GUIDES_X			0x0100 
+#define VRCS_SNAP_TO_GUIDES_Y			0x0080 
+#define VRCS_CONSTRAIN_TO_HORIZONTAL_AXIS	0x0040 
+#define VRCS_CONSTRAIN_TO_VERTICAL_AXIS		0x0020 
+#define VRCS_CONSTRAIN_TO_UNITY_SLOPE_AXIS	0x0010 
+#define VRCS_CONSTRAIN_TO_NEGATIVE_UNITY_SLOPE_AXIS	0x0008 
+#define VRCS_CONSTRAIN_TO_VECTOR		0x0004 
+#define VRCS_CONSTRAIN_TO_VECTOR_REFLECTION	0x0002 
+#define VRCS_INTERNAL				0x0001 
+    
+
+#define VRCS_SNAP_TO_GRID_ABSOLUTE \
+(VRCS_SNAP_TO_GRID_X_ABSOLUTE | VRCS_SNAP_TO_GRID_Y_ABSOLUTE)
+
+#define VRCS_SNAP_TO_GRID_RELATIVE \
+(VRCS_SNAP_TO_GRID_X_RELATIVE | VRCS_SNAP_TO_GRID_Y_RELATIVE)
+
+#define VRCS_SNAP_TO_GUIDES \
+(VRCS_SNAP_TO_GUIDES_X | VRCS_SNAP_TO_GUIDES_Y)
+
+#define VRCS_SNAP_FLAGS \
+(VRCS_SNAP_TO_GRID_ABSOLUTE | VRCS_SNAP_TO_GRID_RELATIVE | VRCS_SNAP_TO_GUIDES)
+
+#define VRCS_CONSTRAIN_TO_HV_AXES \
+(VRCS_CONSTRAIN_TO_HORIZONTAL_AXIS | VRCS_CONSTRAIN_TO_VERTICAL_AXIS)
+
+#define VRCS_CONSTRAIN_TO_DIAGONALS \
+(VRCS_CONSTRAIN_TO_UNITY_SLOPE_AXIS | \
+ VRCS_CONSTRAIN_TO_NEGATIVE_UNITY_SLOPE_AXIS)
+
+#define VRCS_VECTOR_CONSTRAIN \
+(VRCS_CONSTRAIN_TO_VECTOR | VRCS_CONSTRAIN_TO_VECTOR_REFLECTION)
+
+#define VRCS_CONSTRAIN_FLAGS \
+(VRCS_CONSTRAIN_TO_HV_AXES | VRCS_CONSTRAIN_TO_DIAGONALS | \
+ VRCS_VECTOR_CONSTRAIN)
+
+#define VRCS_MOUSE_TWEAKING_FLAGS \
+(VRCS_SNAP_FLAGS | VRCS_CONSTRAIN_FLAGS)
+					
+ /* Constants for VisRulerType ByteEnum */
+#define CUSTOM_RULER_DEFINITION	0xfd
+#define NO_RULERS		0xfe
+#define SYSTEM_DEFAULT		0xff
+
+typedef ByteEnum VisRulerType;					/* XXX */
+#define VRT_INCHES		0x0
+#define VRT_CENTIMETERS		0x1
+#define VRT_POINTS		0x2
+#define VRT_PICAS		0x3
+#define VRT_CUSTOM		CUSTOM_RULER_DEFINITION
+#define VRT_NONE		NO_RULERS
+#define VRT_DEFAULT		SYSTEM_DEFAULT
+
+typedef struct {						/* XXX */
+    WWFixed	G_x;		/* Pixels between horizontal gridlines */
+    WWFixed	G_y;		/* Pixels between vertical gridlines */
+} Grid;
+
+typedef struct {						/* XXX */
+    DWFixed	Guide_location;
+} Guide;
+
+typedef ByteEnum MinUSMeasure;					/* XXX */
+#define MUSM_EIGHTH_INCH	0x0
+#define MUSM_QUARTER_INCH	0x1
+#define MUSM_HALF_INCH		0x2
+#define MUSM_ONE_INCH		0x3
+
+typedef ByteEnum MinMetricMeasure;				/* XXX */
+#define MMM_MILLIMETER		0x0
+#define MMM_HALF_CENTIMETER	0x1
+#define MMM_CENTIMETER		0x2
+
+typedef ByteEnum MinPointMeasure;				/* XXX */
+#define MPM_25_POINT		0x0
+#define MPM_50_POINT		0x1
+#define MPM_100_POINT		0x2
+
+typedef ByteEnum MinPicaMeasure;				/* XXX */
+#define MPM_PICA		0x0
+#define MPM_INCH		0x1
+
+typedef union {							/* XXX */
+   MinUSMeasure		MIT_US;	
+   MinMetricMeasure	MIT_METRIC;
+   MinPointMeasure	MIT_POINT;
+   MinPicaMeasure	MIT_PICA;
+} MinIncrementType;
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ %		Classes
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*
+ *	UI CONTROLLERS
+ */
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ %	RulerTypeControlClass
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+/*
+ * GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+@class  RulerTypeControlClass, GenControlClass;
+
+/*
+ *	Sent from the "RulerType" list on any change
+ */
+@message void MSG_RTC_TYPE_CHANGE(VisRulerType rulerType = cl);	/* XXX */
+
+typedef WordFlags RTCFeatures;					/* XXX */
+/* 10 bits unused */
+#define RTCF_DEFAULT		(0x20)
+#define RTCF_SPREADSHEET	(0x10)
+#define RTCF_INCHES		(0x08)
+#define RTCF_CENTIMETERS	(0x04)
+#define RTCF_POINTS		(0x02)
+#define RTCF_PICAS		(0x01)
+
+typedef struct RulerTypeNotificationBlock {			/* XXX */
+    VisRulerType	RTNB_type;
+} RulerTypeNotificationBlock;
+
+typedef WordFlags RTCToolboxFeatures;				/* XXX */
+/* 10 bits unused */
+#define RTCTF_DEFAULT		(0x20)
+#define RTCTF_SPREADSHEET	(0x10)
+#define RTCTF_INCHES		(0x08)
+#define RTCTF_CENTIMETERS	(0x04)
+#define RTCTF_POINTS		(0x02)
+#define RTCTF_PICAS		(0x01)
+
+#define RTC_DEFAULT_FEATURES \
+(RTCF_INCHES | RTCF_CENTIMETERS | RTCF_POINTS | RTCF_PICAS | RTCF_DEFAULT)
+
+#define RTC_DEFAULT_TOOLBOX_FEATURES (RTCF_INCHES | RTCF_CENTIMETERS)
+
+    @default GCI_output = (TO_APP_TARGET);
+
+@endc	/* RulerTypeControlClass */
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ %	GuideCreateControlClass
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+/*
+ * GenApplication GCN lists to be placed on:
+ *	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+@class  GuideCreateControlClass, GenControlClass;
+
+/*
+ *	Create a guide
+ */
+@message void MSG_GCC_CREATE_VERTICAL_GUIDELINE();		/* XXX */
+@message void MSG_GCC_CREATE_HORIZONTAL_GUIDELINE();		/* XXX */
+
+typedef WordFlags GCCFeatures;					/* XXX */
+/* 14 bits unused */
+#define GCCF_HORIZONTAL_GUIDES	(0x02)
+#define GCCF_VERTICAL_GUIDES	(0x01)
+
+#define GCC_DEFAULT_FEATURES \
+(GCCF_HORIZONTAL_GUIDES | GCCF_VERTICAL_GUIDES)
+
+#define GCC_DEFAULT_TOOLBOX_FEATURES (0)
+
+    @default GCI_output = (TO_APP_TARGET);
+
+@endc	/* GuideCreateControlClass */
+
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ %	RulerGuideControlClass
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+typedef struct {
+    LMemBlockHeader	VRNGCBH_header;
+    word		VRNGCBH_vertGuideArray;
+    word		VRNGCBH_horizGuideArray;
+} VisRulerNotifyGuideChangeBlockHeader;
+
+@class  RulerGuideControlClass, GenControlClass;
+
+@message void MSG_RGC_SELECT_GUIDE				/* XXX */
+    (word guideIndex = cx,
+     GenItemGroupStateFlags stateFlags = dx,
+     word numSelections = bp);
+@message void MSG_RGC_QUERY_GUIDE				/* XXX */
+    (optr list = cx:dx, word itemNum = bp);
+@message void MSG_RGC_DELETE_GUIDE();				/* XXX */
+@message void MSG_RGC_UPDATE_UI					/* XXX */
+    (GenControlUpdateUIParams _far *ptr = ss:bp);
+
+typedef WordFlags RulerGuideControlFeatures;			/* XXX */
+/* 12 bits unused */
+#define RGCF_HV		(0x08)
+#define RGCF_LIST	(0x04)
+#define RGCF_POSITION	(0x02)
+#define RGCF_DELETE	(0x01)
+
+#define RULER_GUIDE_CONTROL_DEFAULT_FEATURES \
+(RGCF_HV | RGCF_LIST | RGCF_POSITION | RGCF_DELETE)
+
+    @default GCI_output = (TO_APP_TARGET);
+    @default GII_type = GII_PROPERTIES;
+    @default GII_visibility = GIV_DIALOG;
+
+    @instance Handle		RGCI_dataBlock = NullHandle;
+    @instance VisRulerType	RGCI_rulerType = 0;
+
+@endc	/* RulerGuideControlClass */
+
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ %	RulerGridControlClass
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+/*
+ *  GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+
+typedef struct {
+    WWFixed	RGNB_gridSpacing;
+    GridOptions	RGNB_gridOptions;
+} RulerGridNotificationBlock;
+
+@class  RulerGridControlClass, GenControlClass;
+
+/*
+ *	Set the grid spacing.
+ * 	PASS:	spacing		- horizontal and vertical grid spacing
+ */
+@message void MSG_RGC_SET_GRID_SPACING(WWFixed points = dx.cx);	/* XXX */
+
+/*
+ * 	Set the grid spacing based on the UI.
+ * 
+ *  Pass:	opts	- These flags will replace the current GridOptions
+ */
+@message void MSG_RGC_SET_GRID_OPTIONS(GridOptions opts = cl);	/* XXX */
+
+typedef WordFlags RGCFeatures;					/* XXX */
+/* 13 bits unused */
+#define RGCF_GRID_SPACING	(0x04)
+#define RGCF_SNAP_TO_GRID	(0x02)
+#define RGCF_SHOW_GRID		(0x01)
+
+#define RGC_DEFAULT_FEATURES \
+(RGCF_GRID_SPACING | RGCF_SNAP_TO_GRID | RGCF_SHOW_GRID)
+
+#define RGC_DEFAULT_TOOLBOX_FEATURES (0)
+
+    @default GCI_output = (TO_APP_TARGET);
+
+@endc	/* RulerGridControlClass */
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ %	RulerShowControlClass
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+/*
+ *  This controller *does not* get notifications from the text rulers.  The
+ *  controller maintains the state.
+ * 
+ *  Message(s) sent out:
+ *  The message in RSCI_message is sent out when changes are made.
+ *  The objects that are to receive this message need to be on the active
+ *  list specifed in RSCI_gcnList (default GAGCNLT_DISPLAY_OBJECTS_WITH_RULERS)
+ *  For example, your GenDisplay class could add displays to this list on:
+ * 	MSG_SPEC_BUILD_BRANCH
+ * 	MSG_VIS_OPEN
+ *  and remove them on:
+ * 	MSG_SPEC_UNBUILD_BRANCH
+ * 	MSG_VIS_CLOSE
+ * 
+ *  GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+@class  RulerShowControlClass, GenControlClass;
+
+/*----------------------------------------------------------------------
+ *		Methods
+ *----------------------------------------------------------------------*/
+
+/*----------------------------------------------------------------------
+ * 		Internal methods
+ *----------------------------------------------------------------------*/
+
+@message void MSG_RSCC_CHANGE_STATE				/* XXX */
+    (RulerShowControlAttributes flags = cx);
+/*----------------------------------------------------------------------
+ *		Hints
+ *----------------------------------------------------------------------*/
+
+/*----------------------------------------------------------------------
+ * 		Constants & Structures
+ *----------------------------------------------------------------------*/
+
+/*
+ *  Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+ *  ATTR_GEN_CONTROL_PROHIBIT_UI)
+ */
+
+typedef WordFlags RSCCFeatures;					/* XXX */
+/* 13 bits unused */
+#define RSCCF_SHOW_VERTICAL	(0x04)
+#define RSCCF_SHOW_HORIZONTAL	(0x02)
+#define RSCCF_SHOW_RULERS	(0x01)
+
+/*
+ *  Toolbox features flags (used with ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI and
+ *  ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI)
+ */
+
+typedef WordFlags RSCCToolboxFeatures;
+/* 16 bits unused */
+
+#define RSCC_DEFAULT_FEATURES	(RSCCF_SHOW_VERTICAL | RSCCF_SHOW_HORIZONTAL)
+#define RSCC_DEFAULT_TOOLBOX_FEATURES	(0)
+
+/* ----------------------------------------------------------------------
+ * 		Instance Data
+ * ----------------------------------------------------------------------*/
+
+typedef WordFlags RulerShowControlAttributes;
+#define RSCA_SHOW_VERTICAL	0x8000
+#define RSCA_SHOW_HORIZONTAL	0x4000
+/* 14 bits unused */
+
+    @instance RulerShowControlAttributes RSCI_attrs =
+	(RSCA_SHOW_VERTICAL | RSCA_SHOW_HORIZONTAL);
+
+    @instance GCNListType	RSCI_gcnList =
+	{MANUFACTURER_ID_GEOWORKS,
+	 GAGCNLT_DISPLAY_OBJECTS_WITH_RULERS};
+	/* objects to notify */
+
+    @instance Message		RSCI_message = 0;
+	/* message to notify with */
+	/* pass: cx - RulerShowControlAttributes */
+
+@prototype void RULER_SHOW_CONTROL_NOTIFY
+    (RulerShowControlAttributes attrs = cx);
+
+    @default GCI_output = (TO_APP_TARGET);
+    @default GI_states = (@default | GS_ENABLED);
+
+@endc	/* RulerShowControlClass */
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ %	VisRulerClass
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@class  VisRulerClass, VisClass;
+/*----------------------------------------------------------------------
+ *		Methods and prototypes
+ *----------------------------------------------------------------------*/
+
+/*
+ * This prototype is used for the snap messages
+ */
+@prototype void VIS_RULER_SNAP(PointDWFixed _far* point=ss:bp);
+
+/*
+ * This prototype is used for messages that take a PointDWFixed on the
+ * stack (but do not alter it).
+ */
+@prototype void VIS_RULER_POINT
+    (@stack sdword yInt, word yFrac, sdword xInt, word xFrac);
+
+/*
+ * This prototype is used for messages that take a DWFixed on the stack
+ * (but do not alter it).
+ */
+@prototype void VIS_RULER_DWFIXED				/* XXX */
+    (@stack sdword dwfInt, word dwfFrac);
+
+/*
+ * 	Notify the ruler that its ruled object is "selected" and that the
+ * 	ruler should update the UI to reflect its own attributes
+ * 
+ * 	Also registers the passed invalAD as the AD it should send out
+ * 	whenever the ruled object needs to redraw itself (as a result
+ * 	of a change in grid spacing, addition of a guideline, etc.)
+ * 
+ * 	PASS:		dest = Object to send inval messages to
+ */
+@message void MSG_VIS_RULER_GAINED_SELECTION			/* XXX */
+    (optr dest = cx:dx);
+
+/*
+ * 	Notify the ruler that its ruled object is no longer "selected".
+ */
+@message void MSG_VIS_RULER_LOST_SELECTION();			/* XXX */
+
+
+@message void MSG_VIS_RULER_UPDATE_CONTROLLERS();		/* XXX */
+@message void MSG_VIS_RULER_UPDATE_TYPE_CONTROLLER();		/* XXX */
+@message void MSG_VIS_RULER_UPDATE_GRID_CONTROLLER();		/* XXX */
+@message void MSG_VIS_RULER_UPDATE_GUIDE_CONTROLLER();		/* XXX */
+@message void MSG_VIS_RULER_COMBINE_GUIDE_INFO			/* XXX */
+    (MemHandle data = cx);
+
+@message void MSG_VIS_RULER_RULE_LARGE_PTR();			/* XXX */
+/* Doesn't work -- Kernel can't pass stack and register args at the same time. */
+/* (PointDWFixed _far *point = ss:bp, VisRulerConstrainStrategy strat = cx); */
+
+
+/*
+ *  Set type of ruler (eg. inches, centimeters)
+ * 
+ * 	PASS:	VisRulerType type
+ */
+@message void MSG_VIS_RULER_SET_TYPE(VisRulerType type = cl);	/* XXX */
+
+/*
+ *  Get type of ruler (eg. inches, centimeters)
+ * 
+ * 	RETURN:	VisRulerType
+ */
+@message VisRulerType MSG_VIS_RULER_GET_TYPE() = cl;		/* XXX */
+
+/*
+ * 	Get default constrain strategy for the ruler
+ * 
+ * 	RETURN:		VisRulerConstrainStrategy
+ */
+@message VisRulerConstrainStrategy
+    MSG_VIS_RULER_GET_CONSTRAIN_STRATEGY() = cx;		/* XXX */
+
+/*
+ * 	Set default constrain strategy for the ruler
+ * 
+ * 	PASS:	setflags	- flags to set
+ *		clearflags	- flags to clear
+ * 	RETURN:	none
+ */
+@message void MSG_VIS_RULER_SET_CONSTRAIN_STRATEGY		/* XXX */
+    (VisRulerConstrainStrategy setflags = cx,
+     VisRulerConstrainStrategy clearflags = dx);
+
+/*
+ * 	Set the "ignore origin" state
+ * 
+ * 	PASS:	ignore	- non-FALSE to ignore the origin.
+ */
+@message void MSG_VIS_RULER_SET_IGNORE_ORIGIN(Boolean ignore = cx); /* XXX */
+
+/*
+ * 	Draw the mouse tick in the ruler on ptr events
+ */
+@message void MSG_VIS_RULER_SHOW_MOUSE();			/* XXX */
+
+/*
+ * 	Don't dnraw the mouse tick in the ruler on ptr events
+ */
+@message void MSG_VIS_RULER_HIDE_MOUSE();			/* XXX */
+
+/*
+ * 	Draw a line on the ruler indicating the mouse position
+ * 
+ * 	PASS:	point	- PointDWFixed location of mouse
+ */
+@message(VIS_RULER_POINT) MSG_VIS_RULER_DRAW_MOUSE_TICK;
+
+/*
+ * 	Set the default VisRulerConstrainStrategy to include grid snapping
+ */
+@message void MSG_VIS_RULER_TURN_GRID_SNAPPING_ON();		/* XXX */
+
+/*
+ * 	Set the default VisRulerConstrainStrategy to not include grid snapping
+ */
+@message void MSG_VIS_RULER_TURN_GRID_SNAPPING_OFF();		/* XXX */
+
+/*
+ * 	Set the default VisRulerConstrainStrategy to include guides snapping
+ */
+@message void MSG_VIS_RULER_TURN_GUIDES_SNAPPING_ON();		/* XXX */
+
+/*
+ * 	Set the default VisRulerConstrainStrategy to not include guides snapping
+ */
+@message void MSG_VIS_RULER_TURN_GUIDES_SNAPPING_OFF();		/* XXX */
+
+/*
+ *  Set minimum increment (eg. 1/8",1/4",1/2",1")
+ * 
+ * 	PASS: 	type		- MinIncrementType
+ */
+@message void MSG_VIS_RULER_SET_MIN_INCREMENT			/* XXX */
+    (MinIncrementType min = cl);
+
+/*
+ *  Set scale factor
+ * 
+ * 	PASS:	ss:bp - ScaleChangedParams
+ * 	RETURN:	none
+ */
+@message void MSG_VIS_RULER_VIEW_SCALE_FACTOR_CHANGED		/* XXX */
+    (@stack WindowHandle viewWindow, 
+     WWFixedAsDWord yScaleFactor,  
+     WWFixedAsDWord xScaleFactor);
+
+/*
+ *  Set scale factor
+ * 
+ * 	PASS:	scale	- scale factor
+ */	
+@message void MSG_VIS_RULER_SET_SCALE
+    (WWFixedAsDWord scale = dx.cx);
+
+/*
+ * 	Set the grid increments for this ruler
+ * 
+ * 	PASS:	spacing		- horizontal and vertical grid spacing
+ */
+@message void MSG_VIS_RULER_SET_GRID_SPACING
+    (WWFixedAsDWord spacing = dx.cx);
+
+/*
+ * 	Set the grid increments for this ruler
+ * 
+ * 	PASS:	spacing		- horizontal grid spacing
+ */
+@message void MSG_VIS_RULER_SET_HORIZONTAL_GRID_SPACING
+    (WWFixedAsDWord spacing = dx.cx);
+
+/*
+ * 	Set the grid increments for this ruler
+ * 
+ * 	PASS:	spacing		- vertical grid spacing
+ */
+@message void MSG_VIS_RULER_SET_VERTICAL_GRID_SPACING
+    (WWFixedAsDWord spacing = dx.cx);
+
+/*
+ * 	Draw the grid to a gstate
+ * 
+ * 	PASS:	gstate		- handle to a GState
+ */
+@message void MSG_VIS_RULER_DRAW_GRID(GStateHandle gstate = bp); /* XXX */
+
+/*
+ * 	Snap the passed coordinate to the grid
+ * 
+ * 	PASS:	*point		- point to snap to grid
+ * 	RETURN:	*point		- point, snapped to grid
+ */
+@message(VIS_RULER_SNAP) MSG_VIS_RULER_SNAP_TO_GRID;
+@message(VIS_RULER_SNAP) MSG_VIS_RULER_SNAP_TO_GRID_X;
+@message(VIS_RULER_SNAP) MSG_VIS_RULER_SNAP_TO_GRID_Y;
+
+/*
+ * 	Define the ruler's reference point
+ * 
+ * 	PASS:	*point		- new reference point
+ */
+@message(VIS_RULER_POINT) MSG_VIS_RULER_SET_REFERENCE;
+
+/*
+ * 	Returns the point closest to the passed point that is an
+ * 	integral number of grid spacings from the reference point
+ * 
+ * 	PASS:	*point		- the point
+ * 	RETURN:	*point		- the snapped point
+ */
+@message(VIS_RULER_SNAP) MSG_VIS_RULER_SNAP_RELATIVE_TO_REFERENCE;
+@message(VIS_RULER_SNAP) MSG_VIS_RULER_SNAP_RELATIVE_TO_REFERENCE_X;
+@message(VIS_RULER_SNAP) MSG_VIS_RULER_SNAP_RELATIVE_TO_REFERENCE_Y;
+
+/*
+ * 	Returns a grid spacing that will look nice on the screen at
+ * 	the current scale factor.
+ * 
+ * 	RETURN:	dx:cx = WWFixed horizontal grid spacing
+ * 		bp:ax = WWFixed vertical grid spacing
+ *
+ * The GridSpacing struct is like the Grid struct, except the two fields are
+ * reversed.  It is only used with this message; especially note that the
+ * ruler's instance data contains a Grid, _not_ a GridSpacing.
+ */
+typedef struct {
+    WWFixed	GS_y;
+    WWFixed	GS_x;
+} GridSpacing;
+@message void MSG_VIS_RULER_GET_GRID_SPACING
+    (GridSpacing* gridspace = axbpcxdx);
+@message void MSG_VIS_RULER_GET_STRATEGIC_GRID_SPACING
+    (GridSpacing* gridspace = axbpcxdx);
+
+
+@message void MSG_VIS_RULER_CREATE_GUIDE_ARRAY();		/* XXX */
+@message(VIS_RULER_DWFIXED) MSG_VIS_RULER_ADD_HORIZONTAL_GUIDE;	/* XXX */
+@message(VIS_RULER_DWFIXED) MSG_VIS_RULER_ADD_VERTICAL_GUIDE;	/* XXX */
+
+@message void MSG_VIS_RULER_DRAW_GUIDES				/* XXX */
+    (GStateHandle gstate = bp);
+
+/* The following message has no handler... */
+@message void MSG_VIS_RULER_DRAW_GUIDE_INDICATORS();
+
+
+/*
+ * 	Snap the passed coordinate to the guides
+ * 
+ * 	PASS:	*point	= PointDWFixed to snap to guides
+ * 	RETURN:	*point	= PointDWFixed snapped to guides
+ */
+@message(VIS_RULER_SNAP) MSG_VIS_RULER_SNAP_TO_GUIDES;
+@message(VIS_RULER_SNAP) MSG_VIS_RULER_SNAP_TO_GUIDES_X;
+@message(VIS_RULER_SNAP) MSG_VIS_RULER_SNAP_TO_GUIDES_Y;
+
+/*
+ * 	Constrain the passed coordinate to the indicated axis(axes)
+ * 
+ * 	PASS:	*point	= PointDWFixed to constrain
+ * 	RETURN:	*point	= PointDWFixed (constrained)
+ */
+@message(VIS_RULER_SNAP) MSG_VIS_RULER_CONSTRAIN_TO_AXES;
+@message(VIS_RULER_SNAP) MSG_VIS_RULER_CONSTRAIN_TO_HORIZONTAL_AXIS;
+@message(VIS_RULER_SNAP) MSG_VIS_RULER_CONSTRAIN_TO_VERTICAL_AXIS;
+@message(VIS_RULER_SNAP) MSG_VIS_RULER_CONSTRAIN_TO_DIAGONALS;
+@message(VIS_RULER_SNAP) MSG_VIS_RULER_CONSTRAIN_X_TO_UNITY_SLOPE_AXIS;
+@message(VIS_RULER_SNAP) MSG_VIS_RULER_CONSTRAIN_Y_TO_UNITY_SLOPE_AXIS;
+@message(VIS_RULER_SNAP) MSG_VIS_RULER_CONSTRAIN_X_TO_NEGATIVE_UNITY_SLOPE_AXIS;
+@message(VIS_RULER_SNAP) MSG_VIS_RULER_CONSTRAIN_Y_TO_NEGATIVE_UNITY_SLOPE_AXIS;
+
+/*
+ * 	Set the origin.
+ * 
+ * 	PASS:	pointInt, pointFrac: integer and fraction fields of a DWFixed.
+ * 	RETURN:	none
+ */
+typedef struct {
+    word	unused;
+    word	DWFR_frac;
+    sdword	DWFR_int;
+} DWFixedReturn;
+@message void MSG_VIS_RULER_SET_ORIGIN
+    (sdword pointInt = dx:cx, word pointFrac = bp);
+
+@message void MSG_VIS_RULER_GET_ORIGIN
+    (DWFixedReturn *retval = axbpcxdx);
+
+/*
+ * 	Set the vector.
+ * 
+ * 	PASS:	*point	- *point and the reference point define the vector.
+ */
+@message(VIS_RULER_POINT) MSG_VIS_RULER_SET_VECTOR;
+
+/*
+ * 	Constrain the passed point to the current vector.
+ * 
+ * 	PASS:	*point	- point to constrain
+ * 	RETURN:	*point	- the constrained point
+ */
+@message(VIS_RULER_SNAP) MSG_VIS_RULER_CONSTRAIN_TO_VECTOR;
+@message(VIS_RULER_SNAP) MSG_VIS_RULER_CONSTRAIN_X_TO_VECTOR;
+@message(VIS_RULER_SNAP) MSG_VIS_RULER_CONSTRAIN_Y_TO_VECTOR;
+@message(VIS_RULER_SNAP) MSG_VIS_RULER_CONSTRAIN_X_TO_VECTOR_REFLECTION;
+@message(VIS_RULER_SNAP) MSG_VIS_RULER_CONSTRAIN_Y_TO_VECTOR_REFLECTION;
+
+/*
+ * Return:	Position at which to draw the dividing line for the ruler.
+ */
+@message word MSG_VIS_RULER_GET_DESIRED_SIZE() = cx;		/* XXX */
+
+/*
+ * Return:	Number of pixels within which a guideline will attract the
+ *		mouse point. 
+ */
+@message word MSG_VIS_RULER_GET_GUIDE_INFLUENCE() = cx;		   /* XXX */
+@message void MSG_VIS_RULER_SET_GUIDE_INFLUENCE(word influence=cx);  /* XXX */
+@message(VIS_RULER_DWFIXED) MSG_VIS_RULER_SELECT_HORIZONTAL_GUIDE; /* XXX */
+@message(VIS_RULER_DWFIXED) MSG_VIS_RULER_SELECT_VERTICAL_GUIDE;   /* XXX */
+@message void MSG_VIS_RULER_DESELECT_ALL_HORIZONTAL_GUIDES();	   /* XXX */
+@message void MSG_VIS_RULER_DESELECT_ALL_VERTICAL_GUIDES();	   /* XXX */
+@message(VIS_RULER_DWFIXED) MSG_VIS_RULER_DELETE_HORIZONTAL_GUIDE; /* XXX */
+@message(VIS_RULER_DWFIXED) MSG_VIS_RULER_DELETE_VERTICAL_GUIDE;   /* XXX */
+
+@message void MSG_VIS_RULER_SHOW_GRID();			   /* XXX */
+@message void MSG_VIS_RULER_HIDE_GRID();			   /* XXX */
+
+/*
+ * 	Invalidates the ruler and its slave. This is provided 'cause
+ * 	if this were done via MSG_VIS_INVALIDATE, multiple invalidations
+ * 	would pile up for the slave on other messages that also call
+ * 	MSG_VIS_INVALIDATE.
+ */
+@message void MSG_VIS_RULER_INVALIDATE_WITH_SLAVES();		/* XXX */
+
+/*
+ *   MSG_VIS_RULER_SET_CONSTRAIN_TRANSFORM is sent to the ruler so that it can
+ *   properly constrain mouse events when the events are taken as happening
+ *   within some transformed coordinate system (eg. a rotated/skewed GrObj)
+ * 
+ *  Context:	Likely a transformed object is about to request a series
+ * 		of constrains, so it passes in the appropriate transform.
+ *  Source:	Any transformed object sending MSG_VIS_RULER_RULE_LARGE_PTR
+ * 		to the ruler with VRCS_VECTOR_CONSTRAIN set.
+ *  Destination:	Any VisRuler
+ *  Interception:	Unlikely
+ * 
+ *  Pass: 	*tm	- TransMatrix representing the transform
+ *  Return: 	nothing
+ */
+@message void MSG_VIS_RULER_SET_CONSTRAIN_TRANSFORM		/* XXX */
+    (TransMatrix* tm = ss:bp);
+
+/*
+ *   MSG_VIS_RULER_CLEAR_CONSTRAIN_TRANSFORM is sent to the ruler to clear
+ *   any transform that it may have been using for transformed vector constrains.
+ * 
+ *  Context:	Likely an untransformed object wants to ensure that no
+ * 		transform is being used to constrain it.
+ *  Source:	Any untransformed object sending MSG_VIS_RULER_RULE_LARGE_PTR
+ * 		to the ruler with VRCS_VECTOR_CONSTRAIN set.
+ *  Destination:	Any VisRuler
+ *  Interception:	Unlikely
+ */
+@message void MSG_VIS_RULER_CLEAR_CONSTRAIN_TRANSFORM();	/* XXX */
+
+
+/*----------------------------------------------------------------------
+ *		Instance Data
+ *----------------------------------------------------------------------*/
+
+    @instance VisRulerAttributes VRI_rulerAttrs =
+    	(VRA_SHOW_GUIDES | VRA_SHOW_GRID | VRA_HORIZONTAL | VRA_MASTER);
+
+    @instance VisRulerType	VRI_type =
+    	(VRT_DEFAULT);			/* measurement type */
+
+    @instance VisRulerConstrainStrategy VRI_constrainStrategy = 0;
+
+    @instance MinIncrementType	VRI_minIncrement = (MUSM_EIGHTH_INCH);
+					/* minimum increment displayed */
+
+    @instance WWFixed		VRI_scale = {0,1};
+					/* scale factor */
+
+    @instance DWFixed		VRI_origin = {0,0};
+					/* 0,0 of the ruler in doc coords */
+
+    @instance PointDWFixed	VRI_reference = {0,0,0,0};
+
+    @instance sdword		VRI_mouseMark = 0;
+
+    @instance word		VRI_window = NullHandle;
+					/* actually a noreloc WindowHandle */
+
+    @instance optr		VRI_slave = NullOptr;
+
+    @instance Grid		VRI_grid = {0,0,0,0};
+
+    @instance WWFixed		VRI_vectorSlope = {0,0};
+					/* slope of vector */
+
+    @instance optr		VRI_guideArray = NullOptr;
+
+    @instance word		VRI_guideInfluence = DEFAULT_GUIDE_INFLUENCE;
+					/* influence of guides in pixels */
+
+    @instance word		VRI_desiredSize = VIS_RULER_HEIGHT;
+
+    @instance word		VRI_reserved = 0;
+
+    @instance dword		VRI_invalOD = NullOptr;
+					/* actually a noreloc optr */
+
+    @instance word		VRI_transformGState = NullHandle;
+					/* actually a noreloc GStateHandle */
+
+    @default VI_bounds = {0,0,2000,VIS_RULER_HEIGHT};
+
+@endc	/* VisRulerClass */
+
+/* ----------------------------------------------------------------------
+ * 		RulerContentClass
+ * ----------------------------------------------------------------------*/
+
+@class  RulerContentClass, VisContentClass;
+@endc	/* RulerContentClass */
+
+/* ----------------------------------------------------------------------
+ * 		RulerViewClass
+ * ----------------------------------------------------------------------*/
+
+typedef ByteFlags RulerViewAttributes;
+#define RVA_HORIZONTAL	0x80
+/* 7 bits unused */
+
+@class  RulerViewClass, GenViewClass;
+    @instance RulerViewAttributes	RVI_attrs = (RVA_HORIZONTAL);
+
+    @default GI_attrs = (@default & ~GA_TARGETABLE);
+
+    @default GVI_attrs = ((@default & ~GVA_FOCUSABLE) |
+			  GVA_WINDOW_COORDINATE_MOUSE_EVENTS |
+			  GVA_SAME_COLOR_AS_PARENT_WIN);
+
+@endc	/* RulerViewClass */
+
+/* ----------------------------------------------------------------------
+ * 		Exported library routines
+ * ----------------------------------------------------------------------*/
+
+/*
+ *  Utility routine for ruler subclasses to scale for drawing
+ * 
+ * 	PASS:		*ds:si - ptr to VisRuler instance
+ * 			dx:cx.ax - point to scale (DWFixed)
+ * 	RETURN:		dx:cx.ax - scaled point (DWFixed)
+ */
+extern void
+    _pascal RulerScaleDocToWinCoords(VisRulerInstance* pself, DWFixed* point);
+
+extern void
+    _pascal RulerScaleWinToDocCoords(VisRulerInstance* pself, DWFixed* point);
+
+#ifdef __HIGHC__
+
+pragma Alias(RulerScaleDocToWinCoords, "RULERSCALEDOCTOWINCOORDS");
+pragma Alias(RulerScaleWinToDocCoords, "RULERSCALEWINTODOCCOORDS");
+
+#endif /* __HIGHC__ */
+
+@endlib
+
+#endif		/* RULERC_GOH */

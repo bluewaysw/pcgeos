@@ -1,0 +1,296 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	socket project
+MODULE:		Resolver
+FILE:		resolver.def
+
+AUTHOR:		Steve Jang, Dec 13, 1994
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SJ	12/13/94   	Initial revision
+
+
+DESCRIPTION:
+	Resolver library that resolves host addresses for IP address.
+	e.g. "barium.seattle.geoworks.com" to 198.211.209.215
+		
+	$Id: resolver.def,v 1.1 97/04/04 14:21:52 newdeal Exp $
+
+USAGE:
+
+	Just call ResolverResolveAddress, or if you need to obtain complete
+	information from DNS about something, read [Returning Result] and
+	then use one of the functions that follow.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+StartLibrary resolver
+
+MAX_HOST_NAME_SIZE	equ	255
+TEST_ONLY		equ	9f81h
+
+global	ResolverResolveAddress:far
+;
+; Gets the host address by its name; simpler version.
+;
+; PASS:		ds:si	= name of the host
+;		cx	= size of string( not including null )
+;		dx	= access point or 0 if none
+; RETURN:	carry clear if no error,
+;			dxbp	= IP address of the host
+;		carry set if error
+;			dx	= ResolverError( all error code is possible )
+;
+
+global	ResolverGetHostByName:far
+;
+; Gets the host address by its name
+;
+; PASS:		^lbx:si	= name of the host( e.g. "balance.cs.mtu.edu",0 )
+;		^lbx:cx = chunk array used to return result
+;		( see above [ Returning Result ] )
+;
+; RETURN:	if carry clr,
+;			^lbx:cx = filled in with IP addresses
+;		if carry set,
+;			dx = ResolverError
+;
+; NOTE:		answer chunk array will be resized by resolver.
+;
+; -----------------------------------------------------------------------------
+;
+; [ Returning Result ]
+;
+; Any query might result in a response with more than one piece of information.
+; For example, address query for a host name might result in a response with
+; multiple IP addresses and a canonical name information.  In this case, we
+; would like to return all of this information to the caller. So, we will use
+; a chunk array to return results. The caller will provide a variable element
+; size chunk array with ResolverAnswerHeader as the header( important ).
+; * see ResolverAnswerSection and ResolverAnswerHeader structures below.
+;
+; [ Resource Record structure ]
+;
+; Answer format is different for each query type.  They will be returned in the
+; following formats.
+;
+; Address:
+; 	type: RRT_A
+;	content: dword for IP address
+;
+; Canonical name( also used for name query for an IP address ):
+; 	type: RRT_CNAME
+;	content: null terminated dotted name string
+;		 ( like "wolf.cs.washington.edu",0 ;
+;		   note that this is different from DNS format )
+;
+; Documentation for RRT_NS, RRT_SOA, RRT_WKS, RRT_PTR, RRT_HINFO, RRT_MINFO,
+; RRT_MX, and RRT_TXT seem redundunt to put here.  If you are planning to use
+; these types, you should read RFC-1034 and RFC-1035 before you do that.
+; Results for these types of queries will contain the exact format of the
+; resource records in their original DNS formats.
+;
+
+global	ResolverGetHostInfo:far
+;
+; Gets information about a host
+;
+; PASS:		^lbx:si	= name of the host
+;		^lbx:cx = chunk array to use to return the result
+;		bp	= ResolverQueryType
+; RETURN:	if carry clear,
+;			^lbx:cx = ResolverAnswerHeader + ResolverAnswerSections
+;		if carry set,
+;			dx = ResolverError
+; DESTROYED:	nothing
+;
+;
+
+global	ResolverDeleteCache:far
+;
+; Delete all cache entries.  Sometimes cache might contain outdated information
+; about domain names.  In this case, you have to delete cache entries before
+; requesting a name to be resolved.
+;
+; PASS:		nothing
+; RETURN:	nothing
+;
+
+global	ResolverStopResolve:far
+;
+; Interrupt a resolve operation.
+;
+; PASS:		ds:si	= name of the host
+;		cx	= size of string( not including null )
+; RETURN: 	nothing
+;
+
+global	ResolverAddDhcpDnsServers:far
+;
+; Adds DNS servers gotten via DHCP to the server list.
+;
+; PASS:		dx	= size of buffer
+;		*es:di	= array of ip addresses
+; RETURN:	nothing
+;
+
+global	ResolverRemoveDhcpDnsServers:far
+;
+; Removes DNS servers gotten via DHCP from the server list.
+;
+; PASS:		nothing
+; RETURN:	nothing
+;
+
+;
+; Query types
+;
+ResourceRecordType	etype	word, 0
+RRT_A			enum ResourceRecordType, 1	; host address
+RRT_NS			enum ResourceRecordType, 2	; name server
+RRT_CNAME		enum ResourceRecordType, 5	; canonical name
+RRT_SOA			enum ResourceRecordType, 6	; start of zone auth.
+RRT_WKS			enum ResourceRecordType, 11	; well known service
+RRT_PTR			enum ResourceRecordType, 12	; domain name ptr
+RRT_HINFO		enum ResourceRecordType, 13	; host info
+RRT_MX			enum ResourceRecordType, 15	; mail exchange
+RRT_TXT			enum ResourceRecordType, 16	; text strings
+
+ResolverQueryType	etype	word, ResourceRecordType
+RQT_AXFR		enum ResolverQueryType, 252	; zone transfer
+RQT_ANY			enum ResolverQueryType, 255	; "*"
+
+NetClass		etype	word, 0
+NC_IN			enum NetClass, 1		; Internet
+NC_CH			enum NetClass, 3		; CHAOS
+NC_HS			enum NetClass, 4		; Hesiod
+NC_ANY			enum NetClass, 255		; "*"
+
+; ---------------------------------------------------------------------------
+; ERROR CODE:
+;
+;	ResolverError and ResolverErrorCode are different.  See descriptions.
+;
+; ---------------------------------------------------------------------------
+
+ResponseErrorCode	etype	word	; error code
+;
+; All these error codes are returned by name server(except REC_INTERNAL_ERROR)
+; and put into RAH_error so that a client who has the knowledge of these
+; error code may utilize them.
+;
+; Most of these will be converted to ResolverError and returned to a normal
+; client as error return value.
+;
+REC_NO_ERROR		enum	ResponseErrorCode, 0	; good
+REC_FORMAT_ERROR	enum	ResponseErrorCode, 1	; implementation error
+REC_SERVER_FAILURE	enum	ResponseErrorCode, 2	; temporary error
+REC_NAME_ERROR		enum	ResponseErrorCode, 3	; domain name exist not
+REC_NOT_IMPLEMENTED	enum	ResponseErrorCode, 4    ; info not available
+REC_REFUSED		enum	ResponseErrorCode, 5	; temporary error
+
+REC_INTERNAL_ERROR	enum	ResponseErrorCode, 106
+;
+; a bug in our code
+;
+REC_NO_NAME_SERVER	enum	ResponseErrorCode, 107
+;
+; name server not found
+;
+REC_CANNOT_OPEN_DOMAIN	enum	ResponseErrorCode, 108
+;
+; cannot open ppp connection
+;
+REC_INTERRUPTED		enum	ResponseErrorCode, 109
+;
+; interrupted by the client
+;
+
+;
+; Answer chunk array structure
+;
+ResolverAnswerHeader	struct
+	RAH_common	ChunkArrayHeader
+	RAH_error	ResponseErrorCode	; 0 = no error
+	RAH_accessId	word			; access point ID to use
+ResolverAnswerHeader	ends
+
+ResolverAnswerSection	struct
+	RAS_type	ResourceRecordType
+	RAS_data	label byte
+ResolverAnswerSection	ends
+
+ResolverError	etype	word, 0, 1
+;
+; Returned by a function call to resolver
+; : More friendly to the user
+;
+
+RE_NO_ERROR		enum	ResolverError
+;
+; Everything looks peachy
+;
+RE_TIMEOUT		enum	ResolverError
+;
+; The request could not be fullfilled within a reasonable amount of time
+;
+RE_OUT_OF_RESOURCE	enum	ResolverError
+;
+; The request reached resource limit and could not proceed further;
+; Or failure to allocate resources necessary to run resolver
+;
+RE_TEMPORARY		enum	ResolverError
+;
+; For some reason, (like link failure, etc) we cannot provide the information
+; you requested.  Try again later.
+;
+RE_INFO_NOT_AVAILABLE	enum	ResolverError
+;
+; The host you specified does not have desired information
+;
+RE_HOST_NOT_AVAILABLE	enum	ResolverError
+;
+; The host you are looking for does not exist
+;
+RE_MEMORY_ERROR		enum	ResolverError
+;
+; Error related to memory allocation and insufficient memory
+;
+RE_UNSUPPORTED_FUNCTION	enum	ResolverError
+;
+; Function is not supported
+;
+RE_INTERNAL_FAILURE	enum	ResolverError
+;
+; Error caused by our implementation fault
+;
+RE_NO_NAME_SERVER	enum	ResolverError
+;
+; This happens in this case:  resolver didn't have name sever address
+; and it tried to use DHCP mechanism to get assigned one, but it could not
+; establish TCP/IP connection or the other end of the line doesn't support
+; DHCP.  Basically you should tell user to provide different access point or
+; set up name server information in access point application.
+;
+RE_INTERRUPTED		enum	ResolverError
+;
+; client interrupted the query by calling ResolverStopResolve
+;
+RE_OPEN_DOMAIN_MEDIUM	enum	ResolverError
+;
+; Error opening domain medium
+;
+
+;#############################################################################
+;			  C Stubs
+;#############################################################################
+
+global	RESOLVERRESOLVEADDRESS:far
+global	RESOLVERDELETECACHE:far
+global	RESOLVERSTOPRESOLVE:far
+
+EndLibrary resolver

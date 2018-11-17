@@ -1,0 +1,119 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GlobalPC 1998.  All rights reserved.
+	GLOBALPC CONFIDENTIAL
+
+PROJECT:	GlobalPC mail library
+MODULE:		
+FILE:		mailsmtp.goh
+
+AUTHOR:		Ian Porteous, Oct 30, 1998
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	porteous 10/30/98   	Initial version.
+
+DESCRIPTION:
+
+	
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef __MAIL_SMTP__
+@define __MAIL_SMTP__
+
+@deflib mailsmtp
+
+/*
+ * Boundary for multipart messages.
+ *
+ * MemHandle MM_boundary;
+ */
+/*
+ * Encoding streams.
+ *
+ * HTStreamHandle SMTPMI_quotedPrintable;
+ * HTStreamHandle SMTPMI_base64;
+ */
+
+typedef enum /*word*/ {
+    OUTB_PROTOCOL_ESMTP
+} OutboxProtocol;
+
+typedef struct {
+    Socket    OB_socket;
+    char      OB_clientName[MAX_CLIENT_NAME_LENGTH];
+    MemHandle OB_errorData;
+    word      OB_wrapLength;
+} OutboxStruct;
+
+typedef MemHandle OUTBOX;
+
+/* 
+ * MSMTP states. 
+ */
+typedef enum {
+    MSMTP_BEGIN,
+    MSMTP_CONNECT,
+    MSMTP_HELO,                      /* HELO command */
+    MSMTP_MAIL,                      /* MAIL command */
+    MSMTP_RCPT,                      /* RCPT command */
+    MSMTP_DATA,                      /* DATA command */
+    MSMTP_DATAI,                     /* Pushing data to server */
+    MSMTP_QUIT,                      /* QUIT command */
+    MSMTP_CHECK_COMMAND_RESPONSE,
+    MSMTP_PUSH_RESP,                 /* Push response to HTSMTP */
+    MSMTP_CONNECTION_CLOSED,         /* 421 */
+    MSMTP_SERVER_OUT_OF_SPACE,       /* 452 */
+    MSMTP_MAILBOX_NOT_FOUND,
+    MSMTP_COMMAND_ERROR,             /* My fault */
+    MSMTP_ERROR,
+    MSMTP_INVALID_STATE
+} MSMTPState;
+
+extern char CRLF[];
+extern char BRCRLF[];
+extern char ENDDATA[];
+extern char ENDDATAESCAPE[];
+extern char EQCRLF[];
+
+#define       CRLFFOLD_LEN 6
+extern char   CRLFFOLD[];
+
+#define       QTEQCRLFFOLD_LEN 8
+extern char   QTEQCRLFFOLD[];
+
+#define       QUOTECRLF_LEN 3
+extern char   QUOTECRLF[];
+
+#define       CMSP_LEN 2
+extern char   CMSP[];
+
+/* ############################################################################
+ * 			       User API
+ * ##########################################################################*/
+
+extern SocketError 
+_pascal MailoutOpen(char *serverName, OutboxProtocol proto, char *foo, OUTBOX *obox, word accPntID);
+
+extern SocketError 
+_pascal MailoutSendMail(OUTBOX boxHandle, MailMessage *msg);
+
+extern MailError 
+_pascal MailoutLoadHeader(MailMessage *msg, char *msg_ptr);
+
+extern void _pascal
+MailoutClose (OUTBOX boxHandle);
+
+extern void _pascal
+MailoutCloseFast (OUTBOX boxHandle);
+
+@endlib
+
+@endif /* __MAIL_SMTP__ */
+

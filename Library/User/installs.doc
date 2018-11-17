@@ -1,0 +1,258 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1993 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		UserInterface
+FILE:		installs.doc
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Doug	5/14/93		Initial version
+
+DESCRIPTION:
+	This file contains information about API installs, major bug fixes,
+	changes in philosophy, etc.  Please add latest info at the top.
+
+
+
+------------------------------------------------------------------------------@
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+INSTALLER:	jenny
+DATE:		5/26/93
+SUMMARY:	Token DB fixes -- NOT BACKWARDS COMPATIBLE WITH CONFIG
+
+FILES:		Token/token.asm
+	
+NEW ROUTINES:	none
+NEW MESSAGES:	none
+NEW ATTRS:	none
+
+OTHER (ROUTINES):
+		Token DB file semaphore grabbed:
+			TokenLockTokenMoniker
+		Token DB file semaphore released:
+			TokenUnlockTokenMoniker
+
+		*NOTE*: A new config must be sent out with any ui
+			library update.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+* TokenLockTokenMoniker now returns with the semaphore for the
+appropriate token database file grabbed. The registers it returns
+have not changed.
+
+* TokenUnlockTokenMoniker now releases the semaphore grabbed by
+TokenLockTokenMoniker. It takes no new arguments.
+
+  IMPORTANT: No token database call may be made between a call
+  to TokenLockTokenMoniker and the corresponding call to
+  TokenUnlockTokenMoniker. TokenLockTokenMoniker grabs the semaphore
+  for the token database file containing the moniker; TokenUnlockTokenMoniker
+  releases it. Calling any token database routine before the semaphore
+  is released will hang the system.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+INSTALLER:	doug
+DATE:		5/20/93 (This file not installed until 5/26, however)
+SUMMARY:	Bug fixes for Zoomer
+
+FILES:		./Library/User/Gen/genApplication.asm
+		./Library/User/Proc/procClass.asm
+		./Library/User/uiConstant.def
+		./Include/Objects/gAppC.def
+		./CInclude/Objects/gAppC.goh
+
+	
+NEW ROUTINES:	none
+
+NEW MESSAGES:	MSG_GEN_APPLICATION_CLOSE_COMPLETE
+
+NEW ATTRS:	AS_REAL_DETACHING
+
+OTHER (MESSAGES):
+		Nuked paramaters:
+			AppLaunchBlock in MSG_GEN_APPLICATION_APP_MODE_COMPLETE
+			AppLaunchBlock in MSG_GEN_APPLICATION_IACP_NO_MORE_CONNECTIONS
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+Detach
+------
+        * Tightened detach synchronization by moving the "update app state to
+          indicate no longer in app mode" code & "call MSG_GEN_APPLICATION_APP_
+          MODE_COMPLETE to figure out what to do next" code into a single place,
+          the new MSG_GEN_APPLICATION_CLOSE_COMPLETE.
+          
+          Eliminates rare crashing bug that appeared in UKI (though could
+          happen elsewhere) when an IACP connection was closed between the
+          sending of MSG_META_ACK to the process, & its return call of
+          MSG_GEN_APPLICATION_APP_MODE_COMPLETE to the application -- the app
+          ended up trying to detach twice, & died horribly as a result.
+          
+          New:
+                MSG_GEN_APPLICATION_CLOSE_COMPLETE
+
+          Changed:
+                MSG_GEN_APPLICATION_APP_MODE_COMPLETE and MSG_GEN_APPLICATION_
+                IACP_NO_MORE_CONNECTIONS no longer require attach/quit flag
+                to be passed in cx.
+
+        * Added "AS_REAL_DETACHING" flag to the app object state flags, which
+          indicates that the app is detaching beyond the point of no return.
+          Used for EC, but I also have a feeling that it may come in handy
+          to distinguish between the steady state scenerio.
+          
+          New:
+                AS_REAL_DETACHING
+
+        * Fixed bug to prevent MSG_GEN_CLOSE_ENGINE, MSG_GEN_CLOSE_CUSTOM
+          from being sent twice in the case of a real or transparent detach
+          while in these modes (which doesn't happen anywhere that I'm aware
+          of at this point in time)
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+INSTALLER:	doug
+DATE:		5/14/93 (This file not installed until 5/26, however)
+SUMMARY:	Bug fixes for Zoomer
+
+FILES:		./Gen/genField.asm
+		./Gen/genApplication.asm
+		./Gen/genManager.asm
+		./User/userDialog.asm
+		./User/userUtils.asm
+		./User/userMain.asm
+		./UI/uiMain.ui
+		./Proc/procClass.asm
+		./uiGlobal.def
+	
+NEW ROUTINES:	none
+
+NEW MESSAGES:	MSG_GEN_APPLICATION_GET_TRANSPARENT_DETACH_LIST
+		MSG_GEN_PROCESS_DO_OPEN_APPLICATION
+	        MSG_GEN_FIELD_ACTIVATE_INITIATE
+
+OTHER (MESSAGES):
+		Name changes:
+              	 	MSG_GEN_FIELD_STARTUP_UPDATE ->
+					MSG_GEN_FIELD_ACTIVATE_UPDATE
+			MSG_GEN_FIELD_STARTUP_ON_SCREEN ->
+					MSG_GEN_FIELD_ACTIVATE_DISMISS
+		Nuked paramaters:
+			AppLaunchBlock in MSG_GEN_FIELD_APP_STARTUP_NOTIFY
+			geode, AppLaunchBlock in MSG_GEN_FIELD_APP_STARTUP_DONE
+
+
+NEW VARDATA:	TEMP_GEN_APPLICATION_EXTRA_STATE_BLOCK
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+Dialogs
+-------
+
+	* UserDoDialog will now raise an app to the top if saves off a
+	  IACP_NEW_CONNECTION(app-mode, on top) into the queue, allowing
+	  the user to always be able to respond to the dialog.
+	  Fixes #17480, #17209
+
+	* Added MSG_GEN_APPLICATION_GET_TRANSPARENT_DETACH_LIST, so that
+	  detach GCN behavior could be altered & current state tested.
+
+App Resurrection
+----------------
+
+	* "Activating..." dialog is now put up if an app will be resurrected
+	  as a result of an IACPConnect request, to provide feedback while the
+	  app is going through its detach/attach cycle.  Since I had to split
+	  out the new functionality I'd added to some existing messages,
+	  I restored the original MSG_GEN_FIELD_APP_STARTUP_NOTIFY,
+	  STARTUP_DONE messages to the way they were before, & renamed the
+	  Activate-dialog related ones to the more easily understandable.  The
+	  changes are then:
+
+	  Parameters no longer required (messages used internally only):
+	      AppLaunchBlock in MSG_GEN_FIELD_APP_STARTUP_NOTIFY
+	      geode, AppLaunchBlock in MSG_GEN_FIELD_APP_STARTUP_DONE
+
+	  Name changes only (messages used internally only, for transparent
+	  launch mode):
+	      MSG_GEN_FIELD_STARTUP_UPDATE -> MSG_GEN_FIELD_ACTIVATE_UPDATE
+	      MSG_GEN_FIELD_STARTUP_ON_SCREEN ->MSG_GEN_FIELD_ACTIVATE_DISMISS
+
+	  New (used internally only):
+	      MSG_GEN_FIELD_ACTIVATE_INITIATE
+
+	  I've added notes regarding all of these changes to the declarations.
+
+API	* Fixed problem w/MSG_GEN_PROCESS_OPEN_APPLICATION not being passed
+	  the just-returned state block when resurrecting.
+
+	  The extra state block returned from MSG_GEN_PROCESS_CLOSE_APPLICATION
+	  is now stored in TEMP_GEN_APPLICATION_EXTRA_STATE_BLOCK, until
+	  it is either passed back in MSG_GEN_PROCESS_OPEN_APPLICATION in
+	  the resurrection case, or saved out to the state file if exiting.
+
+	  NOTE:  Required the removal of "extra state block" support from
+	  CUSTOM & ENGINE application modes.  Documentation for ENGINE didn't
+	  show this support existed before & so is ironically now correct.
+
+	  Parameters no longer returned (as-of-yet-unused method):
+
+	      extra state block, by MSG_GEN_PROCESS_CLOSE_CUSTOM
+	  
+	  I've added a note regarding this change to the declaration.
+
+	  Fixes #18906
+
+	* Broadened meaning of AS_RESTORING_FROM_STATE to cover any case
+	  of opening the app up other than fresh with no state file, as this
+	  seems to most closely match current use & needs.  Change docs
+	  for AS_STATE_FILE_PASSED to more accurately reflect what it's
+	  really about as well -- that the app was truly launched to restore
+	  itself according to a specific state file.
+
+	  Changed resurrection MSG_GEN_OPEN_APPLICATION to pass
+	  AS_RESTORING_FROM_STATE if the app had previously been in app
+	  mode before, as the app otherwise has no warning that the UI tree's
+	  already been in use (i.e. might already be set up).  Keeps the UI
+	  from invoking MSG_META_LOAD_OPTIONS, & keeps the spui from
+	  following "ON_STARTUP" hints.  Added AS_RESTORING_FROM_QUIT to cover
+	  the one problem case I could find, that of the document control
+	  needing to start afresh if coming back to life after a quit, wherein
+	  it closes all documents & needs to start over.
+
+	  Fixes "GeoFile lazarus crash", Datebook expectation of extra state
+	  block returned in CLOSE_APPLICATION to always be returned in
+	  OPEN_APPLICATION.
+
+App Cache
+---------
+	* Changed UI & Spool to be marked as AVOID_TRANPARENT_DETACH, so as
+	  not to depend on starting up in field without transparent detach
+
+	* Moved "remove geode from GCNSLT_TRANSPARENT_DETACH_IN_PROGRESS"
+	  code from GeodeFree to UI_UIFinalDetach, to fix another "bad-timing"
+	  crash.   Means there's now a small window wherein the sytem doesn't
+	  know it's going to get the space back, which is far from fatal.
+
+	* Added removal of geode from GCNSLT_TRANSPARENT_DETACH_IN_PROGRESS
+	  in the case of an application resurrection.
+
+Misc
+----
+	* Update docs for MSG_GEN_PROCESS_REAL_DETACH, which incorrectly
+	  stated that the extra state block was passed.
+
+	* Fixed NukePressHoldTimer to perserve dx
+
+	* Moved removal of TEMP_GEN_FIELD_LOADING_DEFAULT_LAUNCHER from
+	  MSG_GEN_FIELD_STARTUP_ON_SCREEN to the more general test of
+	  something gaining the focus in MSG_META_MUP_ALTER_FTVMC_EXCL.
+

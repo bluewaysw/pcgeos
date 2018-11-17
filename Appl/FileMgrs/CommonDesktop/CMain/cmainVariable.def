@@ -1,0 +1,305 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1988 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Desktop/Main
+FILE:		mainVariable.asm
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	brianc	8/89		Initial version
+
+DESCRIPTION:
+	This file contains contains global variables for the desktop.
+
+	$Id: cmainVariable.def,v 1.3 98/06/03 13:45:33 joon Exp $
+
+------------------------------------------------------------------------------@
+
+FileMgrsClassStructures	segment	resource
+
+;
+; class record for process class
+;
+FileManagerClass
+DesktopClass
+
+; Define methods for process class that live in other modules
+if INSTALLABLE_TOOLS
+method FMGetSelectedFiles, FileManagerClass, MSG_FM_GET_SELECTED_FILES
+method FMOpenFiles, FileManagerClass, MSG_FM_OPEN_FILES
+method FMDupAndAdd, FileManagerClass, MSG_FM_DUP_AND_ADD
+
+method DesktopCallToolLibrary, DesktopClass, MSG_DESKTOP_CALL_TOOL_LIBRARY
+endif		; if INSTALLABLE_TOOLS
+
+if _PRINT_CAPABILITY
+method	LoadApplicationAndPrint, DesktopClass, MSG_DESKTOP_PRINT_FILE
+endif
+
+;
+; class record for cancel buttons
+;
+CancelTriggerClass
+
+FileMgrsClassStructures	ends
+
+idata	segment
+
+if _DOS_LAUNCHERS
+;these are used to create new launchers
+creatingLauncher		byte
+
+launchFilePathHandle		hptr
+launchFileDiskHandle		hptr
+launcherFileHandle	 	hptr
+launcherHeaderHandle		hptr
+launcherEntryTable		hptr
+launcherEntryTableSize		word
+resourceTableHandle		hptr	0
+resourceHandleList		hptr	LAUNCHER_RESOURCE_COUNT dup (?)
+resourceReallocHandleList	hptr	LAUNCHER_RESOURCE_COUNT dup (?)
+
+launcherToken			GeodeToken
+launcherMonikerToken		GeodeToken
+if DBCS_PCGEOS
+launcherGeosName		wchar	FILE_LONGNAME_BUFFER_SIZE dup (?)
+launchFileName			wchar	FILE_LONGNAME_BUFFER_SIZE dup (?)
+oldLauncherName			wchar	FILE_LONGNAME_BUFFER_SIZE dup (?)
+else
+launcherGeosName		char	FILE_LONGNAME_BUFFER_SIZE dup (?)
+launchFileName			char	FILE_LONGNAME_BUFFER_SIZE dup (?)
+oldLauncherName			char	FILE_LONGNAME_BUFFER_SIZE dup (?)
+endif		; if DBCS_PCGEOS
+endif		;  _DOS_LAUNCHERS
+
+usingWastebasket		byte	0
+loggingOut			byte	0
+
+ND<ndClickedOnDrive		word	; drive number/media descriptor	>
+ND<desktopFolderWindow		optr	0	;optr of desktop folder	>
+ND<popupMenu			optr	0	;optr of popup menu	>
+
+if _CONNECT_TO_REMOTE
+connection			ConnectionType	-1
+fileLinkingPending		word	FALSE
+endif
+
+folderBackgroundColor		Color	C_WHITE
+
+if _NEWDESK ;GPC_FOLDER_WINDOW_MENUS
+browseMode			FI_BrowseMode	mask FIBM_MULTIPLE
+endif
+
+if _NEWDESK and _NDO2000
+lowerDesktopIcons		word	TRUE
+endif
+
+if GPC_DEBUG_MODE
+debugMode			word	FALSE
+endif
+
+if GPC_CREATE_DESKTOP_LINK
+debugLinks			word	FALSE
+endif
+
+if GPC_POPUP_MENUS
+allPopups			word	FALSE
+endif
+
+idata	ends
+
+;-------------------------------------------------------------------------------
+
+udata	segment
+
+
+;
+; display type
+;
+desktopDisplayType	DisplayType
+
+;
+; global font and gState stuff
+;
+desktopFontID		word			; font for tree, folder window
+desktopFontSize		word
+desktopFontHeight	word			; actual height of font
+calcGState		hptr.GState		; for calc'ing stuff (no window)
+widest83FilenameWidth	word			; for computing column widths
+widest32FilenameWidth	word			; for computing column widths
+ellipsesWidth		word			; length("..."),  for clipping
+if _ZMGR and SEPARATE_NAMES_AND_DETAILS
+widestFileSize		word
+endif
+
+;
+; handle of target folder object
+;
+targetFolder	hptr
+
+;
+; disk handle of disk where GEOS resides
+;
+geosDiskHandle		hptr.HandleDisk
+
+;
+; flag indicating if SP_TOP is the root of a disk
+;
+GM< topLevelIsRoot	byte	FALSE >
+
+;
+; flag indicating that we are processing an MSG_META_DETACH
+;
+exitFlag	byte
+
+;
+; buffers of geos.ini fields for desktop
+;
+filenameTokenMapBuffer	hptr
+tokenPathnameMapBuffer	hptr
+dosAssociationMapBuffer	hptr
+dosParameterMapBuffer	hptr
+
+;
+; drive-list-building work variables, seesh
+;
+GMONLY< copyCurDrive	word	>
+
+GM< formatCurDrive	word	>
+
+GMONLY< renameCurDrive	word	>
+
+;
+; global file info buffer for all file operations
+;
+fileOperationInfoEntryBuffer	FileOperationInfoEntry <>
+
+;
+; volume new for disk to be formatted
+;
+SBCS <formatVolumeName	char VOLUME_NAME_LENGTH+1 dup (?)		>
+DBCS <formatVolumeName	wchar VOLUME_NAME_LENGTH+1 dup (?)		>
+
+;
+; buffer holding percentage done in disk format and disk copy (can't use
+; stack buffer as we don't use MF_CALL)
+;
+SBCS <formatStatusBuffer	char	20 dup (?)			>
+DBCS <formatStatusBuffer	wchar	20 dup (?)			>
+
+;
+; flag to indicate when an operation should be cancelled
+;
+cancelOperation		byte
+cancelMonikerToChange	word		; which moniker to change to
+					; "Stopping after:" when they cancel
+
+;
+; buffer for building out Get Info field strings
+;	stores attributes (DRASH - 5 chars)
+;	stores filesize (11 chars)
+;	stores date (12:12:12 am  11/11/89 ~ 25 chars)
+;	stores release info (65,536.65,536    65,536-65,536 & null - 31 chars)
+;
+;getInfoStringBuffer	char	32 dup (?)
+;localization, sheesh
+.assert (EVEN_DATE_TIME_BUFFER_SIZE gt 32)
+if DBCS_PCGEOS
+getInfoStringBuffer	wchar	EVEN_DATE_TIME_BUFFER_SIZE dup (?)
+else
+getInfoStringBuffer	char	EVEN_DATE_TIME_BUFFER_SIZE dup (?)
+endif
+
+;
+; did we start from state file or from scratch?
+;
+startFromScratch	byte
+
+;
+; are we forcing a detach because of an error starting up?
+;
+forceQuit	byte
+
+;
+; hack to not show file operation progress box when deleting single file
+; or when confirming each file of a multiple-file delete
+;
+showDeleteProgress	byte
+
+ifndef GEOLAUNCHER	; no disk stuff for GeoLuancher
+
+;
+; flag to indicate if destination disk was inserted for disk copy
+; (need to report different cancel error message if not)
+;
+destinationInserted	byte
+endif
+
+;
+; block handle of information about COMMAND.COM (needed to run BATCH files)
+;
+commandInfoBlock	hptr
+
+ifndef GEOLAUNCHER	; no disk stuff for GeoLuancher
+;
+; chunk handle of monikers used disk copy status reporting
+;
+copyStatusMoniker	lptr
+activeCopyStatusMoniker	lptr
+endif
+
+;
+; token table made for DOS Launcher icons
+;
+if _DOS_LAUNCHERS
+tokenList	hptr
+tokenListSize	word
+;
+;	Launcher Creation data
+;
+launcherData	hptr
+endif	; _DOS_LAUNCHERS
+
+;
+; true if small screen, we some UI adjustments - see MakeSmallScreenChanges
+;
+smallScreen	BooleanByte
+
+
+pathBuffer	PathName
+; Generic path buffer used by a variety of different routines --
+; rather than having a different buffer defined for each, to keep
+; dgroup small, routines should try to use this buffer when possible.
+;	
+
+if _CONNECT_MENU or _CONNECT_TO_REMOTE
+rfsdHandle	hptr
+endif
+
+if _KEEP_MAXIMIZED or _ZMGR
+expressMenu	optr
+endif
+
+if _WRITABLE_TOKEN_DATABASE
+;
+; set TRUE to not launch applications to get their tokens
+;
+disableTokenLaunch	BooleanByte
+endif
+;
+; used to store the callback procedure that checks for duplicate
+; update messages. Used by DesktopUpdateFreeSpace.
+;
+checkDuplicateProc	fptr
+
+;
+; save folder size/positions?
+;
+ifdef SMARTFOLDERS
+saveWinPosSize		word
+endif
+
+udata	ends

@@ -1,0 +1,149 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		attels.def
+
+AUTHOR:		Mark Hirayama, Oct 15, 1993
+
+	
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	hirayama	10/15/93	Initial revision
+
+
+DESCRIPTION:
+
+	This file contains definitions for the attels library.  This
+	library is used to provide a communications layer between
+	the Expo (e-mail) project and AT&T Easylink Service.
+
+	Please note that this is a project in the works.  There are
+	a few exported functions that will later be deleted (denoted
+	by the string *HACK*)  also, some of the structures may
+	later change.
+
+	For a description of how these exported functions are used,
+	please see the file /Library/Email/ExpoAtt/Comm/commMain.asm
+		
+	$Id: attels.def,v 1.1 97/04/04 14:24:56 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+StartLibrary	attels
+
+UseDriver	Internal/serialDr.def
+
+;--------------------------------------------------------------------------
+;	Exported Functions
+;--------------------------------------------------------------------------
+
+global	AttElsStartTransmit:far
+global	AttElsStopTransmit:far
+global	AttElsStartLog:far
+global	AttElsStopLog:far
+global	AttElsCloseApplication:far	; *HACK*
+global	AttElsFakeATimeout:far		; *HACK*!!!!
+
+;--------------------------------------------------------------------------
+;	Exported Types
+;--------------------------------------------------------------------------
+
+;--------------------------------
+;	FileTransferModule
+;--------------------------------
+FileTransferModule	etype	word, 0, 2
+	FTM_FMODEM8	enum	FileTransferModule
+	FTM_FMODEM7	enum	FileTransferModule
+	FTM_YMODEM251	enum	FileTransferModule
+	; FTM_XMODEM	enum	FileTransferModule	; DO NOT USE XMODEM!!!
+
+;--------------------------------------------------
+;	Types of notifications sent to front end
+;		stored in high byte of bp for MSG_META_NOTIFY
+;		low byte of bp is parameter
+;--------------------------------------------------
+StatusNotificationSubtype	etype	byte, 0, 2
+	SNS_DONE	enum	StatusNotificationSubtype
+	SNS_TO_SEND	enum	StatusNotificationSubtype
+	SNS_SENT	enum	StatusNotificationSubtype
+	SNS_TO_RECEIVE	enum	StatusNotificationSubtype
+	SNS_RECEIVED	enum	StatusNotificationSubtype
+
+;--------------------------------------------------------------------------
+;	Exported Records
+;--------------------------------------------------------------------------
+
+;--------------------------------
+;	ConnectOptions
+;--------------------------------
+ConnectOptions	record
+	CO_SEND_OUTGOING:1		; 1 = want to send outgoing
+	CO_RECEIVE_INCOMING:1		; 1 = want to recieve incoming
+	CO_RECEIVE_OLD:1		; 1 = want to re-receive old
+	CO_DEL_ALREADY_READ:1		; 1 = want to del already read msgs
+	:12
+ConnectOptions	end
+
+
+;--------------------------------------------------------------------------
+;	Exported Structures
+;--------------------------------------------------------------------------
+
+ATTELS_FIELD_SIZE	equ	32	; max string length
+
+AttElsField	type	ATTELS_FIELD_SIZE dup (char)
+
+;--------------------------------
+;	StartTransmitData
+;--------------------------------
+;
+; StartTransmitData is a structure that needs to be passed with a call to
+; AttElsStartTransmit.
+;
+StartTransmitData	struct
+	STD_connOptions		ConnectOptions	; tasks to perform.
+	STD_callerPtr		optr		; optr of calling object.
+	even					; make sure structure is even
+StartTransmitData	ends
+
+;--------------------------------
+;	CallParameters
+;--------------------------------
+;
+; Contains modem parameters as chosen by the user.
+;
+CallParameters		struct
+	CP_transProtocol	FileTransferModule
+	CP_portNum		SerialPortNum
+	CP_baudRate		SerialBaud
+	CP_stopBits		byte		; is there an extra stop bit?
+	CP_parity		SerialParity
+	CP_initStr		AttElsField
+	even					; make sure structure is even
+CallParameters		ends
+
+;--------------------------------
+;	AccountParameters
+;--------------------------------
+;
+; Contains account parameters as chosen by the user.
+;
+AcctString		struct
+	AS_string	optr.char
+	AS_size		word
+AcctString		end
+
+AcctParameters		struct
+	AP_phoneNum		AcctString	; phone number string
+	AP_username		AcctString	; username string
+	AP_password		AcctString	; primary password string
+	AP_servicePassword	AcctString	; secondary password string
+	even					; make sure structure is even
+AcctParameters		ends
+
+EndLibrary	attels
+

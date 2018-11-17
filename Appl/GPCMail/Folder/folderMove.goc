@@ -1,0 +1,267 @@
+/***********************************************************************
+ *
+ *	Copyright (c) New Deal 1998 -- All Rights Reserved
+ *
+ * PROJECT:	  Mail
+ * MODULE:	  Mail
+ * FILE:	  folderMove.goc
+ *
+ * AUTHOR:  	  Gene Anderson: 2/19/99
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	2/19/99   gene	    Initial version
+ *
+ * DESCRIPTION:
+ *	FolderMoveClass for the Mail application
+ *
+ * 	$Id$
+ *
+ ***********************************************************************/
+
+@include "mail.goh"
+@include "class.goh"
+@include "global.goh"
+
+@classdecl FolderMoveClass;
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_FOLDER_MOVE_DIALOG_INIT
+ * PASS:            none
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Initialize the move message dialog
+ *
+ * REVISION HISTORY:
+ *         Name      Date        Description
+ *         ----      ----        -----------
+ *         gene      2/19/99     Initial Revision
+ ***************************************************************/
+
+@method FolderMoveClass, MSG_FOLDER_MOVE_DIALOG_INIT
+{
+    word numFolders;
+
+    /*
+     * initialize the folder list. Don't include the standard folders
+     */
+    numFolders = @call TheFolderList::MSG_FOLDER_LIST_GET_NUM_FOLDERS()-NUM_BUILT_IN_FOLDERS;
+    @call MoveFolderList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numFolders);
+    @call MoveFolderList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
+    /*
+     * bring ourselves on screen
+     */
+    @call oself::MSG_GEN_INTERACTION_INITIATE();
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_FOLDER_MOVE_QUERY_MONIKER
+ * PASS:            list - optr of list
+ *                  item - item #
+ * RETURN:          none
+ * DESCRIPTION:
+ *         get a moniker for the move message folder list
+ *
+ * REVISION HISTORY:
+ *         Name      Date        Description
+ *         ----      ----        -----------
+ *         gene      2/19/99     Initial Revision
+ ***************************************************************/
+
+@method FolderMoveClass, MSG_FOLDER_MOVE_QUERY_MONIKER
+{
+    MemHandle fnh;
+    word curFldr;
+    ReplaceItemMonikerFlags flags;
+    TCHAR *folderName;
+
+    fnh = @call TheFolderList::MSG_FOLDER_LIST_GET_FOLDER_NAME(item+NUM_BUILT_IN_FOLDERS);
+    folderName = MemLock(fnh);
+    curFldr = @call TheFolderList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    if (item + NUM_BUILT_IN_FOLDERS == curFldr) {
+	flags = RIMF_NOT_ENABLED;
+    } else {
+	flags = 0;
+    }
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(
+	item, flags, 0, 0, 0,
+	VMDT_TEXT, VMST_FPTR, (dword) folderName);
+    MemFree(fnh);
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_FOLDER_MOVE_MESSAGE
+ * PASS:            none
+ * RETURN:          none
+ * DESCRIPTION:
+ *         move a message
+ *
+ * REVISION HISTORY:
+ *         Name      Date        Description
+ *         ----      ----        -----------
+ *         gene      2/20/99     Initial Revision
+ ***************************************************************/
+
+@method FolderMoveClass, MSG_FOLDER_MOVE_MESSAGE
+{
+    word selection;
+    optr itemObj;
+
+    @call oself::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+    selection = @call MoveFolderList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    itemObj = @call MoveFolderList::MSG_GEN_ITEM_GROUP_GET_ITEM_OPTR(selection);
+    if (@call itemObj::MSG_GEN_GET_ENABLED()) {
+	if (selection != GIGS_NONE) {
+	    @call TheMessageList::MSG_MAIL_LIST_MOVE_MESSAGE(selection + NUM_BUILT_IN_FOLDERS);
+	}
+    }
+}
+
+
+@classdecl FolderRecoverClass;  /* needed even if !MANUAL_RECOVER */
+
+@ifdef MANUAL_RECOVER
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_FOLDER_RECOVER_DIALOG_INIT
+ * PASS:            none
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Initialize the recover message dialog
+ *
+ * REVISION HISTORY:
+ *         Name      Date        Description
+ *         ----      ----        -----------
+ *         gene      2/19/99     Initial Revision
+ ***************************************************************/
+
+@method FolderRecoverClass, MSG_FOLDER_RECOVER_DIALOG_INIT
+{
+    word numFolders;
+
+    /*
+     * initialize the folder list. Don't include the trash folder
+     */
+    numFolders = @call TheFolderList::MSG_FOLDER_LIST_GET_NUM_FOLDERS()-1;
+    @call RecoverFolderList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numFolders);
+    @call RecoverFolderList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
+    /*
+     * bring ourselves on screen
+     */
+    @call oself::MSG_GEN_INTERACTION_INITIATE();
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_FOLDER_RECOVER_QUERY_MONIKER
+ * PASS:            list - optr of list
+ *                  item - item #
+ * RETURN:          none
+ * DESCRIPTION:
+ *         get a moniker for the recover message folder list
+ *
+ * REVISION HISTORY:
+ *         Name      Date        Description
+ *         ----      ----        -----------
+ *         gene      2/19/99     Initial Revision
+ ***************************************************************/
+
+@method FolderRecoverClass, MSG_FOLDER_RECOVER_QUERY_MONIKER
+{
+    MemHandle fnh;
+    TCHAR *folderName;
+    word vItem = item;
+
+    if (item >= MFID_TRASH) vItem++;
+    fnh = @call TheFolderList::MSG_FOLDER_LIST_GET_FOLDER_NAME(vItem);
+    folderName = MemLock(fnh);
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(
+	item, 0, 0, 0, 0,
+	VMDT_TEXT, VMST_FPTR, (dword) folderName);
+    MemFree(fnh);
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_FOLDER_RECOVER_MESSAGE
+ * PASS:            none
+ * RETURN:          none
+ * DESCRIPTION:
+ *         move a message
+ *
+ * REVISION HISTORY:
+ *         Name      Date        Description
+ *         ----      ----        -----------
+ *         gene      2/20/99     Initial Revision
+ ***************************************************************/
+
+@method FolderRecoverClass, MSG_FOLDER_RECOVER_MESSAGE
+{
+    MemHandle mh, dh, rh, newName;
+    TCHAR *fName, *dName, *rName, *pNewName;
+    int destFolder;
+    word folderNum = @call TheMessageList::MSG_MAIL_LIST_GET_FOLDER_NUM();
+    word sel = @call TheMessageList::MSG_MAIL_LIST_GET_LAST_SELECTION();
+    if (sel == GIGS_NONE) {
+	return;
+    }
+
+    /*
+     * get the source file name
+     */
+    mh = @call TheMessageList::MSG_MAIL_LIST_GET_FILE_NAME(sel);
+    fName = MemLock(mh);
+    /*
+     * get the source dir name
+     */
+    dh = @call TheFolderList::MSG_FOLDER_LIST_GET_FOLDER_NAME(folderNum);
+    dName = MemLock(dh);
+    /*
+     * get the destination directory: <account>\<dir>
+     */
+    destFolder = @call RecoverFolderList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    if (destFolder >= MFID_TRASH) destFolder++;
+    rh = @call TheFolderList::MSG_FOLDER_LIST_GET_FOLDER_NAME(destFolder);
+    rName = MemLock(rh);
+    MoveMessageFile(fName, dName, rName, &newName);
+    pNewName = MemLock(newName);
+    DeleteMessageListArrayName(folderNum,fName);
+    /* if we change to support multiple messages, we should move this
+       outside the loop */
+    InsertMessageListArray(destFolder,pNewName);
+    MemFree(newName);
+
+    /*
+     * rebuild the folder list, which will rebuild the message list
+     *
+     * This is overkill sometimes, but necessary if the source
+     * directory was Drafts directory or SHOW_NUM_MESSAGES_IN_FOLDERS
+     * is TRUE as the number of messages will change in two folders.
+     */
+    RebuildFolderList(MFID_LEAVE_SELECTION, TRUE);
+    /*
+     * tell the user the happy news
+     */
+    ReportOK(@messageRecoveredStr, rName);
+errorExit1:
+    MemFree(rh);
+    MemFree(dh);
+    MemFree(mh);
+}
+
+@endif

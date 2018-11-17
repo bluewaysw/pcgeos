@@ -1,0 +1,1880 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1990 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Kernel -- Fatal Error constant definitions
+FILE:		kernelErrors.def
+
+AUTHOR:		Adam de Boor, July 18, 1990
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	7/18/90		Initial revision
+
+
+DESCRIPTION:
+	Fatal-error constants for the kernel.
+		
+	$Id: kernelErrors.def,v 1.1 97/04/05 01:15:45 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+;--------------------------------------------------------------------------
+;			Error values
+;--------------------------------------------------------------------------
+
+	; DO NOT REARRANGE THESE ERRORS or you will screw up the error strings
+
+FIRST_ERROR_WITH_STRING			equ	FatalErrors
+
+FIRST_ANONYMOUS_ERROR			equ	FATAL_TE_DIVIDE_BY_ZERO
+FATAL_TE_DIVIDE_BY_ZERO					enum FatalErrors
+FATAL_TE_OVERFLOW					enum FatalErrors
+FATAL_TE_BOUND						enum FatalErrors
+FATAL_TE_FPU_EXCEPTION					enum FatalErrors
+FATAL_TE_SINGLE_STEP					enum FatalErrors
+FATAL_TE_BREAKPOINT					enum FatalErrors
+FATAL_TIE_ILLEGAL_INST					enum FatalErrors
+ifdef	CATCH_PROTECTION_FAULT
+FATAL_TIE_PROTECTION_FAULT				enum FatalErrors
+endif	; CATCH_PROTECTION_FAULT
+ifdef	CATCH_STACK_EXCEPTION
+FATAL_TIE_STACK_EXCEPTION				enum FatalErrors
+endif	; CATCH_STACK_EXCEPTION
+
+SYS_EMPTY_CALLED					enum FatalErrors
+ILLEGAL_HANDLE						enum FatalErrors
+BAD_MOVE_BLOCK						enum FatalErrors
+LAST_ANONYMOUS_ERROR			equ	BAD_MOVE_BLOCK
+
+HANDLE_TABLE_FULL					enum FatalErrors
+LMEM_CANNOT_ALLOCATE					enum FatalErrors
+
+	; DO NOT REARRANGE THESE ERRORS or you will screw up the error strings
+
+FIRST_FATAL_ERROR_ONLY_IN_INIT		equ	FatalErrors
+
+CANNOT_LOAD_MEMORY_VIDEO_DRIVER                        	enum FatalErrors
+CANNOT_LOAD_KEYBOARD_DRIVER				enum FatalErrors
+CANNOT_LOAD_UI						enum FatalErrors
+
+
+GRAPHICS_BAD_FONT_PATH					enum FatalErrors
+; Either there are no fonts in USERDATA\FONT, the standard path set
+; for fonts is pointing off to oblivion, or the right file system
+; driver isn't downloaded.  This last will only happen in the non-EC,
+; as error checking code in the EC will catch the case otherwise.
+GRAPHICS_NO_FONT_FILES					enum FatalErrors
+DEFAULT_FONT_NOT_FOUND					enum FatalErrors
+
+UNSUPPORTED_DOS_VERSION					enum FatalErrors
+UNABLE_TO_REGISTER_TOP_LEVEL_DISK			enum FatalErrors
+
+FIRST_ERROR_WITHOUT_A_STRING		equ	FatalErrors
+
+if	ERROR_CHECK
+
+;	Boot errors
+
+INIT_FILE_NULL_CATEGORY_PASSED				enum FatalErrors
+
+;	Sys errors
+
+NO_SUCH_INTERRUPT                                  	enum FatalErrors
+SYS_EXIT_INTERRUPT_RUN_QUEUE_IS_ZERO			enum FatalErrors
+BAD_SHUTDOWN_TYPE					enum FatalErrors
+BAD_EXIT_FLAGS						enum FatalErrors
+SYS_SET_EC_LEVEL_BAD_FLAGS				enum FatalErrors
+SYS_GET_INFO_BAD_PARAMETER				enum FatalErrors
+NO_ONE_TO_SEND_SHUTDOWN_ACK_TO_ALAS			enum FatalErrors
+; Someone called SysShutdown(SST_CLEAN/SST_SUSPEND), passing cx==0, after the
+; UI has exited, or before it started up.
+; 
+NOT_ALLOWED_TO_PSEM_IN_INTERRUPT_CODE			enum FatalErrors
+; You are attempting to P a semaphore of some sort while in interrupt code
+; or a critical section (defined by a call to SysEnterInterrupt or
+; SysEnterCritical having been called). This is not allowed, as if the semaphore
+; is already grabbed, the system will come to a screeching halt.
+; 
+
+;	Memory errors
+
+TOO_MANY_LOCKS						enum FatalErrors
+; A memory block may only have at most 254 locks placed on it, and you're on
+; your 255th, or you're attempting to lock a fixed block. If the former, you're
+; probably missing a MemUnlock for one of your MemLocks. If the latter, 
+; remember the tale of the person who told the doctor, "it hurts when I do
+; this."
+
+BAD_UNLOCK						enum FatalErrors
+; You are attempting to unlock an unlocked block.
+
+CANNOT_CHANGE_OWNER					enum FatalErrors
+; You are attempting to change the owner of a non-sharable handle you do not
+; own. Most likely, the handle whose ownership you think you're changing has
+; long since been freed and re-used.
+
+HANDLE_FREE						enum FatalErrors
+ILLEGAL_HANDLE_DATA					enum FatalErrors
+HANDLE_SHARING_ERROR					enum FatalErrors
+; You are attempting to lock down a memory block owned by another geode that
+; isn't marked HF_SHARABLE. Either you've got the wrong handle (e.g. you're
+; using a handle for a block you freed, which was recycled by the system),
+; or you need to mark this block HF_SHARABLE.
+
+ALLOC_ZERO						enum FatalErrors
+; You are not allowed to allocate a zero-sized block of memory. Allocate
+; something HF_DISCARDED with a non-zero size if you just wish to reserve
+; a memory handle for later use.
+
+CORRUPTED_HEAP						enum FatalErrors
+CORRUPTED_LMEM_BLOCK					enum FatalErrors
+ALLOC_TOO_LARGE						enum FatalErrors
+REALLOC_TOO_LARGE					enum FatalErrors
+ALLOC_BAD_FLAGS						enum FatalErrors
+REALLOC_BAD_FLAGS					enum FatalErrors
+MODIFY_BAD_FLAGS					enum FatalErrors
+THREAD_RELEASE_NOT_OWNER				enum FatalErrors
+THREAD_GRAB_TOO_MANY_LOCKS				enum FatalErrors
+BAD_DS							enum FatalErrors
+ILLEGAL_SEGMENT						enum FatalErrors
+BAD_PARA_SIZE						enum FatalErrors
+BAD_SHARING_MODE					enum FatalErrors
+BAD_ACCESS_MODE						enum FatalErrors
+BLOCK_MUST_BE_LOCKED					enum FatalErrors
+CORRUPT_FREE_HANDLE_LIST				enum FatalErrors
+FREE_HANDLE_PASSED_BAD_HANDLE				enum FatalErrors
+NOT_MEM_HANDLE						enum FatalErrors
+MEM_FREE_BLOCK_DATA_NOT_CC				enum FatalErrors
+; This error is trigged when ec +heapFree is enabled and indicates that
+; something has written outside the bounds of one of its blocks into
+; unallocated memory. The system fills free blocks with 0xcc bytes and regularly
+; checks all free memory to make certain all the bytes remain 0xcc. es:di-2
+; or es:di-1 is the first non-cc byte in the free block (the system checks
+; for 0xcccc words, you see). What next? You should look at the data to see
+; if they look like anything you might be creating (e.g. a recognizable text
+; string), then look at blocks that fall just before the free block to see
+; who allocated them and for what purpose, then take a look at the code that
+; would be manipulating those blocks and see if they might scribble like
+; this.
+; 
+FREE_SIZE_NOT_CORRECT					enum FatalErrors
+LAST_FREE_BLOCK_NOT_CORRECT				enum FatalErrors
+BLOCK_CHECHSUM_ERROR					enum FatalErrors
+FREEING_FREE_HANDLE					enum FatalErrors
+NON_FREE_HANDLE_ON_FREE_LIST				enum FatalErrors
+MEM_GET_INFO_BAD_PARAMETER				enum FatalErrors
+ADDRESS_OUT_OF_BOUNDS					enum FatalErrors
+NULL_ELEMENT_PASSED_TO_CHUNK_ARRAY_ROUTINE		enum FatalErrors
+
+COMBINING_NON_ADJACENT_BLOCKS				enum FatalErrors
+HEAP_NOT_OWNED_BY_ME					enum FatalErrors
+GASP_CHOKE_WHEEZE					enum FatalErrors
+LMEM_RESOURCE_CHUNKS_MAY_NOT_BE_FREED			enum FatalErrors
+LMEM_CHUNK_TOO_SMALL_TO_ADD_TO_FREE_LIST		enum FatalErrors
+SPLIT_BLOCK_FREE_SIZE_TOO_BIG				enum FatalErrors
+BLOCK_NOT_SWAPPED					enum FatalErrors
+ECF_UNLOCK_MOVE_FAILED_SORRY				enum FatalErrors
+; This indicates that the memory being moved because of ECF_UNLOCK_MOVE being
+; set was swapped out and could not be swapped back in again, due to an
+; error declared by the swap driver.
+
+FREEING_BLOCK_ON_DUPLICATE_LIST				enum FatalErrors
+CHUNK_ARRAY_ENUM_CALLBACK_TRASHED_DS			enum FatalErrors
+
+INVALID_TIMER_FREE					enum FatalErrors
+MEM_FREE_PASSED_A_BLOCK_IN_A_VM_FILE			enum FatalErrors
+MEM_LOCK_PASSED_A_BLOCK_IN_A_VM_FILE			enum FatalErrors
+MEM_UNLOCK_PASSED_A_BLOCK_IN_A_VM_FILE			enum FatalErrors
+MEM_REFERENCE_COUNT_ILLEGAL_INITIAL_VALUE		enum FatalErrors
+MEM_REFERENCE_COUNT_OVERFLOW				enum FatalErrors
+MEM_REFERENCE_COUNT_UNDERFLOW				enum FatalErrors
+MEM_REFERENCE_COUNT_NEVER_INITIALIZED			enum FatalErrors
+;
+; MemIncRefCount was called on a block with a refCount of 0 - MemInitRefCount
+; was never called on the block
+;
+
+UPGRADING_SHARED_LOCK_WITHOUT_HAVING_LOCKED_IT_SHARED	enum FatalErrors
+DOWNGRADING_EXCL_LOCK_WITHOUT_HAVING_LOCKED_IT_EXCL	enum FatalErrors
+
+FAKE_BLOCK_DOESNT_COVER_ENTIRE_NEW_HEAP_SEGMENT		enum FatalErrors
+; A swap driver is attempting to extend the heap with a segment that must
+; already part of the heap, as the block that intersects the start of segment
+; being added doesn't cover the entire extent of the segment being added.
+; 
+
+LOCKING_DISCARDED_CORE_BLOCK				enum FatalErrors
+; there's a bad interaction happening between unlockMove/lmemMove EC code and
+; some other EC code such that someone is attempting to lock down a core block
+; that's in the process of being moved
+
+FREEING_ACTIVE_STACK					enum FatalErrors
+; attempting to free a memory block that is some thread's stack. usually
+; this means the reference count for the thread's geode has been hosed.
+
+;	ObjMessage errors
+
+BAD_FLAGS_PASSED_TO_OBJ_DISPATCH_MESSAGE		enum FatalErrors
+BAD_FLAGS_RESERVED_MUST_BE_0				enum FatalErrors
+BAD_FLAGS_CANNOT_BE_USED_WITH_MF_RECORD			enum FatalErrors
+BAD_FLAGS_REQUIRES_MF_FORCE_QUEUE			enum FatalErrors
+BAD_FLAGS_REQUIRES_MF_CHECK_DUPLICATE			enum FatalErrors
+BAD_FLAGS_CANNOT_FIXUP_ES_ONLY				enum FatalErrors
+BAD_FLAGS_CANNOT_CALL_AND_CHECK				enum FatalErrors
+BAD_FLAGS_CANNOT_STACK_AND_CHECK			enum FatalErrors
+CANNOT_REMOTE_CALL_FROM_UI				enum FatalErrors
+OBJ_MESSAGE_LOCK_COUNT_CHANGED				enum FatalErrors
+BAD_FLAGS_CANNOT_INSERT_AT_FRONT_AND_CHECK		enum FatalErrors
+CANNOT_HAVE_BOTH_MF_FORCE_QUEUE_AND_MF_CALL		enum FatalErrors
+INSERT_AT_FRONT_REQUIRES_FORCE_QUEUE			enum FatalErrors
+OBJ_COMP_PROCESS_CHILDREN_LOCK_COUNT_CHANGED		enum FatalErrors
+OBJ_NOT_GROWN_AT_CURRENT_CLASS_LEVEL			enum FatalErrors
+OBJ_TEMP_CHUNK_NOT_FOUND				enum FatalErrors
+BAD_ARGS_CANNOT_PASS_HUGE_STACK_FRAME			enum FatalErrors
+BAD_ARGS_CANNOT_PASS_EMPTY_STACK_FRAME			enum FatalErrors
+CANNOT_REPLACE_EVENT_WITH_DATA				enum FatalErrors
+OBJ_BAD_DEREF						enum FatalErrors
+; You called ObjDerefGen, ObjDeref1 or one of their friends but
+; the master offset you are derefing does not have the master offset
+; you are derefing.
+; i.e. You are using the wrong deref routine.
+
+							
+;	Thread errors
+
+ILLEGAL_THREAD						enum FatalErrors
+BLOCK_IN_KERNEL						enum FatalErrors
+THREAD_PRIVATE_DATA_NOT_ALLOCATED			enum FatalErrors
+THREAD_PRIVATE_DATA_OWNED_BY_SOMEONE_ELSE		enum FatalErrors
+UNLOCK_MODULE_BY_WRONG_THREAD				enum FatalErrors
+INVALID_THREAD_EXCEPTION				enum FatalErrors
+THREAD_GET_INFO_BAD_PARAMETER				enum FatalErrors
+SOMETHING_LEFT_ON_STACK_BEFORE_STACK_SPACE_RETURN	enum FatalErrors
+; You called ThreadRestoreStackSpace with something left on the stack that you
+; pushed after calling ThreadBorrowStackSpace. This is a bozo no no.
+; 
+
+THREAD_STACK_NOT_IN_LIST				enum FatalErrors
+; The list of thread stack blocks has been corrupted, possibly by someone
+; calling HandleP on a geode's dgroup handle.
+
+;	Timer errors
+
+CORRUPT_TIMER_LIST					enum FatalErrors
+TIMER_START_BAD_TYPE					enum FatalErrors
+INSERT_TIME_DUPLICATE					enum FatalErrors
+INSERT_TIME_BAD_FLAGS					enum FatalErrors
+BAD_MSDOS_TIME_SET					enum FatalErrors
+CANNOT_STOP_MS_TIMER					enum FatalErrors
+BAD_MSDOS_DATE_SET					enum FatalErrors
+TIMER_BAD_YEAR						enum FatalErrors
+; TimerSetDateAndTime() was passed a year outside the range (1980-2099)
+TIMER_BAD_MONTH						enum FatalErrors
+; TimerSetDateAndTime() was passed a month outside the range (1-12)
+TIMER_BAD_DAY						enum FatalErrors
+; TimerSetDateAndTime() was passed a day outside the range (1-31)
+TIMER_BAD_HOUR						enum FatalErrors
+; TimerSetDateAndTime() was passed an hour outside the range (0-23)
+TIMER_BAD_MINUTE					enum FatalErrors
+; TimerSetDateAndTime() was passed a minute outside the range (0-59)
+TIMER_BAD_SECOND					enum FatalErrors
+; TimerSetDateAndTime() was passed a second outside the range (0-59)
+
+TIMER_MISSED						enum FatalErrors
+; There's a bug in the timer code such that a timer with a time-remaining
+; of 0 was placed on the timer list. This should not happen. It's not
+; your fault :)
+
+TIMER_SET_RTC_RETURNED_ERROR				enum FatalErrors
+; The BIOS call to set the real time clock returned an error.
+
+;	Geode errors
+
+GEODE_PRIV_ALLOC_PASSED_RATHER_LARGE_SIZE		enum FatalErrors
+GEODE_PRIV_PASSED_SIZE_OF_ZERO				enum FatalErrors
+GEODE_PRIV_ALLOC_NEVER_CALLED				enum FatalErrors
+GEODE_PRIV_PASSED_OFFSET_THAT_IS_TOO_LARGE		enum FatalErrors
+GEODE_PRIV_PASSED_RANGE_CONTAINING_FREE_WORD		enum FatalErrors
+GEODE_PRIV_PASSED_RANGE_NOT_OWNED_BY_SAME_GEODE		enum FatalErrors
+GEODE_FREE_LIBRARY_CALLER_UNKNOWN			enum FatalErrors
+LGL_BAD_FLAGS						enum FatalErrors
+PCP_BAD_FLAGS						enum FatalErrors
+CANNOT_FIND_RESOURCE					enum FatalErrors
+CORRUPT_GEODE_LIST					enum FatalErrors
+KERNEL_RELOCATION_TYPE_IS_OBSOLETE			enum FatalErrors
+BAD_GEODE_RELOCATION_TYPE				enum FatalErrors
+BAD_GEODE_RELOCATION_SOURCE				enum FatalErrors
+BAD_GEODE_RELOCATION_RESOURCE_FAR_PTR			enum FatalErrors
+BAD_GEODE_RELOCATION_RESOURCE_OFFSET			enum FatalErrors
+BAD_GEODE_RELOCATION_LIBRARY_SEGMENT_NOT_FOUND		enum FatalErrors
+ILLEGAL_PROCESS						enum FatalErrors
+ILLEGAL_RESOURCE					enum FatalErrors
+ILLEGAL_GEODE						enum FatalErrors
+ILLEGAL_DRIVER						enum FatalErrors
+ILLEGAL_LIBRARY						enum FatalErrors
+ILLEGAL_QUEUE						enum FatalErrors
+ILLEGAL_GSTATE						enum FatalErrors
+ILLEGAL_WINDOW						enum FatalErrors
+LIBRARY_ENTRY_NUMBER_TOO_LARGE				enum FatalErrors
+; Calling ProcGetLibraryEntry with an exported-entry number larger than the
+; number of entry points exported by the library (si holds requested number).
+
+RELOCATION_TO_INVALID_LIBRARY_ROUTINE_NUMBER		enum FatalErrors
+STACK_OVERFLOW						enum FatalErrors
+TPD_BLOCK_HANDLE_CORRUPTED				enum FatalErrors
+TPD_STACK_BOT_TOO_SMALL					enum FatalErrors
+STACK_POINTER_LARGER_THAN_BLOCK				enum FatalErrors
+COULD_NOT_READ_RELOCATIONS				enum FatalErrors
+DIRECTION_FLAG_SET					enum FatalErrors
+CANNOT_UNRELOCATE_UNKNOWN_RESOURCE_HANDLE		enum FatalErrors
+GEODE_GET_DEF_DRIVER_BAD_TYPE				enum FatalErrors
+GEODE_SET_DEF_DRIVER_BAD_TYPE				enum FatalErrors
+DO_RELOCATION_LIBRARY_MUST_BE_LOCKED			enum FatalErrors
+TOO_MANY_SYSTEM_DRIVERS					enum FatalErrors
+SYSTEM_DRIVER_NOT_FOUND_IN_LIST				enum FatalErrors
+GEODE_GET_INFO_BAD_PARAMETER				enum FatalErrors
+INTERRUPTS_OFF_WHEN_THEY_SHOULD_NOT_BE			enum FatalErrors
+DIRECTION_FLAG_SET_INCORRECTLY				enum FatalErrors
+CANNOT_FIND_CODE_SEGMENT				enum FatalErrors
+OBJ_DUPLICATE_BLOCK_REQUIRES_AN_OBJECT_BLOCK		enum FatalErrors
+LOADED_GEODE_STILL_UNREFERENCED				enum FatalErrors
+; You have called GeodeLoad on a driver or library that is not also a process.
+; You need to call GeodeUseDriver for a driver or GeodeUseLibrary for a library.
+; This will also check the protocol number, which is a Good Thing.
+
+CANNOT_LOAD_LIBRARY_WITHOUT_AN_OPEN_FILE		enum FatalErrors
+UNKNOWN_HANDLE_TYPE_IN_HANDLE_TABLE			enum FatalErrors
+; FreeGeodeBlocks is running through the handle table and has hit a handle
+; that is not one of the known non-memory handles. The handle table has
+; been scribbled on.
+
+CANNOT_CALL_MOVABLE_ROUTINE_AFTER_FILESYSTEM_SHUT_DOWN	enum FatalErrors
+; Something in a system driver is attempting to call, during its DR_EXIT
+; function, something that's in movable memory. This is not allowed, as all
+; open files have been closed, making it impossible to ensure that the
+; function in question is in memory (b/c it can't be loaded if it's not).
+
+;	Graphics errors
+
+GRAPHICS_ILLEGAL_COLOR					enum FatalErrors
+GRAPHICS_ILLEGAL_COLOR_FLAG				enum FatalErrors
+GRAPHICS_ILLEGAL_DRAW_MODE				enum FatalErrors
+GRAPHICS_ILLEGAL_LINE_MAP_MODE				enum FatalErrors
+GRAPHICS_ILLEGAL_TEXT_MODE				enum FatalErrors
+GRAPHICS_BAD_REG_PTR					enum FatalErrors
+GRAPHICS_BAD_GSTRING_HANDLE				enum FatalErrors
+GRAPHICS_BAD_SUBSTRING_HANDLE				enum FatalErrors
+GRAPHICS_BAD_GSTATE_DESTROY				enum FatalErrors
+GRAPHICS_ILLEGAL_LINE_JOIN_TYPE				enum FatalErrors
+GRAPHICS_ILLEGAL_LINE_END_TYPE				enum FatalErrors
+GRAPHICS_ILLEGAL_MITER_LIMIT				enum FatalErrors
+GRAPHICS_ILLEGAL_LINE_WIDTH				enum FatalErrors
+GRAPHICS_ILLEGAL_SYSTEM_PATTERN				enum FatalErrors
+GRAPHICS_BAD_GR_INFO_TYPE				enum FatalErrors
+GRAPHICS_BAD_REGION_DEF					enum FatalErrors
+GRAPHICS_BAD_COORDINATE					enum FatalErrors
+GRAPHICS_BAD_GSTRING_NESTING				enum FatalErrors
+GRAPHICS_BAD_GSTRING_TYPE				enum FatalErrors
+GRAPHICS_NO_RECURSIVE_GSTRINGS				enum FatalErrors
+GRAPHICS_ILLEGAL_DASH_SKIP_DISTANCE			enum FatalErrors
+GRAPHICS_ILLEGAL_LINE_STYLE				enum FatalErrors
+GRAPHICS_ILLEGAL_NUM_DASH_PAIRS				enum FatalErrors
+GRAPHICS_ILLEGAL_DASH_ARRAY_ELEMENT			enum FatalErrors
+GRAPHICS_NO_ROTATED_BIT_BLT_SUPPORT			enum FatalErrors
+GRAPHICS_REGION_TOO_BIG					enum FatalErrors
+GRAPHICS_TOO_MANY_POLYGON_EDGES				enum FatalErrors
+GRAPHICS_POLYGON_TOO_FEW_POINTS				enum FatalErrors
+GRAPHICS_BLOCK_TOO_BIG_TO_ALLOC				enum FatalErrors
+GRAPHICS_32_BIT_MUL_OVERFLOW				enum FatalErrors
+GRAPHICS_CALC_CONIC_BUFFER_OVERFLOW			enum FatalErrors
+GRAPHICS_CALC_CONIC_INVALID_POLYLINE			enum FatalErrors
+GRAPHICS_CALC_CONIC_ASSUMES_0_DEGREE_START_END		enum FatalErrors
+GRAPHICS_ARC_TOO_BIG					enum FatalErrors
+GRAPHICS_ARC_ILLEGAL_CLOSE_TYPE				enum FatalErrors
+GRAPHICS_ELLIPSE_ILLEGAL_CALC_ELLIPSE_TYPE		enum FatalErrors
+GRAPHICS_ELLIPSE_START_END_MUST_BE_DIFFERENT		enum FatalErrors
+GRAPHICS_CALC_ELLIPSE_SHOULDNT_HAPPEN			enum FatalErrors
+GRAPHICS_3PT_ARCS_DONT_HANDLE_COLINEAR_POINTS		enum FatalErrors
+GRAPHICS_ROUND_RECT_TOO_MANY_POINTS			enum FatalErrors
+GRAPHICS_LINE_TOO_LONG_IN_GET_LINE_POINTS		enum FatalErrors
+GRAPHICS_DIS_BLOCK_TOO_BIG				enum FatalErrors
+GRAPHICS_REGION_NOT_ENOUGH_POINTS			enum FatalErrors
+GRAPHICS_REGION_OVERDOSE				enum FatalErrors
+GRAPHICS_REGION_LINE_NOT_FOUND				enum FatalErrors
+GRAPHICS_REGION_ZERO_SIZE				enum FatalErrors
+GRAPHICS_REGION_ODD_SIZE				enum FatalErrors
+GRAPHICS_REGION_ILLEGAL_REGION_FILL_RULE		enum FatalErrors
+GRAPHICS_INVALID_GSTRING_OPCODE				enum FatalErrors
+GRAPHICS_WRITING_TO_READ_ONLY_GSTRING			enum FatalErrors
+GRAPHICS_BAD_DESTROY_STRING_KILL_TYPE			enum FatalErrors
+GRAPHICS_CANT_DESTROY_STREAM_GSTRING_DATA		enum FatalErrors
+GRAPHICS_CANT_DESTROY_PTR_GSTRING_DATA			enum FatalErrors
+GRAPHICS_STORING_WAY_TOO_MUCH_TO_A_GSTRING		enum FatalErrors
+GRAPHICS_GR_INIT_FONTS_ERROR				enum FatalErrors
+GRAPHICS_BAD_FONT_FILE					enum FatalErrors
+GRAPHICS_BAD_FLAGS_RESERVED_MUST_BE_0			enum FatalErrors
+GRAPHICS_INVALID_GSTRING_TYPE				enum FatalErrors
+GRAPHICS_CANT_SET_CLIP_RECT_OR_PATH_WHEN_DEFINING_PATH	enum FatalErrors
+GRAPHICS_CANT_POS_PTR_GSTRING_TO_END			enum FatalErrors
+GRAPHICS_EDIT_BITMAP_NEEDS_HUGE_BITMAP			enum FatalErrors
+GRAPHICS_BAD_IMAGE_DATA					enum FatalErrors
+GRAPHICS_BAD_GSTRING_ELEMENT_DATA			enum FatalErrors
+GRAPHICS_EXPECTING_A_GSTRING				enum FatalErrors
+GRAPHICS_CANT_CREATE_ZERO_SIZED_BITMAP			enum FatalErrors
+; You can't pass zero width or height to GrCreateBitmap
+
+GRAPHICS_PATH_ILLEGAL_COMBINE_PARAMETER			enum FatalErrors
+GRAPHICS_PATH_MUST_CALL_ONLY_WHEN_PATH_IS_OPEN		enum FatalErrors
+GRAPHICS_PATH_CANNOT_WRITE_TO_PATH_WITH_THIS_OP		enum FatalErrors
+GRAPHICS_PATH_CANNOT_WRITE_TO_GSTRING_WITH_THIS_OP	enum FatalErrors
+GRAPHICS_PATH_INTERNAL_ILLEGAL_PATH_COMBINE_TYPE	enum FatalErrors
+GRAPHICS_PATH_ERROR_PLAYING_PATH_AS_GSTRING		enum FatalErrors
+GRAPHICS_PATH_STROKE_ILLEGAL_OPCODE			enum FatalErrors
+GRAPHICS_PATH_BUILD_REGION_ILLEGAL_OPCODE		enum FatalErrors
+GRAPHICS_PATH_ILLEGAL_BEGIN_PATH_FLAGS			enum FatalErrors
+GRAPHICS_PATH_EXPECTED_REGION_PATH_HANDLE		enum FatalErrors
+GRAPHICS_FILE_ATTR_NOT_RETURNED_FOR_FONT_FILE		enum FatalErrors
+GRAPHICS_PATH_TEXT_LENGTH_MUST_BE_VALID			enum FatalErrors
+GRAPHICS_PATH_SET_PATH_LMEM_ALLOC_FAILED		enum FatalErrors
+
+GRAPHICS_CMYK_BITMAPS_NOT_SUPPORTED			enum FatalErrors
+GRAPHICS_BAD_BITMAP_MODE				enum FatalErrors
+GRAPHICS_BITMAP_ILLEGAL_COMPACT_TYPE			enum FatalErrors
+GRAPHICS_NEED_HUGE_BITMAP				enum FatalErrors
+GRAPHICS_SPLINE_ILLEGAL_NUMBER_OF_POINTS		enum FatalErrors 
+GRAPHICS_SPLINE_BLOCK_WRONG_SIZE			enum FatalErrors 
+
+GRAPHICS_PATTERN_ILLEGAL_PATTERN_TYPE			enum FatalErrors
+GRAPHICS_PATTERN_ILLEGAL_SYSTEM_HATCH			enum FatalErrors
+GRAPHICS_PATTERN_ILLEGAL_SYSTEM_BITMAP			enum FatalErrors
+GRAPHICS_PATTERN_CUSTOM_PATTERN_TOO_BIG			enum FatalErrors
+; The custom pattern (either a HatchPattern or Bitmap) is too large to be
+; used. A 16K limit is enforced for custom patterns, as these are stored in
+; the GState segment.
+GRAPHICS_PATTERN_INTERNAL_CANT_BE_SOLID_HERE		enum FatalErrors
+GRAPHICS_PATTERN_ILLEGAL_SYSTEM_PATTERN			enum FatalErrors
+GRAPHICS_USER_PATTERNS_NOT_SUPPORTED_YET		enum FatalErrors
+GRAPHICS_HATCH_PATTERN_CANNOT_BE_EMPTY			enum FatalErrors
+GRAPHICS_HATCH_PATTERN_PROBABLY_TOO_MANY_LINES		enum FatalErrors
+GRAPHICS_HATCH_PATTERN_DELTA_Y_CANT_BE_ZERO		enum FatalErrors
+; The HL_deltaY is defined to be in the rotated coordinate space of the hatch
+; line (although the rotation may be zero), so it never makes sense to
+; have a line that continually draws on top of itself.
+GRAPHICS_BAD_RESTORE_STATE				enum FatalErrors
+GRAPHICS_BAD_RESTORE_XFORM				enum FatalErrors
+GRAPHICS_CANT_WRITE_TO_PTR_GSTRING			enum FatalErrors
+GRAPHICS_INTERNAL_ERROR_IN_GSTRING_READ_BUFFERING	enum FatalErrors
+GRAPHICS_MUST_PASS_OD_TO_CREATE_BITMAP			enum FatalErrors
+; You must pass a non-zero exposure OD to GrCreateBitmap as the object
+; that will handle any MSG_META_EXPOSED messages caused by bitblts and the
+; like within the bitmap.
+GRAPHICS_BITMAP_ALREADY_COMPACTED			enum FatalErrors
+; GrCompactBitmap must be passed an uncompacted bitmap
+GRAPHICS_BITMAP_MUST_BE_PACKBITS			enum FatalErrors
+; GrUncompactBitmap must be passed a compacted bitmap in the PackBits format
+GRAPHICS_CANT_DO_THIS_WITH_COMPACTED_BITMAP		enum FatalErrors
+; Can't call GrClearBitmap or GrEditBitmap with a compacted bitmap.
+GRAPHICS_BITMAP_SHOULDNT_BE_LOCKED			enum FatalErrors
+GRAPHICS_DEFINING_PATH_CANT_SET_DEFAULT_STATE		enum FatalErrors
+; You shouldn't be calling GrSetDefaultState while defining a path
+GRAPHICS_UNBALANCED_SAVE_RESTORE_STATE			enum FatalErrors
+; There is an unbalanced GrSaveState/RestoreState pair.  Perhaps you are
+; calling GrNewPage with saved states.
+GRAPHICS_ILLEGAL_PAGE_END_COMMAND			enum FatalErrors
+GRAPHICS_ILLEGAL_PATH_TYPE				enum FatalErrors
+GRAPHICS_BITMAP_RESOLUTION_CANT_BE_ZERO			enum FatalErrors
+; The bitmap resolution stored in the complex bitmap structure is zero,
+; an invalid value.  This may mean that the BMT_COMPLEX bit was set
+; in the B_type field of the bitmap header when it shouldn't be.
+GRAPHICS_SENTINEL_FOR_BITMAP_COMPRESSION_CORRUPTED	enum FatalErrors
+; The sentinel word stored at the end of the buffer used to compress
+; a bitmap has been corrupted, indicating an internal error in
+; GrCompactBitmap
+GRAPHICS_BITMAP_COMPACTION_INTERNAL_ERROR		enum FatalErrors
+GRAPHICS_BITMAP_INTERNAL_ERROR				enum FatalErrors
+GRAPHICS_SENTINEL_FOR_BITMAP_BUFFER_CORRUPTED		enum FatalErrors
+; The sentinel word stored at the end of the buffer used for drawing
+; complex bitmaps has been corrupted, indicating an internal error in
+; either how the size of the buffer was calculated, or how someone is
+; writing into the buffer.
+GRAPHICS_POLYLINE_SPECIAL_SHOULDNT_HAVE_FAILED		enum FatalErrors
+; A call to CheckThinLine() indicated a fat line would be drawn, but
+; PolylineSpecial returned that a thin line would actually suffice. The
+; logic to determine a thin line must be the same in each of these routines.
+
+;	Font Manager errors
+
+FONTMAN_FIND_OUTLINE_DATA_CALLED_WITH_BITMAP_FONT	enum FatalErrors
+; FontDrFindOutlineData() was called with a bitmap font.  It is
+; intended for use by font drivers, and therefore should only
+; be called for fonts that have outline font data available.
+FONTMAN_BAD_ENUM_FLAG_PASSED_TO_IS_FONT_AVAIL		enum FatalErrors
+; GrCheckFontAvail() cannot alphabetize fonts.
+FONTMAN_BAD_FONT_INFO_FOR_ADD_FONT			enum FatalErrors
+; GrAddFont() was called with a bogus FontInfo() entry.
+FONTMAN_FONT_FILE_DELETED				enum FatalErrors
+; The font file was deleted between the time it was first used and
+; the time the font manager attempted to reload a font from it.
+; This probably indicates a bug in the font manager.
+FONTMAN_COULDNT_OPEN_FONT_FILE				enum FatalErrors
+; The font file couldn't be opened to reload a font from it.
+; This probably indicates a bug in the font manager.
+FONTMAN_BAD_FONT_FILE_READ				enum FatalErrors
+; The file read of the font file failed.
+; This probably indicates a trashed font file.
+FONTMAN_FONT_DRIVER_NOT_FOUND				enum FatalErrors
+; The font driver for this font couldn't be found.
+; Is the driver specified in the geos.ini file?
+; Is the (correct version of) the driver in the SYSTEM\FONT directory?
+FONTMAN_NEED_FEF_OUTLINES_OR_FEF_BITMAPS		enum FatalErrors
+; GrCheckFontAvail() and GrEnumFonts() need at least one of
+; FEF_OUTLINES or FEF_BITMAPS set in the FontEnumFlags, otherwise no
+; fonts will ever match.
+FONT_INIT_NO_POINTSIZE_FOUND				enum FatalErrors
+; No pointsize could be found for the default font.  Something may
+; be wrong with the file of the default font, such as a bad header.
+FONT_INIT_IN_USE_CHUNK_NOT_EMPTY			enum FatalErrors
+; The FontsInUse chunk was not empty during initialization.  Something
+; is probably wrong in GrInitDefaultFont() or GrInitFonts().
+FONT_BAD_WEIGHT						enum FatalErrors
+; You should not use FontWeights in the range FW_ULTRA_LIGHT to FW_BLACK.
+; These are provided for backwards compatibility only.
+FONTMAN_FILE_CACHE_CORRUPTED				enum FatalErrors
+; The font file cache was somehow corrupted (eg. a font in the cache
+; didn't exist, was listed in the cache twice, etc.)
+
+;	Window errors
+
+WIN_OPEN_BAD_FLAGS					enum FatalErrors
+WIN_CHANGE_PRIO_BAD_FLAGS				enum FatalErrors
+WIN_MOVE_BAD_FLAGS					enum FatalErrors
+WIN_BAD_WIN_INFO_TYPE					enum FatalErrors
+WIN_PASSED_GSTATE_HAS_NO_WINDOW				enum FatalErrors
+WIN_CAN_NOT_CLOSE_GRABBED_WINDOW			enum FatalErrors
+WIN_ERROR_PTR_CAN_NOT_LEAVE_WINDOW_NOT_ENTERED		enum FatalErrors
+GET_DOUG__WIN_ERROR_PTR_CAN_NOT_BE_IN_TWO_WINDOWS_AT_ONCE		enum FatalErrors
+WIN_GRAB_COUNT_0_ON_RELEASE				enum FatalErrors
+WIN_TOO_MANY_GRABBED_WINDOWS				enum FatalErrors
+WIN_PTR_SHOULD_HAVE_LEFT_CLOSING_WINDOW_BY_NOW		enum FatalErrors
+WIN_UPDATE_NESTED					enum FatalErrors
+WIN_BAD_END_UPDATE					enum FatalErrors
+WIN_SUSPEND_COUNT_UNDERFLOW				enum FatalErrors
+WIN_ILLEGAL_PTR_IMAGE_LEVEL				enum FatalErrors
+WIN_SCROLL_WITH_ROTATED_WINDOW				enum FatalErrors
+WIN_INPUT_OBJ_MUST_BE_RUN_BY_SAME_THREAD_AS_GEODE_INPUT_OBJ enum FatalErrors
+; This is an error that WinOpen generates if the passed "InputOD" & "owner"
+; for geode are not compatible.  Any non-NULL InputOD passed must be run by the 
+; same thread as runs the owner-to-be's geode's input object, by default
+; the geode's GenApplication object.  This is necessary not because of a kernel
+; requirement, but because GenApplication expects to be able to call any
+; InputOD of a window that it has received input for.
+WIN_ERROR_MOVING_WINDOW_ALREADY_IN_BACK_TO_BACK		enum FatalErrors
+; A window or window layer, after being moved to the back, was found to have
+; no siblings to its/their right before beingmoved.  Code earlier in the
+; routine is supposed to have bailed out in this case with nothing to do.
+WIN_BAD_ASSUMPTION					enum FatalErrors
+; Bad assumption internal to window system code
+GET_DOUG__WIN_ERROR_PTR_IN_VIS_BUT_NOT_UNIV			enum FatalErrors
+GET_DOUG__WIN_ERROR_PTR_IN_UNIV_OF_CHILD_BUT_NOT_PARENT		enum FatalErrors
+GET_DOUG__WIN_ERROR_PTR_IN_VIS_OF_CHILD_AND_PARENT_OR_PREV_CHILD	enum FatalErrors
+GET_DOUG__WIN_TREE_SEM_NOT_GRABBED			enum FatalErrors
+GET_DOUG__WIN_ERROR_VIS_REG_BIGGER_THAT_UNIV		enum FatalErrors
+GET_DOUG__WIN_CX_TRASHED				enum FatalErrors
+GET_DOUG__WIN_DX_TRASHED				enum FatalErrors
+GET_DOUG__WIN_ERROR_PTR_IN_UNIV_OF_TWO_CHILDREN_AT_ONCE	enum FatalErrors
+
+OBJ_FLUSH_INPUT_QUEUE_BAD_NEXT_STOP			enum FatalErrors
+; Result of default MetaClass handler for MSG_META_OBJ_FLUSH_INPUT_QUEUE being
+; called with bogus ObjFlushInputQueueNextStop value
+OBJ_ILLEGAL_REFERENCE_TO_DYING_OBJECT_BLOCK		enum FatalErrors
+; Object block being tested has had MSG_META_BLOCK_FREE or ObjFreeObjBlock
+; called on, is no longer marked as "in use", & will be nuked from memory the
+; moment the queues have finished being flushed.  The current operation being
+; performed requires this NOT to be the case.  One example is "WinClose", which
+; requires that the exposureObj & inputObj's not already be dying.  This can
+; be corrected by first closing the window, or changing its inputObj or
+; exposureObj to NULL, & THEN destroying the object, or object block.
+;
+; More in-depth info:  This error checking routine
+; is called by the system when it is about to start another queue-flushing
+; sequence to an object, to make sure that it's going to be around to be able
+; to receive the message -- if the block's about to be freed within one 
+; queue flush, then the new flush doesn't stand any chance of being able to
+; finish without crashing.
+; 
+OWNER_CORE_BLOCK_NOT_LOCKED				enum FatalErrors
+; The kernel is unrelocating a handle and has found that the core block for
+; the owner of the block being unrelocated is not, in fact, locked.
+;
+
+;	File errors
+
+POS_BAD_FLAGS						enum FatalErrors
+OPEN_BAD_FLAGS						enum FatalErrors
+CREATE_BAD_FLAGS					enum FatalErrors
+INVALID_ATTRIBUTES					enum FatalErrors
+SET_PATH_ERROR						enum FatalErrors
+FILE_LIST_CORRUPT					enum FatalErrors
+PATH_DRIVE_MISMATCH					enum FatalErrors
+DIRECTORY_STACK_EMPTY					enum FatalErrors
+PATH_WITH_DRIVE_MUST_BE_ABSOLUTE			enum FatalErrors
+PATH_WITH_DISK_HANDLE_MUST_BE_ABSOLUTE			enum FatalErrors
+
+PATH_IN_BUFFER_NOT_ABSOLUTE				enum FatalErrors
+THREAD_HAS_NO_CURRENT_PATH_BLOCK			enum FatalErrors
+INVALID_STANDARD_PATH					enum FatalErrors
+MALFORMED_PATH						enum FatalErrors
+INIT_FOR_PATH_ENUM_NOT_CALLED_YET			enum FatalErrors
+PATH_BUFFER_OVERFLOW					enum FatalErrors
+FILE_CONSTRUCTED_PATH_DOESNT_END_IN_BACKSLASH		enum FatalErrors
+INIT_FOR_PATH_ENUM_CALLED_FOR_NON_STANDARD_PATH		enum FatalErrors
+VM_FILE_MUST_BE_CLOSED_WITH_VM_CLOSE			enum FatalErrors
+; A geode tried to close a VM file by calling FileClose instead of VMClose.
+; This often happens if a geode has a VM file open, and exits without closing
+; it.
+VM_CLOSE_BAD_PARAMETER_IN_AL				enum FatalErrors
+FILE_MOVE_PATH_TOO_LONG					enum FatalErrors
+RENAME_DESTINATION_MAY_NOT_BE_A_PATH			enum FatalErrors
+ATTEMPTED_TO_PERFORM_UNSUPPORTED_FUNCTION_BEFORE_APPROPRIATE_IFS_DRIVER_WAS_LOADED enum FatalErrors
+; The skeleton IFS driver was called to perform a function it does not support.
+; The likeliest cause is that the proper filesystem driver for the drive in
+; question didn't get loaded (i.e. it was missing from the system::fs key in
+; the .ini file)
+INVALID_FSDRIVER_OFFSET					enum FatalErrors
+; Called FSDUnregister with an offset that's not a registered FS driver, as
+; returned by FSDRegister.
+
+; FileEnum things...
+EXT_ATTR_VALUE_SIZES_DONT_MATCH				enum FatalErrors
+MATCH_ATTRIBUTE_NOT_IN_FILE_ATTRIBUTE_ARRAY		enum FatalErrors
+RETURN_ATTRIBUTE_NOT_IN_FILE_ATTRIBUTE_ARRAY		enum FatalErrors
+RETURN_AREA_TOO_SMALL_FOR_ATTRIBUTE			enum FatalErrors
+FEA_MULTIPLE_MAY_NOT_BE_PART_OF_AN_ATTRIBUTE_ARRAY	enum FatalErrors
+ILLEGAL_EXTENDED_ATTRIBUTE				enum FatalErrors
+EXT_ATTR_SIZE_DOESNT_MATCH_DEFINED_SIZE			enum FatalErrors
+RETURN_AREA_EXTENDS_PAST_RETURN_ENTRY_SIZE		enum FatalErrors
+INVALID_STANDARD_RETURN_TYPE				enum FatalErrors
+INVALID_STANDARD_CALLBACK_TYPE				enum FatalErrors
+INITIAL_BUFFER_SIZE_TOO_LARGE				enum FatalErrors
+NAME_ATTRIBUTE_NOT_IN_FECD				enum FatalErrors
+PREPOSTEROUS_FILE_NAME_LENGTH				enum FatalErrors
+MISSING_NAME_ATTRIBUTE_IN_CALLBACK_DATA			enum FatalErrors
+MISSING_FILE_TYPE_ATTRIBUTE_IN_CALLBACK_DATA		enum FatalErrors
+MISSING_FILE_ATTR_ATTRIBUTE_IN_CALLBACK_DATA		enum FatalErrors
+FSIR_MAY_NOT_BE_LOCKED					enum FatalErrors
+; FileGetDestinationDisk has been called with the FSInfoResource locked in
+; some way. This can lead to deadlock, however, when the disk for a drive
+; specifier is registered.
+; 
+
+;	Local memory manager errors
+
+LMEM_BAD_EC_FLAGS					enum FatalErrors
+LMEM_SIZE_NOT_ROUNDED					enum FatalErrors
+
+BAD_OFFSET_TO_HEAP					enum FatalErrors
+NOT_IN_CORRECT_BLOCK					enum FatalErrors
+BAD_HEAP_TYPE						enum FatalErrors
+BLOCK_NOT_LOCKED					enum FatalErrors
+NOT_LMEM_HANDLE						enum FatalErrors
+LMEM_CHUNK_HANDLE_AT_ODD_ADDRESS			enum FatalErrors
+
+LMEM_FREE_SPACE_EXCEEDS_BLOCK_SIZE			enum FatalErrors
+LMEM_SUM_OF_FREE_CHUNKS_EXCEEDS_LMBH_totalFree		enum FatalErrors
+LMEM_CHUNK_SIZE_LESS_THAN_FOUR				enum FatalErrors
+LMEM_HEAP_SIZES_DONT_ADD_UP				enum FatalErrors
+LMEM_FREE_LIST_NOT_SORTED				enum FatalErrors
+LMEM_FREE_SPACE_DOESNT_ADD_UP				enum FatalErrors
+LMEM_TWO_HANDLES_WITH_THE_SAME_ADDRESS			enum FatalErrors
+LMEM_HANDLE_BEFORE_HANDLE_TABLE				enum FatalErrors
+LMEM_HANDLE_BEYOND_HANDLE_TABLE				enum FatalErrors
+LMEM_ADDR_BEFORE_HEAP_START				enum FatalErrors
+LMEM_ADDR_AFTER_HEAP_END				enum FatalErrors
+LMEM_ADDR_NOT_WORD_ALIGNED				enum FatalErrors
+LMEM_SPACE_AT_END_OF_USED_CHUNK_HAS_CHANGED		enum FatalErrors
+LMEM_FREE_CHUNK_SIZE_NOT_MULTIPLE_OF_FOUR		enum FatalErrors
+LMEM_FREE_CHUNK_HAS_BEEN_MODIFIED			enum FatalErrors
+LMEM_BAD_FLAGS						enum FatalErrors
+LMEM_INIT_HEAP_BAD_FLAGS				enum FatalErrors
+LMEM_INIT_HEAP_BAD_DI					enum FatalErrors
+OPERATION_REQUIRES_CHUNK_HANDLES			enum FatalErrors
+CANNOT_GET_SPACE_EXACT_IF_NO_EXPAND			enum FatalErrors
+CHUNK_ARRAY_QUICK_SORT_OVERFLOW				enum FatalErrors
+LMEM_INIT_HEAP_FREE_SPACE_MUST_BE_NON_ZERO		enum FatalErrors
+CHUNK_ARRAY_ELEMENT_SIZE_PROBABLY_TOO_LARGE		enum Warnings
+CHUNK_ARRAY_HEADER_SIZE_PROBABLY_TOO_LARGE		enum FatalErrors
+CHUNK_ARRAY_HEADER_SIZE_TOO_SMALL			enum FatalErrors
+ELEMENT_ARRAY_TOO_MANY_REFERENCES			enum FatalErrors
+ELEMENT_ARRAY_BAD_TOKEN					enum FatalErrors
+
+CANNOT_REALLOC_CHUNK_TO_ZERO_SIZE_IF_LMF_NO_HANDLES_SET	enum FatalErrors
+CANNOT_ALLOC_CHUNK_OF_ZERO_SIZE_IF_LMF_NO_HANDLES_SET	enum FatalErrors
+LMEM_COMPACT_HEAP_BAD_THRESHHOLD			enum FatalErrors
+
+FSHOF_SET_FILE_NAME_PASSED_TO_SKELETON_DRIVER		enum Warnings
+; The skeleton filesystem driver has been told the name of a file opened
+; before the other drivers were loaded. This means the file in question
+; was opened on a drive for which the driver was not loaded. Likely you will
+; die soon of some other error.
+
+
+
+
+
+;	VM errors
+
+VM_ERR							enum FatalErrors
+VM_ERR_NOT_VM_HANDLE					enum FatalErrors
+VM_BAD_HDR						enum FatalErrors
+VM_BAD_MEM_HAN						enum FatalErrors
+VM_BAD_BLK_HAN						enum FatalErrors
+VM_HANDLE_NOT_IN_USE					enum FatalErrors
+VM_UNASSIGNED_ADJUSTMENT_UNREASONABLE_YOU_PROBABLY_HAVE_A_DETACHABLE_READ_ONLY_LMEM_BLOCK_IN_YOUR_APPLICATION		                enum FatalErrors
+
+VM_BAD_ASSIGNED_LIST					enum FatalErrors
+VM_BAD_SORT_ORDER					enum FatalErrors
+VM_BAD_UNASSIGNED_LIST					enum FatalErrors
+
+VM_BAD_ASSIGNED_COUNT					enum FatalErrors
+VM_BAD_UNASSIGNED_COUNT					enum FatalErrors
+VM_BAD_USED_COUNT					enum FatalErrors
+VM_BAD_TOTAL_COUNT					enum FatalErrors
+VM_BAD_WRITE						enum FatalErrors
+VM_DISCARDING_NON_USED_BLOCK				enum FatalErrors
+VM_BLOCK_HANDLE_NOT_FOUND				enum FatalErrors
+VM_REFERENCE_COUNT_BOGUS				enum FatalErrors
+VM_WRITE_BLOCK_DISCARDED				enum FatalErrors
+VM_WRITE_HANDLE_MISMATCH				enum FatalErrors
+VM_HEADER_NOT_MINE					enum FatalErrors
+VM_BLOCKS_HAVE_SAME_FILE_POSITION			enum FatalErrors
+VM_HEADER_TOO_LARGE					enum FatalErrors
+VM_NO_UNASSIGNED_BLOCKS_LEFT				enum FatalErrors
+VM_BLOCK_ALREADY_USED					enum FatalErrors
+VM_BLOCK_NOT_DIRTY					enum FatalErrors
+VM_BLOCK_HAS_NO_DATA					enum FatalErrors
+VM_BLOCK_HAS_NO_FILE_POSITION				enum FatalErrors
+VM_COMPRESS_HOSED					enum FatalErrors
+VM_HEADER_DISCARDED?_WHAT_THE_HELL?			enum FatalErrors
+VM_BAD_FILE_SIZE					enum FatalErrors
+VM_ASSIGNED_LIST_TAIL_IS_WRONG				enum FatalErrors
+VM_ASSIGNED_LIST_HEAD_IS_WRONG				enum FatalErrors
+VM_GAP_EXISTS_IN_FILE					enum FatalErrors
+VM_TWO_CONSECUTIVE_FREE_BLOCKS				enum FatalErrors
+VM_HEADER_SHOULD_BE_DIRTY				enum FatalErrors
+VM_NEWLY_USED_BLOCK_OVERLAPS_FREE_BLOCK			enum FatalErrors
+VM_BLOCK_DIRTY_WHEN_IT_SHOULD_NOT_BE			enum FatalErrors
+; This seems to indicate that you ran out of disk space.
+VM_PURGE_BLOCKS_RID_ERROR				enum FatalErrors
+VM_BLOCK_LOCKED_IN_VM_CLOSE				enum FatalErrors
+HUGE_ARRAY_DIR_BLOCK_OVERFLOW				enum FatalErrors
+HUGE_ARRAY_BAD_HEADER_SIZE				enum FatalErrors
+HUGE_ARRAY_CORRUPTED					enum FatalErrors
+HUGE_ARRAY_BAD_DIRECTORY				enum FatalErrors
+HUGE_ARRAY_BAD_BLOCK_LINKS				enum FatalErrors
+HUGE_ARRAY_BAD_ELEMENT_NUMBERS				enum FatalErrors
+HUGE_ARRAY_BAD_BLOCK					enum FatalErrors
+HUGE_ARRAY_ELEMENTS_MUST_BE_VARIABLE_SIZED		enum FatalErrors
+HUGE_ARRAY_WRONG_CHUNK_ALLOCATED			enum FatalErrors
+DB_GROUP_OVERRIDE_PASSED_TO_VM_CHAIN_ROUTINE		enum FatalErrors
+VM_ATTACH_BLOCK_MUST_BE_SWAPABLE			enum FatalErrors
+VM_ATTACH_BLOCK_CANNOT_BE_DISCARDABLE			enum FatalErrors
+VM_READ_FILE_WORD_ERROR					enum FatalErrors
+; A call to VMFileReadWord() returned an error.  Given that this is simply
+; doing a file pos, and then reading from a portion of the VM header which
+; is assumed to exist, an error is a bad thing.  See Tony.
+VM_ATTACH_BLOCK_CANNOT_BE_DETACHABLE			enum FatalErrors
+; A block that is passed to VMAttach must be NOT_DETACHABLE, so as to avoid
+; confusing the application state file mechanism, which will expect to be able
+; to save the block to the state file when the application is detached.
+;
+; The NOT_DETACHABLE attribute can be set in a .ui file with
+; "start Resource, notDetachable" or in a .goc file with
+; "@start Resource, notDetachable;"
+
+VMEM_GENERIC_OBJECTS_CANNOT_BE_UPDATED_ASYNCHRONOUSLY	enum FatalErrors
+; The file whose handle is in BX has VMA_COMPACT_OBJ_BLOCK set without
+; having VMA_SYNC_UPDATE set. This is illegal, as it implies that whenever
+; a block containing generic objects is off-screen, it can be compacted,
+; thereby losing all non-save-to-state vardata and other things that could
+; well be vital to bringing the objects back on-screen.
+;
+
+CANNOT_TRUNCATE_MULTI_REFERENCED_VM_FILE		enum FatalErrors
+; Someone has called VMTruncateAndClose for a VM file that has been opened
+; by more than one application. Since VMTruncateAndClose is an extremely
+; destructive operation, rendering the VM file invalid, the kernel refuses to
+; perform it unless it knows only one process is using the file.
+
+DB_UNGROUP_NOT_LOCKED					enum FatalErrors
+; VMMarkUngroupAvail has been called passing the handle of a group block that's
+; not locked. This is illegal, as the handle for the block could go away at
+; any time... this is an internal error in the kernel DB code.
+
+UNGROUPED_GROUP_MAY_NOT_BE_PASSED_AS_AN_EXPLICIT_GROUP	enum FatalErrors
+; DBAlloc was called passing a group in AX that is a member of the set of
+; groups used to satisfy requests for DB_UNGROUPED allocations. For various
+; reasons, this is against the rules. Use DB_UNGROUPED instead, or create your
+; own group (if you need to have items end up in the same group, for some
+; reason).
+
+;	Object errors
+
+YOU_FORGOT_A_FIXUP_FLAG_BOZO				enum Warnings
+
+BAD_REMOVE_CHILD					enum FatalErrors
+BAD_CLASS						enum FatalErrors
+; This error happens frequently when an object or object block is freed before
+; a message in the queue destined for it is delivered.  Always use as high a
+; level of object/block destruction mechanism as you can -- The highest
+; object-level routine in the UI is MSG_GEN_DETROY, in vis, MSG_VIS_DESTROY.
+; Lower is MSG_META_OBJ_FREE, which first flushes queues after which a 
+; MSG_META_FINAL_OBJ_FREE is sent to the object.  The handlers for this last
+; message are allowed to use ObjFreeChunk & LMemFree.  On the block side,
+; once all objects within the block have been taken out of any tree they
+; resided in, MSG_META_BLOCK_FREE & ObjFreeObjBlock are the high-level
+; message/routine to use.  MSG_META_FINAL_BLOCK_FREE ends up being called only
+; after the queues have been flushed out, which in turn is allowed to actually
+; nuke the block.
+;
+BAD_RELOCATION_TYPE					enum FatalErrors
+BAD_RELOCATION_CANNOT_FIND_VM_HANDLE			enum FatalErrors
+; This means some unrelocated handle indicates it should be set from the
+; handle for some VM block, but the block holding the unrelocated handle
+; is not in a VM file, nor is the VM block handle for a valid block from a
+; state file. As a result, the kernel hasn't a clue what to relocate the
+; unrelocated handle to.
+;
+; If you free a VM block in a document after some object that refers to that
+; block has been written to the VM file, you'll get this when the object
+; gets brought back into memory.
+;
+; More likely, if you detach after running something that restored from state
+; for a while, the state file could well have been written out with the
+; state block for a duplicated block having been freed from the state file. The
+; state block for a non-duplicated resource will remain in the file, however,
+; so you'll die with this error. The only thing to do is delete the state
+; file and start over.
+;
+CANNOT_RELOC_CURRENT_BLOCK_TO_OTHER_THAN_HANDLE		enum FatalErrors
+CANNOT_RELOC_LIBRARY_ENTRY_TO_HANDLE_OR_SEGMENT		enum FatalErrors
+CANNOT_RELOC_OWNING_GEODE_TO_BAD_RESOURCE_ID		enum FatalErrors
+CANNOT_RELOC_VM_HANDLE_TO_OTHER_THAN_HANDLE		enum FatalErrors
+BAD_MASTER_OFFSET					enum FatalErrors
+CANNOT_ALLOCATE_CORRECT_CHUNK_HANDLE			enum FatalErrors
+CANNOT_RELOCATE						enum FatalErrors
+CANNOT_UNRELOCATE					enum FatalErrors
+CANNOT_UNRELOCATE_CURRENT_BLOCK_TO_ENTRY_POINT		enum FatalErrors
+CANNOT_UNRELOCATE_VM_HANDLE_TO_ENTRY_POINT		enum FatalErrors
+BAD_LMEM_FLAGS						enum FatalErrors
+CORRUPT_LINKAGE						enum FatalErrors
+ERROR_RETURNED_BY_RELOCATION_HANDLER			enum FatalErrors
+LMEM_BAD_INSERT_OFFSET					enum FatalErrors
+; LMemInsertAt() was passed a bad offset.  The offset passed should
+; be the offset from the start of the chunk you are inserting in.
+LMEM_BAD_DELETE_OFFSET					enum FatalErrors
+; LMemDeleteAt() was passed a bad offset.  The offset passed should
+; be the offset from the start of the chunk you are deleting in.
+LMEM_BAD_DELETE_SIZE					enum FatalErrors
+; LMemDeleteAt() was passed a bad size.  The passed size to delete was
+; larger than the existing chunk.
+LMEM_BAD_DELETE_COMBINATION				enum FatalErrors
+; LMemDeleteAt() was passed a bad offset/size comibination.  The offset
+; plus the size extends beyond the end of the chunk.
+ADD_CHILD_OF_OBJ_ALREADY_IN_COMPOSITE			enum FatalErrors
+CANNOT_MAKE_OBJECT_A_CHILD_OF_ITSELF			enum FatalErrors
+OBJ_DETACH_LOCK_COUNT_NON_ZERO				enum FatalErrors
+OBJ_DETACH_BLOCK_NOT_RESIDENT				enum FatalErrors
+FULL_OBJ_LOCK_CANNOT_FIND_RESOURCE			enum FatalErrors
+TRANSFER_TO_VM_CANNOT_FIND_RESOURCE			enum FatalErrors
+OBJ_DUPLICATE_BLOCK_NOT_DISCARDED			enum FatalErrors
+OBJ_BLOCK_BAD_IN_USE_COUNT				enum FatalErrors
+; Each object block contains an "in-use" count, which is stored in the
+; ObjLMemBlockHeader (The field is OLMBH_inUseCount).   The count starts out
+; as 0, indicating objects are not active, climbs during usage, & must return
+; to 0 before the block may be destroyed.  If you've gotten this error, it
+; is because the count went negative, or became far to large to be a reasonable
+; value.  The most common cause of this is intercepting & not passing on
+; to the superclass a method which inc/decs this count.
+;
+; So, which methods might these be?  The count is incremented each time
+; an object becomes active in some new way in the system, & is decremented
+; each time an object is no longer active in that way.  Currently, there
+; are the following pairs:
+;
+;	1) Incremented whenever a window is created for visible objects having
+;	   the VTF_IS_WINDOW bit, & decremented in the default handler for
+;	   MSG_META_WIN_DEAD. 
+;
+;	2) Inc in MSG_META_OBJ_FREE (sent when objects are being destroyed)/
+;	   Dec in MSG_META_FINAL_OBJ_FREE (sent out after queues interacting with
+;	   object have been cleared)
+;
+; 	3) New object classes are free to inc/dec this count as well, using
+; 	   ObjIncInUseCount & ObjDecInUseCount, but must do so in pairs, or this
+;          fatal error may be the result.
+;
+; Also -- note that if a decrement does not occur for each increment, then
+; the count never reaches zero, resulting in the block never getting free/
+; application never exiting.
+
+OBJ_BAD_IN_USE_COUNT					enum FatalErrors
+; Indicates if in-use count has gone negative for this particular object (The
+; EC code only keeps track of the in-use count on a per-object basis).  See
+; above OBJ_BLOCK_BAD_IN_USE_COUNT for more info.
+
+OBJ_BLOCK_BAD_INTERACTIBLE_COUNT			enum FatalErrors
+; Each object block contains an "interactible" count, which is stored in the
+; ObjLMemBlockHeader (The field is OLMBH_interactibleCount).   The count
+; starts out as 0, & becomes non-zero as objects in the block become visible,
+; or need to have current status information reflected in their state.
+; GenControl objects are not updated unless this value is non-zero.  This
+; error occurs only if the value goes negative, which should never happen,
+; as the count should only be changed by in/dec pairs.
+;
+; So, which methods might these be? Currently, there are the following pairs:
+;
+;	1) Incremented whenever a window is created for visible objects having
+;	   the VTF_IS_WINDOW bit, & decremented in the default handler for
+;	   MSG_META_WIN_DEAD. 
+
+OBJ_BAD_INTERACTIBLE_COUNT				enum FatalErrors
+; Indicates if interactible count has gone negative for this particular object
+; (The EC code only keeps track of the interactible count on a per-object
+; basis).  See above OBJ_BLOCK_BAD_INTERACTIBLE_COUNT for more info.
+
+NESTED_FREE_OBJ_BLOCK					enum FatalErrors
+OBJ_BLOCK_IN_PROCESS_OF_BEING_DESTROYED_IS_BECOMING_IN_USE enum FatalErrors
+NON_OBJECT_BLOCK					enum FatalErrors
+OBJ_RELOCATION_TO_INVALID_LIBRARY_ROUTINE_NUMBER	enum FatalErrors
+OBJ_RELOCATION_TO_INVALID_LIBRARY_NUMBER		enum FatalErrors
+; The application is probably restoring from state and one of its libraries,
+; or its libraries' libraries exports an object class an instance of which
+; was saved to state, but now one of the libraries or libraries' libraries
+; has changed what libraries it imports without having increased the
+; protocol number, so the state file is invalid.
+
+OBJ_LOCK_OBJ_BLOCK_BY_WRONG_THREAD			enum FatalErrors
+ILLEGAL_SEGMENT_VALUE                              	enum FatalErrors
+REMOVE_CHILD_BAD_FLAGS                              	enum FatalErrors
+HANDLE_OF_BLOCK_NOT_STORED_IN_DS_0			enum FatalErrors
+OBJECT_NOT_IN_LMEM_BLOCK				enum FatalErrors
+OBJECT_NOT_IN_OBJECT_BLOCK				enum FatalErrors
+OBJECT_CHUNK_HANDLE_FREE				enum FatalErrors
+OBJECT_CHUNK_EMPTY					enum FatalErrors
+PROCESS_HANDLE_NOT_ALLOWED				enum FatalErrors
+BAD_OBJ_COMP_CALL_TYPE                              	enum FatalErrors
+OBJ_LMEM_BLOCK_HAS_NO_FLAGS				enum FatalErrors
+OBJ_SAVE_BLOCK_NOT_LMEM					enum FatalErrors
+OBJ_SAVE_BLOCK_ALREADY_SAVED				enum FatalErrors
+OBJ_BLOCK_NOT_OWNED_BY_PROCESS				enum FatalErrors
+NOT_PROCESS_HANDLE					enum FatalErrors
+BAD_COPY_CHUNK_MODE                                    	enum FatalErrors
+CANT_COPY_CHUNK_FROM_FIXED_OFFSET_IN_SAME_SEGMENT	enum FatalErrors
+ZERO_SIZE_PASSED_TO_COPY_CHUNK_MESSAGE	         	enum FatalErrors
+ILLEGAL_VARDATA_RELOCATION_OFFSET			enum FatalErrors
+BAD_TABLE_SIZE_PASSED_TO_OBJ_VAR_SCAN_DATA		enum FatalErrors
+; The # of VarDataHandlers passed to ObjVarScanData is unreasonable (0, or
+; very large)
+
+BAD_SIZE_PASSED_TO_OBJ_VAR_ADD_DATA			enum FatalErrors
+; Size of extra data passed to ObjVarAddData is unreasonably large
+
+CLASS_AT_DS_SI_MARKED_NEVER_SAVED_SO_WHY_AM_I_RELOCATING_OR_UNRELOCATING_IT_BUB? enum FatalErrors
+; One of the classes of an object that's in a resource or being saved to state
+; or a VM file has been marked as NEVER_SAVED, when in fact it is. The
+; programmer has been a boob.
+; 
+
+OBJ_SHUTDOWN_OR_DETACH_WHILE_OTHER_STILL_ACTIVE		enum FatalErrors
+; ObjInitDetach was called for an object while a previous MSG_META_DETACH or
+; MSG_META_APP_SHUTDOWN was still active for the object, and the message
+; passed to ObjInitDetach is different from when ObjInitDetach was first called
+; for the object (e.g. a MSG_META_APP_SHUTDOWN was received before the object
+; sent MSG_META_ACK back to the object that sent it a MSG_META_DETACH). You
+; might also have trashed AX before calling ObjInitDetach, so it didn't
+; receive the message number your object actually received.
+
+INVALID_CHUNK_HANDLE					enum Warnings
+
+;	Font manager errors
+
+	;
+	; Disk manager errors
+	;
+DISK_ASSERTION_FAILED					enum FatalErrors
+BAD_DISK_HANDLE						enum FatalErrors
+BAD_DRIVE_NUMBER					enum FatalErrors
+BAD_DISK_HAN_TBL					enum FatalErrors
+DISK_TOP_LEVEL_DRIVE_NOT_CREATED			enum FatalErrors
+FSD_LOADED_BUT_NOT_REGISTERED				enum FatalErrors
+;	When restoring a disk handle, was able to find the core block for
+;	the IFS driver, but not its  FSDriver record. Likely the FSDriver
+;	chain has been corrupted.
+;
+
+SAVED_DISK_HAS_NO_DRIVE_SPECIFIER_FOR_DRIVE_NAME	enum FatalErrors
+;	When trying to locate the drive for a saved disk handle, we
+;	were told the saved drive name, which should always be a name followed
+;	by a colon (aka a drive specifier), had no drive specifier. Either
+;	DiskSave screwed up or, more likely, the saved data have been corrupted
+;	by the application.
+;
+
+	;
+	; Dosappl module errors
+	;
+
+	;
+	; Drive Parameter Initialization module errors
+	;
+IOCTL_FAILED						enum FatalErrors
+BAD_DRIVE_SPECIFIED					enum FatalErrors
+DRIVE_NOT_LOCKED_EXCLUSIVE				enum FatalErrors
+;	You are attempting to release exclusive access on a drive that is
+;	marked as being locked for shared access.
+;
+
+
+	;
+	; Initfile errors
+	;
+
+INI_FILE_VERIFICATION_ERROR				enum FatalErrors
+CORRUPTED_INI_FILE					enum FatalErrors
+INIT_FILE_BAD_BLOB					enum FatalErrors
+INIT_FILE_BAD_BP					enum FatalErrors
+INIT_FILE_BAD_DS					enum FatalErrors
+INIT_FILE_BAD_ES					enum FatalErrors
+INIT_FILE_START_OF_CATEGORY_NOT_FOUND			enum FatalErrors
+INIT_FILE_CATEGORY_STRING_TOO_LONG			enum FatalErrors
+INIT_FILE_NULL_KEYWORD_PASSED				enum FatalErrors
+INIT_FILE_BLOCK_ROUTINES_SHOULD_NOT_HAVE_A_SIZE_PASSED_IN_FLAGS_WORD \
+							enum FatalErrors
+if HASH_INIFILE
+INIT_FILE_CORRUPT_HASH_TABLE				enum FatalErrors
+endif				; HASH_INIFILE
+
+	;
+	; ChunkArray module errors
+	;
+
+CORRUPT_CHUNK_ARRAY					enum FatalErrors
+PTR_IS_NOT_POINTING_AT_AN_ELEMENT			enum FatalErrors
+CANNOT_SORT_VARIABLE_SIZED_CHUNK_ARRAYS			enum FatalErrors
+CANNOT_RESIZE_FIXED_SIZE_ELEMENT			enum FatalErrors
+
+	;
+	; Input manager errors
+	;
+IM_BAD_FLAGS_RETURNED_FROM_MONITOR			enum FatalErrors
+IM_ABS_MOUSE_CHANGE					enum FatalErrors; temp
+IM_START_RESIZE_BAD_XOR_FLAGS				enum FatalErrors
+IM_START_RESIZE_FLIPPING_NOT_SUPPORTED			enum FatalErrors
+CANNOT_START_INPUT_MANAGER				enum FatalErrors
+IM_START_PEN_MODE_WAS_CALLED_TWICE			enum FatalErrors
+SIZE_OF_PEN_CODE_BLOCK_WAS_ODD				enum FatalErrors
+INK_ENUM_EXCEEDED_END_OF_BUFFER				enum FatalErrors
+; We tried to terminate a line segment, but there were no points in the
+; point buffer.
+;
+
+NUM_INK_POINTS_IS_ZERO					enum FatalErrors
+; We are sending ink off, and the # points is 0. This shouldn't happen.
+
+INK_Y_COORD_IS_NEGATIVE					enum FatalErrors
+; Somehow, an ink point had a negative Y coord
+;
+
+
+CANNOT_DELETE_MORE_POINTS_THAN_EXIST			enum FatalErrors
+; For some strange reason, the code tried to delete more points from the
+; input manager ink buffer than actually existed.
+
+TOO_MANY_INK_POINTS					enum FatalErrors
+INK_DATA_EXCEEDED_BOUNDS_OF_BUFFER			enum FatalErrors
+; More ink points have been stored in the ink buffer than should be able
+; to fit.
+
+NO_INK_GSTATE						enum FatalErrors
+; MSG_IM_INK_REPLY was received but there was no inkGState for some reason
+;
+
+; One of the handlers for the ink collection finite state machine
+; trashed AL...
+
+; Indicates that the MSG_IM_INK_REPLY (with AX=TRUE) was received before
+; any pointer window was set
+;
+
+IM_ERROR_BAD_PTR_IMAGE_VALUE				enum FatalErrors
+; Indicates that ImSetPtrImage was called with cx = 0, but dx was not set
+; to a legal PtrImageValue.
+;
+
+IM_NULL_REGION_DEF_PASSED_TO_IM_START_MOVE_RESIZE	enum FatalErrors
+
+IM_MEMLOCK_FAILURE					enum FatalErrors
+; Internal IM problem
+
+IM_BAD_SETPTR_PARAMS					enum FatalErrors
+; Internal IM problem
+
+IM_MONITOR_ALREADY_IN_MONITOR_CHAIN			enum FatalErrors
+; You have attempted to call ImAddMonitor passing a Monitor structure that
+; is already in the monitor chain. You need to have called ImRemoveMonitor
+; on the Monitor before you can add it back in again.
+
+	;
+	; Diskcopy errors
+	;
+
+DISKCOPY_INVALID_DRIVE 					enum FatalErrors
+DISKCOPY_ASSERTION_FAILED				enum FatalErrors
+DISKCOPY_BAD_ES						enum FatalErrors
+
+	;
+	; Format errors
+	;
+
+FORMAT_ASSERTION_FAILED					enum FatalErrors
+FORMAT_BAD_DS						enum FatalErrors
+FORMAT_IOCTL_FAILED					enum FatalErrors
+FORMAT_BOGUS_BPB					enum FatalErrors
+
+	;
+	; Longname module errors
+	;
+
+
+	;
+	; DBase errors
+	;
+
+; an impossible item reference was given.
+; When a free is done and no item-block is found to contain the item.
+; The database file contains no map  block.
+DB_NO_MAP_BLOCK						enum FatalErrors
+; The groups free list contains a bad ptr.
+; The free-list holds a non-free block.
+BAD_ITEM_BLOCK_REFERENCE_COUNT				enum FatalErrors
+
+	;
+	; Localization errors
+	;
+
+DATE_TIME_FORMAT_NO_END_DELIMITER			enum FatalErrors
+DATE_TIME_FORMAT_UNKNOWN_TOKEN				enum FatalErrors
+DATE_TIME_ILLEGAL_FORMAT				enum FatalErrors
+DATE_TIME_POINTER_BEYOND_BLOCK_END			enum FatalErrors
+DATE_TIME_POINTER_INTO_UNLOCKED_BLOCK			enum FatalErrors
+CANNOT_USE_DOUBLE_BYTE_CHARS_IN_THIS_VERSION		enum FatalErrors
+DATE_TIME_ILLEGAL_MONTH					enum FatalErrors
+DATE_TIME_ILLEGAL_DAY					enum FatalErrors
+DATE_TIME_ILLEGAL_HOUR					enum FatalErrors
+DATE_TIME_ILLEGAL_MINUTE				enum FatalErrors
+DATE_TIME_ILLEGAL_SECONDS				enum FatalErrors
+DATE_TIME_YEAR_TOO_OLD					enum FatalErrors
+
+	;
+	; C errors
+	;
+
+SYSNOTIFY_STRINGS_MUST_BE_IN_SAME_SEGMENT		enum FatalErrors
+
+	;
+	; General Change Notification errors
+	;
+
+GCN_ILLEGAL_NOTIFICATION_MESSAGE				enum FatalErrors
+GCN_SEND_DESTINATION_MUST_BE_ZERO			enum FatalErrors
+GCN_BAD_USAGE_COUNT					enum FatalErrors
+; Result of NDBH_usageCount within a NotificationDataBlock having an
+; abnormally large number in it.
+
+; You passed both GCNLSF_RETURN_COUNT and GCNLSF_SET_STATUS to GCNListSend
+; or GCNListSendToBlock, but the two are mutually exclusive, as the
+; undisturbed status message handle is expected to be returned in cx.
+; 
+
+GCN_UNRELOCATING_GCN_LIST_WITH_UNOWNED_OPTR		enum FatalErrors
+; Cannot unrelocate a GCN list with optrs that are owned by someone other than
+; the owner of the GCN list itself.
+
+	;
+	; FSD module errors
+	;
+
+ALL_DRIVE_NUMBERS_IN_USE				enum FatalErrors
+FSIR_NOT_LOCKED						enum FatalErrors
+TOO_MANY_PRIMARY_FSDs					enum FatalErrors
+FSIR_NOT_LOCKED_EXCL_BY_THIS_THREAD			enum FatalErrors
+FSIR_NOT_LOCKED_SHARED_BY_THIS_THREAD			enum FatalErrors
+FSD_BYTES_PER_CLUSTER_OVER_64K				enum FatalErrors
+FSD_COULD_NOT_GET_CURRENT_DIR				enum FatalErrors
+INVALID_ALLOC_OP					enum FatalErrors
+INVALID_HANDLE_OP					enum FatalErrors
+INVALID_PATH_OP						enum FatalErrors
+
+FSD_ES_ISNT_SHARED_FSIR					enum FatalErrors
+; A routine was expecting FSInfoResource to have been locked shared and
+; its segment loaded into ES.
+;
+
+	;
+	; Object Variable Storage errors
+	;
+
+OVS_BAD_HANDLER_TABLE					enum FatalErrors
+; The pointer passed to ObjVarScanData does not point to a valid
+; VarDataHandlerTable or VarDataCHandlerTable.
+;
+OVS_SIZE_OF_VAR_DATA_ENTRIES_GREATER_THAN_VAR_DATA_AREA	enum FatalErrors
+; The variable data storage area of the object has been corrupted -- the
+; sum of the sizes of the individual entries exceeds the total size of the
+; variable data storage area.
+;
+OVS_CORRUPTED_VAR_DATA_ENTRY				enum FatalErrors
+; The VDE_entrySize field was 0, which is illegal.  This field must
+; be at least (size VDE_entrySize + size VDE_dataType).
+;
+OVS_VAR_DATA_HANDLER_CHANGED_DATA_ENTRY			enum FatalErrors
+; A VarDataHandler or VarDataCHandler has changed the data entry it is
+; handling.  This is illegal.  A VarDataHandler or VarDataCHandler is not
+; allowed to change the data entry or add or remove data entries.
+;
+; A data entry size of 0 or 2 was passed to ObjVarAddDataEntry.
+; ObjVarAddDataEntry is only used to add a data type with extra data.  If a
+; data type with no extra data is to be added, use ObjVarAddDataType.
+;
+OVS_BAD_MSG_META_INITIALIZE_VAR_DATA_HANDLER		enum FatalErrors
+; MSG_META_INITIALIZE_VAR_DATA has been called on an object to get a 
+; particular variable data type created & initialized, and ds:ax has NOT
+; been returned, as is required, pointing to the extra data of the new
+; data entry (Should match return value of ObjVarFindData for the given
+; data type)
+;
+
+OVS_VAR_DATA_HANDLER_ADDED_OR_REMOVED_DATA_ENTRY	enum FatalErrors
+; After calling a VarDataHandler or VarDataCHandler, the size of the vardata
+; area for the object has changed.  It is not allowed for a handler to do
+; anything which can cause this to happen, such as add or remove vardata
+; entries to/from the current object.  For this reason, it is also not 
+; advisable to make any message calls from within a handler, unless it is
+; known that no current or future handlers for that message would be adding/
+; removing vardata entries to/from this object.
+; 
+
+BAD_DETACH_MSG						enum FatalErrors
+; ObjInitDetach was called with AX != MSG_META_DETACH or MSG_META_APP_SHUTDOWN
+
+if	ANALYZE_WORKING_SET
+endif
+
+STANDARD_PATH_EXPECTED					enum FatalErrors
+
+META_INTERNAL_QUIT_PROBLEM				enum FatalErrors
+; Internal quit problem, consult a physician
+
+RESOURCE_CALL_INT_STACK_MESSED_UP_POSSIBLY_WRITING_PAST_DGROUP enum FatalErrors
+
+
+TIMER_NOT_STOPPED_BEFORE_GEODE_EXITED			enum Warnings
+; A timer for the currently-exiting geode (ds:bx.HM_owner is the handle
+; of the geode) remains on the timer list. All timers belonging to a geode
+; must be stopped or must expire before the geode may exit.
+
+NON_SEMAPHORE_PASSED_TO_SEM_ROUTINE			enum FatalErrors
+; A non-semaphore handle was passed to ThreadPSem/VSem
+;
+
+NO_VIDEO_DRIVER_LOADED_YET				enum FatalErrors
+; The system tried to make a call to the video driver before it was
+; loaded.
+;
+
+PROCESS_CLASS_ASKED_TO_SEND_TO_OBJ_BLOCK_OUTPUT		enum FatalErrors
+; This is not allowed.  Find out who is sending what event to where and
+; make sure it is correct.
+;
+
+CANNOT_CALL_GEODE_PRIV_WRITE_ON_KERNEL_GEODE		enum FatalErrors
+; It is not allowed to write data to the kernel geode priv area.
+;
+endif
+
+TRIED_TO_BORROW_AMOUNT_GREATER_THAN_STACK_SIZE		enum Warnings
+INK_DEBUGGING_TURNED_ON					enum Warnings
+; The [input]/debugInk flag is set to true.
+
+DISCARDING_MOUSE_INPUT					enum Warnings
+; The user tried to have ink collected for a window that was suspended,
+; or had a null mask region. In this case, we just discard the mouse
+; input. This is an odd case, so we flag it. It usually only happens if
+; the user tries to enter ink in a window while the window was opening.
+
+FAULTING_IN_VM_BLOCKS					enum Warnings
+; GEOS is loading in all the used VM blocks in a VM file. This is sometimes
+; done for synchronization purposes for shared files, but it generally
+; happens when the application has mistakenly opened a file
+; VMAF_FORCE_READ_ONLY without passing VMAF_FORCE_DENY_WRITE.
+
+TIMER_VALUE_SLOWER_THAN_60_HZ				enum FatalErrors
+; Due to a problem with the timer routine, someone wanted to program
+; the timer to generate the next interrupt at an interval larger
+; than 60 times a second.
+
+C_METHOD_HANDLER_TRASHED_DI				enum FatalErrors
+; A C message handler returns DI as the "MethodParameterDef", which contains
+; information about what kind of data is being returned by the handler, and
+; how to map that data into the appropriate registers. This FatalError is
+; hit if an invalid type is returned in DI. This usually means that DI was
+; changed by the method handler.
+
+BAD_C_METHOD_PARAMETER_DEF				enum FatalErrors
+; This usually means that the parameter data stored in a class' method
+; table has been trashed somehow.
+;
+
+GRAPHICS_ILLEGAL_GET_MASK_TYPE				enum FatalErrors
+
+if ERROR_CHECK
+
+FILE_STANDARD_PATH_DIRECTORY_INVALID_STANDARD_PATH	enum FatalErrors
+; Either FileAddStandardPathDirectory() or FileDeleteStandardPathDirectory()
+; was passed a value for a StandardPath that is not a valid StandardPath.
+
+FILE_STANDARD_PATH_DIRECTORY_INVALID_PATH_STRING	enum FatalErrors
+; Either FileAddStandardPathDirectory() or FileDeleteStandardPathDirectory()
+; was passed a string for the path that was ridicuously long, and therefore
+; probably not the string the caller had in mind.
+
+VMO_OPEN_AND_VMO_NATIVE_WITH_EXT_ATTRS_NOT_ALLOWED	enum FatalErrors
+; You can not pass VMO_OPEN and VMO_NATIVE_WITH_EXT_ATTRS_NOT_ALLOWED
+; as the flags to VMOpen. You can only use VMO_NATIVE_WITH_EXT_ATTRS_NOT_ALLOWED
+; with the VMO_CREATE* options
+
+VMO_TEMP_FILE_AND_VMO_NATIVE_WITH_EXT_ATTRS_NOT_ALLOWED	enum FatalErrors
+; You can not pass VMO_TEMP_FILE and VMO_NATIVE_WITH_EXT_ATTRS_NOT_ALLOWED
+; as the flags to VMOpen. You can only use VMO_NATIVE_WITH_EXT_ATTRS_NOT_ALLOWED
+; with the VMO_CREATE* options
+
+OBJECT_PASSED_TO_ObjCallSuperNoLock_IS_NOT_OF_PASSED_CLASS enum FatalErrors
+; The object passed to ObjCallSuperNoLock is not of the class passed to
+; ObjCallSuperNoLock.	
+;
+
+COORDINATE_VALUE_OVERFLOW				enum FatalErrors
+; The X coord of the current point was out of bounds (more than +/-32767) after
+; the brush width was subtracted. The brush width may have been invalid.
+
+
+PTR_EVENT_WITH_NEGATIVE_COORDINATE			enum FatalErrors
+; A pointer event with a negative coordinate came in to the ink collection
+; code - this should not be possible, as we force all events to conform to
+; the screen bounds - perhaps a memory trashing bug destroyed screenXMin/Max
+; or screenYMin/Max?
+
+INK_NUM_STROKES_MUST_BE_NON_ZERO			enum FatalErrors
+; The # ink strokes was non-zero when it should not have been. This can
+; only happen if one of the points in the ink data had the high bit set
+; (signifying the end of an ink stroke), but the collection code never
+; set it (perhaps a memory trashing bug)?
+
+INVALID_MSG_PASSED_TO_INK_REPLY_HANDLER			enum FatalErrors
+; An invalid value in AX was passed to InkReplyHandler - I have no idea how
+; this could happen
+
+CANNOT_DISCARD_DUPLICATED_BLOCK				enum FatalErrors
+; You cannot discard a duplicated block, as the system has no idea where to
+; read the data in from when you lock it.
+
+CANNOT_DISCARD_NON_OBJ_BLOCK				enum FatalErrors
+; MSG_PROCESS_OBJ_BLOCK_DISCARD only works on LMem blocks of type
+; LMEM_TYPE_OBJ_BLOCK.
+
+CANNOT_DISCARD_BLOCK_THAT_IS_IN_USE			enum FatalErrors
+; The OLMBH_inUseCount was non-zero in the block passed to
+; MSG_PROCESS_OBJ_BLOCK_DISCARD
+
+CANNOT_DISCARD_ALLOCATED_OBJ_BLOCK			enum FatalErrors
+; The passed obj block had the OLMBH_resourceSize field set to 0, which
+; signifies that the block was not read from a resource, and so cannot
+; be discarded.
+
+TOTAL_HEAP_SPACE_IN_USE_EXCEEDED_64_MEGS		enum FatalErrors
+; For some reason the amout of heapspace in use by all apps was calculated
+; to exceed 64 megs - unless some magical system has 64 megs of heap space,
+; this is likely due to some other error, like memory trashing.
+
+LARGE_VALUE_FOR_CHARACTER				enum Warnings
+; A character value > 255 was passed to a routine or fetched from a
+; string, probably indicating the geode isn't doing stuff the DBCS way.
+
+BAD_INI_STRING						enum Warnings
+; A string for a category or key passed to a GEOS.INI routine was
+; either suspiciously short (ie. 1 character) or contained non-ASCII
+; characters, indicating there may be problems.  All keys and category
+; strings should be SBCS, ASCII strings.
+
+ILLEGAL_INIT_FILE_STRING				enum FatalErrors
+; Strings in a DBCS GEOS.INI file are stored as a string of hex digits.
+; Either an illegal character was found (non-hex) or the string was not
+; a multiple of 4 characters long.
+
+UNCONVERTABLE_DOS_CHARACTER_FOR_BOOT			enum FatalErrors
+; A character value > 127 was found at boot time, when certain strings
+; need to be converted from DOS to GEOS before the FSD has been loaded.
+
+UNCONVERTABLE_GEOS_CHARACTER_FOR_SKELETON_FSD		enum FatalErrors
+; A character value > 127 was passed to the skeleton FSD.  This is the
+; kernel's file system driver that it uses to load the real FSD, and
+; until the real FSD is loaded, non-ASCII characters cannot be used.
+
+CHARACTER_VALUE_TOO_LARGE				enum FatalErrors
+; A character value > 255 was encountered.  Internally to the kernel,
+; single-byte strings are used for certain operations.
+
+FUNCTION_NOT_SUPPORTED_IN_DBCS				enum FatalErrors
+; A function that is not used in DBCS was called.
+
+ILLEGAL_CHAR_TYPE_TABLE					enum FatalErrors
+; There is an error in a CharTypeTable used by the LocalIsAlpha(), etc.
+; routines.  Either an entry is out of order or illegal flags are set.
+
+ILLEGAL_CHAR_CASE_TABLE					enum FatalErrors
+; There is an error in a CharCaseTable used by the LocalUpcaseChar(), etc.
+; routines.  Either an entry is out of order or illegal flags are set.
+
+ILLEGAL_CHAR_SORT_TABLE					enum FatalErrors
+; There is an error in a CharSortTable used by LocalCmpStrings(), etc.
+; routines.  Either an entry is out of order or illegal flags are set.
+
+FONTMAN_FONT_BUF_CORRUPTED				enum FatalErrors
+; There is a FontBuf in memory which has been corrupted.  This is likely
+; either a memory-trashing bug from any part of the system, or depending
+; on when the corruption was found, possibly a bug in a particular font
+; driver.
+
+LOCAL_TOO_MANY_KINSOKU_CHARS				enum FatalErrors
+; LocalSetKinsoku() was called with too long of a string.  The maximum
+; number of characters permitted is MAX_KINSOKU_CHARS.
+
+if	EMM_XIP
+EMMXIP_EMM_ERROR					enum FatalErrors
+; The EMM driver used to map in XIP resources returned an error from one
+; of its calls
+
+endif
+
+if	FULL_EXECUTE_IN_PLACE
+INVALID_XIP_RESOURCE_OFFSET				enum FatalErrors
+; The offset of an XIP resource did not lie on a paragraph boundary
+
+
+ILLEGAL_PREALLOCATED_COREBLOCK_HANDLE			enum FatalErrors
+; The geode handle preallocated for the first coreblock in the system lies
+; in the range of handles that lie in the XIP image, which is illegal. This
+; usually happens if the primary file system driver is present in the XIP
+; image, but a version is on the disk as well, so the kernel tries to use
+; the version on the disk, even though it has the coreblock handle of the
+; XIP version stuffed in its GH_geodeHandle field.
+;
+; The solution is to either remove the FSD from the disk, or if you are
+; debugging a file system driver, you need to remake a version of the
+; XIP image that does not have the file system driver in it.
+
+COULD_NOT_DISCARD_COREBLOCK				enum FatalErrors
+; For some reason, we could not discard the coreblock for a geode when
+; freeing the geode.
+
+
+PRE_LOADING_NON_FIXED_RESOURCE_IN_XIP_GEODE		enum FatalErrors
+; Somehow a resource snuck into the XIP image that was not fixed, and
+; yet was not marked discarded, and so the system tried to preload it
+
+FREEING_XIP_RESOURCE					enum FatalErrors
+; A resource in an XIP geode is being freed (this isn't allowed, as XIP
+; handles should never be freed.
+
+XIP_FAR_POINTER_PASSED_TO_MOVABLE_XIP_RESOURCE		enum FatalErrors
+; A routine in a movable XIP resource was passed a far pointer to
+; another movable XIP resource.  This is bad as the previous mocable
+; XIP resource is probably paged out, rendering the pointer invalid.
+
+SYS_COPY_TO_STACK_ERROR_BOTTOM_OF_STACK_MANGLED		enum FatalErrors
+; A parameter block was copied to the base of the stack, but when it was
+; to be freed, the token stored at the end of the parameter block was
+; not what we expected, indicating someone is destroying the parameter
+; stack (and thus the base of the stack).
+
+SYS_COPY_TO_STACK_ERROR_NO_RESTORE_REGS_ROUTINE		enum FatalErrors
+; No routine was specified to restore registers after doing a SysCopyToStack.
+; Most likely, someone called SysRemoveFromStackPreserveRegs after calling
+; SysCopyToStack, not SysCopyToStackPreserve<regs>.
+
+HANDLE_TO_ID_PASSED_NON_RESIDENT_COREBLOCK		enum FatalErrors
+; If we pass a coreblock handle to HandleToID, something is hideously wrong, as
+; we should change the caller to detect coreblock handles and do something
+; special with them.
+
+HEAP_END_COMES_AFTER_START_OF_XIP_READ_ONLY_RESOURCES	enum FatalErrors
+; On XIP systems, the read-only resources are assumed to lie after the heap.
+
+XIP_PAGE_NUMBER_NOT_IN_VALID_RANGE			enum FatalErrors
+; The page number passed to ECCheckXIPPageNumber was not valid for the
+; given device.
+
+XIP_MAP_ERROR						enum FatalErrors
+; The system tried to map in the InitGeos code, but did not find the special
+; tag value it expects. This is likely because of a bug in MapInXIPResource.
+
+endif	;FULL_EXECUTE_IN_PLACE
+
+CANNOT_LOAD_XIP_GEODE_ON_NON_XIP_SYSTEM			enum FatalErrors
+; An XIP geode was loaded by a non-XIP kernel.
+
+FAR_POINTER_TO_MOVABLE_XIP_RESOURCE			enum FatalErrors
+; It is not kosher to pass a pointer to a movable XIP resource, as it could
+; be mapped out if the routine you pass it to is in the XIP image as well,
+; and is in movable memory.
+
+RELOCATING_XIP_GEODE					enum FatalErrors
+; A resource from a geode marked as being XIPed is being relocated, which
+; should never happen.
+
+LOADING_XIP_RESOURCE_FROM_NON_XIP_GEODE			enum FatalErrors
+; A resource in an XIP geode has a handle in the range of handles used by
+; the XIP image.
+
+DUPLICATING_NON_LMEM_XIP_RESOURCE			enum Warnings
+; GeodeDuplicateResource is called on an XIP resource that is not an LMem
+; resource, which is bad if there are any relocations in the resource, as
+; we can't relocate it.
+
+MAPPING_HANDLE_OUTSIDE_OF_XIP_IMAGE			enum FatalErrors
+; We are trying to map in a handle that does not lie in the XIP image
+
+FONTMAN_IN_USE_FONT_FILE_DELETED			enum Warnings
+; The font file was deleted between the time it was first used and
+; the time the font manager attempted to reload a font from it.
+; This could indicate a bug in the font manager. It might also be a
+; result of removing fonts in use.
+
+FONT_ADD_FAILED						enum FatalErrors
+; The it seemed the font file was added, but it did not appear on
+; the FontsAvailList.  Indicates a bug in the font manager.
+
+FONT_DELETE_FAILED					enum Warnings
+; Tried to delete a font from the system, but the delete failed.
+; Probably tried to delete the default font.
+
+SEGMENT_PASSED_TO_LOAD_RESOURCE_LOW_NOT_IN_HEAP		enum FatalErrors
+; LoadResourceLow was passed a segment value outside the bounds of the heap.
+; This can happen if someone tries to load a fixed read-only XIP resource.
+
+DISABLE_APO_COUNT_OVERFLOW				enum FatalErrors
+; count that keeps track of how many requests to disable the auto
+; power off feature have been made, has overflowed.
+; SysEnableAPO or SysDisableAPO have been called in a sequence such
+; that the counter has overflowed.
+; MSG_GEN_APPLICATION_MARK_APP_COMPLETELY_BUSY and  
+; MSG_GEN_APPLICATION_MARK_BUSY call SysDisableAPO and 
+; ..._MARK_NOT_BUSY and .._MARK_APP_NOT_COMPLETELY.. call SysEnableAPO
+
+PATCH_FILE_ERROR		enum	FatalErrors
+; The Patch file contains invalid information
+
+CLASS_MUST_BE_IN_FIXED_RESOURCE	enum	FatalErrors
+;A object's class structure was not in a fixed resource
+
+FONTMAN_FONT_HAS_NEGATIVE_REFERENCE_COUNT		enum FatalErrors
+; The reference count on a font has gone negative.  This generally means
+; that either the mechanism for reference counts on fonts is not working
+; correctly, or someone has done something illegal like free a GState
+; directly.
+
+GRAPHICS_ILLEGAL_TEXT_MISC_MODE_BITS_SET		enum FatalErrors
+; Unused bits in the TextMiscModeFlags in a GState were non-zero.
+; Probably indicates in a problem in GrSetTextSpacePad() or the text object.
+
+MSG_META_EXPOSED_NOT_HANDLED_ON_INPUT_MANAGER_THREAD	enum FatalErrors
+; An FEP or similar driver has opened a window with the expose OD set
+; to the input manager thread.  In such situations, the FEP is required
+; to handle and consume all MSG_META_EXPOSED events that arrive on the
+; IM thread for any such windows.  This means the FEP must have an
+; InputMonitor active before any such windows are opened.
+
+LMEM_INVALID_BLOCK_SIZE					enum FatalErrors
+; The LMBH_blockSize field didn't match the true size of the block
+
+if USE_PATCHES
+PATCH_FILE_NAME_ERROR					enum FatalErrors
+; A patch filename is invalid in some way.
+endif
+
+RESOURCE_NOT_SNATCHABLE					enum FatalErrors
+; GeodeSnatchResource cannot load dgroup or the core block
+
+LMF_IN_RESOURCE_FLAG_SET_ON_NON_OBJECT_BLOCK		enum FatalErrors
+; The LMF_IN_RESOURCE flag should only be set on object blocks
+
+endif	;ERROR_CHECK
+
+GLOBAL_HEAP_IS_CONGESTED_SO_THREAD_IS_SLEEPING		enum Warnings
+; An allocation on the global heap has failed and the caller passed
+; HAF_NO_ERR, so the system is hoping that memory will become available
+; if the current thread sleeps for a bit and allows other threads to
+; complete their work. To avoid this situation, accept errors when
+; calling MemAlloc or MemReAlloc, and then try to allocate a smaller
+; piece of memory or notify the user that the current operation  has failed.
+
+
+if 	ERROR_CHECK
+
+EXTRA_STATE_BLOCK_CANNOT_BE_DISCARDABLE			enum FatalErrors
+EXTRA_STATE_BLOCK_MUST_BE_SWAPPABLE			enum FatalErrors
+DISCARDING_VM_BLOCK_INCORRECTLY				enum FatalErrors
+; VM blocks should be discarded via the VM system, but this one
+; is being discarded by DoDiscard, which doesn't update the VMHeader.
+
+endif	;ERROR_CHECK
+
+
+ILLEGAL_RESERVATION					enum FatalErrors
+; Either an app called GeodeRequestSpace, or a "reservation handle" was
+; trashed.
+
+
+
+if ERROR_CHECK
+
+ODD_LMEM_BLOCK_SIZE					enum FatalErrors
+ODD_LMEM_TOTAL_FREE_SIZE				enum FatalErrors
+; LMem blocks are not allowed to be odd.  This can mean that someone somewhere
+; is trashing these elements of a local heap.
+;
+
+NO_PEN_SUPPORT_IN_THIS_KERNEL				enum FatalErrors
+; Someone is trying to use the pen support in the kernel, despite the fact
+; that the NO_PEN_SUPPORT flag has been turned on
+
+STRING_SORT_STACK_CAN_ONLY_HAVE_TWO_STRINGS		enum FatalErrors
+; On removing the strings copied to the stack to translate special
+; characters, two is the maximum number.
+
+NOT_ENOUGH_HEAPSPACE_TO_LOAD_UI				enum FatalErrors
+; There is not enough heapspace to load the UI geode, so something has gone
+; tragically awry...
+
+CANNOT_CALL_MEM_LOCK_ON_AN_OBJECT_BLOCK			enum Warnings
+; Object blocks must be locked down via ObjLockObjBlock, not MemLock, else
+; object relocations will not get done
+
+BLOCK_ALLOCATED_WITH_NO_FLAGS				enum Warnings
+; A block was allocated that was neither fixed, discardable, nor swapable.
+; This is bad, as it'll just sit on the heap, even if there is available
+; swap space.
+
+VM_DISCARD_DIRTY_BLOCKS_LOGIC_ERROR			enum FatalErrors
+
+endif	; ERROR_CHECK
+
+
+VM_CANT_GRAB_BLOCK_SO_DISCARD_FAILED			enum FatalErrors
+; A VM block is locked by another thread and can't be grabbed exclusively
+; by this thread which wants to discard it.  VMDiscardDirtyBlocks will
+; fail, leaving the file in a bad state.
+;
+
+XIP_IMAGE_CREATED_WITHOUT_H_FLAG			enum Warnings
+; The XIP image was created without the -H flag, so no handle information
+; is output to the geode coreblocks. This means that if a geode resource is
+; resized (for example, an application object block resource) and the geode
+; exits, that resource handle will contain the wrong size when it restarts.
+
+XIP_RESOURCE_LEFT_LOCKED_WHEN_GEODE_EXITED		enum FatalErrors
+; A resource in the XIP image was left locked when the geode exited
+
+INVALID_HANDLE_FLAGS_STORED_IN_XIP_IMAGE		enum FatalErrors
+; Invalid bits were set in the flags for the handles of a geode in the XIP
+; image
+
+RESIDENT_RESOURCE_BEING_CHANGED_TO_BE_DISCARDED		enum FatalErrors
+; A resident resource was being marked "discarded", which is illegal
+
+
+INVALID_HANDLE_SIZE_STORED_IN_XIP_IMAGE			enum FatalErrors
+; A resource was allocated to be more than 64K
+
+
+CHANGING_SIZE_OF_RESIDENT_RESOURCE			enum FatalErrors
+; The size of a resident resource of an XIP geode changed from one launch
+; to another.
+
+
+ILLEGAL_RESOURCE_COUNT					enum FatalErrors
+; A geode had no resources, or > 0x8001 resources...
+
+INVALID_POINTER_INTO_STACK				enum FatalErrors
+; A pointer into the unused stack portion was passed to ECCheckStack
+; (DS:SI lies above TPD_stackBot, but below SP)...	
+
+NON_RESOURCE_BLOCK_BEING_SAVED_TO_STATE_FILE		enum Warnings
+; A non-resource block is being saved to the state file, which typically means
+; that someone forgot to free up a duplicated resource.
+
+
+GRAPHICS_BAD_BITMAP_FORMAT				enum FatalErrors
+; The format of the bitmap is either invalid or unsupported by the system.
+;
+
+CHUNK_ARRAY_ENUM_INSERT_OR_DELETE_RUN_BY_MULTIPLE_THREADS enum Warnings
+; Because of the way ChunkArrayEnum keeps track of nested calls,
+; simultaneous use of Enum, Insert, or Delete by multiple threads
+; is prohibited.
+;
+
+APP_DOES_NOT_HAVE_HEAP_SPACE_VALUE			enum Warnings
+; The application being loaded does not have a heapspace value set in its
+; .gp file.	
+
+ERROR_ENCOUNTERED_WHILE_WRITING_OUT_VM_BLOCK		enum Warnings
+; We were trying to limit the # handles used by a VM file, and we encountered
+; a disk error.
+
+VM_WRITE_BLOCK_SWAPPED					enum FatalErrors
+; You can't write out a swapped block, silly.
+
+VM_HANDLE_MISMATCH					enum FatalErrors
+; For some reason, calling VMLock/Unlock changed the handle stored for a
+; resident block.	
+
+THREAD_DESTROY_CALLED_FROM_MOVABLE_RESOURCE		enum Warnings
+; Someone is calling ThreadDestroy from a movable resource.  This is bad
+; since ThreadDestroy never returns and the locked movable resource containing
+; the caller will never be unlocked.  (You shouldn't call ThreadDestroy from
+; a fixed resource that is called from a movable resource either, as that
+; causes the same problem.)
+
+REQUESTED_PROC_CALL_FIXED_OR_MOVABLE_TO_LEAP_INTO_SPACE enum FatalErrors
+; The caller passed a zero for the virtual segment of ProcCallFixedOrMovable().
+; Make sure you're passing a valid virtual segment and offset for the routine.
+
+
+WARNING_NO_VIDEO_DRIVER_LOADED_YET			enum Warnings
+; We tried to turn off the screen before any video driver was loaded.
+; This should be OK, as typically the power management driver handles this.
+
+THREAD_PRIORITY_OVERFLOW				enum FatalErrors
+; A thread's priority wrapped to 0.
+
+TRAP_NOT_SET						enum FatalErrors
+; We are doing single-step debugging, and yet the trap flag *IS NOT SET*!
+
+ROUNDING_UP_GSTATE_SIZE_TO_USE_CACHE			enum Warnings
+; GState size has been rounded up to use cached gstate.
+
+BAD_ELEMENT_PASSED_TO_CHUNK_ARRAY_RESIZE		enum FatalErrors
+; The element number passed to ChunkArrayElementResize is beyond the end
+; of the chunk array.
+
+if UTILITY_MAPPING_WINDOW
+
+UTIL_WINDOW_BAD_WINDOW_NUMBER				enum FatalErrors
+; The window number passed to SysMapUtilWindow must be in the range
+; 0 -> ((number of windows returns by SysGetUtilWindowInfo) - 1)
+
+UTIL_WINDOW_UNMATCHED_UNMAP				enum FatalErrors
+; SysUnmapUtilWindow was called without a previous SysMapUtilWindow.
+
+UTIL_WINDOW_EMM_ERROR					enum FatalErrors
+; Error using EMM function for utility mapping window.
+
+UTIL_WINDOW_BAD_ADDRESS					enum FatalErrors
+; The address passed to SysMapUtilWindow must be 220000h or greater.
+
+endif
+
+if INK_DIGITIZER_COORDS
+
+IM_SETUP_DIGITIZER_COORDS_BUFFER_WAS_CALLED_TWICE	enum FatalErrors
+; and it shouldn't be. Duh.
+
+ERROR_REMOVING_DIGITIZER_COORDS_BUFFER			enum FatalErrors
+
+WARNING_MOUSE_DR_DOES_NOT_SUPPORT_SET_BUFFER		enum Warnings
+; The loaded mouse driver does not support the MOUSE_ESC_SET_BUFFER
+; escape command.
+
+INK_RECEIVED_UNEXPECTED_MSG_IM_READ_DIGITIZER_COORDS	enum FatalErrors
+; A MSG_IM_READ_DIGITIZER_COORDS was received by the InkInputMonitor
+; when it was in a state that was not expecting it.
+
+WARNING_INK_DIGITIZER_COORDS_BLOCK_FULL			enum Warnings
+; The ink digitizer coordinates notification block is full so 
+; the ink system has stoped collecting digitizer coordinates.
+
+WARNING_INK_DIGITIZER_COORDS_BLOCK_ALLOC_FAILED		enum Warnings
+; The allocation or re-alloc of the ink digitizer coordinates 
+; notification block failed.
+
+WARNING_INK_GESTURE_NOT_FULL_STROKE			enum Warnings
+; The points recognized as a gesture by an ink gesture callback 
+; are not a full stroke or multiple full strokes contrary to what 
+; the ink digitizer coords code is expecting.
+
+endif ; INK_DIGITIZER_COORDS
+
+if COMPRESSED_XIP
+
+ERROR_ATTEMPTED_TO_MAP_IN_A_COMPRESSED_XIP_RESOURCE	enum FatalErrors
+; The kernel attempted to map in a compressed XIP resource.
+; Most likely there is a problem with the XIP image.
+
+ERROR_COMPRESSED_XIP_IMAGE_IS_HOSED			enum FatalErrors
+; There's something wrong with the XIP image.
+
+endif ; COMPRESSED_XIP
+
+if COMPRESSED_VM
+
+ERROR_COMPRESSED_VM_DATA_IS_CORRUPT			enum FatalErrors
+; The compressed data in the VM block is corrupt.
+
+WARNING_COMPRESSED_VM_DATA_SIZE_IS_BIGGER		enum Warnings
+; THe compressed data size is bigger than uncompressed data size.
+
+endif ; COMPRESSED_VM
+
+ERROR_VM_BLOCK_DATA_IS_COMPRESSED			enum FatalErrors
+; The data in the VM block has been marked compressed, but this kernel
+; does not support compressed VM files.
+
+NOT_ALLOWED_TO_CALL_MOVABLE_ROUTINE_IN_INTERRUPT_CODE	enum FatalErrors
+; You are attempting to call a movable routine while in interrupt code
+; or a critical section (defined by a call to SysEnterInterrupt or
+; SysEnterCritical having been called). This is not allowed, as if the system
+; needs to bring the movable resource into memory, it needs to grab
+; semaphores, which is not allowed.
+
+if 	ERROR_CHECK
+
+RCI_CALL_WANTS_TO_LEAP_INTO_SPACE			enum FatalErrors
+PCFOM_CALL_WANTS_TO_LEAP_INTO_SPACE			enum FatalErrors
+; Either RCI or PCFOM was going to make a call to a null segment.  This
+; is a bad thing and makes backtracing impossible.  Maybe the handle
+; handle table was corrupted, or a discarded/swapped block failed to load.
+
+endif	;ERROR_CHECK
+
+if	CHECKSUM_DOS_BLOCKS
+
+DOS_BLOCK_CHECKSUM_CHANGED				enum FatalErrors
+; A DOS block has changed from the time between the last SysUnlockBIOS
+; and the current SysLockBIOS.  This means someone may be playing with
+; bytes where they shouldn't.  "p DOSBlockStruct ds:si" describes the
+; block that changed, and ax contains the new checksum.
+
+endif	;CHECKSUM_DOS_BLOCKS

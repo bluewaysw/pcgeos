@@ -1,0 +1,151 @@
+/***************************************************************************
+ *  FILE:  INIGUARD.GOH
+ ***************************************************************************/
+
+/***************************************************************************
+ *		Constants
+ ***************************************************************************/
+
+typedef word IGType ;
+#define IG_TYPE_BOOLEAN  0      /* .INI Boolean attached to GenBoolean */
+#define IG_TYPE_BITWISE  1      /* .INI Integer attached to GenBoolean */
+#define IG_TYPE_CHOICE   2      /* .INI Integer attached to GenItemGroup */
+#define IG_TYPE_COLOR    3      /* .INI List attached to special object */
+#define IG_TYPE_LIST     4      /* .INI List attached to special object */
+#define IG_TYPE_UNKNOWN  5
+
+/***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************/
+
+    /*---------------------------------------------------------------------*/
+    @class INIGuardianClass, MetaClass ;
+        /* INSTANCE DATA: */
+        @instance ChunkHandle IG_category = NullHandle ;
+        @instance ChunkHandle IG_key = NullHandle ;
+                  /* Key and category form the entry in the .INI file */
+
+        @instance optr        IG_uiObject = NullHandle ;
+                  /* uiObject tells what UI object to change and get */
+                  /* data from. */
+
+        @instance IGType      IG_entryType = IG_TYPE_BOOLEAN ;
+                  /* entry type tells not only what type of .INI category */
+                  /* is being accessed (Boolean, integer, string), but */
+                  /* also what type of UI object is attached.  See the */
+                  /* definition of IGType. */
+
+        @instance word        IG_defaultData = TRUE ;
+                  /* defaultData is the normal value for this .INI entry. */
+                  /* For a list, this is a chunk handle to the array */
+                  /* of fields. */
+
+        @instance word        IG_originalData = TRUE ;
+                  /* originalData is the originally loaded values from */
+                  /* the .INI file.  For a list, this is a chunk handle */
+                  /* the original fields. */
+
+        @instance word        IG_mask = 0xFFFF ;
+                  /* Bitwise mask to control what bits to affect */
+                  /* Used mainly by Bitwise types */
+
+        @instance word        IG_onData = TRUE ;
+                  /* onData is the value to use when the item is */
+                  /* selected.  For complex lists, this field is */
+                  /* not used. */
+
+        @instance word        IG_offData = FALSE ;
+                  /* onData is the value to use when the item is */
+                  /* not selected.  For complex lists, this field is */
+                  /* not used. */
+
+        @instance word        IG_uiState = TRUE ;
+                  /* Reflects the state of what the UI should be */
+                  /* with the current settings.  Mainly used to */
+                  /* determine if the UI object changed. */
+                  /* True/False for booleans and bitwise, */
+                  /* integer for value fields, and special for */
+                  /* complex lists. */
+
+        @instance Boolean     IG_requireReboot = FALSE ;
+                  /* Flag noting if a change .INI field requires */
+                  /* rebooting. */
+
+        @instance Boolean     IG_deleteOnFalse = FALSE ;
+                  /* Flag making the entry disappear on false entries */
+
+        /* MESSAGES: */
+        @message void MSG_INI_GUARDIAN_LOAD() ;
+                 /* Loads values from the .INI file and initializes */
+                 /* the UI object */
+
+        @message void MSG_INI_GUARDIAN_SAVE() ;
+                 /* Saves the .INI value to the .INI file */
+
+        @message void MSG_INI_GUARDIAN_REVERT() ;
+                 /* Go backs to the originalData and resets the */
+                 /* UI object. */
+
+        @message Boolean MSG_INI_GUARDIAN_CHECK_IF_CHANGED() ;
+                 /* Determines if a change has occured. */
+
+        @message Boolean MSG_INI_GUARDIAN_CHECK_IF_REQUIRE_REBOOT() ;
+                 /* Rreturns the IG_requireReboot flag. */
+
+        @message void MSG_INI_GUARDIAN_USE_DEFAULT() ;
+                 /* Set the value to the default value and updates */
+                 /* the UI accordingly. */
+
+        @message void MSG_INI_GUARDIAN_UPDATE_UI() ;
+                 /* Makes the attached UI object reflect the */
+                 /* state of the INI guardian. */
+
+        @message void MSG_INI_GUARDIAN_GET_UI_STATE() ;
+                 /* Update the G_uiState value to reflect the */
+                 /* state of the UI object */
+
+        @message void MSG_INI_GUARDIAN_CLOSE() ;
+                 /* Close out any open information.  We're about */
+                 /* to be destroyed */
+    @endc
+    /*---------------------------------------------------------------------*/
+
+/***************************************************************************
+ *		Macros
+ ***************************************************************************/
+ /* BE CAREFULL WHEN LOOKING AT THE DATA IN GUARDS.GOC --- THE ORDER
+  * IN THE DEFINE DOESN'T MATCH THE ORDER IN THE @Object  */
+
+    @define defINIGuard(NAME, CAT, KEY, OBJ, TYPE, MASK, DEFAULT, \
+                        ONDATA, OFFDATA, REQREBOOT)  \
+        @object INIGuardianClass NAME = { \
+            IG_category = CAT ; \
+            IG_key = KEY ; \
+            IG_uiObject = OBJ ; \
+            IG_entryType = TYPE ; \
+            IG_defaultData = DEFAULT ; \
+            IG_mask = MASK ; \
+            IG_onData = ONDATA ; \
+            IG_offData = OFFDATA ; \
+            IG_requireReboot = REQREBOOT ; \
+        }
+
+    @define defINIGuardDel(NAME, CAT, KEY, OBJ, TYPE, MASK, DEFAULT, \
+                        ONDATA, OFFDATA, REQREBOOT)  \
+        @object INIGuardianClass NAME = { \
+            IG_category = CAT ; \
+            IG_key = KEY ; \
+            IG_uiObject = OBJ ; \
+            IG_entryType = TYPE ; \
+            IG_defaultData = DEFAULT ; \
+            IG_mask = MASK ; \
+            IG_onData = ONDATA ; \
+            IG_offData = OFFDATA ; \
+            IG_requireReboot = REQREBOOT ; \
+            IG_deleteOnFalse = TRUE ; \
+        }
+
+/***************************************************************************
+ *  END OF FILE:  INIGUARD.GOH
+ ***************************************************************************/
+

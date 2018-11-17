@@ -1,0 +1,1521 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1994 -- All Rights Reserved
+ *
+ * PROJECT:	  Crossword
+ * MODULE:	  Crossword
+ * FILE:	  cword.ui
+ *
+ * AUTHOR:  	  Peter Trinh, Apr 29, 1994
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	PT	4/29/94   	Initial version
+ *
+ * DESCRIPTION:
+ *	This file contains definitions of objects for the Crossword 
+ *	Application. 
+ *
+ *
+ * 	$Id: cword.ui,v 1.2 98/05/19 19:30:53 joon Exp $
+ *
+ ***********************************************************************/
+
+/*-----------------------------------------------------------------------------
+	Include files
+-----------------------------------------------------------------------------*/
+#include "generic.uih"
+#include "cword.uih"
+#include "Art/mkrCword.ui"
+#include "Art/mkrCwordTiny.ui"
+#include "Art/mkrCwordDoc.ui"
+
+/*-----------------------------------------------------------------------------
+	Constants
+-----------------------------------------------------------------------------*/
+
+#define CWORD_INIT_CATEGORY     "cword"
+#define CWORD_INIT_KEY_STARTUP  "noQuickTipsOnStartup"
+
+#ifdef PRODUCT_NDO2000
+#define NDO_NO_CROSSWORD_DOWNLOAD 1
+#endif
+
+
+/*-----------------------------------------------------------------------------
+	Application object
+-----------------------------------------------------------------------------*/
+/* The very top-level generic object of an application MUST be a GenApplication
+ * object. The con.gp file contains "appobj" statement which indicates
+ * that this "CrosswordApp" object is in fact the top-level UI object.
+ * This object should be in its own resource so that GeoManager can load it
+ * quickly to grab the icon for this application. GeoManager will store this
+ * icon in its "Token Database", so that the icon image can be reused quickly.
+ */
+
+start	AppSCMonikerResource, data;
+visMoniker DatafileMonikerList = list {
+/*
+	CwordDocSCMoniker,
+	CwordDocSMMoniker,
+	CwordDocYCMoniker,
+	CwordDocYMMoniker,
+	CwordDocSCGAMoniker
+*/
+        CwordDocMoniker,
+	CwordDocTinyMoniker
+}
+
+
+end	AppSCMonikerResource;
+
+start	CwordAppResource;
+
+
+CwordApp = CwordApplication {
+	moniker = list {
+/*
+		CwordSCMoniker,
+		CwordSMMoniker,
+		CwordSCGAMoniker,
+		CwordYCMoniker,
+		CwordYMMoniker,
+		CwordTinyTCMoniker,
+		CwordTinyTMMoniker,
+		CwordTinyTCGAMoniker,
+*/
+	        CwordMoniker,
+		CwordTinyMoniker,
+		CwordTextMoniker
+	}
+	children = CwordPrimary,
+			SelectorInteraction, 
+			CompletedInteraction,
+			MightBeCompletedInteraction,
+			CwordPenInputControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = CwordPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) =
+		SelectorBox;
+	hints = {
+		HINT_APP_IS_ENTERTAINING,
+		ATTR_GEN_APPLICATION_KBD_OBJ {
+			D_OPTR	CwordPenInputControl
+		},
+		ATTR_GEN_HELP_FILE {
+		    char "crosswd", 0
+		}
+	}
+}
+
+visMoniker CwordTextMoniker = "Crossword";
+
+end	CwordAppResource;
+
+
+/*-----------------------------------------------------------------------------
+	Interface object
+-----------------------------------------------------------------------------*/
+
+start	CwordInterfaceResource;
+
+
+CwordPenInputControl = CwordGenPenInputControl {
+	attributes = default +notUserInitiatable;
+	hints = {
+		ATTR_GEN_PEN_INPUT_CONTROL_INITIATE_WHEN_ENABLED,
+		ATTR_GEN_PEN_INPUT_CONTROL_IS_FLOATING_KEYBOARD,
+		ATTR_GEN_CONTROL_PROHIBIT_UI {
+			word	mask GPICF_HWR_ENTRY_AREA or \
+				mask GPICF_CHAR_TABLE_MATH or \
+				mask GPICF_CHAR_TABLE_SYMBOLS 
+		}
+	}
+}
+
+/* Every application has at least one GenPrimary object. This object serves
+ * as the main window of the application. Inside this window, various UI
+ * components, such as menus or lists, can be placed. 
+ */
+
+CwordPrimary = GenPrimary {
+	children =
+
+#if _RESTRICTED_MENUS
+
+
+			ScreenInteraction, 
+#if _GULLIVER
+			GulliverMenuBar,
+#endif
+
+#else /* _RESTRICTED_MENUS */
+
+			FileMenu,
+			OtherMenu,
+			ScreenInteraction, 
+
+#endif /* _RESTRICTED_MENUS */
+
+			SavingInteraction, 
+			HelpInteraction;
+
+	/* We don't want to display the menu bar on startup because of  
+	 * precious space real-estate. */
+	/* For now, we do not want to support the floating keyboard. */
+	/* Make the primary is large as possible, but at the same time
+	 * keeping it on the screen. */
+	hints = {
+		HINT_DISPLAY_MENU_BAR_HIDDEN_ON_STARTUP,
+		ATTR_GEN_DISPLAY_MENU_BAR_POPPED_OUT,
+		HINT_PRIMARY_FULL_SCREEN,
+		HINT_DISPLAY_NOT_RESIZABLE,
+		ATTR_GEN_HELP_CONTEXT {
+		    char	"TOC", 0
+		}
+	}
+
+}
+
+
+/*-----------------------------------------------------------------------------
+	GenView object
+-----------------------------------------------------------------------------*/
+/* This GenView object creates a window where the application can display
+ * portions of the document as necessary. As we want this window to be
+ * scrollable, the specific UI (Motif) will create scroll bars which the
+ * user can interact with. Whenever a portion of the window needs to be
+ * redrawn, the GenView object will invalidate a portion of the window,
+ * causing a MSG_META_EXPOSED to be sent to the application. The application
+ * will draw the document into the window as requested. The window keeps
+ * track of a mask, which is used to clip the application's drawing operations,
+ * so that only the invalid portion of the window is drawn to. 
+ */
+
+CwordView = CwordGenView {
+
+	/* size of document, in points (72 points per inch). The GenView 
+	 * object will either adopt a default size, or will size itself 
+	 * to fit inside the GenPrimary window. */
+	docRight = BOARD_DEF_DOC_RIGHT;
+	docBottom = BOARD_DEF_DOC_BOTTOM;
+	backColorR = C_WHITE;  
+	
+	/* make view scrollable in X and Y.  Also, we'll keep the view
+	 * from getting larger than the content. */
+        horizAttributes = default +scrollable; 
+        vertAttributes  = default +scrollable;
+
+	horizIncrement = BOARD_DEFAULT_CELL_SIZE;
+	vertIncrement = BOARD_DEFAULT_CELL_SIZE;
+
+	hints = {
+		HINT_VIEW_REMOVE_SCROLLERS_WHEN_NOT_SCROLLABLE,
+		HINT_DEFAULT_TARGET,
+		HINT_DEFAULT_FOCUS,
+	}
+
+	output = CwordContent;
+	inkType = GVIT_QUERY_OUTPUT;
+}
+
+/* -------------------------------------------------------------------------
+	Using GenInteraction groups to layout the screen visually. 
+----------------------------------------------------------------------------*/
+
+#if !_RESTRICTED_MENUS
+FileMenu = GenInteraction {
+	moniker	= 'G', "Game";
+	children = OpenButton, SaveButton, IntroInteraction;
+	visibility = popup;
+	hints = { ATTR_GEN_INTERACTION_GROUP_TYPE \
+			{ GenInteractionGroupType GIGT_FILE_MENU } }
+}
+#endif
+
+ScreenInteraction = GenInteraction {
+	children = CwordView, NonGridInteraction;
+
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_INCLUDE_ENDS_IN_CHILD_SPACING,
+
+		HINT_IF_SYSTEM_ATTRS { word mask SA_PORTRAIT },
+			/* Portrait Layout */
+			HINT_ORIENT_CHILDREN_VERTICALLY,
+			HINT_CENTER_CHILDREN_HORIZONTALLY,
+			HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY,
+		HINT_ELSE,
+			/* Landscape Layout */
+			HINT_ORIENT_CHILDREN_HORIZONTALLY,
+			HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+			HINT_CENTER_CHILDREN_VERTICALLY,
+		HINT_ENDIF
+	}
+}
+
+NonGridInteraction = GenInteraction {
+	children =	ClueListInteraction
+#if !_GULLIVER
+/*			, ButtonInteraction */
+#endif
+			;
+
+	hints = {
+		HINT_IF_SYSTEM_ATTRS { word mask SA_PORTRAIT },
+			/* Portrait Layout */
+			HINT_ORIENT_CHILDREN_HORIZONTALLY,
+			HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ELSE,
+			/* Landscape Layout */
+			HINT_ORIENT_CHILDREN_VERTICALLY,
+			HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_ENDIF
+	}
+
+}
+
+ClueListInteraction = GenInteraction {
+	children = AcrossClueList, DownClueList;
+	hints = {
+		HINT_IF_SYSTEM_ATTRS { word mask SA_PORTRAIT },
+			/* Portrait Layout */
+			HINT_CENTER_CHILDREN_ON_MONIKERS,
+			HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ELSE,
+			/* Landscape Layout */
+			HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+			HINT_DIVIDE_HEIGHT_EQUALLY,
+		HINT_ENDIF
+	}
+}
+
+
+#if !_GULLIVER
+ButtonInteraction = GenInteraction {
+
+#if _SINGLE_CLUE_LIST
+	children = DirectionButton;
+#else
+	children = ZoomButton, VerifyButton, PuzzleButton;
+#endif
+
+	hints = {
+		HINT_INCLUDE_ENDS_IN_CHILD_SPACING,
+		HINT_IF_SYSTEM_ATTRS { word mask SA_PORTRAIT },
+			/* Portrait Layout */
+			HINT_ORIENT_CHILDREN_VERTICALLY,
+			HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY,
+			HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_ELSE,
+			/* Landscape Layout */
+			HINT_ORIENT_CHILDREN_HORIZONTALLY,
+			HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+			HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ENDIF
+	}
+}
+#endif /* !_GULLIVER && !_JEDI */
+
+
+/* ZoomButton is used to toggle between the whole puzzle screen and the
+ * large screen for writing.
+ */
+
+ZoomButton = GenTrigger {
+	moniker = 'Z',"Zoom";
+
+#if _SINGLE_CLUE_LIST
+	genStates = default -usable;
+#else
+	genStates = default -enabled;
+#endif
+
+	genAttributes = default +initiatesInputIgnore;
+	action = MSG_CGV_ZOOM_TOGGLE, CwordView;
+	hints = {
+
+
+		HINT_CENTER_MONIKER,
+		HINT_IF_SYSTEM_ATTRS { word mask SA_PORTRAIT },
+			/* Portrait Layout */
+			HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ENDIF
+	}
+}
+
+
+/* PuzzleButton is used to play a new puzzle or restore old puzzle. */
+
+PuzzleButton = GenTrigger {
+	moniker = 'P',"Puzzles";
+
+#if _SINGLE_CLUE_LIST
+	genStates = default -usable;
+#endif
+
+	action = MSG_CFB_PUZZLES_CHECK_DONE, SelectorBox;
+	hints = {
+
+
+		HINT_CENTER_MONIKER,
+		HINT_IF_SYSTEM_ATTRS { word mask SA_PORTRAIT },
+			/* Portrait Layout */
+			HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ENDIF
+	}
+}
+
+
+/* the VerifyButton is used to verify the user letter of all 
+ * non-empty cells 
+*/
+
+VerifyButton = GenTrigger {
+
+	moniker = 'C',"Check All Entries";
+
+#if _SINGLE_CLUE_LIST
+	genStates = default -usable;
+#else
+	genStates = default -enabled;
+#endif
+
+	genAttributes = default +initiatesInputIgnore;
+	action = MSG_CWORD_BOARD_VERIFY, Board;
+	hints = {
+
+
+		HINT_CENTER_MONIKER,
+		HINT_IF_SYSTEM_ATTRS { word mask SA_PORTRAIT },
+			/* Portrait Layout */
+			HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ENDIF
+	}
+}
+
+
+/* This is for toggling between the two directions of the ClueLists. */
+#if _SINGLE_CLUE_LIST
+DirectionButton = GenTrigger {
+
+	moniker = 'D',"Direction";
+
+	genAttributes = default +initiatesInputIgnore;
+	action = MSG_CWORD_BOARD_TOGGLE_CLUE_LIST, Board;
+	hints = {
+
+
+		HINT_CENTER_MONIKER,
+		HINT_IF_SYSTEM_ATTRS { word mask SA_PORTRAIT },
+			/* Portrait Layout */
+			HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ENDIF
+	}
+}
+#endif _SINGLE_CLUE_LIST
+
+#if !_RESTRICTED_MENUS
+SaveButton = GenTrigger {
+	moniker = 'S', "Save";
+	kbdAccelerator = control 's';
+	action = MSG_CFB_SAVE_BUTTON, SelectorBox;
+	genStates = default -enabled;
+}
+
+OpenButton = GenTrigger {
+	moniker = 'O', "Open...";
+	kbdAccelerator = control 'o';
+	action = MSG_CFB_PUZZLES_CHECK_DONE, SelectorBox;
+}
+#endif /* !_RESTRICTED_MENUS */
+
+
+OtherMenu = GenInteraction {
+#if _GULLIVER
+	moniker = 'F', "Functions";
+#else
+	moniker	= 'S', "Squares";
+#endif
+
+	children =
+#if _RESTRICTED_MENUS
+			CheckWordButton,
+#else
+			CheckButtonInteraction, 
+#endif
+			FindEmptyButton,
+			ClearXButton, LaunchWMatcher, ShowNumberOption;
+	visibility = popup;
+
+#if _GULLIVER
+	hints = {
+		HINT_AVOID_MENU_BAR,
+	}
+#endif
+}
+
+
+#if !_RESTRICTED_MENUS
+CheckButtonInteraction = GenInteraction {
+	children =	CheckButton, 
+			CheckWordButton;
+}
+
+CheckButton = GenTrigger {
+	moniker = 'C', "Check All";
+	genAttributes = default +initiatesInputIgnore;
+	kbdAccelerator = control 'c';
+	action = MSG_CWORD_BOARD_VERIFY, Board;
+	genStates = default -enabled;
+}
+#endif /* !_RESTRICTED_MENUS */
+
+FindEmptyButton = GenTrigger {
+	moniker = 'F', "Find Empty Square";
+	action = MSG_CWORD_BOARD_FIND_EMPTY_CELL, Board;
+	genStates = default -enabled;
+}
+
+ClearXButton = GenTrigger {
+	moniker = 'X', "Clear X Squares";
+	kbdAccelerator = control 'x';
+	action = MSG_CWORD_BOARD_CLEAR_X_CELLS, Board;
+	genStates = default -enabled;
+}
+
+LaunchWMatcher = GenTrigger 
+{
+    moniker = 'M', "Find a Matching Word...";
+    action = MSG_CWORD_PROCESS_LAUNCH_WORD_MATCHER, process;
+}
+
+ShowNumberOption = GenInteraction
+{
+    moniker = 'h', "Show Start of Words";
+    children = NumberOptions;
+    visibility = popup;
+}
+NumberOptions = GenItemGroup
+{
+    children = ShowNumber, ShowTriangle;
+    selection = "mask SHOW_NUMBER";
+    destination = Board;
+    applyMsg = MSG_CWORD_BOARD_CHANGE_SHOW_NUMBER_OPTION;
+}
+ShowNumber = GenItem {
+    moniker = "With Numbers";
+    identifier = "mask SHOW_NUMBER";
+}
+ShowTriangle = GenItem {
+    moniker = "With Triangles";
+    identifier = "mask SHOW_TRIANGLE";
+}
+
+CheckWordButton = GenTrigger {
+	moniker = 'W', "Check Word";
+	kbdAccelerator = control 'w';
+	action = MSG_CWORD_BOARD_VERIFY_WORD, Board;
+	genStates = default -enabled;
+}
+
+ClearButton = GenInteraction {
+	moniker = 't', "Start Over";
+	children = 	ClearAllQueryText, 
+			YesTrigger, 
+			NoTrigger;
+	attributes = default +modal;
+	genAttributes = default +initiatesInputIgnore;
+	visibility = dialog;
+	genStates = default -enabled;
+	hints = {
+		HINT_WINDOW_NO_SYS_MENU
+	}
+
+}
+
+ClearAllQueryText = GenText {
+	text = "Are you sure you want to start over?  If you do, all the letters in the puzzle will be erased and you will not be able to recover them.";
+	textDisplayAttributes = default -useTabForNavigation;
+	genAttributes = default +readOnly;
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+YesTrigger = GenTrigger {
+	moniker = 'S', "Start Over";
+	genAttributes = signalInteractionComplete;
+	hints = {HINT_SEEK_REPLY_BAR, HINT_TRIGGER_DESTRUCTIVE_ACTION}
+	action = MSG_CWORD_BOARD_CLEAR_PUZZLE, Board;
+}
+
+NoTrigger = GenTrigger {
+	moniker = 'D', "Don't Start Over";
+	genAttributes = signalInteractionComplete;
+	hints = {HINT_SEEK_REPLY_BAR}
+}
+
+#if _GULLIVER
+GulliverMenuBar = GenInteraction {
+	children = ViewTriggersInteraction, FunctionTriggersInteraction;
+	hints = {
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+	}
+}
+
+ViewTriggersInteraction = GenInteraction {
+	children = IntroInteraction, ZoomButton;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+	}
+}
+
+FunctionTriggersInteraction = GenInteraction {
+	children = 	OtherMenu, PuzzleButton, VerifyButton
+
+#if _SINGLE_CLUE_LIST
+			, DirectionButton
+#endif
+			;
+
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+#endif /* _GULLIVER */
+
+end	CwordInterfaceResource;
+
+
+start	CwordFileResource, notDetachable;
+
+IntroInteraction = GenInteraction {
+    children = MyIntroInteraction, /*QuickTipButton, */ClearButton
+/*#ifndef NDO_NO_CROSSWORD_DOWNLOAD
+	       ,URLInteraction
+/*#endif */
+	       ;
+}
+
+
+/*#ifndef NDO_NO_CROSSWORD_DOWNLOAD
+URLInteraction = GenInteraction {
+	moniker 	= 'G', "Get new puzzles from Internet";
+
+	visibility 	= dialog;
+	attributes 	= default +modal;
+	children 	= CWordURLText, CWordLoadURL, CWordCancel;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_CENTER_CHILDREN_ON_MONIKERS
+	}
+}
+
+CWordURLText = GenText {
+	text = "You can quickly download new puzzles from MyTurn.com.  There's a new puzzle available for free every week!  Press the \\\"Connect\\\" button to take a look at the available puzzles.";
+	textDisplayAttributes = default -useTabForNavigation;
+	genAttributes = default +readOnly;
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+CWordLoadURL = GenTrigger {
+    moniker = 'C', "Connect";
+    genAttributes = default +signalInteractionComplete; 
+    action = MSG_CWORD_PROCESS_LAUNCH_WEB_BROWSER, process;
+    hints = {
+	HINT_SEEK_REPLY_BAR
+    }
+}
+
+CWordCancel = GenTrigger {
+    moniker = 'D', "Don't Connect";
+    genAttributes = signalInteractionComplete;
+    hints = {
+	HINT_SEEK_REPLY_BAR,
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND {WORD IC_DISMISS}
+    }
+}
+/*#endif  */
+
+MyIntroInteraction = GenInteraction {
+	moniker 	= 'P', "Puzzle Info";
+
+	visibility 	= dialog;
+	attributes 	= default +modal;
+	children 	= CopyrightText, 
+			  TitleText, 
+			  AuthorText,
+			  SourceText,
+			  RatingText,
+			  SizeText,
+			  VeryInterestingTrigger;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_CENTER_CHILDREN_ON_MONIKERS
+	}
+}
+
+QuickTipButton = GenTrigger {
+	moniker = 'Q', "Quick Tips...";
+	action = MSG_GEN_INTERACTION_INITIATE, HelpInteraction;
+}
+
+CopyrightText = GenText {
+	moniker = "Copyright: ";
+	text = "None";
+	textDisplayAttributes = default -useTabForNavigation;
+	genAttributes = default +readOnly;
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE,
+		HINT_PLACE_MONIKER_TO_LEFT
+	}
+}
+
+TitleText = GenText {
+	/* Turned this off because the titles now can have little to
+	 * do with what is contained in the file. -Don 3/18/00    */
+	genStates = default -usable;
+	moniker = "Title: ";
+	text = "No Title";
+	textDisplayAttributes = default -useTabForNavigation;
+	genAttributes = default +readOnly;
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE,
+		HINT_PLACE_MONIKER_TO_LEFT
+	}
+}
+
+AuthorText = GenText {
+	moniker = "Author: ";
+	text = "Unknown";
+	textDisplayAttributes = default -useTabForNavigation;
+	genAttributes = default +readOnly;
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE,
+		HINT_PLACE_MONIKER_TO_LEFT
+	}
+}
+
+SourceText = GenText {
+	moniker = "Source: ";
+	text = "Unknown";
+	textDisplayAttributes = default -useTabForNavigation;
+	genAttributes = default +readOnly;
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE,
+		HINT_PLACE_MONIKER_TO_LEFT
+	}
+}
+
+RatingText = GenText {
+	moniker = "Rating: ";
+	text = "Not rated";
+	textDisplayAttributes = default -useTabForNavigation;
+	genAttributes = default +readOnly;
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE,
+		HINT_PLACE_MONIKER_TO_LEFT
+	}
+}
+
+SizeText = GenText {
+	moniker = "Size: ";
+	text = "Default";
+	textDisplayAttributes = default -useTabForNavigation;
+	genAttributes = default +readOnly;
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE,
+		HINT_PLACE_MONIKER_TO_LEFT
+	}
+}
+
+VeryInterestingTrigger = GenTrigger {
+	moniker = 'O', "OK";
+	genAttributes = signalInteractionComplete;
+	hints = {HINT_SEEK_REPLY_BAR}
+}
+
+SavingInteraction = GenInteraction {
+	children = SaveGlyph;
+	type = organizational;
+	visibility = dialog;
+	attributes = default +notUserInitiatable, +modal;
+	hints = {
+		HINT_WINDOW_NO_TITLE_BAR
+	}
+}
+
+SaveGlyph = GenGlyph {
+	moniker = "Saving current puzzle ...";
+}
+
+SelectorInteraction = CwordFileSelectorInteraction {
+	moniker = "Open";
+	children = PuzzleGlyph, CwordSelector, SelectorChoiceList, Ok, Cancel;
+	attributes = default +modal;
+	visibility = dialog;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_WINDOW_NO_SYS_MENU
+	}
+}
+
+PuzzleGlyph = GenGlyph {
+	moniker = "Select A Puzzle To Play";
+}
+
+CwordSelector = CwordFilteredFileSelector {
+	action = MSG_CFB_FILE_SELECTED, SelectorBox;
+	fileCriteria = dirs, geosNonExecutables, fileFilter;
+/*	attributes = default +useVirtualRoot, -hasDocumentButton, \
+			-hasChangeDriveList, -hasChangeDirectoryList; */
+        hints = {
+/*		ATTR_GEN_FILE_SELECTOR_VIRTUAL_ROOT {
+/*if _NDO2000 or _BBXENSEM
+								GenFilePath <SP_DOCUMENT, CwordRootDirectory>
+/*else
+                        GenFilePath <SP_USER_DATA, "Crossword Puzzles">
+/*endif
+                },
+                ATTR_GEN_PATH_DATA {
+/*if _NDO2000
+								GenFilePath <SP_DOCUMENT, CwordRootDirectory>
+/*else
+                        GenFilePath <SP_USER_DATA, "Crossword Puzzles">
+/*endif
+		}, */
+		ATTR_GEN_FILE_SELECTOR_TOKEN_MATCH {
+			GeodeToken <"CW00", MANUFACTURER_ID_GEOWORKS>
+		},
+		HINT_FILE_SELECTOR_FILE_LIST_WIDTH {word 37},
+		HINT_PLACE_MONIKER_ABOVE
+        }
+}
+
+
+SelectorChoiceList = GenItemGroup {
+	children = 	ChoiceInProgressItem, 
+			ChoiceNotInProgressItem, 
+			ChoiceCompletedItem;
+	selection = CFFST_IN_PROGRESS;
+	destination = CwordSelector;
+	applyMsg = MSG_CFFS_SET_MODE;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY
+	}
+}
+
+ChoiceInProgressItem = GenItem {
+	moniker = "Show Puzzles In Progress";
+	identifier = CFFST_IN_PROGRESS;
+}
+
+ChoiceNotInProgressItem = GenItem {
+	moniker = "Show New Puzzles";
+	identifier = CFFST_NEVER_STARTED;
+}
+
+ChoiceCompletedItem = GenItem {
+	moniker = "Show Completed Puzzles";
+	identifier = CFFST_COMPLETED;
+}
+
+
+
+Ok = GenTrigger {
+	moniker = 'P', "Play Puzzle";
+	action = MSG_CFB_OK, SelectorBox;
+	genAttributes = signalInteractionComplete;
+	hints = {
+		HINT_DEFAULT_DEFAULT_ACTION,
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_ACTION_DATA { word 0}
+	}
+}
+
+Cancel = GenTrigger {
+	moniker = 'C', "Cancel";
+	genAttributes = signalInteractionComplete;
+	hints = {HINT_SEEK_REPLY_BAR}
+}
+
+
+
+CompletedInteraction = GenInteraction {
+	moniker = "Congratulations";
+	children = 	CompletedText, 
+			MarkCompletedTrigger,
+			DeleteTrigger,
+			CancelTrigger; 
+	attributes = default +modal;
+	visibility = dialog;
+}
+
+CompletedText = GenText {
+	text = "You can mark this puzzle as completed so that you can play it again from scratch. \\\r\\\rOr, you can delete the original puzzle to free up space. If you choose Delete, you will not be able to play the puzzle again. ";
+	textDisplayAttributes = default -useTabForNavigation;
+	genAttributes = default +readOnly;
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+DeleteTrigger = GenTrigger {
+	moniker = 'D', "Delete";
+	genAttributes = signalInteractionComplete;
+	hints = {HINT_SEEK_REPLY_BAR}
+	action = MSG_CFB_DELETE, SelectorBox;
+}
+
+MarkCompletedTrigger = GenTrigger {
+	moniker = 'M', "Mark Completed";
+	genAttributes = signalInteractionComplete;
+	hints = {HINT_SEEK_REPLY_BAR}
+	action = MSG_CFB_MARK_COMPLETED, SelectorBox;
+}
+
+CancelTrigger = GenTrigger {
+	moniker = 'C', "Cancel";
+	genAttributes = signalInteractionComplete;
+	hints = {HINT_SEEK_REPLY_BAR}
+	action = MSG_CFB_SAVE_BUTTON, SelectorBox;
+}
+
+
+MightBeCompletedInteraction = GenInteraction {
+	moniker = "Are You Finished?";
+	children = 	MightBeCompletedText, 
+			MightBeAllDoneTrigger, 
+			MightBeFinishLaterTrigger;
+	attributes = default +modal;
+	visibility = dialog;
+}
+
+MightBeCompletedText = GenText {
+	text = "All the squares have been filled in. \\\r\\\rIf you are satisfied with your answers, choose All Done. \\\r\\\rIf you want to finish the puzzle later, choose Finish Later.\\\r"; 
+	textDisplayAttributes = default -useTabForNavigation;
+	genAttributes = default +readOnly;
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+
+MightBeAllDoneTrigger = GenTrigger {
+	moniker = 'A', "All Done";
+	genAttributes = signalInteractionComplete;
+	hints = {HINT_SEEK_REPLY_BAR}
+	action = MSG_GEN_INTERACTION_INITIATE, CompletedInteraction;
+}
+
+MightBeFinishLaterTrigger = GenTrigger {
+	moniker = 'F', "Finish Later";
+	genAttributes = signalInteractionComplete;
+	hints = {HINT_SEEK_REPLY_BAR}
+	action = MSG_CFB_PUZZLES_SAVE, SelectorBox;
+}
+
+
+
+end	CwordFileResource;
+
+start	CwordQuickTipsResource, notDetachable;
+#include "Art/mkrQtipsKeyQuestion.ui"
+#include "Art/mkrQtipsKeyClue.ui"
+#include "Art/mkrQtipsKeyTapTap.ui"
+#include "Art/mkrQtipsKeyTap.ui"
+#include "Art/mkrQtipsKeyDelete.ui"
+
+#ifdef PEN_POSSIBLE
+#include "Art/mkrQtipsPenQuestion.ui"
+#include "Art/mkrQtipsPenClue.ui"
+#include "Art/mkrQtipsPenLarger.ui"
+#include "Art/mkrQtipsPenTap.ui"
+#include "Art/mkrQtipsPenMinus.ui"
+#endif
+
+HelpInteraction = GenInteraction {
+	moniker = " Quick Tips ";
+	attributes	= default +notUserInitiatable, +modal;	
+	type		= multipleResponse;
+	visibility	= dialog;
+	children = 	KeyboardQuickTips,
+#if PEN_POSSIBLE
+			PenQuickTips,
+#endif
+		  ShowOnStartupGroup,
+				 OKTipsButton,
+			LetsPlayButton;
+
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		ATTR_GEN_HELP_CONTEXT {
+		    char	"TOC", 0
+		}
+	}
+}
+
+ShowOnStartupGroup = GenBooleanGroup {
+    children = ShowOnStartupBoolean;
+}
+
+ShowOnStartupBoolean = GenBoolean {
+    moniker = 'S', "Show this Dialog box when Crossword starts";
+    identifier = SHOW_ON_STARTUP;
+}
+
+LetsPlayButton = GenTrigger {
+	moniker = "Let's Play";
+	action = MSG_CFB_LOAD_LAST_PUZZLE_PLAYED, SelectorBox;
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		HINT_DEFAULT_DEFAULT_ACTION,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {WORD IC_OK}
+	}
+}
+
+OKTipsButton = GenTrigger {
+	moniker = 'O', "OK";
+	genStates = default -usable;
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {WORD IC_DISMISS}
+	}
+}
+
+KeyboardQuickTips = GenInteraction {
+	children =	KeyboardTapSquare,
+			KeyboardTapSquareAgain,
+			KeyboardTapClue,
+			KeyboardDelete,
+			KeyboardQuestionMark;
+	type	= organizational;
+}
+
+KeyboardQuestionMark = GenInteraction {
+	children = KeyboardQuestionMarkGlyph,KeyboardQuestionMarkText;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY
+	}
+}
+
+KeyboardQuestionMarkGlyph = GenGlyph {
+	moniker = list {
+		QtipsKeyQuestionSMMoniker 
+	}
+	hints = {
+	    HINT_FIXED_SIZE {
+		SpecWidth < SST_PIXELS, 40 >
+		SpecHeight<>
+	    }
+	}
+}
+
+KeyboardQuestionMarkText = GenText {
+	text = "Type a ? in a square and you will be given the correct letter.";
+	textDisplayAttributes = default -useTabForNavigation;
+	genAttributes = default +readOnly;
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+
+KeyboardTapSquare = GenInteraction {
+	children = KeyboardTapSquareGlyph,KeyboardTapSquareText;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY
+	}
+}
+
+KeyboardTapSquareGlyph = GenGlyph {
+	moniker = list {
+		QtipsKeyTapSMMoniker 
+	}
+	hints = {
+	    HINT_FIXED_SIZE {
+		SpecWidth < SST_PIXELS, 40 >
+		SpecHeight<>
+	    }
+	}
+}
+
+KeyboardTapSquareText = GenText {
+	text = "Click on a square to highlight the corresponding clue.";
+	textDisplayAttributes = default -useTabForNavigation;
+	genAttributes = default +readOnly;
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+KeyboardTapClue = GenInteraction {
+	children = KeyboardTapClueGlyph,KeyboardTapClueText;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY
+	}
+}
+
+KeyboardTapClueGlyph = GenGlyph {
+	moniker = list {
+		QtipsKeyClueSMMoniker
+	}
+	hints = {
+	    HINT_FIXED_SIZE {
+		SpecWidth < SST_PIXELS, 40 >
+		SpecHeight<>
+	    }
+	}
+}
+
+KeyboardTapClueText = GenText {
+	text = "Click on an Across or Down clue to highlight the corresponding squares.";
+	textDisplayAttributes = default -useTabForNavigation;
+	genAttributes = default +readOnly;
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+
+KeyboardTapSquareAgain = GenInteraction {
+	children = KeyboardTapSquareAgainGlyph,KeyboardTapSquareAgainText;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY
+	}
+}
+
+KeyboardTapSquareAgainGlyph = GenGlyph {
+	moniker = list {
+		QtipsKeyTapTapSMMoniker
+	}
+	hints = {
+	    HINT_FIXED_SIZE {
+		SpecWidth < SST_PIXELS, 40 >
+		SpecHeight<>
+	    }
+	}
+}
+
+KeyboardTapSquareAgainText = GenText {
+	text = "Click on the square again to switch the direction.";
+	textDisplayAttributes = default -useTabForNavigation;
+	genAttributes = default +readOnly;
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+KeyboardDelete = GenInteraction {
+	children = KeyboardDeleteGlyph,KeyboardDeleteText;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY
+	}
+}
+
+KeyboardDeleteGlyph = GenGlyph {
+	moniker = list {
+		QtipsKeyDeleteSMMoniker 
+	}
+	hints = {
+	    HINT_FIXED_SIZE {
+		SpecWidth < SST_PIXELS, 40 >
+		SpecHeight<>
+	    }
+	}
+}
+
+KeyboardDeleteText = GenText {
+	text = "Use the Backspace, Delete or Spacebar to erase letters.";
+	textDisplayAttributes = default -useTabForNavigation;
+	genAttributes = default +readOnly;
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+
+#if PEN_POSSIBLE
+PenQuickTips = GenInteraction {
+	children =	PenTapSquare,
+			PenTapClue,
+			PenDrawLargerThanSquare,
+			PenDelete,
+			PenQuestionMark;
+	type	= organizational;
+	hints = {
+		HINT_IF_SYSTEM_ATTRS { word mask SA_VERTICALLY_TINY },
+			HINT_CUSTOM_CHILD_SPACING {
+				SpecSizeSpec< SST_PIXELS, 5 >
+			},
+		HINT_ENDIF
+	}
+}
+
+PenDrawLargerThanSquare = GenInteraction {
+	children = PenDrawLargerThanSquareGlyph,PenDrawLargerThanSquareText;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY
+	}
+}
+
+PenDrawLargerThanSquareGlyph = GenGlyph {
+	moniker = QtipsPenLargerSMMoniker;
+}
+
+PenDrawLargerThanSquareText = GenText {
+	text = "You may draw your letters larger than the squares.";
+	textDisplayAttributes = default -useTabForNavigation;
+	genAttributes = default +readOnly;
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+PenQuestionMark = GenInteraction {
+	children = PenQuestionMarkGlyph,PenQuestionMarkText;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY
+	}
+}
+
+PenQuestionMarkGlyph = GenGlyph {
+	moniker = QtipsPenQuestionSMMoniker;
+}
+
+PenQuestionMarkText = GenText {
+	text = "Draw a ? on a square to get the correct letter.";
+	textDisplayAttributes = default -useTabForNavigation;
+	genAttributes = default +readOnly;
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+PenDelete = GenInteraction {
+	children = PenDeleteGlyph,PenDeleteText;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY
+	}
+}
+
+PenDeleteGlyph = GenGlyph {
+	moniker = QtipsPenMinusSMMoniker;
+}
+
+PenDeleteText = GenText {
+	text = "Draw a horizontal dash to delete a letter.";
+	textDisplayAttributes = default -useTabForNavigation;
+	genAttributes = default +readOnly;
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+
+PenTapClue = GenInteraction {
+	children = PenTapClueGlyph,PenTapClueText;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY
+	}
+}
+
+PenTapClueGlyph = GenGlyph {
+	moniker = QtipsPenClueSMMoniker;
+}
+
+PenTapClueText = GenText {
+	text = "Tap on an across or down clue to highlight the corresponding squares.";
+	textDisplayAttributes = default -useTabForNavigation;
+	genAttributes = default +readOnly;
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+
+PenTapSquare = GenInteraction {
+	children = PenTapSquareGlyph,PenTapSquareText;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY
+	}
+}
+
+PenTapSquareGlyph = GenGlyph {
+	moniker = QtipsPenTapSMMoniker;
+}
+
+PenTapSquareText = GenText {
+	text = "Tap on a square to highlight the corresponding clues.";
+	textDisplayAttributes = default -useTabForNavigation;
+	genAttributes = default +readOnly;
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+#endif /* PEN_POSSIBLE */
+
+end	CwordQuickTipsResource;
+
+start	CwordClueListResource, notDetachable;
+
+/* AcrossClueList - is a scrollable list that will display all the Across 
+   clues. */
+AcrossClueList = CwordClueList {
+	moniker = "Across";
+	hints = {
+		HINT_ITEM_GROUP_SCROLLABLE,
+		ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION,
+
+		HINT_IF_SYSTEM_ATTRS { word mask SA_PORTRAIT },
+			/* Portrait Layout */
+			HINT_FIXED_SIZE {
+				SpecWidth<>
+				SpecHeight<SST_LINES_OF_TEXT, CLUE_LIST_MIN_ITEMS_DISPLAYED>
+				word CLUE_LIST_MIN_ITEMS_DISPLAYED
+			},
+			HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+#if _SINGLE_CLUE_LIST
+			HINT_PLACE_MONIKER_ABOVE,
+#endif
+		HINT_ELSE,
+			/* Landscape Layout */
+			HINT_FIXED_SIZE {
+				SpecWidth< SST_PCT_OF_FIELD_WIDTH, PCT_35 >
+				SpecHeight<>
+			},
+			HINT_PLACE_MONIKER_ABOVE,
+			HINT_EXPAND_HEIGHT_TO_FIT_PARENT,	
+		HINT_ENDIF,
+	}
+
+	behaviorType = nonExclusive;
+	queryMsg = MSG_CWORD_CLUE_LIST_QUERY_MSG;
+	applyMsg = MSG_CWORD_CLUE_LIST_APPLY_MSG;
+	destination = AcrossClueList;
+	direction = across;
+}
+
+
+/* DownClueList - is a scrollable list that will display all the Down clues. */
+DownClueList = CwordClueList {
+	moniker = "Down";
+
+	hints = {
+		HINT_ITEM_GROUP_SCROLLABLE,
+		ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION,
+		HINT_IF_SYSTEM_ATTRS { word mask SA_PORTRAIT },
+			/* Portrait Layout */
+			HINT_FIXED_SIZE {
+				SpecWidth<>
+				SpecHeight<SST_LINES_OF_TEXT, CLUE_LIST_MIN_ITEMS_DISPLAYED>
+				word CLUE_LIST_MIN_ITEMS_DISPLAYED
+			},
+			HINT_EXPAND_WIDTH_TO_FIT_PARENT,	
+#if _SINGLE_CLUE_LIST
+			HINT_PLACE_MONIKER_ABOVE,
+#endif
+		HINT_ELSE,
+			/* Landscape Layout */
+			HINT_FIXED_SIZE {
+				SpecWidth< SST_PCT_OF_FIELD_WIDTH, PCT_35 >
+				SpecHeight<>
+			},
+			HINT_PLACE_MONIKER_ABOVE,
+			HINT_EXPAND_HEIGHT_TO_FIT_PARENT,	
+		HINT_ENDIF
+	}
+
+	behaviorType = nonExclusive;
+	queryMsg = MSG_CWORD_CLUE_LIST_QUERY_MSG;
+	applyMsg = MSG_CWORD_CLUE_LIST_APPLY_MSG;
+	destination = DownClueList;
+	direction = down;
+}
+
+end	CwordClueListResource;
+
+
+
+start	CwordVisResource, notDetachable;
+
+/*-----------------------------------------------------------------------------
+	VisContent object
+-----------------------------------------------------------------------------*/
+/* The VisContent object is the head of the visible trees and interact 
+ * with the GenView object.  The VisContent object is necessary for 
+ * displaying visible objects in a view. 
+ */
+
+CwordContent = CwordVisContent {
+	children = Board;
+	right = BOARD_DEF_DOC_RIGHT;
+	bottom = BOARD_DEF_DOC_BOTTOM;
+}
+
+
+/*-----------------------------------------------------------------------------
+	Board object
+-----------------------------------------------------------------------------*/
+/* Our Board is a subclass of VisClass.  It maintains additional instance
+ * data necessary for the game.
+*/
+
+Board = CwordBoard {
+	/* We want the size of the Board to be the size of grids, including
+ 	 * the four surrounding borders. */
+	right = BOARD_DEF_DOC_RIGHT;
+	bottom = BOARD_DEF_DOC_BOTTOM;
+}
+
+
+/*---------------------------------------------------------------------------
+	File object
+---------------------------------------------------------------------------*/
+
+SelectorBox = CwordFileBox {
+}
+
+end	CwordVisResource;
+
+
+start	CwordStrings, data;
+
+chunk	CoolText = "COOL";
+localize "one of the five congratulatory words";
+chunk	FinisText = "FINIS";
+localize "one of the five congratulatory words";
+chunk	RadText = "RAD";
+localize "one of the five congratulatory words";
+chunk	DoneText = "DONE";
+localize "one of the five congratulatory words";
+chunk	YesText = "YES";
+localize "one of the five congratulatory words";
+
+chunk	CwordSourceDirectory = "Crossword Puzzles";
+localize "the folder in Documents puzzles are kept";
+chunk nullPath = "";
+localize not;
+chunk	InternetSourceDirectory = "impdoc";
+localize not;
+
+chunk	UserDocName = "Crossword Puzzle Solutions";
+
+chunk	VMFileErr = "User Solution VM document error.";
+
+chunk	CreateUserErr = "Error in creating user solution document.";
+
+chunk	CwordChunkArrayCreateErr = "Internal Chunk Array Error.";
+
+chunk	CwordInitFailedErr = "The Board and/or the ClueList failed to "
+	"initialize properly.  Please restart game.";
+
+chunk	DirectoryErr = "The directory Crossword Puzzles could not be "
+		"created under the DOCUMENT directory.";
+
+
+/* Trouble loading source file */
+
+
+chunk	CwordFileErr = "Cannot find the source file for the last puzzle played. Perhaps it has been moved or deleted.";
+
+chunk	CwordSourceErr = "The puzzle you have selected has a corrupt "
+		"source file.  Please select another puzzle.";
+
+/* Protocol Errors */
+
+chunk	UpgradeErr = "Please upgrade your application to the newest "
+		"version. Exiting Crossword...";
+
+chunk	ProtocolErr = "The puzzle you have selected "
+	  "has a version that is not supported, and therefore "
+	  "cannot be opened.  Please select another puzzle.";
+
+chunk	DeleteUserProtocolErr = "The puzzle solutions currently saved "
+	"are in an older format. These older solutions will be erased so that "
+	"you can save new solutions.";
+
+
+
+/* Bad source file problems */
+
+chunk	BytesErr = "The number of digits in the number of compressed "
+	"bytes is too large.  The source file is corrupt.  Please "
+	"select another puzzle." ;
+
+chunk	GridErr = "The selected puzzle is not valid.  The size of the "
+		"puzzle grid should be between 10x10 and 25x25.";
+
+
+
+/* Low on memory problems */
+
+chunk	CwordMemErr = "Not enough memory for the Crossword Game to run.";
+
+chunk	CCLLowMemErr = "A ClueList can't build its Map. The system is "
+	"LOW ON MEMORY.";
+
+chunk	CCLLowMemWarn = "ClueList can't display the requested item because "
+	"the system is LOW ON MEMORY.";
+
+chunk	CCLAppendErr = "ClueList can't append new items to its Map.  "
+	"Perhaps the system is LOW ON MEMORY.";
+
+chunk	HWRLowMemWarn = "Just lost last series of written text.  The HWR "
+	"module was unable to create a TextQueue.  Please re-write text.  "
+	"The system is LOW ON MEMORY, so free up memory to avoid this "
+	"problem.";
+
+chunk	HWRTextQueueAppendWarn = "Just lost a character, because couldn't "
+	"append recognized character to the TextQueue.  Please re-write "
+	"text.  Perhaps the system is LOW ON MEMORY.";
+
+
+/* Ini file key setting */
+chunk   CWordCategory = CWORD_INIT_CATEGORY;
+localize not;
+chunk   CWordKey = "url";
+localize not;
+chunk   CWordStartupKey = CWORD_INIT_KEY_STARTUP;
+localize not;
+
+
+/*---------------------------------------------------------------------------
+	The Cword Charater Set
+---------------------------------------------------------------------------*/
+
+
+chunk	HWREnabledChars = "AZaz";
+localize "The character ranges that the handwriting library will recognize. The characters must be in pairs and the first character of each pair must have a lower ascii value";
+
+chunk	KBDEnabledAlpha = "AZaz";
+localize "The character ranges that a cell will accept as input. The characters must be in pairs and the first character of each pair must have a lower ascii value";
+
+end	CwordStrings;
+
+
+
+
+
+
+

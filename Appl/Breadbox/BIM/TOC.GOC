@@ -1,0 +1,1823 @@
+@include <stdapp.goh>
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+#include <sound.h>
+
+@include "aim.goh"
+@include "toc.goh"
+@include "extern.goh"
+@include "toccfg.goh"
+@include "error.goh"
+@ifndef USE_LIST
+@include "simptree.goh"
+@endif
+
+#include "miscfunc.h"
+
+/**********************************************************************
+ * Typedefs, Defines, Enums, Structs...
+ **********************************************************************/
+
+typedef ByteFlags OnlineBuddyStatusFlags;
+#define OBSF_ARRIVED     0x01
+#define OBSF_DEPARTED    0x02
+#define OBSF_AWAY        0x04
+#define OBSF_ONLINE      0x08
+
+#define OBSF_ADMASK ( OBSF_ARRIVED | OBSF_DEPARTED )
+
+typedef ByteEnum OnlineBuddyUserClassEnum;
+#define OBUCE_NONE               0x00
+#define OBUCE_AOL                0x01
+#define OBUCE_OSCAR_ADMIN        0x02
+#define OBUCE_OSCAR_UNCONFIRMED  0x03
+#define OBUCE_OSCAR_NORMAL       0x04
+
+/* OnlineBuddyStruct used for the online buddy list.  Reflects active user
+   information and is updated by TOC. */
+
+typedef struct
+{
+    BuddyName BS_name;                      /* Buddy name */
+    word BS_group;                          /* Index of group to which buddy belongs */
+    dword BS_signon;                        /* Signon time */
+    OnlineBuddyStatusFlags BS_status;       /* Arrived/Departed/Away */
+    word BS_idle;                           /* Idle time */
+    word BS_evil;                           /* Evil */
+    OnlineBuddyUserClassEnum BS_class;      /* User Class */
+}
+OnlineBuddyStruct;
+
+/* IMWindowStruct used for the buddy window list.  Reflects on-screen
+   IM windows and is maintained by us. */
+   
+typedef struct
+{
+    BuddyName IMWS_name;                    /* Buddy name */
+    optr IMWS_window;                       /* Object pointer to window */
+}
+IMWindowStruct;
+
+#define INVALID_BUDDY   (CA_NULL_ELEMENT)
+#define INVALID_WINDOW  (CA_NULL_ELEMENT)
+
+#define MAX_ONLINE_BUDDY_LIST_SIZE  100
+#define MAX_WINDOW_LIST             100
+
+typedef ByteEnum TocNoiseEnum;
+#define TNE_ARRIVED     0x01
+#define TNE_DEPARTED    0x02
+#define TNE_IM_IN       0x03
+
+/**********************************************************************
+ * Globals
+ **********************************************************************/
+
+optr OnlineBuddyList = NullOptr;
+optr IMWindowList = NullOptr;
+MemHandle TocNoiseControl = NullHandle;
+
+/**********************************************************************
+ * Resources
+ **********************************************************************/
+
+@start TocStringResource, data;
+@chunk char TocCmdIMIn[] = "IM_IN";
+@localize not;
+@chunk char TocCmdUpdateBuddy[] = "UPDATE_BUDDY";
+@localize not;
+@chunk char TocCmdSendIM[] = "toc_send_im";
+@localize not;
+@chunk char TocCmdNick[] = "NICK";
+@localize not;
+@chunk char TocCmdConfig[] = "CONFIG";
+@localize not;
+@chunk char TocCmdAddBuddy[] = "toc_add_buddy";
+@localize not;
+@chunk char TocCmdRemoveBuddy[] = "toc_remove_buddy";
+@localize not;
+@chunk char TocCmdSetConfig[] = "toc_set_config";
+@localize not;
+@chunk char TocCmdAddPermit[] = "toc_add_permit";
+@localize not;
+@chunk char TocCmdAddDeny[] = "toc_add_deny";
+@localize not;
+@chunk char TocCmdError[] = "ERROR";
+@localize not;
+@chunk char TocCmdSignOn[] = "SIGN_ON";
+@localize not;
+@chunk char TocErrorSeparator[] = "********\r";
+#define TOC_ERROR_SEPARATOR_SIZE    9
+@chunk char TocCmdInitDone[] = "toc_init_done";
+@localize not;
+@end TocStringResource;
+
+@start TocNoiseResource, data;
+@chunk word TocNoiseArrived[] = {
+	ChangeEnvelope( 0, IP_MARIMBA, IT_STANDARD_TABLE ), 
+	DeltaTick(  1 ),
+	VoiceOn(    0, MIDDLE_G, DYNAMIC_F ),
+	DeltaTick(	20 ),
+	VoiceOff(	0 ),
+	DeltaTick(	5 ),
+	VoiceOn(	0, MIDDLE_E, DYNAMIC_F ),
+	DeltaTick(	20 ),
+	VoiceOff(	0 ),
+	General(	GE_END_OF_SONG )
+};
+@chunk word TocNoiseDeparted[] = {
+    ChangeEnvelope( 0, IP_ACOUSTIC_BASS, IT_STANDARD_TABLE ),
+    DeltaTick(  1 ),
+    VoiceOn(    0, LOW_G, DYNAMIC_MP ),
+    DeltaTick(  7 ),
+    VoiceOff(   0 ),
+    DeltaTick(  2 ),
+    VoiceOn(    0, LOW_C, DYNAMIC_MP ),
+    DeltaTick(  7 ),
+    VoiceOff(   0 ),
+	General(	GE_END_OF_SONG )
+};
+@end TocNoiseResource;    
+
+/**********************************************************************
+ * Function Declarations
+ **********************************************************************/
+Boolean TocUpdateBuddy(char *arg);
+Boolean TocIMIn(char *arg);
+Boolean TocNick(char *arg, TocConnectionData *tcd);
+Boolean TocConfig(char *arg, TocConnectionData *tcd);
+Boolean TocConfigSendList(TocConnectionData *tcd, optr command,
+                          ConfigEnumStruct *ces);
+void    TocError(char *arg);
+Boolean TocInitDone(TocConnectionData *tcd);
+Boolean TocSignOn(TocConnectionData *tcd);
+void    TocMakeNoise(TocNoiseEnum sound);
+
+Boolean TocUpdateFromConfig(TocConnectionData *tcd);
+Boolean TocUpdatePDFromConfig(TocConnectionData *tcd, Boolean bInit);
+Boolean TocSendConfig(TocConnectionData *tcd);
+
+word FindBuddy(BuddyName name);
+word AddBuddy(BuddyName name, GroupHandle group);
+void RemoveBuddy(word idx);
+void RemoveAllBuddies(void);
+word GetBuddyIndexInGroup(word idx, word groupidx);
+word GetBuddyIndex(word groupidx, word buddyidx);
+
+void UIAddBuddy(word groupidx, word idx);
+void UIRemoveBuddy(word groupidx, word idx);
+void UIUpdateBuddy(word groupidx, word idx);
+
+optr FindIMWindowByName(BuddyName name);
+word FindIMWindowByOptr(optr window, BuddyName name);
+optr AddIMWindow(BuddyName name);
+optr CreateIMWindow(BuddyName name);
+void DestroyIMWindow(optr window);
+void ActivateIMWindow(optr window);
+void RemoveIMWindow(optr window);
+Boolean TocActivateOrCreateIMWindow(word idx);
+void TocDestroyIMWindow(optr window);
+
+/**********************************************************************
+ * Initialization/Shutdown Functions
+ **********************************************************************/
+
+/* TocInitialize */
+/* Perform the many initialization procedures. */
+    /* Create the online buddy list block if it doesn't exist,
+       otherwise remove all entries. */
+    /* Create the window list block if it doesn't exist. */
+Boolean TocInitialize(void)
+{
+    MemHandle mh;
+    Boolean retval = FALSE;
+
+    if (OnlineBuddyList == NullOptr)
+    {
+        /* Create the online buddy list block. */
+        mh = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+        if (mh != NullHandle)
+        {
+            MemLock(mh);
+            OnlineBuddyList = ConstructOptr(mh,
+              ChunkArrayCreate(mh, sizeof(OnlineBuddyStruct), 0, 0));
+            MemUnlock(mh);
+        }
+        else
+            retval = TRUE;
+
+        UIInitialize();
+    }
+    else
+        RemoveAllBuddies();
+
+    if (!retval && IMWindowList == NullOptr)
+    {
+        /* Create the window list block. */
+        mh = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+        if (mh != NullHandle)
+        {
+            MemLock(mh);
+            IMWindowList = ConstructOptr(mh,
+              ChunkArrayCreate(mh, sizeof(IMWindowStruct), 0, 0));
+            MemUnlock(mh);
+        }
+        else
+            retval = TRUE;
+    }
+
+    return retval;
+}
+
+/**********************************************************************
+ * TOC<-->Client Communication Functions
+ **********************************************************************/
+
+/* TocParseReceive */
+/* Identify the TOC->client commands and hand off to the appropriate routine. */
+
+Boolean TocParseReceive(TocConnectionData *tcd, char *command)
+{
+    char *args;
+    Boolean retval = FALSE;
+
+    /* Locate the end of the command name. */
+    args = strchr(command, ':');
+    if (args != NULL)
+        /* Null-terminate the command name for ease of comparison. */
+        *(args++) = '\0';
+
+    MemLock(HandleOf(@TocCmdIMIn));
+
+    /* Check against each known command. */
+    if (!strcmp(command, LMemDeref(@TocCmdIMIn)))
+        retval = TocIMIn(args);
+    else if (!strcmp(command, LMemDeref(@TocCmdUpdateBuddy)))
+        retval = TocUpdateBuddy(args);
+    else if (!strcmp(command, LMemDeref(@TocCmdNick)))
+        retval = TocNick(args, tcd);
+    else if (!strcmp(command, LMemDeref(@TocCmdConfig)))
+        retval = TocConfig(args, tcd);
+    else if (!strcmp(command, LMemDeref(@TocCmdError)))
+        TocError(args);
+    else if (!strcmp(command, LMemDeref(@TocCmdSignOn)))
+        TocSignOn(tcd);
+    else
+        /* Command not found. */
+        retval = TRUE;
+
+    MemUnlock(HandleOf(@TocCmdIMIn));
+
+    return retval;
+}
+
+/* TocSendMessage */
+
+Boolean TocSendMessage(TocConnectionData *tcd, optr window, MemHandle text)
+{
+    BuddyName name;
+    Boolean retval = FALSE;
+    word idx;
+    
+    /* Find the user name associated with the passed window. */
+    MemLockShared(HandleOf(IMWindowList));
+    idx = FindIMWindowByOptr(window, name);
+    MemUnlockShared(HandleOf(IMWindowList));
+    if (idx == INVALID_WINDOW)
+    {
+        /* Internal error */
+        ErrorInternal();
+        retval = TRUE;
+    }
+    else
+    {
+        /* Append the message to the main IM text. */
+        MemHandle temptext;
+        word len;
+        char *ptext;
+
+        /* Copy text into temporary memblock for processing. */
+        len = MemGetInfo(text, MGIT_SIZE);
+        temptext = MemAlloc(len, HF_DYNAMIC, HAF_STANDARD_LOCK);
+
+        if (temptext != NullHandle)
+        {
+            memcpy(MemDeref(temptext), MemLock(text), len);
+            MemUnlock(text);
+
+            /* Prepend our screen name */
+            if (!PrependUsername(temptext, tcd->TCD_screenName))
+            {
+                /* Replace null terminator with line return. */
+                ptext = MemDeref(temptext);
+                len = strlen(ptext);
+                ptext[len++] = '\r';
+
+                /* Add text */
+                MemUnlock(temptext);
+                @call ConstructOptr(OptrToHandle(window),
+                  OptrToChunk(@AIM_IM_WINDOW_MAIN_TEXT))::
+                  MSG_VIS_TEXT_APPEND_BLOCK(temptext, len);
+                @call ConstructOptr(OptrToHandle(window),
+                  OptrToChunk(@AIM_IM_WINDOW_MAIN_TEXT))::
+                  MSG_VIS_TEXT_SELECT_END();
+            }
+            else
+                MemUnlock(temptext);
+            MemFree(temptext);
+        }
+    
+        /* Send the message. */
+        MemLock(HandleOf(@TocCmdSendIM));
+        retval = TocSendAddString(tcd, LMemDeref(@TocCmdSendIM), 0);
+        MemUnlock(HandleOf(@TocCmdSendIM));
+        if (!retval)
+        {
+            NormalizeName(name, name);
+            retval = TocSendAddString(tcd, name, ASF_PREPEND_SPACE);
+        }
+        if (!retval)
+        {
+            ptext = MemLock(text);
+            retval = TocSendAddString(tcd, ptext, ASF_PREPEND_SPACE | ASF_QUOTES | ASF_NULL_TERM);
+            MemUnlock(text);
+        }
+        if (!retval)
+            retval = TocSendToToc(tcd);
+        if (retval)
+            /* Comm error */
+            ErrorComm();
+    }
+
+    return retval;
+}
+
+/* TocUpdateBuddy */
+/* Parse and handle the TOC->client UPDATE_BUDDY command. */
+/* Adds the buddy to the online buddy list if not already present. */
+/* Sets the buddy's status from the command data. */
+
+Boolean TocUpdateBuddy(char *arg)
+{
+    OnlineBuddyStatusFlags bstat = 0;
+    char *argv[6];
+    word bdyidx = INVALID_BUDDY;
+    OnlineBuddyStruct *pbs;
+    Boolean retval = FALSE, bAdded = FALSE;
+    word dummy;
+    sdword temp;
+    GroupHandle group;
+
+    /* Parse the command: Separate into at least 6 arguments */
+    if (ParseArgs(arg, 6, argv))
+    {
+        /* Comm error */
+        ErrorComm();
+        retval = TRUE;
+    }
+
+    /* Test if user online or offline. */
+    if (argv[1][0] == 'T')
+        bstat = OBSF_ONLINE;
+
+    /* Try to locate the user in the online buddy list. */
+    if (strlen(argv[0]) > MAX_USER_NAME_LEN)
+        argv[0][MAX_USER_NAME_LEN] = '\0';
+    if (!retval && (bdyidx = FindBuddy(argv[0])) == INVALID_BUDDY)
+    {
+        /* Failing that, add the user to the online buddy list if online */
+        /* and if listed in configuration. */
+        if ((bstat & OBSF_ONLINE) && ConfigFindBuddy(&group, argv[0], TRUE))
+        {
+            if ((bdyidx = AddBuddy(argv[0], group)) == INVALID_BUDDY)
+            {
+                /* Internal error */
+                ErrorInternal();
+                retval = TRUE;
+            }
+            else
+                bAdded = TRUE;
+        }
+    }
+    if (!retval && bdyidx != INVALID_BUDDY)
+    {
+        /* Lock and deref buddy list item. */
+        MemLock(HandleOf(OnlineBuddyList));
+        pbs = ChunkArrayElementToPtr(OnlineBuddyList, bdyidx, &dummy);
+
+        /* Test if online/offline status has changed from last known status. */
+        if ((pbs->BS_status & OBSF_ONLINE) != bstat)
+        {
+            if (bstat & OBSF_ONLINE)
+            {
+                bstat |= OBSF_ARRIVED;       /* User has gone online. */
+                TocMakeNoise(TNE_ARRIVED);
+            }
+            else
+            {
+                bstat |= OBSF_DEPARTED;      /* User has gone offline. */
+                TocMakeNoise(TNE_DEPARTED);
+            }
+            pbs->BS_status = (pbs->BS_status & ~(OBSF_ADMASK | OBSF_ONLINE))
+              | bstat;                       /* Apply status changes. */
+
+            /* Restart timer to process future removal from list */
+            @send process::MSG_AIM_START_LIST_TIMER();
+        }
+
+        /* Set idle and evil values. */
+        if (!UtilAsciiToHex32(argv[4], &temp))
+            pbs->BS_idle = temp;
+        if (!UtilAsciiToHex32(argv[2], &temp))
+            pbs->BS_evil = temp;
+
+        /* Set user class. */
+        if (argv[5][0] == 'A')
+            pbs->BS_class = OBUCE_AOL;
+        else if (argv[5][0] != '\0')
+            switch (argv[5][1])
+            {
+                case 'A':   pbs->BS_class = OBUCE_OSCAR_ADMIN; break;
+                case 'U':   pbs->BS_class = OBUCE_OSCAR_UNCONFIRMED; break;
+                case 'O':   pbs->BS_class = OBUCE_OSCAR_NORMAL; break;
+            }
+        if (strlen(argv[5]) >= 3 && argv[5][2] == 'U')
+            pbs->BS_status |= OBSF_AWAY;
+        else
+            pbs->BS_status &= ~OBSF_AWAY;
+
+        UIUpdateBuddy(pbs->BS_group,
+          GetBuddyIndexInGroup(bdyidx, pbs->BS_group));
+
+        /* Unlock buddy list. */
+        MemUnlock(HandleOf(OnlineBuddyList));
+    }
+    return retval;
+}
+
+void TocProcessBuddies(void)
+{
+    OnlineBuddyStruct *pbs;
+    word idx, count, dummy;
+    
+    MemLock(HandleOf(OnlineBuddyList));
+
+    count = ChunkArrayGetCount(OnlineBuddyList);
+    for (idx = 0; idx < count; idx ++)
+    {
+        pbs = ChunkArrayElementToPtr(OnlineBuddyList, idx, &dummy);
+    
+        /* If user has departed, remove from online buddy list. */
+        if (pbs->BS_status & OBSF_DEPARTED)
+        {
+            RemoveBuddy(idx);
+
+            /* Another buddy now occupies the current index, and the list
+               has shrunk.  Adjust our counters appropriately. */
+            idx --; count --;
+        }
+        /* If user has arrived, remove arrived status and update. */
+        else if (pbs->BS_status & OBSF_ARRIVED)
+        {
+            pbs->BS_status &= ~OBSF_ARRIVED;
+            UIUpdateBuddy(pbs->BS_group,
+              GetBuddyIndexInGroup(idx, pbs->BS_group));
+        }
+    }
+
+    MemUnlock(HandleOf(OnlineBuddyList));
+}
+
+
+/* TocIMIn */
+/* Parse and handle the TOC->client IM_IN command. */
+/* Creates an IM window for the buddy if not already created. */
+/* Removes the HTML tags from the command data. */
+/* Adds the command data to the inbound text. */
+
+Boolean TocIMIn(char *arg)
+{
+    char *argv[3];
+    Boolean retval = FALSE;
+    optr window = NullOptr;
+    word len;
+    MemHandle text;
+    char *ptext;
+    
+    /* Parse the command: Separate into at least 3 arguments */
+    if (ParseArgs(arg, 3, argv))
+    {
+        /* Comm error */
+        ErrorComm();
+        retval = TRUE;
+    }
+
+    if (!retval)
+    {
+        /* Search IM window list for <Source User> */
+        if (strlen(argv[0]) > MAX_USER_NAME_LEN)
+            argv[0][MAX_USER_NAME_LEN] = '\0';
+        if ((window = FindIMWindowByName(argv[0])) == NullOptr)
+
+            /* Create window if not found */
+            window = AddIMWindow(argv[0]);
+            /* If window is null, we've too many windows... oh well! */
+    }
+    if (!retval && window != NullOptr)
+    {
+        /* Copy text into temporary memblock for processing. */
+        len = strlen(argv[2]);
+        text = MemAlloc(len + 1, HF_DYNAMIC, HAF_STANDARD_LOCK);
+        if (text != NullHandle)
+        {
+            /* Parse text */
+            ptext = MemDeref(text);
+            RemoveHTML(argv[2], ptext);
+
+            /* Prepend user name */
+            if (!PrependUsername(text, argv[0]))    /* Might grow */
+            {
+                /* Replace null terminator with line return. */
+                ptext = MemDeref(text);
+                len = strlen(ptext);
+                ptext[len++] = '\r';
+
+                /* Add text */
+                MemUnlock(text);
+                @call ConstructOptr(OptrToHandle(window),
+                  OptrToChunk(@AIM_IM_WINDOW_MAIN_TEXT))::
+                  MSG_VIS_TEXT_APPEND_BLOCK(text, len);
+                @call ConstructOptr(OptrToHandle(window),
+                  OptrToChunk(@AIM_IM_WINDOW_MAIN_TEXT))::
+                  MSG_VIS_TEXT_SELECT_END();
+
+                TocMakeNoise(TNE_IM_IN);
+            }
+            else
+                MemUnlock(text);
+            MemFree(text);
+        }
+    }
+    return retval;
+}
+
+/* TocNick */
+/* Set the connection's full screen name from the command argument. */
+
+Boolean TocNick(char *arg, TocConnectionData *tcd)
+{
+    /* Only accept the change if a normalized comparison succeeds. */
+    if (!NormalizedCompare(arg, tcd->TCD_screenName))
+        strncpy(tcd->TCD_screenName, arg, MAX_USER_NAME_SZ_LEN);
+
+    return FALSE;
+}
+
+/* TocConfig */
+/* Set the user's configuration. */
+
+#define TOC_CONFIG_MAX_LINE_LENGTH      80
+#define TOC_CONFIG_MAX_LINE_LENGTH_SZ   81
+#define TOC_CONFIG_MAX_ADD              20
+
+Boolean TocConfig(char *arg, TocConnectionData *tcd)
+{
+    char line[TOC_CONFIG_MAX_LINE_LENGTH_SZ];
+    char *p;
+    GroupHandle curGroup = ConfigGetDefaultGroup();
+    Boolean retval = FALSE;
+    Boolean firstGroup = TRUE;
+
+    /* Process each line in the passed config. */
+    while (*arg != '\0' && !retval)
+    {
+        /* Copy line into temp buffer. */
+        p = line;
+        while (((*p = *arg) != '\n') && (*p != '\0'))
+            p++, arg++;
+        if (!(*arg == '\0'))   /* Skip if reached null term before EOL */
+        {
+            /* Properly null-terminate line. */
+            *p = '\0';
+            /* Adjust arg to point to next line. */
+            arg++;
+
+            /* A valid line has an alpha char in first position and a space in
+             * the second position. */
+            if (line[0] != '\0' && line[1] == ' ')
+            {
+                p = &line[2];   /* Point to the item value. */
+
+                /* If group, find or add the group name, cache group handle. */
+                if (line[0] == 'g' && *p != '\0')
+                {
+                    GroupHandle newGroup;
+
+                    if (strlen(p) > MAX_GROUP_NAME_LEN)
+                        line[2 + MAX_GROUP_NAME_LEN] = '\0';
+                    if ((newGroup = ConfigFindGroup(p)) == INVALID_GROUP)
+                    {
+                        /* This is done in case the user removed the
+                           default group from their configuration. */
+                        if (firstGroup)
+                            ConfigRemoveGroup(0);
+                        if ((newGroup = ConfigAddGroup(p))
+                          == INVALID_GROUP)
+                        {
+                            /* Internal error */
+                            ErrorInternal();
+                            retval = TRUE;
+                        }
+                    }
+                    if (newGroup != INVALID_GROUP)
+                        curGroup = newGroup;
+                }
+
+                /* If buddy, add the user to the current group. */
+                else if (line[0] == 'b' && *p != '\0')
+                {
+                    if (strlen(p) > MAX_USER_NAME_LEN)
+                        line[2 + MAX_USER_NAME_LEN] = '\0';
+                    if (!ConfigFindBuddy(NULL, p, FALSE))
+                    {
+                        if (ConfigAddBuddyToGroup(curGroup, p, CONFIG_LIST_TYPE_BUDDY))
+                        {
+                            /* Internal error */
+                            ErrorInternal();
+                            retval = TRUE;
+                        }
+                    }
+                }
+
+                /* If permit, add the user to the permit group. */
+                else if (line[0] == 'p' && *p != '\0')
+                {
+                    GroupHandle permit = ConfigGetPermit(NULL);
+                    
+                    if (strlen(p) > MAX_USER_NAME_LEN)
+                        line[2 + MAX_USER_NAME_LEN] = '\0';
+                    if (ConfigFindBuddyInGroup(permit, p) == INVALID_BUDDY)
+                    {
+                        if (ConfigAddBuddyToGroup(permit, p, CONFIG_LIST_TYPE_PERMIT))
+                        {
+                            /* Internal error */
+                            ErrorInternal();
+                            retval = TRUE;
+                        }
+                    }
+                }
+
+                /* If deny, add the user to the deny group. */
+                else if (line[0] == 'd' && *p != '\0')
+                {
+                    GroupHandle deny = ConfigGetDeny(NULL);
+                    
+                    if (strlen(p) > MAX_USER_NAME_LEN)
+                        line[2 + MAX_USER_NAME_LEN] = '\0';
+                    if (ConfigFindBuddyInGroup(deny, p) == INVALID_BUDDY)
+                    {
+                        if (ConfigAddBuddyToGroup(deny, p, CONFIG_LIST_TYPE_DENY))
+                        {
+                            /* Internal error */
+                            ErrorInternal();
+                            retval = TRUE;
+                        }
+                    }
+                }
+
+                /* If permit/deny mode, set the mode. */
+                else if (line[0] == 'm' && *p != '\0')
+                {
+                    dword temp;
+
+                    if (!UtilAsciiToHex32(p, &temp))
+                        ConfigSetPermitDenyMode((TocPermitDenyMode)temp);
+                }
+
+                /* This is done here rather than after a group line, just in
+                 * case there are buddy lines without an initial group line.
+                 */
+                firstGroup = FALSE; 
+
+            } /* endif (line[0] != '\0'...) */
+        } /* endif (!(*arg == '\0')) */
+    } /* endwhile */
+
+    /* Process the newly created configuration. */
+    if (!retval)
+    {
+        if ((retval = TocUpdateFromConfig(tcd)
+          || TocUpdatePDFromConfig(tcd, TRUE)) != 0)
+            /* Comm error */
+            ErrorComm();
+    }
+
+    /* Initialization is done. */
+    if (!retval)
+        retval = TocInitDone(tcd);
+        
+    if (!retval)
+        @send, forceQueue process::MSG_AIM_CONNECT_SUCCESS();
+    else
+        @send, forceQueue process::MSG_AIM_CONNECT_FAILURE();
+
+    return retval;
+}
+
+Boolean TocConfigSendList(TocConnectionData *tcd, optr command,
+                          ConfigEnumStruct *ces)
+{
+    Boolean retval = FALSE, gotBuddy;
+    BuddyName buddy;
+    word count = 0;
+    
+    gotBuddy = ConfigGetFirstBuddy(ces, buddy);
+    while (gotBuddy && !retval)
+    {
+        NormalizeName(buddy, buddy);
+        
+        if (count == 0)
+        {
+            MemLock(HandleOf(command));
+            retval = TocSendAddString(tcd, LMemDeref(command), 0);
+            MemUnlock(HandleOf(command));
+        }
+        if (!retval)
+            retval = TocSendAddString(tcd, buddy, ASF_PREPEND_SPACE);
+        if ((++count) == TOC_CONFIG_MAX_ADD)
+        {
+            if (!retval)
+                if (!(retval = TocSendAddString(tcd, NULL, ASF_NULL_TERM)))
+                    retval = TocSendToToc(tcd);
+            count = 0;
+        }
+        gotBuddy = ConfigGetNextBuddy(ces, buddy);
+    }
+    if (!retval && count)
+        if (!(retval = TocSendAddString(tcd, NULL, ASF_NULL_TERM)))
+            retval = TocSendToToc(tcd);
+
+    return retval;
+}
+
+/* TocUpdateFromConfig */
+/* Sends the toc_add_buddy command to the remote server for all buddies
+ *   in all buddy groups.  Usually performed after receiving the configuration
+ *   from said server.
+ * Returns zero on success.
+ * Returns non-zero on send failure.
+ */
+
+Boolean TocUpdateFromConfig(TocConnectionData *tcd)
+{
+    ConfigEnumStruct ces;
+    Boolean retval = FALSE;
+    GroupHandle curGroup;
+
+    /* For each buddy, send toc_add_buddy. */
+    curGroup = ConfigGetFirstGroup(&ces, NULL);
+    while (curGroup != INVALID_GROUP && !retval)
+    {
+        retval = TocConfigSendList(tcd, @TocCmdAddBuddy, &ces);
+        curGroup = ConfigGetNextGroup(&ces, NULL);
+    }
+
+    return retval;
+}
+
+/* TocUpdatePDFromConfig */
+/* Sends the proper permit/deny commands to the remote server to set
+ *   the configured permit/deny lists and mode.  If bInit is non-zero,
+ *   the commands to reset the user to permit-all mode are sent first.
+ * Returns zero on success.
+ * Returns non-zero on send failure.
+ */
+Boolean TocUpdatePDFromConfig(TocConnectionData *tcd, Boolean bInit)
+{
+    TocPermitDenyMode pdmode;
+    ConfigEnumStruct ces;
+    Boolean retval = FALSE;
+
+    /* Reset the permit/deny state to permit all if not doing initial config. */
+    if (!bInit)
+    {
+        MemLock(HandleOf(@TocCmdAddPermit));
+        retval = TocSendAddString(tcd, LMemDeref(@TocCmdAddPermit), ASF_NULL_TERM)
+          || TocSendToToc(tcd)
+          || TocSendAddString(tcd, LMemDeref(@TocCmdAddDeny), ASF_NULL_TERM)
+          || TocSendToToc(tcd);
+        MemUnlock(HandleOf(@TocCmdAddPermit));
+    }
+
+    pdmode = ConfigGetPermitDenyMode();
+    
+    /* If in permit some mode, send toc_add_permit. */
+    if (pdmode == TOC_PDMODE_PERMIT_SOME)
+    {
+        ConfigGetPermit(&ces);
+        retval = TocConfigSendList(tcd, @TocCmdAddPermit, &ces);
+    }
+    /* If in deny some mode, send toc_add_deny. */
+    else if (pdmode == TOC_PDMODE_DENY_SOME)
+    {
+        ConfigGetDeny(&ces);
+        retval = TocConfigSendList(tcd, @TocCmdAddDeny, &ces);
+    }
+
+    return retval;
+}
+
+
+Boolean TSCAddLine(TocConnectionData *tcd, char type, char *item)
+{
+    char line[TOC_CONFIG_MAX_LINE_LENGTH + 1];
+    word len;
+
+    line[0] = type;
+    line[1] = ' ';
+    strncpy(&line[2], item, TOC_CONFIG_MAX_LINE_LENGTH - 2);
+    line[TOC_CONFIG_MAX_LINE_LENGTH] = '\0';
+    len = strlen(line);
+    line[len] = '\n';
+
+    return (TocSendAddBuffer(tcd, (byte *)line, len + 1));
+}
+
+Boolean TSCEnumGroup(TocConnectionData *tcd, ConfigEnumStruct *ces,
+                               char type)
+{
+    Boolean gotBuddy = FALSE;
+    BuddyName buddy;
+    Boolean retval = FALSE;
+
+    gotBuddy = ConfigGetFirstBuddy(ces, buddy);
+    while (gotBuddy && !retval)
+    {
+        /* Add the buddy. */
+        retval = TSCAddLine(tcd, type, buddy);
+        gotBuddy = ConfigGetNextBuddy(ces, buddy);
+    }
+
+    return retval;
+}
+
+/* TocSendConfig */
+/* Sends the current configuration to the remote server.  Hopefully it
+ *   will keep it for us on our next return.
+ * Returns zero on success.
+ * Returns non-zero on send failure.
+ */
+Boolean TocSendConfig(TocConnectionData *tcd)
+{
+    GroupName group;
+    ConfigEnumStruct ces;
+    Boolean retval = FALSE;
+    GroupHandle curGroup;
+    char temp[UHTA_NULL_TERM_BUFFER_SIZE];
+
+    temp[0] = '{'; temp[1] = '\0';
+    MemLock(HandleOf(@TocCmdSetConfig));
+    if (!(retval = TocSendAddString(tcd, LMemDeref(@TocCmdSetConfig), 0)))
+        retval = TocSendAddString(tcd, temp, ASF_PREPEND_SPACE | ASF_DONT_ESCAPE);
+    MemUnlock(HandleOf(@TocCmdSetConfig));
+
+    /* Add main buddy list. */
+    curGroup = ConfigGetFirstGroup(&ces, group);
+    while (curGroup != INVALID_GROUP && !retval)
+    {
+        /* Add the group. */
+        retval = TSCAddLine(tcd, 'g', group)
+          || TSCEnumGroup(tcd, &ces, 'b');
+        curGroup = ConfigGetNextGroup(&ces, group);
+    }
+
+    /* Add permit and deny lists. */
+    if (!retval)
+    {
+        ConfigGetPermit(&ces);
+        retval = TSCEnumGroup(tcd, &ces, 'p');
+    }
+    if (!retval)
+    {
+        ConfigGetDeny(&ces);
+        retval = TSCEnumGroup(tcd, &ces, 'd');
+    }
+
+    /* Add permit/deny mode. */
+    if (!retval)
+    {
+        UtilHex32ToAscii(temp, ConfigGetPermitDenyMode(), UHTAF_NULL_TERMINATE);
+        retval = TSCAddLine(tcd, 'm', temp);
+    }
+    
+    temp[0] = '}'; temp[1] = '\0';
+    if (!retval)
+        retval = TocSendAddString(tcd, temp, ASF_DONT_ESCAPE | ASF_NULL_TERM)
+          || TocSendToToc(tcd);
+
+    return retval;
+}
+
+void TocError(char *arg)
+{
+    char *argv[2];
+    optr window;
+    Boolean bHasParam, bShownInIM = FALSE;
+    dword error = 0;
+    ChunkHandle emsg = NullChunk;
+
+    /* Parse the command: Separate into at least 2 arguments */
+    bHasParam = !ParseArgs(arg, 2, argv);
+
+    /* Determine the appropriate message for this error code. */
+    if (!UtilAsciiToHex32(argv[0], &error))
+    {
+        switch ((word)error)
+        {
+            case 901:   emsg = ChunkOf(@ErrorGeneralNotAvail); break;
+            case 902:   emsg = ChunkOf(@ErrorGeneralWarning); break;
+            case 903:   emsg = ChunkOf(@ErrorGeneralSpeed); break;
+            case 960:   emsg = ChunkOf(@ErrorIMOutSpeed); break;
+            case 961:   emsg = ChunkOf(@ErrorIMInBig); break;
+            case 962:   emsg = ChunkOf(@ErrorIMInSpeed); break;
+        }
+    }
+
+    /* Can this message be shown in an IM window? */
+    if (emsg && bHasParam && ErrorTestIfUserScoped(emsg))
+    {
+        /* Does an IM window exist for the buddy? */
+        if (strlen(argv[1]) > MAX_USER_NAME_LEN)
+            argv[1][MAX_USER_NAME_LEN] = '\0';
+        if ((window = FindIMWindowByName(argv[1])) != NullOptr)
+        {
+            /* Construct the final error message text. */
+            word len, userlen;
+            MemHandle text;
+            char *msg, *ptext;
+
+            MemLock(HandleOf(@ErrorGeneralNotAvail));
+            msg = LMemDeref(ConstructOptr(HandleOf(@ErrorGeneralNotAvail), emsg));
+
+            userlen = strlen(argv[1]);
+            len = strlen(msg) + userlen + TOC_ERROR_SEPARATOR_SIZE * 2;
+            text = MemAlloc(len + 1, HF_DYNAMIC, HAF_STANDARD_LOCK);
+            if (text != NullHandle)
+            {
+                /* Start with separator. */
+                ptext = MemDeref(text);
+                MemLock(HandleOf(@TocErrorSeparator));
+                strcpy(ptext, LMemDeref(@TocErrorSeparator));
+                ptext += strlen(ptext);
+
+                /* Next, append the message, replacing the parameter marker
+                   with the username. */
+                while (*msg != '\0')
+                {
+                    if (*msg == '\001')
+                    {
+                        strcpy(ptext, argv[1]);
+                        ptext += userlen;
+                    }
+                    else
+                        *(ptext++) = *msg;
+                    msg ++;
+                }
+                /* Append line feed. */
+                *(ptext++) = '\r';
+
+                /* Finally, append the separator again. */
+                strcpy(ptext, LMemDeref(@TocErrorSeparator));
+                MemUnlock(HandleOf(@TocErrorSeparator));
+                EC_ERROR_IF(strlen(MemDeref(text)) != len, -1);
+
+                /* Add text */
+                MemUnlock(text);
+                @call ConstructOptr(OptrToHandle(window),
+                  OptrToChunk(@AIM_IM_WINDOW_MAIN_TEXT))::
+                  MSG_VIS_TEXT_APPEND_BLOCK(text, len);
+                bShownInIM = TRUE;
+
+                MemFree(text);
+            }
+        }
+    }
+
+    if (emsg && !bShownInIM)
+    {
+        /* If the message can't be shown in an IM window, display it
+           independently. */
+        if (!bHasParam)
+            argv[1] = strrchr(argv[0], 0);  /* Set a valid parameter */
+        ErrorDisplayMessage(emsg, argv[1]);
+    }
+}    
+
+Boolean TocInitDone(TocConnectionData *tcd)
+{
+    Boolean retval = FALSE;
+
+    /* Send the toc_init_done command. */
+    MemLock(HandleOf(@TocCmdInitDone));
+    retval = TocSendAddString(tcd, LMemDeref(@TocCmdInitDone), ASF_NULL_TERM)
+      || TocSendToToc(tcd);
+
+    if (retval)
+        /* Comm error */
+        ErrorComm();
+    else
+        /* Remove the connect status display. */
+        TocSetConnectStatus(NullOptr);
+
+    return retval;
+}
+
+/* Normally this is intercepted by the TocConnect routine.  If we see it
+ * in this context, a pause just occurred, servers were swapped, and we
+ * must send the buddy list and the permit/deny settings once again.
+ */
+Boolean TocSignOn(TocConnectionData *tcd)
+{
+    if (TocUpdateFromConfig(tcd)
+      || TocUpdatePDFromConfig(tcd, TRUE) || TocInitDone(tcd))
+    {
+        /* Comm error */
+        ErrorComm();
+        return TRUE;
+    }
+    else
+        return FALSE;
+}
+
+Boolean TocAddRemoveCommon(TocConnectionData *tcd, BuddyName name, optr command)
+{
+    BuddyName normalName;
+    Boolean retval = FALSE;
+
+    /* Normalize buddy name for sending. */
+    NormalizeName(name, normalName);
+    
+    /* Send toc_add_buddy command. */
+    MemLock(HandleOf(command));
+    retval = TocSendAddString(tcd, LMemDeref(command), 0);
+    MemUnlock(HandleOf(command));
+    if (!retval)
+        retval = (TocSendAddString(tcd, normalName,
+          ASF_PREPEND_SPACE | ASF_NULL_TERM) || TocSendToToc(tcd));
+
+    return retval;
+}
+
+/* TocAddBuddy */
+/* Send the toc_add_buddy command to the server. */
+
+Boolean TocAddBuddy(TocConnectionData *tcd, BuddyName name)
+{
+    return TocAddRemoveCommon(tcd, name, @TocCmdAddBuddy);
+}
+
+/* TocRemoveBuddy */
+/* Send the toc_remove_buddy command to the server, and if the buddy is
+ * present in the online buddy list, remove it.
+ */
+
+Boolean TocRemoveBuddy(TocConnectionData *tcd, BuddyName name)
+{
+    word idx = FindBuddy(name);
+
+    if (idx != INVALID_BUDDY)
+        RemoveBuddy(idx);
+
+    return TocAddRemoveCommon(tcd, name, @TocCmdRemoveBuddy);;
+}
+
+/* TocRemoveGroup */
+/* Send the toc_remove_buddy command to the server for all buddies
+ * in group in the passed enumeration struct.
+ */
+Boolean TocRemoveGroup(TocConnectionData *tcd, ConfigEnumStruct *ces)
+{
+    return TocConfigSendList(tcd, @TocCmdRemoveBuddy, ces);
+}
+
+void TocMakeNoise(TocNoiseEnum sound)
+{
+    if (AimSoundEnabled())
+    {
+        if (sound != TNE_IM_IN)
+        {
+            optr music;
+
+            /* Get the optr of the sound to play. */
+            if (sound == TNE_ARRIVED)
+                music = @TocNoiseArrived;
+            else /* sound == TNE_DEPARTED */
+                music = @TocNoiseDeparted;
+
+            if (TocNoiseControl == NullHandle)
+                /* Allocate a new music control block. */
+                SoundAllocMusic((const word _far *)music, 1, &TocNoiseControl);
+            else
+            {
+                /* Stop the music if it's currently playing. */
+                SoundStopMusicLMem(TocNoiseControl);
+                /* Redirect the block to the new sound. */
+                SoundReallocMusicLMem(TocNoiseControl, music);
+            }
+            _asm push si;   /* Hack to make work on NDO */
+            SoundPlayMusicLMem(TocNoiseControl, SP_STANDARD + SP_IMMEDIATE,
+              0, 0x0020 /* EOSF_UNLOCK_LMEM */);
+            _asm pop si;
+        }
+        else    /* sound == TNE_IM_IN */
+            UserStandardSound(SST_NOTIFY | SST_IGNORE_SOUND_OFF);
+    }
+}
+
+void TocFreeNoise(void)
+{
+    if (TocNoiseControl != NullHandle)
+    {
+        SoundStopMusicLMem(TocNoiseControl);
+        SoundFreeMusic(TocNoiseControl);
+    }
+}        
+
+/**********************************************************************
+ * Online Buddy List Management Functions
+ **********************************************************************/
+
+/* FindBuddy */
+/* Search the online buddy list for the passed buddy name.  Return its index
+ * if found, otherwise INVALID_BUDDY.
+ */
+
+word FindBuddy(BuddyName name)
+{
+    OnlineBuddyStruct *pbs;
+    word idx, count, dummy, retval = INVALID_BUDDY;
+
+    MemLock(HandleOf(OnlineBuddyList));
+
+    count = ChunkArrayGetCount(OnlineBuddyList);
+    for (idx = 0; idx < count && retval == INVALID_BUDDY; idx ++)
+    {
+        pbs = ChunkArrayElementToPtr(OnlineBuddyList, idx, &dummy);
+        if (!NormalizedCompare(name, pbs->BS_name))
+            retval = idx;
+    }
+
+    MemUnlock(HandleOf(OnlineBuddyList));
+
+    return retval;
+}
+
+/* AddBuddy */
+/* Add the passed buddy to the online buddy list.  Return its index.  If no room,
+   return INVALID_BUDDY. */
+
+sword AddBuddyBInsertCB(void *pElement, void *pData)
+{
+    return NormalizedCompare(pData, ((OnlineBuddyStruct *)pElement)->BS_name);
+}
+
+word AddBuddy(BuddyName name, GroupHandle group)
+{
+    OnlineBuddyStruct *pbs;
+    word idx = INVALID_BUDDY, groupidx;
+
+    MemLock(HandleOf(OnlineBuddyList));
+
+    if (ChunkArrayGetCount(OnlineBuddyList) < MAX_ONLINE_BUDDY_LIST_SIZE)
+    {
+        pbs = ChunkArrayBInsert(OnlineBuddyList, name, AddBuddyBInsertCB);
+        idx = ChunkArrayPtrToElement(OnlineBuddyList, pbs);
+        memset(pbs, 0, sizeof(OnlineBuddyStruct));
+        strcpy(pbs->BS_name, name);
+        groupidx = pbs->BS_group = ConfigGetGroupIndex(group);
+    }
+
+    MemUnlock(HandleOf(OnlineBuddyList));
+
+    if (idx != INVALID_BUDDY)
+        UIAddBuddy(groupidx, idx);
+    
+    return idx;
+}
+
+/* RemoveBuddy */
+/* Remove the user at the passed index from the online buddy list. */
+
+void RemoveBuddy(word idx)
+{
+    OnlineBuddyStruct *pbs;
+    word count, dummy;
+
+    MemLock(HandleOf(OnlineBuddyList));
+
+    count = ChunkArrayGetCount(OnlineBuddyList);
+    EC_ERROR_IF(idx >= count, -1);
+
+    if (idx < count)
+    {
+        pbs = ChunkArrayElementToPtr(OnlineBuddyList, idx, &dummy);
+        UIRemoveBuddy(pbs->BS_group, idx);
+        pbs = ChunkArrayElementToPtr(OnlineBuddyList, idx, &dummy);
+        ChunkArrayDelete(OnlineBuddyList, pbs);
+    }
+
+    MemUnlock(HandleOf(OnlineBuddyList));
+}
+
+/* RemoveAllBuddies */
+/* Remove all users from the online buddy list. */
+
+void RemoveAllBuddies(void)
+{
+    OnlineBuddyStruct *pbs;
+    word count, dummy;
+
+    MemLock(HandleOf(OnlineBuddyList));
+
+    count = ChunkArrayGetCount(OnlineBuddyList);
+
+    while (count--)
+    {
+        pbs = ChunkArrayElementToPtr(OnlineBuddyList, count, &dummy);
+        UIRemoveBuddy(pbs->BS_group, count);
+        pbs = ChunkArrayElementToPtr(OnlineBuddyList, count, &dummy);
+        ChunkArrayDelete(OnlineBuddyList, pbs);
+    }
+
+    MemUnlock(HandleOf(OnlineBuddyList));
+}
+
+word GetBuddyIndexInGroup(word idx, word groupidx)
+{
+    word i, buddyidx = 1;
+    OnlineBuddyStruct *pbs;
+    word count, dummy;
+
+    MemLock(HandleOf(OnlineBuddyList));
+
+    count = ChunkArrayGetCount(OnlineBuddyList);
+    EC_ERROR_IF(idx >= count, -1);
+
+    if (idx < count)
+    {
+        for (i = 0; i < idx; i++)
+        {
+            pbs = ChunkArrayElementToPtr(OnlineBuddyList, i, &dummy);
+            if (pbs->BS_group == groupidx)
+                buddyidx ++;
+        }
+    }
+
+    MemUnlock(HandleOf(OnlineBuddyList));
+
+    return buddyidx;
+}
+
+word GetBuddyIndex(word groupidx, word buddyidx)
+{
+    word i, idx = INVALID_BUDDY;
+    OnlineBuddyStruct *pbs;
+    word count, dummy;
+
+    MemLock(HandleOf(OnlineBuddyList));
+
+    count = ChunkArrayGetCount(OnlineBuddyList);
+
+    for (i = 0; i < count && idx == INVALID_BUDDY; i++)
+    {
+        pbs = ChunkArrayElementToPtr(OnlineBuddyList, i, &dummy);
+        if (pbs->BS_group == groupidx)
+            if (-- buddyidx == 0)
+                idx = i;
+    }
+
+    MemUnlock(HandleOf(OnlineBuddyList));
+
+    return idx;
+}
+
+
+/**********************************************************************
+ * UI Online Buddy List Management Functions
+ **********************************************************************/
+
+void UIInitialize(void)
+{
+    @call BuddyList::MSG_GEN_SIMPLE_TREE_LIST_INITIALIZE();
+}
+
+/* UIGetBuddyListItemMoniker */
+
+@ifndef USE_TREE
+
+/* UIAddBuddy */
+
+void UIAddGroup(word idx)
+{
+    @call BuddyList::MSG_GEN_SIMPLE_TREE_LIST_ADD_LEVEL(idx, 0, TRUE);
+}
+    
+void UIRemoveGroup(word idx)
+{
+    @call BuddyList::MSG_GEN_SIMPLE_TREE_LIST_REMOVE_LEVEL(idx, 0);
+}
+
+/* UIAddBuddy */
+
+void UIAddBuddy(word groupidx, word idx)
+{
+    @call BuddyList::MSG_GEN_SIMPLE_TREE_LIST_ADD_LEVEL(groupidx,
+      GetBuddyIndexInGroup(idx, groupidx), FALSE);
+}
+
+/* UIRemoveBuddy */
+
+void UIRemoveBuddy(word groupidx, word idx)
+{
+    @call BuddyList::MSG_GEN_SIMPLE_TREE_LIST_REMOVE_LEVEL(groupidx,
+      GetBuddyIndexInGroup(idx, groupidx));
+}
+
+/* UIUpdateBuddy */
+/* Updates the display of the indexed buddy in the indexed group on the
+   online buddy list. */
+
+void UIUpdateBuddy(word groupidx, word buddyidx)
+{
+    optr bitmap = NullOptr;
+
+    if (buddyidx)
+    {
+        OnlineBuddyStruct *pbs;
+        word count, idx, dummy;
+        GSTLReplaceItemFlags flags = 0;
+        char text[30];
+
+        MemLock(HandleOf(OnlineBuddyList));
+
+        idx = GetBuddyIndex(groupidx, buddyidx);
+        count = ChunkArrayGetCount(OnlineBuddyList);
+        if (idx < count)
+        {
+            pbs = ChunkArrayElementToPtr(OnlineBuddyList, idx, &dummy);
+            if (pbs->BS_status & OBSF_ARRIVED)
+                /* Draw arrived bitmap. */
+                bitmap = @ArrivedMoniker;
+            else if (pbs->BS_status & OBSF_DEPARTED)
+                /* Draw departed bitmap. */
+                bitmap = @DepartedMoniker;
+            else if (pbs->BS_status & OBSF_AWAY)
+                /* Draw away bitmap for away state */
+                bitmap = @AwayMoniker;
+            if (pbs->BS_idle > 0 || pbs->BS_status & OBSF_DEPARTED)
+                /* Set half mask on text for idle or departed state. */
+                flags = GSTLRIF_DRAW_TEXT_GRAYED;
+
+            /* Start out with the buddy name. */
+            strcpy(text, pbs->BS_name);
+
+#if 0   /* We're not doing this at this time */
+            /* Append the warning level if non-zero. */
+            if (pbs->BS_evil)
+                sprintf(strrchr(text, 0), " (%d%%)", pbs->BS_evil);
+#endif
+
+            @call BuddyList::MSG_GEN_SIMPLE_TREE_LIST_REPLACE_ITEM_BITMAP_AND_TEXT(
+              groupidx, buddyidx, bitmap, text, 14, 32, flags);
+        }
+
+        MemUnlock(HandleOf(OnlineBuddyList));
+    }
+    else
+    {
+        GroupName name;
+        
+        if (!(ConfigGetGroupByIndex(groupidx, name) == INVALID_GROUP))
+        {
+            if (@call BuddyList::MSG_GEN_SIMPLE_TREE_LIST_IS_LEVEL_OPENED(groupidx))
+                /* Draw open arrow bitmap */
+                bitmap = @OpenedArrowMoniker;
+            else
+                /* Draw closed arrow bitmap */
+                bitmap = @ClosedArrowMoniker;
+
+            @call BuddyList::MSG_GEN_SIMPLE_TREE_LIST_REPLACE_ITEM_BITMAP_AND_TEXT(
+              groupidx, 0, bitmap, name, 0, 15, 0);
+        }
+    }
+}
+
+/**********************************************************************
+ * MSG_AIM_QUERY_BUDDY_LIST
+ **********************************************************************/
+@extern method AIMProcessClass, MSG_AIM_QUERY_BUDDY_LIST
+{
+    UIUpdateBuddy(levelOne, levelTwo);
+}
+
+/**********************************************************************
+ * MSG_AIM_BUDDY_LIST_ACTION
+ **********************************************************************/
+@extern method AIMProcessClass, MSG_AIM_BUDDY_LIST_ACTION
+{
+    dword levels = @call BuddyList::MSG_GEN_SIMPLE_TREE_LIST_GET_SELECTION();
+
+    if (GSTLGS_LEVEL_TWO(levels) == 0)
+        /* Open or close the group in the tree list. */
+        @send BuddyList::MSG_GEN_SIMPLE_TREE_LIST_TOGGLE_LEVEL(
+          GSTLGS_LEVEL_ONE(levels));
+    else
+        /* Activate an existing IM window or create a new IM window for
+         * the selected buddy user. */
+        TocActivateOrCreateIMWindow(GetBuddyIndex(GSTLGS_LEVEL_ONE(levels),
+          GSTLGS_LEVEL_TWO(levels)));
+}
+
+@else /* ifdef USE_TREE */
+
+/* UIAddBuddy */
+
+void UIAddBuddy(word groupidx, word idx)
+{
+}
+
+/* UIRemoveBuddy */
+
+void UIRemoveBuddy(word groupidx, word idx)
+{
+}
+
+void UIUpdateBuddy(word idx)
+{
+    char text[80];
+    
+    /* Retrieve the buddy name text from the requested position in the list. */
+    /* Append status indicators to the text. */
+        /* Idle */
+        /* Away (Unavailable) */
+        /* Evil */
+        /* User Class (AOL/Oscar Admin-Unconfirmed-Normal) */
+    text[0] = '\0';
+    UIGetBuddyListItemMoniker(idx, text);
+
+    /* Replace the list moniker. */
+}
+
+/**********************************************************************
+ * MSG_AIM_DRAW_BUDDY_LIST
+ **********************************************************************/
+@method AIMProcessClass, MSG_AIM_DRAW_BUDDY_LIST
+{
+    ExtUITreeCacheElement attrs;
+    Rectangle bounds;
+    
+    /* Figure out what kind of item in the list is being drawn. */
+    @call list::MSG_EXTUI_TREE_GET_LINE_ATTRS(item, &attrs);
+
+    /* If the item is a group, get the group name and draw. */
+    if (attrs.EUITCE_level == 0)
+    {
+        GroupName name;
+
+        ConfigGetGroupByIndex(attrs.EUITCE_index, name);
+
+        @call list::MSG_EXTUI_TREE_INIT_LINE(item, GetBuddyCountForGroup(group));
+        @call list::MSG_EXTUI_TABLE_GET_FIELD_BOUNDS(item, 0, 1, &bounds);
+        @call list::MSG_EXTUI_TABLE_DRAW_FIELD_TEXT(list, item, 0, &bounds,
+          name, 0, 0);
+    }
+    /* If the item is a buddy, get the buddy name and draw. */
+    else /* if (attrs.EUITCE_level == 1) */
+    {
+        char text[80];
+
+        text <- buddyname;
+
+        @call list::MSG_EXTUI_TREE_INIT_LINE(item, 0);
+        @call list::MSG_EXTUI_TABLE_GET_FIELD_BOUNDS(item, 0, 1, &bounds);
+        @call list::MSG_EXTUI_TABLE_DRAW_FIELD_TEXT(list, item, 0, &bounds,
+          text, 0, 0);
+}
+
+/**********************************************************************
+ * MSG_AIM_INFO_BUDDY_LIST
+ **********************************************************************/
+@extern method AIMProcessClass, MSG_AIM_INFO_BUDDY_LIST
+{
+    ExtUITreeCacheElement attrs;
+    Rectangle bounds;
+    Boolean children = FALSE;
+    
+    /* Figure out what kind of item in the list is being drawn. */
+    @call list::MSG_EXTUI_TREE_GET_LINE_ATTRS(identifier, &attrs);
+
+    /* If the item is a group, get its buddy count. */
+    if (attrs.EUITCE_level == 0)
+    {
+        /* Get the group this node represents. */
+        GroupHandle group = ConfigGetGroupByIndex(index, NULL);
+
+        /* Get the count of all the online buddies in the group. */
+        if (GetBuddyCountForGroup(group))
+            children = TRUE;
+    }
+
+    @call list::MSG_EXTUI_TREE_SET_NODE_LINE(identifier,
+      children);
+}
+    
+
+/**********************************************************************
+ * MSG_AIM_ATTACH_BUDDY_LIST
+ **********************************************************************/
+@method AIMProcessClass, MSG_AIM_ATTACH_BUDDY_LIST
+{
+    /* If this node is the root, attach all groups. */
+    if (cache == 0)
+    {
+        /* Get and send group count. */
+        @call tree::MSG_EXTUI_TREE_NODE_ATTACHED(cache, index,
+          EUI_TREE_NONE_NODE, ConfigGetGroupCount());
+    }
+    /* If this node is a group, attach all buddies. */
+    else
+    {
+        /* Get the group this node represents. */
+        GroupHandle group = ConfigGetGroupByIndex(index, NULL);
+        
+        /* Get the count of all the online buddies in the group. */
+        @call tree::MSG_EXTUI_TREE_NODE_ATTACHED(cache, index,
+          group, GetBuddyCountForGroup(group));
+}
+
+/**********************************************************************
+ * MSG_AIM_DETACH_BUDDY_LIST
+ **********************************************************************/
+@method AIMProcessClass, MSG_AIM_DETACH_BUDDY_LIST
+{
+}
+
+/**********************************************************************
+ * MSG_AIM_BUDDY_LIST_ACTION
+ **********************************************************************/
+@method AIMProcessClass, MSG_AIM_BUDDY_LIST_ACTION
+{
+    /* Activate an existing IM window or create a new IM window for
+     * the selected buddy user. */
+/*    TocActivateOrCreateIMWindow(selection);*/
+}
+
+@endif
+
+/**********************************************************************
+ * IM Window List and UI Management Functions
+ **********************************************************************/
+
+/* FindIMWindowByName */
+/* Search the IM window list for the passed user.  Return its optr if found,
+   otherwise NullOptr. */
+
+optr FindIMWindowByName(BuddyName name)
+{
+    optr retval = NullOptr, idx, count, dummy;
+    IMWindowStruct *pwin;
+
+    MemLock(HandleOf(IMWindowList));
+
+    count = ChunkArrayGetCount(IMWindowList);
+    for (idx = 0; idx < count && retval == NullOptr; idx ++)
+    {
+        pwin = ChunkArrayElementToPtr(IMWindowList, idx, &dummy);
+        if (!strncmp(name, pwin->IMWS_name, MAX_USER_NAME_SZ_LEN))
+            retval = pwin->IMWS_window;
+    }
+
+    MemUnlock(HandleOf(IMWindowList));
+    return retval;
+}
+
+/* FindIMWindowByOptr */
+/* Search the IM window list for the passed window optr.  Return its index
+   if found, otherwise INVALID_WINDOW.  Also fills in name with the buddy
+   name of the window.  Note that the list must be locked
+   prior to calling this function. */
+
+word FindIMWindowByOptr(optr window, BuddyName name)
+{
+    optr retval = INVALID_WINDOW, idx, count, dummy;
+    IMWindowStruct *pwin;
+
+    count = ChunkArrayGetCount(IMWindowList);
+    for (idx = 0; idx < count && retval == INVALID_WINDOW; idx ++)
+    {
+        pwin = ChunkArrayElementToPtr(IMWindowList, idx, &dummy);
+        if (window == pwin->IMWS_window)
+        {
+            retval = idx;
+            if (name != NULL)
+                strcpy(name, pwin->IMWS_name);
+        }
+    }
+
+    return retval;
+}
+
+/* AddIMWindow */
+/* Create a IM window for the passed user, and add the window to the
+   IM window list.  Return the window's optr, NullOptr if the window
+   could not be added to the list. */
+
+optr AddIMWindow(BuddyName name)
+{
+    optr retval;
+    IMWindowStruct *pwin;
+
+    MemLockExcl(HandleOf(IMWindowList));
+
+    if (ChunkArrayGetCount(IMWindowList) >= MAX_WINDOW_LIST)
+        retval = NullOptr;
+    else if ((retval = CreateIMWindow(name)) != NullOptr)
+    {
+        pwin = ChunkArrayAppend(IMWindowList, 0);
+        strncpy(pwin->IMWS_name, name, MAX_USER_NAME_SZ_LEN);
+        pwin->IMWS_name[MAX_USER_NAME_LEN] = '\0';
+        pwin->IMWS_window = retval;
+    }
+
+    MemUnlockExcl(HandleOf(IMWindowList));
+    return retval;
+}
+
+/* CreateIMWindow */
+/* Create an IM window. */
+
+optr CreateIMWindow(BuddyName name)
+{
+    MemHandle mh;
+    optr retval = NullOptr;
+    
+    mh = ObjDuplicateResource(OptrToHandle(@AIM_IM_WINDOW_ROOT), 0, -1);
+    if (mh != NullHandle)
+    {
+        retval = ConstructOptr(mh, OptrToChunk(@AIM_IM_WINDOW_ROOT));
+        @call retval::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(name, VUM_NOW);
+        @call application::MSG_GEN_ADD_CHILD(retval, CCO_LAST | CCF_MARK_DIRTY);
+        @call retval::MSG_GEN_SET_USABLE(VUM_NOW);
+        @call retval::MSG_META_UPDATE_WINDOW(0, VUM_NOW);
+        if (AimFocusEnabled())
+        {
+            @send application::MSG_GEN_BRING_TO_TOP();
+        }
+        ActivateIMWindow(retval);
+    }
+    return retval;
+}
+
+void DestroyIMWindow(optr window)
+{
+    @call window::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+    @call application::MSG_GEN_REMOVE_CHILD(window, 0);
+    @send window::MSG_META_BLOCK_FREE();
+}
+
+void ActivateIMWindow(optr window)
+{
+    @send window::MSG_GEN_BRING_TO_TOP();
+}
+
+/* RemoveIMWindow */
+/* Remove the window from the IM window list.  (Destruction of the window
+   object is handled elsewhere.) */
+
+void RemoveIMWindow(optr window)
+{
+    word idx, dummy;
+    IMWindowStruct *pwin;
+
+    MemLockExcl(HandleOf(IMWindowList));
+
+    idx = FindIMWindowByOptr(window, NULL);
+    if (idx != INVALID_WINDOW)
+    {
+        pwin = ChunkArrayElementToPtr(IMWindowList, idx, &dummy);
+        ChunkArrayDelete(IMWindowList, pwin);
+    }
+
+    MemUnlockExcl(HandleOf(IMWindowList));
+}
+
+/* TocActivateOrCreateIMWindow */
+/* Activates (brings to the front) the IM window of the indexed buddy, or
+   if none exists, creates a new one. */
+
+Boolean TocActivateOrCreateIMWindow(word idx)
+{
+    OnlineBuddyStruct *pbs;
+    word count;
+    word dummy;
+    optr window;
+    BuddyName name;
+    Boolean retval = FALSE;
+    
+    MemLock(HandleOf(OnlineBuddyList));
+
+    /* Get the buddy name of the passed item. */
+    count = ChunkArrayGetCount(OnlineBuddyList);
+    if (idx < count)
+    {
+        pbs = ChunkArrayElementToPtr(OnlineBuddyList, idx, &dummy);
+        strcpy(name, pbs->BS_name);
+    }
+    else
+    {
+        /* Internal error */
+        ErrorInternal();
+        retval = TRUE;
+    }
+
+    MemUnlock(HandleOf(OnlineBuddyList));
+
+    if (!retval)
+    {
+        /* Search IM window list for <Source User> */
+        if ((window = FindIMWindowByName(name)) == NullOptr)
+        {
+            /* Create window if not found */
+            if ((window = AddIMWindow(name)) == NullOptr)
+                retval = TRUE;
+        }
+        else
+            ActivateIMWindow(window);
+    }
+
+    return retval;
+}
+
+/* TocDestroyIMWindow */
+/* Removes the passed window from the IM window list and destroys it. */
+
+void TocDestroyIMWindow(optr window)
+{
+    /* Remove the window from the window list. */
+    RemoveIMWindow(window);
+
+    /* At this point, no further messages will be sent to the window
+     * by us, so it's safe to destroy the window.
+     */
+    DestroyIMWindow(window);
+}
+
+/**********************************************************************
+ * MSG_GEN_DISPLAY_CLOSE
+ **********************************************************************/
+@extern method AIMProcessClass, MSG_AIM_CLOSE_IM
+{
+    /* Remove and destroy the window. */
+    TocDestroyIMWindow(window);
+}
+
+/**********************************************************************
+ * GenInteractionExClass                                              *
+ **********************************************************************/
+@classdecl GenInteractionExClass;
+
+@method GenInteractionExClass, MSG_GEN_GUP_INTERACTION_COMMAND
+{
+    if (command == IC_DISMISS)
+    {
+        @send pself->GIEI_destination::
+          {GEN_INTERACTION_EX_ON_DISMISSED}(pself->GIEI_onDismissed)(oself);
+    }
+    return @callsuper();
+}
+
+/**********************************************************************
+ * MSG_AIM_UPDATE_PDCONFIG                                            *
+ **********************************************************************/
+@extern method AIMProcessClass, MSG_AIM_UPDATE_PDCONFIG
+{
+    /* Set all users offline, we'll get updates after the P/D change. */
+    RemoveAllBuddies();
+
+    /* Send the permit/deny settings. */
+    if (TocUpdatePDFromConfig(&tcd, FALSE))
+        /* Comm error */
+        ErrorComm();
+}
+
+/**********************************************************************
+ * MSG_AIM_UPDATE_CONFIG                                              *
+ **********************************************************************/
+@extern method AIMProcessClass, MSG_AIM_UPDATE_CONFIG
+{
+    /* Send the entire config to the server. */
+    if (TocSendConfig(&tcd))
+        /* Comm error */
+        ErrorComm();
+}
+

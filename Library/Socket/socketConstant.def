@@ -1,0 +1,805 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	GEOS
+MODULE:		Socket Library
+FILE:		socketConstant.def
+
+AUTHOR:		Eric Weber, Mar 30, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	EW	3/30/94   	Initial revision
+
+
+DESCRIPTION:
+	
+		
+	$Id: socketConstant.def,v 1.1 97/04/07 10:46:07 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+COMMENT @--------------------------------------------------------------
+			      CONSTANTS
+----------------------------------------------------------------------@
+
+SocketReceiveOperation	etype	word
+	SRO_RECV	enum	SocketReceiveOperation
+	SRO_PEEK	enum	SocketReceiveOperation
+
+PacketDeliveryDirection	etype	word
+	PDD_OUTGOING	enum	PacketDeliveryDirection
+	PDD_INCOMING	enum	PacketDeliveryDirection
+
+;
+; specify initial and maximum length of a data queue
+; the size of the queue chunk in bytes is twice the current length,
+;   which will vary between the initial and maximum length as needed
+;
+INITIAL_DATA_QUEUE_LENGTH	equ	16
+MAX_DATA_QUEUE_LENGTH		equ	2048
+CheckHack <INITIAL_DATA_QUEUE_LENGTH lt 256>
+
+; this refers to the size of the logical queue, including the data
+; packets, not the actual queue chunk, which only contains pointers to
+; the data
+DEFAULT_MAX_RECV_QUEUE_SIZE		equ	4096
+DEFAULT_MAX_SEND_QUEUE_SIZE		equ	4096
+
+;
+; size of listen queue created by LoadOnMsg
+;
+LOM_LISTEN_QUEUE_SIZE		equ	5
+
+;
+; range of port numbers to be assigned randomly for implicit binds
+; these will be assigned in MANUFACTURER_ID_GEOWORKS for link domains
+; and in MANUFACTURER_ID_SOCKET_16BIT_PORT for data domains
+;
+IMPLICIT_PORT_MIN			equ	8000h
+IMPLICIT_PORT_MAX			equ	0ffffh
+
+;
+; Default time (in seconds) to wait before shutting down a driver when there
+; are no more references to it
+;
+DEFAULT_DRIVER_CLOSE_DELAY		equ	100	; 100 seconds
+
+;
+; stack size for SocketRemoveDomain
+;
+DRIVER_CLOSE_STACK			equ	2000
+
+;
+; driver timeout for DR_SOCKET_SEND_DATA
+;
+DEFAULT_SEND_TIMEOUT			equ	30	; 30 seconds
+
+;
+; number of times to try to resolve an address before giving up
+;
+MAX_RESOLVE_ATTEMPTS			equ	2
+
+;------------------------------------------------------------------------------
+;	Global macros
+;------------------------------------------------------------------------------
+
+if DBCS_PCGEOS
+
+DomainNameStruct	struct
+    DNS_blockHandle	hptr					;block handle
+    DNS_namePtr		fptr.wchar				;old ptr
+    DNS_iniCat		char MAX_INITFILE_CATEGORY_LENGTH*4 dup(?)	;.ini
+DomainNameStruct	ends
+
+endif
+
+
+COMMENT @--------------------------------------------------------------
+
+			 LIBRARY STATE BLOCK
+
+The library keeps a single lmem block in which it records information
+about active ports, connections, and sockets.  It does not contain any
+actual packets, however.
+
+This single block design will produce an unwieldy block if the user has
+hundreds of simultaneous connections.
+
+----------------------------------------------------------------------@
+
+;
+; The ControlChunkType enum is a signature which is applied to chunks in
+; the control block as an attempt to figure out what kind of chunk they
+; are.  For normal chunks, it is the first word, for chunk arrays the fifth
+; word.  
+;
+; The values were chosen to be unlikely to show up by accident, or to
+; be confused with a legitimate value for CAH_count
+;
+ControlChunkType	etype	word,  1a1ah, 1010h
+	CCT_SOCKET_ARRAY	enum	ControlChunkType
+	CCT_PORT_ARRAY		enum	ControlChunkType
+	CCT_DOMAIN_ARRAY	enum	ControlChunkType
+	CCT_SOCKET_INFO		enum	ControlChunkType
+	CCT_PORT_INFO		enum	ControlChunkType
+	CCT_DOMAIN_INFO		enum	ControlChunkType
+	CCT_LISTEN_QUEUE	enum	ControlChunkType
+	CCT_LOAD_REQUEST	enum	ControlChunkType
+
+;
+; Domains and Links have a three state lifecycle.  They are only usable
+; when in the OCS_OPEN state
+;
+OpenCloseState		etype	word
+	OCS_STANDBY	enum	OpenCloseState	; placeholder - not created yet
+	OCS_OPENING	enum	OpenCloseState	; being created
+	OCS_OPEN	enum	OpenCloseState	; normal operation
+	OCS_CLOSING	enum	OpenCloseState	; being destroyed
+
+;
+; InternalSocketState is used to keep track of the lifecycle of a socket
+;
+; ISS_ERROR implies no connection was ever made
+; ISS_FAILED implies the connection was made, then broken
+;
+InternalSocketState	etype	byte, 0, 2
+	ISS_UNCONNECTED	enum	InternalSocketState	; not connected
+	ISS_LISTENING	enum	InternalSocketState	; queueing connections
+	ISS_ACCEPTING	enum	InternalSocketState	; conn request received
+	ISS_CONNECTING	enum	InternalSocketState	; trying to connect
+	ISS_CONNECTED	enum	InternalSocketState	; connected
+	ISS_CLOSING	enum	InternalSocketState	; async closing
+	ISS_ERROR	enum	InternalSocketState	; error in connection
+
+
+SocketFlags	record
+	SF_INTERRUPTIBLE:1		; current operation can be aborted
+	SF_INTERRUPT:1			; socket has been interrupted
+	SF_SEND_ENABLE:1		; data can be sent
+	SF_RECV_ENABLE:1		; data can be received
+	SF_FAILED:1			; connection failed
+	SF_EXCEPT:1			; exception occurred since last recv
+	SF_INLINE:1			; driver will inline urgent data
+	SF_NODELAY:1			; driver will send data ASAP
+	SF_DISCARD:1			; discard incoming data
+	SF_SINTERRUPT:1			; interrupt next send
+	SF_SENDING:1			; send in progress
+	SF_LINGER:1			; close will block until complete
+	:4
+SocketFlags	end
+
+
+;
+; Connection info is used three ways
+;	1) to address outgoing packets
+;	2) to sort incoming packets by connection
+;	3) to record pending connections
+;
+ConnectionEndpoint	struct
+	CE_domain		nptr.DomainInfo		; domain id
+	CE_link			word		 	; represents address
+							;  (matches LI_handle
+							;  and CI_handle)
+	CE_port			SocketPort		; port
+ConnectionEndpoint	ends
+
+
+;
+; the SocketArray keeps track of all allocated sockets
+;
+SocketArray	struct
+	SA_header	ChunkArrayHeader
+EC <	SA_type		ControlChunkType	>
+SocketArray	ends
+
+;
+; A Socket is actually an nptr to a SocketInfo structure in the state block
+;
+SocketInfo	struct
+EC <	SI_type		ControlChunkType				>
+	SI_delivery	SocketDeliveryType
+	SI_state	InternalSocketState
+	SI_flags	SocketFlags
+	SI_owner	hptr		; app which created this socket
+	SI_port		lptr.PortInfo
+	SI_semSem	hptr		; sem for access to other sems
+	SI_waitSem	hptr		; wait here for state change or data
+	SI_exceptSem	hptr		; wait here for exceptions or urgent
+	SI_waitPtr	fptr		; who is waiting (pointer to variable
+					;  on stack in which to store socket
+					;  handle when condition met)
+	SI_exceptPtr	fptr		; who is waiting (pointer to variable
+					;  on stack in which to store socket
+					;  handle when condition met)
+	SI_dataQueue	word		; chunk handle in SocketQueues block
+					;  of data queue
+	SI_curQueueSize	dword		; current size of receive queue
+	SI_maxQueueSize	dword		; maximum size of receive queue
+	SI_maxSendSize	word		; maximum size of send queue
+	SI_queueToken	word		; GeodeRequestSpace token for queue
+	SI_dataOffset	word		; offset of next byte
+SocketInfo	ends
+
+SequencedSocketInfo	struct
+	SSI_common	SocketInfo
+	SSI_error	word		; why connection failed, high byte is
+					;  SpecSocketDrError, low byte is 
+					;  SocketError
+	SSI_urgent	dword		; urgent data, if size <= 4,
+					; optr to data, if size > 4
+	SSI_urgentSize	word
+	SSI_connection	ConnectionEndpoint
+SequencedSocketInfo	ends
+
+DatagramSocketInfo	struct
+	DSI_common	SocketInfo
+	DSI_exception	SocketDrException
+	align word
+	DSI_domain	lptr.DomainInfo ; default domain
+	DSI_port	SocketPort
+	DSI_addressSize	word
+	DSI_address	label byte	; default address
+DatagramSocketInfo	ends
+
+;
+; The port array keeps track of all the active ports in the system
+;
+PortArray	struct
+	PA_header	ChunkArrayHeader
+EC <	PA_type		ControlChunkType				>
+PortArray	ends
+
+;
+; The library keeps a sorted chunk array of PortArrayEntries to map
+; doubleword port numbers to port info arrays
+;
+PortArrayEntry	struct
+	PAE_id		SocketPort
+	PAE_info	nptr.PortInfo
+PortArrayEntry	ends
+
+;
+; The port contains a chunk array with pointers to all sockets with
+; connections on this port.
+;
+PortInfo	struct
+	PI_header	ChunkArrayHeader	; chunk array of Socket
+EC <	PI_type		ControlChunkType				>
+	PI_number	SocketPort		; our port number
+	PI_restriction	lptr.DomainInfo		; domain, if restricted
+	PI_numActive	word			; # of actively bound sockets
+	PI_numPassive	word			; # of passively bound sockets
+	PI_listener	lptr.SocketInfo		; socket which is listening
+	PI_listenQueue	lptr.ListenQueue 	; array of ConnectionEndpoint
+	PI_dgram	lptr.SocketInfo		; datagram receiver
+	PI_loadInfo	lptr.LoadRequest	; LoadOnMsg stuff
+PortInfo	ends
+
+;
+; A LoadRequest chunk is allocated by LoadOnMsg to indicate the geode
+; which should be loaded when a connect request or datagram arrives
+; on this port
+;
+LoadRequest	struct
+	LR_type		ControlChunkType
+	LR_loadType	SocketLoadType
+	LR_disk		hptr
+	LR_path		label char
+LoadRequest	ends
+
+;
+; The domain array keeps track of all the active domains in the system
+;
+DomainArray	struct
+	DA_header	ChunkArrayHeader
+EC <	DA_type		ControlChunkType	>
+DomainArray	ends
+
+;
+; Domain info records information about a particular driver.  The name of the
+; domain is stored inline at the end of the structure.  The array holds
+; link infos.
+;
+
+DomainFlags	record
+	DF_SELF_LOAD:1	; set if the driver was not loaded by us
+	:7
+DomainFlags	end
+	
+DomainInfo	struct
+	DI_header		ChunkArrayHeader <>
+EC <	DI_type			ControlChunkType			>
+	DI_id			word		; unique id
+	DI_driverType		SocketDriverType
+	DI_flags		DomainFlags
+	DI_driver		hptr		; geode handle of driver
+	DI_client		word		; client handle of library
+	DI_entry		fptr		; entry point for delivery
+	DI_state		OpenCloseState
+	DI_openMutex		hptr		; semaphore for opening links
+	DI_closeMutex		hptr		; semaphore for closing links
+	DI_miscCount		word		; # of misc ops in progress
+;	DI_bindCount		word		; # of BindInDomain
+	DI_seqHeaderSize	byte		; # of bytes to reserve on
+	DI_dgramHeaderSize	byte		;   sequenced/datagram pkts
+	DI_timer		hptr		; for timed shutdown
+	DI_timerID		word		; ID of timer
+	DI_nameSize		word		; size of name field sans null
+	DI_name			label char	; null terminated domain name
+DomainInfo	ends
+;
+; NOTES on DomainInfo:
+;
+; if geode handle is 0, we didn't load the driver, so we don't need to
+; close it either
+;
+; whenever the library does an operation which does not depend on any
+; link (e.g. get address controller, datagrams), the miscMutex is
+; locked and the miscCount indicates how many threads are in the
+; driver. No mutex is locked when sending or receiving data on a link.
+;
+
+
+;
+; A link info is used to map addresses to link handles
+;
+LinkInfo	struct
+	LI_handle	word			; driver supplied handle
+	LI_id		word			; internal id
+	LI_state	OpenCloseState
+	LI_refCount	word			; number of connections
+	LI_addrSize	word			; link connections only
+	LI_address	label byte
+LinkInfo	ends
+
+;
+; A connection info is used to find the socket for an incoming packet
+; from a data driver
+;
+ConnectionInfo	struct
+	CI_handle	word
+	CI_socket	nptr.SocketInfo
+ConnectionInfo	ends
+
+;
+; SetupPacketInfo relies on the following assumption
+;
+.assert	(offset LI_handle) eq (offset CI_handle)
+
+;
+; A ListenQueue is a chunk array of ConnectionEndpoint which remembers pending
+; connections on a listening socket
+;
+ListenQueue	struct
+	LQ_header		ChunkArrayHeader <>
+EC <	LQ_type			ControlChunkType			>
+	LQ_maxEntries		word		; max pending connections
+ListenQueue	ends
+
+
+COMMENT @---------------------------------------------------------------------
+
+			MISC DATA TYPES
+	      These do not appear in the control block.
+
+-----------------------------------------------------------------------------@
+
+;
+; PDB contains ASCII representations of the port number and domain name
+; size with hex digits
+;
+PortDomainBuffer	struct
+	PDB_port	TCHAR	8 dup (?)
+	PDB_domainSize	TCHAR	4 dup (?)
+PortDomainBuffer	ends
+
+;
+; LSH contains the information which will be written (after conversion to
+; (hex digits) as the first 20 bytes of a .ini file entry for a LoadOnMsg
+; request
+;
+; This string is followed by the domain name, the hex encoding of the
+; saved disk handle data, and the pathname of the geode to load
+;
+; The "sizes" refers to the number bytes used to represent the
+; data of the respective fields as an ASCII string the ini file.
+; 
+;		# bytes in SBCS			# bytes in DBCS
+;		---------------			---------------
+; domainSize		N				2N
+; diskSize		8				16
+; pathSize		N				2N
+; LSH_loadType		S = size SocketLoadType		2S
+
+LoadStringHeader	struct
+	LSH_port	SocketPort
+	LSH_domainSize	word
+	LSH_diskSize	word
+	LSH_pathSize	word
+	LSH_loadType	SocketLoadType
+LoadStringHeader	ends
+
+
+COMMENT @---------------------------------------------------------------------
+
+			    PACKET FORMATS
+
+These data structures define the various types of headers used by the
+net library.  These are placed into what the driver considers the 'data'
+section of the packet, and are not directly related to the types defined
+in socketInt.def for communication with the driver.
+
+Every packet starts with a packet type identifier, and an offset in bytes to
+the start of the user data.  The offset is important because it allows
+future versions of the library to add new fields to the packet headers in
+a backward-compatible way.
+
+-----------------------------------------------------------------------------@
+
+;
+; Packet is used internally to pass information about a packet to routines
+; which create packets
+;
+PacketInfo	struct
+	PI_srcPort	SocketPort	; source of packet
+	PI_destPort	SocketPort	; destination of packet
+	PI_driverType	SocketDriverType
+	align word
+	PI_entry	fptr.far	; entry point of driver
+	PI_client	word		; client handle
+	PI_link		word		; link handle
+	PI_headerSize	word		; minimum link header size
+PacketInfo	ends
+
+;
+; LinkPacketType is used to determine the format of an incoming packet
+; from a link driver
+;
+LinkPacketType	etype	byte, 0, 2
+	LPT_USER_DATA			enum	LinkPacketType
+	LPT_CONNECTION_CONTROL		enum	LinkPacketType
+
+
+;
+; Link control packets are used to synchronize opening and closing links.
+;
+; When the library first opens a link, it sends LCO_OPEN.  When the reference
+;  count for the link drops to zero, the library sends LCO_CLOSE and marks
+;  the link closed for sending.  When an LCO_CLOSE is received, the link
+;  is marked closed for receiving.  If an LCO_CLOSE is received while
+;  the send side is closed, the library instructs the driver to close the
+;  link.  If a new connection is requested for a link with a closed send
+;  side, an LCO_REOPEN is sent to cancel the LCO_CLOSE.  If an LCO_OPEN
+;  is received for an open link, the library assumes that the link failed
+;  and this is a new link.
+;
+; LCO_ABORT is sent when the library needs to unilaterally shut down a
+; link, for example if GEOS is exiting.
+;
+if 0
+LinkControlOperation	etype byte
+	LCO_OPEN	enum	LinkControlOperation
+	LCO_REOPEN	enum	LinkControlOperation
+	LCO_CLOSE	enum	LinkControlOperation
+	LCO_ABORT	enum	LinkControlOperation
+
+LinkControlPacket	struct
+	LCP_type	SequencedPacketType
+	LCP_opcode	LinkControlOperation
+LinkControlPacket	ends
+endif
+
+;
+; Connection control packets are used to coordinate the start and end of
+; a connection between sequenced sockets.  When the user calls connect(),
+; the library sends CCO_OPEN over the link.  When the remote user calls
+; accept(), a CCO_ACCEPT is sent back.  If there is no listening socket
+; on the port, a CCO_REFUSED is returned instead.  A CCO_ACCEPT packet will
+; immediately be acknowledged by CCO_BEGIN, unless a CCO_CANCEL has already
+; been sent.
+;
+; CCO_CLOSE terminates
+; the sender's side of the connection, but data is still received until
+; the other party sends CCO_CLOSE as well.  
+;
+; CCO_CANCEL is used to unilaterally terminate an open connection, or to
+; cancel a pending connection (usually because of a timeout).
+;
+ConnectionControlOperation	etype byte,0,2
+	CCO_OPEN	enum	ConnectionControlOperation
+	CCO_ACCEPT	enum	ConnectionControlOperation
+	CCO_BEGIN	enum	ConnectionControlOperation
+	CCO_REFUSE	enum	ConnectionControlOperation
+	CCO_CLOSE	enum	ConnectionControlOperation
+	CCO_CANCEL	enum	ConnectionControlOperation
+
+ConnectionControlPacket	struct
+	CCP_type	LinkPacketType
+	CCP_source	SocketPort
+	CCP_dest	SocketPort
+	CCP_opcode	ConnectionControlOperation
+ConnectionControlPacket	ends
+
+LinkDataPacket		struct
+	LDP_type	LinkPacketType
+	LDP_offset	byte
+	LDP_source	SocketPort
+	LDP_dest	SocketPort
+LinkDataPacket		ends
+
+;#############################################################################
+;			 Internal Socket Errors
+;  This is an extension of the SocketError enum for errors which are used
+;  internally by the library but never returned to the user
+;
+; 
+;#############################################################################
+
+SE_LINK_NOT_FOUND			enum	SocketError
+; No established link exists for the specified address
+
+SE_CONNECTION_CANCELED			enum	SocketError
+; The remote library timed out
+
+;#############################################################################
+;			     Fatal Errors
+;#############################################################################
+
+ILLEGAL_SOCKET				enum	FatalErrors
+; The specified NetMsgSocket does not refer to a valid socket.
+
+ILLEGAL_SOCKET_STATE			enum	FatalErrors
+; The specified NetMsgSocketState is not valid.
+
+ILLEGAL_DELIVERY_TYPE			enum	FatalErrors
+; The specified NetMsgDeliveryType is not valid.
+
+ILLEGAL_BIND_FLAGS			enum	FatalErrors
+; The specified NetMsgBindFlags are not valid.
+
+ILLEGAL_OPERATION_ON_DATAGRAM_SOCKET	enum	FatalErrors
+; The requested operation is not permitted on sockets with the datagram
+; delivery type.
+
+ILLEGAL_OPERATION_ON_STREAM_SOCKET	enum	FatalErrors
+; The requested operation is not permitted on sockets with the stream
+; delivery type.
+
+ILLEGAL_OPERATION_ON_PASSIVE_SOCKET	enum	FatalErrors
+; The requested operation is not permitted on a socket which was bound
+; with the NMBF_PASSIVE flag.
+
+SOCKET_NOT_CONNECTED			enum	FatalErrors
+; The requested operation requires a socket which has been connected.
+
+SOCKET_NOT_BOUND			enum	FatalErrors
+; The requested operation requires a socket which has been bound.
+
+EXCESSIVE_TIMEOUT			enum	FatalErrors
+; An unreasonable timeout value was supplied
+
+UNEXPECTED_PACKET_TYPE			enum	FatalErrors
+; A packet arrived with an unknown value in the type field
+
+ILLEGAL_HEADER_SIZE			enum	FatalErrors
+; the header sizes requested by the driver exceed 255 bytes
+
+ADDRESS_OUT_OF_BOUNDS			enum	FatalErrors
+; an invalid pointer was passed
+
+ILLEGAL_CONNECTION			enum	FatalErrors
+; a driver passed an unrecognized connection handle
+
+URGENT_FLAG_REQUIRES_NON_DATAGRAM_SOCKET	enum	FatalErrors
+; SSF/SRF_URGENT cannot be used on a datagram socket
+
+ADDRESS_FLAG_REQUIRES_DATAGRAM_SOCKET		enum	FatalErrors
+; SSF/SRF_ADDRESS must only be used on a datagram socket
+
+OPEN_LINK_FLAG_IS_FOR_DATAGRAM_SOCKETS		enum	FatalErrors
+; SSF_OPEN_LINK must only be used on a datagram socket
+
+CANNOT_USE_SOCKET_AFTER_CLOSED		enum	FatalErrors
+; Once SocketClose has been called for a socket, that socket can no
+; longer be passed into any API and MUST be considered freed.
+
+;#############################################################################
+;			     Warnings
+;
+;	Warnings are used to signal conditions which may, or may not,
+;	actually be an error.
+;#############################################################################
+
+ORPHANED_PACKET				enum	Warnings
+; A sequenced packet arrived which does not correspond to any existing
+; connection
+
+WARNING_PACKET_DATA_NOT_AT_END		enum	Warnings
+; The data portion of a sequenced packet is not at the end of the chunk
+
+WARNING_UNIMPLEMENTED_FUNCTION		enum	Warnings
+; The application called an unimplemented function
+
+WARNING_CONNECTION_HAS_NO_LINK		enum	Warnings
+; A connection has the handle of a nonexistent link
+
+WARNING_NULL_CONNECTION_HANDLE		enum	Warnings
+; A LinkInfo has a null handle
+
+LINK_CONNECT_REQUEST_FAILED		enum	Warnings
+; The call to DR_LINK_CONNECT_REQUEST failed
+
+CLOSING_UNUSED_CONNECTION		enum	Warnings
+; A connection with no associated socket was closed
+
+REDUNDENT_CLOSE				enum	Warnings
+; The driver attempted to close an already closed connection
+
+CANT_LOAD_APPLICATION			enum	Warnings
+; The libary was unable to load an application specified by LoadOnMsg
+
+CANT_ALLOCATE_LOADREQUEST_BLOCK		enum	Warnings
+; The library was unable to allocate a fixed block to hold the LoadRequest
+; structure needed to load a geode in response to a connection request.
+
+INVALID_MIN_IMPLICIT_PORT		enum	Warnings
+; The minImplicitPort cannot be 65535.  It has been reset to 65534
+ 
+INVALID_MAX_IMPLICIT_PORT		enum	Warnings
+; The range allowed for implicit port nums (i.e. min+1 .. max)
+; is null.  The maxImplicitPort has been set to minImplicitPort+1
+
+DOMAIN_NOT_FOUND			enum	Warnings
+; The domain required for an operation was not located
+
+CANT_ALLOCATE_CONTROL_PACKET		enum	Warnings
+; No space is left in the packet heap to allocate a control message
+; for a link driver
+
+INVALID_LOAD_STRING			enum	Warnings
+; A string in the LoadOnMsg string section of the [socket] init file
+; category is invalid.
+
+IGNORING_LOAD_STRING_DUE_TO_ALLOC_FAILURE	enum	Warnings
+; A string in the LoadOnMsg string section of the [socket] init file
+; category was not parsed because the library could not allocate temporary
+; memory to hold the string
+
+GEODE_USE_DRIVER_FAILED				enum	Warnings
+; Couldn't load a socket driver
+
+OVERWRITING_EXCEPTION				enum	Warnings
+; A new exception came in before the previous exception had been
+; read by the application.  The old value will be discarded.
+
+IGNORING_EXCEPTION				enum	Warnings
+; An exception came in for a port to which no datagram socket is bound.
+
+CANT_RESERVE_SPACE				enum	Warnings
+; GeodeRequestSpace failed to reserve space for the maximum queue size
+; for a socket
+
+;#############################################################################
+;			     Internal Fatal Errors
+;	There should be no way to generate these by any API calls.  They
+;       occur only due to internal bugs.
+;#############################################################################
+
+PORT_NOT_FOUND				enum	FatalErrors
+; The library was unable to locat the port to which a socket is bound
+
+UNEXPECTED_SOCKET_ERROR			enum	FatalErrors
+; An internal routine returned an error code which it shouldn't have
+
+UNEXPECTED_SOCKET_STATE			enum	FatalErrors
+; A socket was in a state which should not have been possible
+
+UNEXPECTED_DOMAIN_STATE			enum	FatalErrors
+; A domain was in a state which should not have been possible
+
+UNEXPECTED_DOMAIN_TYPE			enum	FatalErrors
+; A domain has the wrong SocketDriverType to be at this point
+; in the code
+
+SOCKET_NOT_IN_PORT_ARRAY		enum	FatalErrors
+; A socket which claims to be connected is not in the list of connected
+; sockets for the port.
+
+SOCKET_LINK_MISMATCH			enum	FatalErrors
+; The specified socket is not connected over the specified link.
+
+DOMAIN_NOT_IN_DOMAIN_ARRAY		enum	FatalErrors
+; A domain info chunk was not listed in the domainArray
+
+INVALID_DOMAIN				enum	FatalErrors
+; attempted to operate on a zero length domain name
+
+INVALID_ADDRESS				enum	FatalErrors
+; attempted to operate on a zero length address
+
+REGISTER_FAILED				enum	FatalErrors
+; a call to DR_SOCKET_REGISTER failed
+
+TIMEOUT_FAULT				enum	FatalErrors
+; the computed drop-dead-time corresponds to a reserved value
+
+UNEXPECTED_SEMAPHORE_ERROR		enum	FatalErrors
+; ThreadPTimedSem returned an error other then timeout
+
+PORT_NOT_IN_PORT_ARRAY			enum	FatalErrors
+; A PortInfo structure is not bound properly to its port number
+
+CORRUPT_SOCKET				enum	FatalErrors
+; A SocketInfo data structure contains invalid data
+
+CORRUPT_PORT				enum	FatalErrors
+; A PortInfo data structure contains invalid data
+
+CORRUPT_DOMAIN				enum	FatalErrors
+; A DomainInfo data structure contains invalid data
+
+CORRUPT_PACKET				enum	FatalErrors
+; A packet received from a driver contains invalid data
+
+CORRUPT_ENDPOINT			enum	FatalErrors
+; A ConnectionEndpoint contains an invalid link handle
+
+UNEXPECTED_QUEUE_ERROR			enum	FatalErrors
+; The queue system returned an unexpected error code
+
+UNEXPECTED_SOCKET_DRIVER_ERROR		enum	FatalErrors
+; A socket driver returned an unexpected error code
+
+LINK_ALREADY_CLOSED			enum	FatalErrors
+; Attempted to reduce reference count below zero.
+
+UNEXPECTED_SOCKET			enum	FatalErrors
+; A routine encountered a socket handle which should not have been
+; possible to encounter.
+
+UNEXPECTED_DISCONNECT_INDICATION	enum	FatalErrors
+; A disconnect indication was received for an in-use link
+; this will eventually be handled, but for now it will just cause
+; problems
+
+INVALID_SOCKET_CLIENT_OPERATION		enum	FatalErrors
+; The driver requested a SocketClientOperation which is not defined or
+; is not valid for the entry point to which it was passed
+
+SOCKET_NOT_IN_CHECK_ARRAY		enum	FatalErrors
+; The socket located by CheckReady is not actually in the list
+; of sockets passed by the user
+
+INVALID_DOMAIN_NAME_SIZE		enum	FatalErrors
+; On a DBCS system, the domain name must have even size
+
+SEGMENT_NOT_SOCKET_CONTROL		enum	FatalErrors
+; The segment register given to Assert {read,write}Control does not actually
+; point to the SocketControl block.
+
+CONTROL_SEGMENT_NOT_LOCKED_RIGHT	enum	FatalErrors
+; The SocketControl segment is supposed to be locked according to
+; bx (SocketControlLockType), but is actually locked as indicated by
+; socket::lockType.
+
+INVALID_CONNECTION_HANDLE		enum	FatalErrors
+; Drivers are not permitted to use 0 as a connection/link handle.
+
+UNREASONABLE_QUEUE_SIZE			enum	FatalErrors
+; It shouldn't be possible to have a queue size over 64k, but somehow
+; we managed it
+
+SOCKET_NOT_IN_SOCKET_ARRAY		enum	FatalErrors
+; Every socket should be in the socket array.  This one wasn't.
+
+RECEIVE_STILL_ENABLED			enum	FatalErrors
+; We shouldn't be here unless the socket's receive side has been
+; shut down already

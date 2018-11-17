@@ -1,0 +1,100 @@
+/**********************************************************************
+ * FILE: NCONTENT.GOC - NewsContentClass Code
+ * Project - News Reader
+ * Started 4/28/98
+ **********************************************************************/
+
+/**********************************************************************
+ * Includes                                                           *
+ **********************************************************************/
+
+@include <stdapp.goh>
+
+@include "utils.goh"
+#include <ansi/stdio.h>
+#include <ansi/string.h>
+
+@include "newsread.goh"
+@include "extern.goh"
+
+#include "news.h"
+
+/**********************************************************************
+ * Class Declarations                                                 *
+ **********************************************************************/
+
+@classdecl NewsContentClass;
+
+/**********************************************************************
+ * Global Variables                                                   *
+ **********************************************************************/
+
+/**********************************************************************
+ * Methods                                                            *
+ **********************************************************************/
+
+/*-------------------------------------------------------------------------
+ | Method:  NewsContentClass::MSG_META_CONTENT_VIEW_OPENING
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    When a view is opened that previously had a text object in it,
+ |    reconnect the text object.  This code is used to avoid losing all
+ |    the text in a display that destroys its vis tree when minimized.
+ |
+ | Inputs:
+ |    optr view                   -- View being opened
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    EDG  ??/??/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method NewsContentClass, MSG_META_CONTENT_VIEW_OPENING
+{
+    VisContentInstance * vself;
+
+    @callsuper();
+
+      /*
+       * Set up the geometry for the content so that the
+       * geometry manager is not used.
+       */
+    vself = ObjDerefVis( oself );
+
+    /* Put the flags to what they should. */
+    vself->VI_attrs &= ~VA_MANAGED;
+    vself->VI_optFlags &= ~(VOF_GEOMETRY_INVALID | VOF_GEO_UPDATE_PATH);
+    vself->VI_geoAttrs |= VCGA_CUSTOM_MANAGE_CHILDREN;
+}
+
+@method NewsContentClass, MSG_META_GAINED_FOCUS_EXCL
+{
+    optr textObj;
+
+    @callsuper();
+    textObj = @call oself::MSG_VIS_FIND_CHILD_AT_POSITION(CCO_FIRST);
+    if (textObj) {
+	@call textObj::MSG_META_GRAB_FOCUS_EXCL();
+	/* To ensure that tab navigation (e.g., from Subject field to here)
+	   causes text object to get the target. */
+	@send @genParent::MSG_META_GRAB_TARGET_EXCL();
+    }
+}
+
+@method NewsContentClass, MSG_META_GAINED_TARGET_EXCL
+{
+    optr textObj;
+
+    @callsuper();
+    textObj = @call oself::MSG_VIS_FIND_CHILD_AT_POSITION(CCO_FIRST);
+    if (textObj) {
+	@call textObj::MSG_META_GRAB_TARGET_EXCL();
+    }
+}
+
+/**********************************************************************
+ * END OF FILE: NCONTENT.GOC - NewsContentClass Code
+ **********************************************************************/
+

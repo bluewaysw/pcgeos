@@ -1,0 +1,153 @@
+#!/bin/sh -
+#
+# This script copies tool files to the CD-Rom image directory.
+#
+# $Id: copyToolFiles,v 1.5 94/02/07 17:42:01 jon Exp $
+#
+
+MAKETOOLPATH=/staff/pcgeos/Tools/scripts/sdk
+export MAKETOOLPATH
+
+
+if [ "$1" = "" ] || [ "$2" = "" ]; then
+	echo "Usage: copyToolFiles <branch> <CD-Rom dir>"
+	echo "Ex.: copyToolFiles Release20X /n/intl_disks"
+	exit 1
+fi
+
+#==============================================================================
+# Copy a bunch of stuff from T:\PCGEOS\BIN to the destination
+#==============================================================================
+
+if ( cd /n/nevada/tools/pcgeos ); then
+
+	cd /n/nevada/tools/pcgeos
+
+echo ""
+echo "----------------------------------------------------------------------"
+echo "The following files are from `pwd`:"
+echo "----------------------------------------------------------------------"
+
+find bin \( -name bmake.exe -o \
+	    -name clean.bat -o \
+	    -name esp.exe -o \
+	    -name findlbdr.exe -o \
+	    -name glue.exe -o \
+	    -name goc.exe -o \
+	    -name grev.exe -o \
+	    -name loc.exe -o \
+	    -name makedpnd.exe -o \
+	    -name mdirs20.bat -o \
+	    -name mkmf.exe -o \
+	    -name pcs.exe -o \
+	    -name pg.exe -o \
+	    -name pmake.exe -o \
+	    -name printobj.exe -o \
+	    -name sdkver.bat -o \
+	    -name swat.exe -o \
+	    -name swat.cfg -o \
+	    -name swat.pif -o \
+	    -name sysfiles -o \
+	    -name uic.exe \) \
+	-exec $MAKETOOLPATH/copy_for_sdk {} $2/pcgeos \;
+else
+	echo "error: Couldn't copy BIN files because /n/nevada/tools"
+	echo "Is nowhere to be found."
+fi
+
+#==============================================================================
+# Copy a bunch of stuff from /staff/pcgeos/Tools to the destination
+#==============================================================================
+
+cd /staff/pcgeos/Tools/com43
+echo ""
+echo "----------------------------------------------------------------------"
+echo "The following files are from `pwd`:"
+echo "----------------------------------------------------------------------"
+$MAKETOOLPATH/copy_for_sdk com43.com $2/pcgeos/bin
+$MAKETOOLPATH/copy_for_sdk pccom.com $2/pcgeos/bin
+
+cd /staff/pcgeos/Tools/pctrans
+echo ""
+echo "----------------------------------------------------------------------"
+echo "The following files are from `pwd`:"
+echo "----------------------------------------------------------------------"
+$MAKETOOLPATH/copy_for_sdk pcget.com $2/pcgeos/bin
+$MAKETOOLPATH/copy_for_sdk pcsend.com $2/pcgeos/bin
+
+
+#==============================================================================
+#  Copy .tcl files from /staff/pcgeos/Tools/swat/lib.new
+#==============================================================================
+
+cd /staff/pcgeos/Tools/swat/lib.new
+echo ""
+echo "----------------------------------------------------------------------"
+echo "The following files are from `pwd`:"
+echo "----------------------------------------------------------------------"
+
+find .  \(  \( -name \*.tcl -o \
+	       -name \*.fei -o \
+	       -name \*.80x8x -o \
+	       -name DOCTAGS -o \
+	       -name README -o \
+	       -name synopsis \
+	     \) \
+	     -a ! \
+	     \( \
+		-name x11.tcl -o \
+		-name zap.tcl \
+	     \) \
+	    -exec $MAKETOOLPATH/copy_for_sdk -u {} $2/pcgeos/tcl \; \
+	\) -o \
+	\(  -type d \
+		\( -name Internal -o \
+		   -name Obsolete \
+		\) \
+	    -prune \
+	\)
+
+find .  \(  \( -name \*.tlc \
+	     \) \
+	     -a ! \
+	     \( \
+		-name x11.tlc -o \
+		-name zap.tlc \
+	     \) \
+	    -exec $MAKETOOLPATH/copy_for_sdk {} $2/pcgeos/tcl \; \
+	\) -o \
+	\(  -type d \
+		\( -name Internal -o \
+		   -name Obsolete \
+		\) \
+	    -prune \
+	\)
+
+echo Copying ./DOC.sdk to $2/pcgeos/tcl/DOC
+cp DOC.sdk $2/pcgeos/tcl/DOC
+
+
+#==============================================================================
+#  .MK and .PLT files
+#==============================================================================
+
+if ( cd /n/nevada/tools/pcgeos/include ); then
+
+cd /n/nevada/tools/pcgeos/include
+
+echo ""
+echo "----------------------------------------------------------------------"
+echo "The following files are from `pwd`:"
+echo "----------------------------------------------------------------------"
+
+$MAKETOOLPATH/copy_for_sdk -u geos.mk $2/pcgeos/Include
+$MAKETOOLPATH/copy_for_sdk -u geode.mk $2/pcgeos/Include
+$MAKETOOLPATH/cp_for_sdk -u borland.mk $2/pcgeos/Include/compiler.mk
+
+find . -name \*.plt \
+       -exec $MAKETOOLPATH/copy_for_sdk -u {} $2/pcgeos/Include/LDF \;
+else
+	echo "error: Couldn't copy .mk or .plt files because directory is missing"
+fi
+
+echo copyToolFiles Ended At `date`

@@ -1,0 +1,4570 @@
+/***********************************************************************
+ *
+ *      Copyright (c) Geoworks 1992 -- All Rights Reserved
+ *
+ * PROJECT:       GeoFile
+ * MODULE:        ffDatabaseLayout.goc
+ * FILE:          ffDatabaseLayout.goc
+ *
+ * AUTHOR:        Jeremy Dashe : Aug  6, 1992
+ *
+ * DESCRIPTION:
+ *      This file contains functions and methods for defining, altering,
+ *      and dealing with layouts for the flat file library.
+ *
+ * RCS STAMP:
+ *      $Id: ffDatabaseLayout.goc,v 1.1 97/04/04 18:03:13 newdeal Exp $
+ *
+ ***********************************************************************/
+
+#ifdef __HIGHC__
+pragma Code("DATABASELAYOUTMANAGEMENT");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg DATABASELAYOUTMANAGEMENT
+#endif
+
+typedef struct
+{
+	long    dagnabbit;
+	char    muck;
+} _FOO_METAWARE_STRUC_;
+
+@include <stdapp.goh>
+#include <cell.h>
+@include <grobj.goh>
+#include <system.h>
+@include <spool.goh>
+
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+
+@include <ffile.goh>
+#include <ffFatal.h>
+@include <Objects/FlatFile/ffileC.goh>
+@include <Objects/FlatFile/ffRecC.goh>
+#include <Database/ffdExtrn.h>
+
+#define FFD_CURRENT_RECORD(x)   (x->FFI_showOnlyMarked ? \
+				 x->FFI_currentMarkedRecord : \
+				 x->SSI_active.CR_row)
+
+/*************************************************************************
+		Forward Declarations
+ *************************************************************************/
+
+void FFDSetGrObjectsForDataEntry(optr oself, LayoutType layoutType);
+void FFDSetGrObjectsForDesignMode(optr oself, LayoutType layoutType);
+void DetachCurrentLayout(optr oself);
+
+void AttachLayout(optr oself, optr newGrObjBody, optr ffGrObjHeadOptr, 
+		  LayoutType layoutType, Boolean printing);
+
+optr AttachNewGrObjBody(FlatFileDatabaseInstance *pself, 
+			MemHandle ffGrObjBodyHandle, 
+			ChunkHandle ffGrObjBodyChunk,
+			VMBlockHandle *ffGrObjBlock);
+
+void GenerateLayoutNameAndPutInHeader(optr oself, byte layoutNum, 
+			RecordLayoutChunkArrayHeader *chunkArrayAddress);
+
+FFLayoutNameInsertionResult
+InsertLayoutNameIntoSortedList(optr oself, byte layoutNum, TCHAR *layoutName,
+				byte numLayouts);
+
+void DeleteLayoutName(byte layoutNum, optr oself);
+
+byte FFDGetLayoutNum(FlatFileDatabaseInstance *pself, byte layoutNameIndex);
+
+void FFDCreateMultiRecordLayoutDontDisplay(optr oself,
+					   MemHandle mrGrObjBodyHandle,
+					   ChunkHandle mrGrObjBodyChunk,
+					   byte layoutNum);
+
+void FFDSetRecordOrderForLayout(optr oself, byte layoutNum, 
+				RecordOrderOption recordOrder);
+
+RecordOrderOption FFDGetRecordOrderForLayout(optr oself, byte layoutNum);
+
+optr GetPageLayoutBoundaryOptr(optr oself, byte layoutNum);
+
+void
+FFDCheckIfNeedToResizePageLayoutBoundary(optr oself, LayoutSize bounds);
+
+void
+FFDSetMultiRecordBounds(optr oself, LayoutSize bounds);
+
+void
+FFDSetSingleRecordBounds(optr oself, LayoutSize bounds);
+
+void FFDAddRecordLayout(optr oself, optr ffGrObjHeadOptr);
+void FFDRemoveRecordLayout(optr oself);
+void FFDSwitchToLayout(optr oself, byte layoutNum, optr ffGrObjHeadOptr,
+		       LayoutType layoutType, Boolean printing);
+LayoutType FFDGetLayoutType(optr oself, byte layoutNum, byte curLayout);
+
+void FFDSetPageBounds(optr oself, PageSizeReport *psr);
+
+/*************************************************************************
+		Declarations of routines defined in ffDatabase.goc
+*************************************************************************/
+extern FieldID FFDGetFreeColumnNum(byte *columnsTaken);
+
+extern FieldID FindFieldListElement(FieldID list[],
+				FieldListID colNum,
+				FieldListID numFields);
+
+
+/*************************************************************************
+		External Declarations
+ *************************************************************************/
+@extern chunk @FFDLayoutName;
+@extern chunk @FFDConfirmDeleteLayout;
+
+/***********************************************************************
+ *
+ * FUNCTION:    AttachNewGrObjBody
+ *
+ * DESCRIPTION: Attaches a new grObjBody;
+ *              - creates a new VM block
+ *              - converts it to a memory block
+ *              - adds the graphic body to the attribute manager's list
+ *
+ * PARAMETERS:  Pass:   pself -- ptr to flatfile instance data
+ *                      ffGrObjBodyHandle - handle to new graphic body
+ *                      ffGrObjBodyChunk - chunk handle to new graphic body
+ *                      *ffGrObjBody - pointer to VM block handle of new
+ *                                      graphic body; filled in by routine
+ *
+ *              Return: optr to new graphic body.
+ *
+ * Called BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/17/92         Initial Revision 
+ *
+ ***********************************************************************/
+optr
+AttachNewGrObjBody(FlatFileDatabaseInstance *pself, 
+			MemHandle ffGrObjBodyHandle, 
+			ChunkHandle ffGrObjBodyChunk,
+			VMBlockHandle *ffGrObjBlock)
+{
+    MemHandle memBlock;
+    optr newGrObjBody;
+
+    /*
+     * Create new VM block
+     */
+
+    *ffGrObjBlock = VMAttach(pself->documentHandle, 0, ffGrObjBodyHandle);
+
+    VMPreserveBlocksHandle(pself->documentHandle, *ffGrObjBlock);
+
+    /* 
+     * Convert the VM block to a memory block so that we can
+     * access the objects within the block
+     */
+
+    memBlock = VMVMBlockToMemBlock(pself->documentHandle, *ffGrObjBlock);
+
+    newGrObjBody = ConstructOptr(memBlock, ffGrObjBodyChunk);
+
+    /*
+     * Add the new graphic body to the Attribute Manager's list
+     */
+    @call newGrObjBody::MSG_GB_ATTACH_GOAM(pself->FFI_grObjAM);
+
+    return(newGrObjBody);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    AttachLayout
+ *
+ * DESCRIPTION: Attaches a new layout;
+ *              - makes the new body a child of the FlatFile object
+ *              - Copy the layout name list from the layout's chunk array
+ *                to the instance data. Also calculate the other two
+ *                sorted lists for the instance data.
+ *              NOTE: this routine assumes that pself->FFI_currentLayout
+ *                    is already set to the new layout
+ *              - forces a redraw of the content
+ *
+ * PARAMETERS:  pass:   oself -- optr to current flatfile object
+ *                      newGrObjBody - optr to grObjBody for this layout
+ *                      ffGrObjHeadOptr - optr to grObjHead for this document
+ *                      layoutType - LT_SINGLE_RECORD/LT_MULTI_RECORD/
+ *                                   LT_REPORT
+ *                      printing - set if we should not update lists or
+ *                                 other UI.
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/7/92          Initial Revision 
+ *
+ ***********************************************************************/
+void
+AttachLayout(optr oself, optr newGrObjBody, optr ffGrObjHeadOptr, 
+	     LayoutType layoutType, Boolean printing)
+{
+    FlatFileDatabaseInstance *pself;
+    byte i, layoutNamesIndex, notInLayoutNamesIndex;
+    RecordLayoutChunkArrayHeader *cellDataPtr;
+    EventHandle event;
+
+    /*
+     * Add the graphic body as the first child of the
+     * FlatFile object. Don't mark dirty because we don't want
+     * the document dirtied as soon as it is open, nor
+     * do we save the Document/Content or the parent pointer
+     * in the GrObjBody.
+     */
+    @call self::MSG_VIS_ADD_CHILD(newGrObjBody, CCF_MARK_DIRTY);
+
+    /*
+     * Notify the GrObjBody that it has been added to
+     * the Document/Content. And pass it the GrObjHead.
+     */
+    @call newGrObjBody::MSG_GB_ATTACH_UI(ffGrObjHeadOptr);
+
+    /*
+     * We want a MSG_VIS_OPEN to be sent to the GrObjBody
+     */
+    @call newGrObjBody::MSG_VIS_MARK_INVALID(VOF_WINDOW_INVALID, VUM_NOW);
+    @call newGrObjBody::MSG_VIS_VUP_UPDATE_WIN_GROUP(VUM_NOW);
+
+    @call newGrObjBody::MSG_META_GRAB_TARGET_EXCL();
+
+    /*
+     * Force the View to redraw
+     */
+    event = @record GenViewClass::MSG_GEN_VIEW_REDRAW_CONTENT();
+
+    @send oself::MSG_VIS_VUP_CALL_OBJECT_OF_CLASS(event);
+
+    pself = ObjDerefGen(oself);
+
+    pself->FFI_currentLayoutType = layoutType;
+
+    /*
+     * Retrieve the new layout's chunk array
+     */
+    cellDataPtr = CellLock(&pself->SSI_cellParams,
+			     RECORD_LAYOUT_ROW, 
+			     pself->FFI_currentLayout);
+    /*
+     * Copy the sorted name list into instance data
+     */
+    memcpy(&pself->FFI_layoutNameList,
+	   &cellDataPtr->RLCAH_layoutSortedFieldList,
+	   MAX_NUM_FIELDS);
+
+    /*
+     * Copy the field navigation order from the layout into instance data.
+     */
+    memcpy(&pself->FFI_fieldOrderInfo,
+	   &cellDataPtr->RLCAH_fieldOrderInfo,
+	   sizeof(FFDBFieldNavigationOrderInfo));
+
+    CellUnlock(cellDataPtr);
+
+    /* 
+     * Figure out what the other lists should be (the whole database
+     * list, and the "not in layout" list); update all the associated
+     * instance data.
+     */
+    layoutNamesIndex = 0;
+    notInLayoutNamesIndex = 0;
+    pself->FFI_numInLayoutNameList = 0;
+    pself->FFI_numInNotInLayoutNameList = 0;
+
+    for (i=0; i < pself->FFI_numFields; i++) {
+	if (pself->FFI_databaseNameList[i] == 
+			pself->FFI_layoutNameList[layoutNamesIndex]) {
+	    layoutNamesIndex++;
+	    pself->FFI_numInLayoutNameList++;
+	}
+	else {
+	    pself->FFI_notInLayoutNameList[notInLayoutNamesIndex] = 
+			pself->FFI_databaseNameList[i];
+	    notInLayoutNamesIndex++;
+	    pself->FFI_numInNotInLayoutNameList++;
+	}
+    }
+
+    /*
+     * Notify all of the lists that they should reset themselves
+     * for the new layout, unless we're printing.
+     */
+    if (!printing) {
+	SendWholeListNotification(oself, 0, RESET, pself->FFI_numFields);
+	SendDatabaseListNotification(oself, 0, RESET, 
+				     pself->FFI_numInNotInLayoutNameList);
+	SendLayoutListNotification(oself, 0, RESET, 
+				   pself->FFI_numInLayoutNameList);
+    }
+
+    /*
+     * Mark the database dirty
+     */
+    ObjMarkDirty(oself);
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDMarkCurrentLayoutMode
+ *
+ * DESCRIPTION: This routine sets a layout's mode to the mode given
+ *
+ * PARAMETERS:  pself - pointer to FlatFile instance data
+ *              newMode - ModeType 
+ *              layoutType - which layout (single/multi) are we changing?
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/15/92         Initial Revision
+ *
+ ***********************************************************************/
+void
+FFDMarkCurrentLayoutMode(FlatFileDatabaseInstance *pself, ModeType newMode,
+				LayoutType layoutType)
+{
+    RecordLayoutChunkArrayHeader *layoutInfoPtr;
+    MultiRecordLayoutStruct *multiRecInfoPtr;
+
+    /*
+     * Set it for the single-record layout
+     */
+    if (layoutType == LT_SINGLE_RECORD) {
+	layoutInfoPtr = CellLock(&pself->SSI_cellParams,
+				 RECORD_LAYOUT_ROW,
+				 (word) pself->FFI_currentLayout);
+    
+	layoutInfoPtr->RLCAH_layoutMode = newMode;
+
+	CellDirty(layoutInfoPtr);
+	CellUnlock(layoutInfoPtr);
+    }
+    else {
+	/*
+	 * Set it for the multi-record layout
+	 */
+	multiRecInfoPtr = CellLock(&pself->SSI_cellParams,
+				 MULTI_RECORD_LAYOUT_ROW,
+				 (word) pself->FFI_currentLayout);
+    
+	multiRecInfoPtr->MRLS_layoutMode = newMode;
+
+	CellDirty(multiRecInfoPtr);
+	CellUnlock(multiRecInfoPtr);
+    }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_SET_CURRENT_MODE_TO_DESIGN for FlatFileDatabaseClass
+ *
+ * DESCRIPTION: This message sets the current mode to design mode.
+ *
+ *              Mark the current layout as being in Design Mode.
+ *
+ * PARAMETERS:
+ *              pass: nothing   
+ *              return: nothing
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  5/12/92         Initial version
+ *      anna    5/14/92         Enable the GrObjToolbox
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_SET_CURRENT_MODE_TO_DESIGN
+{
+    optr grObjHeadOptr;
+    optr mrGrObjBody;
+    EventHandle	event;
+
+    grObjHeadOptr = pself->FFI_grObjHeadOptr;
+
+    /*
+     * If we're a multi-record layout moving to Design, we want to
+     * remove the recordLayout grObjBody as a vis-child
+     */
+    if ((pself->FFI_currentLayoutType == LT_MULTI_RECORD) &&
+		(pself->FFI_currentMode == MT_DATA_ENTRY)) {
+	FFDRemoveRecordLayout(oself);
+
+	/*
+	 * Give the multi-record grobjbody the target
+	 */
+	pself = ObjDerefGen(oself);
+	mrGrObjBody = FFDGetGrObjBodyForLayout(oself, 
+						pself->FFI_currentLayout,
+						LT_MULTI_RECORD);
+	@call mrGrObjBody::MSG_META_GRAB_TARGET_EXCL();
+    }
+
+
+    @call self::MSG_FFD_SET_CURRENT_MODE(MT_DESIGN);
+
+    /*
+     * Reset the current tool 
+     */
+    pself = ObjDerefGen(oself);
+    /*
+     * If we have the tool set in the instance data, look it up
+     */
+    if (pself->FFI_designModeGrObjTool != (ClassStruct *) 0) {
+	@call grObjHeadOptr::MSG_GH_SET_CURRENT_TOOL(
+			     pself->FFI_designModeGrObjTool, 0);
+    }
+    else {
+	@call grObjHeadOptr::MSG_GH_SET_CURRENT_TOOL(
+			(ClassStruct *) &PointerClass, 0);
+    }
+    /*
+     * notify focus (GrObjBody) to update edit menu
+     */
+    event = @record GrObjBodyClass::MSG_GB_UPDATE_UI_CONTROLLERS(GOUINT_SELECT);
+    @call oself::MSG_META_SEND_CLASSED_EVENT(event, TO_FOCUS);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_SET_CURRENT_MODE_TO_DATA_ENTRY for 
+ *              FlatFileDatabaseClass
+ *
+ * DESCRIPTION: This message sets the current mode to data entry mode.
+ *              The current record's information is loaded into the
+ *              layout's text objects.
+ *              
+ * PARAMETERS:
+ *              pass: nothing   
+ *              return: nothing
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  5/12/92         Initial version
+ *      anna    5/14/92         Set current tool to text tool,
+ *                              disable GrObjToolbox.
+ *      anna    5/18/92         Changed current tool to Steve's new
+ *                              "Edit text but don't create it" tool.
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_SET_CURRENT_MODE_TO_DATA_ENTRY
+{
+    CurrentToolValues currentTool;
+    ModeType oldMode;
+
+    /*
+     * This message gets sent when we open up an existing file. In this
+     * case, we don't want to add a grobj body (it's already attached)
+     * to the flatfile object. We can check this by seeing what mode
+     * we're already in. Store it here so we can check it later
+     */
+    oldMode = pself->FFI_currentMode;
+
+    @call self::MSG_FFD_SET_CURRENT_MODE(MT_DATA_ENTRY);
+
+    /*
+     * If we're in  a multi-record layout, we want to add the record
+     * layout as a vis-child of the flatfile object, because it will
+     * be displayed numerous times
+     */
+    pself = ObjDerefGen(oself);
+    if ((pself->FFI_currentLayoutType == LT_MULTI_RECORD) &&
+			(oldMode == MT_DESIGN)) {
+	FFDAddRecordLayout(oself, pself->FFI_grObjHeadOptr);
+    }
+
+    /*
+     * Save the current tool
+     */
+    pself = ObjDerefGen(oself);
+    @call pself->FFI_grObjHeadOptr::MSG_GH_GET_CURRENT_TOOL(&currentTool);
+
+    pself = ObjDerefGen(oself);
+    pself->FFI_designModeGrObjTool = currentTool.CTV_toolClass;
+
+    /*
+     * Set the current tool to text ("edit only") tool
+     */
+    @call pself->FFI_grObjHeadOptr::MSG_GH_SET_CURRENT_TOOL(
+			(ClassStruct *) &EditTextGuardianClass, 0);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_GET_CURRENT_MODE for FlatFileDatabaseClass
+ *
+ * DESCRIPTION: This message returns the current database's mode.
+ *
+ * PARAMETERS:
+ *      ModeType ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  9/ 2/92         Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_GET_CURRENT_MODE
+{
+    return (pself->FFI_currentMode);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_SET_CURRENT_MODE for FlatFileDatabaseClass
+ *
+ * DESCRIPTION: This message is called to change a database's mode from
+ *              one mode to another.
+ *
+ * PARAMETERS:  pass:   ModeType newMode -- new mode to switch to.
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  5/11/92         Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_SET_CURRENT_MODE
+{
+    ModeType currentMode; 
+
+    currentMode = pself->FFI_currentMode;
+
+    /* If we're already in the requested mode, return. */
+    if (newMode == currentMode) {
+	return;
+    }
+
+    /* Are we switching to a data entry mode from a design mode? */
+    if (currentMode == MT_DESIGN) {
+	/*
+	 * We are indeed in design mode.  Are we switching to a data
+	 * entry mode?
+	 */
+	if (newMode == MT_DATA_ENTRY) {
+	    /*
+	     * We're switching to a data entry mode, alrighty.  Change the
+	     * layout's GrObjects to be non-selectable and possibly
+	     * non-editable.
+	     */
+	    FFDSetGrObjectsForDataEntry(oself, pself->FFI_currentLayoutType);
+	}
+    } else {
+	/* 
+	 * We're switching from some data entry mode to a design mode.
+	 * Set all GrObjects to be selectable and editable.
+	 */
+	FFDSetGrObjectsForDesignMode(oself, pself->FFI_currentLayoutType);
+    }
+
+    /* Update our current mode. */
+    pself = ObjDerefGen(oself);
+    pself->FFI_currentMode = newMode;
+
+    /*
+     * We don't need to redraw, because the removal/addition of the
+     * grObjTools will cause a redraw anyway
+     */
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDSetGrObjectsForDataEntryForGivenLayout
+ *
+ * DESCRIPTION: This routine sets the given layout's GrObjects for 
+ *              data entry mode.
+ *
+ * PARAMETERS:  oself - optr to database that needs GrObj work done
+ *              layoutType - LT_SINGLE_RECORD or LT_MULTI_RECORD
+ *
+ * CALLED BY:   FFDSetGrObjectsForDataEntry
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    9/4/92          Initial Revision
+ *
+ ***********************************************************************/
+void
+FFDSetGrObjectsForDataEntryForGivenLayout(optr oself, LayoutType layoutType)
+{
+    FlatFileDatabaseInstance *pself;
+    optr grobjBody;
+    word axr, cxr, dxr, bpr;
+
+    pself = ObjDerefGen(oself);
+    grobjBody = @call oself::
+	MSG_FFD_GET_GROBJ_BODY_FOR_LAYOUT(pself->FFI_currentLayout,
+					  layoutType);
+
+    ObjLockObjBlock(OptrToHandle(grobjBody));
+
+    GrObjBodyProcessSelectedGrObjsCommon(
+	grobjBody, MSG_GO_BECOME_UNSELECTED, 0, 0, 0, &axr, &cxr, &dxr, &bpr);
+
+    GrObjBodyProcessAllGrObjsInDrawOrderCommon(
+	grobjBody, OCCT_SAVE_PARAMS_DONT_TEST_ABORT,
+	MSG_GO_CHANGE_LOCKS,
+	(GOL_MOVE | GOL_RESIZE | GOL_ROTATE | GOL_SKEW |
+	GOL_EDIT | GOL_COPY | GOL_DELETE | GOL_SELECT | GOL_ATTRIBUTE),
+	(GOL_PRINT), GOL_LOCK,
+	&axr, &cxr, &dxr, &bpr);
+
+    /*
+     * Now turn on all of the appropriate GrObjects.
+     */
+    GrObjBodyProcessAllGrObjsInDrawOrderCommon(
+	grobjBody, OCCT_SAVE_PARAMS_DONT_TEST_ABORT,
+	MSG_FFTFG_SET_FOR_DATA_ENTRY, 0, 0, 0,
+	&axr, &cxr, &dxr, &bpr);
+
+    MemUnlock(OptrToHandle(grobjBody));
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDSetGrObjectsForDataEntry
+ *
+ * DESCRIPTION: This routine sets the current layout's GrObjects for 
+ *              data entry mode.
+ *
+ * PARAMETERS:  oself - optr to database that needs GrObj work done
+ *              layoutType - LT_SINGLE_RECORD or LT_MULTI_RECORD
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  5/11/92         Initial Revision
+ *
+ ***********************************************************************/
+void
+FFDSetGrObjectsForDataEntry(optr oself, LayoutType layoutType)
+{
+    optr pageLayoutBoundaryOptr;
+    FlatFileDatabaseInstance *pself;
+
+    pself = ObjDerefGen(oself);
+
+    /*
+     * Loop through the layout's GrObjects 
+     * and turn them all off.
+     */
+    FFDSetGrObjectsForDataEntryForGivenLayout(oself, layoutType);
+
+    /*
+     * Make the page boundary drawable
+     */
+    pself = ObjDerefGen(oself);
+
+    pageLayoutBoundaryOptr = GetPageLayoutBoundaryOptr(oself, 
+					pself->FFI_currentLayout);
+
+    (void) @call pageLayoutBoundaryOptr::
+	MSG_GO_CHANGE_LOCKS((GOL_LOCK | GOL_DRAW), GOL_LOCK);
+
+    /*
+     * Mark this layout as having its GrObjects in Data Entry mode
+     */
+    pself = ObjDerefGen(oself);
+    FFDMarkCurrentLayoutMode(pself, MT_DATA_ENTRY, layoutType);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_LOAD_FIELD_WITH_PAGE_NUMBER for FlatFileDatabaseClass
+ *
+ * DESCRIPTION: This message loads a text field with the current page
+ *              number in multi-record mode.
+ *
+ * PARAMETERS:
+ *      void (optr fieldOptr)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  6/17/92         Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_LOAD_FIELD_WITH_PAGE_NUMBER
+{
+    TCHAR text[NUM_ASCII_DIGITS];
+
+    if (pself->FFI_editingNewRecord) {
+	text[0] = _TEXT('-');
+	text[1] = _TEXT('-');
+	text[2] = _TEXT('\0');
+    } else {
+	sprintf(text, _TEXT("%d"), pself->FFI_currentPage + 1);
+    }
+
+    @call fieldOptr::MSG_VIS_TEXT_REPLACE_ALL_PTR(text, 0);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDSetGrObjectsForDesignModeForGivenLayout
+ *
+ * DESCRIPTION: This routine sets the given layout's GrObjects for 
+ *              design mode.
+ *
+ * PARAMETERS:  oself - optr to database that needs GrObj work done
+ *              layoutType - LT_SINGLE_RECORD or LT_MULTI_RECORD
+ *
+ * CALLED BY:   FFDSetGrObjectsForDesignMode
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    9/4/92          Initial Revision
+ *
+ ***********************************************************************/
+void
+FFDSetGrObjectsForDesignModeForGivenLayout(optr oself, 
+					   LayoutType layoutType)
+{
+    optr grobjBody, pageBoundaryOptr;
+    FlatFileDatabaseInstance *pself;
+    word axr, cxr, dxr, bpr;
+
+    pself = ObjDerefGen(oself);
+
+    grobjBody = @call oself::
+	MSG_FFD_GET_GROBJ_BODY_FOR_LAYOUT(pself->FFI_currentLayout,
+					  layoutType);
+
+    ObjLockObjBlock(OptrToHandle(grobjBody));
+
+    GrObjBodyProcessSelectedGrObjsCommon(
+	grobjBody, MSG_GO_BECOME_UNSELECTED, 0, 0, 0, &axr, &cxr, &dxr, &bpr);
+
+    GrObjBodyProcessAllGrObjsInDrawOrderCommon(
+	grobjBody, OCCT_SAVE_PARAMS_DONT_TEST_ABORT,
+	MSG_GO_CHANGE_LOCKS, 0, 
+	(GOL_MOVE  | GOL_RESIZE | GOL_COPY | GOL_ROTATE | GOL_SKEW |
+	 GOL_EDIT  | GOL_DELETE | GOL_SELECT | GOL_ATTRIBUTE |
+	 GOL_PRINT | GOL_LOCK), 0,
+	&axr, &cxr, &dxr, &bpr);
+
+    /*
+     * If we're in multi-record, we don't want to make the page boundary
+     * deletable/rotatable/skewable/groupable; set 
+     * the appropriate locks for it here
+     */
+    pself = ObjDerefGen(oself);
+    if (layoutType == LT_MULTI_RECORD) {
+	pself = ObjDerefGen(oself);
+	pageBoundaryOptr = GetPageLayoutBoundaryOptr(oself, 
+						pself->FFI_currentLayout);
+	@call pageBoundaryOptr::
+	    MSG_GO_CHANGE_LOCKS(GOL_LOCK | GOL_DELETE | GOL_ROTATE |
+				GOL_SKEW | GOL_GROUP | GOL_ATTRIBUTE | GOL_COPY,
+				GOL_LOCK);
+    }
+
+    /*
+     * Now we need to set the field text elements in the layout to be
+     * selectable but not editable (and reset the text that is
+     * sitting in them to the field name).
+     */
+    GrObjBodyProcessAllGrObjsInDrawOrderCommon(
+	grobjBody, OCCT_SAVE_PARAMS_DONT_TEST_ABORT,
+	MSG_FFTFG_SET_FOR_DESIGN_MODE, 0, 0, 0,
+	&axr, &cxr, &dxr, &bpr);
+
+    MemUnlock(OptrToHandle(grobjBody));
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDSetGrObjectsForDesignMode
+ *
+ * DESCRIPTION: This function sets all of the current layout's
+ *              fields and ornamentation editable, movable, etc --
+ *              basically what you'd expect in design mode.
+ *
+ * PARAMETERS:  oself - an optr to a FlatFileDatabase object
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  5/11/92         Initial Revision
+ *      anna    6/10/92         Draw field names into grObjects
+ *
+ ***********************************************************************/
+void
+FFDSetGrObjectsForDesignMode(optr oself, LayoutType layoutType)
+{
+    optr pageLayoutBoundaryOptr;
+    FlatFileDatabaseInstance *pself;
+    RecordLayoutChunkArrayHeader *cellDataPtr;
+
+    pself = ObjDerefGen(oself);
+
+    /*
+     * First, retrieve the record layout chunk array.
+     */
+    FFDSetGrObjectsForDesignModeForGivenLayout(oself, 
+						layoutType);
+
+    /*
+     * Make the record boundary and page boundary non-drawable
+     */
+    pself = ObjDerefGen(oself);
+
+    cellDataPtr = CellLock(&pself->SSI_cellParams,
+			   RECORD_LAYOUT_ROW,
+			   pself->FFI_currentLayout);
+
+    pageLayoutBoundaryOptr = GetPageLayoutBoundaryOptr(oself, 
+					pself->FFI_currentLayout);
+
+    (void) @call pageLayoutBoundaryOptr::
+	MSG_GO_CHANGE_LOCKS(GOL_LOCK, GOL_DRAW | GOL_LOCK);
+
+    CellUnlock(cellDataPtr);
+
+    /*
+     * Mark this layout as having its GrObjects in Design mode
+     */
+    pself = ObjDerefGen(oself);
+    FFDMarkCurrentLayoutMode(pself, MT_DESIGN, layoutType);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDStoreLayoutNameList
+ *
+ * DESCRIPTION: Stores the sorted name arrays (currently in
+ *              the instance data) in the chunk array for the current
+ *              layout.
+ *
+ * PARAMETERS:  pass:   oself -- optr to current flatfile object
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/7/92          Initial Revision 
+ *
+ ***********************************************************************/
+void
+FFDStoreLayoutNameList(optr oself)
+{
+    FlatFileDatabaseInstance *pself;
+    RecordLayoutChunkArrayHeader *cellDataPtr;
+    optr cellOptr;
+
+    pself = ObjDerefGen(oself);
+
+    /*
+     * If this is a single-record layout, store the sorted layout list 
+     * in the chunk array for this layout.
+     * First lock this layout's cell
+     */
+    if (pself->FFI_currentLayoutType == LT_SINGLE_RECORD) {
+	cellDataPtr = CellLockGetRef(&pself->SSI_cellParams,
+			     RECORD_LAYOUT_ROW, 
+			     pself->FFI_currentLayout,
+			     &cellOptr);
+
+    /*
+     * Copy the layout list into the layout cell
+     */
+	memcpy(&cellDataPtr->RLCAH_layoutSortedFieldList, 
+	       &pself->FFI_layoutNameList,
+	       MAX_NUM_FIELDS);
+
+	cellDataPtr = LMemDeref(cellOptr);
+
+	CellDirty(cellDataPtr);
+    
+	cellDataPtr = LMemDeref(cellOptr);
+
+	CellUnlock(cellDataPtr);
+    }
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDStoreLayoutFieldOrder
+ *
+ * DESCRIPTION: Stores the field order info list (currently in
+ *              the instance data) in the chunk array for the current
+ *              layout.
+ *
+ * PARAMETERS:  pass:   oself -- optr to current flatfile object
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  3/8/93          Initial version
+ *
+ ***********************************************************************/
+void
+FFDStoreLayoutFieldOrder(optr oself)
+{
+    FlatFileDatabaseInstance *pself;
+    RecordLayoutChunkArrayHeader *cellDataPtr;
+    optr cellOptr;
+
+    pself = ObjDerefGen(oself);
+
+    cellDataPtr = CellLockGetRef(&pself->SSI_cellParams,
+				 RECORD_LAYOUT_ROW, 
+				 pself->FFI_currentLayout,
+				 &cellOptr);
+
+    /*
+     * Copy the field order list into the layout cell
+     */
+    memcpy(&cellDataPtr->RLCAH_fieldOrderInfo, 
+	   &pself->FFI_fieldOrderInfo,
+	   sizeof(FFDBFieldNavigationOrderInfo));
+
+    cellDataPtr = LMemDeref(cellOptr);
+    CellDirty(cellDataPtr);
+    
+    cellDataPtr = LMemDeref(cellOptr);
+    CellUnlock(cellDataPtr);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    DetachCurrentLayout
+ *
+ * DESCRIPTION: Detaches the GrObjBody associated with the current layout
+ *              from the Flatfile object.
+ *
+ *              Also stores the sorted name arrays (currently in
+ *              the instance data) in the chunk array for the current
+ *              layout.
+ *
+ *              Also stores the current field order info (currently
+ *              in instance data) in the chunk array.
+ *
+ * PARAMETERS:  pass:   oself -- optr to current flatfile object
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/7/92          Initial Revision 
+ *
+ ***********************************************************************/
+void
+DetachCurrentLayout(optr oself)
+{
+    FlatFileDatabaseInstance *pself;
+    optr oldGrObjBody;
+
+    pself = ObjDerefGen(oself);
+
+    /*
+     * Reset the instance data for which record to display first in
+     * multi-record mode
+     */
+    pself->FFI_currentTopRecordInMultiRecDisplay = -1;
+
+    /*
+     * Get the current grObjBody
+     */
+    oldGrObjBody = @call oself::MSG_FFD_GET_GROBJ_BODY_FOR_LAYOUT(
+					pself->FFI_currentLayout,
+					pself->FFI_currentLayoutType);
+
+    /*
+     * Notify the current GrObjBody that is it about to be removed from
+     * the Document/Content and closed.
+     */
+    @call oldGrObjBody::MSG_GB_DETACH_UI();
+
+    /*
+     * Mark the removed body dirty, so that if we "discard changes"
+     * (revert to saved) later, the vis link is preserved
+     */
+    ObjLockObjBlock(OptrToHandle(oldGrObjBody));
+    ObjMarkDirty(oldGrObjBody);
+    MemUnlock(OptrToHandle(oldGrObjBody));
+
+    /*
+     * Remove the current GrObjBody from the visual tree
+     */
+    @call oldGrObjBody::MSG_VIS_REMOVE(VUM_MANUAL);
+    
+    /*
+     * Store the layout name list and field order into the appropriate cell
+     */
+    FFDStoreLayoutNameList(oself);
+    FFDStoreLayoutFieldOrder(oself);
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_CREATE_NEW_LAYOUT 
+ *              for FlatFileDatabaseClass
+ *
+ * DESCRIPTION: Creates a new single-record layout and displays it.
+ *              Returns the current layout number.
+ *
+ * PARAMETERS:
+ *      byte (MemHandle singleRecordGrObjBodyHandle, 
+ *            MemHandle multiRecordGrObjBodyHandle,
+ *            ChunkHandle ffGrObjBodyChunk, 
+ *            optr ffGrObjHeadOptr)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    6/30/92         Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_CREATE_NEW_LAYOUT
+{
+    optr newGrObjBody;
+    VMBlockHandle ffGrObjBlock;
+    byte layoutNum;
+    EventHandle event;
+
+    /*
+     * Detach the current GrObjBody from the flatfile object
+     */
+    DetachCurrentLayout(oself);
+
+    pself = ObjDerefGen(oself);
+    newGrObjBody = AttachNewGrObjBody(pself, 
+				      singleRecordGrObjBodyHandle, 
+				      ffGrObjBodyChunk,
+				      &ffGrObjBlock);
+    /*
+     * Set up the chunk array for the record layout
+     */
+    layoutNum = @call self::MSG_FFD_INIT_SINGLE_RECORD_LAYOUT(-1,
+							ffGrObjBlock,
+							ffGrObjBodyChunk,
+							newGrObjBody,
+							LT_SINGLE_RECORD);
+
+    /*
+     * Make the new body a child of the flatfile object, and send 
+     * it a VIS_OPEN
+     */
+    AttachLayout(oself, newGrObjBody, ffGrObjHeadOptr, LT_SINGLE_RECORD, FALSE);
+
+    /*
+     * Set up the multi-record layout
+     */
+    FFDCreateMultiRecordLayoutDontDisplay(oself,
+					  multiRecordGrObjBodyHandle,
+					  ffGrObjBodyChunk,
+					  layoutNum);
+    /*
+     * Force the View to redraw
+     */
+    event = @record GenViewClass::MSG_GEN_VIEW_REDRAW_CONTENT();
+
+    @send oself::MSG_VIS_VUP_CALL_OBJECT_OF_CLASS(event);
+
+    /*
+     * Return the new layout number.
+     */
+    return (layoutNum);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    GetPageLayoutBoundaryOptr
+ *
+ * DESCRIPTION: Returns the optr to the given layout's page layout
+ *              boundary (repeater box).
+ *
+ * PARAMETERS:  Pass:   oself -- optr to flatfile instance data
+ *                      layoutNum - what you'd think
+ *
+ *              Return: optr to record layout boundary GrObject.
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    9/4/92          Initial Revision 
+ *
+ ***********************************************************************/
+optr
+GetPageLayoutBoundaryOptr(optr oself, byte layoutNum) 
+{
+    MultiRecordLayoutStruct *multiRecordLayoutPtr;
+    MemHandle pageLayoutBoundaryMemBlock;
+    optr pageLayoutBoundaryOptr;
+    FlatFileDatabaseInstance *pself;
+
+    pself = ObjDerefGen(oself);
+
+    /*
+     * Get the size of the record layout's boundary
+     */
+    multiRecordLayoutPtr = CellLock(&pself->SSI_cellParams,
+			       MULTI_RECORD_LAYOUT_ROW,
+			       layoutNum);
+    
+    if (!multiRecordLayoutPtr) {
+	return((optr) 0);
+    }
+    
+    pageLayoutBoundaryMemBlock = VMVMBlockToMemBlock(pself->documentHandle, 
+				multiRecordLayoutPtr->MRLS_mrBoundaryVMBlock);
+    pageLayoutBoundaryOptr = ConstructOptr(pageLayoutBoundaryMemBlock, 
+				multiRecordLayoutPtr->MRLS_mrBoundaryChunk);
+
+    CellUnlock(multiRecordLayoutPtr);
+
+    return(pageLayoutBoundaryOptr);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDCheckIfNeedToResizePageLayoutBoundary
+ *
+ * DESCRIPTION: Checks if the the page layout boundary object is at least
+ *              as big as given width and height. If not, changes its
+ *              size.
+ *
+ * PARAMETERS:  Pass:   oself -- optr to flatfile instance data
+ *                      bounds - minumum width & height of page
+ *                               layout boundary object.
+ *
+ *              Return: nothing
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    9/8/92          Initial Revision 
+ *
+ ***********************************************************************/
+void
+FFDCheckIfNeedToResizePageLayoutBoundary(optr oself, LayoutSize bounds)
+{
+    FlatFileDatabaseInstance *pself;
+    RectWWFixedAsDWord pageLayoutRect;
+    optr pageLayoutRectOptr;
+    sdword pageLayoutRectHeight, pageLayoutRectWidth;
+    Boolean needChange;
+
+    pself = ObjDerefGen(oself);
+
+    pageLayoutRectOptr = GetPageLayoutBoundaryOptr(oself, 
+						   pself->FFI_currentLayout);
+
+    /*
+     * If there's no page layout rectangle, then we're done.
+     */
+    if (!pageLayoutRectOptr) {
+	return;
+    }
+
+    /*
+     * Tell the subclassed page boundary object how big we are now 
+     */
+    @call pageLayoutRectOptr::MSG_FFPLR_SET_RECORD_BOUNDARY_SIZE(bounds);
+
+    /*
+     * Now resize the GrObj part of it.
+     */
+    @call pageLayoutRectOptr::MSG_GO_GET_WWF_OBJECT_BOUNDS( 
+					(RectWWFixed *) &pageLayoutRect);
+
+    pageLayoutRectHeight = IntegerOf(pageLayoutRect.RWWF_bottom) - 
+			   IntegerOf(pageLayoutRect.RWWF_top);
+    pageLayoutRectWidth =  IntegerOf(pageLayoutRect.RWWF_right) -
+			   IntegerOf(pageLayoutRect.RWWF_left);
+    /*
+     * Is the page boundary at least as big as the record boundary?
+     */
+    needChange = FALSE;
+
+    if (bounds.LS_width > pageLayoutRectWidth) {
+	needChange = TRUE;
+    } else {
+	bounds.LS_width = pageLayoutRectWidth;
+    }
+
+    if (bounds.LS_height > pageLayoutRectHeight) {
+	needChange = TRUE;
+    } else {
+	bounds.LS_height = pageLayoutRectHeight;
+    }
+
+    if (needChange) {
+	FFDSetMultiRecordBounds(oself, bounds);
+    }
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDResizePageIfNecessary
+ *
+ * DESCRIPTION: Checks if the the page is at least as big as given width
+ *              and height, plus margins. If not, the page size is upped.
+ *
+ * PARAMETERS:  Pass:   oself -- optr to flatfile instance data
+ *                      bounds - new size of single record layout.
+ *
+ *              Return: nothing
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  3/18/93         Initial version
+ *
+ ***********************************************************************/
+void
+FFDResizePageIfNecessary(optr oself, LayoutSize bounds)
+{
+    PageSizeReport psr;
+    Boolean needChange;
+    dword pageHeight, pageWidth;
+
+    FFDGetPageBounds(oself, &psr);
+    pageHeight = psr.PSR_height - (psr.PSR_margins.PCMP_top +
+				   psr.PSR_margins.PCMP_bottom);
+    pageWidth  = psr.PSR_width  - (psr.PSR_margins.PCMP_left +
+				   psr.PSR_margins.PCMP_right);
+
+    /*
+     * Are we big enough?
+     */
+    if (bounds.LS_width > pageWidth) {
+	psr.PSR_width = bounds.LS_width + psr.PSR_margins.PCMP_left +
+	    psr.PSR_margins.PCMP_right;
+	needChange = TRUE;
+    }
+
+    if (bounds.LS_height > pageHeight) {
+	psr.PSR_height = bounds.LS_height + psr.PSR_margins.PCMP_top +
+	    psr.PSR_margins.PCMP_bottom;
+	needChange = TRUE;
+    }
+
+    if (needChange) {
+	FFDSetPageBounds(oself, &psr);
+    }
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDSetSingleRecordBounds
+ *
+ * DESCRIPTION: Sets the width and height of the record layout boundary
+ *
+ * PARAMETERS:  Pass:   oself -- optr to flatfile instance data
+ *                      bounds - width/height to set it to.
+ *
+ *              Return: nothing
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    9/4/92          Initial Revision 
+ *      anna    9/14/92         Added setting of record boundary object
+ *
+ ***********************************************************************/
+void
+FFDSetSingleRecordBounds(optr oself, LayoutSize bounds)
+{
+    RecordLayoutChunkArrayHeader *layoutInfoPtr;
+    FlatFileDatabaseInstance *pself;
+    optr layoutOptr;
+    RectDWord grobjBodyBounds;
+
+    pself = ObjDerefGen(oself);
+
+    /*
+     * Get the cell with the record layout info 
+     */
+    layoutInfoPtr = CellLock(&pself->SSI_cellParams,
+			     RECORD_LAYOUT_ROW,
+			     (word) pself->FFI_currentLayout);
+    
+#if ERROR_CHECK
+    if (!layoutInfoPtr) {
+	EC_ERROR(CELL_DOES_NOT_EXIST);
+    }
+#endif /* ERROR_CHECK */
+
+    layoutInfoPtr->RLCAH_singleRecordSize.LS_width = bounds.LS_width;
+    layoutInfoPtr->RLCAH_singleRecordSize.LS_height = bounds.LS_height;
+
+    CellDirty(layoutInfoPtr);
+    CellUnlock(layoutInfoPtr);
+
+    /*
+     * Set the grobj body to its new size
+     */
+    layoutOptr = FFDGetGrObjBodyForLayout(oself, 
+					  pself->FFI_currentLayout, 
+					  LT_SINGLE_RECORD);
+    grobjBodyBounds.RD_left = grobjBodyBounds.RD_top = 0;
+    grobjBodyBounds.RD_right = bounds.LS_width;
+    grobjBodyBounds.RD_bottom = bounds.LS_height;
+
+    @call layoutOptr::MSG_GB_SET_BOUNDS(&grobjBodyBounds);
+
+    /*
+     * Make sure the page boundary is big enough to hold the
+     * record layout boundary
+     */
+    FFDCheckIfNeedToResizePageLayoutBoundary(oself, bounds);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_SET_SINGLE_RECORD_BOUNDS for FlatFileDatabaseClass
+ *
+ * DESCRIPTION: This message sets the single record bounds for the current
+ *              layout.  Note that the actual view is not modified, only
+ *              flat file's data.
+ *
+ * PARAMETERS:
+ *      void (LayoutSize bounds)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *      The bounds are assumed to start at (0,0), so only the right
+ *      and bottom bounds are used.
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  9/ 2/92         Initial version
+ *      anna    9/4/92          Rewrite to store data in cell instead of
+ *                              instance data.
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_SET_SINGLE_RECORD_BOUNDS
+{
+    FFDSetSingleRecordBounds(oself, bounds);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDGetSingleRecordBounds
+ *
+ * DESCRIPTION: Returns the width and height of the record layout boundary
+ *
+ * PARAMETERS:  Pass:   oself -- optr to flatfile instance data
+ *                      *bounds - to be filled in
+ *
+ *              Return: nothing
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    9/4/92          Initial Revision 
+ *
+ ***********************************************************************/
+void
+FFDGetSingleRecordBounds(optr oself, LayoutSize *bounds)
+{
+    FlatFileDatabaseInstance *pself;
+    RecordLayoutChunkArrayHeader *layoutInfoPtr;
+
+    pself = ObjDerefGen(oself);
+
+    /*
+     * Get the cell with the record layout info 
+     */
+    layoutInfoPtr = CellLock(&pself->SSI_cellParams,
+			     RECORD_LAYOUT_ROW,
+			     (word) pself->FFI_currentLayout);
+    
+#if ERROR_CHECK
+    if (!layoutInfoPtr) {
+	EC_ERROR(CELL_DOES_NOT_EXIST);
+    }
+#endif /* ERROR_CHECK */
+
+    memcpy(bounds, &(layoutInfoPtr->RLCAH_singleRecordSize),sizeof(LayoutSize));
+
+    CellUnlock(layoutInfoPtr);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_GET_SINGLE_RECORD_BOUNDS for 
+ *              FlatFileDatabaseClass
+ *
+ * DESCRIPTION: 
+ *              Returns the size of the record layout boundary for the
+ *              current layout.
+ *
+ * PARAMETERS:
+ *      Pass:   LayoutSize *bounds - ptr to width, heightto be filled in
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/30/92         Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_GET_SINGLE_RECORD_BOUNDS
+{
+    FFDGetSingleRecordBounds(oself, bounds);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     FFDGetPageLayoutBoundaryStartingOffset for 
+ *              FlatFileDatabaseClass
+ *
+ * DESCRIPTION: 
+ *              Returns the x,y coordinates of the upper left corner of
+ *              the page layout boundary for the current layout.
+ *
+ * PARAMETERS:
+ *      Pass:   sdword *boundaryXCoord - ptr to top left coord, 
+ *                                       to be filled in
+ *              sdword *boundaryYCoord - ptr to top y coord, 
+ *                                       to be filled in
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    8/21/92         Initial version
+ *
+ ***********************************************************************/
+void FFDGetPageLayoutBoundaryStartingOffset(optr oself, 
+					    sdword *boundaryXCoord,
+					    sdword *boundaryYCoord)
+{
+    optr pageLayoutBoundaryOptr;
+    RectWWFixed plbRect;
+    FlatFileDatabaseInstance *pself;
+    PointDWFixed pageLayoutCenter;
+
+    pself = ObjDerefGen(oself);
+
+    /*
+     * Get the size of the page layout's boundary
+     */
+    pageLayoutBoundaryOptr = GetPageLayoutBoundaryOptr(oself,
+						pself->FFI_currentLayout);
+
+#if ERROR_CHECK
+    if (!pageLayoutBoundaryOptr) {
+	EC_ERROR(CELL_DOES_NOT_EXIST);
+    }
+#endif /* ERROR_CHECK */
+
+    /*
+     * Get the object coordinates
+     */
+    @call pageLayoutBoundaryOptr::MSG_GO_GET_WWF_OBJECT_BOUNDS(
+							&plbRect); 
+    @call pageLayoutBoundaryOptr::MSG_GO_GET_CENTER(&pageLayoutCenter);
+
+    /*
+     * The top & left coordinates are negative, w.r.t. the center, so
+     * we want to add them
+     */
+    *boundaryXCoord = (sdword) pageLayoutCenter.PDF_x.DWF_int + 
+		      ((sdword) ((sword) plbRect.RWWF_left.WWF_int));
+    *boundaryYCoord = (sdword) pageLayoutCenter.PDF_y.DWF_int +
+		      ((sdword) ((sword) plbRect.RWWF_top.WWF_int));
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDSetMultiRecordGrObjBodyToPageSize
+ *
+ * DESCRIPTION: This routine resizes the multi-record grobj body to be
+ *              the same size as the page layout.
+ *
+ * PARAMETERS:  oself - an optr to the current database
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  3/18/93         Initial version
+ *
+ ***********************************************************************/
+void
+FFDSetMultiRecordGrObjBodyToPageSize(optr oself)
+{
+    PageSizeReport psr;
+    optr layoutOptr;
+    RectDWord grobjBodyBounds;
+    FlatFileDatabaseInstance *pself = ObjDerefGen(oself);
+
+    FFDGetPageBounds(oself, &psr);
+    
+    /*
+     * Set the grobj body to its new size
+     */
+    layoutOptr = FFDGetGrObjBodyForLayout(oself, 
+					  pself->FFI_currentLayout, 
+					  LT_MULTI_RECORD);
+    grobjBodyBounds.RD_left = grobjBodyBounds.RD_top = 0;
+    grobjBodyBounds.RD_right = psr.PSR_width;
+    grobjBodyBounds.RD_bottom = psr.PSR_height;
+
+    @call layoutOptr::MSG_GB_SET_BOUNDS(&grobjBodyBounds);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDGetMultiRecordBounds
+ *
+ * DESCRIPTION: Returns the width and height of the page layout boundary
+ *
+ * PARAMETERS:  Pass:   oself -- optr to flatfile instance data
+ *                      *bounds - to be filled in
+ *
+ *              Return: nothing
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    9/4/92          Initial Revision 
+ *
+ ***********************************************************************/
+void
+FFDGetMultiRecordBounds(optr oself, LayoutSize *bounds)
+{
+    optr pageLayoutBoundaryOptr;
+    RectWWFixedAsDWord plbRect;
+    FlatFileDatabaseInstance *pself;
+
+    pself = ObjDerefGen(oself);
+
+    /*
+     * Get the size of the page layout's boundary
+     */
+    pageLayoutBoundaryOptr = GetPageLayoutBoundaryOptr(oself, 
+						pself->FFI_currentLayout);
+
+#if ERROR_CHECK
+    if (!pageLayoutBoundaryOptr) {
+	EC_ERROR(CELL_DOES_NOT_EXIST);
+    }
+#endif /* ERROR_CHECK */
+
+    @call pageLayoutBoundaryOptr::MSG_GO_GET_WWF_OBJECT_BOUNDS(
+					(RectWWFixed *)&plbRect); 
+
+    /* Calculate width */
+    bounds->LS_width = (sdword) IntegerOf(plbRect.RWWF_right -
+					  plbRect.RWWF_left);
+
+    /* Calculate height */
+    bounds->LS_height = (sdword) IntegerOf(plbRect.RWWF_bottom -
+					   plbRect.RWWF_top);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_GET_MULTI_RECORD_BOUNDS for 
+ *              FlatFileDatabaseClass
+ *
+ * DESCRIPTION: 
+ *              Returns the size of the page layout boundary for the
+ *              current layout.
+ *
+ * PARAMETERS:
+ *      Pass:   LayoutSize *bounds - ptr to width, height to be filled in
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    8/21/92         Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_GET_MULTI_RECORD_BOUNDS
+{
+    FFDGetMultiRecordBounds(oself, bounds);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDSetMultiRecordBounds
+ *
+ * DESCRIPTION: Sets the width and height of the page layout boundary
+ *
+ * PARAMETERS:  Pass:   oself -- optr to flatfile instance data
+ *                      bounds - new width & height 
+ *
+ *              Return: nothing
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    9/8/92          Initial Revision 
+ *
+ ***********************************************************************/
+void
+FFDSetMultiRecordBounds(optr oself, LayoutSize bounds)
+{
+    optr pageLayoutBoundaryOptr;
+    FlatFileDatabaseInstance *pself;
+    PointWWFixed newSize;
+
+    pself = ObjDerefGen(oself);
+
+    /*
+     * Get the size of the page layout's boundary
+     */
+    pageLayoutBoundaryOptr = GetPageLayoutBoundaryOptr(oself, 
+						pself->FFI_currentLayout);
+
+#if ERROR_CHECK
+    if (!pageLayoutBoundaryOptr) {
+	EC_ERROR(CELL_DOES_NOT_EXIST);
+    }
+#endif /* ERROR_CHECK */
+
+    newSize.PF_x.WWF_int = bounds.LS_width;
+    newSize.PF_x.WWF_frac = 0;
+    newSize.PF_y.WWF_int = bounds.LS_height;
+    newSize.PF_y.WWF_frac = 0;
+    @call pageLayoutBoundaryOptr::MSG_GO_SET_SIZE(&newSize);
+    @call pageLayoutBoundaryOptr::MSG_GO_INVALIDATE();
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_SET_MULTI_RECORD_WITHIN_MARGINS for
+ *              FlatFileDatabaseClass
+ *
+ * DESCRIPTION: This message makes sure the current multi-record area is not
+ *              above or to the left of the top and left margins.  It will
+ *              move the repeater box if it needs to.
+ *
+ *              Warning: the size of the repeater box is left alone, so you
+ *                       should make sure the size is ok before calling this
+ *                       message.
+ *
+ * PARAMETERS:
+ *      void (PageSizeReport *psr)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  2/ 4/93         Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_SET_MULTI_RECORD_WITHIN_MARGINS
+{
+    optr pageLayoutBoundaryOptr;
+    Boolean mrTooFarLeft, mrTooHighUp;
+    PointDWFixed location;
+
+    pself = ObjDerefGen(oself);
+
+    /*
+     * Get the location of the page layout's boundary
+     */
+    pageLayoutBoundaryOptr = GetPageLayoutBoundaryOptr(oself, 
+						      pself->FFI_currentLayout);
+
+#if ERROR_CHECK
+    if (!pageLayoutBoundaryOptr) {
+	EC_ERROR(CELL_DOES_NOT_EXIST);
+    }
+#endif /* ERROR_CHECK */
+
+    @call pageLayoutBoundaryOptr::MSG_GO_GET_POSITION(&location);
+
+    mrTooFarLeft = (location.PDF_x.DWF_int < psr->PSR_margins.PCMP_left);
+    mrTooHighUp  = (location.PDF_y.DWF_int < psr->PSR_margins.PCMP_top);
+    if (mrTooFarLeft || mrTooHighUp) {
+	if (mrTooFarLeft) {
+	    location.PDF_x.DWF_int = psr->PSR_margins.PCMP_left;
+	}
+	
+	if (mrTooHighUp) {
+	    location.PDF_y.DWF_int = psr->PSR_margins.PCMP_top;
+	}
+
+	@call pageLayoutBoundaryOptr::MSG_GO_SET_POSITION(&location);
+    }
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_REDRAW_MULTI_RECORD for FlatFileDatabaseClass
+ *
+ * DESCRIPTION: This message simply invalidates the current multi-record
+ *              box so it redraws.
+ *
+ * PARAMETERS:
+ *      void ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  9/15/92         Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_REDRAW_MULTI_RECORD
+{    
+    optr pageLayoutBoundaryOptr;
+
+    /*
+     * Get the page layout boundary
+     */
+    pageLayoutBoundaryOptr = GetPageLayoutBoundaryOptr(oself, 
+						pself->FFI_currentLayout);
+
+#if ERROR_CHECK
+    if (!pageLayoutBoundaryOptr) {
+	EC_ERROR(CELL_DOES_NOT_EXIST);
+    }
+#endif /* ERROR_CHECK */
+
+    @call pageLayoutBoundaryOptr::MSG_GO_INVALIDATE();
+}
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_SET_MULTI_RECORD_BOUNDS for 
+ *              FlatFileDatabaseClass
+ *
+ * DESCRIPTION: 
+ *              Sets the size of the page layout boundary for the
+ *              current layout.
+ *
+ * PARAMETERS:
+ *      Pass:   LayoutSize bounds - new width and height
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    9/8/92          Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_SET_MULTI_RECORD_BOUNDS
+{
+    FFDSetMultiRecordBounds(oself, bounds);
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:    StoreMultiRecordBoundary
+ *
+ * DESCRIPTION:  Store the VM handle and chunk of the multi-record layout
+ *              boundary in the chunk array header of this layout's structure
+ *
+ * PARAMETERS:  oself - optr to database object
+ *              boundaryOptr - optr to multi-record layout boundary
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    8/12/92         Initial Revision
+ *      anna    9/4/92          complete rewrite because of elimination
+ *                              of record layout object.
+ *
+ ***********************************************************************/
+void
+StoreMultiRecordBoundary(optr oself, optr boundaryOptr)
+{
+    MultiRecordLayoutStruct *multiRecordLayoutPtr;
+    FlatFileDatabaseInstance *pself;
+    VMFileHandle dummyFileHandle;
+
+    pself = ObjDerefGen(oself);
+
+    /*
+     * Get the size of the record layout's boundary
+     */
+    multiRecordLayoutPtr = CellLock(&pself->SSI_cellParams,
+			       MULTI_RECORD_LAYOUT_ROW,
+			       pself->FFI_currentLayout);
+    
+#if ERROR_CHECK
+    if (!multiRecordLayoutPtr) {
+	EC_ERROR(CELL_DOES_NOT_EXIST);
+    }
+#endif /* ERROR_CHECK */
+    
+    multiRecordLayoutPtr->MRLS_mrBoundaryVMBlock = 
+	VMMemBlockToVMBlock(OptrToHandle(boundaryOptr), &dummyFileHandle);
+    multiRecordLayoutPtr->MRLS_mrBoundaryChunk =
+	OptrToChunk(boundaryOptr);
+
+    CellDirty(multiRecordLayoutPtr);
+    CellUnlock(multiRecordLayoutPtr);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDGetLayoutName
+ *
+ * DESCRIPTION:  Get layout name for specified layout.  
+ *               If textBuffer is non-NULL, the name will be
+ *               strcpy()'d into the area pointed to by the textBuffer.
+ *               Else, a block will be allocated as sharable, the name
+ *               copied into the block, the block will be unlocked, and
+ *               the block's handle returned.
+ *
+ *               If the layout doesn't exist, you will crash :|
+ *
+ * PARAMETERS:  oself - optr todatabase
+ *              layoutNum - absolute column number of layout
+ *              *textBuffer - pointer to place to put the text
+ *              
+ *              Returns: MemHandle - handle to block containing text
+ *                                      (see above description)
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/8/92          Initial Revision
+ *
+ ***********************************************************************/
+MemHandle _pascal
+FFDGetLayoutName(optr oself, word layoutNum, TCHAR *textBuffer)
+{
+    MemHandle retval;
+    RecordLayoutChunkArrayHeader *cellDataPtr;
+    MemHandle textBlock;
+    TCHAR *textPtr;
+    FlatFileDatabaseInstance *pself;
+
+    pself = ObjDerefGen(oself);
+
+    /*
+     * First, retrieve the record layout chunk array.
+     */
+    cellDataPtr = CellLock(&pself->SSI_cellParams,
+			     RECORD_LAYOUT_ROW, 
+			     layoutNum);
+#if ERROR_CHECK
+    if (!cellDataPtr) {
+	EC_ERROR(CELL_DOES_NOT_EXIST);
+    }
+#endif /* ERROR_CHECK */
+    
+    retval = NullHandle;
+
+    if (textBuffer != NULL) {
+	/* Fill the passed text buffer. */
+	strcpy(textBuffer, cellDataPtr->RLCAH_layoutName); 
+    } else {
+	/* Allocate a text buffer. */
+	textBlock = MemAlloc(strlen(cellDataPtr->RLCAH_layoutName)*
+			     sizeof(TCHAR),
+			     HF_SWAPABLE | HF_SHARABLE, HAF_NO_ERR);
+	textPtr = MemLock(textBlock);
+	strcpy(textPtr, cellDataPtr->RLCAH_layoutName);
+	MemUnlock(textBlock);
+	retval = textBlock;
+    }
+
+    CellUnlock(cellDataPtr);
+
+    return (retval);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_GET_INDEXED_LAYOUT_NAME for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:  Get layout name for specified layout.  The layout number
+ *              passed reflects the index into the sorted list of layout
+ *              names.
+ *              If textBuffer is non-NULL, the name will be
+ *              strcpy()'d into the area pointed to by the textBuffer.
+ *              Else, a block will be allocated as sharable, the name
+ *              copied into the block, the block will be unlocked, and
+ *              the block's handle returned.
+ *
+ * PARAMETERS:  MemHandle (word layoutNameIndex, TCHAR *textBuffer)
+ *
+ * PARAMETERS:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/6/92          Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_GET_INDEXED_LAYOUT_NAME
+{
+    return(FFDGetLayoutName(oself, 
+			    FFDGetLayoutNum(pself, layoutNameIndex), 
+			    textBuffer));
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_GET_CURRENT_LAYOUT for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:  Get current layout number.  
+ *
+ * PARAMETERS:  byte ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/6/92          Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_GET_CURRENT_LAYOUT
+{
+    return(pself->FFI_currentLayout);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_GET_CURRENT_LAYOUT_INDEX for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:  Get the current layout number's index into the list
+ *               of sorted layout names.  
+ *
+ * PARAMETERS:  byte ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/10/92         Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_GET_CURRENT_LAYOUT_INDEX
+{
+    byte *sortedLayoutNames, i;
+
+    sortedLayoutNames = CellLock(&pself->SSI_cellParams,
+				 RECORD_LAYOUT_ROW, 
+				 (word) LAYOUT_NAME_ARRAY_COLUMN);
+
+    /*
+     * Loop around looking for the element
+     */
+    for (i = 0; i < pself->FFI_numLayouts; i++) {
+	if (sortedLayoutNames[i] == pself->FFI_currentLayout) {
+	    break;
+	}
+    }
+
+    CellUnlock(sortedLayoutNames);
+    return(i);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_GET_LAYOUT_NAME for FlatFileDatabaseClass
+ *
+ * DESCRIPTION: Get layout name for specified layout.  
+ *              The layout number passed represents the absolute layout
+ *              number, NOT the position in the sorted layout list.
+ *              If textBuffer is non-NULL, the name will be
+ *              strcpy()'d into the area pointed to by the textBuffer.
+ *              Else, a block will be allocated as sharable, the name
+ *              copied into the block, the block will be unlocked, and
+ *              the block's handle returned.
+ *
+ * PARAMETERS:  MemHandle (word layoutNum, TCHAR *textBuffer)
+ *
+ * PARAMETERS:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/6/92          Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_GET_LAYOUT_NAME
+{
+    return(FFDGetLayoutName(oself, layoutNum, textBuffer));
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_GET_CURRENT_LAYOUT_NAME for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:  Get layout name for current layout.  
+ *              If textBuffer is non-NULL, the name will be
+ *              strcpy()'d into the area pointed to by the textBuffer.
+ *              Else, a block will be allocated as sharable, the name
+ *              copied into the block, the block will be unlocked, and
+ *              the block's handle returned.
+ *
+ * PARAMETERS:  MemHandle (TCHAR *textBuffer)
+ *
+ * PARAMETERS:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/9/92          Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_GET_CURRENT_LAYOUT_NAME
+{
+    return(FFDGetLayoutName(oself, pself->FFI_currentLayout, textBuffer));
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_GET_LAYOUT_NUM_FROM_INDEX for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:  Get the absolute layout number, corresponding to the
+ *              given index into the list of sorted layouts.
+ *
+ * PARAMETERS:  byte (byte layoutNameIndex)
+ *
+ * PARAMETERS:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/13/92         Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_GET_LAYOUT_NUM_FROM_INDEX
+{
+    return(FFDGetLayoutNum(pself, layoutNameIndex)); 
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_GET_LAYOUT_NOTES for FlatFileDatabaseClass
+ *
+ * DESCRIPTION: Get layout notes for specified layout.  
+ *              The layout number passed represents the absolute layout
+ *              number, NOT the position in the sorted layout list.
+ *              If textBuffer is non-NULL, the notes will be
+ *              strcpy()'d into the area pointed to by the textBuffer.
+ *              Else, a block will be allocated as sharable, the notes
+ *              copied into the block, the block will be unlocked, and
+ *              the block's handle returned.
+ *
+ * PARAMETERS:  MemHandle (byte layoutNum, TCHAR *textBuffer)
+ *
+ * PARAMETERS:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/6/92          Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_GET_LAYOUT_NOTES
+{
+    MemHandle retval;
+    RecordLayoutChunkArrayHeader *cellDataPtr;
+    MemHandle textBlock;
+    TCHAR *textPtr;
+
+    /*
+     * First, retrieve the record layout chunk array.
+     */
+    cellDataPtr = CellLock(&pself->SSI_cellParams,
+			     RECORD_LAYOUT_ROW, 
+			     (word) layoutNum);
+#if ERROR_CHECK
+    if (!cellDataPtr) {
+	EC_ERROR(CELL_DOES_NOT_EXIST);
+    }
+#endif /* ERROR_CHECK */
+    
+    retval = NullHandle;
+
+    if (textBuffer != NULL) {
+	/* Fill the passed text buffer. */
+	strcpy(textBuffer, cellDataPtr->RLCAH_layoutNotes); 
+    } else {
+	/* Allocate a text buffer. */
+	textBlock = MemAlloc(strlen(cellDataPtr->RLCAH_layoutNotes)*
+			     sizeof(TCHAR),
+			     HF_SWAPABLE | HF_SHARABLE, HAF_NO_ERR);
+	textPtr = MemLock(textBlock);
+	strcpy(textPtr, cellDataPtr->RLCAH_layoutNotes);
+	MemUnlock(textBlock);
+	retval = textBlock;
+    }
+
+    CellUnlock(cellDataPtr);
+
+    return (retval);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_STORE_LAYOUT_NOTES for FlatFileDatabaseClass
+ *
+ * DESCRIPTION: Store layout notes for specified layout.  
+ *              The layout number passed represents the absolute layout
+ *              number, NOT the position in the sorted layout list.
+ *
+ * PARAMETERS:  void (byte layoutNum, TCHAR *textBuffer)
+ *
+ * PARAMETERS:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/6/92          Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_STORE_LAYOUT_NOTES
+{
+    RecordLayoutChunkArrayHeader *cellDataPtr;
+
+    /*
+     * First, retrieve the record layout chunk array.
+     */
+    cellDataPtr = CellLock(&pself->SSI_cellParams,
+			     RECORD_LAYOUT_ROW, 
+			     (word) layoutNum);
+#if ERROR_CHECK
+    if (!cellDataPtr) {
+	EC_ERROR(CELL_DOES_NOT_EXIST);
+    }
+#endif /* ERROR_CHECK */
+    
+    strcpy(cellDataPtr->RLCAH_layoutNotes, textBuffer); 
+
+    CellDirty(cellDataPtr);
+    CellUnlock(cellDataPtr);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    SwitchLayoutModeIfNecessary
+ *
+ * DESCRIPTION:  Look up the status for the given layout. 
+ *
+ * PARAMETERS:   Pass:
+ *                      oself - optr to database object
+ *                      layoutNum - absolute layout number column
+ *                      layoutType - LT_SINGLE_RECORD, LT_MULTI_RECORD,
+ *                                      LT_REPORT
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/27/92         Initial Revision
+ *
+ ***********************************************************************/
+void
+SwitchLayoutModeIfNecessary(optr oself, word layoutNum, LayoutType layoutType)
+{
+    FlatFileDatabaseInstance *pself;
+    RecordLayoutChunkArrayHeader *recordLayoutPtr;
+    MultiRecordLayoutStruct *mrLayoutPtr;
+    ModeType currentLayoutMode;
+
+    pself = ObjDerefGen(oself);
+
+    switch (layoutType) {
+	case LT_SINGLE_RECORD:
+		recordLayoutPtr = CellLock(&pself->SSI_cellParams,
+					 RECORD_LAYOUT_ROW,
+					 layoutNum);
+		currentLayoutMode = recordLayoutPtr->RLCAH_layoutMode;
+		CellUnlock(recordLayoutPtr);
+
+		if (!(currentLayoutMode & pself->FFI_currentMode)) {
+		    /* Switch modes! */
+		    if (pself->FFI_currentMode == MT_DESIGN) {
+			FFDSetGrObjectsForDesignMode(oself, layoutType);
+		    }
+		    else {
+			FFDSetGrObjectsForDataEntry(oself, layoutType);
+		    }
+		}
+		break;
+	case LT_MULTI_RECORD:
+		mrLayoutPtr = CellLock(&pself->SSI_cellParams,
+					 MULTI_RECORD_LAYOUT_ROW,
+					 layoutNum);
+		currentLayoutMode = mrLayoutPtr->MRLS_layoutMode;
+		CellUnlock(mrLayoutPtr);
+
+		if (!(currentLayoutMode & pself->FFI_currentMode)) {
+		    /* Switch modes! */
+		    if (pself->FFI_currentMode == MT_DESIGN) {
+			FFDSetGrObjectsForDesignMode(oself, layoutType);
+		    }
+		    else {
+			FFDSetGrObjectsForDataEntry(oself, layoutType);
+			/*
+			 * For data entry mode, we need the record layout
+			 * boundary to be set to the proper mode as well
+			 */
+			SwitchLayoutModeIfNecessary(oself, layoutNum,
+							LT_SINGLE_RECORD);
+		    }
+		}
+		break;
+    }
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDAddRecordLayout
+ *
+ * DESCRIPTION: 
+ *              Add the single-record layout needs to be added as a 
+ *              vis-child of the flatfile object.
+ *              NOTE: pself->FFI_currentMode and pself->FFI_currentLayoutType
+ *              must be set for the new configuration when this routine
+ *              is called.
+ *
+ * PARAMETERS:   Pass:
+ *                      oself - optr to database object
+ *                      ffGrObjHeadOptr - optr to grobj head
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/27/92         Initial Revision
+ *
+ ***********************************************************************/
+void 
+FFDAddRecordLayout(optr oself, optr ffGrObjHeadOptr)
+{
+    FlatFileDatabaseInstance *pself;
+    optr recordLayoutGrObjBody;
+
+    pself = ObjDerefGen(oself);
+
+    recordLayoutGrObjBody = @call oself::MSG_FFD_GET_GROBJ_BODY_FOR_LAYOUT(
+					pself->FFI_currentLayout,
+					LT_SINGLE_RECORD);
+
+    @call oself::MSG_VIS_ADD_CHILD(recordLayoutGrObjBody, CCF_MARK_DIRTY);
+
+    /*
+     * Notify the GrObjBody that it has been added to
+     * the Document/Content. And pass it the GrObjHead.
+     */
+    @call recordLayoutGrObjBody::MSG_GB_ATTACH_UI(ffGrObjHeadOptr);
+
+    pself = ObjDerefGen(oself);
+    SwitchLayoutModeIfNecessary(oself, pself->FFI_currentLayout, 
+					LT_SINGLE_RECORD);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDCheckToAddRecordLayout
+ *
+ * DESCRIPTION: When a layout is displayed in Data Entry as multi-record,
+ *              both layouts (the single-record and multi-record) are
+ *              actually displayed. So in this case, the single-record
+ *              layout needs to be added as a vis-child of the flatfile
+ *              object.
+ *              NOTE: pself->FFI_currentMode and pself->FFI_currentLayoutType
+ *              must be set for the new configuration when this routine
+ *              is called.
+ *
+ * PARAMETERS:   Pass:
+ *                      oself - optr to database object
+ *                      ffGrObjHeadOptr - optr to grobj head
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/27/92         Initial Revision
+ *
+ ***********************************************************************/
+void
+FFDCheckToAddRecordLayout(optr oself, optr ffGrObjHeadOptr)
+{
+    FlatFileDatabaseInstance *pself;
+
+    pself = ObjDerefGen(oself);
+
+    if ((pself->FFI_currentMode == MT_DATA_ENTRY) &&
+		(pself->FFI_currentLayoutType == LT_MULTI_RECORD)) {
+
+	FFDAddRecordLayout(oself, ffGrObjHeadOptr);
+    }
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDRemoveRecordLayout
+ *
+ * DESCRIPTION: 
+ *              Remove the single-record layout as vis-child before
+ *              we display the next layout.
+ *              Also resets the proper GrObjBody bounds for the single-record
+ *              layout.
+ *
+ * PARAMETERS:   Pass:
+ *                      oself - optr to database object
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/27/92         Initial Revision
+ *
+ ***********************************************************************/
+void
+FFDRemoveRecordLayout(optr oself)
+{
+    RectDWord   recordLayoutBounds;
+    LayoutSize bounds;
+    optr recordLayoutGrObjBody;
+    FlatFileDatabaseInstance *pself;
+
+    pself = ObjDerefGen(oself);
+    recordLayoutGrObjBody = @call oself::MSG_FFD_GET_GROBJ_BODY_FOR_LAYOUT(
+					pself->FFI_currentLayout,
+					LT_SINGLE_RECORD);
+
+    FFDGetSingleRecordBounds(oself, &bounds);
+    /*
+     * We're switching from multi-record to single-record,
+     * so reset the bounds of the grobjBody to (0,0,0,0)
+     */
+    recordLayoutBounds.RD_top = 0;
+    recordLayoutBounds.RD_bottom = bounds.LS_height;
+    recordLayoutBounds.RD_left = 0;
+    recordLayoutBounds.RD_right = bounds.LS_width;
+
+    @call recordLayoutGrObjBody::MSG_GB_SET_BOUNDS(&recordLayoutBounds);
+
+    @call recordLayoutGrObjBody::MSG_GB_DETACH_UI();
+
+    /*
+     * Mark the removed body dirty, so that if we "discard changes"
+     * (revert to saved) later, the vis link is preserved
+     */
+    ObjLockObjBlock(OptrToHandle(recordLayoutGrObjBody));
+    ObjMarkDirty(recordLayoutGrObjBody);
+    MemUnlock(OptrToHandle(recordLayoutGrObjBody));
+
+    /*
+     * Remove the current GrObjBody from the visual tree
+     */
+    @call recordLayoutGrObjBody::MSG_VIS_REMOVE(VUM_MANUAL);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDCheckToRemoveRecordLayout
+ *
+ * DESCRIPTION: 
+ *              If we're coming from Data Entry multi-record mode, then
+ *              both layouts (the single-record and multi-record) are
+ *              actually displayed. In this case, we first want to
+ *              remove the single-record layout as vis-child before
+ *              we display the next layout.
+ *              Also resets the proper GrObjBody bounds for the single-record
+ *              layout.
+ *
+ * PARAMETERS:   Pass:
+ *                      oself - optr to database object
+ *                      oldMode - MT_DESIGN or MT_DATA_ENTRY; where are
+ *                              we coming from?
+ *                      oldLayoutType - Which layout type are we switching 
+ *                              from?
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/27/92         Initial Revision
+ *
+ ***********************************************************************/
+void
+FFDCheckToRemoveRecordLayout(optr oself, ModeType oldMode, 
+					LayoutType oldLayoutType)
+{
+    if ((oldMode == MT_DATA_ENTRY) && (oldLayoutType == LT_MULTI_RECORD)) {
+	FFDRemoveRecordLayout(oself); 
+    }
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDSwitchToLayout 
+ *
+ * DESCRIPTION:  Switch to the desired layout. 
+ *
+ *              Internal version of MSG_FFD_SWITCH_TO_LAYOUT
+ *
+ * PARAMETERS:  Pass:   optr oself - optr to database object
+ *                      byte layoutNum - absolute column # for layout
+ *                      optr ffGrObjHeadOptr - optr to GrObj head
+ *                      LayoutType layoutType - LT_SINGLE_RECORD or
+ *                                              LT_MULTI_RECORD
+ *                      Note: if LT_MULTI_RECORD is requested but the
+ *                              layout requested is single-record, then
+ *                              single-record will be displayed.
+ *                      Boolean printing - set if we should not reset the
+ *                              current view.
+ *              Returns:
+ *                      nothing 
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    9/24/92         Initial version; broke out into function
+ *
+ ***********************************************************************/
+void
+FFDSwitchToLayout(optr oself, byte layoutNum, optr ffGrObjHeadOptr,
+		  LayoutType layoutType, Boolean printing)
+{
+    optr newGrObjBody, appObject;
+    InsertResult insertResult;
+    LayoutSize recordBounds;
+    EventHandle event;
+    PageSizeReport psr;
+    FlatFileDatabaseInstance *pself; 
+    word axr, cxr, dxr, bpr;
+    UIInterfaceLevel userLevel;
+
+    /*
+     * Which mode are we in? If we're below level 4, we can't (well,
+     * shouldn't) be requesting LT_MULTI_RECORD. If this is the case,
+     * force it to be LT_SINGLE_RECORD
+     */
+    appObject = GeodeGetAppObject(0);
+
+    userLevel = GET_UI_INTERFACE_LEVEL (@call appObject::
+	MSG_GEN_APPLICATION_GET_APP_FEATURES ());
+
+
+    if ((layoutType == LT_MULTI_RECORD) && (UIIL_ADVANCED != userLevel)) {
+	layoutType = LT_SINGLE_RECORD;
+    }
+
+    pself = ObjDerefGen(oself);
+
+    /*
+     * If we've moving _away_ from Multi-Record Data Entry, we want
+     * to detach the record layout grObjBody
+     */
+    FFDCheckToRemoveRecordLayout(oself, pself->FFI_currentMode, 
+					pself->FFI_currentLayoutType);
+
+    /*
+     * If we're in data entry mode, commit the current record
+     */
+    pself = ObjDerefGen(oself);
+    if (pself->FFI_currentMode == MT_DATA_ENTRY) {
+	insertResult = @call self::
+			MSG_FFD_COMMIT_TEMP_DATA_ROW_TO_DATABASE(TRUE,
+							CRT_REGULAR_COMMIT); 
+
+	switch (insertResult) {
+	    case INSERT_FAILED:
+		return;
+	    case INSERT_OK:
+	    case NO_INSERT_DONE:
+		break;
+	}
+    }
+
+    /*
+     * Set the record order in the instance data
+     */
+    pself = ObjDerefGen(oself);
+    pself->FFI_recordOrder = FFDGetRecordOrderForLayout(oself, layoutNum);
+
+    /*
+     * If we're changing layout types, detach the current GrObjBody 
+     * from the flatfile object.
+     * This routine also stores the sorted name arrays in the
+     * chunk array for the current layout.
+     */
+    DetachCurrentLayout(oself);
+
+    /*
+     * Store the layout display type for the current layout
+     */
+    @call self::MSG_FFD_SET_LAYOUT_TYPE(layoutNum, layoutType);
+
+    pself = ObjDerefGen(oself);
+    pself->FFI_currentLayout = layoutNum;
+
+    /*
+     * Get the grObjBody for the requested layout and attach it
+     */
+    newGrObjBody = @call self::MSG_FFD_GET_GROBJ_BODY_FOR_LAYOUT(layoutNum, 
+								 layoutType);
+
+    /*
+     * Adjust the size of the view if we're not printing.
+     */
+    if (!printing) {
+	switch (layoutType) {
+	    case LT_SINGLE_RECORD:
+		FFDGetSingleRecordBounds(oself, &recordBounds);
+		break;
+		
+	    case LT_MULTI_RECORD:
+		FFDGetPageBounds(oself, &psr);
+		recordBounds.LS_width = psr.PSR_width;
+		recordBounds.LS_height = psr.PSR_height;
+		break;
+	}       
+
+	event = @record GenViewClass::
+	    MSG_GEN_VIEW_SET_DOC_BOUNDS(recordBounds.LS_height,
+					recordBounds.LS_width,
+					0, 0);
+
+	@send oself::MSG_VIS_VUP_CALL_OBJECT_OF_CLASS(event);
+    }
+
+    pself = ObjDerefGen(oself);
+    if ((pself->FFI_currentMode == MT_DESIGN) && 
+			(layoutType == LT_SINGLE_RECORD)) {
+	ObjLockObjBlock(OptrToHandle(newGrObjBody));
+
+	/*
+	 * Tell the fields that they are about to be set to design
+	 * so that they will not respond to LOST_TARGET_EXCL messages
+	 * (indirectly sent by AttachLayout) as if they are in data entry
+	 */
+	GrObjBodyProcessAllGrObjsInDrawOrderCommon(
+	    newGrObjBody, OCCT_SAVE_PARAMS_DONT_TEST_ABORT,
+	    MSG_FFTFG_SIMPLE_SET_FOR_DESIGN_MODE, 0, 0, 0,
+	    &axr, &cxr, &dxr, &bpr);
+
+	MemUnlock(OptrToHandle(newGrObjBody));
+    }
+
+    /*
+     * If we're changing layout types, attach the new layout
+     */
+    AttachLayout(oself, newGrObjBody, ffGrObjHeadOptr, layoutType, printing);
+
+    /*
+     * Are the GrObjects of the new layout in the correct mode? If not,
+     * switch.
+     */
+    pself = ObjDerefGen(oself);
+
+    SwitchLayoutModeIfNecessary(oself, layoutNum, layoutType);
+    
+    /*
+     * If we're changing to multi-record data entry, we want to attach
+     * the record layout grobjBody also
+     */
+    FFDCheckToAddRecordLayout(oself, ffGrObjHeadOptr);
+
+    /*
+     * If we're in data entry mode, display the new values on the screen
+     */
+    pself = ObjDerefGen(oself);
+    if (pself->FFI_numInLayoutNameList != 0) {
+	/*
+	 * First make sure we have fields; if we don't, do nothing
+	 */
+	if ((pself->FFI_currentMode == MT_DATA_ENTRY) &&
+	    ((pself->FFI_editingNewRecord) ||
+	     (pself->FFI_totalNumRecordsInDatabase == 0))) {
+	    @call self::MSG_FFD_EDIT_NEW_RECORD(FALSE, NRT_REGULAR, TRUE);
+	}
+	else {
+	    if ((pself->FFI_currentMode == MT_DATA_ENTRY) && 
+		(pself->FFI_totalNumRecordsInDatabase > 0)) {
+		@call oself::MSG_FFD_RECORD_CONTROL(FFRCR_GOTO_RECORD, 
+						FFD_CURRENT_RECORD(pself));
+	    }
+	}
+    }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_SWITCH_TO_LAYOUT for FlatFileDatabaseClass
+ *
+ * DESCRIPTION:  Switch to the desired layout. 
+ *
+ *              Inserts the current record.
+ *              If there were no problems inserting:
+ *              Removes the current GrObjBody from the FlatFile object,
+ *              attaches the new one and displays it.
+ *              Loads the current record to the new layout screen.
+ *
+ * PARAMETERS:  Pass:   byte layoutNum - absolute column # for layout
+ *                      optr ffGrObjHeadOptr - optr to GrObj head
+ *                      LayoutType layoutType - LT_SINGLE_RECORD or
+ *                                              LT_MULTI_RECORD
+ *                      Note: if LT_MULTI_RECORD is requested but the
+ *                              layout requested is single-record, then
+ *                              single-record will be displayed.
+ *              Returns:
+ *                      nothing 
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/7/92          Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_SWITCH_TO_LAYOUT
+{
+    FFDSwitchToLayout(oself, layoutNum, ffGrObjHeadOptr, layoutType,
+		      printing);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_RENAME_LAYOUT for FlatFileDatabaseClass
+ *
+ * DESCRIPTION: Rename the given layout. 
+ *
+ *              Returns FALSE if the name is already used; TRUE otherwise.
+ *
+ * PARAMETERS:  byte layoutNum - absolute layout column number 
+ *              TCHAR *newLayoutName                     
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/13/92         Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_RENAME_LAYOUT
+{
+    RecordLayoutChunkArrayHeader *layoutChunkArray;
+    byte *sortedByteArray;
+    byte copyOfSortedByteArray[MAX_NUM_LAYOUTS];
+
+    /*
+     * Make a copy of the sorted list of names in case the new one
+     * fails
+     */
+    sortedByteArray = CellLock(&pself->SSI_cellParams,
+			       RECORD_LAYOUT_ROW, 
+			       (word) LAYOUT_NAME_ARRAY_COLUMN);
+
+    memcpy(copyOfSortedByteArray, sortedByteArray, MAX_NUM_LAYOUTS);
+
+    CellUnlock(sortedByteArray);
+
+    /*
+     * Get rid of the old name in the sorted list
+     */
+    DeleteLayoutName(layoutNum, oself);
+
+    /*
+     * Put the new name in the list; notice that we are telling it that
+     * there is one less layout than there actually is; this is because
+     * we have "deleted" the old name from the list. So the current number
+     * of layouts in the sorted list is one less than actually exist
+     * in the database.
+     */
+    if (InsertLayoutNameIntoSortedList(oself, layoutNum, newLayoutName,
+					(pself->FFI_numLayouts - 1)) ==
+			FFD_DUPLICATE_LAYOUT_NAME)  {
+	/*
+	 * If it failed, re-insert the old name
+	 */
+	CellReplace(&pself->SSI_cellParams,
+		RECORD_LAYOUT_ROW, 
+		(word) LAYOUT_NAME_ARRAY_COLUMN,
+		copyOfSortedByteArray,
+		MAX_NUM_LAYOUTS);
+
+	return(FFD_DUPLICATE_LAYOUT_NAME);
+    }
+
+    /* 
+     * Store the new layout name in the layout's chunk array
+     */
+    pself = ObjDerefGen(oself);
+    layoutChunkArray = CellLock(&pself->SSI_cellParams,
+				RECORD_LAYOUT_ROW, 
+				(word) layoutNum);
+
+    strcpy(layoutChunkArray->RLCAH_layoutName, newLayoutName);
+
+    CellDirty(layoutChunkArray);
+    CellUnlock(layoutChunkArray);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_DELETE_LAYOUT for FlatFileDatabaseClass
+ *
+ * DESCRIPTION: Delete the given layout. 
+ *
+ *              If there is only one layout, we can't delete it, so
+ *              return FALSE. Otherwise return TRUE.
+ *
+ *              If the layout we're trying to delete is the one we're
+ *              on (i.e. is the current layout), the make the current
+ *              layout the one which is in the sorted list after this
+ *              one (or before, if it's the last one)
+ *
+ * PARAMETERS:  byte layoutNum - absolute layout column number 
+ *              optr ffGrObjHeadOptr - optr to the GrObj head.
+ *
+ *              Returns FFDeleteLayoutResult
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/13/92         Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_DELETE_LAYOUT
+{
+    byte *sortedByteArray, layoutIndex, newLayoutNum;
+    LayoutType newLayoutType;
+    EventHandle event;
+    TCHAR *confirmationMsg;
+    InteractionCommand userResponse;
+
+    /*
+     * If there is only one layout, then refuse to delete.
+     */
+    if (pself->FFI_numLayouts == (byte) 1) {
+	return(FFD_ATTEMPTED_TO_DELETE_LAST_LAYOUT);
+    }
+
+
+    MemLock(OptrToHandle(@FFDConfirmDeleteLayout));
+    confirmationMsg = LMemDeref(@FFDConfirmDeleteLayout);
+
+    /* Prompt the user: are you serious? */
+    userResponse = UserStandardDialog(
+	    (TCHAR *)0,
+	    /* not GIT_MULTIPLE_RESPONSE, so no custom triggers  */
+	    (TCHAR *)0,
+	    /* No string arguments  */
+	    (TCHAR *)0, (TCHAR *) 0,
+	    /* dialog string */
+	    confirmationMsg,
+	    /* dialog type */
+	    (CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
+	    /* interaction type */
+	    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET));
+
+    MemUnlock(OptrToHandle(@FFDConfirmDeleteLayout));
+
+    if (userResponse == IC_NO) {
+	return(FFD_NO_DELETE_LAYOUT_DONE);
+    }
+
+    sortedByteArray = CellLock(&pself->SSI_cellParams,
+			       RECORD_LAYOUT_ROW, 
+			       (word) LAYOUT_NAME_ARRAY_COLUMN);
+			       
+    /*
+     * Is the current layout the one we're trying to delete? 
+     * If so, make the current layout the one *after* this one.
+     */
+    if (pself->FFI_currentLayout == layoutNum) {
+	layoutIndex = FindFieldListElement(sortedByteArray,
+					   layoutNum,
+					   pself->FFI_numLayouts);
+	/*
+	 * Is this the last layout in the list? If so, set the current
+	 * layout to the one before. 
+	 */
+	if (layoutIndex == (pself->FFI_numLayouts-1)) {
+	    newLayoutNum = sortedByteArray[layoutIndex - 1];
+	}
+	else {
+	    newLayoutNum = sortedByteArray[layoutIndex + 1];
+	}
+
+	CellUnlock(sortedByteArray);
+	newLayoutType = @call self::
+			MSG_FFD_GET_LAYOUT_TYPE(newLayoutNum, FALSE);
+
+	@call self::MSG_FFD_SWITCH_TO_LAYOUT(newLayoutNum, 
+					     ffGrObjHeadOptr,
+					     newLayoutType, FALSE);
+    }
+    else {
+	CellUnlock(sortedByteArray);
+    }
+
+    /*
+     * Get rid of the old name in the sorted list
+     */
+    DeleteLayoutName(layoutNum, oself);
+
+    /*
+     * Empty up the single-record and multi-record layout chunk arrays
+     */
+    pself = ObjDerefGen(oself);
+    CellReplace(&pself->SSI_cellParams,
+		RECORD_LAYOUT_ROW, 
+		(word) layoutNum,
+		(void *) 0,
+		0);
+
+    CellReplace(&pself->SSI_cellParams,
+		MULTI_RECORD_LAYOUT_ROW, 
+		(word) layoutNum,
+		(void *) 0,
+		0);
+
+    /*
+     * Clean up the "layouts taken" array
+     */
+    pself = ObjDerefGen(oself);
+    pself->FFI_layoutColumnsTaken[layoutNum/8] =
+	pself->FFI_layoutColumnsTaken[layoutNum/8] & 
+			(~(0x80 >> (layoutNum % 8))); 
+  
+    /*
+     * Decrement the number of layouts in the database
+     */
+    pself->FFI_numLayouts--;
+
+    /*
+     * Force the View to redraw
+     */
+    event = @record GenViewClass::MSG_GEN_VIEW_REDRAW_CONTENT();
+
+    @send oself::MSG_VIS_VUP_CALL_OBJECT_OF_CLASS(event);
+    
+    return(FFD_DELETE_LAYOUT_OK);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_SWITCH_TO_INDEXED_LAYOUT for FlatFileDatabaseClass
+ *
+ * DESCRIPTION: Switches to the layout of the given index.
+ *              (The index is an index into the sorted list of layout names.)
+ *              Checks the layout type of the requested layout, and
+ *              then displays the layout.
+ *
+ * PARAMETERS:  byte layoutIndex - index of layout column in sorted
+ *                                      list of layouts
+ *              optr ffGrObjHeadOptr - optr to the GrObj head.
+ *
+ *              Returns:
+ *                      layoutType of new layout
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    9/24/92         Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_SWITCH_TO_INDEXED_LAYOUT
+{
+    byte layoutNum;
+    LayoutType layoutType;
+
+    layoutNum = FFDGetLayoutNum(pself, index);
+    layoutType = FFDGetLayoutType(oself, layoutNum, FALSE);
+    FFDSwitchToLayout(oself, layoutNum, ffGrObjHeadOptr, layoutType, FALSE);
+
+    return(layoutType);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDInitMultiRecordLayoutStruct
+ *
+ * DESCRIPTION:  Create the chunk array for a multi-record layout.
+ *
+ * PARAMETERS:  oself - optr to database object
+ *              mrGrObjBodyBlock - VM block where grobj resides
+ *              mrGrObjBodyChunk - chunk handle to grobj
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/24/92         Initial Revision
+ *
+ ***********************************************************************/
+void
+FFDInitMultiRecordLayoutStruct(optr oself, VMBlockHandle mrGrObjBodyBlock, 
+				ChunkHandle mrGrObjBodyChunk)
+{
+
+    MultiRecordLayoutStruct *mrLayoutPtr;
+    MemHandle multiRecordBlock;
+    FlatFileDatabaseInstance *pself;
+
+    pself = ObjDerefGen(oself);
+
+    /*
+     * Allocate & initialize the block for the structure 
+     */
+    multiRecordBlock = MemAlloc(sizeof(MultiRecordLayoutStruct), 
+					0, HAF_NO_ERR | HAF_ZERO_INIT);
+
+    mrLayoutPtr = MemLock(multiRecordBlock);
+
+    mrLayoutPtr->MRLS_layoutCommon.LC_grObjBodyVMBlock = mrGrObjBodyBlock;
+    mrLayoutPtr->MRLS_layoutCommon.LC_grObjBodyChunk = mrGrObjBodyChunk;
+
+    /*
+     * Store it in the database
+     */
+    CellReplace(&pself->SSI_cellParams,
+		MULTI_RECORD_LAYOUT_ROW, 
+		(word) pself->FFI_currentLayout,
+		mrLayoutPtr,
+		sizeof(MultiRecordLayoutStruct));
+
+    MemFree(multiRecordBlock);
+
+}
+
+/***********************************************************************
+*
+* FUNCTION:    DrawMultiRecordLayoutBoundary (INTERNAL)
+*
+* DESCRIPTION:  Draws a rectangle to indicate the boundary for this
+*               multi-record layout. 
+*
+* CALLED BY:    
+*               
+*
+* PARAMETERS:   
+*               oself - optr to FlatFile instance data
+*               grObjBodyOptr - what you'd think. 
+*               ffDrawFlags - DRAW or DONT_DRAW
+*       
+* STRATEGY:     
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*       Name    Date            Description
+*       ----    ----            -----------
+*       anna    7/22/92         Initial Revision
+*
+***********************************************************************/
+void 
+DrawMultiRecordLayoutBoundary(optr oself, optr grObjBodyOptr,
+			      PageSizeReport *psr, ffDrawFlags drawFlags)
+{
+    optr boundaryOptr;
+    GrObjInitializeData initData;
+    WWFixed boundaryLineWidth;
+    LayoutSize recordBounds;
+
+    /*
+     * Instantiate the rectangle
+     */
+    boundaryOptr = @call grObjBodyOptr::MSG_GB_INSTANTIATE_GROBJ(
+			  (ClassStruct *) &FFPageLayoutRectClass);
+
+    StoreMultiRecordBoundary(oself, boundaryOptr);
+
+    /*
+     * Specify the position and size of the new grobject and
+     * have it initialize itself to the default attributes
+     * The grobject is set within the margins of the document.
+     */
+    FFDGetSingleRecordBounds(oself, &recordBounds);
+
+    initData.GOID_position.PDF_x.DWF_int = psr->PSR_margins.PCMP_top;
+    initData.GOID_position.PDF_x.DWF_frac = 0;
+    initData.GOID_position.PDF_y.DWF_int = psr->PSR_margins.PCMP_left;
+    initData.GOID_position.PDF_y.DWF_frac = 0;
+    initData.GOID_width.WWF_int = (word) recordBounds.LS_width;
+    initData.GOID_width.WWF_frac = 0;
+    initData.GOID_height.WWF_int = (word) recordBounds.LS_height;
+    initData.GOID_height.WWF_frac = 0;
+
+    @call boundaryOptr::MSG_GO_INITIALIZE(&initData);
+
+    /*
+     * Set area color, line width and style 
+     */
+    @call boundaryOptr::MSG_GO_SET_AREA_COLOR(0xff, 0xff, 0xff);
+
+    boundaryLineWidth.WWF_int = DEFAULT_MULTI_RECORD_BOUNDARY_LINE_WIDTH;
+    boundaryLineWidth.WWF_frac = 0;
+
+    @call boundaryOptr::MSG_GO_SET_LINE_WIDTH(boundaryLineWidth);
+
+    @call boundaryOptr::MSG_GO_SET_LINE_STYLE(LS_DOTTED);
+
+    /*
+     * Tell the thing it can't be rotated/skewed/grouped 
+     */
+    @call boundaryOptr::MSG_GO_CHANGE_LOCKS(GOL_LOCK | GOL_ROTATE | GOL_SKEW |
+				GOL_GROUP | GOL_ATTRIBUTE | GOL_COPY,
+					    GOL_LOCK);
+
+    /*
+     * Notify object that it is complete and ready to go
+     */
+    @call boundaryOptr::MSG_GO_NOTIFY_GROBJ_VALID();
+    
+    @call boundaryOptr::MSG_FFPLR_SET_RECORD_BOUNDARY_SIZE(recordBounds);
+
+    /*
+     * Add the new grobject to the body; if requested, draw it too.
+     */
+    if (drawFlags == DONT_DRAW) {
+	@call grObjBodyOptr::MSG_GB_ADD_GROBJ(boundaryOptr, 
+				GOBAGOR_LAST | GOBAGOF_DRAW_LIST_POSITION);
+    }
+    else {
+	@call grObjBodyOptr::MSG_GB_ADD_GROBJ_THEN_DRAW(boundaryOptr, 
+		GOBAGOR_LAST | GOBAGOF_DRAW_LIST_POSITION);
+    }
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:     FFDCreateMultiRecordLayoutDontDisplay
+ *
+ * DESCRIPTION:  Creates a page layout for the given layout number,
+ *               if it doesn't exist already. Does not display it!
+ *
+ * PARAMETERS:  
+ *               oself - optr to flatfile database instance data
+ *               mrGrObjBodyHandle - VM handle to new grobj body
+ *               mrGrObjBodyChunk - chunk handle to new grobj body
+ *               layoutNum - absolute layout column number.
+ *
+ * NOTE:         If a multi-record layout already exists for the given layout,
+ *               nothing happens.
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/24/92         Initial Revision
+ *
+ ***********************************************************************/
+void FFDCreateMultiRecordLayoutDontDisplay(optr oself,
+					   MemHandle mrGrObjBodyHandle,
+					   ChunkHandle mrGrObjBodyChunk,
+					   byte layoutNum)
+{
+    optr mrGrObjBody;
+    VMBlockHandle mrGrObjBlock;
+    MultiRecordLayoutStruct *mrLayoutPtr;
+    FlatFileDatabaseInstance *pself;
+    PageSizeReport psr;
+    LayoutSize mrSize;
+
+#if ERROR_CHECK
+    RecordLayoutChunkArrayHeader *recordLayoutPtr;
+#endif /* ERROR_CHECK */
+
+    pself = ObjDerefGen(oself);
+
+#if ERROR_CHECK
+    /*
+     * Make sure we have a record layout for this layout number
+     */
+
+    recordLayoutPtr = CellLock(&pself->SSI_cellParams,
+				RECORD_LAYOUT_ROW,
+				layoutNum);
+    if (!recordLayoutPtr) {
+	EC_ERROR(NO_RECORD_LAYOUT_FOR_THIS_LAYOUT_NUM);
+    }
+    CellUnlock(recordLayoutPtr);
+
+#endif /* ERROR_CHECK */
+    
+    /*
+     * Do we already have a multi-record layout for this layout number?
+     * If so, do nothing
+     */
+    mrLayoutPtr = CellLock(&pself->SSI_cellParams,
+				 MULTI_RECORD_LAYOUT_ROW,
+				 layoutNum);
+    if (mrLayoutPtr) {
+	/* It's already there; unlock it */
+	CellUnlock(mrLayoutPtr);
+	return;
+    }
+
+    /*
+     * Objects are in design mode
+     */
+    mrLayoutPtr->MRLS_layoutMode = MT_DESIGN;
+
+    /*
+     * Set the page size to the default
+     */
+    SpoolGetDefaultPageSizeInfo(&psr);
+
+    mrGrObjBody = AttachNewGrObjBody(pself, 
+				      mrGrObjBodyHandle, 
+				      mrGrObjBodyChunk,
+				      &mrGrObjBlock);
+    /*
+     * Set up the chunk array for the record layout
+     */
+    FFDInitMultiRecordLayoutStruct(oself,
+				   mrGrObjBlock,
+				   mrGrObjBodyChunk);
+
+    /*
+     * Draw the boundary for the multi-record layout
+     */
+    DrawMultiRecordLayoutBoundary(oself, mrGrObjBody, &psr, DONT_DRAW);
+
+    /*
+     * Set the record order 
+     */
+    pself = ObjDerefGen(oself);
+    pself->FFI_recordOrder = ROO_TOP_TO_BOTTOM;
+    FFDSetRecordOrderForLayout(oself, layoutNum, ROO_TOP_TO_BOTTOM);
+
+    FFDSetPageBounds(oself, &psr);
+
+    /*
+     * Set the multi-record size to be the same as the single-record size.
+     */
+    FFDGetSingleRecordBounds(oself, &mrSize);
+    FFDSetMultiRecordBounds(oself, mrSize);
+
+    @send ConstructOptr(mrGrObjBodyHandle, mrGrObjBodyChunk)::
+	MSG_VIS_LAYER_SET_DOC_BOUNDS(psr.PSR_height, psr.PSR_width, 0, 0);
+    @send ConstructOptr(mrGrObjBodyHandle, mrGrObjBodyChunk)::
+	MSG_GEN_VIEW_SET_DOC_BOUNDS(psr.PSR_height, psr.PSR_width, 0, 0);
+}
+
+/***********************************************************************
+*
+* MESSAGE:      MSG_FFD_SET_LAYOUT_TYPE
+*
+* DESCRIPTION:  Sets the layout type for the given layout number.
+*
+* CALLED BY:    GLOBAL
+*
+* PARAMETERS:   PASS:   layoutNum  - absolute column number of layout
+*                       LayoutType (LT_SINGLE_RECORD/LT_MULTI_RECORD)
+*               RETURNS: nothing
+*
+* STRATEGY:     
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*       Name    Date            Description
+*       ----    ----            -----------
+*       anna    7/21/92         Initial Revision
+*
+***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_SET_LAYOUT_TYPE 
+{
+    RecordLayoutChunkArrayHeader *recordLayoutPtr;
+
+    /*
+     * First, retrieve the record layout chunk array.
+     */
+    recordLayoutPtr = CellLock(&pself->SSI_cellParams,
+			     RECORD_LAYOUT_ROW, 
+			     layoutNum);
+#if ERROR_CHECK
+    if (!recordLayoutPtr) {
+	EC_ERROR(CELL_DOES_NOT_EXIST);
+    }
+#endif /* ERROR_CHECK */
+    
+    recordLayoutPtr->RLCAH_layoutType = layoutType;
+
+    CellDirty(recordLayoutPtr);
+    CellUnlock(recordLayoutPtr);
+}
+
+/***********************************************************************
+*
+* FUNCTION:     FFDGetGrObjBodyForLayout
+*
+* DESCRIPTION:  Given the layout number, returns the GrObjBody for that
+*               layout.
+*
+* CALLED BY:    GLOBAL
+*
+* PARAMETERS:   Pass:
+*                   oself - optr to database object
+*                   byte layoutNum - absolute layout column number
+*                   LayoutType layoutType - LT_SINGLE_RECORD, LT_MULTI_RECORD...
+*               Returns:
+*                   optr to grObjBody
+*
+* STRATEGY:     Get the VM block handle and chunk handle for the GrObjBody
+*               in the header of the layout's chunk array. Dereference it,
+*               and return optr.
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*       Name    Date            Description
+*       ----    ----            -----------
+*       anna    5/8/92          Initial Revision
+*       anna    7/27/92         added ModeType parameter
+*
+***********************************************************************/
+optr FFDGetGrObjBodyForLayout(optr oself, byte layoutNum, 
+						LayoutType layoutType) 
+{
+    RecordLayoutChunkArrayHeader *cellDataPtr;
+    MemHandle memBlock;
+    CellRef cellOptr;
+    optr grObjBodyOptr;
+    word rowNumber;
+    VMBlockHandle grobjVMHandle;
+    ChunkHandle grobjChunk;
+    FlatFileDatabaseInstance *pself;
+
+    pself = ObjDerefGen(oself);
+
+    switch (layoutType) {
+	case LT_SINGLE_RECORD:
+		rowNumber = RECORD_LAYOUT_ROW;
+		break;
+	case LT_MULTI_RECORD:
+	case LT_REPORT:
+		rowNumber = MULTI_RECORD_LAYOUT_ROW;
+		break;
+    }
+
+    /*
+     * First, retrieve the record layout chunk array.
+     */
+    cellDataPtr = CellLockGetRef(&pself->SSI_cellParams,
+			     rowNumber, 
+			     layoutNum,
+			     &cellOptr);
+#if ERROR_CHECK
+    if (!cellDataPtr) {
+	EC_ERROR(CELL_DOES_NOT_EXIST);
+    }
+#endif /* ERROR_CHECK */
+    
+    if (layoutType == LT_SINGLE_RECORD) {
+	grobjVMHandle = cellDataPtr->RLCAH_layoutCommon.LC_grObjBodyVMBlock;
+	grobjChunk = cellDataPtr->RLCAH_layoutCommon.LC_grObjBodyChunk;
+    }
+    else {
+	/* it's multi-record */
+	grobjVMHandle = ((MultiRecordLayoutStruct *)cellDataPtr)->MRLS_layoutCommon.LC_grObjBodyVMBlock;
+	grobjChunk = ((MultiRecordLayoutStruct *)cellDataPtr)->MRLS_layoutCommon.LC_grObjBodyChunk;
+    }
+
+    memBlock = VMVMBlockToMemBlock(pself->documentHandle, grobjVMHandle);
+
+    grObjBodyOptr = ConstructOptr(memBlock, grobjChunk);
+
+    CellUnlock(cellDataPtr);
+
+    return(grObjBodyOptr);
+}
+
+/***********************************************************************
+*
+* MESSAGE:      MSG_FFD_GET_GROBJ_BODY_FOR_LAYOUT
+*
+* DESCRIPTION:  Given the layout number, returns the GrObjBody for that
+*               layout.
+*
+* CALLED BY:    GLOBAL
+*
+* PARAMETERS:   Pass:
+*                   byte layoutNum - absolute layout column number
+*                   LayoutType layoutType - LT_SINGLE_RECORD, LT_MULTI_RECORD...
+*               Returns:
+*                   optr to grObjBody
+*
+* STRATEGY:     Get the VM block handle and chunk handle for the GrObjBody
+*               in the header of the layout's chunk array. Dereference it,
+*               and return optr.
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*       Name    Date            Description
+*       ----    ----            -----------
+*       anna    5/8/92          Initial Revision
+*       anna    7/27/92         added ModeType parameter
+*
+***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_GET_GROBJ_BODY_FOR_LAYOUT 
+{
+    return(FFDGetGrObjBodyForLayout(oself, layoutNum, layoutType));
+}
+
+/***********************************************************************
+*
+* MESSAGE:      MSG_FFD_GET_GROBJ_BODIES_FOR_CURRENT_LAYOUT
+*
+* DESCRIPTION:  Returns the GrObjBody for the current layout.
+*               If we are in data entry & multi-record, both the
+*               attached grobj bodies are returned (single and double)
+*
+* CALLED BY:    GLOBAL
+*
+* PARAMETERS:   Pass:   *grobjBody2 = address of second grobjbody
+*               Returns:
+*                       optr to grObjBody
+*                       *grobjBody2 filled in
+
+*
+* STRATEGY:     
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*       Name    Date            Description
+*       ----    ----            -----------
+*       anna    10/21/92        Initial Revision
+*
+***********************************************************************/
+@extern method FlatFileDatabaseClass, 
+			MSG_FFD_GET_GROBJ_BODIES_FOR_CURRENT_LAYOUT 
+{
+    optr grobjBody1;
+
+    grobjBody1 = FFDGetGrObjBodyForLayout(oself, 
+					  pself->FFI_currentLayout, 
+					  pself->FFI_currentLayoutType);
+
+    if ((pself->FFI_currentMode == MT_DATA_ENTRY) &&
+		(pself->FFI_currentLayoutType == LT_MULTI_RECORD)) {
+	*grobjBody2 = FFDGetGrObjBodyForLayout(oself,
+						pself->FFI_currentLayout,
+						LT_SINGLE_RECORD);
+    }
+    else {
+	*grobjBody2 = (optr) 0;
+    }
+
+    return(grobjBody1);
+}
+
+/***********************************************************************
+*
+* FUNCTION:     FFDGetLayoutType
+*
+* DESCRIPTION:  Returns the layout type for the given layout number.
+*
+* CALLED BY:    GLOBAL
+*
+* PARAMETERS:   PASS: oself      - optr to database
+*                     layoutNum  - absolute column number of layout
+*                     curLayout  - TRUE if you simply want the current layout
+*                                  type, FALSE if you want the layoutNum type.
+*
+*               RETURN: LayoutType (LT_SINGLE_RECORD/LT_MULTI_RECORD)
+*
+* STRATEGY:     
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*      Name    Date             Description
+*      ----    ----             -----------
+*      anna    9/24/92          Initial Revision; broke out from 
+*                                       MSG_FFD_GET_LAYOUT_TYPE
+*
+***********************************************************************/
+LayoutType
+FFDGetLayoutType(optr oself, byte layoutNum, byte curLayout)
+{
+    LayoutType layoutType;
+    RecordLayoutChunkArrayHeader *cellDataPtr;
+    FlatFileDatabaseInstance *pself = ObjDerefGen(oself);
+
+    /*
+     * If they want the current layout type, return it.
+     */
+    if (curLayout) {
+	return pself->FFI_currentLayoutType;
+    }
+    
+    /*
+     * They want a specific layout.  Retrieve the record layout chunk array.
+     */
+    cellDataPtr = CellLock(&pself->SSI_cellParams,
+			     RECORD_LAYOUT_ROW, 
+			     layoutNum);
+#if ERROR_CHECK
+    if (!cellDataPtr) {
+	EC_ERROR(CELL_DOES_NOT_EXIST);
+    }
+#endif /* ERROR_CHECK */
+    
+    layoutType = cellDataPtr->RLCAH_layoutType;
+
+    CellUnlock(cellDataPtr);
+
+    return(layoutType);
+}
+
+/***********************************************************************
+*
+* MESSAGE:      MSG_FFD_GET_LAYOUT_TYPE
+*
+* DESCRIPTION:  Returns the layout type for the given layout number.
+*
+* CALLED BY:    GLOBAL
+*
+* PARAMETERS:   PASS: layoutNum  - absolute column number of layout
+*                     curLayout  - TRUE if you simply want the current layout
+*                                  type, FALSE if you want the layoutNum type.
+*
+*               RETURN: LayoutType (LT_SINGLE_RECORD/LT_MULTI_RECORD/
+*                                   LT_REPORT)
+*
+* STRATEGY:     
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*      Name    Date             Description
+*      ----    ----             -----------
+*      anna    7/21/92          Initial Revision
+*      jdashe  9/14/92          Added currLayout flag.
+*
+***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_GET_LAYOUT_TYPE 
+{
+    return(FFDGetLayoutType(oself, layoutNum, curLayout));
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    InitSortedLayoutNameArrays
+ *
+ * DESCRIPTION:  Initialize the array in which the sorted list of
+ *               layout names is kept. The 256-byte array is stored
+ *              in the first cell of the record layout row.
+ *
+ * PARAMETERS:
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/ 8/92         Initial Revision
+ *
+ ***********************************************************************/
+void
+InitSortedLayoutNameArrays(FlatFileDatabaseInstance *pself)
+{
+    MemHandle tempBlock;
+    byte *sortedLayoutColumns;
+
+    /*
+     * Just initialize it with all zeroes
+     */
+    tempBlock = MemAlloc(MAX_NUM_LAYOUTS, HF_SWAPABLE,
+			 HAF_NO_ERR | HAF_ZERO_INIT);
+
+    sortedLayoutColumns = MemLock(tempBlock);
+
+    /*
+     * Store it in the database
+     */
+    CellReplace(&pself->SSI_cellParams,
+		RECORD_LAYOUT_ROW, 
+		(word) LAYOUT_NAME_ARRAY_COLUMN,
+		sortedLayoutColumns,
+		MAX_NUM_LAYOUTS);
+
+    /*
+     * Mark the first layout cell as "taken", since that's where we're
+     * storing layout names
+     */
+    pself->FFI_layoutColumnsTaken[0] = 0x80;
+
+    MemFree(tempBlock);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDGetLayoutNum
+ *
+ * DESCRIPTION:  Given an index into the sorted layout name array, this
+ *              routine returns the layout number.
+ *
+ * PARAMETERS:  pass:  pself - pointer to flatfile instance data
+ *                     layoutNameIndex
+ *              returns: byte (= layout number)
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/ 8/92         Initial Revision
+ *
+ ***********************************************************************/
+byte
+FFDGetLayoutNum(FlatFileDatabaseInstance *pself, byte layoutNameIndex)
+{
+    byte *sortedByteArray;
+    byte layoutNum;
+
+    /*
+     * Find the position of the new layout name in the list of sorted
+     * layout names. The sorted list is stored in the first cell of the
+     * RECORD_LAYOUT_ROW
+     */
+    sortedByteArray = CellLock(&pself->SSI_cellParams,
+			       RECORD_LAYOUT_ROW, 
+			       (word) LAYOUT_NAME_ARRAY_COLUMN);
+		
+    layoutNum = sortedByteArray[layoutNameIndex];
+
+    CellUnlock(sortedByteArray);
+
+    return(layoutNum);
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    DeleteLayoutName
+ *
+ * DESCRIPTION: Delete the given layout number (absolute column number) 
+ *              from the sorted list of layout names.
+ *
+ * PARAMETERS:  layoutNum: layout number (absolute) 
+ *              oself: optr to flatfile instance data 
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/13/92         Initial Revision
+ *
+ ***********************************************************************/
+void
+DeleteLayoutName(byte layoutNum, optr oself)
+{
+    byte *sortedByteArray, i, layoutIndex;
+    FlatFileDatabaseInstance *pself;
+
+    pself = ObjDerefGen(oself);
+
+    sortedByteArray = CellLock(&pself->SSI_cellParams,
+			       RECORD_LAYOUT_ROW, 
+			       (word) LAYOUT_NAME_ARRAY_COLUMN);
+		
+    layoutIndex = FindFieldListElement(sortedByteArray,
+					   layoutNum,
+					   pself->FFI_numLayouts);
+    /*
+     * Delete the thing by moving up all the other entries
+     */
+    for (i = layoutIndex; i < (pself->FFI_numLayouts-1); i++) {
+	sortedByteArray[i] = sortedByteArray[i+1];
+    }
+    sortedByteArray[pself->FFI_numLayouts-1] = 0;
+
+    CellDirty(sortedByteArray);
+    CellUnlock(sortedByteArray);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    InsertLayoutNameIntoSortedList
+ *
+ * DESCRIPTION:  Initialize the array in which the sorted list of
+ *               layout names is kept. The 256-byte array is stored
+ *              in the first cell of the record layout row.
+ *
+ * PARAMETERS:  oself: optr to flatfile instance data
+ *              layoutNum: (absolute) layout number
+ *              *layoutName: pointer to new layout name
+ *              numLayouts: number of layouts in the database
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/ 8/92         Initial Revision
+ *
+ ***********************************************************************/
+FFLayoutNameInsertionResult
+InsertLayoutNameIntoSortedList(optr oself, byte layoutNum, TCHAR *layoutName,
+				byte numLayouts)
+{
+    byte *sortedByteArray;
+    byte copyOfSortedByteArray[MAX_NUM_LAYOUTS];
+    FlatFileDatabaseInstance *pself;
+    byte newIndex;
+
+    pself = ObjDerefGen(oself);
+
+    /*
+     * Find the position of the new layout name in the list of sorted
+     * layout names. The sorted list is stored in the first cell of the
+     * RECORD_LAYOUT_ROW
+     */
+    sortedByteArray = CellLock(&pself->SSI_cellParams,
+			       RECORD_LAYOUT_ROW, 
+			       (word) LAYOUT_NAME_ARRAY_COLUMN);
+		
+    memcpy(copyOfSortedByteArray, sortedByteArray, MAX_NUM_LAYOUTS);
+
+    CellUnlock(sortedByteArray);
+
+    newIndex = InsertSortedFieldArray(
+			   FFDGetLayoutName, 
+			   copyOfSortedByteArray, 
+			   layoutNum, 
+			   numLayouts,
+			   layoutName, 
+			   oself); 
+
+    /*
+     * See if name was a duplicate
+     */
+    if (newIndex == (byte) -1) {
+	return(FFD_DUPLICATE_LAYOUT_NAME);
+    }
+
+    pself = ObjDerefGen(oself);
+    CellReplace(&pself->SSI_cellParams,
+		RECORD_LAYOUT_ROW, 
+		(word) LAYOUT_NAME_ARRAY_COLUMN,
+		copyOfSortedByteArray,
+		MAX_NUM_LAYOUTS);
+
+    ObjMarkDirty(oself);
+    return(FFD_NO_ERROR);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    GenerateNewLayoutName
+ *
+ * DESCRIPTION:  Get the right number for the new layout name; the names
+ *              are of the form "Layout 1", "Layout 2" etc.
+ *
+ * PARAMETERS:  pself: pointer to database instance data
+ *              *layoutName: pointer to new layout name
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:    Get the current highest number from the instance data;
+ *              increment it, and turn it into ascii.
+ *              Make sure it's not taken already; if it is, get the
+ *              next available name.
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/15/92         Initial Revision
+ *
+ ***********************************************************************/
+void
+GenerateNewLayoutName(FlatFileDatabaseInstance *pself, TCHAR *layoutName)
+{
+    word newLayoutNumber;
+    TCHAR *startLayoutName;
+
+    pself->FFI_highestLayoutNumber++;
+    newLayoutNumber = pself->FFI_highestLayoutNumber;
+
+    MemLock(OptrToHandle(@FFDLayoutName));
+    startLayoutName = LMemDeref(@FFDLayoutName);
+    strcpy(layoutName, startLayoutName);
+    UtilHex32ToAscii((TCHAR *)layoutName+strlen(layoutName), 
+			 (dword) newLayoutNumber, 
+			 UHTAF_NULL_TERMINATE);
+    MemUnlock(OptrToHandle(@FFDLayoutName));
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    GenerateLayoutNameAndPutInHeader
+ *
+ * DESCRIPTION: Get the right number for the new layout name; 
+ *              Copy it into the layout name slot in the chunk array
+ *              header.
+ *
+ * PARAMETERS:  oself: optr to database instance data
+ *              layoutNum: absolute column number for this layout 
+ *              RecordLayoutChunkArrayHeader *chunkArrayAddress;
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:    Get the current highest number from the instance data;
+ *              increment it, and turn it into ascii.
+ *              Make sure it's not taken already; if it is, get the
+ *              next available name.
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/17/92         Initial Revision
+ *
+ ***********************************************************************/
+void
+GenerateLayoutNameAndPutInHeader(optr oself, byte layoutNum, 
+			RecordLayoutChunkArrayHeader *chunkArrayAddress)
+{
+    FlatFileDatabaseInstance *pself;
+    TCHAR layoutName[MAX_LAYOUT_NAME_LENGTH+1];
+
+    pself = ObjDerefGen(oself);
+
+    /*
+     * Get the right number for the new layout name; the names are of
+     * the form "Layout 1", "Layout 2", etc.
+     *
+     * Always start at zero, so that if we delete a layout, we can re-use
+     * the number.  Slight speed penalty, as we have to find the next avail
+     * layout number every time. - brianc 10/26/94
+     */
+    pself->FFI_highestLayoutNumber = 0;
+    GenerateNewLayoutName(pself, layoutName);
+
+    /*
+     * Insert the new layout name into the sorted list of layout names
+     * Keep trying until you find one that's not a duplicate.
+     */
+    while (InsertLayoutNameIntoSortedList(oself, layoutNum, layoutName,
+			pself->FFI_numLayouts) == FFD_DUPLICATE_LAYOUT_NAME) {
+	pself = ObjDerefGen(oself);
+	GenerateNewLayoutName(pself, layoutName);
+    }
+
+    /*
+     * Copy it into the chunk array's header
+     */
+    strcpy(chunkArrayAddress->RLCAH_layoutName, layoutName);
+}
+
+/***********************************************************************
+*
+* MESSAGE:      MSG_FFD_INIT_MULTI_RECORD_LAYOUT
+*
+* DESCRIPTION:  Initialize the multi-record chunk array for the 
+*               given record layout number.
+*               Store the GrObjBody VM block & chunk handle in the header.
+*               Then store the chunk array in a Spreadsheet cell in
+*               MULTI_RECORD_LAYOUT_ROW.
+*
+* CALLED BY:    GLOBAL
+*
+* PARAMETERS:   PASS: byte layoutNum  
+*                     MemHandle mrGrObjBodyHandle
+*                     ChunkHandle mrGrObjBodyChunk
+*                     optr ffGrObjHeadOptr
+*
+*               RETURN: nothing
+*
+* STRATEGY:     
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*      Name    Date             Description
+*      ----    ----             -----------
+*      anna    8/18/92          Initial Revision
+*
+***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_INIT_MULTI_RECORD_LAYOUT 
+{
+    FFDCreateMultiRecordLayoutDontDisplay(oself,
+					  mrGrObjBodyHandle,
+					  mrGrObjBodyChunk,
+					  layoutNum);
+}
+
+/***********************************************************************
+*
+* MESSAGE:      MSG_FFD_INIT_SINGLE_RECORD_LAYOUT
+*
+* DESCRIPTION:  Initialize the chunk array for the given record layout number.
+*               Store the GrObjBody VM block & chunk handle in the header.
+*               Then store the chunk array in a Spreadsheet cell in
+*               RECORD_LAYOUT_ROW.
+*
+*               If this is the first record layout to be created, we
+*               also set up the array of sorted layout names, to be stored
+*               in the first cell of the RECORD_LAYOUT_ROW
+*
+* CALLED BY:    GLOBAL
+*
+* PARAMETERS:   PASS: byte layoutNum  (=-1 if you want next available)
+*                     VMBlockHandle grObjBodyVMBlock
+*                     ChunkHandle grObjBodyChunk
+*                     optr grObjBodyOptr
+*                     LayoutType layoutType
+*
+*               RETURN: layoutNum
+*
+* STRATEGY:     
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*      Name    Date             Description
+*      ----    ----             -----------
+*      anna    5/5/92           Initial Revision
+*
+***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_INIT_SINGLE_RECORD_LAYOUT 
+{
+    RecordLayoutChunkArrayHeader *chunkArrayAddress;
+    MemHandle blockWithHeap;
+    ChunkHandle recordLayoutChunkArray;
+    PageSizeReport psr;
+    LayoutSize srLayoutSize;
+    EventHandle event;
+
+    /*
+     * Is this the first layout to be created? If so, set up the array
+     * of sorted layout names in the first cell of the record layout row
+     */
+    if (pself->FFI_numLayouts == 0) {
+	InitSortedLayoutNameArrays(pself); 
+    }
+
+    /*
+     * Allocate & initialize the heap and lock it
+     */
+    blockWithHeap = MemAllocLMem(LMEM_TYPE_GENERAL, 
+				 sizeof(LMemBlockHeader));
+
+    MemLock(blockWithHeap);
+
+    /*
+     * Create the chunk array for record layouts
+     */
+    recordLayoutChunkArray = ChunkArrayCreate(blockWithHeap,
+				(word) sizeof(RecordLayoutChunkArrayElement),
+				(word) sizeof(RecordLayoutChunkArrayHeader),0);
+	
+    /*
+     * Write the GrObjBody information into the header
+     */
+    chunkArrayAddress = LMemDerefHandles(blockWithHeap, 
+					 recordLayoutChunkArray); 
+
+    chunkArrayAddress->RLCAH_layoutCommon.LC_grObjBodyVMBlock = 
+					grObjBodyVMBlock;
+    chunkArrayAddress->RLCAH_layoutCommon.LC_grObjBodyChunk = grObjBodyChunk;
+    chunkArrayAddress->RLCAH_lastFieldYPosition = FIRST_FIELD_Y_POSITION;
+
+    chunkArrayAddress->RLCAH_layoutMode = MT_DESIGN;
+    chunkArrayAddress->RLCAH_layoutType = layoutType;
+
+    /*
+     * Assign layout number if we don't already have it
+     */
+    if (layoutNum == (byte) -1) {
+	layoutNum = FFDGetFreeColumnNum(pself->FFI_layoutColumnsTaken);
+    }
+
+    GenerateLayoutNameAndPutInHeader(oself, layoutNum, chunkArrayAddress);
+
+    /*
+     * Fill the layout fieldname list with empty values
+     */
+    memset(chunkArrayAddress->RLCAH_layoutSortedFieldList, 
+		0xff, MAX_NUM_FIELDS);
+
+    /*
+     * Fill the field order array with empty values
+     */
+    memset(chunkArrayAddress->RLCAH_fieldOrderInfo.FNOI_fieldOrderList, 
+		0xff, MAX_NUM_FIELDS);
+    chunkArrayAddress->RLCAH_fieldOrderInfo.FNOI_lastItemIndex = 0xffff;
+
+    pself = ObjDerefGen(oself);
+    pself->FFI_currentLayout = layoutNum;
+    pself->FFI_currentLayoutType = LT_SINGLE_RECORD;
+    pself->FFI_numLayouts++;
+
+    ObjMarkDirty(oself);
+    /*
+     * Store the chunk array in the database
+     */
+    CellReplace(&pself->SSI_cellParams,
+		RECORD_LAYOUT_ROW, 
+		(word) layoutNum,
+		chunkArrayAddress,
+		LMemGetChunkSizeHandles(blockWithHeap, recordLayoutChunkArray));
+
+    MemFree(blockWithHeap);
+
+    /*
+     * Set the size of the single record layout to the system's default
+     * document size minus the system default margin area.
+     */
+    SpoolGetDefaultPageSizeInfo(&psr);
+
+    srLayoutSize.LS_width = (sdword) psr.PSR_width -
+	(psr.PSR_margins.PCMP_right + psr.PSR_margins.PCMP_left);
+    srLayoutSize.LS_height = (sdword) psr.PSR_height -
+	(psr.PSR_margins.PCMP_top + psr.PSR_margins.PCMP_bottom);
+
+    @send grObjBodyOptr::MSG_VIS_LAYER_SET_DOC_BOUNDS(srLayoutSize.LS_height,
+						      srLayoutSize.LS_width,
+						      0, 0);
+    @send grObjBodyOptr::MSG_GEN_VIEW_SET_DOC_BOUNDS(srLayoutSize.LS_height,
+						     srLayoutSize.LS_width,
+						     0, 0);
+    FFDSetSingleRecordBounds(oself, srLayoutSize);
+
+    event = @record VisContentClass::
+	MSG_VIS_CONTENT_SET_DOC_BOUNDS(srLayoutSize.LS_height,
+				       srLayoutSize.LS_width,
+				       0, 0);
+    @send oself::MSG_VIS_VUP_CALL_OBJECT_OF_CLASS(event);
+
+    return(layoutNum);
+}
+
+/***********************************************************************
+*
+* MESSAGE:      FFDSetRecordOrderForLayout
+*
+* DESCRIPTION:  Set the record order for the given layout.
+*               Record order is for multi-record layouts; it is either
+*               top->bottom, then left->right, or
+*               left->right, then top->bottom
+*               The record order is stored as part of the multi-record
+*               layout definition.
+*               If the multi-record layout doesn't exist, does nothing.
+*
+* CALLED BY:    GLOBAL
+*
+* PARAMETERS:   PASS: oself - optr to database object
+*                     layoutNum  - layout number for which we want to set order
+*                     recordOrder - ROO_TOP_TO_BOTTOM or ROO_LEFT_TO_RIGHT
+*
+*               RETURN: nothing
+*
+* STRATEGY:     
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*      Name    Date             Description
+*      ----    ----             -----------
+*      anna    9/2/92           Initial Revision
+*
+***********************************************************************/
+void
+FFDSetRecordOrderForLayout(optr oself, byte layoutNum, 
+				RecordOrderOption recordOrder)
+{
+    MultiRecordLayoutStruct *MRLayoutPtr;
+    FlatFileDatabaseInstance *pself;
+
+    pself = ObjDerefGen(oself);
+
+    /*
+     * First, retrieve the record layout chunk array.
+     */
+    MRLayoutPtr = CellLock(&pself->SSI_cellParams,
+			     MULTI_RECORD_LAYOUT_ROW, 
+			     layoutNum);
+    if (!MRLayoutPtr) {
+	return;
+    }
+    
+    MRLayoutPtr->MRLS_recordOrder = recordOrder;
+
+    CellDirty(MRLayoutPtr);
+    CellUnlock(MRLayoutPtr);
+}
+
+/***********************************************************************
+*
+* MESSAGE:      MSG_FFD_SET_RECORD_ORDER_FOR_LAYOUT
+*
+* DESCRIPTION:  Set the record order for the given layout.
+*               Record order is for multi-record layouts; it is either
+*               top->bottom, then left->right, or
+*               left->right, then top->bottom
+*               The record order is stored as part of the multi-record
+*               layout definition.
+*
+* CALLED BY:    GLOBAL
+*
+* PARAMETERS:   PASS: byte layoutNum  
+*                     RecordOrderOption recordOrder
+*
+*               RETURN: nothing
+*
+* STRATEGY:     
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*      Name    Date             Description
+*      ----    ----             -----------
+*      anna    9/2/92           Initial Revision
+*
+***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_SET_RECORD_ORDER_FOR_LAYOUT 
+{
+    if (layoutNum == pself->FFI_currentLayout) {
+	pself->FFI_recordOrder = recordOrder;
+    }
+
+    FFDSetRecordOrderForLayout(oself, layoutNum, recordOrder);
+}
+
+/***********************************************************************
+*
+* MESSAGE:      MSG_FFD_SET_RECORD_ORDER_FOR_CURRENT_LAYOUT
+*
+* DESCRIPTION:  Set the record order for the current layout.
+*               Record order is for multi-record layouts; it is either
+*               top->bottom, then left->right, or
+*               left->right, then top->bottom
+*
+* CALLED BY:    GLOBAL
+*
+* PARAMETERS:   PASS: RecordOrderOption recordOrder
+*
+*               RETURN: nothing
+*
+* STRATEGY:     
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*      Name    Date             Description
+*      ----    ----             -----------
+*      anna    9/2/92           Initial Revision
+*
+***********************************************************************/
+@extern method FlatFileDatabaseClass, 
+			MSG_FFD_SET_RECORD_ORDER_FOR_CURRENT_LAYOUT 
+{
+    pself->FFI_recordOrder = recordOrder;
+    FFDSetRecordOrderForLayout(oself, pself->FFI_currentLayout, recordOrder);
+}
+
+/***********************************************************************
+*
+* MESSAGE:      FFDGetRecordOrderForLayout
+*
+* DESCRIPTION:  Return the record order for the given layout.
+*               Record order is for multi-record layouts; it is either
+*               top->bottom, then left->right, or
+*               left->right, then top->bottom
+*
+* CALLED BY:    GLOBAL
+*
+* PARAMETERS:   PASS:   optr oself - optr to flatfile object
+*                       byte layoutNum - absolute layout number
+*
+*               RETURN: RecordOrderOption (either ROO_LEFT_TO_RIGHT or
+*                                               ROO_TOP_TO_BOTTOM)
+*
+* STRATEGY:     
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*      Name    Date             Description
+*      ----    ----             -----------
+*      anna    9/2/92           Initial Revision
+*
+***********************************************************************/
+RecordOrderOption
+FFDGetRecordOrderForLayout(optr oself, byte layoutNum) 
+{
+    MultiRecordLayoutStruct *MRLayoutPtr;
+    RecordOrderOption recordOrder;
+    FlatFileDatabaseInstance *pself;
+
+    pself = ObjDerefGen(oself);
+
+    if (layoutNum == pself->FFI_currentLayout) {
+	return(pself->FFI_recordOrder);
+    }
+    else {
+	/*
+	 * First, retrieve the record layout chunk array.
+	 */
+	MRLayoutPtr = CellLock(&pself->SSI_cellParams,
+			     MULTI_RECORD_LAYOUT_ROW, 
+			     layoutNum);
+#if ERROR_CHECK
+    if (!MRLayoutPtr) {
+	EC_ERROR(CELL_DOES_NOT_EXIST);
+    }
+#endif /* ERROR_CHECK */
+    
+	recordOrder = MRLayoutPtr->MRLS_recordOrder;
+
+	CellUnlock(MRLayoutPtr);
+	return(recordOrder);
+    }
+}
+
+/***********************************************************************
+*
+* MESSAGE:      MSG_FFD_GET_RECORD_ORDER_FOR_LAYOUT
+*
+* DESCRIPTION:  Return the record order for the given layout.
+*               Record order is for multi-record layouts; it is either
+*               top->bottom, then left->right, or
+*               left->right, then top->bottom
+*
+* CALLED BY:    GLOBAL
+*
+* PARAMETERS:   PASS:   byte layoutNum
+*
+*               RETURN: RecordOrderOption (either ROO_LEFT_TO_RIGHT or
+*                                               ROO_TOP_TO_BOTTOM)
+*
+* STRATEGY:     
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*      Name    Date             Description
+*      ----    ----             -----------
+*      anna    9/2/92           Initial Revision
+*
+***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_GET_RECORD_ORDER_FOR_LAYOUT 
+{
+    return(FFDGetRecordOrderForLayout(oself, layoutNum));
+}
+
+/***********************************************************************
+*
+* MESSAGE:      MSG_FFD_GET_RECORD_ORDER_FOR_CURRENT_LAYOUT
+*
+* DESCRIPTION:  Return the record order for the current layout.
+*               Record order is for multi-record layouts; it is either
+*               top->bottom, then left->right, or
+*               left->right, then top->bottom
+*
+* CALLED BY:    GLOBAL
+*
+* PARAMETERS:   PASS:   nothing
+*
+*               RETURN: RecordOrderOption (either ROO_LEFT_TO_RIGHT or
+*                                               ROO_TOP_TO_BOTTOM)
+*
+* STRATEGY:     
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*      Name    Date             Description
+*      ----    ----             -----------
+*      anna    9/2/92           Initial Revision
+*
+***********************************************************************/
+@extern method FlatFileDatabaseClass, 
+				MSG_FFD_GET_RECORD_ORDER_FOR_CURRENT_LAYOUT 
+{
+    return(pself->FFI_recordOrder);
+}
+
+/********* Beginning of DatabasePrint resource *********/
+
+#ifdef __HIGHC__
+pragma Code ("DATABASEPRINT");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg DATABASEPRINT
+#endif
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDSetPageBounds
+ *
+ * DESCRIPTION: This function sets the page bounds for the
+ *              current layout.  Note that the actual view is not 
+ *              modified, only the layout's header data.
+ *
+ * PARAMETERS:
+ *              oself - an optr to the current database
+ *              psr - a pointer to a descriptive PageSizeReport
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  10/16/92                Initial version
+ *
+ ***********************************************************************/
+void
+FFDSetPageBounds(optr oself, PageSizeReport *psr)
+{
+    MultiRecordLayoutStruct *mrLayoutPtr, mrLayoutReplacement;
+    FlatFileDatabaseInstance *pself = ObjDerefGen(oself);
+    
+    /*
+     * Retrieve the record layout chunk array.
+     */
+    mrLayoutPtr = CellLock(&pself->SSI_cellParams,
+			   MULTI_RECORD_LAYOUT_ROW,
+			   pself->FFI_currentLayout);
+
+#if ERROR_CHECK
+    if (!mrLayoutPtr) {
+	EC_ERROR(CELL_DOES_NOT_EXIST);
+    }
+#endif /* ERROR_CHECK */
+    
+    /*
+     * Copy the original header, then the page size and type structure.
+     */
+    memcpy(&mrLayoutReplacement, mrLayoutPtr, sizeof(MultiRecordLayoutStruct));
+    memcpy(&(mrLayoutReplacement.MRLS_pageReport), psr, sizeof(PageSizeReport));
+
+    CellUnlock(mrLayoutPtr);
+
+    /*
+     * Replace the header with the new, fresh, updated version.
+     */
+    CellReplace(&pself->SSI_cellParams,
+		MULTI_RECORD_LAYOUT_ROW,
+		pself->FFI_currentLayout,
+		&mrLayoutReplacement,
+		sizeof(MultiRecordLayoutStruct));
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_SET_PAGE_BOUNDS for FlatFileDatabaseClass
+ *
+ * DESCRIPTION: This message sets the page bounds for the
+ *              current layout.  Note that the actual view is not 
+ *              modified, only the layout's header data.
+ *
+ * PARAMETERS:
+ *      void (PageSizeReport *psr)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  9/ 3/92         Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_SET_PAGE_BOUNDS
+{
+    FFDSetPageBounds(oself, psr);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDGetPageBounds
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * DESCRIPTION: This function copies the page size and type of the current
+ *              layout into a PageSizeReport structure passed by the
+ *              caller.
+ *
+ * PARAMETERS:  oself - an optr to the current database
+ *              psr - a pointer to the PageSizeReport to be filled
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  9/21/92         Initial version
+ *
+ ***********************************************************************/
+void
+FFDGetPageBounds(optr oself, PageSizeReport *psr)
+{
+    MultiRecordLayoutStruct *mrLayoutPtr;
+    FlatFileDatabaseInstance *pself = ObjDerefGen(oself);
+
+    /*
+     * Retrieve the record layout chunk array.
+     */
+    mrLayoutPtr = CellLock(&pself->SSI_cellParams,
+			   MULTI_RECORD_LAYOUT_ROW,
+			   pself->FFI_currentLayout);
+
+#if ERROR_CHECK
+    if (!mrLayoutPtr) {
+	EC_ERROR(CELL_DOES_NOT_EXIST);
+    }
+#endif /* ERROR_CHECK */
+    
+    /*
+     * Copy over the page size and type structure.
+     */
+    memcpy(psr, &(mrLayoutPtr->MRLS_pageReport), sizeof(PageSizeReport));
+
+    /*
+     * Done!
+     */
+    CellUnlock(mrLayoutPtr);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_GET_PAGE_BOUNDS for FlatFileDatabaseClass
+ *
+ * DESCRIPTION: This message copies the page size and type of the current
+ *              layout into a PageSizeReport structure passed by the
+ *              caller.
+ *
+ * PARAMETERS:
+ *      void (PageSizeReport *psr)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  9/9/92          Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_GET_PAGE_BOUNDS
+{
+    FFDGetPageBounds(oself, psr);
+}
+/********* End of DatabasePrint segment *********/

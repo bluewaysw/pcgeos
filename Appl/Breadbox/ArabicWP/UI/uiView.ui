@@ -1,0 +1,135 @@
+/*
+ * Project:	GeoWrite
+ * File:	UI/uiView.ui
+ *
+ * Author:	Tony Requist
+ *
+ *	This file contains the user interface description for the view
+ * menu.
+ *
+ *	$Id: uiView.ui,v 1.1 97/04/04 15:55:52 newdeal Exp $
+ *
+ */
+
+/*-----------------------------------------------------------------------------
+	View menu
+-----------------------------------------------------------------------------*/
+
+start PrimaryUI;
+
+ViewMenu = GenInteraction {
+#ifdef DO_PIZZA
+	children = ViewControlGroup, ViewTypeSubGroup, WritePageControl
+		, WriteRowColumnDisplayControl;
+#else
+	children = ViewControlGroup, ViewTypeSubGroup, WritePageControl;
+#endif
+	visibility = popup;
+	hints = { 
+		ATTR_GEN_INTERACTION_GROUP_TYPE { 
+			GenInteractionGroupType GIGT_VIEW_MENU 
+		}
+	}
+}
+
+end PrimaryUI;
+
+start ViewMenuUI;
+
+/*
+ * This object exists so that the ViewControl can be easily enabled/disabled
+ * without intertering with the GenControl mechanism
+ */
+
+ViewControlGroup = GenInteraction {
+	children = WriteViewControl;
+}
+
+
+WriteViewControl = GenViewControl {
+	hints = {
+
+	    HINT_GEN_CONTROL_SCALABLE_UI_DATA { GenControlScalableUIEntry <
+		 GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		 UIIL_INTRODUCTORY,
+		 GVC_SUGGESTED_INTRODUCTORY_FEATURES>,
+		<GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		 UIIL_BEGINNING,
+		 GVC_SUGGESTED_BEGINNING_FEATURES or mask GVCF_REDRAW>,
+		<GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL,
+		 UIIL_INTERMEDIATE,
+		 GVC_DEFAULT_FEATURES or mask GVCF_REDRAW>,
+		<GCSUIC_SET_TOOLBOX_FEATURES_IF_APP_LEVEL,
+		 UIIL_BEGINNING,
+		 GVC_DEFAULT_TOOLBOX_FEATURES or mask GVCTF_REDRAW>}
+	}
+}
+
+/****/
+ViewTypeSubGroup = GenInteraction {
+	genStates = default -enabled;
+	moniker = 'D', "Display Modes";
+	children = ViewTypeList;
+	visibility = popup;
+}
+
+ViewTypeList = GenItemGroup vardataReloc {
+	children = PageEntry, CondensedEntry, GalleyEntry,
+		   DraftWithStylesEntry, DraftWithoutStylesEntry;
+	applyMsg = MSG_WRITE_DOCUMENT_SET_DISPLAY_MODE;
+	destination = "TO_APP_MODEL";
+	genAttributes = default +notifyVisibility;
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS { UN_DD WriteDocumentClass },
+		ATTR_GEN_VISIBILITY_DATA { word 0, mask GV_DISPLAY_MODE }
+	}
+}
+
+PageEntry = GenItem {
+	moniker = 'P', "Page";
+	identifier = "VLTDM_PAGE";
+}
+
+CondensedEntry = GenItem {
+	moniker = 'C', "Condensed";
+	identifier = "VLTDM_CONDENSED";
+}
+
+GalleyEntry = GenItem {
+	moniker = 'G', "Galley";
+	identifier = "VLTDM_GALLEY";
+}
+
+DraftWithStylesEntry = GenItem {
+	moniker = 'D', "Draft With Styles";
+	identifier = "VLTDM_DRAFT_WITH_STYLES";
+}
+
+DraftWithoutStylesEntry = GenItem {
+	moniker = 'S', "Draft Without Styles";
+	identifier = "VLTDM_DRAFT_WITHOUT_STYLES";
+}
+/***/
+
+WritePageControl = GenPageControl vardataReloc {
+	output = "TO_APP_MODEL";
+	hints = {
+		ATTR_GEN_DESTINATION_CLASS { UN_DD WriteDocumentClass },
+		HINT_GEN_CONTROL_SCALABLE_UI_DATA { GenControlScalableUIEntry <
+		      GCSUIC_SET_TOOLBOX_FEATURES_IF_APP_FEATURE_ON,
+		      mask WF_SIMPLE_TEXT_ATTRIBUTES,
+		      mask GPCTF_PREVIOUS_PAGE or mask GPCTF_GOTO_PAGE or \
+		      mask GPCTF_NEXT_PAGE>
+		}
+	}
+}
+
+
+
+#ifdef DO_PIZZA
+WriteRowColumnDisplayControl = RowColumnDisplayControl {
+}
+#endif
+
+end ViewMenuUI;
+

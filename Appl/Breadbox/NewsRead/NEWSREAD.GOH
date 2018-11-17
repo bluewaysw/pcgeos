@@ -1,0 +1,294 @@
+/**********************************************************************
+ * NEWSREAD.GOH - News Reader Header File                             *
+ * Project - News Reader                                              *
+ * Started 4/28/98                                                    *
+ **********************************************************************/
+
+@include "utils.goh"
+
+#include "news.h"
+@include "options.goh"
+@include <parentc.goh>
+@include <Objects\gSysC.goh> 
+extern Boolean G_startupPassword;
+
+
+@include <objects/vltextc.goh>
+
+#ifndef __NEWSREAD_GOH
+#define __NEWSREAD_GOH
+
+#define NEWS_VIEW_ARTICLES      0
+#define NEWS_VIEW_THREADS       1
+#define NEWS_VIEW_GROUPS        2
+
+
+@ifdef DO_ERROR_CHECKING
+@define DEBUG
+@endif
+
+#ifdef DO_ERROR_CHECKING
+#define DEBUG
+#endif
+
+@include <ExtUI/tree.goh>
+
+
+/**********************************************************************
+ * Class Definitions                                                  *
+ **********************************************************************/
+
+/*----------------------------------------------------------------------
+  Class:  NewsProcessClass
+  Description:  Main application thread to process various top level
+                functionality
+  ----------------------------------------------------------------------*/
+@class NewsProcessClass, GenProcessClass;
+@message void MSG_NEWS_GET_GROUPS();
+@message void MSG_NEWS_DISCONNECT_FROM_SERVER();
+@message void MSG_NEWS_CONNECT_TO_SERVER();
+@message void MSG_NEWS_READ_GROUP();
+@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_NEWS_ARTICLE_LIST_MONIKER_QUERY;
+@message (GEN_TRIGGER_ACTION) MSG_NP_POST_WIN_SEND_ACTION ;
+@message void MSG_NEWS_WRITE_GROUP_LIST();
+@message (GEN_TRIGGER_ACTION) MSG_NEWS_UNSUBSCRIBE_GROUP ;
+@message void MSG_NEWS_SUBSCRIBE_GROUP();
+@message void MSG_NEWS_IMPORT_GROUP_LIST();
+@message Boolean MSG_NEWS_GET_MESSAGES(word groupNum);
+@message void MSG_NEWS_DOWNLOAD_ARTICLE();
+@message void MSG_NEWS_SUBSCRIBE_BY_NAME();
+@message void MSG_NEWS_GET_MESSAGES_ALL_GROUPS();
+@message void MSG_NEWS_DELETE_ARTICLE();
+@message void MSG_NEWS_INITIATE_POST();
+@message void MSG_NEWS_SAVE_MESSAGE();
+@message void MSG_NEWS_READ_NEWSGROUP() ;
+@message void MSG_NEWS_ADD_NEWSGROUP() ;
+@message void MSG_NEWS_UPDATE_NEWSGROUP() ;
+@message void MSG_NEWS_UPDATE_ALL_NEWSGROUPS() ;
+@message void MSG_NEWS_DELETE_NEWSGROUPS() ;
+@message void MSG_NEWS_MARK_READ_NEWSGROUP() ;
+@message void MSG_NEWS_MARK_READ_THREAD() ;
+@message void MSG_NEWS_MARK_READ_ARTICLE() ;
+@message void MSG_NP_POST_WIN_POST_MESSAGE() ;
+@message void MSG_NP_POST_WIN_REPLY_MESSAGE() ;
+@message void MSG_NEWS_DELETE_ALL_READ_NEWSGROUP() ;
+@message void MSG_NEWS_UPDATE_SELECTED_NEWSGROUP() ;
+@message void MSG_NEWS_SEARCH_NEWSGROUPS() ;
+
+@message Boolean MSG_NEWS_CALL_PER_SELECTED_GROUP(
+                  optr destination,
+                  Message msg) ;
+@message Boolean MSG_NEWS_CALL_ALL_GROUPS(
+                  optr destination,
+                  Message msg) ;
+@message void MSG_NEWS_SUBSCRIBE(
+                  NewsgroupEntry *p_group,
+                  Boolean errorIfSubscribed);
+
+@prototype Boolean MSG_NEWS_SELECTED_GROUP_ACTION(word groupNum) ;
+
+@message (MSG_NEWS_SELECTED_GROUP_ACTION) MSG_NEWS_UPDATE_SINGLE_NEWSGROUP ;
+@message (MSG_NEWS_SELECTED_GROUP_ACTION) MSG_NEWS_DELETE_ALL_READ_FOR_SINGLE_NEWSGROUP ;
+@message (MSG_NEWS_SELECTED_GROUP_ACTION) MSG_NEWS_MARK_READ_FOR_SINGLE_NEWSGROUP ;
+@message (MSG_NEWS_SELECTED_GROUP_ACTION) MSG_NEWS_MARK_FOR_DELETE_SINGLE_NEWSGROUP ;
+
+@message void MSG_NEWS_READ_THREAD() ;
+@message void MSG_NEWS_SHOW_ARTICLE(
+                  optr largeTextObj,
+                  word groupIndex,
+                  word threadIndex,
+                  word articleIndex) ;
+@message (GEN_TRIGGER_ACTION) MSG_NP_MAIN_VIEW_PRINT ;
+
+@message (GEN_TRIGGER_ACTION) MSG_NEWS_PROCESS_PICK_ADD_GROUP;
+@message void MSG_NEWS_PROCESS_GET_GROUP_NAME(word list, word selection,
+                                                  char *buffer);
+
+/* external article list messages */
+@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_NP_PICK_LIST_MONIKER_QUERY;
+@message (GEN_ITEM_GROUP_STATUS_MSG) MSG_NP_PICK_LIST_TYPE_CHANGED;
+@message void MSG_NP_PICK_LIST_INITIALIZE();
+@message word MSG_NP_PICK_LIST_GET_TYPE();
+
+typedef struct {
+    byte    textBuffer[MAX_GROUP_NAME_SIZE + 5] ;
+    NewsSenderName	senderBuffer;
+	Boolean readFlag ;
+    Boolean focusMark ;
+    word    unreadCount ;
+    word	totalCount ;
+	word    indentOffset ;
+    byte    lineType ;
+    TimerDateAndTime dateTime ;
+} T_mainListMonikerQueryData ;
+
+@prototype void NP_MAIN_LIST_MONIKER_QUERY_MSG(
+                word index, T_mainListMonikerQueryData *data);
+
+@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_NP_MAIN_LIST_MONIKER_QUERY ;
+@message void MSG_NP_MAIN_LIST_INITIALIZE() ;
+@message (NP_MAIN_LIST_MONIKER_QUERY_MSG) 
+                                MSG_NP_MAIN_LIST_NEWSGROUP_MONIKER_QUERY ;
+@message (NP_MAIN_LIST_MONIKER_QUERY_MSG) 
+                                MSG_NP_MAIN_LIST_THREAD_MONIKER_QUERY ;
+@message (NP_MAIN_LIST_MONIKER_QUERY_MSG) 
+                                MSG_NP_MAIN_LIST_ARTICLE_MONIKER_QUERY ;
+
+@message void MSG_NP_MAIN_LIST_OPEN_LEVEL(word index) ;
+@message void MSG_NP_MAIN_LIST_CLOSE_LEVEL() ;
+@message (GEN_ITEM_GROUP_STATUS_MSG) MSG_NP_MAIN_LIST_DOUBLE_PRESS ;
+@message (GEN_ITEM_GROUP_STATUS_MSG) MSG_NP_MAIN_LIST_SELECTION ;
+@message word MSG_NP_MAIN_LIST_CHECK_SELECTION() ;
+
+@message (GEN_TRIGGER_ACTION) MSG_NP_MAIN_LIST_UPDATE_ALL ;
+@message (GEN_TRIGGER_ACTION) MSG_NP_MAIN_LIST_UPDATE ;
+@message (GEN_TRIGGER_ACTION) MSG_NP_MAIN_LIST_GET ;
+@message (GEN_TRIGGER_ACTION) MSG_NP_MAIN_LIST_GET_ALL ;
+
+@message void MSG_NP_MAIN_LIST_NEXT_ARTICLE_THREAD_GROUP() ;
+@message void MSG_NP_MAIN_LIST_PREV_ARTICLE_THREAD_GROUP() ;
+
+@message void MSG_NP_MAIN_VIEW_SHOW_NOTHING() ;
+
+@message (GEN_VISIBILITY_OUTPUT) MSG_NP_POST_WIN_VISIBILITY_NOTIFICATION ;
+
+@message (GEN_TRIGGER_ACTION) MSG_NP_ACTION_BAR_DELETE_ACTION ;
+@message (GEN_TRIGGER_ACTION) MSG_NP_ACTION_BAR_DELETE_READ_ACTION ;
+@message (GEN_TRIGGER_ACTION) MSG_NP_ACTION_BAR_MARK_READ_ACTION ;
+@message void MSG_NP_ACTION_BAR_MARK_READ_UPDATE() ;
+@message void MSG_NP_ACTION_BAR_ONLINE_MODE_UPDATE() ;
+@message (GEN_TRIGGER_ACTION) MSG_NP_ACTION_BAR_DISCONNECT_ACTION ;
+@message void MSG_NP_ACTION_BAR_DELETE_UPDATE() ;
+@message void MSG_NP_ACTION_BAR_UPDATE_BUTTONS() ;
+
+@message (GEN_TRIGGER_ACTION) MSG_NP_NAVIGATION_BAR_READ_NEXT ;
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_NP_NAVIGATION_BAR_LEVEL_APPLY ;
+
+@message void MSG_NEWS_UPDATE_ARTICLE() ;
+
+@message void MSG_NP_POST_WIN_ADD_SIGNATURE();
+
+@message void MSG_NP_MAIN_VIEW_PARSE_MESSAGE() ;
+
+@message void MSG_NP_SAVE_FILES_EXTRACT_FILE_LIST() ;
+@message Boolean MSG_NP_SAVE_FILES_EXTRACT_FILE(
+                                        word*       fileList,
+                                        TCHAR*      name,
+                                        word        *fCount) ;
+@message (GEN_TRIGGER_ACTION) MSG_NP_SAVE_FILES_OPEN ;
+@message (GEN_TRIGGER_ACTION) MSG_NP_SAVE_FILES_CLOSE ;
+@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_NP_SAVE_FILES_MONIKER_QUERY ;
+
+@message (GEN_TRIGGER_ACTION) MSG_NP_SAVE_FILES_SAVE ;
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_NP_SAVE_FILES_APPLY_SELECTION ;
+
+@message (EXTUI_TABLE_DRAW_FIELD_MSG) MSG_NP_ARTICLE_LIST_DRAW_FIELD ;
+@message (EXTUI_TABLE_INFO_FIELD_MSG) MSG_NP_ARTICLE_LIST_INFO_FIELD ;
+@message (EXTUI_TREE_ATTACH_NODE_MSG) MSG_NP_ARTICLE_LIST_NODE_ATTACH ;
+@message (EXTUI_TREE_DETACH_NODE_MSG) MSG_NP_ARTICLE_LIST_NODE_DETACH ;
+
+@message (GEN_TRIGGER_ACTION) MSG_NP_READ_MESSAGE ;
+
+@message void MSG_NP_GROUP_LIST_INITIALIZE() ;
+@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_NP_GROUP_LIST_MONIKER_QUERY ;
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_NP_GROUP_LIST_SELECTION ;
+@message void MSG_NP_ARTICLE_TREE_INITIALIZE() ;
+
+@message Boolean MSG_NP_DETERMINE_DOWNLOAD_COUNT(dword *count, char *groupName, Boolean *markRead) ;
+
+@message void MSG_NP_UPDATE_CONNECTION_STATE() ;
+@message void MSG_NP_CONNECT() ;
+@message void MSG_NP_DISCONNECT() ;
+
+@message (GEN_TRIGGER_ACTION) MSG_NEWS_SHOW_HEADERS ;
+@message (GEN_TRIGGER_ACTION) MSG_NEWS_HIDE_HEADERS ;
+@message void MSG_NEWS_UPDATE_ARTICLE2() ;
+
+@message (GEN_TRIGGER_ACTION) MSG_NEWS_READ_NEXT ;
+@message (GEN_TRIGGER_ACTION) MSG_NEWS_READ_PREV ;
+@message (GEN_TRIGGER_ACTION) MSG_NEWS_READ_DISCARD ;
+@message void MSG_NEWS_READ_UPDATE_NAVI() ;
+@message void MSG_NEWS_READ_DELETE_NOTIFY(word group, word thread, word article) ;
+
+@message void MSG_NP_SETTINGS_SAVE(Boolean quit) ;
+@message void MSG_NP_SETTINGS_TRANSFER_AUTHINFO(Boolean direction);
+
+@endc
+
+
+/*----------------------------------------------------------------------
+  Class:  NewsContentClass
+  Description:  Subclass of VisContent to help control the displaying
+                of the text in the content.
+  ----------------------------------------------------------------------*/
+@class NewsContentClass, GenContentClass;
+@endc
+
+/*----------------------------------------------------------------------
+  Class:  PrintTextClass
+  Description:  Standard NewsText with a few intercepts for cleaning up
+                memory.
+  ----------------------------------------------------------------------*/
+@class NewsTextClass, VisLargeTextClass;
+
+@instance dword NTI_tabEnd = 0 ;
+
+@message void MSG_NEWS_TEXT_OPEN(optr content, VisTextStorageFlags storage);
+@message void MSG_NEWS_TEXT_CLOSE(optr content);
+
+@endc
+
+@class NewsHeaderTextClass, NewsTextClass;
+
+@message void MSG_NEWS_TEXT_RECALC_TAB_WIDTH(dword tabEnd) ;
+
+@endc
+
+/*----------------------------------------------------------------------
+  Class:  GenTextChangedClass
+  Description:  General text object that outputs status msgs when empty.
+  ----------------------------------------------------------------------*/
+@class GenTextChangedClass, GenTextClass ;
+@endc
+
+/*----------------------------------------------------------------------
+  Class:  SettingsDialogClass
+  Description:  Handles setting up the setings Dialog class
+  ----------------------------------------------------------------------*/
+@class SettingsDialogClass, GenInteractionClass ;
+@message void MSG_SETTINGS_CHANGED() ;
+@message Boolean MSG_SETTINGS_INIT_FILE_READ_STRING(optr child, 
+				char *buf, word buflen);
+@endc
+
+/*----------------------------------------------------------------------
+  Class:  AddNewsgroupDialogClass
+  Description:  Handles setting up the setings Dialog class
+  ----------------------------------------------------------------------*/
+@class AddNewsgroupDialogClass, GenInteractionClass ;
+@message void MSG_ADD_NEWS_DIALOG_CHANGED() ;
+@message void MSG_ADD_NEWS_SEARCH() ;
+@endc
+
+/*----------------------------------------------------------------------
+  Class:  NewsGroupsClass
+  Description:  Complete list of newsgroups UI interface
+  ----------------------------------------------------------------------*/
+@class NewsGroupsClass, GenDynamicListClass;
+@instance optr NGI_textObj = NullHandle ;
+@instance MemHandle MGI_subList = NullHandle ;
+@message void MSG_NEWS_GROUPS_INITIALIZE() ;
+@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_NEWS_GROUPS_QUERY;
+@message (GEN_ITEM_GROUP_STATUS_MSG) MSG_NEWS_GROUPS_SELECTED_ITEM ;
+@message void MSG_NEWS_GROUPS_CLEAR_SUB_LIST() ;
+@message Boolean MSG_NEWS_GROUPS_APPEND_TO_SUB_LIST(word entry) ;
+@message void MSG_NEWS_GROUP_SHOW_ALL() ;
+@message void MSG_NEWS_GROUP_INIT_VIEW(optr visChild) ;
+@endc
+
+#define DISPLAY_NEWSGROUPS      0
+#define DISPLAY_THREADS         1
+#define DISPLAY_ARTICLES        2
+#define DISPLAY_POST            3
+
+#endif

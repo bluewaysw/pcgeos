@@ -1,0 +1,362 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1990 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		disk.def
+
+AUTHOR:		Adam de Boor, Apr 11, 1990
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	4/11/90		Initial revision
+
+
+DESCRIPTION:
+	Definitions for the manipulation of disk handles and disks in general.
+		
+	$Id: disk.def,v 1.1 97/04/04 14:23:31 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__DISK
+
+include	file.def		; For VolumeName
+include	drive.def		; For DriveType
+
+StartKernel
+
+;------------------------------------------------------------------------------
+;		DiskFormat Definitions
+;------------------------------------------------------------------------------
+global DiskFormat:far
+
+DiskFormatFlags	record
+    :13
+    DFF_CALLBACK_PCT_DONE:1	; Set if should call callback with the
+				;  percent-complete
+    DFF_CALLBACK_CYL_HEAD:1	; Set if should call callback with the current
+				;  cylinder and head
+    DFF_FORCE_ERASE:1		; Set if should force erasure of entire disk
+DiskFormatFlags	end
+
+FormatError				etype	word
+FMT_DONE					enum	FormatError, 0
+FMT_READY					enum	FormatError
+FMT_RUNNING					enum	FormatError
+FMT_DRIVE_NOT_READY				enum	FormatError
+FMT_ERR_WRITING_BOOT				enum	FormatError
+FMT_ERR_WRITING_ROOT_DIR			enum	FormatError
+FMT_ERR_WRITING_FAT				enum	FormatError
+FMT_ABORTED					enum	FormatError
+FMT_SET_VOLUME_NAME_ERR				enum	FormatError
+FMT_CANNOT_FORMAT_FIXED_DISKS_IN_CUR_RELEASE	enum	FormatError
+
+FMT_BAD_PARTITION_TABLE				enum	FormatError ;fixed disk
+FMT_ERR_READING_PARTITION_TABLE			enum	FormatError ;fixed disk
+FMT_ERR_NO_PARTITION_FOUND			enum	FormatError ;fixed disk
+FMT_ERR_MULTIPLE_PRIMARY_PARTITIONS		enum	FormatError ;fixed disk
+FMT_ERR_NO_EXTENDED_PARTITION_FOUND		enum	FormatError ;fixed disk
+FMT_ERR_CANNOT_ALLOC_SECTOR_BUFFER		enum	FormatError
+FMT_ERR_DISK_IS_IN_USE				enum	FormatError
+FMT_ERR_WRITE_PROTECTED				enum	FormatError
+FMT_ERR_DRIVE_CANNOT_SUPPORT_GIVEN_FORMAT	enum	FormatError
+FMT_ERR_INVALID_DRIVE_SPECIFIED			enum	FormatError
+FMT_ERR_DRIVE_CANNOT_BE_FORMATTED		enum	FormatError
+FMT_ERR_DISK_UNAVAILABLE			enum	FormatError
+FMT_ERR_CANNOT_FORMAT_TRACK			enum	FormatError ; catch-all
+
+;------------------------------------------------------------------------------
+;		DiskCopy Definitions
+;------------------------------------------------------------------------------
+global DiskCopy:far
+
+DiskCopyFlags	record
+    DCF_GREEDY:1		; if set, use as much memory as necessary and
+				;  possible to minimize disk swaps. Applicable
+				;  only if source and dest drives are the same
+    :7
+DiskCopyFlags	end
+
+DiskCopyCallback etype word, 0
+DCC_GET_SOURCE_DISK		enum DiskCopyCallback
+;	Desc:	prompt the user to insert the source disk.
+;	Pass:
+;		ax - DCC_GET_SOURCE_DISK
+;		dl - 0 based drive number
+;	Return:
+;		ax = 0 to continue, non-0 to abort
+
+DCC_REPORT_NUM_SWAPS		enum DiskCopyCallback
+;	Desc:	tell the user how many times s/he'll have to swap disks
+;		to accomplish the copy.
+;	Pass:
+;		ax - DCC_REPORT_NUM_SWAPS
+;		dx - number of swaps required
+;	Return:
+;		ax = 0 to continue, non-0 to abort
+
+DCC_GET_DEST_DISK		enum DiskCopyCallback
+;	Desc:	prompt the user to insert the destination disk.
+;	Pass:
+;		ax - DCC_GET_DEST_DISK
+;		dl - 0 based drive number
+;	Return:
+;		ax = 0 to continue, non-0 to abort
+
+DCC_VERIFY_DEST_DESTRUCTION	enum DiskCopyCallback
+;	Desc:	make sure the user really wants to biff the formatted disk
+;		s/he inserted as the destination.
+;	Pass:
+;		ax - DCC_VERIFY_DEST_DESTRUCTION
+;		bx - disk handle of destination disk
+;		dl - 0 based drive number
+;	Return:
+;		ax = 0 to continue, non-0 to abort
+
+DCC_REPORT_FORMAT_PCT		enum DiskCopyCallback
+;	Desc:	During the formatting phase of the copy, report how much of
+;		the format is complete.
+;	Pass:
+;		ax - DCC_REPORT_FORMAT_PCT
+;		dx - percentage of destination disk formatted
+;	Return:
+;		ax = 0 to continue, non-0 to abort
+
+DCC_REPORT_READ_PCT		enum DiskCopyCallback
+;	Desc:	Report how much of the source disk has been read.
+;	Pass:
+;		ax - DCC_REPORT_READ_PCT
+;		dx - percentage of source disk read
+;	Return:
+;		ax = 0 to continue, non-0 to abort
+
+DCC_REPORT_WRITE_PCT		enum DiskCopyCallback
+;	Desc:	Report how much of the destination disk has been written.
+;	Pass:
+;		ax - DCC_REPORT_WRITE_PCT
+;		dx - percentage of destination disk written
+;	Return:
+;		ax = 0 to continue, non-0 to abort
+
+DiskCopyError etype word, FormatError	; these start where FormatError ends
+					;  off, so an error formatting the
+					;  destination disk can be returned
+					;  straight.
+ERR_INVALID_SOURCE_DRIVE				enum DiskCopyError
+	; passed source drive doesn't exist
+
+ERR_INVALID_DEST_DRIVE					enum DiskCopyError
+	; passed destination drive doesn't exist
+
+ERR_SOURCE_DRIVE_DOESNT_SUPPORT_DISK_COPY		enum DiskCopyError
+ERR_DEST_DRIVE_DOESNT_SUPPORT_DISK_COPY			enum DiskCopyError
+
+ERR_DRIVES_HOLD_DIFFERENT_FILESYSTEM_TYPES		enum DiskCopyError
+	; the two drives are managed by different filesystem drivers, so
+	; a disk cannot be copied between the two with this function
+
+ERR_SOURCE_DISK_INCOMPATIBLE_WITH_DEST_DRIVE		enum DiskCopyError
+	; the source disk is formatted in a way the destination drive
+	; does not support.
+
+ERR_SOURCE_DISK_NOT_FORMATTED				enum DiskCopyError
+	; attempted to register the source disk after prompting for it and
+	; the registration failed.
+
+ERR_COULD_NOT_REGISTER_FORMATTED_DESTINATION_DISK	enum DiskCopyError
+	; attempted to create a disk handle for the destination disk (which
+	; was already formatted) and failed, for some reason.
+
+ERR_DISKCOPY_INSUFFICIENT_MEM				enum DiskCopyError
+ERR_CANT_READ_FROM_SOURCE				enum DiskCopyError
+ERR_CANT_WRITE_TO_DEST					enum DiskCopyError
+ERR_OPERATION_CANCELLED					enum DiskCopyError
+ERR_DISK_IS_IN_USE					enum DiskCopyError
+
+;------------------------------------------------------------------------------
+;		Disk Registration
+;------------------------------------------------------------------------------
+
+global DiskRegisterDisk:far
+global DiskRegisterDiskSilently:far
+
+;------------------------------------------------------------------------------
+;		Disk Handle Accessor Functions
+;------------------------------------------------------------------------------
+
+global DiskForEach:far		;file-selector calls this kernel routine
+
+
+global DiskGetDrive:far
+global DiskGetVolumeName:far
+global DiskSetVolumeName:far
+
+global DiskGetVolumeInfo:far
+
+DiskInfoStruct	struct
+    DIS_blockSize	word	; # bytes in which filesystem allocations
+				;  are performed. Useful as an efficient
+				;  buffer size for disk transfers, with
+				;  certain restrictions.
+    DIS_freeSpace	sdword	; # bytes free on the disk
+    DIS_totalSpace	sdword	; # bytes on the entire disk
+if DBCS_PCGEOS
+    DIS_name		wchar	VOLUME_BUFFER_SIZE dup(?)
+else
+    DIS_name		char	VOLUME_BUFFER_SIZE dup(?)
+endif
+DiskInfoStruct	ends
+
+global DiskGetVolumeFreeSpace:far
+
+global DiskFind:far
+
+DiskFindResult		etype	word
+DFR_UNIQUE		enum	DiskFindResult
+DFR_NOT_UNIQUE		enum	DiskFindResult
+DFR_NOT_FOUND		enum	DiskFindResult
+
+;------------------------------------------------------------------------------
+;		Disk Handle Save/Restore
+;------------------------------------------------------------------------------
+global	DiskSave:far
+;
+;	Save a disk handle away so it can be restored when the system is
+;	restarted.
+;
+;	Pass:	bx	= disk handle
+;		es:di	= buffer for opaque data that allows the handle to
+;			  be restored.
+;		cx	= size of the buffer.
+;	Return:	carry clear if ok:
+;			cx	= actual number of bytes used in the passed
+;				  buffer.
+;		carry set if error:
+;			cx	= number of bytes needed to save the disk
+;				  handle. This is 0 if the disk handle cannot
+;				  be saved, for some reason (e.g. the disk
+;				  handle refers to a drive that no longer
+;				  exists).
+;
+
+global	DiskRestore:far
+;
+;	Fetch the disk handle for a saved disk (it can very easily differ
+;	between invocations of PC/GEOS).
+;
+;	Pass:	ds:si	= buffer to which the disk handle was saved with
+;			  DiskSave
+;		cx:dx	= callback routine to call if user must be prompted
+;			  for the disk. If cx is 0, no callback will be
+;			  attempted, and failure will be returned if the disk
+;			  was in drive that no longer exists, or contains
+;			  removable media but not the disk in question.
+;	Return:	carry set if disk could not be restored:
+;			ax	= DiskRestoreError indicating why.
+;		carry clear if disk properly restored:
+;			ax	= handle of disk for this invocation of PC/GEOS
+;
+;	Notes:
+;		The callback routine is called:
+;		Pass: 	ds:dx	= drive name (null-terminated, with
+;				  trailing ':')
+;			ds:di	= disk name (null-terminated)
+;			ds:si	= buffer to which the disk handle was saved
+;				  with DiskSave
+;			ax	= DiskRestoreError that would be returned if
+;				  callback weren't being called.
+;			bx, bp	= as passed to DiskRestore
+;		Return:	carry clear if disk should be in the drive
+;				ds:si	= new position of buffer, if it moved
+;			carry set if user canceled the restore:
+;				ax	= error code to return (usually
+;					  DRE_USER_CANCELED_RESTORE)
+;		Destroy:cx, dx, bx, di
+;
+
+
+DiskRestoreError	etype	word, 0, 1
+    DRE_DISK_IN_DRIVE				enum	DiskRestoreError
+    ;	This is the value returned if the disk is in the drive, both by
+    ;	DiskRestore itself, and by the callback routine, if it's called.
+    ;	In the callback's case, of course, it just *thinks* the disk is
+    ;	in the drive; it doesn't know for sure.
+    ;
+    
+    DRE_DRIVE_NO_LONGER_EXISTS			enum 	DiskRestoreError
+    ;	The drive in which the disk was registered no longer exists, and the
+    ;	filesystem driver either isn't loaded or couldn't restore the drive,
+    ;	for some reason.
+    ;
+    
+    DRE_REMOVABLE_DRIVE_DOESNT_HOLD_DISK	enum	DiskRestoreError
+    ;	The disk was in a removable-media drive and that drive doesn't contain
+    ;	the disk.
+    ;
+    
+    DRE_USER_CANCELED_RESTORE			enum	DiskRestoreError
+    ;	Provided solely for callback routines to use, as it implies the user
+    ;	was asked, which DiskRestore will not do.
+    ;
+    
+    DRE_COULDNT_CREATE_NEW_DISK_HANDLE		enum	DiskRestoreError
+    ;	Attempted to create the new disk handle, after deciding the disk was
+    ;	in the drive, but had some difficulty finding the disk name, etc.
+    ;
+
+    DRE_REMOVABLE_DRIVE_IS_BUSY			enum	DiskRestoreError
+    ;	The disk was in a removable-media drive that is currently marked
+    ;	as busy, so system could neither confirm nor deny that it holds
+    ;	the saved disk. Try again later.
+    ;
+
+    DRE_NOT_ATTACHED_TO_SERVER			enum	DiskRestoreError
+    ;	The disk was from a network server to which we are not logged in.
+    ;
+
+    DRE_PERMISSION_DENIED			enum	DiskRestoreError
+    ;	The disk was on a network which is (now) denying access to it.
+    ;
+    
+    DRE_ALL_DRIVES_USED				enum	DiskRestoreError
+    ;	The disk was on a network volume that isn't mounted, but there is
+    ;	no drive left to which it can be mapped.
+    ;
+
+;------------------------------------------------------------------------------
+;		Miscellaneous
+;------------------------------------------------------------------------------
+
+;
+; If a disk handle ANDed with this constant yields non-zero, the disk handle
+; is actually a StandardPath in disguise.
+; 
+DISK_IS_STD_PATH_MASK	equ	1
+
+global DiskCheckWritable:appfar
+global DiskCheckInUse:far
+global DiskCheckUnnamed:far
+
+;-
+
+global DISKGETVOLUMEINFO:far
+global DISKSETVOLUMENAME:far
+global DISKGETVOLUMEFREESPACE:far
+global DISKCOPY:far
+global DISKFORMAT:far
+global DISKREGISTERDISK:far
+global DISKREGISTERDISKSILENTLY:far
+global DISKFOREACH:far
+global DISKGETDRIVE:far
+global DISKGETVOLUMENAME:far
+global DISKFIND:far
+global DISKCHECKWRITABLE:far
+global DISKCHECKINUSE:far
+global DISKCHECKUNNAMED:far
+global DISKSAVE:far
+global DISKRESTORE:far
+
+EndKernel

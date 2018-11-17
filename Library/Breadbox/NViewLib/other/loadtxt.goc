@@ -1,0 +1,63 @@
+/*
+ *      LOADTXT.GOC - view files in plain text (ISO Latin) format
+ *
+ *      by Marcus Groeber, mgroeber@compuserve.com
+ *
+ */
+
+@include <stdapp.goh>
+@include <foam.goh>
+#include <library.h>
+#include <xlatLib.h>
+
+#include <ansi\stdio.h>
+#include <ansi\string.h>
+
+@include <nview.goh>
+
+NViewStatus LoadTextDoc(FDocumentDir dir, char *file, optr text)
+{
+    FileHandle fh;
+    unsigned char buf[512],c,cl;
+    word i,j,count;
+    const VisTextCharAttr mono =
+      CHAR_ATTR_FONT_SIZE_STYLE(FID_DTC_URW_MONO, 12, 0);
+
+    FilePushDir();
+    FoamSetDocumentDir(dir);
+    fh = FileOpen(file, FILE_ACCESS_R | FILE_DENY_W);
+    FilePopDir();
+
+    if(!fh)                             /* abort if source file not found */
+      return NVS_CANNOT_OPEN_FILE;
+
+    /* Display plain text in monospace font, like Notes application. */
+    @call text::MSG_VIS_TEXT_SET_CHAR_ATTR(&mono, TEXT_ADDRESS_PAST_END,0);
+
+    cl = 0;
+    count = FileRead(fh, buf, sizeof(buf), FALSE);
+    while(count)
+    {
+      for(i=j=0; i<count; i++)
+      {
+        c = buf[i];
+        if(c>=' ' || (c=='\r' && cl!='\n') || (c=='\n' && cl!='\r') || c=='\t')
+        {                               /* skip LF after CR and vice versa */
+          buf[j++] = (c=='\n')? '\r' : c;
+          cl = c;                       /* remember byte before recoding */
+        }
+      }
+
+      /* Convert "Windows" character set to Geos. */
+      LocalCodePageToGeos((char *)buf, j, CODE_PAGE_LATIN_1, '.');
+
+      /* Put into text object */
+      @call text::MSG_VIS_TEXT_APPEND_PTR((char *)buf, j);
+
+      count = FileRead(fh, buf, sizeof(buf), FALSE);
+    }
+
+    FileClose(fh, TRUE);
+
+    return NVS_NO_ERROR;
+}

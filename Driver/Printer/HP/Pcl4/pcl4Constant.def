@@ -1,0 +1,508 @@
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Berkeley Softworks 1990 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		LaserJet printer driver
+FILE:		pcl4Constant.def
+
+AUTHOR:		Dave Durran Jan 1992
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Dave	1/92		Initial revision
+
+
+DESCRIPTION:
+	This file contains constants and structure definitions used by the
+	PCL 4 printer driver
+
+	$Id: pcl4Constant.def,v 1.1 97/04/18 11:52:18 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;Equate used to determine which routines go into the fixed or common
+;code modules -----MUST BE PRESENT 
+DR_PRINT_LAST_RESIDENT	=	DR_PRINT_HOME_CURSOR
+;WARNING: if this is anything other than DR_PRINT_HOME_CURSOR, the 
+;printcomTables file will have to be pulled into the driver, and routines
+;be passed between it and the driver-specific tables.
+
+PCL4MODE	=	1		;conditional flag for this PCL version
+
+	;group of local variables used by the Send Scanline Routines.
+PrintScanlineInfo	struc
+	PSI_begOLine	word	?	;offset to beginning of scanline.
+	PSI_begOData	word	?	;offset to beginning of dots.
+	PSI_begOZeros	word	?	;offset to beginning of zeros.
+if	ERROR_CHECK
+	PSI_pstateSeg	word	?	;image of PState segment address.
+	PSI_bitmapSeg	word	?	;image of bitmap segment address.
+	PSI_bandBWidth	word	?	;image of bitmap byte width.
+	PSI_lineCount	word	?	;image of line counter.
+endif
+PrintScanlineInfo	ends
+
+;constants used to define graphics print resolution, and band geometry.
+
+LO_RES_X_RES		=	75	;number of dots / inch in X.
+LO_RES_Y_RES		=	75	;number of scanlines / inch.
+LO_RES_BAND_HEIGHT	=	1	;number of scanlines in one print band.
+LO_RES_BUFF_HEIGHT      =       1       ;number of scanlines in one band buff.
+LO_RES_INTERLEAVE_FACTOR =      1       ;number of interleaves.
+
+MED_RES_X_RES		=	150	;number of dots / inch in X.
+MED_RES_Y_RES		=	150	;number of scanlines / inch.
+MED_RES_BAND_HEIGHT	=	1	;number of scanlines in one print band.
+MED_RES_BUFF_HEIGHT     =       1       ;number of scanlines in one band buff.
+MED_RES_INTERLEAVE_FACTOR =     1       ;number of interleaves.
+
+
+HI_RES_X_RES		=	300	;number of dots / inch in X.
+HI_RES_Y_RES		=	300	;number of scanlines / inch.
+HI_RES_BAND_HEIGHT	=	1	;number of scanlines in one print band.
+HI_RES_BUFF_HEIGHT      =       1       ;number of scanlines in one band buff.
+HI_RES_INTERLEAVE_FACTOR =      1       ;number of interleaves.
+
+PR_MARGIN_LEFT		=	18
+PR_MARGIN_RIGHT		=	18
+PR_MARGIN_TOP		=	18
+PR_MARGIN_BOTTOM	=	18
+PR_GRAPHIC_MARGIN	=	75	;number of 1/300" margin.
+
+;This next constant needs some definition.  The ENOUGH_BLANK is the reason 
+;that the laserjet+ driver works on less memory equipped laserjets.  It is the
+;number of blank space on a scan line that can be traded for the X and Y cursor
+;move codes plus the enter and leave graphic mode codes.
+
+;Start graphics mode:	<ESC>*r1A<ESC>*b<number of bytes>W<ESC>*rB
+;								14-17 bytes
+;Y cursor move:		<ESC>*p<number of 1/300">Y		5-8 bytes
+;X cursor move:		<ESC>*p<number of 1/300">X		5-8 bytes
+
+;TOTALS								24-33 bytes
+
+;Not all of these bytes translate directly into main memory usage.  How
+;exactly they are implemented in different HP Laserjet models is a mystery.
+;Some experimentation has shown the number 24 to be about a wash for the 
+;upper half of the page. Since Y positions increase the the number of digits
+;as you go down a page, 25 seems to be the best fit (tested on the Laserjet+
+;which seemed to be the worst case).  The HP Laserjet IIP seems to be the 
+;most effecient, allowing this number to be more like 10.
+			
+ENOUGH_BLANK	=	25
+
+;------------------------------------------------------------------------------
+;	Constants defined by HP:
+;------------------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+
+HP_MAX_CHARS		=	256
+
+HP_SCALE_FACTOR_LOW	=	0x2AAA
+HP_SCALE_FACTOR_HIGH	=	0x4		;=4.1666
+
+;------------------------------------------------------------------------------
+; LaserJet constants
+;------------------------------------------------------------------------------
+HP_MAX_SOFT_FONTS	=	0
+HP_MAX_POINTSIZE	=	0
+HP_MAX_MEMORY_LOW	=	60416		;=59K
+HP_MAX_MEMORY_HIGH	=	0
+
+;------------------------------------------------------------------------------
+; LaserJet Plus constants
+;------------------------------------------------------------------------------
+HP_PLUS_MAX_SOFT_FONTS	=	32
+HP_PLUS_MAX_POINTSIZE	=	36
+HP_PLUS_MAX_MEMORY_LOW	=	11264		;=395K
+HP_PLUS_MAX_MEMORY_HIGH	=	6
+
+;------------------------------------------------------------------------------
+; LaserJet II constants
+;------------------------------------------------------------------------------
+HP_II_MAX_SOFT_FONTS	=	16
+HP_II_MAX_POINTSIZE	=	72
+HP_II_MAX_MEMORY_LOW	=	11264		;=395K
+HP_II_MAX_MEMORY_HIGH	=	6
+
+;------------------------------------------------------------------------------
+; LaserJet IID constants
+;------------------------------------------------------------------------------
+HP_IID_MAX_SOFT_FONTS	=	32
+HP_IID_MAX_POINTSIZE	=	655
+HP_IID_MAX_MEMORY_LOW	=	11264		;=395K
+HP_IID_MAX_MEMORY_HIGH	=	6
+
+;------------------------------------------------------------------------------
+; LaserJet IIP constants
+;------------------------------------------------------------------------------
+HP_IIP_MAX_SOFT_FONTS	=	65535	;(limited only by memory)
+HP_IIP_MAX_POINTSIZE	=	655
+HP_IIP_MAX_MEMORY_LOW	=	11264		;=395K
+HP_IIP_MAX_MEMORY_HIGH	=	6
+
+;------------------------------------------------------------------------------
+; LaserJet III constants
+;------------------------------------------------------------------------------
+HP_III_MAX_SOFT_FONTS	=	65535	;(limited only by memory)
+HP_III_MAX_POINTSIZE	=	655
+HP_III_MAX_MEMORY_LOW	=	11264		;=395K
+HP_III_MAX_MEMORY_HIGH	=	6
+
+
+
+;------------------------------------------------------------------------------
+;
+; HP font IDs:
+;
+HPFontID	etype	byte
+HPFID_LINE_PRINTER	enum HPFontID
+HPFID_PICA		enum HPFontID
+HPFID_ELITE		enum HPFontID
+HPFID_COURIER		enum HPFontID
+HPFID_HELV		enum HPFontID
+HPFID_TMSRMN		enum HPFontID
+HPFID_LETTER_GOTHIC	enum HPFontID
+HPFID_SCRIPT		enum HPFontID
+HPFID_PRESTIGE		enum HPFontID
+HPFID_CASLON		enum HPFontID
+
+;
+; HP character sets:
+;
+HPCharSet	etype	word
+HPCS_ROMAN_8		enum HPCharSet, 277
+HPCS_WINDOWS		enum HPCharSet, 292
+HPCS_PC_8		enum HPCharSet, 341
+
+;
+; HP Font Types:
+;
+HPFontTypes	etype	byte
+HPFT_7_BIT		enum HPFontTypes
+HPFT_8_BIT_192_CHARS	enum HPFontTypes
+HPFT_8_BIT_256_CHARS	enum HPFontTypes
+
+;
+; HP Width types:
+;
+HPWidthTypes	etype	byte
+HPWT_EXTRA_COMPRESSED	enum HPWidthTypes, -5
+HPWT_EXTRA_CONDENSED	enum HPWidthTypes, -3
+HPWT_CONDENSED		enum HPWidthTypes, -2
+HPWT_SEMI_CONDENSED	enum HPWidthTypes, -1
+HPWT_NORMAL		enum HPWidthTypes, 0
+HPWT_SEMI_EXPANDED	enum HPWidthTypes, 1
+HPWT_EXPANDED		enum HPWidthTypes, 2
+HPWT_EXTRA_EXPANDED	enum HPWidthTypes, 3
+
+;
+; HP Font Styles:
+;
+HPFontStyles	etype	byte
+HPFS_UPRIGHT		enum HPFontStyles
+HPFS_ITALIC		enum HPFontStyles
+
+;
+; HP Stroke Weights:
+;
+HPStrokeWeights	etype	byte
+HPSW_ULTRA_THIN		enum HPStrokeWeights, -7
+HPSW_EXTRA_THIN		enum HPStrokeWeights, -6
+HPSW_THIN		enum HPStrokeWeights, -5
+HPSW_EXTRA_LIGHT	enum HPStrokeWeights, -4
+HPSW_LIGHT		enum HPStrokeWeights, -3
+HPSW_DEMI_LIGHT		enum HPStrokeWeights, -2
+HPSW_SEMI_LIGHT		enum HPStrokeWeights, -1
+HPSW_BOOK		enum HPStrokeWeights, 0
+HPSW_SEMI_BOLD		enum HPStrokeWeights, 1
+HPSW_DEMI_BOLD		enum HPStrokeWeights, 2
+HPSW_BOLD		enum HPStrokeWeights, 3
+HPSW_EXTRA_BOLD		enum HPStrokeWeights, 4
+HPSW_BLACK		enum HPStrokeWeights, 5
+HPSW_EXTRA_BLACK	enum HPStrokeWeights, 6
+HPSW_ULTRA_BLACK	enum HPStrokeWeights, 7
+
+;
+; HP Serif Styles:
+;
+HPSerifStyles	etype	byte
+HPSS_SANS_SERIF_SQUARE	enum HPSerifStyles
+HPSS_SANS_SERIF_ROUND	enum HPSerifStyles
+HPSS_SERIF_LINE		enum HPSerifStyles
+HPSS_SERIF_TRIANGLE	enum HPSerifStyles
+HPSS_SERIF_SWATH	enum HPSerifStyles
+HPSS_SERIF_BLOCK	enum HPSerifStyles
+HPSS_SERIF_BRACKET	enum HPSerifStyles
+HPSS_ROUNDED_BRACKET	enum HPSerifStyles
+HPSS_FLAIR_STROKE	enum HPSerifStyles
+
+HPOrientations	etype	byte
+HPO_PORTRAIT		enum HPOrientations
+HPO_LANDSCAPE		enum HPOrientations
+
+HPSpacings	etype	byte
+HPS_FIXED		enum HPSpacings
+HPS_PROPORTIONAL	enum HPSpacings
+
+HPCharFormats	etype	byte
+HPCF_STANDARD		enum HPCharFormats, 4
+
+HPCharClasses	etype	byte
+HPCC_NORMAL		enum HPCharClasses, 1
+HPCC_COMPRESSED		enum HPCharClasses, 2
+
+HPContinuationFlag	etype	byte
+HPCF_START		enum HPContinuationFlag, 0
+HPCF_CONTINUATION	enum HPContinuationFlag, 1
+
+
+;------------------------------------------------------------------------------
+
+;
+; Header of HP soft font:
+;	not IIP	- field ignored on LaserJet IIPs
+;	PCL	- field is in PCL dots
+;	PCL4	- field is in PCL quarter dots
+;	PCL1024 - field is in 1024ths of PCL dot
+;
+HPFontHeader struc
+    HPFH_size		word	64	;font header size
+    HPFH_res05		byte	0	;RESERVED		(not IIP)
+    HPFH_fontType	HPFontTypes <HPFT_8_BIT_256_CHARS>
+    HPFH_res1		word	0	;RESERVED
+    HPFH_baseline	word	0	;baseline dist	(PCL)	(not IIP)
+    HPFH_cwidth		word	0	;cell width	(PCL)	(not IIP)
+    HPFH_cheight	word	0	;cell height	(PCL)	(not IIP)
+    HPFH_orientation	HPOrientations	;portrait or landscape
+    HPFH_spacing	HPSpacings	;spacing (fixed or proportional)
+    HPFH_symbolSet	HPCharSet <HPCS_PC_8>
+    HPFH_pitch		word		;pitch / HMI	(PCL4)
+    HPFH_height		word		;height		(PCL4)
+    HPFH_x_height	word		;x height	(PCL4)	(not IIP)
+    HPFH_widthType	HPWidthTypes	;prop. char width	(not IIP)
+    HPFH_style		HPFontStyles	;style
+    HPFH_weight		HPStrokeWeights	;stroke weight
+    HPFH_fontID		HPFontID	;HP font ID
+    HPFH_res8		byte	0	;RESERVED
+    HPFH_serifStyle	HPSerifStyles	;serif style		(not IIP)
+    HPFH_res2		word	0	;RESERVED
+    HPFH_underDist	sbyte		;under dist	(PCL)
+    HPFH_underThick	sbyte		;under thick	(PCL)	(not IIP)
+    HPFH_textHeight	word		;line spacing	(PCL4)	(not IIP)
+    HPFH_textWidth	word		;avg char width (PCL4)	(not IIP)
+    HPFH_res3		word	0	;RESERVED
+    HPFH_res4		word	0	;RESERVED
+    HPFH_pitchExt	byte		;addtl. pitch	(PCL1024)
+    HPFH_heightExt	byte		;addtl. height	(PCL1024)
+    HPFH_res5		word	0	;RESERVED
+    HPFH_res6		word	0	;RESERVED
+    HPFH_res7		word	0	;RESERVED
+    HPFH_fontName	byte 16 dup (char) ;font name		(IIP,IID only)
+HPFontHeader ends
+
+;
+; Header of soft character:
+; 	PC means in physical coordinates, and depends on orientation.
+;
+HPCharHeader struc
+    HPCH_format		HPCharFormats		<HPCF_STANDARD>
+    HPCH_continuation	HPContinuationFlag	<HPCF_START>
+    HPCH_size		byte	14
+    HPCH_class		HPCharClasses		<HPCC_NORMAL>
+    HPCH_orientation	HPOrientations		<HPO_PORTRAIT>
+    HPCH_res1		byte	0		
+    HPCH_leftOffset	word		;offset from left to (0,0)	(PC)
+    HPCH_topOffset	word		;offset from top to (0,0)	(PC)
+    HPCH_charWidth	word		;width of char data		(PC)
+    HPCH_charHeight	word		;height of char data		(PC)
+    HPCH_deltaX		word		;character width
+HPCharHeader ends
+
+;
+; Header for continuation of character:
+;	This is used for characters larger than 32K.
+;
+HPCharContinuation struc
+    HPCC_format		HPCharFormats		<HPCF_STANDARD>
+    HPCC_contiunation	HPContinuationFlag	<HPCF_CONTINUATION>
+HPCharContinuation ends
+
+		;initial value for our series of HP soft font IDs
+INITIAL_HP_FONT_ID	=	0
+
+HPFontControls 		etype byte, 0, 1
+HPFC_DELETE_ALL_SOFT_FONTS	enum HPFontControls
+HPFC_DELETE_TEMP_SOFT_FONTS	enum HPFontControls
+HPFC_DELETE_SOFT_FONT		enum HPFontControls
+HPFC_DELETE_CHARACTER		enum HPFontControls
+HPFC_MAKE_FONT_TEMPORARY	enum HPFontControls
+HPFC_MAKE_FONT_PERMANENT	enum HPFontControls
+HPFC_COPY_FONT			enum HPFontControls
+HPFC_NO_OPERATION		enum HPFontControls, 0xff
+
+HPMacroControls		etype byte, 0, 1
+HPMC_START_MACRO_DEFINITION	enum HPMacroControls
+HPMC_STOP_MACRO_DEFINITION	enum HPMacroControls
+HPMC_EXECUTE_MACRO		enum HPMacroControls
+HPMC_CALL_MACRO			enum HPMacroControls
+HPMC_ENABLE_AUTO_OVERLAY	enum HPMacroControls
+HPMC_DISABLE_AUTO_OVERLAY	enum HPMacroControls
+HPMC_DELETE_ALL_MACROS		enum HPMacroControls
+HPMC_DELETE_TEMP_MACROS		enum HPMacroControls
+HPMC_DELETE_MACRO		enum HPMacroControls
+HPMC_MAKE_MACRO_TEMPORARY	enum HPMacroControls
+HPMC_MAKE_MACRO_PERMANENT	enum HPMacroControls
+;
+; minimum size of font in printer:
+; (ie. with no characters)
+;	-- see 3-2, LaserJet Technical Manual (blue book)
+;
+HP_FONT_SIZE	=	2048
+
+;------------------------------------------------------------------------------
+;	Miscellaneous constants:
+;------------------------------------------------------------------------------
+MAX_BITMAP_SIZE		=	16384		;LaserJet pukes at > 32K
+MAX_BITMAP_OFFSET	=	14		;=log2(16384)
+MAX_SFE_NUMBER		=	64		;maximum # of soft font entries
+
+;------------------------------------------------------------------------------
+;	Soft font structures & constants:
+;------------------------------------------------------------------------------
+
+;
+; Flags for each character in soft-font:
+;
+SoftCharFlags record
+    :6
+    SCF_ON_PAGE:1		;TRUE: character is on current page
+    SCF_IN_PRINTER:1		;TRUE: character is in printer
+SoftCharFlags end
+
+;
+; Structure for each character in soft font:
+;
+SoftCharEntry struc
+    SCE_flags		SoftCharFlags		;flags for character
+    SCE_size32		word			;size / 32
+SoftCharEntry ends
+
+;
+; Source of soft font:
+;
+SoftFontSources	etype	byte
+SFS_BSW		enum	SoftFontSources		;built by OS/90
+SFS_DISK	enum	SoftFontSources		;loaded from disk
+SFS_CARTRIDGE	enum	SoftFontSources		;in font cartridge
+
+;
+; Flags for each SoftFontEntry in list:
+;
+SoftFontFlags record
+    :5
+    SFF_SOURCE SoftFontSources:2 	;source (BSW, disk, cartridge)
+    SFF_ON_PAGE:1		 	;TRUE: font is on current page
+SoftFontFlags end
+
+;
+; Structure for soft-font entry in list:
+;
+SoftFontEntry struc
+    SFE_fontID		FontID			;BSW font ID
+    SFE_style		PrintTextStyle		;style
+    SFE_pointsize	word			;pointsize
+    SFE_optFontEntry    OptFontEntry <>		;additional font stuff
+    SFE_fontTag		word			;printer font ID
+    SFE_orientation	FontOrientation		;portrait or landscape
+    SFE_usage		word			;heap count for LRU
+    SFE_flags		SoftFontFlags		;flags for this font
+    SFE_size		dword			;size in printer
+    SFE_numChars	byte			;# of chars in font
+    SFE_chars		SoftCharEntry HP_MAX_CHARS dup (<>)
+SoftFontEntry ends
+
+TestFontEntry	struc
+    TFE_fontID          FontID                  ;BSW font ID
+    TFE_style           PrintTextStyle          ;style
+    TFE_pointsize       word                    ;pointsize
+    TFE_optFontEntry    OptFontEntry <>		;additional font stuff
+TestFontEntry	ends
+
+;
+; Structure to keep track of the max values in the printer.
+;
+DownloadProperties	struc
+	DP_maxNumFonts	word			;max # of softfonts ....
+	DP_maxPointsize	word			;max vertical size....
+DownloadProperties	ends
+
+
+
+;------------------------------------------------------------------------------
+;	FDRLocals structure
+
+;	structure in stack for saving various font driver variables.
+;------------------------------------------------------------------------------
+FontDriverInfo	struc
+	FDI_pstate		sptr		;PState segment address.
+	FDI_sfontSeg		word	(?)	;segment of soft font entry.
+	FDI_sfontOff		word	(?)	;Offset of soft font entry.
+	FDI_currTrackKern	sword	(?)	;+track Kern Value (dots)
+	FDI_currentDes		word	(?)
+	FDI_currentWidth	word	(?)
+	FDI_currentYOffset	word	(?)
+	FDI_charBandHeight	word	(?)	;height in scanlines of slice.
+	FDI_charBandSize	word	(?)
+	FDI_numCharBands	word	(?)
+	FDI_realWidth		word	(?)
+	FDI_bitmapHandle	lptr
+	FDI_windowHandle	hptr
+	FDI_fileHandle		hptr
+	FDI_gstateHandle	hptr
+	FDI_CharHeader		HPCharHeader	;image of HP Character Header.
+	FDI_characterCode	byte	(?)	;ASCII code scratch.
+	FDI_HPtypeface		byte	(?)	;HP font ID scratch
+FontDriverInfo	ends
+;------------------------------------------------------------------------------
+;	internal structures and constants for soft-font manager:
+;------------------------------------------------------------------------------
+;
+; Header for soft-font manager info block:
+;
+HPFontInfo	 struc
+    HPFI_blockHeader	LMemBlockHeader <>	;required header info
+    HPFI_numFonts	word			;# of fonts in printer
+    HPFI_maxNumFonts	word			;max # of fonts in printer
+    HPFI_maxPointsize	word			;max pointsize for softfonts
+    HPFI_fontMemory	dword			;size of soft fonts in printer
+    HPFI_heapCount	word			;heap counter for LRU
+    HPFI_allocID	word			;next ID to alloc
+    HPFI_bmFileHandle	hptr			;saved version of the vm file
+    HPFI_header		HPFontHeader <>		;font header template
+    HPFI_testFontEntry	TestFontEntry <>	;entry to compare against.
+    HPFI_fontEntries	lptr.SoftFontEntry	;chunk handle of font list
+HPFontInfo	 ends
+
+;
+; number of chunk handles to allocate:
+;
+FONT_MANAGER_NUM_HANDLES	= 2
+;
+; flags for initializing LMem heap:
+;
+FONT_MANAGER_ALLOC_FLAGS	equ (STD_INIT_HEAP / 8) or \
+				    (FONT_MANAGER_NUM_HANDLES shl 8)
+
+;------------------------------------------------------------------------------
+;	fatal errors from the font manager:
+;------------------------------------------------------------------------------
+
+CANT_ADD_CHAR_TO_FONT_NOT_IN_PRINTER				enum FatalErrors
+CANT_DELETE_FONT_IN_USE						enum FatalErrors
+HP_CHAR_TOO_BIG							enum FatalErrors
+DRIVER_CANT_CREATE_VIDMEM_FILE					enum FatalErrors

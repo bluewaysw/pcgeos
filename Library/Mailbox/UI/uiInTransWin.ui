@@ -1,0 +1,134 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1995 -- All Rights Reserved
+ *
+ * PROJECT:	  
+ * MODULE:	  
+ * FILE:	  uiInTransWin.ui
+ *
+ * AUTHOR:  	  Allen Yuen, Jan 12, 1995
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	AY	1/12/95   	Initial version
+ *
+ * DESCRIPTION:
+ *	This file contains the UI template for the inbox deadline
+ *	notification dialog box.
+ *
+ * 	$Id: uiInTransWin.ui,v 1.1 97/04/05 01:19:21 newdeal Exp $
+ *
+ ***********************************************************************/
+
+start InWinCloseUI, notDetachable;
+
+InWinCloseRoot = InboxTransWinClose {
+	genStates = default -usable;
+	visibility = dialog;
+	type = multipleResponse;
+	attributes = notUserInitiatable;
+	children = InWinCloseText, InWinCloseMessage, InWinCloseSendNow,
+		   InWinCloseSendLater, InWinCloseDeleteMessage,
+		   InWinCloseLaterBox;
+	msgGlyph = InWinCloseMessage;
+	notifyText = null;	/* Do NOT put InWinCloseText here!  The \1
+				   has to be filled by InboxTransWinCloseClass
+				   itself since the verb has to be in passive
+				   voice. */
+	nowTrigger = InWinCloseSendNow;
+	laterTrigger = InWinCloseSendLater;
+	delayHour = InWinCloseLaterHour;
+	delayMinute = InWinCloseLaterMinute;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		ATTR_GEN_WINDOW_CUSTOM_PARENT {
+			hptr	0	; use screen as parent
+		},
+		ATTR_GEN_WINDOW_CUSTOM_LAYER_PRIORITY {
+			; keep on top. dont set win prio, though, as we want
+			; it to not interfere with control panels, etc.
+			LayerPriority	LAYER_PRIO_ON_TOP
+		}
+
+	}
+}
+
+InWinCloseText = GenText {
+	genAttributes = default +readOnly;
+	text = "The following message has reached its deadline and must now be \\1 or deleted:";
+		localize "the \1 character is replaced by the appropriate verb for the message (e.g. 'accepted' or 'viewed')";
+}
+
+InWinCloseMessage = MessageGlyph {
+	/* moniker set before box put up */
+}
+
+InWinCloseSendNow = GenTrigger {
+	moniker = 'N', "\\1 Now";
+		localize "the \1 character is replaced by the appropriate verb for the transport medium (e.g. 'fax' or 'mail')";
+	action = MSG_MSND_SEND_MESSAGE_NOW, InWinCloseRoot;
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		HINT_DEFAULT_DEFAULT_ACTION
+	}
+}
+
+InWinCloseSendLater = GenTrigger {
+	moniker = 'L', "\\1 Later";
+		localize "the \1 character is replaced by the appropriate verb for the transport medium (e.g. 'fax' or 'mail')";
+	action = MSG_GEN_INTERACTION_INITIATE, InWinCloseLaterBox;
+	hints = {
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+InWinCloseDeleteMessage = GenTrigger {
+	moniker = 'D', "Discard";
+	action = MSG_MSND_DELETE_MESSAGE, InWinCloseRoot;
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+InWinCloseLaterBox = GenInteraction {
+	visibility = dialog;
+	type = command;
+	attributes = notUserInitiatable, modal;
+	children = InWinCloseLaterGlyph, InWinCloseLaterTime,
+		   InWinCloseLaterOK;
+}
+
+InWinCloseLaterGlyph = GenGlyph {
+	moniker = "How much later?";
+}
+
+InWinCloseLaterTime = GenInteraction {
+	children = InWinCloseLaterHour, InWinCloseLaterMinute;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+
+InWinCloseLaterHour = GenValue {
+	moniker = "Hours:";
+	maximum = "(254-23-1) - 1"; /* imposed by UtilGetFutureFileDateTime */
+}
+
+InWinCloseLaterMinute = GenValue {
+	moniker = "Minutes:";
+	maximum = "60 - 1";
+}
+
+InWinCloseLaterOK = GenTrigger {
+	moniker = "OK";
+	action = MSG_MSND_SEND_MESSAGE_LATER, InWinCloseRoot;
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+end InWinCloseUI;

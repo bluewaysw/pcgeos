@@ -1,0 +1,249 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+ *
+ * PROJECT:	PCGEOS
+ * MODULE:	uiPrint.ui
+ * FILE:	uiPrint.ui
+ *
+ * AUTHOR:  	Gene Anderson: Jun  8, 1992
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	6/ 8/92	  gene	    Initial version
+ *
+ * DESCRIPTION:
+ *	GeoCalc UI for printing and page setup
+ *
+ * 	$Id: uiPrint.ui,v 1.3 98/02/17 04:11:06 gene Exp $
+ *
+ ***********************************************************************/
+
+start Interface;
+
+GCPrintControl = PrintControl vardataReloc {
+	printAttributes =
+		default -pageControls,
+		+showProgress,
+		+progressByPage,
+		+markAppBusy,
+		+verifyPrint;
+
+	printOutput = "TO_APP_MODEL";
+	docNameOutput = GCDocumentGroup;
+	hints = {
+#if LIMITED_FAX_SUPPORT
+		ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI {
+			word	mask PRINTCTF_FAX_TRIGGER
+		},
+		ATTR_GEN_CONTROL_PROHIBIT_UI {
+			word 	mask PRINTCF_FAX_TRIGGER
+		},
+#endif
+		HINT_SAME_CATEGORY_AS_PARENT,
+		ATTR_GEN_DESTINATION_CLASS { UN_DD GeoCalcDocumentClass },
+		ATTR_PRINT_CONTROL_APP_UI { UN_OPTR GeoCalcPrintUI },
+		ATTR_GEN_CONTROL_DO_NOT_USE_LIBRARY_NAME_FOR_HELP
+	}
+}
+
+end Interface;
+
+start PrintUI;
+
+GeoCalcPrintUI = GenInteraction ignoreDirty {
+#if _APP_NAME_IS_SPREADSHEET
+	moniker = "Spreadsheet Options";
+#else
+	moniker = "NewCalc Options";
+#endif
+	children =
+		GCPrintRange,
+		GCPrintOptionsGroup;
+	genStates = default -usable;
+	genAttributes = default +notifyVisibility;
+	hints = {
+		HINT_DRAW_IN_BOX,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		ATTR_GEN_VISIBILITY_DATA { word 0, mask GCGV_PRINT }
+	}
+}
+
+GCPrintRange = GenText ignoreDirty {
+	text = "";
+	moniker = "Print Range:";
+
+	textDisplayAttributes =
+		singleLineText,
+		useTabForNavigation;
+	hints = {
+		HINT_TEXT_SELECT_TEXT,
+		HINT_DEFAULT_FOCUS,
+		HINT_FIXED_SIZE {
+		    SpecWidth <SST_AVG_CHAR_WIDTHS, MAX_CELL_GOTO_TEXT_LENGTH>
+		    SpecHeight <SST_LINES_OF_TEXT, 1>
+		},
+		ATTR_GEN_TEXT_NO_SPACES,
+		ATTR_GEN_TEXT_MAKE_UPPERCASE
+	}
+}
+
+
+GCPrintOptionsGroup = GenBooleanGroup ignoreDirty {
+	children =
+		PrintDocumentOption,
+		PrintGraphicsOption,
+		PrintNotesOption;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+	selectedBooleans = "mask SPF_PRINT_DOCUMENT or \
+				mask SPF_PRINT_GRAPHICS";
+}
+
+PrintDocumentOption = GenBoolean ignoreDirty {
+	moniker = "Print Spreadsheet";
+	identifier = "mask SPF_PRINT_DOCUMENT";
+}
+
+PrintGraphicsOption = GenBoolean ignoreDirty {
+	moniker = "Print Graphics";
+	identifier = "mask SPF_PRINT_GRAPHICS";
+}
+
+PrintNotesOption = GenBoolean ignoreDirty {
+	moniker = "Print Cell Notes";
+	identifier = "mask SPF_PRINT_NOTES";
+}
+
+
+/******************************************************************************
+ We add some specific UI for Jedi
+******************************************************************************/
+
+
+/* ---------------------------------------- */
+
+GCPageSetup = GenInteraction {
+	moniker = 'g', "Page Setup";
+	visibility = dialog;
+	type = properties;
+	children =
+		GCPrintStartPage,
+		GCSetupOptionsGroup,
+		GCPageSetupApplyTrigger;
+	genAttributes = default +notifyVisibility;
+	hints = {
+		ATTR_GEN_VISIBILITY_DATA { word 0, mask GCGV_PAGE_SETUP },
+		ATTR_GEN_HELP_CONTEXT {
+			char "dbPageSetup", 0
+		}
+	}
+}
+
+GCPageSetupApplyTrigger = GenTrigger vardataReloc {
+	action = MSG_GEOCALC_DOCUMENT_CHANGE_PAGE_SETUP, "TO_APP_MODEL";
+	hints = {
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_APPLY },
+		HINT_DEFAULT_DEFAULT_ACTION,
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_DESTINATION_CLASS { UN_DD GeoCalcDocumentClass }	
+	}
+}
+
+GCPrintStartPage = GenValue ignoreDirty {
+	moniker = 'N', "Starting Page Number:";
+	value = "GEOCALC_DEFAULT_START_PAGE";
+	minimum = 1;
+	maximum = 99;
+	increment = 1;
+}
+
+GCSetupOptionsGroup = GenBooleanGroup ignoreDirty {
+	moniker = "Options:";
+	children =
+		PrintSidewaysOption,
+		PrintScaleToFitOption,
+		PrintContinuousOption,
+		PrintCenterHorizontallyOption,
+		PrintCenterVerticallyOption,
+		PrintGridOption,
+		PrintTitlesOption,
+		PrintHeaderOption,
+		PrintFooterOption;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_ALLOW_CHILDREN_TO_WRAP,
+		HINT_WRAP_AFTER_CHILD_COUNT {
+			word 	5
+		}
+	}
+	selectedBooleans = "GEOCALC_DEFAULT_PRINT_FLAGS";
+}
+
+PrintGridOption = GenBoolean ignoreDirty {
+	moniker = 'G', "Print Grid Lines";
+	identifier = "mask SPF_PRINT_GRID";
+}
+
+PrintTitlesOption = GenBoolean ignoreDirty {
+	moniker = 'T', "Print Row & Column Titles";
+	identifier = "mask SPF_PRINT_ROW_COLUMN_TITLES";
+}
+
+PrintHeaderOption = GenBoolean ignoreDirty {
+	moniker = 'd', "Print Header";
+	identifier = "mask SPF_PRINT_HEADER";
+}
+
+PrintFooterOption = GenBoolean ignoreDirty {
+	moniker = 'F', "Print Footer";
+	identifier = "mask SPF_PRINT_FOOTER";
+}
+
+PrintSidewaysOption = GenBoolean ignoreDirty {
+	moniker = 'S', "Print Sideways";
+	identifier = "mask SPF_PRINT_SIDEWAYS";
+}
+
+PrintScaleToFitOption = GenBoolean ignoreDirty {
+	moniker = 'P', "Scale to Fit on One Page";
+	identifier = "mask SPF_SCALE_TO_FIT";
+}
+
+PrintContinuousOption = GenBoolean ignoreDirty {
+	moniker = 'C', "Continuous Printing";
+	identifier = "mask SPF_CONTINUOUS";
+}
+
+PrintCenterHorizontallyOption = GenBoolean ignoreDirty {
+	moniker = 'H', "Center Horizontally";
+	identifier = "mask SPF_CENTER_HORIZONTALLY";
+}
+
+PrintCenterVerticallyOption = GenBoolean ignoreDirty {
+	moniker = 'V', "Center Vertically";
+	identifier = "mask SPF_CENTER_VERTICALLY";
+}
+
+end PrintUI;
+
+
+start TextObjectPrintUI;
+
+PrintTextObject = VisText ignoreDirty {
+	right	= "8*72";			/* Standard page size */
+	bottom	= "10*72";
+	optFlags = default -geometryInvalid;
+	text = "";
+#ifdef DO_PIZZA
+	charAttrRuns = "(VTDS_12 shl offset VTDCA_SIZE) or VTDF_BITSTREAM_KANJI_HON_MINCHO";
+#else
+	charAttrRuns = "(VTDS_12 shl offset VTDCA_SIZE) or VTDF_URW_ROMAN";
+#endif
+}
+
+end TextObjectPrintUI;

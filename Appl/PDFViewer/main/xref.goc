@@ -1,0 +1,601 @@
+//========================================================================
+//
+// XRef.cc
+//
+// Copyright 1996 Derek B. Noonburg
+//
+//========================================================================
+
+#ifdef __GNUC__
+#pragma implementation
+#endif
+
+@include "pdfvu.goh"
+
+#include <ansi/string.h>
+#include <ansi/stdlib.h>
+@include "obj.goh"
+@include "stream.goh"
+@include "parser.goh"
+@include "diction.goh"
+@include "xref.goh"
+@include "lexer.goh"
+
+//------------------------------------------------------------------------
+
+#define xrefSearchSize 1024	// read this many bytes at end of file
+				//   to look for 'startxref'
+
+//------------------------------------------------------------------------
+// XRef
+//------------------------------------------------------------------------
+
+/* 
+ * Forward decls
+ */
+long XRefReadTrailer (XRef *xref, Stream *fs);
+void XRefSetStart (XRef *xref, Stream *fs);
+
+
+
+void
+XRefInitNull(XRef *xref) {
+
+  xref->size = 0;
+  xref->entries = NULL;
+  initNull(&xref->trailerDict);
+}
+
+
+Boolean
+XRefInit(XRef *xref, FileHandle fileHan) {
+    XRefEntry *pEntries;
+
+/* XRef::XRef(FileStream *str) {
+*/
+
+    Stream fs;
+    Obj obj;
+
+  long pos;
+  long i;
+
+    initNull(&obj);
+    FStreamInit(&fs, fileHan, 0, -1, &obj);
+    ObjFree(&obj);
+
+  xref->ok = gTrue;
+  xref->size = 0;
+  xref->entries = NULL;
+  xref->fHan = fileHan;
+
+  // read the trailer
+//  file = str->getFile();
+
+  XRefSetStart(xref, &fs);
+//  xref->start = 0;		/* str->getStart(); */
+  pos = XRefReadTrailer(xref, &fs);
+
+
+  // if there was a problem with the trailer,
+  // try to reconstruct the xref table
+  if (pos == 0) 
+    {
+    goto err;
+//    if (!(ok = constructXRef(str))) {
+//      xref = oldXref;
+//      return;
+//    }
+
+  // trailer is ok - read the xref table
+  } else {
+    xref->entries = MemAlloc(xref->size * sizeof(XRefEntry), 
+			     HF_SWAPABLE,
+			     HAF_NO_ERR);
+    pEntries = (XRefEntry *) MemLock(xref->entries);
+
+    for (i = 0; i < xref->size; ++i) {
+      pEntries[i].offset = -1;
+      pEntries[i].used = gFalse;
+    }
+    MemUnlock(xref->entries);
+
+    while (XRefReadXRef(xref, &fs, &pos)) ;
+
+    // if there was a problem with the xref table,
+    // try to reconstruct it
+// skip it for now.
+    if (!xref->ok) {
+      if (xref->entries) MemFree(xref->entries);
+      xref->size = 0;
+      xref->entries = NULL;
+//      if (!(ok = constructXRef(str))) {
+//	xref = oldXref;
+//	return;
+//      }
+      goto err;
+    }
+  }
+
+  // set up new xref table
+//  xref = this;
+
+  // check for encryption
+  if (XRefCheckEncrypted(xref)) {
+    xref->ok = gFalse;
+//    xref = oldXref;
+//    return;
+    goto err;
+  }
+
+  StreamFree(&fs);
+  return TRUE;
+
+  err:
+  StreamFree(&fs);
+  return FALSE;
+
+}	/* End of XRefInit.	*/
+
+void XRefFree(XRef *xref) {
+
+  if (xref->entries) 
+      MemFree(xref->entries);
+
+  ObjFree(&xref->trailerDict);
+}
+
+/*
+ * Find garbage bytes at start of file
+ */
+#define headerSearchSize 512
+
+void XRefSetStart (XRef *xref, Stream *fs) {
+  short i;
+  char hdrBuf[headerSearchSize+1];
+
+  StreamSetPos(fs, 0);
+
+  for (i = 0; i < headerSearchSize; ++i)
+    hdrBuf[i] = FStreamGetChar(fs);
+  hdrBuf[headerSearchSize] = '\0';
+  for (i = 0; i < headerSearchSize - 5; ++i) {
+    if (!strncmp(&hdrBuf[i], "%PDF-", 5))
+      break;
+  }
+  if (i >= headerSearchSize - 5) {
+    EC_WARNING(-1);
+//    error(-1, "May not be a PDF file (continuing anyway)");
+    xref->start = 0;
+    return;
+  }
+  xref->start = i;
+}
+
+long
+XRefReadTrailer (XRef *xref, Stream *fs) {
+
+/* int XRef::readTrailer(FileStream *str) {
+*/
+
+  Parser parser;
+  Obj obj;
+  char buf[xrefSearchSize+1];
+  long n, pos, pos1;
+  char *p;
+  long c;
+  long i;
+  Obj *ptrailerDict = &xref->trailerDict;
+  Stream *fs2;
+//  Stream *str;
+  Lexer *lexer;
+
+  // read last xrefSearchSize bytes
+  StreamSetPos(fs, -xrefSearchSize);
+  for (n = 0; n < xrefSearchSize; ++n) {
+    if ((c = StreamGetChar(fs)) == EOF)
+      break;
+    buf[n] = c;
+  }
+  buf[n] = '\0';
+
+  // find startxref
+  for (i = n - 9; i >= 0; --i) {
+    if (!strncmp(&buf[i], "startxref", 9))
+      break;
+  }
+  if (i < 0)
+    return 0;
+  for (p = &buf[i+9]; isspace(*p); ++p) ;
+  pos = atol(p);
+
+  // find trailer dict by looking after first xref table
+  // (NB: we can't just use the trailer dict at the end of the file --
+  // this won't work for linearized files.)
+  StreamSetPos(fs, xref->start + pos);
+  for (i = 0; i < 4; ++i)
+    buf[i] = StreamGetChar(fs);
+  if (strncmp(buf, "xref", 4))
+    return 0;
+  pos1 = pos + 4;
+  while (1) {
+    StreamSetPos(fs, xref->start + pos1);
+    for (i = 0; i < 35; ++i) {
+      if ((c = StreamGetChar(fs)) == EOF)
+	return 0;
+      buf[i] = c;
+    }
+    if (!strncmp(buf, "trailer", 7))
+      break;
+    p = buf;
+    while (isspace(*p)) ++p;
+    while ('0' <= *p && *p <= '9') ++p;
+    while (isspace(*p)) ++p;
+    n = atol(p);
+    while ('0' <= *p && *p <= '9') ++p;
+    while (isspace(*p)) ++p;
+    if (p == buf)
+      return 0;
+    pos1 += (p - buf) + n * 20;
+  }
+  pos1 += 7;
+
+
+  // read trailer dict
+
+  initNull(&obj);
+
+// new Parser(new Lexer(new FileStream(file, start + pos1, -1, &obj)));
+
+  fs2 = gmalloc( sizeof(Stream) );
+//  str = gmalloc( sizeof (Stream) );
+  lexer = gmalloc( sizeof (Lexer) );
+
+  FStreamInit(fs2, xref->fHan, xref->start + pos1, -1, &obj);
+//  StreamInitFS(str, fs2);
+  LexerInitFromStream(lexer, fs2, xref);
+  ParserInit(&parser, lexer);
+  ObjFree(&obj);
+
+  ParserGetObj(&parser, ptrailerDict);
+  if (isDict(ptrailerDict)) {
+    ObjDictLookupNF(ptrailerDict, "Size", &obj);
+    if (isInt(&obj))
+      xref->size = getInt(&obj);
+    else
+      pos = 0;
+    ObjFree(&obj);
+    ObjDictLookupNF(ptrailerDict, "Root", &obj);
+    if (isRef(&obj)) {
+      xref->rootNum = getRefNum(&obj);
+      xref->rootGen = getRefGen(&obj);
+    } else {
+      pos = 0;
+    }
+    ObjFree(&obj);
+  } else {
+    pos = 0;
+  }
+  ParserFree(&parser);
+
+  // return first xref position
+  return pos;
+
+}	/* End of ReadTrailer.	*/
+
+GBool
+XRefReadXRef (XRef *xref, Stream *fs, long *pos)
+{
+/* GBool XRef::readXRef(FileStream *str, int *pos) {
+*/
+  Parser parser;
+  Obj obj, obj2;
+  char s[22];
+  GBool more;
+  long first, n, i, j;
+  long c;
+  Stream *fs2;
+//  Stream *str;
+  Lexer *lexer;
+  XRefEntry *pEntries;
+
+/* Lock down the xref table */
+
+  pEntries = MemLock(xref->entries);
+
+  // seek to xref in stream
+  StreamSetPos(fs, xref->start + *pos);
+
+  // make sure it is an xref table
+  while ((c = StreamGetChar(fs)) != EOF && isspace(c)) ;
+  s[0] = (char)c;
+  s[1] = StreamGetChar(fs);
+  s[2] = StreamGetChar(fs);
+  s[3] = StreamGetChar(fs);
+  if (!(s[0] == 'x' && s[1] == 'r' && s[2] == 'e' && s[3] == 'f'))
+    goto err2;
+
+  // read xref
+
+  while (1) {
+    while ((c = StreamLookChar(fs)) != EOF && isspace(c))
+      StreamGetChar(fs);
+    if (c == 't')
+      break;
+    for (i = 0; (c = StreamGetChar(fs)) != EOF && isdigit(c) && i < 20; ++i)
+      s[i] = (char)c;
+    if (i == 0)
+      goto err2;
+    s[i] = '\0';
+    first = atol(s);
+    while ((c = StreamLookChar(fs)) != EOF && isspace(c))
+      StreamGetChar(fs);
+    for (i = 0; (c = StreamGetChar(fs)) != EOF && isdigit(c) && i < 20; ++i)
+      s[i] = (char)c;
+    if (i == 0)
+      goto err2;
+    s[i] = '\0';
+    n = atol(s);
+    while ((c = StreamLookChar(fs)) != EOF && isspace(c))
+      StreamGetChar(fs);
+    for (i = first; i < first + n; ++i) {
+      for (j = 0; j < 20; ++j) {
+	if ((c = StreamGetChar(fs)) == EOF)
+	  goto err2;
+	s[j] = (char)c;
+      }
+      if (pEntries[i].offset < 0) {
+	s[10] = '\0';
+	pEntries[i].offset = atol(s);
+	s[16] = '\0';
+	pEntries[i].gen = atol(&s[11]);
+	if (s[17] == 'n')
+	  pEntries[i].used = gTrue;
+	else if (s[17] == 'f')
+	  pEntries[i].used = gFalse;
+	else
+	  goto err2;
+      }
+    }
+  }
+
+  // read prev pointer from trailer dictionary
+  initNull(&obj);
+//    new FileStream(file, str->getPos(), -1, &obj)));
+
+  fs2 = gmalloc( sizeof(Stream) );
+//  str = gmalloc( sizeof (Stream) );
+  lexer = gmalloc( sizeof (Lexer) );
+
+  FStreamInit(fs2, xref->fHan, FStreamGetPos(fs), -1, &obj);
+//  StreamInitFS(str, fs2);
+  LexerInitFromStream(lexer, fs2, xref);
+  ParserInit(&parser, lexer);
+  ObjFree(&obj);
+
+  ParserGetObj(&parser, &obj);
+  if (!isCmdSame(&obj, "trailer"))
+    goto err1;
+  ObjFree(&obj);
+  ParserGetObj(&parser, &obj);
+  if (!isDict(&obj))
+    goto err1;
+  DictLookupNF(getDict(&obj), "Prev", &obj2);
+  if (isInt(&obj2)) {
+    *pos = getInt(&obj2);
+    more = gTrue;
+  } else {
+    more = gFalse;
+  }
+  ObjFree(&obj);
+  ObjFree(&obj2);
+
+  ParserFree(&parser);
+  MemUnlock(xref->entries);	/* Unlock xref table */
+  return more;
+
+ err1:
+  ObjFree(&obj);
+ err2:
+  xref->ok = gFalse;
+  EC_WARNING(-1);
+  MemUnlock(xref->entries);	/* Unlock xref table */
+  return gFalse;
+
+}	/* End of XRefReadXRef.	*/
+
+#if 0
+// Attempt to construct an xref table for a damaged file.
+GBool XRef::constructXRef(FileStream *str) {
+  Parser *parser;
+  Object obj;
+  char buf[256];
+  long pos;
+  long num, gen;
+  long newSize;
+  char *p;
+  long i;
+  GBool gotRoot;
+
+  error(0, "PDF file is damaged - attempting to reconstruct xref table...");
+  gotRoot = gFalse;
+
+  str->reset();
+  while (1) {
+    pos = str->getPos();
+    if (!str->getLine(buf, 256))
+      break;
+    p = buf;
+
+    // got trailer dictionary
+    if (!strncmp(p, "trailer", 7)) {
+      obj.initNull();
+      parser = new Parser(new Lexer(
+		 new FileStream(file, start + pos + 8, -1, &obj)));
+      if (!trailerDict.isNone())
+	trailerDict.free();
+      parser->getObj(&trailerDict);
+      if (trailerDict.isDict()) {
+	trailerDict.dictLookupNF("Root", &obj);
+	if (obj.isRef()) {
+	  rootNum = obj.getRefNum();
+	  rootGen = obj.getRefGen();
+	  gotRoot = gTrue;
+	}
+	obj.free();
+      } else {
+	pos = 0;
+      }
+      delete parser;
+
+    // look for object
+    } else if (isdigit(*p)) {
+      num = atol(p);
+      do {
+	++p;
+      } while (*p && isdigit(*p));
+      if (isspace(*p)) {
+	do {
+	  ++p;
+	} while (*p && isspace(*p));
+	if (isdigit(*p)) {
+	  gen = atol(p);
+	  do {
+	    ++p;
+	  } while (*p && isdigit(*p));
+	  if (isspace(*p)) {
+	    do {
+	      ++p;
+	    } while (*p && isspace(*p));
+	    if (!strncmp(p, "obj", 3)) {
+	      if (num >= size) {
+		newSize = (num + 1 + 255) & ~255;
+		entries = (XRefEntry *)
+		            grealloc(entries, newSize * sizeof(XRefEntry));
+		for (i = size; i < newSize; ++i) {
+		  entries[i].offset = -1;
+		  entries[i].used = gFalse;
+		}
+		size = newSize;
+	      }
+	      if (!entries[num].used || gen >= entries[num].gen) {
+		entries[num].offset = pos - start;
+		entries[num].gen = gen;
+		entries[num].used = gTrue;
+	      }
+	    }
+	  }
+	}
+      }
+    }
+  }
+
+  if (gotRoot)
+    return gTrue;
+
+  error(-1, "Couldn't find trailer dictionary");
+  return gFalse;
+}
+#endif
+
+GBool XRefCheckEncrypted(XRef *xref) {
+  Obj obj;
+  GBool encrypted;
+
+  ObjDictLookup(&xref->trailerDict, "Encrypt", &obj, xref);
+  if ((encrypted = !isNull(&obj))) {
+      EC_WARNING(-1);
+//    error(-1, "PDF file is encrypted and cannot be displayed");
+//    error(-1, "* Decryption support is currently not included in xpdf");
+//    error(-1, "* due to legal restrictions: the U.S.A. still has bogus");
+//    error(-1, "* export controls on cryptography software.");
+  }
+  ObjFree(&obj);
+  return encrypted;
+}
+
+void XRefFetch(XRef *xref, long num, long gen, Obj *obj) {
+  XRefEntry *e;
+  Parser parser;
+  Obj obj1, obj2, obj3;
+  XRefEntry *pEntries;
+
+  Stream *fs2;
+//  Stream *str;
+  Lexer *lexer;
+
+
+  // check for bogus ref - this can happen in corrupted PDF files
+  if (num < 0 || num >= xref->size) {
+    initNull(obj);
+    return ;
+  }
+
+/* lock down xref table */
+
+  pEntries = MemLock(xref->entries);
+
+  e = &pEntries[num];
+  if (e->gen == gen && e->offset >= 0) {
+    initNull(&obj1);
+
+//    parser = new Parser(new Lexer(
+//      new FileStream(file, start + e->offset, -1, &obj1)));
+
+    fs2 = gmalloc( sizeof(Stream) );
+//    str = gmalloc( sizeof (Stream) );
+    lexer = gmalloc( sizeof (Lexer) );
+
+    FStreamInit(fs2, xref->fHan, xref->start + e->offset, -1, &obj1);
+//    StreamInitFS(str, fs2);
+    LexerInitFromStream(lexer, fs2, xref);
+    ParserInit(&parser, lexer);
+    ObjFree(&obj1);
+
+    ParserGetObj(&parser, &obj1);
+    ParserGetObj(&parser, &obj2);
+    ParserGetObj(&parser, &obj3);
+    if (isInt(&obj1) && getInt(&obj1) == num &&
+	isInt(&obj2) && getInt(&obj2) == gen &&
+	isCmdSame(&obj3, "obj")) {
+      ParserGetObj(&parser, obj);
+    } else {
+      initNull(obj);
+    }
+    ObjFree(&obj1);
+    ObjFree(&obj2);
+    ObjFree(&obj3);
+    ParserFree(&parser);
+  } else {
+    initNull(obj);
+  }
+
+/* unlock xref table */
+
+  MemUnlock(xref->entries);
+}
+
+void XRefGetDocInfo(XRef *xref, Obj *obj) {
+
+  ObjDictLookup(&xref->trailerDict, "Info", obj, xref);
+}
+
+  // Is xref table valid?
+  GBool XRefIsOk(XRef *xref) { return xref->ok; }
+
+  // Is the file encrypted?
+  GBool XRefIsEncrypted(XRef *xref) { return gFalse; }
+
+  // Get catalog object.
+  void XRefGetCatalog(XRef *xref, Obj *obj) { 
+
+	  XRefFetch(xref, xref->rootNum, xref->rootGen, obj); 
+  }
+
+ GBool XRefOkToPrint(XRef *xref) {
+  return gTrue;
+}
+
+ GBool XRefOkToCopy(XRef *xref) {
+  return gTrue;
+}

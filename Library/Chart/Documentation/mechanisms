@@ -1,0 +1,138 @@
+*****************************************************************************
+$Id: mechanisms,v 1.2.26.1 97/03/29 04:49:25 canavese Exp $
+*****************************************************************************
+			       Overview
+*****************************************************************************
+This document contains a brief summary of the different mechanisms used
+in creating charts. The basic mechanisms are:
+	- Template
+	- Build
+	- Geometry (size calculations)
+	- Positioning
+	- Realization
+	- Text attribute inheritance
+	- Unrealize
+
+
+*****************************************************************************
+	Template
+*****************************************************************************
+Every chart starts from the basic template, which includes:
+
+	ChartGroup object - the "parent" of all chart objects.  This
+	object is a vertical composite (ChartCompClass).
+	It can contain the chart title, the ChartVertComp, and the
+	legend (if legend is at bottom of chart). 
+
+	ChartVertComp - this object contains the horizontal axis
+	title, if any, and the ChartHorizComp.  Its children are
+	arranged vertically
+
+	ChartHorizComp - this composite arranges its children
+	horizontally.  Children include the plot area, y-axis title,
+	and legend (if at right of chart).
+
+	PlotArea -- this is a hybrid object of sorts.  In some ways,
+	it acts as a composite -- it is the "parent" of the axes
+	and all the series data.
+
+******************************************************************************
+	BUILD
+******************************************************************************
+
+The technique is to start at the top by asking the ChartGroup to build
+itself.  Since the ChartGroup is a composite, it will send the build
+to all its children.
+
+Plot Area:
+----------
+The Plot Area determines which axes should be part of the chart and
+creates them.  The Plot Area initializes the axes so that they know
+what type they are, what orientation they have, and what data is
+associated with them.
+
+*****************************************************************************
+			       Geometry
+*****************************************************************************
+This involves figuring (and setting) the sizes for all the chart objects.
+The mechanism here is similar to the MSG_VIS_RECALC_SIZE used by the
+geometry manager, but it has slightly different behavior.
+
+Each object is passed a maximum height and width. It then returns a desired
+height and width which is always less than or equal to the maximum values.
+
+Some objects don't require any work to determine their own size, but have
+dependents who need to set their sizes. This is true of most of the composite
+objects.
+
+ChartGroup:
+----------
+The ChartGroup is always equal in size to the maximum size given
+(based on the GrObj rectangle that represents it).  Since it is a
+ChartComp, it performs the dfault ChartComp geometry behavior on its
+children.  This is:  calculate each child's size if it's a fixed-size
+child.  If it's expandable, come back at the end and allocate any
+left-over size to the expandable child.  As such, each chartComp can
+only have one expandable child.  While this seems rather limiting, it
+is enough to get the job done without needless complexity.
+
+If any chart object changes its size, then the "SIZE_CHANGED" flag is
+set in that object's instance data.  This will cause the GrObject to
+be updated for that object.
+
+Plot Area:
+----------
+The Plot Area is responsible for computing the sizes of the axes.
+Axis geometry is quite complicated (see Documentation/axes for more
+info).  
+
+
+
+*****************************************************************************
+			     Positioning
+*****************************************************************************
+Positioning the objects is done after the sizes have been set. This starts
+at the top of the Chart tree and works its way down. Positioning of each
+object is done relative to the ChartGroup's 32-bit document position.
+
+
+ChartGroup:
+----------
+positions itself at the GrObj rectangle's position.  Positions
+children per ChartCompClass (vertical).  If any object's position
+changes, then the GrObj must be updated.
+
+Plot Area:
+----------
+Axes are positioned based on their mutual intersection positions.
+
+
+*****************************************************************************
+			     Realization
+*****************************************************************************
+If any chart object's size or position changes, then "realization"
+takes place.  Realization can take place in either of the following
+forms:
+
+	- Creation of a new GrObject if none exists, or if the current
+	one is no good
+
+	- Resizing or repositioning the existing GrObject for a chart
+	object. 
+
+******************************************************************************
+		UI and CLASSED EVENTS
+******************************************************************************
+
+Using the ChartCompClass composite mechanism, messages can be sent up and
+down the chart heirarchy.  
+
+ChartGroupClass operates via its superclass (ChartCompClass) to send
+the messages down the tree.  
+
+PlotArea class does additional work to send messages to the Axes,
+where applicable.
+
+
+
+

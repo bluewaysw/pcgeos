@@ -1,0 +1,318 @@
+//========================================================================
+//
+// Page.cc
+//
+// Copyright 1996 Derek B. Noonburg
+//
+//========================================================================
+
+#ifdef __GNUC__
+#pragma implementation
+#endif
+
+
+@include "pdfvu.goh"
+@include "page.goh"
+@include "obj.goh"
+@include "diction.goh"
+@include "array.goh"
+
+
+//------------------------------------------------------------------------
+// PageAttrs
+//------------------------------------------------------------------------
+
+void PageAttrsInit(PageAttrs *this, PageAttrs *attrs, Dict *dict, XRef *xref) {
+  Obj obj1, obj2;
+//gdouble w, h;
+
+  // get old/default values
+  if (attrs) {
+#ifdef USE_FULL_PAGE_ATTRS
+    this->x1 = attrs->x1;
+    this->y1 = attrs->y1;
+    this->x2 = attrs->x2;
+    this->y2 = attrs->y2;
+    this->cropX1 = attrs->cropX1;
+    this->cropY1 = attrs->cropY1;
+    this->cropX2 = attrs->cropX2;
+    this->cropY2 = attrs->cropY2;
+    this->rotate = attrs->rotate;
+#endif
+    ObjCopy(&this->resources, &attrs->resources);
+  } else {
+    // set default MediaBox to 8.5" x 11" -- this shouldn't be necessary
+    // but some (non-compliant) PDF files don't specify a MediaBox
+#ifdef USE_FULL_PAGE_ATTRS
+    this->x1 = 0;
+    this->y1 = 0;
+    this->x2 = 612;
+    this->y2 = 792;
+    this->cropX1 = this->cropY1 = this->cropX2 = this->cropY2 = 0;
+    this->rotate = 0;
+#endif
+    initNull(&this->resources);
+  }
+
+#ifdef USE_FULL_PAGE_ATTRS
+
+  // media box
+  DictLookup(dict, "MediaBox", &obj1, xref);
+  if (isArray(&obj1) && ObjArrayGetLength(&obj1) == 4) {
+    ObjArrayGet(&obj1, 0, &obj2, xref);
+    if (isNum(&obj2))
+      this->x1 = getNum(&obj2);
+    ObjFree(&obj2);
+    ObjArrayGet(&obj1, 1, &obj2, xref);
+    if (isNum(&obj2))
+      this->y1 = getNum(&obj2);
+    ObjFree(&obj2);
+    ObjArrayGet(&obj1, 2, &obj2, xref);
+    if (isNum(&obj2))
+      this->x2 = getNum(&obj2);
+    ObjFree(&obj2);
+    ObjArrayGet(&obj1, 3, &obj2, xref);
+    if (isNum(&obj2))
+      this->y2 = getNum(&obj2);
+    ObjFree(&obj2);
+  }
+  ObjFree(&obj1);
+
+  // crop box
+  DictLookup(dict, "CropBox", &obj1, xref);
+  if (isArray(&obj1) && ObjArrayGetLength(&obj1) == 4) {
+    ObjArrayGet(&obj1, 0, &obj2, xref);
+    if (isNum(&obj2))
+      this->cropX1 = getNum(&obj2);
+    ObjFree(&obj2);
+    ObjArrayGet(&obj1, 1, &obj2, xref);
+    if (isNum(&obj2))
+      this->cropY1 = getNum(&obj2);
+    ObjFree(&obj2);
+    ObjArrayGet(&obj1, 2, &obj2, xref);
+    if (isNum(&obj2))
+      this->cropX2 = getNum(&obj2);
+    ObjFree(&obj2);
+    ObjArrayGet(&obj1, 3, &obj2, xref);
+    if (isNum(&obj2))
+      this->cropY2 = getNum(&obj2);
+    ObjFree(&obj2);
+
+#if 0       /* This doesn't help us when printing! */
+    
+    // if the MediaBox is excessively larger than the CropBox,
+    // just use the CropBox
+    w = 0.25 * (this->cropX2 - this->cropX1);
+    h = 0.25 * (this->cropY2 - this->cropY1);
+    if (this->cropX1 - this->x1 > w || this->x2 - this->cropX2 > w ||
+	this->cropY1 - this->y1 > h || this->y2 - this->cropY2 > h) {
+      this->x1 = this->cropX1;
+      this->x2 = this->cropX2;
+      this->y1 = this->cropY1;
+      this->y2 = this->cropY2;
+    }
+#endif
+
+  } else {
+    this->cropX1 = this->cropX2 = this->cropY1 = this->cropY2 = 0;
+  }
+  ObjFree(&obj1);
+
+  // rotate
+  DictLookup(dict, "Rotate", &obj1, xref);
+  if (isInt(&obj1))
+    this->rotate = getInt(&obj1);
+  ObjFree(&obj1);
+  while (this->rotate < 0)
+    this->rotate += 360;
+  while (this->rotate >= 360)
+    this->rotate -= 360;
+#endif
+
+  // resource dictionary
+/* XXX: made this into "nf" to prevent reading in resource, if a reference.
+ * If the dict is there in place, though, we read it.
+ */
+  DictLookupNF(dict, "Resources", &obj1);
+  if (isRef(&obj1) || isDict(&obj1)) {
+    ObjFree(&this->resources);
+    ObjCopy(&this->resources, &obj1);
+  }
+  ObjFree(&obj1);
+}
+
+void PageAttrsFree(PageAttrs *this) {
+  ObjFree(&this->resources);
+}
+
+#ifdef USE_FULL_PAGE_ATTRS
+
+  // Accessors.
+  gdouble PageAttrsGetX1(PageAttrs *this) { return this->x1; }
+  gdouble PageAttrsGetY1(PageAttrs *this) { return this->y1; }
+  gdouble PageAttrsGetX2(PageAttrs *this) { return this->x2; }
+  gdouble PageAttrsGetY2(PageAttrs *this) { return this->y2; }
+  GBool PageAttrsIsCropped(PageAttrs *this) { return this->cropX2 > this->cropX1; }
+  gdouble PageAttrsGetCropX1(PageAttrs *this) { return this->cropX1; }
+  gdouble PageAttrsGetCropY1(PageAttrs *this) { return this->cropY1; }
+  gdouble PageAttrsGetCropX2(PageAttrs *this) { return this->cropX2; }
+  gdouble PageAttrsGetCropY2(PageAttrs *this) { return this->cropY2; }
+  long PageAttrsGetRotate(PageAttrs *this) { return this->rotate; }
+#endif
+
+Dict *PageAttrsGetResourceDict(PageAttrs *this) {
+
+    return isDict(&this->resources) ? 
+	    getDict(&this->resources) : (Dict *)NULL;
+}
+
+void PageAttrsCopyResourceDict(PageAttrs *this, Obj *dest, XRef *xref) {
+
+    if (isRef(&this->resources)) {
+	ObjFetch(dest, &this->resources, xref);
+    } else if (isDict(&this->resources)) {
+	ObjCopy(dest, &this->resources);
+    } else {
+	initNull(dest);
+    }
+}
+
+
+//------------------------------------------------------------------------
+// Page
+//------------------------------------------------------------------------
+
+void PageInit(Page *page, long num1, Dict *pageDict, PageAttrs *attrs1) {
+
+  page->ok = gTrue;
+  page->num = num1;
+
+  // get attributes
+  memcpy(&page->attrs, attrs1, sizeof (PageAttrs));
+  ObjCopy(&page->attrs.resources, &attrs1->resources);
+
+/* we don't process annotations for now, so don't read them in.
+ * Sometimes, they're actual arrays, not a reference, so they do take up
+ * fixed memory for all time when read in...
+ */
+
+#if 0
+  // annotations
+  DictLookupNF(pageDict, "Annots", &page->annots);
+  if (!(isRef(&page->annots) || isArray(&page->annots) || isNull(&page->annots))) {
+      EC_WARNING(-1);
+//    error(-1, "Page annotations object (page %d) is wrong type (%s)",
+//	  num, annots.getTypeName());
+    ObjFree(&page->annots);
+    goto err2;
+  }
+#else
+  initNull(&page->annots);
+#endif
+
+  // contents
+  DictLookupNF(pageDict, "Contents", &page->contents);
+  if (!(isRef(&page->contents) || isArray(&page->contents) ||
+	isNull(&page->contents))) {
+      EC_WARNING(-1);
+//    error(-1, "Page contents object (page %d) is wrong type (%s)",
+//	  num, contents.getTypeName());
+    ObjFree(&page->contents);
+    goto err1;
+  }
+
+  return;
+
+ err2:
+  initNull(&page->annots);
+ err1:
+  initNull(&page->contents);
+  page->ok = gFalse;
+}
+
+
+void PageFree(Page *page) {
+
+  PageAttrsFree(&page->attrs);
+  ObjFree(&page->annots);
+  ObjFree(&page->contents);
+}
+
+#if 0
+void Page::display(OutputDev *out, long dpi, long rotate) {
+#ifndef PDF_PARSER_ONLY
+  Gfx *gfx;
+  Object obj;
+
+  if (printCommands) {
+    printf("***** MediaBox = ll:%g,%g ur:%g,%g\n",
+	   getX1(), getY1(), getX2(), getY2());
+    if (isCropped()) {
+      printf("***** CropBox = ll:%g,%g ur:%g,%g\n",
+	     getCropX1(), getCropY1(), getCropX2(), getCropY2());
+    }
+    printf("***** Rotate = %d\n", attrs->getRotate());
+  }
+  rotate += getRotate();
+  if (rotate >= 360)
+    rotate -= 360;
+  else if (rotate < 0)
+    rotate += 360;
+  gfx = new Gfx(out, num, attrs->getResourceDict(),
+		dpi, getX1(), getY1(), getX2(), getY2(), isCropped(),
+		getCropX1(), getCropY1(), getCropX2(), getCropY2(), rotate);
+  contents.fetch(&obj);
+  if (!obj.isNull())
+    gfx->display(&obj);
+  obj.free();
+  delete gfx;
+#endif
+}
+#endif
+
+  GBool PageIsOk(Page *page) { return page->ok; }
+
+#ifdef USE_FULL_PAGE_ATTRS
+  // Get page parameters.
+  gdouble PageGetX1(Page *page) { return PageAttrsGetX1(&page->attrs); }
+  gdouble PageGetY1(Page *page) { return PageAttrsGetY1(&page->attrs); }
+  gdouble PageGetX2(Page *page) { return PageAttrsGetX2(&page->attrs); }
+  gdouble PageGetY2(Page *page) { return PageAttrsGetY2(&page->attrs); }
+  GBool  PageIsCropped(Page *page) { return PageAttrsIsCropped(&page->attrs); }
+  gdouble PageGetCropX1(Page *page) { return PageAttrsGetCropX1(&page->attrs); }
+  gdouble PageGetCropY1(Page *page) { return PageAttrsGetCropY1(&page->attrs); }
+  gdouble PageGetCropX2(Page *page) { return PageAttrsGetCropX2(&page->attrs); }
+  gdouble PageGetCropY2(Page *page) { return PageAttrsGetCropY2(&page->attrs); }
+  gdouble PageGetWidth(Page *page) { 
+    return PageAttrsGetX2(&page->attrs) - PageAttrsGetX1(&page->attrs); 
+  }
+  gdouble PageGetHeight(Page *page) { 
+    return PageAttrsGetY2(&page->attrs) - PageAttrsGetY1(&page->attrs); 
+  }
+  long PageGetRotate(Page *page) { return PageAttrsGetRotate(&page->attrs); }
+#endif
+
+  Dict *PageGetResourceDict(Page *page) { return PageAttrsGetResourceDict(&page->attrs); }
+
+void PageCopyResourceDict(Page *page, Obj *dest, XRef *xref) { 
+    PageAttrsCopyResourceDict(&page->attrs, dest, xref); 
+}
+
+
+  // Get annotations array.
+  void PageGetAnnots(Page *page, Obj *obj, XRef *xref) {
+
+      ObjFetch(obj, &page->annots, xref); 
+  }
+
+  // Get contents.
+  void PageGetContents(Page *page, Obj *obj, XRef *xref) {
+
+      ObjFetch(obj, &page->contents, xref); 
+  }
+
+#if 0
+  // Display a page.
+  void display(OutputDev *out, long dpi, long rotate);
+
+#endif

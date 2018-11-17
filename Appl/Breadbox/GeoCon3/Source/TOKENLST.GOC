@@ -1,0 +1,2285 @@
+/***************************************************************************
+ *  FILE:  TOKENLST.GOC
+ ***************************************************************************/
+
+/*-------------------------------------------------------------------------
+ | Project:  GeoCon 3.0
+ |           Copyright (c) 1997 Breadbox Computer Company
+ *-----------------------------------------------------------------------*/
+
+@include <stdapp.goh>
+@include "source\iniguard.goh"
+@include "source\tokenlst.goh"
+@include "source\geocon.goh"
+#include <initfile.h>
+#include <Ansi\string.h>
+#include <Ansi\stdio.h>
+#include <token.h>
+
+//@define DEBUG_VERSION
+
+/*=========================================================================*
+ *  Types and defines:
+ *=========================================================================*/
+
+#define MAX_TOKEN_LIST_ITEMS      100
+#define MAX_TOKEN_EXECUTABLE      80
+#define MAX_TOKEN_PARAMETERS      40
+#define MAX_TOKEN_MASK_LENGTH     14
+
+typedef struct {
+    char mask[MAX_TOKEN_MASK_LENGTH] ;
+    char alphaMask[MAX_TOKEN_MASK_LENGTH] ;
+    GeodeToken token ;
+    GeodeToken geosExec ;
+    ChunkHandle executable ;
+    ChunkHandle parameters ;
+} T_tokenItem ;
+
+typedef struct {
+    word numTokens ;
+    Boolean isDirty ;
+    MemHandle stringsBlock ;
+    T_tokenItem tokenArray[MAX_TOKEN_LIST_ITEMS] ;
+} T_tokenList ;
+
+/*=========================================================================*
+ *  Externals:
+ *=========================================================================*/
+
+@extern object DOSList ;
+@extern object DOSTokenTrigger ;
+@extern object SelectIconList ;
+@extern object AddFilenameMaskText ;
+@extern object DOSExecText ;
+@extern object DOSParamText ;
+@extern object ChangeExecDialog ;
+@extern object ChangeExecFileSelector ;
+@extern object DOSExecEntry ;
+@extern object DOSParamEntry ;
+@extern object ChangeParamText ;
+@extern object ChangeParamDialog ;
+
+typedef Boolean far (*T_myInitFileEnumCallback)(
+            const char *p_stringSection,
+            word sectionNum,
+            void *p_data) ;
+
+extern Boolean MyInitFileEnumStringSection(
+            const char *category,
+            const char *key,
+            InitFileReadFlags flags,
+            T_myInitFileEnumCallback callback,
+            word codeSegment,
+            void *enumData) ;
+
+Boolean ParseTokenString(char **p_string, GeodeToken *p_geodeToken) ;
+
+static Boolean _pascal FilterFileSelectorFilterRoutine(
+                           optr oself,
+				           FileEnumCallbackData *fecd,
+				           word frame) ;
+
+void ResolveGEOSNames(char *p_path, T_tokenList *p_list) ;
+
+void ResolveGEOSFilename(
+         FileLongName name,
+         GeodeToken *token,
+         T_tokenList *p_list) ;
+
+/* debuging */
+#ifdef DEBUG_VERSION
+FileHandle G_debugFile = NullHandle ;
+#define DebugOut(str, n)  { \
+            FileWrite(G_debugFile, (str), (n), FALSE) ; \
+            FileCommit(G_debugFile, FALSE) ;  \
+        }
+#else
+#define DebugOut(str, n)  {}  /* Nothing */
+#endif
+
+/*=========================================================================*
+ *  Prototypes:
+ *=========================================================================*/
+
+Boolean far TokenLoadCallback(
+            const char *p_stringSection,
+            word sectionNum,
+            void *p_data) ;
+Boolean far TokenCompareCallback(
+            const char *p_stringSection,
+            word sectionNum,
+            void *p_data) ;
+Boolean far AssociationLoadCallback(
+            const char *p_stringSection,
+            word sectionNum,
+            void *p_data) ;
+Boolean far ParametersLoadCallback(
+            const char *p_stringSection,
+            word sectionNum,
+            void *p_data) ;
+
+/*=========================================================================*
+ *  METHODS FOR CLASS:  INITokenListClass
+ *=========================================================================*/
+
+
+    @classdecl INITokenListClass ;
+
+
+/*-------------------------------------------------------------------------
+ | Method:  INITokenListClass::MSG_INI_GUARDIAN_LOAD
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Loads the token list from the guardian class and starts up
+ |    the UI.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/18/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method INITokenListClass, MSG_INI_GUARDIAN_LOAD
+{
+    T_tokenList *p_list ;
+    MemHandle listBlock ;
+    dword tokenData ;
+    MemHandle stringsBlock ;
+
+#ifdef DEBUG_VERSION
+G_debugFile = FileCreate("GeoCon.log", FCF_NATIVE|FILE_CREATE_TRUNCATE|FILE_DENY_NONE|FILE_ACCESS_RW, FILE_ATTR_NORMAL) ;
+DebugOut("Loaded 0.\r\n", 11) ;
+#endif
+    /* First, make sure we have no data. */
+    @call oself::MSG_INI_TOKEN_LIST_DELETE_ALL() ;
+
+    /* Ok, now allocate a block for the empty list */
+    listBlock = MemAlloc(sizeof(T_tokenList), HF_SWAPABLE, HAF_ZERO_INIT) ;
+    if (listBlock)  {
+        p_list = MemLock(listBlock) ;
+
+        /* We have no entries in the list */
+        p_list->numTokens = 0 ;
+
+        /* Load in the sections */
+        MyInitFileEnumStringSection(
+            "fileManager",
+            "filenameTokens",
+            0,
+            (T_myInitFileEnumCallback)TokenLoadCallback,
+            _CS,
+            (void *)p_list) ;
+
+        /* Now let's create the strings block */
+        stringsBlock = MemAllocLMem(LMEM_TYPE_GENERAL, 0) ;
+        pself->ITLI_strings = stringsBlock ;
+
+        /* Got the block, right? */
+        if (stringsBlock)  {
+            /* Yeah, got an lmem block */
+            p_list->stringsBlock = stringsBlock ;
+
+            /* Load in DOS executable sections */
+            MyInitFileEnumStringSection(
+                "fileManager",
+                "dosAssociations",
+                0,
+                (T_myInitFileEnumCallback)AssociationLoadCallback,
+                _CS,
+                (void *)p_list) ;
+
+            /* Go find the GEOS names that match */
+            ResolveGEOSNames("\\", p_list) ;
+        }
+
+        MemUnlock(listBlock) ;
+
+        /* Now let's load the parameter definitions */
+        MyInitFileEnumStringSection(
+            "fileManager",
+            "dosParameters",
+            0,
+            (T_myInitFileEnumCallback)ParametersLoadCallback,
+            _CS,
+            (void *)p_list) ;
+
+        /* Record this new block as the state block */
+        pself->IG_uiState = listBlock ;
+
+        /* Make the UI reflect this change */
+        @call oself::MSG_INI_GUARDIAN_UPDATE_UI() ;
+    }
+
+    /* Try to load the token list */
+    tokenData = TokenListTokens(TRF_ONLY_GSTRING, 0, 0) ;
+    pself = LMemDeref(oself) ;
+    pself->ITLI_tokenList = TokenListTokensHandleFromDWord(tokenData) ;
+    pself->ITLI_numTokens = TokenListTokensCountFromDWord(tokenData) ;
+
+    @call SelectIconList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(
+              pself->ITLI_numTokens) ;
+    @call DOSList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+              0,
+              FALSE) ;
+    @send DOSList::MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG(TRUE) ;
+/*
+    @send DOSList::MSG_INI_TOKEN_HIGHLIGHT_MASK(0, 0, 0) ;
+*/
+}
+
+/*-------------------------------------------------------------------------
+ | Routine: TokenLoadCallback
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Goes through all the entries in the token list and adds them
+ |    to the given T_tokenList structure.
+ |
+ | Inputs:
+ |    const char *p_stringSection -- String to process for this section
+ |    word sectionNum             -- position of string section
+ |    void *p_data                -- passed user data
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/18/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+Boolean far TokenLoadCallback(
+            const char *p_stringSection,
+            word sectionNum,
+            void *p_data)
+{
+    T_tokenList *p_list ;
+    char *p_start ;
+    char *p_end ;
+    char *p_dest ;
+    T_tokenItem *p_item ;
+
+    /* Get the correct type of the data */
+    p_list = (T_tokenList *)p_data ;
+
+    /* Only add to the list if the list is not full. */
+    if (p_list->numTokens < MAX_TOKEN_LIST_ITEMS)  {
+        /* Get a pointer to the one item we can change */
+        p_item = p_list->tokenArray + p_list->numTokens ;
+
+        /* Parse the list into its elements */
+        /* Get the filename mask */
+        p_start = p_stringSection ;
+        while (((*p_start == ' ') ||
+               (*p_start == '\t')) &&
+               (*p_start != '\0'))  {
+            p_start++ ;
+        }
+        /* We are now at the start of the mask.  Find the end */
+        /* of the mask. */
+        p_end = p_start ;
+        while ((*p_end != ' ') &&
+               (*p_end != '\t') &&
+               (*p_end != '=') &&
+               (*p_end != '\0'))  {
+            p_end++ ;
+        }
+
+        /* Don't add if we have a problem */
+        if (p_start == p_end) {
+            /* Signal an error and stop the processing */
+            return TRUE ;
+        }
+
+        /* Copy over the filename mask */
+        p_dest = p_item->mask ;
+        strncpy(
+            p_dest,
+            p_start,
+            p_end-p_start) ;
+        p_dest[p_end-p_start] = '\0' ;
+
+        /* We are now ready to get the attached geode */
+
+        /* Find the equal sign */
+        while ((*p_end != '=') && (*p_end != '\0'))
+            p_end++ ;
+
+        /* Try to get an icon token. */
+        if (ParseTokenString(
+                &p_end,
+                &p_item->token) == TRUE)  {
+            /* Is there a geos token too? */
+            if (ParseTokenString(&p_end, &p_item->geosExec) == FALSE)  {
+                /* Didn't get it, clear it. */
+                *((dword *)p_item->geosExec.GT_chars) = 0 ;
+            }
+        } else {
+            *((dword *)p_item->token.GT_chars) = 0 ;
+            *((dword *)p_item->geosExec.GT_chars) = 0 ;
+        }
+
+        /* We've added another token. */
+        p_list->numTokens++ ;
+    }
+
+    /* Keep processing */
+    return FALSE ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine: AssociationLoadCallback
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Load a DOS association and add to the token list and strings.
+ |
+ | Inputs:
+ |    const char *p_stringSection -- String to process for this section
+ |    word sectionNum             -- position of string section
+ |    void *p_data                -- passed user data
+ |                                   In this case, a T_tokenList *
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/22/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+Boolean far AssociationLoadCallback(
+            const char *p_stringSection,
+            word sectionNum,
+            void *p_data)
+{
+    T_tokenList *p_list ;
+    char *p_start ;
+    char *p_end ;
+    char mask[40] ;
+    char dosAssociation[80] ;
+    T_tokenItem *p_item ;
+    word tokenPos ;
+    char *p_exec ;
+
+    /* Get the correct type of the data */
+    p_list = (T_tokenList *)p_data ;
+
+    /* Find the start of this association filename mask */
+    p_start = p_stringSection ;
+    while (((*p_start == ' ') ||
+           (*p_start == '\t')) &&
+           (*p_start != '\0'))  {
+        p_start++ ;
+    }
+
+    /* We are now at the start of the mask.  Find the end */
+    /* of the mask. */
+    p_end = p_start ;
+    while ((*p_end != ' ') &&
+           (*p_end != '\t') &&
+           (*p_end != '=') &&
+           (*p_end != '\0'))  {
+        p_end++ ;
+    }
+
+    /* Don't add if we have a problem */
+    if (p_start == p_end) {
+        /* Signal an error and stop the processing */
+        return TRUE ;
+    }
+
+    /* Copy over the filename mask */
+    strncpy(
+        mask,
+        p_start,
+        p_end-p_start) ;
+    mask[p_end-p_start] = '\0' ;
+
+    /* Now try to find this mask in the token list */
+    p_item = p_list->tokenArray ;
+    for (tokenPos=0; tokenPos < p_list->numTokens; tokenPos++, p_item++)  {
+        if (strcmp(mask, p_item->mask) == 0)
+            break ;
+    }
+
+    /* Do we need to add an entry */
+    if (tokenPos == p_list->numTokens)  {
+        /* Yes, we need to add a new entry */
+        /* Are we out of space? */
+        if (tokenPos >= MAX_TOKEN_LIST_ITEMS)
+            /* yes, Abort this entry */
+            return FALSE ;
+
+        /* Clear the new entry */
+        memset(p_item, 0, sizeof(*p_item)) ;
+
+        /* Copy over the mask */
+        strcpy(p_item->mask, mask) ;
+
+        /* Add one to the list */
+        p_list->numTokens++ ;
+    }
+
+    /* Ok, if we got here, p_item points to the current entry */
+    /* with the matching filename mask */
+    /* Let's get the dos association for this mask */
+    /* Find the start */
+    p_start = p_end ;
+    while ((*p_start == '=') ||
+           (*p_start == ' ') ||
+           (*p_start == '\t'))  {
+        if (*p_start == '\0')
+            break ;
+        p_start++ ;
+    }
+
+    /* Find the end */
+    p_end = p_start ;
+    while ((*p_end != '\0') &&
+           (*p_end != '\n') &&
+           (*p_end != '\r') &&
+           (*p_end != '\t') &&
+           (*p_end != ' '))  {
+        p_end++ ;
+    }
+
+    /* Copy over the association */
+    strncpy(
+        dosAssociation,
+        p_start,
+        p_end-p_start) ;
+    dosAssociation[p_end-p_start] = '\0' ;
+
+    /* Lock in the strings block */
+    MemLock(p_list->stringsBlock) ;
+
+    /* If there is already an executable, get rid of it */
+    if (p_item->executable)  {
+        LMemFreeHandles(p_list->stringsBlock, p_item->executable) ;
+        p_item->executable = NullHandle ;
+    }
+
+    /* Allocate a new string in the strings block */
+    p_item->executable = LMemAlloc(p_list->stringsBlock, 1+p_end-p_start);
+
+    /* Copy in the string into the strings block. */
+    p_exec = LMemDerefHandles(p_list->stringsBlock, p_item->executable) ;
+    strcpy(p_exec, dosAssociation) ;
+    MemUnlock(p_list->stringsBlock) ;
+
+    /* Keep processing */
+    return FALSE ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine: ParametersLoadCallback
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Load a parameter entry and adds it to the token list and strings.
+ |
+ | Inputs:
+ |    const char *p_stringSection -- String to process for this section
+ |    word sectionNum             -- position of string section
+ |    void *p_data                -- passed user data
+ |                                   In this case, a T_tokenList *
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/22/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+Boolean far ParametersLoadCallback(
+            const char *p_stringSection,
+            word sectionNum,
+            void *p_data)
+{
+    T_tokenList *p_list ;
+    char *p_start ;
+    char *p_end ;
+    char filename[40] ;
+    char parameters[80] ;
+    T_tokenItem *p_item ;
+    word tokenPos ;
+    char *p_param ;
+
+    /* Get the correct type of the data */
+    p_list = (T_tokenList *)p_data ;
+
+    /* Find the start of this association filename */
+    p_start = p_stringSection ;
+    while (((*p_start == ' ') ||
+           (*p_start == '\t')) &&
+           (*p_start != '\0'))  {
+        p_start++ ;
+    }
+
+    /* We are now at the start of the mask.  Find the end */
+    /* of the filename. */
+    p_end = p_start ;
+    while ((*p_end != ' ') &&
+           (*p_end != '\t') &&
+           (*p_end != '=') &&
+           (*p_end != '\0'))  {
+        p_end++ ;
+    }
+
+    /* Don't add if we have a problem */
+    if (p_start == p_end) {
+        /* Signal an error and stop the processing */
+        return TRUE ;
+    }
+
+    /* Copy over the filename */
+    strncpy(
+        filename,
+        p_start,
+        p_end-p_start) ;
+    filename[p_end-p_start] = '\0' ;
+
+    /* Now try to find this filename in the token list */
+    p_item = p_list->tokenArray ;
+    for (tokenPos=0; tokenPos < p_list->numTokens; tokenPos++, p_item++)  {
+        if (strcmp(filename, p_item->mask) == 0)
+            break ;
+    }
+
+    /* Do we need to add an entry */
+    if (tokenPos == p_list->numTokens)  {
+        /* Yes, we need to add a new entry */
+        /* Are we out of space? */
+        if (tokenPos >= MAX_TOKEN_LIST_ITEMS)
+            /* yes, Abort this entry */
+            return FALSE ;
+
+        /* Clear the new entry */
+        memset(p_item, 0, sizeof(*p_item)) ;
+
+        /* Copy over the mask */
+        strcpy(p_item->mask, filename) ;
+
+        /* Add one to the list */
+        p_list->numTokens++ ;
+    }
+
+    /* Ok, if we got here, p_item points to the current entry */
+    /* with the matching filename mask */
+    /* Let's get the parameters for this filename */
+    /* Find the start */
+    p_start = p_end ;
+    while ((*p_start == '=') ||
+           (*p_start == ' ') ||
+           (*p_start == '\t'))  {
+        if (*p_start == '\0')
+            break ;
+        p_start++ ;
+    }
+
+    /* Find the end */
+    p_end = p_start ;
+    while ((*p_end != '\0') &&
+           (*p_end != '\n') &&
+           (*p_end != '\r') &&
+           (*p_end != '\t') &&
+           (*p_end != ' '))  {
+        p_end++ ;
+    }
+
+    /* Copy over the parameters */
+    strncpy(
+        parameters,
+        p_start,
+        p_end-p_start) ;
+    parameters[p_end-p_start] = '\0' ;
+
+    /* Lock in the strings block */
+    MemLock(p_list->stringsBlock) ;
+
+    /* If there is already a parameters entry, get rid of it */
+    if (p_item->parameters)  {
+        LMemFreeHandles(p_list->stringsBlock, p_item->parameters) ;
+        p_item->parameters = NullHandle ;
+    }
+
+    /* Allocate a new string in the strings block */
+    p_item->parameters = LMemAlloc(p_list->stringsBlock, 1+p_end-p_start);
+
+    /* Copy in the string into the strings block. */
+    p_param = LMemDerefHandles(p_list->stringsBlock, p_item->parameters) ;
+    strcpy(p_param, parameters) ;
+    MemUnlock(p_list->stringsBlock) ;
+
+    /* Keep processing */
+    return FALSE ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  INITokenListClass::MSG_INI_GUARDIAN_SAVE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Saves the execOnToken section in the .INI file.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/18/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method INITokenListClass, MSG_INI_GUARDIAN_SAVE
+{
+    T_tokenList *p_list ;
+    T_tokenItem *p_item ;
+    word i ;
+    char buffer[80] ;
+    char buffer2[80] ;
+    char *p_string ;
+
+    /* Only process this if we have a list */
+    if (pself->IG_uiState)  {
+        /* First, delete the whole section. */
+        InitFileDeleteEntry("fileManager", "filenameTokens") ;
+
+        /* Now go through the whole list and write them out */
+        p_list = MemLock(pself->IG_uiState) ;
+        p_item = p_list->tokenArray ;
+        for (i=0; i<p_list->numTokens; i++)  {
+            /* Only save on the token list if got a token */
+            if (p_item->token.GT_chars[0] != '\0')  {
+                /* What we write depends on if there is */
+                /* an executable GEOS token. */
+                sprintf(
+                    buffer,
+                    "    %-13s = \"%c%c%c%c\",%d",
+                    p_item->mask,
+                    p_item->token.GT_chars[0],
+                    p_item->token.GT_chars[1],
+                    p_item->token.GT_chars[2],
+                    p_item->token.GT_chars[3],
+                    p_item->token.GT_manufID) ;
+                if (p_item->geosExec.GT_chars[0] != '\0')  {
+                    sprintf(
+                        buffer2,
+                        ",\"%c%c%c%c\",%d",
+                        p_item->geosExec.GT_chars[0],
+                        p_item->geosExec.GT_chars[1],
+                        p_item->geosExec.GT_chars[2],
+                        p_item->geosExec.GT_chars[3],
+                        p_item->geosExec.GT_manufID) ;
+                    strcat(buffer, buffer2) ;
+                }
+                InitFileWriteStringSection(
+                    "fileManager",
+                    "filenameTokens",
+                    buffer) ;
+            }
+            p_item++ ;
+        }
+        MemUnlock(pself->IG_uiState) ;
+
+        /* Now let's do the DOS associations */
+        /* First, delete the whole section. */
+        InitFileDeleteEntry("fileManager", "dosAssociations") ;
+
+        /* Now go through the whole list and write them out */
+        p_list = MemLock(pself->IG_uiState) ;
+        p_item = p_list->tokenArray ;
+        for (i=0; i<p_list->numTokens; i++)  {
+            /* Only save on the token list if this mask does */
+            /* not have a GEOS executable attached */
+            if (p_item->geosExec.GT_chars[0] == '\0')  {
+                /* Is there a dos exectuable attached? */
+                if (p_item->executable)  {
+                    /* We'll write out the string */
+                    MemLock(p_list->stringsBlock) ;
+                    p_string = LMemDerefHandles(
+                                   p_list->stringsBlock,
+                                   p_item->executable) ;
+                    if (p_string)  {
+                        sprintf(
+                            buffer,
+                            "    %-13s = %s",
+                            p_item->mask,
+                            p_string) ;
+
+                        InitFileWriteStringSection(
+                            "fileManager",
+                            "dosAssociations",
+                            buffer) ;
+                    }
+
+                    MemUnlock(p_list->stringsBlock) ;
+                }
+            }
+            p_item++ ;
+        }
+        MemUnlock(pself->IG_uiState) ;
+
+        /* Now let's do the DOS parameters */
+        /* First, delete the whole section. */
+        InitFileDeleteEntry("fileManager", "dosParameters") ;
+
+        /* Now go through the whole list and write them out */
+        p_list = MemLock(pself->IG_uiState) ;
+        p_item = p_list->tokenArray ;
+        for (i=0; i<p_list->numTokens; i++)  {
+            /* Only save on the token list if this mask does */
+            /* not have a GEOS executable attached */
+            if (p_item->geosExec.GT_chars[0] == '\0')  {
+                /* Is there dos parameters attached? */
+                if (p_item->parameters)  {
+                    /* We'll write out the string */
+                    MemLock(p_list->stringsBlock) ;
+                    p_string = LMemDerefHandles(
+                                   p_list->stringsBlock,
+                                   p_item->parameters) ;
+                    if (p_string)  {
+                        sprintf(
+                            buffer,
+                            "    %-13s = %s",
+                            p_item->mask,
+                            p_string) ;
+
+                        InitFileWriteStringSection(
+                            "fileManager",
+                            "dosParameters",
+                            buffer) ;
+                    }
+
+                    MemUnlock(p_list->stringsBlock) ;
+                }
+            }
+            p_item++ ;
+        }
+        MemUnlock(pself->IG_uiState) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  INITokenListClass::MSG_INI_GUARDIAN_REVERT
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Goes back to the original data and resets the ui object.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/18/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method INITokenListClass, MSG_INI_GUARDIAN_REVERT
+{
+    /* We are going to old data */
+    /* Just reload */
+    @call oself::MSG_INI_GUARDIAN_LOAD() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  INITokenListClass::MSG_INI_GUARDIAN_USE_DEFAULT
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Uses the default value and updates the UI accordingly.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/18/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method INITokenListClass, MSG_INI_GUARDIAN_USE_DEFAULT
+{
+    /* This version of the code has no default settings */
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  INITokenListClass::MSG_INI_GUARDIAN_UPDATE_UI
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Make the attached UI object reflect the state of the INI guardian.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/18/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method INITokenListClass, MSG_INI_GUARDIAN_UPDATE_UI
+{
+    T_tokenList *p_list ;
+
+    /* Only bother if we got a block and a uiObject */
+    if ((pself->IG_uiState != NullHandle) &&
+            (pself->IG_uiObject != NullHandle))  {
+        p_list = MemLock(pself->IG_uiState) ;
+        @call (pself->IG_uiObject)::MSG_GEN_DYNAMIC_LIST_INITIALIZE(
+                   p_list->numTokens) ;
+        MemUnlock(pself->IG_uiState) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  INITokenListClass::MSG_INI_GUARDIAN_CHECK_IF_CHANGED
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Determine if the token list is different from the saved list.
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE if changed, else FALSE
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/18/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method INITokenListClass, MSG_INI_GUARDIAN_CHECK_IF_CHANGED
+{
+    T_tokenList *p_list ;
+    Boolean isDirty = FALSE ;
+
+    /* To do the check, we are going to enumerate through all the */
+    /* currently saved items in the list and see if they are */
+    /* the same. */
+    if (pself->IG_uiState)  {
+        /* Get the dirty flag */
+        p_list = MemLock(pself->IG_uiState) ;
+        isDirty = p_list->isDirty ;
+        MemUnlock(pself->IG_uiState) ;
+    }
+
+    return isDirty ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  INITokenListClass::MSG_INI_TOKEN_LIST_DELETE_ALL
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Delete any attached data to this object.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/18/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method INITokenListClass, MSG_INI_TOKEN_LIST_DELETE_ALL
+{
+    /* Free up the list of token items */
+    if (pself->IG_uiState)  {
+        MemFree(pself->IG_uiState) ;
+        pself->IG_uiState = NullHandle ;
+    }
+
+    /* Free up the token list */
+    if (pself->ITLI_tokenList)  {
+        MemFree(pself->ITLI_tokenList) ;
+        pself->ITLI_tokenList = NullHandle ;
+    }
+
+    /* Free up the strings block */
+    if (pself->ITLI_strings)  {
+        MemFree(pself->ITLI_strings) ;
+        pself->ITLI_strings = NullHandle ;
+    }
+
+    /* Now there are no tokens */
+    pself->ITLI_numTokens = 0 ;
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  INITokenListClass::MSG_INI_TOKEN_LIST_QUERY
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Handles the query message for displaying items in a GenDynamicList.
+ |
+ | Inputs:
+ |    optr list                   -- Querying list.
+ |    word item                   -- Entry position.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/18/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method INITokenListClass, MSG_INI_TOKEN_LIST_QUERY
+{
+    T_tokenList *p_list ;
+
+    if (pself->IG_uiState)  {
+        p_list = MemLock(pself->IG_uiState) ;
+
+        @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
+                  item,
+                  p_list->tokenArray[item].mask) ;
+
+        MemUnlock(pself->IG_uiState) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  INITokenListClass::MSG_INI_TOKEN_LIST_REMOVE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Handles the trigger message to remove an item from the list.
+ |
+ | Inputs:
+ |    optr trigger                -- Calling trigger.  Ignored.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/18/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method INITokenListClass, MSG_INI_TOKEN_LIST_REMOVE
+{
+    word item ;
+    T_tokenList *p_list ;
+    T_tokenItem *p_item ;
+
+    /* Doesn't work if we have no state info */
+    if (pself->IG_uiState)  {
+        /* What's selected? */
+        item = @call DOSList::MSG_GEN_ITEM_GROUP_GET_SELECTION() ;
+
+        p_list = MemLock(pself->IG_uiState) ;
+
+        /* Only remove if the item is selected on the list */
+        if (item < p_list->numTokens)  {
+            /* First, get rid of the item's attached data */
+            p_item = p_list->tokenArray + item ;
+            if (p_item->executable)  {
+                /* Remove the executable string */
+                MemLock(p_list->stringsBlock) ;
+                LMemFreeHandles(p_list->stringsBlock, p_item->executable) ;
+                p_item->executable = NullHandle ;
+                MemUnlock(p_list->stringsBlock) ;
+            }
+            if (p_item->parameters)  {
+                /* Remove the parameters string */
+                MemLock(p_list->stringsBlock) ;
+                LMemFreeHandles(p_list->stringsBlock, p_item->parameters) ;
+                p_item->parameters = NullHandle ;
+                MemUnlock(p_list->stringsBlock) ;
+            }
+
+            /* Constrict the list (unless at the end) */
+            if ((item+1) != p_list->numTokens)
+                memcpy(
+                    p_list->tokenArray+item,
+                    p_list->tokenArray+item+1,
+                    sizeof(p_list->tokenArray[0]) *
+                        (p_list->numTokens - item - 1)) ;
+
+            /* One less now */
+            p_list->numTokens-- ;
+
+            /* Remove that item from the gen list */
+            @call DOSList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(item, 1) ;
+
+            /* Select the new token */
+            if (item >= p_list->numTokens)
+                if (item > 0)
+                    item-- ;
+            @call DOSList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+                      item,
+                      FALSE) ;
+
+            /* Update the icon on the trigger */
+            @send DOSList::MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG(FALSE) ;
+
+            /* Mark the list as dirty. */
+            p_list->isDirty = TRUE ;
+        }
+
+        MemUnlock(pself->IG_uiState) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  INITokenListClass::MSG_INI_TOKEN_LIST_ADD
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Request for the addition of filename mask on the token list.
+ |
+ | Inputs:
+ |    optr trigger                -- Calling trigger.  Ignored.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/21/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method INITokenListClass, MSG_INI_TOKEN_LIST_ADD
+{
+    T_tokenList *p_list ;
+    T_tokenItem *p_pos ;
+    char mask[14] ;
+    word newPos ;
+
+    /* Doesn't work if we have no state info */
+    if (pself->IG_uiState)  {
+        /* Lock in the filename mask */
+        p_list = MemLock(pself->IG_uiState) ;
+        if (p_list->numTokens < MAX_TOKEN_LIST_ITEMS)  {
+            p_pos = &p_list->tokenArray[p_list->numTokens] ;
+
+            /* Clear out the position */
+            memset(p_pos, 0, sizeof(*p_pos)) ;
+
+            /* Setup the default icon as the regular icon */
+            strncpy(p_pos->token.GT_chars, "FILE", 4) ;
+
+            /* Get the filename mask */
+            @call AddFilenameMaskText::MSG_VIS_TEXT_GET_ALL_PTR(
+                      p_pos->mask) ;
+            @call AddFilenameMaskText::MSG_VIS_TEXT_GET_ALL_PTR(
+                      mask) ;
+
+            /* Add the item to the list */
+            @call DOSList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(
+                      p_list->numTokens,
+                      1) ;
+
+            /* One more created */
+            p_list->numTokens++ ;
+
+            /* Sort the icons with the new element in it */
+            @call oself::MSG_INI_TOKEN_LIST_SORT_TOKENS() ;
+            newPos = @call oself::MSG_INI_TOKEN_LIST_FIND_MASK(mask) ;
+
+            /* Reinitialize the list */
+            @send DOSList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(
+                      p_list->numTokens) ;
+
+            /* Select the new token */
+            @send DOSList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+                      newPos,
+                      FALSE) ;
+
+            /* Update the icon on the trigger */
+            @send DOSList::MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG(FALSE) ;
+
+            /* Mark the list as dirty. */
+            p_list->isDirty = TRUE ;
+        }
+        MemUnlock(pself->IG_uiState) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  INITokenListClass::MSG_INI_TOKEN_HIGHLIGHT_MASK
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    The user has moved over a different mask.  Update the icon and other
+ |    input data.
+ |
+ | Inputs:
+ |    word selection              -- Current selection.
+ |    word numSelections          -- Should always be 1.  Ignored.
+ |    GenItemGroupStateFlags stateFlags -- Ignored.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/21/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method INITokenListClass, MSG_INI_TOKEN_HIGHLIGHT_MASK
+{
+    T_tokenList *p_list ;
+    ChunkHandle execString ;
+    ChunkHandle paramsString ;
+    Boolean isDOSExec = FALSE ;
+    char *p_dot ;
+    T_tokenItem *p_item ;
+
+DebugOut("Highlight\r\n", 11) ;
+    /* Only process this if we have a list */
+    if (pself->IG_uiState)  {
+DebugOut("Good\r\n", 6) ;
+        /* Now display the related entry */
+        p_list = MemLock(pself->IG_uiState) ;
+        p_item = p_list->tokenArray + selection ;
+
+        if (selection < p_list->numTokens)  {
+            p_dot = strchr(p_item->mask, '.') ;
+            if (p_dot)  {
+                /* See if the extension makes it a DOS executable */
+                if ((strcmp(p_dot, ".COM") == 0) ||
+                    (strcmp(p_dot, ".BAT") == 0) ||
+                    (strcmp(p_dot, ".EXE") == 0) ||
+                    (strcmp(p_dot, ".com") == 0) ||
+                    (strcmp(p_dot, ".bat") == 0) ||
+                    (strcmp(p_dot, ".exe") == 0))  {
+                    isDOSExec = TRUE ;
+                }
+            }
+
+            if (isDOSExec)  {
+DebugOut("Is DOS exec\r\n", 13) ;
+                @call DOSExecEntry::MSG_GEN_SET_NOT_USABLE(VUM_NOW) ;
+                @call DOSParamEntry::MSG_GEN_SET_USABLE(VUM_NOW) ;
+            } else {
+                @call DOSParamEntry::MSG_GEN_SET_NOT_USABLE(VUM_NOW) ;
+                @call DOSExecEntry::MSG_GEN_SET_USABLE(VUM_NOW) ;
+            }
+
+DebugOut("Token: ", 7) ;
+DebugOut(&p_item->token, 6) ;
+/*
+            @call DOSTokenTrigger::MSG_GEN_REPLACE_VIS_MONIKER(
+                      VUM_MANUAL,
+                      0,
+                      0,
+                      0,
+                      VMDT_TOKEN,
+                      VMST_FPTR,
+                      (dword)&p_item->token) ;
+
+            @send DOSTokenTrigger::MSG_DOS_TOKEN_TRIGGER_CONFIRM_TOKEN() ;
+*/
+            @call DOSTokenTrigger::MSG_DOS_TOKEN_TRIGGER_SET_TOKEN(
+                      p_item->token) ;
+
+            /* What strings do we have? */
+            execString = p_item->executable ;
+            paramsString = p_item->parameters ;
+
+            /* Now update the executable string */
+            if (execString)  {
+                @call DOSExecText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(
+                         ConstructOptr(
+                             p_list->stringsBlock,
+                             execString),
+                         0) ;
+            } else {
+                @call DOSExecText::MSG_VIS_TEXT_DELETE_ALL();
+            }
+
+            /* Now update the parameters string */
+            if (paramsString)  {
+                @call DOSParamText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(
+                         ConstructOptr(
+                             p_list->stringsBlock,
+                             paramsString),
+                         0) ;
+            } else {
+                @call DOSParamText::MSG_VIS_TEXT_DELETE_ALL();
+            }
+        }
+
+        MemUnlock(pself->IG_uiState) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  INITokenListClass::MSG_INI_TOKEN_LIST_QUERY_ICON
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Handles the query message for displaying tokens in the
+ |    SelectTokenDialog.
+ |
+ | Inputs:
+ |    optr list                   -- Querying list.
+ |    word item                   -- Entry position.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/21/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method INITokenListClass, MSG_INI_TOKEN_LIST_QUERY_ICON
+{
+    GeodeToken *p_tokenList ;
+    GeodeToken foundToken ;
+
+    if (pself->ITLI_tokenList)  {
+        /* Bring in the list */
+        p_tokenList = MemLock(pself->ITLI_tokenList) ;
+        foundToken = p_tokenList[item] ;
+        MemUnlock(pself->ITLI_tokenList) ;
+
+        /* Replace the item on the list */
+        @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(
+                  item,
+                  0,
+                  48,
+                  48,
+                  0,
+                  VMDT_TOKEN,
+                  VMST_FPTR,
+                  (dword)&foundToken) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  INITokenListClass::MSG_INI_TOKEN_LIST_SELECTED_ICON
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    An icon was selected from the SelectIconDialog.
+ |
+ | Inputs:
+ |    word selection              -- Position in the list.
+ |    word numSelections          -- Should be 1.  Ignored.
+ |    GenItemGroupStateFlags stateFlags -- Ignored.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/21/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method INITokenListClass, MSG_INI_TOKEN_LIST_SELECTED_ICON
+{
+    T_tokenList *p_list ;
+    GeodeToken *p_tokenList ;
+    GeodeToken selectedToken ;
+    word maskSelected ;
+
+    /* Don't bother unless we really have a list and a list of */
+    /* locations. */
+    if ((pself->ITLI_tokenList) && (pself->IG_uiState))  {
+        /* Bring in the list and get the selection */
+        p_tokenList = MemLock(pself->ITLI_tokenList) ;
+        selectedToken = p_tokenList[selection] ;
+        MemUnlock(pself->ITLI_tokenList) ;
+
+        /* Determine which filename mask we are affecting */
+        maskSelected = @call DOSList::MSG_GEN_ITEM_GROUP_GET_SELECTION() ;
+
+        /* Lock in the list */
+        p_list = MemLock(pself->IG_uiState) ;
+
+        /* Make sure we have an item */
+        if (maskSelected < p_list->numTokens)  {
+            /* Mark the list as dirty if its different */
+            if (memcmp(
+                    &p_list->tokenArray[maskSelected].token,
+                    &selectedToken,
+                    sizeof(selectedToken))!=0)
+                p_list->isDirty = TRUE ;
+
+            /* Copy over the changed icon */
+            p_list->tokenArray[maskSelected].token = selectedToken ;
+
+            /* Replace the item on the list */
+            @call DOSTokenTrigger::MSG_GEN_REPLACE_VIS_MONIKER(
+                      VUM_NOW,
+                      0,
+                      0,
+                      0,
+                      VMDT_TOKEN,
+                      VMST_FPTR,
+                      (dword)&selectedToken) ;
+        }
+
+        MemUnlock(pself->IG_uiState) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  INITokenListClass::MSG_INI_TOKEN_LIST_OPEN_FILE_SELECTOR
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Bring up the file selector for changing exec's to run.
+ |
+ | Inputs:
+ |    optr trigger                -- Calling trigger.  Ignored.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/22/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method INITokenListClass, MSG_INI_TOKEN_LIST_OPEN_FILE_SELECTOR
+{
+    @call oself::MSG_INI_TOKEN_LIST_GO_TO_WORLD(trigger) ;
+    @call ChangeExecDialog::MSG_GEN_INTERACTION_INITIATE() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  INITokenListClass::MSG_INI_TOKEN_LIST_GO_TO_WORLD
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Change to the world directory
+ |
+ | Inputs:
+ |    optr trigger                -- Calling trigger.  Ignored.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/22/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method INITokenListClass, MSG_INI_TOKEN_LIST_GO_TO_WORLD
+{
+    /* Jump over the to the world directory  */
+    @call ChangeExecFileSelector::
+              MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH(
+                  "\\",
+                  SP_APPLICATION) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  INITokenListClass::MSG_INI_TOKEN_LIST_USE_EXEC
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    User has selected an exec to use.  Make the change on the token list.
+ |
+ | Inputs:
+ |    optr trigger                -- Calling trigger.  Ignored.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/18/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method INITokenListClass, MSG_INI_TOKEN_LIST_USE_EXEC
+{
+    T_tokenList *p_list ;
+    dword flagsAndDrive ;
+    char buffer[100] ;
+    char fullPath[200] ;
+    DiskHandle disk ;
+    char *p_pos ;
+    GeosFileType fileType ;
+    word item ;
+    T_tokenItem *p_item ;
+    char *p_string ;
+
+    /* Doesn't work if we have no state info */
+    if (pself->IG_uiState)  {
+        /* What item in the token list is currently selected (if any) */
+        item = @call DOSList::MSG_GEN_ITEM_GROUP_GET_SELECTION() ;
+        p_list = MemLock(pself->IG_uiState) ;
+
+        /* Only process if an item is selected */
+        if (item < p_list->numTokens)  {
+            /* First, we need a file to work with.  Call up a file dialog. */
+            flagsAndDrive =
+                @call ChangeExecFileSelector::
+                    MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(
+                        buffer) ;
+
+            /* Extract the disk handle */
+            disk = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(flagsAndDrive) ;
+
+            /* Construct the full path at the end of the app list */
+            p_pos = fullPath ;
+            FileConstructFullPath(
+                &p_pos,
+                sizeof(fullPath),
+                disk,
+                buffer,
+                TRUE) ;
+
+            /* One last check, is this really a geos file, subdir, */
+            /* or dos file? */
+            FileGetPathExtAttributes(
+                fullPath,
+                FEA_FILE_TYPE,
+                &fileType,
+                sizeof(fileType)) ;
+
+            /* Get a quick pointer to the list item */
+            p_item = p_list->tokenArray+item ;
+
+            /* Only add executables (ignore sub-directories) */
+            if (fileType == GFT_EXECUTABLE)  {
+                /* Get the GeodeToken of the executable and save it */
+                FileGetPathExtAttributes(
+                    fullPath,
+                    FEA_TOKEN,
+                    &p_item->geosExec,
+                    sizeof(p_item->geosExec)) ;
+
+                /* Make sure we have a regular token defined */
+                if (p_item->token.GT_chars[0] == '\0')  {
+                    strncpy(p_item->token.GT_chars, "FILE", 4) ;
+                    p_item->token.GT_manufID = 0 ;
+                }
+
+                /* Don't need a path for GEOS executables */
+                @call ChangeExecFileSelector::
+                          MSG_GEN_FILE_SELECTOR_GET_SELECTION(fullPath) ;
+            }
+
+            /* Change the exec string appropriately */
+            if ((fileType == GFT_NOT_GEOS_FILE) ||
+                (fileType == GFT_EXECUTABLE))  {
+                /* Lock in the strings block */
+                MemLock(p_list->stringsBlock) ;
+
+                /* Delete the old string (if it exists) */
+                if (p_item->executable)
+                    LMemFreeHandles(
+                        p_list->stringsBlock,
+                        p_item->executable) ;
+
+                /* Allocate a new string and copy it over */
+                p_item->executable =
+                    LMemAlloc(p_list->stringsBlock, 1+strlen(fullPath)) ;
+                p_string = LMemDerefHandles(
+                               p_list->stringsBlock,
+                               p_item->executable) ;
+                strcpy(p_string, fullPath) ;
+                MemUnlock(p_list->stringsBlock) ;
+            }
+
+            /* If this is a dos file, don't allow GEOS executable token */
+            if (fileType == GFT_NOT_GEOS_FILE)  {
+                /* Get rid of the token */
+                memset(&p_item->geosExec, 0, sizeof(p_item->geosExec)) ;
+            }
+
+            /* Ok, I think we've made a change */
+            p_list->isDirty = TRUE ;
+
+            @send DOSList::MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG(FALSE) ;
+        }
+
+        MemUnlock(pself->IG_uiState) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  INITokenListClass::MSG_INI_TOKEN_LIST_OPEN_PARAM_DIALOG
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Bring up the change parameter dialog after copying our data in.
+ |
+ | Inputs:
+ |    optr trigger                -- Calling trigger.  Ignored.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/22/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method INITokenListClass, MSG_INI_TOKEN_LIST_OPEN_PARAM_DIALOG
+{
+    T_tokenList *p_list ;
+    ChunkHandle params ;
+    word item ;
+
+    /* Doesn't work if we have no state info */
+    if (pself->IG_uiState)  {
+        /* What item in the token list is currently selected (if any) */
+        item = @call DOSList::MSG_GEN_ITEM_GROUP_GET_SELECTION() ;
+
+        /* Find the parameters for the currently selected file mask */
+        p_list = MemLock(pself->IG_uiState) ;
+        if (item < p_list->numTokens)  {
+            params = p_list->tokenArray[item].parameters ;
+
+            /* Anything? */
+            if (params)  {
+                /* Yes, something to copy */
+                MemLock(pself->ITLI_strings) ;
+                @call ChangeParamText::MSG_VIS_TEXT_REPLACE_ALL_OPTR(
+                          ConstructOptr(
+                              pself->ITLI_strings,
+                              params),
+                          0) ;
+                MemUnlock(pself->ITLI_strings) ;
+            } else {
+                /* No, just clear out the text */
+                @call ChangeParamText::MSG_VIS_TEXT_DELETE_ALL();
+            }
+            /* Now bring up the dialog */
+            @call ChangeParamDialog::MSG_GEN_INTERACTION_INITIATE() ;
+        }
+        MemUnlock(pself->IG_uiState) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  INITokenListClass::MSG_INI_TOKEN_LIST_CHANGE_PARAMETERS
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    This method is called when the user enters new parameters.
+ |
+ | Inputs:
+ |    optr trigger                -- Calling trigger.  Ignored.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/22/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method INITokenListClass, MSG_INI_TOKEN_LIST_CHANGE_PARAMETERS
+{
+    T_tokenList *p_list ;
+    T_tokenItem *p_item ;
+    ChunkHandle params ;
+    word item ;
+    char buffer[100] ;
+    char *p_string ;
+
+    /* Doesn't work if we have no state info */
+    if (pself->IG_uiState)  {
+        /* What item in the token list is currently selected (if any) */
+        item = @call DOSList::MSG_GEN_ITEM_GROUP_GET_SELECTION() ;
+
+        /* Find the parameters for the currently selected file mask */
+        p_list = MemLock(pself->IG_uiState) ;
+        if (item < p_list->numTokens)  {
+            p_item = p_list->tokenArray + item ;
+            /* Is the text empty of filled? */
+            if ((@call ChangeParamText::MSG_VIS_TEXT_GET_TEXT_SIZE()) == 0)  {
+                /* If empty, just delete the whole thing */
+                MemLock(p_list->stringsBlock) ;
+                LMemFreeHandles(p_list->stringsBlock, p_item->parameters) ;
+                p_item->parameters = NullHandle ;
+                MemUnlock(p_list->stringsBlock) ;
+            } else {
+                /* otherwise, let's grab the data */
+                @call ChangeParamText::MSG_VIS_TEXT_GET_ALL_PTR(buffer) ;
+                MemLock(p_list->stringsBlock) ;
+                if (p_item->parameters)
+                    LMemFreeHandles(p_list->stringsBlock, p_item->parameters) ;
+                p_item->parameters = LMemAlloc(
+                                         p_list->stringsBlock,
+                                         1+strlen(buffer)) ;
+                p_string = LMemDerefHandles(
+                               p_list->stringsBlock,
+                               p_item->parameters) ;
+                strcpy(p_string, buffer) ;
+                MemUnlock(p_list->stringsBlock) ;
+            }
+
+            /* Update the list */
+            @send DOSList::MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG(FALSE) ;
+
+            /* Mark the list as dirty */
+            p_list->isDirty = TRUE ;
+        }
+        MemUnlock(pself->IG_uiState) ;
+    }
+}
+
+#define ALPHA_MASK_HIGHEST_CHARACTER  ((char)'Z')
+
+void AlphaMaskSection(char *p_from, char *p_to, int numChars)
+{
+    Boolean starMode = FALSE ;
+    word i ;
+
+    for (i=0; i<numChars; i++, p_from++, p_to++)  {
+        if ((*p_from == '\0') || (*p_from == ' ') || (*p_from == '.'))
+            break ;
+        if (starMode)  {
+            *p_to = ALPHA_MASK_HIGHEST_CHARACTER ;
+        }  else  {
+            if (*p_from == '?')
+                *p_to = ALPHA_MASK_HIGHEST_CHARACTER ;
+            else
+                *p_to = *p_from ;
+
+            if (*p_from == '*')  {
+                starMode = TRUE ;
+                *p_to = ALPHA_MASK_HIGHEST_CHARACTER ;
+            }
+        }
+    }
+    for (; i<numChars; i++, p_to++)
+        if (starMode)
+            *p_to = ALPHA_MASK_HIGHEST_CHARACTER ;
+        else
+            *p_to = ' ' ;
+}
+
+void ConvertToAlphaMask(char *p_name, char *buffer)
+{
+    char *p_pos ;
+
+    /* Clear out the goal string with spaces */
+    memset(buffer, ' ', MAX_TOKEN_MASK_LENGTH) ;
+
+    /* Convert the 8 chars of the 8.3 mask */
+    AlphaMaskSection(p_name, buffer, 8) ;
+
+    /* Add a period */
+    buffer[8] = '.' ;
+
+    /* Find where the period is in the original mask */
+    p_pos = strchr(p_name, '.') ;
+
+    /* If there is a position, convert the 3 of the 8.3 file mask */
+    /* otherwise, just terminate the string there. */
+    if (p_pos)
+        AlphaMaskSection(p_pos+1, buffer+9, 3) ;
+    else
+        buffer[8] = '\0' ;
+    buffer[MAX_TOKEN_MASK_LENGTH-1] = '\0' ;
+
+    DebugOut(buffer, 12) ;
+}
+
+/*-------------------------------------------------------------------------
+ |  Method:  INITokenListClass::MSG_INI_TOKEN_LIST_SORT_TOKENS
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Sorts all the tokens in the INITokenListClass' token list so that
+ |    all entries are organized alphabetically AND file 'SAMPLE.TXT' comes
+ |    before '*.TXT'
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/17/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method INITokenListClass, MSG_INI_TOKEN_LIST_SORT_TOKENS
+{
+    T_tokenList *p_list ;
+    T_tokenItem *p_top ;
+    T_tokenItem *p_compare ;
+    T_tokenItem *p_pos ;
+    word i ;
+    word pos ;
+    T_tokenItem swapItem ;
+
+    /* If no list, nothing to sort. */
+    if (pself->IG_uiState)   {
+        /* Lock in the token list */
+        p_list = MemLock(pself->IG_uiState) ;
+
+        /* Convert all the filename masks in the token */
+        /* list into 'alpha-masks' or names that can be sorted */
+        /* alphabetically. */
+        for (i=0; i<p_list->numTokens; i++)
+            ConvertToAlphaMask(
+                p_list->tokenArray[i].mask,
+                p_list->tokenArray[i].alphaMask) ;
+
+        /* Sort the list of tokens */
+        for (i=0; (i+1)<p_list->numTokens; i++)  {
+            /* Get a quick pointer for fast lookup */
+            p_top = p_list->tokenArray + i ;
+
+            /* Declare this position as the chosen one to compare */
+            p_compare = p_top ;
+
+            /* Determine where the item should be placed */
+            for (pos=i+1; pos<p_list->numTokens; pos++)  {
+                /* Get the quick pointer for this position */
+                p_pos = p_list->tokenArray + pos ;
+
+                /* If this position is alphabetically higher in the list */
+                /* then make this the 'best' position and continue */
+                /* comparing with it. */
+                if (strcmp(p_pos->alphaMask, p_compare->alphaMask) < 0)
+                    p_compare = p_pos ;
+            }
+
+            /* Swap the items (if not the same position) */
+            if (p_compare != p_top)  {
+                memcpy(&swapItem, p_compare, sizeof(T_tokenItem)) ;
+                memcpy(p_compare, p_top, sizeof(T_tokenItem)) ;
+                memcpy(p_top, &swapItem, sizeof(T_tokenItem)) ;
+            }
+        }
+
+        /* Now that the items are sorted, we can unlock the list */
+        MemUnlock(pself->IG_uiState) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ |  Method:  INITokenListClass::MSG_INI_TOKEN_LIST_FIND_MASK
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Search for a given mask in the list.
+ |
+ | Input:
+ |    char *p_mask                -- Mask to find
+ |
+ | Output:
+ |    word                        -- Position found, else 0xFFFF
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/17/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method INITokenListClass, MSG_INI_TOKEN_LIST_FIND_MASK
+{
+    word i ;
+    T_tokenList *p_list ;
+
+    /* Lock the block if we have one */
+    if (pself->IG_uiState)  {
+        p_list = (T_tokenList *)MemLock(pself->IG_uiState) ;
+
+        /* Do a linear search for a matching mask */
+        for (i=0; i<p_list->numTokens; i++)  {
+            if (strcmp(p_mask, p_list->tokenArray[i].mask) == 0)
+                break ;
+        }
+        if (i == p_list->numTokens)
+            i = 0xFFFF ;
+        MemUnlock(pself->IG_uiState) ;
+    }
+
+    return i ;
+}
+
+/*=========================================================================*
+ *  METHODS FOR CLASS:  DOSTokenTriggerClass
+ *=========================================================================*/
+
+
+    @classdecl DOSTokenTriggerClass ;
+
+
+/*-------------------------------------------------------------------------
+ | Method:  DOSTokenTriggerClass::MSG_DOS_TOKEN_TRIGGER_CONFIRM_TOKEN
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Makes sure a token has been received and updates accordingly.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/21/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method DOSTokenTriggerClass, MSG_DOS_TOKEN_TRIGGER_CONFIRM_TOKEN
+{
+    if (pself->GI_visMoniker == NullHandle)  {
+        @call oself::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+                  "Unknown token",
+                  VUM_MANUAL) ;
+
+DebugOut("** No icon\r\n", 12) ;
+    } else {
+DebugOut("** Got icon\r\n", 13) ;
+    }
+    @send oself::MSG_GEN_UPDATE_VISUAL(VUM_NOW) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  DOSTokenTriggerClass::MSG_DOS_TOKEN_TRIGGER_SET_TOKEN
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Declare what token is to be shown on this trigger.
+ |
+ | Inputs:
+ |    GeodeToken newToken         -- Token to use for this trigger
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/17/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method DOSTokenTriggerClass, MSG_DOS_TOKEN_TRIGGER_SET_TOKEN
+{
+    pself->DTTI_token = newToken ;
+    pself->DTTI_needReload = TRUE ;
+    @send oself::MSG_VIS_REDRAW_ENTIRE_OBJECT() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  DOSTokenTriggerClass::MSG_VIS_DRAW
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Declare what token is to be shown on this trigger.
+ |
+ | Inputs:
+ |    DrawFlags drawFlags         -- Condition to draw the flags (Ignored)
+ |    GStateHandle gstate         -- State to make draws to (Ignored)
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  09/17/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method DOSTokenTriggerClass, MSG_VIS_DRAW
+{
+    if (pself->DTTI_needReload)  {
+	GeodeToken t ;
+	t = pself->DTTI_token ;
+        pself->DTTI_needReload = FALSE ;
+/*
+        @call oself::MSG_GEN_REPLACE_VIS_MONIKER(
+                      VUM_MANUAL,
+                      0,
+                      0,
+                      0,
+                      VMDT_TOKEN,
+                      VMST_FPTR,
+                      (dword)&pself->DTTI_token) ;
+*/
+        @call oself::MSG_GEN_REPLACE_VIS_MONIKER(
+                      VUM_MANUAL,
+                      0,
+                      0,
+                      0,
+                      VMDT_TOKEN,
+                      VMST_FPTR,
+                      (dword)&t) ;
+        @send oself::MSG_DOS_TOKEN_TRIGGER_CONFIRM_TOKEN() ;
+        @send oself::MSG_VIS_REDRAW_ENTIRE_OBJECT() ;
+    }
+
+    @callsuper() ;
+}
+
+/*=========================================================================*
+ *  METHODS FOR CLASS:  ChangeExecFileSelectorClass
+ *=========================================================================*/
+
+
+    @classdecl ChangeExecFileSelectorClass ;
+
+
+
+/*-------------------------------------------------------------------------
+ | Method:  ChangeExecFileSelectorClass::
+ |          MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Returns the filter routine and information needed to do the file
+ |    selector filtering.
+ |
+ | Inputs:
+ |    GenFileSelectorGetFilterRoutineResults *filter -- Return structure.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/22/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method ChangeExecFileSelectorClass, MSG_GEN_FILE_SELECTOR_GET_FILTER_ROUTINE
+{
+    static GenFileSelectorFilterRoutine *const filterRoutine =
+    	&FilterFileSelectorFilterRoutine;
+
+    static FileExtAttrDesc filterFileSelectorFilterAttrs[] = {
+        { FEA_NAME, 0, sizeof(FileLongName), NULL },
+        { FEA_FILE_ATTR, 0, sizeof(FileAttrs), NULL },
+        { FEA_FILE_TYPE, 0, sizeof(GeosFileType), NULL },
+        { FEA_END_OF_LIST, 0, 0, NULL}
+    };
+
+    /* Fill up the filter routine with the CS corrected version */
+    filter->filterRoutine = filterRoutine;
+
+    /* And tell what information we want to look at */
+    filter->filterAttrs = filterFileSelectorFilterAttrs;
+}
+
+/*=========================================================================*
+ *  ROUTINES:
+ *=========================================================================*/
+
+
+/*-------------------------------------------------------------------------
+ | Routine: TokenParseString
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Parses a given string to extract a GeodeToken.  Returns in the
+ |    passed pointer what location it ended at.
+ |
+ | Inputs:
+ |    char **p_string             -- Pointer pointing to string and
+ |                                   will end up with the final location.
+ |    GeodeToken *p_geodeToken    -- Token to fill data.
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE if token found, else FALSE
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/21/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+#define SkipPointerToOrFail(p, c)  { \
+             while ((*(p) != (c)) && (*(p) != '\0')) \
+                  (p)++ ; \
+             } \
+             if (*(p) == '\0') \
+                  return FALSE ;
+
+Boolean ParseTokenString(char **p_string, GeodeToken *p_geodeToken)
+{
+    char *p_pos ;
+    word i ;
+    word value ;
+
+    /* Clear out the geode token */
+    *((dword *)p_geodeToken->GT_chars) = 0 ;
+
+    p_pos = *p_string ;
+
+    /* Find the first quote */
+    SkipPointerToOrFail(p_pos, '\"') ;
+
+    /* Skip the quote */
+    p_pos++ ;
+
+    /* Take the next four characters */
+    for (i=0; i<4; i++)
+        p_geodeToken->GT_chars[i] = *(p_pos++) ;
+
+    /* Now try to find a comma. */
+    SkipPointerToOrFail(p_pos, ',') ;
+
+    /* Skip the comma */
+    p_pos++ ;
+
+    value = 0 ;
+
+    /* Now get the value of the following number */
+    while ((*p_pos != ',') && (*p_pos != '\0'))  {
+        if ((*p_pos >= '0') && (*p_pos <= '9'))  {
+            value *= 10 ;
+            value += *p_pos - '0' ;
+        }
+        p_pos++ ;
+    }
+
+    /* Put the value in the geode */
+    p_geodeToken->GT_manufID = value ;
+
+    /* Note what location we got to */
+    *p_string = p_pos ;
+
+    /* Note that we successfully got a geode token */
+    return TRUE ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine: FilterFileSelectorFileRoutine
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Filters out files for either subdirs, GEOS executables, or
+ |    DOS executables.
+ |
+ | Inputs:
+ |    optr oself                  -- File seletor in question.  Ignored.
+ |    FileEnumCallbackData *fecd  -- Particular file data to analyze.
+ |    word frame                  -- Ignored.
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE to reject file, else FALSE.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/22/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+static Boolean _pascal FilterFileSelectorFilterRoutine(
+                           optr oself,
+				           FileEnumCallbackData *fecd,
+				           word frame)
+{
+    word i;
+    FileAttrs *p_attrs;
+    char *p_name ;
+    GeosFileType *p_fileType ;
+
+    /* Get pointers to the different data members */
+    p_attrs = FileEnumLocateAttr(fecd, FEA_FILE_ATTR, NULL) ;
+    p_name = FileEnumLocateAttr(fecd, FEA_NAME, NULL) ;
+    p_fileType = FileEnumLocateAttr(fecd, FEA_FILE_TYPE, NULL) ;
+
+    /* If its a subdirectory, keep it */
+    if (*p_attrs & FA_SUBDIR)
+        return FALSE ;
+
+    /* If its a GEOS executable, keep it */
+    if (*p_fileType == GFT_EXECUTABLE)
+        return FALSE ;
+
+    /* Find the . in the filename (if there is one) */
+    i = 0 ;
+    for (;; i++)  {
+        /* Reject the DOS name if it does not have a dot */
+        if (p_name[i] == '\0')
+            return TRUE ;
+
+        /* Stop on the dot */
+        if (p_name[i] == '.')
+            break ;
+    }
+
+    /* Return FALSE if its a DOS executable, else TRUE */
+	return(! (((p_name[i] == '.') &&
+		   (p_name[i+1] == 'E') &&
+		   (p_name[i+2] == 'X') &&
+		   (p_name[i+3] == 'E')) ||
+		  ((p_name[i] == '.') &&
+		   (p_name[i+1] == 'C') &&
+		   (p_name[i+2] == 'O') &&
+		   (p_name[i+3] == 'M')) ||
+		  ((p_name[i] == '.') &&
+		   (p_name[i+1] == 'B') &&
+		   (p_name[i+2] == 'A') &&
+		   (p_name[i+3] == 'T'))));
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  ResolveGEOSNames                      !! Recursive !!
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Searchs at the relative position under the world directory looking
+ |    at all GEOS executable names and finding matches in the list.
+ |
+ | Inputs:
+ |    char *p_path                -- Search at this relative path
+ |    T_tokenList *p_list         -- Current filename mask list.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/22/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+void ResolveGEOSNames(char *p_path, T_tokenList *p_list)
+{
+    FileEnumParams FF ;
+    static FileExtAttrDesc filterList[] = {
+        { FEA_NAME, 0, sizeof(FileLongName), NULL },
+        { FEA_TOKEN, (void *)sizeof(FileLongName), sizeof(GeodeToken), NULL },
+        { FEA_END_OF_LIST, 0, 0, NULL}
+    };
+    MemHandle fileBuffer ;
+    word numFilesNotHandled ;
+    word numFilesReturned ;
+    typedef struct {
+        FileLongName filename ;
+        GeodeToken token ;
+    } T_fileEnumEntry ;
+    T_fileEnumEntry *p_names ;
+    char subPath[200] ;
+    word len ;
+    word count ;
+    static int thisDepth = 0 ;
+
+    FilePushDir() ;
+    FileSetCurrentPath(SP_APPLICATION, p_path);
+
+    /* Set up the information to allow us to examine all the files */
+    /* of a directory using the Wildcard search mask */
+    FF.FEP_searchFlags = FESF_GEOS_EXECS ;
+    FF.FEP_returnAttrs = &(filterList[0]) ;
+    FF.FEP_returnSize = sizeof(FileLongName) + sizeof(GeodeToken);
+    FF.FEP_matchAttrs = NullHandle;
+    FF.FEP_bufSize = FE_BUFSIZE_UNLIMITED ;
+    FF.FEP_skipCount = 0 ;
+    FF.FEP_callback = NullHandle ;
+    FF.FEP_callbackAttrs = NullHandle ;
+    FF.FEP_headerSize = 0 ;
+
+    /* Search the current directory based on the above input
+       parameters. */
+    fileBuffer = NullHandle ;
+    FileEnum(&FF, &fileBuffer, &numFilesNotHandled) ;
+
+    /* If we have a block returned, figure out how many entries are
+       in that block.  If the block was not returned, then we must
+       have zero entries. */
+    if (fileBuffer != NullHandle)  {
+        numFilesReturned = (MemGetInfo(fileBuffer, MGIT_SIZE)/
+                              FF.FEP_returnSize) ;
+    } else {
+        numFilesReturned = 0 ;
+    }
+
+    if (numFilesReturned)  {
+        /* Process all the names */
+        p_names = MemLock(fileBuffer) ;
+        for (count = 0; count<numFilesReturned; count++)  {
+            ResolveGEOSFilename(p_names->filename, &p_names->token, p_list) ;
+            p_names++ ;
+        }
+        MemUnlock(fileBuffer) ;
+    }
+
+    /* Destroy the list */
+    if (fileBuffer)  {
+        MemFree(fileBuffer) ;
+        fileBuffer = NullHandle ;
+    }
+
+    /* Now lets check out all the sub-directories */
+    FF.FEP_searchFlags = FESF_DIRS ;
+    FileEnum(&FF, &fileBuffer, &numFilesNotHandled) ;
+
+    /* If we have a block returned, figure out how many entries are
+       in that block.  If the block was not returned, then we must
+       have zero entries. */
+    if (fileBuffer != NullHandle)  {
+        numFilesReturned = (MemGetInfo(fileBuffer, MGIT_SIZE)/
+                              FF.FEP_returnSize) ;
+    } else {
+        numFilesReturned = 0 ;
+    }
+
+    if (numFilesReturned)  {
+        /* Process all the sub-directories in a recursive method. */
+        for (count=0; count<numFilesReturned; count++)  {
+            /* Create the sub-dir name */
+            strcpy(subPath, p_path) ;
+            len = strlen(subPath)-1 ;
+            if (subPath[len] != '\\')
+                strcat(subPath, "\\") ;
+            p_names = MemLock(fileBuffer) ;
+            strcat(subPath, p_names[count].filename) ;
+            MemUnlock(fileBuffer) ;
+
+            /* Recursively go through this sub-dir */
+            if (thisDepth < 3)  {
+                thisDepth++ ;
+                ResolveGEOSNames(subPath, p_list) ;
+                thisDepth-- ;
+            }
+        }
+    }
+
+    /* Destroy the list */
+    if (fileBuffer)  {
+        MemFree(fileBuffer) ;
+        fileBuffer = NullHandle ;
+    }
+
+    FilePopDir() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  ResolveGEOSFilename
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Replaces all token masks with the same geode token with the
+ |    given GEOS filename.
+ |
+ | Inputs:
+ |    FileNameLong name           -- Name to replace in list.
+ |    GeodeToken *token           -- Token to compare and search.
+ |    T_tokenList *p_list         -- List of tokens to search.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  08/22/97  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+void ResolveGEOSFilename(
+         FileLongName name,
+         GeodeToken *token,
+         T_tokenList *p_list)
+{
+    word i ;
+    T_tokenItem *p_item ;
+    char *p_string ;
+
+    /* Go through the list of token filename masks and see if there */
+    /* is a match */
+    p_item = p_list->tokenArray ;
+    for (i=0; i<p_list->numTokens; i++, p_item++)  {
+        /* Is this a matching GEOS token? */
+        if (memcmp(&p_item->geosExec, token, sizeof(*token)) == 0)  {
+            /* Yes, we have a match */
+            /* We need to change the string */
+            MemLock(p_list->stringsBlock) ;
+
+            /* Free the old string */
+            if (p_item->executable)
+                LMemFreeHandles(p_list->stringsBlock, p_item->executable) ;
+
+            /* Allocate and copy in the new one */
+            p_item->executable =
+                LMemAlloc(p_list->stringsBlock, 1+strlen(name)) ;
+
+            if (p_item->executable)  {
+                /* Copy in the string */
+                p_string = LMemDerefHandles(
+                               p_list->stringsBlock,
+                               p_item->executable) ;
+                strcpy(p_string, name) ;
+            }
+
+            MemUnlock(p_list->stringsBlock) ;
+        }
+    }
+}
+
+/***************************************************************************
+ *  END OF FILE:  TOKENLST.GOC
+ ***************************************************************************/
+

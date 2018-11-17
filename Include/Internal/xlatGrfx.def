@@ -1,0 +1,242 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC/GEOS
+MODULE:		Graphics Translation Library
+FILE:		xlatGrfx.def
+
+AUTHOR:		Jim DeFrisco, 12 february 1991
+
+REVISION HISTORY:
+
+		Name	Date	Description
+		----	----	-----------
+		Jim	02/91	Initial version
+		Jenny	11/91	Moved some entry points to xlatLib.def
+
+DESCRIPTION:
+	This file should be included by any geode that makes use of the 
+	services of the graphics translation libraries
+		
+	$Id: xlatGrfx.def,v 1.1 97/04/04 14:16:09 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+SetDef	__TRANSGRAPHICS
+
+UseLib	Internal/xlatLib.def
+
+
+;------------------------------------------------------------------------------
+;      	Positions for routines in a Graphics Translation Library
+;------------------------------------------------------------------------------
+
+; 	The TransRoutine correspond to the library routines described
+; 	immediately below this enumeration. To find out what is passed
+;	and returned for each TransRoutine, see its matching library
+;	routine description.
+
+;       Each constant specifies the offset in the exported library entry
+;       table for the translation library.  The library definition for the 
+;	translation libraries must start with the corresponding routines.
+
+
+TR_EXPORT_RAW		enum	TransRoutine
+TR_EXPORT_HEADER	enum	TransRoutine
+TR_EXPORT_TRAILER	enum	TransRoutine
+TR_EXPORT_BEGIN_PAGE	enum	TransRoutine
+TR_EXPORT_END_PAGE	enum	TransRoutine
+TR_NORMALIZE_FILENAME	enum	TransRoutine
+
+;----------------------------------------------------------------------------
+;               Graphics Translation Library Routines
+;----------------------------------------------------------------------------
+
+global	TransExportRaw:far
+;
+;       pass:           dx	- handle of block holding ExportOptionsStruct
+;				  (or 0 if no options required)
+;			ds:si	- pointer to buffer containing data
+;			cx	- #bytes to write
+;			di	- file handle of target export file 
+;
+;       return:   	ax	- TransError error code
+;				  (either TE_NO_ERROR or, if there was
+;				  an error from FileWrite, TE_EXPORT_ERROR)
+;			cx	- # of bytes written
+;
+;       This call performs part of the export function.  This is intended to
+;	be used by a piece of code that understands the same format that is
+;	being written.  It will probably be used infrequently, and almost 
+;	certainly not as part of the common import/export library.  It was
+;	created to handle some requirements of the PostScript printer driver.
+;
+
+global	TransExportHeader:far
+;
+;       pass:           dx	- handle of block holding ExportOptionsStruct
+;				  (or 0 if no options required)
+;			di	- file handle of target export file 
+;       return: 	ax	- error code, type TransError
+;
+;       This call performs part of the export function.  It writes out any
+;	header information needed in the destination file.
+;
+
+global	TransExportTrailer:far
+;
+;       pass:           dx	- handle of block holding ExportOptionsStruct
+;				  (or 0 if no options required)
+;			di	- file handle of target export file 
+;
+;       return: 	ax	- error code, type TransError
+;
+;       This call performs part of the export function.  It writes out any
+;	trailing information needed in the destination file.
+;
+
+global	TransExportBeginPage:far
+;
+;       pass:           dx	- handle of block holding ExportOptionsStruct
+;				  (or 0 if no options required)
+;			di	- file handle of target export file 
+;
+;       return:   	ax	- TransError error code
+;				  TE_NO_MULTIPLE_PAGE_DOCS if format
+;				  does not support multiple pages
+;
+;       This call performs part of the export function.  It should be used
+;	along with TransExportEndPage to bracket each page of the document
+;	if the document contains multiple pages.  It is not necessary
+;	for single page documents.  Some graphics formats will not support
+;	mutliple page documents.  In that case, an error will be returned
+;	by this routine and the calling program should make arrangements 
+;	for the pages to be written to separate files.  
+;
+
+global	TransExportEndPage:far
+;
+;       pass:           dx	- handle of block holding ExportOptionsStruct
+;				  (or 0 if no options required)
+;			di	- file handle of target export file 
+;
+;       return:  	ax	- error code, type TransError
+;
+;       This call performs part of the export function.  It should be used
+;	along with TransExportBeginPage to bracket each page of the document
+;	if the document contains multiple pages.  It is not necessary
+;	for single page documents.  Some graphics formats will not support
+;	mutliple page documents.  In that case, an error will be returned
+;	by the TransExportBeginPage routine and the calling program should 
+;	make arrangements for the pages to be written to separate files.  
+;
+
+global	TransNormalizeFilename:far
+;
+;       pass:           dx	- handle of block holding ExportOptionsStruct
+;				  (or 0 if no options required)
+;       return:   	ax	- error code, type TransError
+;
+;       The purpose of this call is to ensure that the filename to be used 
+;	for output conforms to the standard file naming conventions for this
+;	type of graphics file.  This call performs part of the export 
+;	function.  It should be called after TransGetExportOptions is 
+;	called, and after all the options are setup in the options block.  
+;	When this call return, the filename in the options block will be
+;	changed (if necessary) to conform to file naming conventions.
+;
+
+;----------------------------------------------------------------------------
+;               Structures and Constants
+;----------------------------------------------------------------------------
+
+
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+;
+;		IMPORT AND EXPORT OPTIONS BLOCK
+;
+;	These data structures are one of the central pieces of data that
+;	are passed to the translation routines.  Their structure is fairly
+;	simple, as described below:
+;
+;	* The first part of the block contains options that are common
+;	  to all translation libraries of a given category.  These elements
+;	  are defined in the appropriate xlat<Category>.def (for example,
+;	  xlatGrfx.def for the graphics category) file
+;
+;	* The second part of the block contains options that are particular
+;	  to the specific data file type being translated.  This structure
+;	  is defined in the appropriate xlat<FileType>.def (for example,
+;	  xlatPS.def for the PostScript library) file.
+;
+;	* The final part of the block contains state variables used internally
+;	  by the translation library.  These are typically defined internal
+;	  to the library and are not defined for use outside the translation
+;	  library.  Changing these values will probably de-rail the 
+;	  translation process.
+;
+;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+;	Import Flags
+;	This bit field is used to specify a number of options...
+
+GImportFlags	record	
+    GIF_UNUSED:16			; options to be specified later
+GImportFlags	end
+
+;	Import Options
+;	This structure holds the common import options required of all 
+;	graphics translation libraries.  For individual translation 
+;	libraries that require additional options, those additions are
+;	appended to the end of this structure (this is always the first
+;	element of any larger structure)
+
+GImportOpts	struct
+    GIO_flags	GImportFlags		; bit field of import options
+GImportOpts	ends
+
+
+
+
+
+;	Export Flags
+;	This bit field is used to specify a number of options...
+;	When defining a new option, make the default state=0 so that it
+;	is easy to initialize....
+
+GExportFlags	record	
+    GEF_NO_COMMENTS:1,			; don't write out comments
+    GEF_NO_HEADER:1,			; don't write out header
+    GEF_NO_TRAILER:1,			; don't write out trailer
+    GEF_COLLATE:1,			; collate copies if #copies > 1
+    GEF_PAGES_DESCENDING:1,		; pages in descending order if #pages >1
+    GEF_UNUSED:11			; options to be specified later
+GExportFlags	end
+
+
+;	Export Options
+;	This structure holds the common export options required of all 
+;	graphics translation libraries.  For individual translation 
+;	libraries that require additional options, those additions are
+;	appended to the end of this structure (this is always the first
+;	element of any larger structure)
+
+GExportOpts	struct
+    GEO_flags	GExportFlags		; bit field of export options
+    GEO_drawFlags GSControl		; flags to pass to GrDrawGString
+    GEO_pages	word			; # pages to output (0 if unknown)
+    GEO_copies	word			; #copies
+    GEO_appName	char FILE_LONGNAME_LENGTH+1 dup (?) ; name of application
+    GEO_docName	char FILE_LONGNAME_LENGTH+1 dup (?) ; name of document
+
+    GEO_fileName char PATH_BUFFER_SIZE dup (?) ; name/path of file
+					; this file name can be either absolute
+					;  or relative to the DOCUMENT directory
+    GEO_docH	word			; document height 
+    GEO_docW	word			; document width
+    GEO_hFile	hptr			; file handle for above fileName
+GExportOpts	ends
+

@@ -1,0 +1,215 @@
+******************************************************************************
+$Id: overview,v 1.1.27.1 97/03/29 04:49:27 canavese Exp $
+******************************************************************************
+			       Overview
+******************************************************************************
+This document contains a rough overview of the chart library.
+
+The chart library is intended to take an application independent block of
+data and to produce a visual representation of a chart for that data.
+
+The data structures for a chart break down into two large pieces. The
+first is the chart object block. This is an object-lmem block that
+contains many different chart related objects.  The second block is
+the chart parameter block. This block contains the data to chart along
+with series and category titles.
+
+Both of these blocks are vm blocks and so must be associated with a VM
+file. This means that to use the chart library you must have a VM file,
+even if it contains nothing but the chart object block and the chart
+parameter block.
+
+
+******************************************************************************
+			      Interface
+******************************************************************************
+The interface between the application and the chart library is a simple one.
+
+There are only a few routines:
+    ChartCreateChart()
+	Takes a set of parameters and returns the VM block which
+	contains the chart object block.
+
+    ChartUpdateChart()
+	Takes the VM block which contains the chart object block
+	and a new set of parameters and updates the chart
+	appropriately.
+
+    ChartDeleteChart()
+	Takes the VM block which contains the chart object block
+	and nukes the chart and any associated data-structures.
+
+The application is responsible for saving the chart object blocks VM handle.
+
+The other interactions with the chart library come via interactions with
+the graphic objects. These interactions are controlled by the chart library
+and so are not necessarily of interest to the application.
+
+We may decide at a later date to allow direct manipulation of the chart
+object attributes from the application. I'm sure we can determine a
+reasonable interface for doing this.
+
+
+******************************************************************************
+			    Chart Objects
+******************************************************************************
+A chart is a collection of logical units called chart objects. When
+these objects appear on the screen they do so as graphic objects. This
+is similar to the generic UI being "realized" as visual objects.
+
+The logical units that a chart is broken down into are:
+	Main Chart
+		This object contains all the other objects other than
+		the legend. Think of it as a large composite object.
+		It directly controls (contains):
+			Chart Title, Plot Group
+	Chart Title
+		This is the title of the chart and is positioned at
+		the top of the chart.
+	Plot Group
+		This is another composite object which contains:
+			Axis Titles, Plot Area
+	Axis Titles
+		These are titles which are associated with a given
+		value or category axis. Their position and orientation
+		will depend on the chart type and variation.
+	Plot Area
+		This is another composite which contains:
+			Axes (Value and Category), Series Area
+	Axes
+		These are the value and category axes.
+	Series Area
+		This is a composite which contains one Series Data 
+		object for each plotted series.
+	Series Data
+		This is a single object which contains the series
+		number and is responsible for realizing that series
+		as a group of graphic objects.
+
+
+*****************************************************************************
+			       Creation
+*****************************************************************************
+When a chart is created the chart library is passed a parameter block,
+a VM file handle, a position, and a size. It creates the a chart and
+displays it using the Graphic Object library to realize the chart.
+
+The initial chart type is usually a standard column chart with each
+row representing a series and each column representing a category. The
+exception to this rule is if the range is unusually small or if the
+range contains no titles in the left-most column or top row. In that
+case the chart library brings up a modal dialog box which asks the
+user what sort of chart to create.
+
+
+******************************************************************************
+				Update
+******************************************************************************
+When data changes in the spreadsheet the chart needs to be updated.
+The way this works is that for each chart in a spreadsheet there is a
+cell which contains the formula "=<range>" where <range> is the range
+of the spreadsheet which is being charted.
+
+This chart cell is on the dependency list of every cell in the range
+it refers to. When a cell in that range gets changed the spreadsheet
+recreates the chart parameter block and passes it off to the chart
+library.
+
+The chart library compares the new chart parameters to the old chart
+parameters and decides what chart objects need updating and how to go
+about doing the update.
+
+
+******************************************************************************
+			  Attribute Changes
+******************************************************************************
+There are many different attributes that apply to the various chart
+objects. These include display-type attributes like color, pattern,
+text-font/style. These attributes apply to certain chart objects.
+
+There are also chart specific attributes. These include things like:
+	- Chart type and variation
+	- Interpretation of data
+		(eg: rows are series, columns are series)
+	- Interpretation of first row/column
+		(eg: first row is/is-not titles)
+
+
+******************************************************************************
+			 Direct Manipulation
+******************************************************************************
+The chart library realizes a chart as a collection of graphic objects.
+In some cases a single chart object can be a group of graphic objects.
+A good example of this would be a single series for a column chart.
+This single series would consist of one rectangle for each category
+all grouped together into a single series.
+
+There are a few objects which can be directly manipulated by the user.
+
+Main Chart:
+	The main chart can be moved or resized. Moving the chart
+	causes the position of the chart and all related objects to
+	change. Resizing causes the chart to be unrealized (all
+	graphic objects get destroyed) and the re-realized in
+	its new size.
+
+Legend:
+	The legend can be moved by the user but not resized. Changes 
+	here affect the legend only.
+
+Axes:
+	The axes can be moved by the user. The move in a constrained
+	manner either horizontally or vertically. The limits of their
+	movement are the bounds of the plottable area on their related
+	axis.
+	
+	Changing the position of an axis doesn't really move the axis
+	to the final position that the user drops it. Instead where
+	the user drops the axis determines at what value it intersects
+	its related axis.
+
+	The act of moving an axis can change the geometry of the Plot
+	Area and as a result the axis may not end up in the exact
+	position where the user drops it. It will end up crossing the
+	related axis at the position where the user dropped it. That
+	position may have moved though...
+
+
+******************************************************************************
+				Files
+******************************************************************************
+There are several files in this directory and some of them will
+contain duplicate information. The files that currently exist are:
+	axes
+		Discussion of the implementation issues associated
+		with value and category axes.
+
+	manipulation
+		Lots of information about how the user will manipulate
+		chart objects and the complexities involved.
+	
+	mechanisms
+		Documentation of the mechanisms which are the basis
+		of the operation of the chart library.
+
+	organization
+		A description of how the directories for the chart
+		library are laid out.
+
+	overview
+		That's this file.
+		
+	parameters
+		A detailed description of the parameter block that the
+		application must supply to the chart library for
+		creating and updating charts.
+
+	stuffNotDone
+		A long (oh well :-) list of the things that aren't
+		done yet. Includes short descriptions of possible
+		approaches to some of these items.
+
+	tools
+		A description of the tcl tools available to help out
+		in debugging both the chart library and interactions
+		between the application and the chart library.

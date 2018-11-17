@@ -1,0 +1,280 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+FILE:		fileEnum.def
+
+DECLARER:	Kernel
+
+DESCRIPTION:
+	This file defines structures and routine for FileEnum.
+
+	$Id: fileEnum.def,v 1.1 97/04/04 14:24:12 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__FILE_ENUM
+
+include	file.def
+
+StartKernel
+
+global FileEnum:far
+global FileEnumPtr:far
+global FileEnumLocateAttr:far
+global FileEnumWildcard:far
+
+global FILEENUM:far
+global FILEENUMLOCATEATTR:far
+global FILEENUMWILDCARD:far
+
+;--------------------------------------------------------------------------
+;			Parameter block passed to FileEnum
+;--------------------------------------------------------------------------
+
+FileEnumSearchFlags	record
+    FESF_DIRS:1			; accept directories
+    FESF_NON_GEOS:1		; accept non-GEOS files
+    FESF_GEOS_EXECS:1		; accept GEOS executables
+    FESF_GEOS_NON_EXECS:1	; accept GEOS non-executables (datafiles)
+    FESF_REAL_SKIP:1		; use FEP_skipCount is real skip count
+				;	(see FileEnum for explanation)
+    FESF_CALLBACK:1		; use FEP_callback field
+    FESF_LOCK_CB_DATA:1		; for use in FileEnumPtr only; if set,
+				;  FEP_cbData1 and FEP_cbData2 are assumed
+				;  to be far pointers to movable or fixed
+				;  memory that must be locked before
+				;  FileEnum is called.
+    FESF_LEAVE_HEADER:1		; if set, then FEP_headerSize indicates
+				;  number of bytes at the beginning of the
+				;  return block that should be left 0 by
+				;  FileEnum, to form a header to be filled
+				;  in by the caller.
+FileEnumSearchFlags	end
+	
+FILE_ENUM_ALL_FILE_TYPES = mask FESF_NON_GEOS or \
+			mask FESF_GEOS_EXECS or mask FESF_GEOS_NON_EXECS
+
+FILE_ENUM_ALL_FILE_DIR_TYPES = FILE_ENUM_ALL_FILE_TYPES or mask FESF_DIRS
+
+;
+; see FileEnum routine for explanation of these parameters
+;
+FileEnumParams	struct
+    FEP_searchFlags		FileEnumSearchFlags	0
+    ;
+    ; Flags to control the search.
+    ; 
+
+    FEP_returnAttrs		fptr.FileExtAttrDesc	0
+    ;
+    ; Array of attributes that are to be returned. The entries in the returned
+    ; buffer can be of an arbitrary size, which size is controlled by the
+    ; FEP_returnSize parameter. Each extended attribute returned for a
+    ; file that matches is copied into the entry at an offset given by the
+    ; FEAD_value.offset for the attribute. At most FEAD_size bytes are
+    ; copied.
+    ;
+    ; If the segment is 0, the offset is of type FileEnumStandardReturnType,
+    ; specifying the attributes to be returned for a standard structure, as
+    ; defined later in this file. FEP_returnSize should still be either the
+    ; size of the appropriate structure, or larger if that structure has
+    ; been incorporated into a larger one of your own. The standard return
+    ; type FESRT_COUNT_ONLY exists so you receive no information about
+    ; the files that match, just their number (in dx, as the number that
+    ; wouldn't fit in the buffer). One of FEP_bufSize or FEP_returnSize should
+    ; be 0 in this case.
+    ;
+    ; The last entry in the array has FEA_END_OF_LIST as its FEAD_attr.
+    ;
+
+    FEP_returnSize		word	0
+    ;
+    ; Size of each entry in the returned buffer.
+    ;
+    
+    FEP_matchAttrs		fptr.FileExtAttrDesc	0
+    ;
+    ; Array of attributes that are to be matched by FileEnum itself. For
+    ; attributes that are records (and hence a word or smaller),
+    ; FEAD_value.offset holds the bits that must be set in the attribute,
+    ; while FEAD_value.segment holds the bits that must *not* be set in the
+    ; attribute's actual value. For all other attributes, FEAD_value is a
+    ; pointer to the exact value to match. FEAD_size gives the size of that
+    ; value.
+    ;
+    ; The last entry in the array has FEA_END_OF_LIST as its FEAD_attr.
+    ;
+    ; If all the checks are to be performed by the callback, or if all
+    ; files are desired, regardless their attributes, FEP_matchAttrs.segment
+    ; may be passed as 0. FEP_matchAttrs.offset may be anything in this case.
+    ; 
+
+    FEP_bufSize			word	FE_BUFSIZE_UNLIMITED
+    ;
+    ; NUMBER of structures that FEP_buffer can hold.  This is used
+    ; as the maximum number of files to find.  The actual size
+    ; of the buffer (in bytes) is determined by this and the
+    ; FEP_returnType.  If set to 0, the dx returned is a count
+    ; of the matching files in the directory.
+    ;
+FE_BUFSIZE_UNLIMITED		equ	-1	; Value to pass in FEP_bufSize
+						;  to place no limit on the
+						;  number of files for which
+						;  to return data.
+
+    FEP_skipCount		word	0
+    ;
+    ; number of matches to skip before storing in FEP_buffer.
+    ; This can be used to make several passes through the files in a directory.
+    ; Each pass will process the next X number of files in the directory:
+    ;	FileEnum(skipCount=0, FEP_bufSize=20)
+    ;	process(FEP_buffer)
+    ;	FileEnum(skipCount=20, FEP_bufSize=20)
+    ;	process(FEP_buffer)
+    ;	FileEnum(skipCount=40, FEP_bufSize=20)
+    ;	process(FEP_buffer)
+    ;	FileEnum(skipCount=60, FEP_bufSize=20)
+    ;	process(FEP_buffer)
+    ; This means that a buffer that only holds 20 files may be used as opposed
+    ; to a buffer of unknown size which would otherwise be needed to hold
+    ; return structures for all files in the directory.
+    ;
+    ; Skip count optimization - if the FESF_REAL_SKIP bit is set, then this is
+    ; the actual number of files to skip, matching or not.  If FESF_REAL_SKIP
+    ; is clear, FEP_skipCount is the number of MATCHING files to skip.  The
+    ; real skip count is faster because the match condition does not need to
+    ; be checked.
+    ; 
+    ; with FESF_REAL_SKIP set:
+    ;
+    ; When FileEnum returns after filling in FEP_bufSize number of matching
+    ; entries, di will be updated to the real number of files passed through
+    ; in order to get those FEP_bufSize files.
+    ;
+    ; Starting with di at 0, FileEnum will increment di once for each file
+    ; checked.  When FileEnum returns, save di for the next time FileEnum is
+    ; called.
+    ;
+
+    FEP_callback		fptr.far	0
+    ;
+    ; Callback routine to determine if the file should be accepted by FileEnum.
+    ;
+    ; THE CALLBACK IS DONE AFTER ALL THE REGULARLY SPECIFIED TESTS HAVE
+    ; ACCEPTED THE FILE.  SO THIS CALLBACK IS A LAST STEP CHECK TO ACCEPTANCE
+    ; OF THE FILE.
+    ;
+    ; Passed to callback routine:
+    ; 	ds	= segment of FileEnumCallbackData
+    ; 	bp	= inherited stack frame, which must be passed to any
+    ;		  FileEnum helper routines the callback calls.
+    ;
+    ; The callback routine can look at the FileEnumStructure passed by using:
+    ;	FooCallback	proc	far	params:FileEnumParams
+    ;		.enter inherit far
+    ;
+    ; Should be returned by callback routine:
+    ;	- carry clear to accept file
+    ;	- carry set to reject file
+    ;
+    ; Callback routine should destroy no registers and should not change
+    ; passed structures.
+    ;
+    ; Only relevant if mask FESF_CALLBACK is set.
+    ;
+    ; If FESF_CALLBACK is set and FEP_callback.segment is 0, FEP_callback.offset
+    ; is a FileEnumStandardCallback to use. FEP_callbackAttrs is ignored in
+    ; this case, as the system knows what extra attributes are required by
+    ; each standard callback. See the description of each FESC_* constant
+    ; to find what should be passed in FEP_cbData1 and FEP_cbData2
+    ;
+
+    FEP_callbackAttrs		fptr.FileExtAttrDesc
+    ;
+    ; If segment is non-zero, and FESF_CALLBACK is set in FEP_searchFlags,
+    ; this specifies an array of attributes the callback routine will need
+    ; to examine. FileEnum will always pass the callback all attributes
+    ; given in either the FEP_returnAttrs or FEP_matchAttrs array. This
+    ; array is for attributes for which you can't give an exact value (thus
+    ; they can't be in FEP_matchAttrs) and of which you don't actually need
+    ; to make a record (thus they can't be in FEP_returnAttrs).
+    ;
+    ; The last entry in the array has FEA_END_OF_LIST as its FEAD_attr.
+    ;
+    ; If no additional attributes are required when FESF_CALLBACK is set,
+    ; FEP_callbackAttrs.segment must be zero.
+    ; 
+
+    FEP_cbData1		dword	0
+    FEP_cbData2		dword	0
+    ;
+    ; This allows the caller of FileEnum to pass data to the callback
+    ; routine.
+    ;
+    
+    FEP_headerSize	word	0
+    ;
+    ; Amount of space to leave at the start of the return block if
+    ; FESF_LEAVE_HEADER set.
+    ; 
+    even
+FileEnumParams	ends
+
+FileEnumCallbackData	struct
+    FECD_attrs		label	FileExtAttrDesc
+    ;
+    ; Array of extended-attribute descriptors for the current file. The end of
+    ; the array is signaled by a FileExtAttrDesc with FEA_END_OF_LIST in its
+    ; FEAD_attr field. All the attribute values lie in the same segment as
+    ; the FileEnumCallbackData, so their FEAD_value.segment will be DS unless
+    ; the file doesn't have that particular attribute, in which case
+    ; FEAD_value.segment will be 0.
+    ; 
+FileEnumCallbackData	ends
+
+;--------------------------------------------------------------------------
+;			Standard Structures returned by FileEnum
+;--------------------------------------------------------------------------
+
+FileEnumStandardReturnType	etype	word, 0
+    FESRT_COUNT_ONLY		enum	FileEnumStandardReturnType
+    FESRT_DOS_INFO		enum	FileEnumStandardReturnType
+    FESRT_NAME			enum	FileEnumStandardReturnType
+    FESRT_NAME_AND_ATTR		enum	FileEnumStandardReturnType
+
+FEDosInfo	struct
+	FEDI_attributes	FileAttrs	; file's attributes
+	FEDI_modified	FileDateAndTime	; file's modification timestamp
+	FEDI_fileSize	dword		; file's size in bytes
+					; file's name and extension in the form
+					; of a null terminated string
+	FEDI_name	FileLongName
+	FEDI_pathInfo	DirPathInfo
+FEDosInfo	ends
+
+FENameAndAttr		struct
+    FENAA_attr		FileAttrs
+    FENAA_name		FileLongName
+FENameAndAttr		ends
+
+;------------------------------------------------------------------------------
+;		Standard Callbacks Provided by FileEnum
+;------------------------------------------------------------------------------
+FileEnumStandardCallback	etype	word, 0
+    FESC_WILDCARD		enum	FileEnumStandardCallback
+    ;	FEP_cbData1 is a far pointer to a null-terminated string containing
+    ;	a virtual filename, with the special characters * and ? interpreted
+    ;	as meaning 0-or-more-of-any-charaater and any-character, respectively.
+    ;
+    ;	Note that the match occurs in the virtual namespace, so "*.*" will not
+    ;	match all files, as it will in standard DOS, but rather all files that
+    ;	have a . in their virtual name.
+    ;
+    ;	FEP_cbData2.low should be non-zero to perform the match in a case-
+    ;	insensitive fashion, or zero to be case-sensitive.
+    ;
+    
+
+EndKernel

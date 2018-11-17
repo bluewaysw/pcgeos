@@ -1,0 +1,209 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	DOVE
+MODULE:		Ark
+FILE:		ark.def
+
+AUTHOR:		Greg Grisco, Oct 18, 1996
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	grisco	10/18/96   	Initial revision
+
+
+DESCRIPTION:
+	Definition for Ark library
+		
+	$Id: ark.def,v 1.1 97/04/04 14:27:07 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__ARK
+
+StartLibrary	ark
+
+include	Internal/nec.def
+
+;-----------------------------------------------------------------------------
+;		Types
+;-----------------------------------------------------------------------------
+SecretMode	etype	byte
+
+	SM_OFF		enum	SecretMode
+	SM_ON		enum	SecretMode
+
+
+FloatingKeyboardType	record
+	FKT_DEFAULT:1		; default keyboard, the previously used
+				;	keyboard
+	FKT_TYPEWRITER:1	; alphanumeric keyboard
+	FKT_HANDWRITE:1		; handwriting keyboard
+	FKT_HIRAGANA:1		; syllabary keyboard
+	FKT_NUMBER:1		; numeric keyboard
+	FKT_JIS:1		; JIS keyboard
+	FKT_FIXED_STRING:1	; fixed words keyboard
+	FKT_SYMBOL:1		; symbol keyboard
+	FKT_SET_BUTTON:1	; used to disallow keyboard switching
+	:7
+FloatingKeyboardType	end
+
+FloatingKeyboardEntryMode	record
+	FKEM_DEFAULT:1		; default entry, previous entry mode
+	FKEM_1BYTE:1		; 1 byte character entry
+	FKEM_2BYTE:1		; 2 byte character entry
+	FKEM_ALPHABET:1		; alphabet entry
+	FKEM_HIRAGANA:1		; Hiragana entry
+	FKEM_KATAKANA:1		; Katakana entry
+	FKEM_CAPITAL_CHAR:1	; uppercase entry
+	FKEM_SMALL_CHAR:1	; lowercase entry
+	:8
+FloatingKeyboardEntryMode	end
+
+FloatingKbdFlags	record
+	FKF_ON:1		; set if floating keyboard is on
+	FKF_NEEDS_SPACE:1	; set if floating keyboard requires space
+FloatingKbdFlags	end
+
+;-----------------------------------------------------------------------------
+;		Classes
+;-----------------------------------------------------------------------------
+
+FloatingKbdAppClass	class	GenApplicationClass
+
+MSG_FLOATING_KBD_APP_SET_TYPE				message
+;
+; Set keyboard type.  There is no default handling for this.  A subclass
+; must intercept this and switch to the appropriate keyboard type and entry
+; mode.
+;
+; Pass:		cx = keyboard type
+;		dx = disallow keyboard type
+;		bp = keyboard entry mode
+; Return:	nothing
+;
+
+MSG_FLOATING_KBD_APP_OPEN				message
+;
+; Open floating keyboard.  The default handling of this sets the layer and
+; priority of the floating keyboard app so it appears with the working
+; (focus) application.
+;
+; Pass:		cx = layer ID for floating keyboard
+; Return:	nothing
+;
+
+MSG_FLOATING_KBD_APP_CLOSE				message
+;
+; Close floating keyboard.  The default handling of this just closes
+; the floating keyboard.
+;
+; Pass:		nothing
+; Return:	nothing
+;
+
+MSG_FLOATING_KBD_APP_SET_WIN_PRIORITY			message
+;
+; Pass:		cx = window priority for floating keyboard
+;
+
+FloatingKbdAppClass	endc
+
+FloatingKbdSpaceClass	class	GenInteractionClass
+FloatingKbdSpaceClass	endc
+
+FloatingKbdWindowClass	class	GenInteractionClass
+
+MSG_FLOATING_KBD_WINDOW_SET_LAYER			message
+;
+; Sent internally to move floating keyboard window to appropriate layer.
+;
+; Pass:		cx = layer ID for floating keyboard
+; Return:	nothing
+;
+
+MSG_FLOATING_KBD_WINDOW_SET_PRIORITY			message
+;
+; Pass:		cx = window priority for floating keyboard
+;
+
+FloatingKbdWindowClass	endc
+
+SecretModeToggleButtonClass	class	GenTriggerClass
+
+protominor	MoreSecretModeSupport
+
+MSG_SECRET_MODE_TOGGLE_BUTTON				message
+;
+; Set correct appearance for secret mode toggle button based on current
+; secret mode.
+;
+; Pass:		cl = SecretMode
+; Return:	nothing
+;
+;
+
+protoreset
+
+SecretModeToggleButtonClass	endc
+
+;-----------------------------------------------------------------------------
+;		Library routines
+;-----------------------------------------------------------------------------
+
+global	SecretModeSetState:far
+global	SECRETMODESETSTATE:far
+;	Desc:	Sets the current state of Secret Mode (on/off) and
+;		sends notification of state change.
+;	Pass:	cl	= SecretMode
+; 	Return:	nothing
+;
+
+global	SecretModeGetState:far
+global	SECRETMODEGETSTATE:far
+;	Desc:	Gets the current state of Secret Mode.
+;	Pass:	nothing
+; 	Return:	cl	= SecretMode
+;
+
+global	SecretModeGetFileSecret:far
+global	SECRETMODEGETFILESECRET:far
+;	Desc:	Get secret mode of passed file.
+;	Pass:	bx = file handle
+;	Return:	ax = SecretMode
+;
+
+global	SecretModeSetFileSecret:far
+global	SECRETMODESETFILESECRET:far
+;	Desc:	Set secret mode of passed file.
+;	Pass:	bx = file handle
+;		ax = SecretMode
+;	Return:	carry set if error
+
+global	FloatingKbdSetState:far
+global	FLOATINGKBDSETSTATE:far
+;	Desc:	Sets the state of the floating keyboard.  FKF_ON set will
+;		bring up the keyboard.  FKF_ON clear will take down the
+;		keyboard.  FKF_NEEDS_SPACE set will notify the
+;		FloatingKbdSpace object.
+;	Pass:	ax = FloatingKbdFlags
+;		cx = layer ID for floating keyboard
+;	Return:	nothing
+;
+
+global	FloatingKbdSetType:far
+global	FLOATINGKBDSETTYPE:far
+;	Desc:	Sets the display and entry mode of the floating keyboard.
+;	Pass:	cx = display type
+;		dx = disallow type
+;		bp = entry mode
+;
+
+EndLibrary	ark
+

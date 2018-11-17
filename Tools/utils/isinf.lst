@@ -1,0 +1,155 @@
+Phar Lap Macro Assembler  Version 5.1           Wed Aug 14 18:38:25 1996
+
+                                                              Page    1-1
+
+
+                                        COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                                        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                                         
+                                         
+                                        	Copyright (c) GeoWorks 1991 -- All Rig
+                                        hts Reserved 
+                                         
+                                        PROJECT:	PC GEOS 
+                                        MODULE:		 
+                                        FILE:		isinf.asm 
+                                         
+                                        AUTHOR:		Adam de Boor, April 26, 1991 
+                                         
+                                        ROUTINES: 
+                                        	Name			Description 
+                                        	----			----------- 
+                                        	isinf			See if the passed double is in
+                                        finity, 
+                                        				according to IEEE754 standards. 
+                                        	isnan			See if the passed double is no
+                                        t-a-number, 
+                                        				according to IEEE754 standards. 
+                                        	caller			Return the caller's caller. U
+                                        sed by malloc() 
+                                         
+                                        	 
+                                        REVISION HISTORY: 
+                                        	Name	Date		Description 
+                                        	----	----		----------- 
+                                        	Adam	4/26/91		Initial revision 
+                                         
+                                         
+                                        DESCRIPTION: 
+                                        	This file contains various functions t
+                                        hat must be written in 
+                                        	assembly when running under the DOS-Ex
+                                        tender. 
+                                        		 
+                                         
+                                        	$Id: ISINF.ASM,v 3.1 1996/08/07 05:00:
+                                        42 ron Exp $ 
+                                         
+                                        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                                        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+                                         
+                                         
+00000000                                _TEXT	segment	word public use32 'CODE' 
+                                        CGROUP	group	_TEXT 
+                                        assume cs:CGROUP 
+                                         
+00000000                                isinf	proc	near 
+                                        	public	isinf 
+00000000  55                            	push	ebp 
+00000001  8B EC                         	mov	ebp, esp 
+Phar Lap Macro Assembler  Version 5.1           Wed Aug 14 18:38:25 1996
+
+                                                              Page    1-2
+
+
+00000003  33 C0                         	xor	eax, eax 
+00000005  83 7D 0C 00                   	cmp	dword ptr ss:[ebp+12], 0; low mant
+                                        issa all zero? 
+00000009  0F 85 0000001B                	jne	isinf_done		; nope. not infinity 
+0000000F  81 7D 08 7FF00000             	cmp	dword ptr ss:[ebp+8], 07ff00000h	;
+                                         positive infinity? 
+00000016  0F 84 0000000D                	je	isinf_yes 
+0000001C  81 7D 08 FFF00000             	cmp	dword ptr ss:[ebp+8], 0fff00000h	;
+                                         negative infinity? 
+00000023  0F 85 00000001                	jne	isinf_done		; no 
+00000029                                isinf_yes: 
+00000029  40                            	inc	eax 
+0000002A                                isinf_done: 
+0000002A  5D                            	pop	ebp 
+0000002B  C3                            	ret 
+                                        isinf	endp 
+                                         
+0000002C                                isnan	proc	near 
+                                        	public	isnan 
+0000002C  55                            	push	ebp 
+0000002D  8B EC                         	mov	ebp, esp 
+0000002F  33 C0                         	xor	eax, eax		; assume no 
+                                         
+00000031  8B 55 08                      	mov	edx, ss:[ebp+8] 
+00000034  8B DA                         	mov	ebx, edx 
+00000036  81 E2 7FF00000                	and	edx, 7ff00000h 
+0000003C  81 FA 7FF00000                	cmp	edx, 7ff00000h 
+00000042  0F 85 00000017                	jne	isnan_done		; exponent not 7ff => 
+                                        not NaN 
+                                         
+00000048  81 E3 000FFFFF                	and	ebx, 0fffffh 
+0000004E  0F 85 0000000A                	jne	isnan_yes		; mantissa of 0 is rese
+                                        rved for inf 
+                                         
+00000054  83 7D 0C 00                   	cmp	dword ptr ss:[ebp+12], 0; low mant
+                                        issa m.b.non z. to be NaN 
+00000058  0F 84 00000001                	je	isnan_done 
+0000005E                                isnan_yes: 
+0000005E  40                            	inc	eax 
+0000005F                                isnan_done: 
+0000005F  5D                            	pop	ebp 
+00000060  C3                            	ret 
+                                        isnan	endp 
+                                         
+00000061                                caller	proc	near	; return the caller's 
+                                        caller. This assumes the caller 
+                                        			;  is near and has a frame pointer..
+                                        . 
+                                        	public	caller 
+00000061  8B 45 04                      	mov	eax, ss:[ebp+4] 
+00000064  C3                            	ret 
+                                        caller	endp 
+                                         
+00000065                                _TEXT	ends 
+Phar Lap Macro Assembler  Version 5.1           Wed Aug 14 18:38:25 1996
+
+                                                              Page    1-3
+
+
+                                         
+                                        end 
+Phar Lap Macro Assembler  Version 5.1           Wed Aug 14 18:38:25 1996
+
+                                                              Symbols-1
+
+
+	GROUPS AND SEGMENTS
+Name                                Size      Use    Align Combine   Class
+
+CGROUP . . . . . . . . . . . . .    Group
+   _TEXT . . . . . . . . . . . .    00000065  USE32  WORD  PUBLIC    CODE
+
+	PROCEDURES
+Name                                Type      Offset    Scope   Segment
+
+caller . . . . . . . . . . . . .    N PROC    00000061  Public  _TEXT
+isinf  . . . . . . . . . . . . .    N PROC    00000000  Public  _TEXT
+isnan  . . . . . . . . . . . . .    N PROC    0000002C  Public  _TEXT
+
+	VARIABLES AND LABELS
+Name                                Type      Offset    Scope   Segment
+
+isinf_done . . . . . . . . . . .    N LABEL   0000002A  Prvate  _TEXT
+isinf_yes  . . . . . . . . . . .    N LABEL   00000029  Prvate  _TEXT
+isnan_done . . . . . . . . . . .    N LABEL   0000005F  Prvate  _TEXT
+isnan_yes  . . . . . . . . . . .    N LABEL   0000005E  Prvate  _TEXT
+
+
+       9 Symbols
+       0 Warning Errors
+       0 Severe Errors

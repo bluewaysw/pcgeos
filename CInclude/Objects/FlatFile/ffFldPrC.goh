@@ -1,0 +1,341 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+ *
+ * PROJECT:	  PC/GEOS
+ * FILE:	  CInclude/Objects/FlatFile/ffFldPrC.goh
+ *
+ * AUTHOR:  	  Anna Lijphart: Feb, 1992
+ *
+ * REVISION HISTORY:
+ *	Date	 Name	Description
+ *	----	 ----	-----------
+ *	2/92	 anna	Initial version
+ *
+ * DESCRIPTION:
+ *	This file defines the flat file database field properties class
+ *
+ * 	$Id: ffFldPrC.goh,v 1.1 97/04/04 15:50:50 newdeal Exp $
+ *
+ ***********************************************************************/
+
+@optimize
+
+#include <geos.h>
+
+@include <Objects/gCtrlC.goh>
+@include <Objects/gTextC.goh>
+@include <Objects/FlatFile/ffDbase.goh>
+@include <Objects/FlatFile/ffFldPr.goh>
+
+
+@class FFFieldPropertiesClass, GenControlClass;
+
+/*
+ * Instance data
+ */
+@instance FFFPContext FFFP_context = FFFPC_NONE;
+
+@instance FFD_attributes FFFP_attrEnabled = 0;
+@instance byte FFFP_markBusyCount = 0;
+
+/* 
+ * This structure is used to store the inputs from the novice user
+ * dialog boxes. For value inputs (like min/max), it stores the actual
+ * text string input as well as the FloatNum it represents. This is to
+ * facilitate faster transfer to the Advanced dialog box, and to
+ * prevent duplicate (and time-consuming) checking.  If the "Advanced"
+ * dialog box is brought up, the values in this structure are
+ * displayed in it.
+ */
+@instance FFFieldPropertiesInputStruct FFFP_fpis = {
+    {
+    	0,			/* colNum                             */
+	_TEXT(""),		/* fieldName   	    	    	      */
+	FDT_GENERAL_TEXT,	/* dataType                           */
+	    	    	    	/* computedDefaultTokenStream	      */
+    	{PARSER_TOKEN_END_OF_EXPRESSION,
+	   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+ 	 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+ 	 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+ 	 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+ 	 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+ 	 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+ 	 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+ 	 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+	0,  	    	    	/* numTokensInTokenStream   	      */
+	0,			/* maxNumCharsAllowedInThisTextField  */
+	0,  	    		/* minValue                           */
+	0,	    	    	/* maxValue                           */
+	_TEXT("")		/* notes    	    	    	      */
+    },
+    0,_TEXT(""), _TEXT("")
+};
+
+/*
+ * This is the current column being edited. We need to store it
+ * in case the user decides to "Reset" old values.
+ */
+@instance byte FFFP_colNum = 0;
+
+/*
+ * FFFP_createNewOptr is used by the Field Properties UI controller when the
+ * user hits the "Create Another" trigger.  A MSG_FFFP_INITIATE_DIALOG_BOX
+ * is sent to the createNewOptr.
+ *
+ * Application writers must load these instance data with the optrs to the
+ * Create New Field field properties box, etc. (see GeoFile's
+ * Main/mainProcess.goc)
+ */
+
+@instance optr FFFP_computedFieldExpressionBuilderOptr;
+@instance optr FFFP_defaultValueExpressionBuilderOptr;
+
+/*********************  External messages *********************/
+
+/*
+ * MSG_FFFP_SET_EXPRESSION_BUILDER_INFO --
+ *	This message sets the FFFP_computedFieldExpressionBuilderOptr and
+ *	FFFP_defaultValueExpressionBuilderOptr instance data.
+ */
+@message void MSG_FFFP_SET_EXPRESSION_BUILDER_INFO(optr computedFEB,
+						   optr defaultVEB);
+
+/*
+ * MSG_FFFP_INITIATE_INTERACTION --
+ *
+ * This message causes a field properties interaction to come up.
+ */
+@message void MSG_FFFP_INITIATE_INTERACTION();
+
+/*
+ * MSG_FFFP_INITIATE_NEW_FIELD_INTERACTION --
+ *
+ * This message causes a field properties interaction to come up,
+ * ready to edit a new field.
+ */
+@message void MSG_FFFP_INITIATE_NEW_FIELD_INTERACTION();
+
+/*********************  Internal messages *********************/
+
+/*
+ * MSG_FFFP_SET_DATA_TYPE_ATTRIBUTE_OPTIONS --
+ *
+ * This message is sent when a user clicks on a data type list item.
+ */
+@message (GEN_ITEM_GROUP_STATUS_MSG) MSG_FFFP_SET_DATA_TYPE_ATTRIBUTE_OPTIONS;
+
+/*
+ * MSG_FFFP_APPLY --
+ *
+ * This message is sent when user clicks on the "Apply" button.
+ */
+@message void MSG_FFFP_APPLY();
+
+/*
+ * MSG_FFFP_RESET --
+ *
+ * This message is sent when user clicks on the "Reset" button.
+ */
+@message void MSG_FFFP_RESET();
+
+/*
+ * MSG_FFFP_CLOSE --
+ *
+ * This message is sent when user clicks on the "Close" button.
+ */
+@message void MSG_FFFP_CLOSE();
+
+/*
+ * MSG_FFFP_CREATE_FIELD --
+ *
+ * This message is called by the OK and OK & Create Another triggers
+ * in the Advanced box. It creates a new field and stores the inputs.
+ */
+@message void MSG_FFFP_CREATE_FIELD(word messageToSendBack);
+
+/*
+ * MSG_FFFP_STORE_FIELD_INFO--
+ *
+ * Stores inputs from the dialog box. Used both for creating
+ * fields and for updating existing fields.
+ * If it's a new field, set colNum = -1.
+ */
+@message void MSG_FFFP_STORE_FIELD_INFO(word messageToSendBack,
+						byte colNum);
+
+/*
+ * MSG_FFFP_CANCEL --
+ *
+ * This message is sent when user clicks on the Reset button.
+ */
+@message void MSG_FFFP_CANCEL();
+
+/*
+ * MSG_FFFP_EDIT_DEFAULT_OR_COMPUTED_EXPRESSION --
+ *	This message is sent by the SetDefaultOrComputedTrigger in the
+ *	Field Properties UI controller.  It impiles that an expression
+ *	builder should come up to edit an expression.
+ */
+@message void MSG_FFFP_EDIT_DEFAULT_OR_COMPUTED_EXPRESSION();
+
+/*
+ * MSG_FFFP_SET_DEFUALT_OR_COMPUTED_EXPRESSION --
+ *	This message is called from the outside after the fpUIC
+ *	sent out an expression request from MSG_FFFP_EDIT_DEFAULT_OR_
+ *	COMPUTED_EXPRESSION.  It (possibly) contains a handle to a new
+ *	token stream, and definitely has the number of tokens in the
+ *	token stream in numTokens.  If the handle is null, then the
+ *	expression is null.
+ */
+@message void MSG_FFFP_SET_DEFAULT_OR_COMPUTED_EXPRESSION(MemHandle tokenStream,
+							  word numTokens);
+/*
+ * MSG_FFFP_NEW_FIELD --
+ *
+ * This message clears all fields in the dialog box. 
+ */
+@message void MSG_FFFP_NEW_FIELD();
+
+/*
+ * MSG_FFFP_ENABLE_TRIGGERS --
+ * 	This method re-enables the advanced box's Create trigger
+ *	and gives the text the tagrget and focus.
+ */
+@message void MSG_FFFP_ENABLE_TRIGGERS();
+
+/*
+ * MSG_FFFP_DISPLAY_NOTES --
+ * 	This method is sent out by the "Set field notes" trigger to
+ *	indicate that the set field notes interaction should be
+ *	displayed with the current set of field notes.
+ */
+@message void MSG_FFFP_DISPLAY_NOTES();
+
+/*
+ * MSG_FFFP_ACCEPT_NOTES --
+ * 	This method is sent out by the "Set field notes" text object
+ *	to indicate that the enclosed text should be used to replace
+ *	the current set of field notes.
+ */
+@message (GEN_TEXT_APPLY_MSG) MSG_FFFP_ACCEPT_NOTES;
+
+/*
+ * MSG_FFFP_FIELD_CREATION_DONE --
+ *
+ * If specified by the caller, this message gets sent by 
+ * MSG_FFD_CREATE_NEW_FIELD_WITH_RESPONSE
+ * when the field properties have been checked for validity. 
+ * This handler puts up an error message if the field name was
+ * invalid. 
+ * If the field was valid, this method adds the field name to the
+ * layout list, and adds two screen display GrObjects (one label
+ * and one field)
+ * 
+ * fieldResult: FFFieldCreationResult enum indicating outcome of
+ *		attempt to create field.
+ * colNum:  the column number of the newly created field
+ */
+@message void MSG_FFFP_FIELD_CREATION_DONE(
+					FFFieldCreationResult fieldResult,
+					byte colNum);
+
+/*
+ * MSG_FFFP_FIELD_MODIFICATION_DONE --
+ *
+ * If specified by the caller, this message gets sent by 
+ * MSG_FFD_CHANGE_FIELD_ATTRIBUTES_WITH_RESPONSE
+ * when the field properties have been checked for validity. 
+ * This handler puts up an error message if the field name was
+ * invalid. 
+ * If the field name changed, this method notifies the extra lists
+ * (layoutNameList and notInLayoutNameLists) that the name changed.
+ * In addition, it notifies the field screen display GrObject. 
+ * 
+ * fieldResult: FFFieldCreationResult enum indicating outcome of
+ *		attempt to create field.
+ * colNum:  the column number of the newly created field
+ * nameChanged: TRUE if the field name was changed, FALSE otherwise.
+ */
+@message void MSG_FFFP_FIELD_MODIFICATION_DONE(
+					FFFieldCreationResult fieldResult,
+					byte colNum,
+					Boolean nameChanged);
+
+/*
+ * MSG_FFFP_INC_MARK_BUSY_COUNT
+ *
+ *	Increment the count of how many times the application has been marked
+ *	busy. When the Field Properties box is initiated, it checks
+ *	this count, and decrements it if set. 
+ *	If set, Field Properties controller will mark the app not busy,
+ *	and resume input.
+ */
+@message void MSG_FFFP_INC_MARK_BUSY_COUNT();
+
+/*
+ * HINTS
+ */
+
+/*
+ * If you want the dialog box to be modal then set this hint
+ */
+@vardata void HINT_FFFP_MAKE_MODAL;
+
+@default GCI_output = (TO_APP_TARGET);
+
+/*
+ * Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+ * ATTR_GEN_CONTROL_PROHIBIT_UI)
+ */
+
+/* FFFPFeatures */
+typedef WordFlags FFFieldPropertiesFeatures;
+#define FFFP_FIELD_NAME_FEATURE		0x0100	/* field name */
+#define FFFP_FIELD_NAME_DESCR_FEATURE	0x0080	/* field name description */
+#define FFFP_DATA_TYPE_FEATURE		0x0040	/* data type */
+#define FFFP_COMPUTED_DATA_TYPE_FEATURE	0x0020	/* "Computed" data type */
+#define FFFP_FIELD_ATTRS_FEATURE 	0x0010	/* Field Attrs: Notes, 
+						   Computed/Default string */
+#define FFFP_DATA_ATTRS_FEATURE		0x0008	/* Data Attrs: Length,
+						   Min, Max */
+#define FFFP_CREATE_TRIGGER_FEATURE	0x0004	/* "Create" trigger */
+#define FFFP_CANCEL_TRIGGER_FEATURE	0x0002	/* "Cancel" trigger */
+#define FFFP_APPLY_RESET_CLOSE_TRIGGER_FEATURE	0x0001	/* Apply/Reset/Close
+							   triggers */
+/*
+ * Toolbox features flags (used with ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI and
+ * ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI)
+ */
+
+/* (NONE) */
+
+/*
+ * Feature flags for different UI levels
+ */
+#define FFFP_INTERMEDIATE_FEATURES	(FFFP_FIELD_NAME_FEATURE | \
+					 FFFP_FIELD_NAME_DESCR_FEATURE | \
+					 FFFP_CREATE_TRIGGER_FEATURE | \
+					 FFFP_CANCEL_TRIGGER_FEATURE)
+
+#define FFFP_ADVANCED_FEATURES		(FFFP_FIELD_NAME_FEATURE | \
+					 FFFP_DATA_TYPE_FEATURE | \
+					 FFFP_COMPUTED_DATA_TYPE_FEATURE | \
+					 FFFP_FIELD_ATTRS_FEATURE | \
+					 FFFP_DATA_ATTRS_FEATURE | \
+					 FFFP_CREATE_TRIGGER_FEATURE | \
+					 FFFP_CANCEL_TRIGGER_FEATURE)
+
+#define FFFP_EDIT_FIELD_INTERMEDIATE_FEATURES (FFFP_FIELD_NAME_FEATURE | \
+					 FFFP_APPLY_RESET_CLOSE_TRIGGER_FEATURE)
+
+#define FFFP_EDIT_FIELD_ADVANCED_FEATURES (FFFP_FIELD_NAME_FEATURE | \
+					 FFFP_DATA_TYPE_FEATURE | \
+					 FFFP_COMPUTED_DATA_TYPE_FEATURE | \
+					 FFFP_FIELD_ATTRS_FEATURE | \
+					 FFFP_DATA_ATTRS_FEATURE | \
+					 FFFP_APPLY_RESET_CLOSE_TRIGGER_FEATURE)
+
+#define FFFP_DEFAULT_TOOLBOX_FEATURES 	0
+
+@endc

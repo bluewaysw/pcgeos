@@ -1,0 +1,606 @@
+/*
+ *
+ * Project:	GeoManager 2.0
+ * Module:	Desktop/Launcher
+ * File:	UI/uiLauncher.ui
+ *
+ * Author:	David Litwin
+ *
+ *	This file contains the user Interface description for the
+ * DOS Launcher definition functionality.
+ *
+ *	$Id: cuiLauncher.ui,v 1.1 97/04/04 15:01:25 newdeal Exp $
+ *
+ */
+
+
+#ifndef GEOLAUNCHER
+
+/*-----------------------------------------------------------------------------
+				DOS ROOM
+-----------------------------------------------------------------------------*/
+
+/*---------------------------------  Menu  ----------------------------------*/
+start Interface;
+CreateLauncherTrigger = GenTrigger {
+	moniker = 'C',"Create Launcher";
+	hints = {HINT_TRIGGER_BRINGS_UP_WINDOW}
+	genAttributes = default +initiatesInputIgnore;
+	action = MSG_CREATE_DOS_LAUNCHER, process;
+}
+
+EditLauncherTrigger = GenTrigger {
+	moniker = 'E',"Edit Launcher";
+	hints = {HINT_TRIGGER_BRINGS_UP_WINDOW}
+	genAttributes = default +initiatesInputIgnore;
+	action = MSG_EDIT_DOS_LAUNCHER, process;
+}
+
+end Interface;
+
+
+start DOSLauncherResource;
+
+/*------------------------  Create Launcher File Box  -----------------------*/
+GetCreateLauncherFileBox = GenInteraction ignoreDirty {
+	moniker = "Select DOS File for Launcher:";
+	children =	CreateLauncherFileSelector,
+			GetCreateLauncherFileBoxSelectTrigger;
+	type = command;
+	visibility = dialog;
+	attributes = default +modal;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		ATTR_GEN_HELP_CONTEXT { char "dSelDOS",0 }
+	}
+}
+
+CreateLauncherFileSelector = WFileSelector {
+	fileCriteria = dirs, nonGeosFiles, fileFilter;
+	hints = {
+		HINT_FILE_SELECTOR_SINGLE_ACTION,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS,20>
+			SpecHeight <>
+			word 	1
+		},
+		ATTR_GEN_PATH_DATA {
+			GenFilePath< SP_TOP, "..">
+		}
+	}
+	action = MSG_DOS_LAUNCHER_CREATE_FILE_CHECK, process;
+}
+
+GetCreateLauncherFileBoxSelectTrigger = GenTrigger {
+	moniker = 'T', "Use This File";
+	genAttributes = default +initiatesInputIgnore,
+				+signalInteractionComplete;
+	genStates = default -enabled;
+	action = MSG_DOS_LAUNCHER_FILE_SELECTED,process;
+	hints = {HINT_SEEK_REPLY_BAR, HINT_DEFAULT_DEFAULT_ACTION, HINT_DEFAULT_FOCUS}
+}
+
+
+/*-------------------------  Edit Launcher File Box  ------------------------*/
+GetEditLauncherFileBox = GenInteraction ignoreDirty {
+	moniker = "Select DOS Launcher to Edit:";
+	children =	EditLauncherFileSelector,
+			GetEditLauncherFileBoxSelectTrigger;
+	type = command;
+	visibility = dialog;
+	attributes = default +modal;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		ATTR_GEN_HELP_CONTEXT { char "dESelDOS",0 }
+	}
+}
+
+EditLauncherFileSelector = GenFileSelector {
+	fileCriteria = dirs, geosExecutables;
+	hints = {
+		HINT_FILE_SELECTOR_SINGLE_ACTION,
+		ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH {
+			GeodeToken <"LAUN", MANUFACTURER_ID_GEOWORKS>
+		},
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS,20>
+			SpecHeight <>
+			word 	1
+		}
+	}
+	action = MSG_DOS_LAUNCHER_EDIT_FILE_CHECK, process;
+}
+
+GetEditLauncherFileBoxSelectTrigger = GenTrigger {
+	moniker = 'T', "Edit This Launcher";
+	genAttributes = default +initiatesInputIgnore,
+				+signalInteractionComplete;
+	genStates = default -enabled;
+	action = MSG_DOS_LAUNCHER_FILE_SELECTED,process;
+	hints = {HINT_SEEK_REPLY_BAR, HINT_DEFAULT_DEFAULT_ACTION, HINT_DEFAULT_FOCUS}
+}
+
+
+/*------------------------  Edit Launcher Dialog Box  -----------------------*/
+EditLauncherBox = GenInteraction ignoreDirty {
+	moniker = "DOS Launcher Settings";
+	type = command;
+	visibility = dialog;
+	attributes = default +modal;
+	children =	/*EditLauncherDOSName,*/
+			EditLauncherIconGroup,
+			EditLauncherChangeMonikerList,
+			EditLauncherGeosName,
+			EditLauncherPromptFileList,
+			EditLauncherArgsGroup,
+			EditLauncherPromptReturnList,
+			EditLauncherDestinationList,
+			EditLauncherOK,
+			EditLauncherOptionsTrigger,
+			EditLauncherCancel;
+	hints = {
+		HINT_IF_SYSTEM_ATTRS { SystemAttrs mask SA_VERTICALLY_TINY},
+			HINT_MINIMIZE_CHILD_SPACING,
+		HINT_ENDIF,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		ATTR_GEN_HELP_CONTEXT { char "dLauncher",0 }
+	}
+}
+
+/*
+EditLauncherDOSName = GenText {
+	genAttributes = readOnly;
+	maxLength = 13;
+}
+*/
+
+EditLauncherOK = GenTrigger {
+	moniker = 'U', "Use These Settings";
+	action = MSG_MAKE_DOS_LAUNCHER, process;
+	hints = { HINT_DEFAULT_DEFAULT_ACTION, HINT_SEEK_REPLY_BAR }
+}
+
+EditLauncherOptionsTrigger = GenTrigger {
+	moniker = 'O', "Options";
+	action = MSG_DOS_LAUNCHER_POP_UP_OPTIONS, process;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+		}
+}
+
+EditLauncherCancel = GenTrigger {
+	genAttributes = default +signalInteractionComplete;
+	action = MSG_DOS_LAUNCHER_CANCEL_EDIT_BOX, process;
+	hints = { HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {word IC_DISMISS} }
+}
+
+/*-------------------------------  Icon Group  ------------------------------*/
+EditLauncherIconGroup = GenInteraction {
+	moniker = 'I', "Icon";
+	/*
+	children = EditLauncherDisplayGlyph, EditLauncherChooseIconInteraction;
+	*/
+	children = EditLauncherChooseIconList, EditLauncherListOptionsInteraction;
+	hints = {HINT_DRAW_IN_BOX, 
+		 HINT_CENTER_CHILDREN_HORIZONTALLY,
+		 HINT_EXPAND_WIDTH_TO_FIT_PARENT}
+}
+
+/*
+EditLauncherDisplayGlyph = GenGlyph {
+}
+
+
+EditLauncherChooseIconInteraction = GenInteraction {
+	children = EditLauncherChooseIconList, EditLauncherChooseIconOK,
+			EditLauncherChooseIconCancel;
+}
+*/
+
+EditLauncherChooseIconList = GenDynamicList {
+	behaviorType = exclusive;
+	numSelections = 1;
+	queryMsg = MSG_LAUNCHER_REQUEST_ICON_MONIKER;
+	destination = process;
+	hints = {	HINT_ITEM_GROUP_SCROLLABLE,
+		 HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		 HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+/*EditLauncherChooseIconOK = GenTrigger {
+	genAttributes = default +signalInteractionComplete;
+	action = MSG_DOS_LAUNCHER_CANCEL_EDIT_BOX, process;
+	hints = { HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {word IC_DISMISS} }
+}
+
+EditLauncherChooseIconCancel = GenTrigger {
+}
+*/
+
+EditLauncherListOptionsInteraction = GenInteraction {
+	moniker = 't', "List Options";
+	children = EditLauncherListOptionsManufacturerID,
+		EditLauncherListOptionsOk, EditLauncherListOptionsCancel;
+	type = command;
+	visibility = dialog;
+	attributes = default +modal;
+}
+
+EditLauncherListOptionsManufacturerID = GenValue {
+	moniker = "Manufacturer ID:";
+	value = MANUFACTURER_ID_DOS_LAUNCHER;
+	displayFormat = integer;
+	hints = {HINT_VALUE_NOT_INCREMENTABLE}
+}
+
+EditLauncherListOptionsOk = GenTrigger {
+	genAttributes = default +signalInteractionComplete;
+	action = MSG_DOS_LAUNCHER_SET_LIST_OPTIONS, process;
+	hints = { HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {word IC_OK} }
+}
+
+EditLauncherListOptionsCancel = GenTrigger {
+	genAttributes = default +signalInteractionComplete;
+	hints = { HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {word IC_DISMISS} }
+}
+
+/*-----------------------  Launcher's Geos Name Group  ----------------------*/
+EditLauncherGeosName = GenText {
+	moniker = 'L', "Launcher Name:";
+	maxLength = "FILE_LONGNAME_LENGTH";
+	textDisplayAttributes = default +singleLineText, +allowTextOffEnd;
+	hints = {
+		ATTR_GEN_TEXT_LEGAL_FILENAMES,
+		HINT_DEFAULT_FOCUS,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, 2*72>
+			SpecHeight <>
+		  }
+	}
+}
+
+
+/*----------------------------  Arguments Group  ----------------------------*/
+EditLauncherArgsGroup = GenInteraction {
+	moniker = "Command Line Options";
+	children = EditLauncherArgsSubGroup;
+	hints = {HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		 HINT_CENTER_CHILDREN_HORIZONTALLY,
+		 HINT_DRAW_IN_BOX} 
+}
+
+EditLauncherArgsSubGroup = GenInteraction {
+	children =	EditLauncherUserSuppliedArgsList,
+			EditLauncherArgumentText,
+			EditLauncherConfirmList;
+	hints = {
+		HINT_IF_SYSTEM_ATTRS { SystemAttrs mask SA_VERTICALLY_TINY},
+			HINT_MINIMIZE_CHILD_SPACING,
+		HINT_ENDIF
+	}
+}
+
+EditLauncherUserSuppliedArgsList = GenItemGroup {
+	children = EditLauncherNoArgs, EditLauncherRuntimeArgs,
+			EditLauncherSetArgs;
+	behaviorType = exclusive;
+	numSelections = 1;
+	selection = 0;
+	destination = process;
+	applyMsg = MSG_DOS_LAUNCHER_ARGS_LIST_CHANGE;
+	hints = {
+		HINT_IF_SYSTEM_ATTRS { SystemAttrs mask SA_VERTICALLY_TINY },
+			HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_ELSE,
+			HINT_ORIENT_CHILDREN_VERTICALLY,
+			HINT_LEFT_JUSTIFY_CHILDREN,
+		HINT_ENDIF,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT
+	}
+}
+
+EditLauncherNoArgs = GenItem {
+	moniker = 'N', "No Command Line Options";
+	identifier = "mask LDF_NO_ARGS";
+}
+
+EditLauncherRuntimeArgs = GenItem {
+	moniker = 'A', "Ask For Options Each Time";
+	identifier = "mask LDF_PROMPT_ARGS";
+}
+
+EditLauncherSetArgs = GenItem {
+	moniker = 'S', "Specify Options Now";
+	identifier = "mask LDF_ARGS_SET";
+}
+
+EditLauncherArgumentText = GenText {
+	moniker = 't', "Options:";
+	maxLength = "PATH_BUFFER_SIZE";
+	genStates = default -enabled;
+	textDisplayAttributes = default +singleLineText, +allowTextOffEnd;
+	hints = {
+		  HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, 4*72>
+			SpecHeight <>
+		  }
+	}
+}
+
+
+/*-------------------------  Prompt on return ------------------------*/
+EditLauncherPromptReturnList = GenItemGroup {
+	moniker = 'R', "Ask Before Returning?";
+	children = EditLauncherPromptReturnYes, EditLauncherPromptReturnNo;
+	behaviorType = exclusive;
+	numSelections = 1;
+	selection = 1;
+	hints = {HINT_ORIENT_CHILDREN_HORIZONTALLY}
+}
+
+EditLauncherPromptReturnYes = GenItem {
+	moniker = "Yes";
+	identifier = "mask LDF_PROMPT_USER";
+}
+
+EditLauncherPromptReturnNo = GenItem {
+	moniker = "No";
+	identifier = 0;				/* LDF_PROMPT_USER cleared */
+}
+
+
+/*-----------------------  Destination List  ----------------------*/
+EditLauncherDestinationList = GenItemGroup {
+	moniker = "Place Launcher in:";
+	children =	EditLauncherDOSROOM,
+			EditLauncherWORLD;
+	behaviorType = exclusive;
+	numSelections = 1;
+	selection = "SP_DOS_ROOM";
+	hints = {HINT_ORIENT_CHILDREN_HORIZONTALLY}
+}
+
+EditLauncherDOSROOM = GenItem {
+	moniker = 'D', "DOSROOM Folder";
+	identifier = "SP_DOS_ROOM";
+}
+
+
+EditLauncherWORLD = GenItem {
+	moniker = 'W', "WORLD Folder";
+	identifier = "SP_APPLICATION";
+}
+
+
+/*-------------------------  Change Monikers? -----------------------*/
+EditLauncherChangeMonikerList = GenItemGroup {
+	moniker = 'C', "Change Monikers Already In Launcher?";
+	children = EditLauncherChangeMonikerYes,
+	    EditLauncherChangeMonikerNo;
+	behaviorType = exclusive;
+	numSelections = 1;
+	selection = FALSE;
+	hints = {HINT_ORIENT_CHILDREN_HORIZONTALLY}
+}
+
+EditLauncherChangeMonikerYes = GenItem {
+	moniker = "Yes";
+	identifier = TRUE;
+}
+
+EditLauncherChangeMonikerNo = GenItem {
+	moniker = "No";
+	identifier = FALSE;
+}
+
+/*-------------------------  Prompt for file ------------------------*/
+EditLauncherPromptFileList = GenItemGroup {
+	moniker = 'P', "Prompt For A Single File?";
+	children = EditLauncherPromptFileYes, EditLauncherPromptFileNo;
+	behaviorType = exclusive;
+	numSelections = 1;
+	selection = 0;
+	hints = {HINT_ORIENT_CHILDREN_HORIZONTALLY}
+}
+
+EditLauncherPromptFileYes = GenItem {
+	moniker = "Yes";
+	identifier = "mask LDF_PROMPT_FILE";
+}
+
+EditLauncherPromptFileNo = GenItem {
+	moniker = "No";
+	identifier = 0;				/* LDF_PROMPT_FILE cleared */
+}
+
+
+/*-------------------------  Confirm Arguments -----------------------*/
+EditLauncherConfirmList = GenItemGroup {
+	moniker = 'B', "Confirm Options Before Running?";
+	children = EditLauncherConfirmYes, EditLauncherConfirmNo;
+	behaviorType = exclusive;
+	numSelections = 1;
+	selection = 0;
+	hints = {HINT_ORIENT_CHILDREN_HORIZONTALLY}
+}
+
+EditLauncherConfirmYes = GenItem {
+	moniker = "Yes";
+	identifier = "mask LDF_CONFIRM";
+}
+
+EditLauncherConfirmNo = GenItem {
+	moniker = "No";
+	identifier = 0;				/* LDF_CONFIRM cleared */
+}
+
+
+/*--------------------------  Edit Launcher Options  ------------------------*/
+EditLauncherOptionsBox = GenInteraction ignoreDirty {
+	children = EditLauncherOptionPaths,
+	    		EditLauncherOptionsAppOrDocCustomText,
+			EditLauncherOptionTokenBox,
+			EditLauncherOptionsOK,
+			EditLauncherOptionsCancel;
+	visibility = dialog;
+	attributes = default +modal;
+	hints = {
+		ATTR_GEN_HELP_CONTEXT { char "dLOptions",0 }
+	}
+
+}
+
+EditLauncherOptionPaths = GenInteraction {
+	children = EditLauncherWorkingDirectory,
+	           EditLauncherCheckFile1,
+		   EditLauncherCheckFile2,
+		   EditLauncherDocFile;
+	hints = {
+	    HINT_SEEK_REPLY_BAR,
+	    HINT_CENTER_CHILDREN_ON_MONIKERS
+	}
+}
+
+EditLauncherWorkingDirectory = GenText {
+	moniker = 'S', "Starting Folder:";
+	maxLength = "PATH_BUFFER_SIZE";
+	textDisplayAttributes = default +singleLineText, +allowTextOffEnd;
+	hints = {
+			HINT_DEFAULT_FOCUS,
+			HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, 4*72>
+			SpecHeight <>
+		  }
+	}
+}
+
+EditLauncherCheckFile1 = GenText {
+	moniker = 'F', "File To Check:";
+	maxLength = "PATH_BUFFER_SIZE";
+	textDisplayAttributes = default +singleLineText, +allowTextOffEnd;
+	hints = {
+		  HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, 4*72>
+			SpecHeight <>
+		  }
+	}
+}
+
+
+EditLauncherCheckFile2 = GenText {
+	moniker = 'e', "Second File To Check:";
+	maxLength = "PATH_BUFFER_SIZE";
+	textDisplayAttributes = default +singleLineText, +allowTextOffEnd;
+	hints = {
+		  HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, 4*72>
+			SpecHeight <>
+		  }
+	}
+}
+
+EditLauncherDocFile = GenText {
+	moniker = 'D', "Documentation File:";
+	maxLength = "PATH_BUFFER_SIZE";
+	textDisplayAttributes = default +singleLineText, +allowTextOffEnd;
+	hints = {
+		  HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, 4*72>
+			SpecHeight <>
+		  }
+	}
+}
+
+EditLauncherOptionsAppOrDocCustomText = GenText {
+	moniker = 'A', "Run App Dialog Custom Text:";
+	maxLength = "APPORDOC_CUSTOM_TEXT_LENGTH";
+	textDisplayAttributes = default +initScrolling;
+	hints = {
+	    HINT_MINIMUM_SIZE {
+		SpecWidth <SST_AVG_CHAR_WIDTHS, 35>
+		SpecHeight <SST_LINES_OF_TEXT, 6>
+	    },
+	    HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+EditLauncherOptionTokenBox = GenInteraction {
+	children = EditLauncherOptionTokenManual,
+		   EditLauncherOptionTokenEntry;
+	hints = {HINT_ORIENT_CHILDREN_HORIZONTALLY}
+}
+
+EditLauncherOptionTokenManual = GenItemGroup {
+	moniker = 'T', "Use Custom Token?";
+	children = EditLauncherOptionTokenManualYes,
+	           EditLauncherOptionTokenManualNo;
+	behaviorType = exclusive;
+	numSelections = 1;
+	selection = FALSE;
+	destination = process;
+	applyMsg = MSG_DOS_LAUNCHER_TOKEN_OPTIONS_CHANGE;
+	hints = {HINT_ORIENT_CHILDREN_HORIZONTALLY}
+}
+
+EditLauncherOptionTokenManualYes = GenItem {
+	moniker = "Yes";
+	identifier = TRUE;
+}
+
+EditLauncherOptionTokenManualNo = GenItem {
+	moniker = "No";
+	identifier = FALSE;
+}
+
+EditLauncherOptionTokenEntry = GenInteraction {
+	children = EditLauncherOptionTokenChars,
+		   EditLauncherOptionTokenManufID;
+	hints = {HINT_ORIENT_CHILDREN_VERTICALLY,
+		 HINT_CENTER_CHILDREN_ON_MONIKERS}
+}
+
+EditLauncherOptionTokenChars = GenText {
+	moniker = 'C', "Token Chars:";
+	maxLength = 4;
+	textDisplayAttributes = default +singleLineText;
+	hints = {
+	    HINT_FIXED_SIZE {
+		SpecWidth <SST_WIDE_CHAR_WIDTHS, 4>
+		SpecHeight <>
+	    }
+	}
+}
+
+EditLauncherOptionTokenManufID = GenValue {
+	moniker = 'M', "Manufacturer ID:";
+	value = MANUFACTURER_ID_DOS_LAUNCHER;
+	displayFormat = integer;
+	hints = {HINT_VALUE_NOT_INCREMENTABLE}
+}
+
+EditLauncherOptionsOK = GenTrigger {
+	moniker = "OK";
+	genAttributes = default +signalInteractionComplete;
+	action = MSG_DOS_LAUNCHER_SET_OPTIONS, process;
+	hints = {	HINT_SEEK_REPLY_BAR,
+			HINT_DEFAULT_DEFAULT_ACTION	}
+}
+
+EditLauncherOptionsCancel = GenTrigger {
+	genAttributes = default +signalInteractionComplete;
+	hints = {	HINT_SEEK_REPLY_BAR,
+			ATTR_GEN_TRIGGER_INTERACTION_COMMAND {word IC_DISMISS} }
+}
+
+
+end DOSLauncherResource;
+
+
+#endif			/* ifndef GEOLAUNCHER */

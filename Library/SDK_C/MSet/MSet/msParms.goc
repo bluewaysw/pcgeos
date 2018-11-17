@@ -1,0 +1,579 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1993 -- All Rights Reserved
+
+PROJECT:	PC SDK
+MODULE:		Sample Library -- Mandelbrot Set Library
+FILE:		msParms.goc
+
+AUTHOR:		Paul DuBois, Sep  8, 1993
+
+ROUTINES:
+	Name			Description
+	----			-----------
+EnterParams			Start modifying MSetParams block
+
+EnterCalcParams			Start modifying MSetCalcParams block
+
+ExitParams			Finish modifying MSetParams block
+
+ExitCalcParams			Finish modifying MSetCalcParams block
+
+ExitParamsNoChange		As above, but doesn't dirty the vm block
+
+
+MSG_MSET_SET_PRIORITY		Sets the calculation thread priority
+
+MSG_MSET_SET_COLOR_SCHEME	Set the coloring scheme
+
+MSG_VIS_SET_SIZE		Sets the width and height of the MSet
+
+MSG_MSET_SET_POSITION		Sets the top-left coordinate of the MSet
+
+MSG_MSET_SET_RESOLUTION		Sets the resolution (magnification) of the MSet
+
+MSG_MSET_SET_SELECT_XY		Sets the "Selected point"
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dubois	9/ 8/93   	Initial version.
+
+DESCRIPTION:
+	Methods that change the MSet's MSetParameters block.
+	i.e. MSG_MSET_SET_... and MSG_MSET_GET_...
+
+	$Id: msParms.goc,v 1.1 97/04/07 10:43:43 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+
+@include <Objects/SDK_C/msetC.goh>
+@include <Objects/SDK_C/msCalcC.goh>
+@include <SDK_C/mset.goh>		/* Exported enums, structs */
+
+#include "msConst.h"			/* Constants and such */
+#include "msFatErr.h"			/* Fatal errors */
+
+/***********************************************************************
+ *		Internally used function prototypes
+ ***********************************************************************/
+
+/*
+ * These enter/exit routines are here to cut down on code size, and to help
+ * avoid silly coding mistakes which might arise from blindly copying and
+ * pasting code.  Each Enter routine must be matched with a later call to an
+ * Exit routine.
+ */
+
+static MSetInstance*
+EnterParams (optr		oself,
+	     MSetInstance*	pself,
+	     MSetParameters**	mspPP,
+	     MemHandle*		mspHP);
+
+static MSetInstance*
+EnterCalcParams (optr		oself,
+		 MSetInstance*	pself,
+		 MSetCalcParameters**	mscpPP,
+		 MemHandle*	mscpHP);
+
+static void
+ExitParams (optr		oself,
+	    MSetInstance*	pself,
+	    MemHandle		mspH);
+
+static void
+ExitCalcParams (optr		oself,
+		MSetInstance*	pself,
+		MemHandle	mscpH);
+
+#define ExitParamsNoChange(mspH) VMUnlock(mspH);
+
+
+/***********************************************************************
+ *		EnterParams
+ ***********************************************************************
+ * SYNOPSIS:	Common code for routines which modify fields of the
+ *		MSetParameters block.
+ * CALLED BY:	LOCAL
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	Locks MSetParameters block
+ *
+ * STRATEGY:
+ *	Since we need to return a lot, we take pointers as well as
+ *	having a return value.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	9/ 9/93   	Initial Revision
+ *
+ ***********************************************************************/
+static MSetInstance*
+EnterParams (optr		oself,
+	     MSetInstance*	pself,
+	     MSetParameters**	mspPP,
+	     MemHandle*		mspHP)
+{
+    *mspPP = VMLock(pself->MSI_vmFile,
+		    pself->MSI_msetVMBlock,
+		    mspHP);
+    return pself;
+}	/* End of EnterParams. */
+
+/***********************************************************************
+ *		EnterCalcParams
+ ***********************************************************************
+ * SYNOPSIS:	Common code for routines which modify fields of the
+ *		MSetCalcParameters block.
+ * CALLED BY:	LOCAL
+
+ * RETURN:	re-dereferenced pself
+ * SIDE EFFECTS:
+ *	@calls a MSG_MSC_PAUSE to the calculation thread
+ *	Dereferences oself
+ *	Locks MSetCalcParameters block
+ *
+ * STRATEGY:
+ *	Since we need to return a re-dereferenced pself, a pointer
+ *	to the locked MSetParameters block, and a handle to that locked
+ *	block, we take pointers to all those values.
+ *	The thread must not be running while we play with these data,
+ *	so a MSG_MSC_PAUSE is sent to it.
+ *
+ * BUGS/IDEAS:
+ *	Naming conventions can get a bit bizarre.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	9/ 9/93   	Initial Revision
+ *
+ ***********************************************************************/
+static MSetInstance*
+EnterCalcParams (optr			oself,
+		 MSetInstance*		pself,
+		 MSetCalcParameters**	mscpPP,
+		 MemHandle*		mscpHP)
+{
+    MSetParameters*	mspP;
+    MemHandle		mspH;
+    VMBlockHandle	mscpVM;
+
+    @call pself->MSI_calcThread, NullChunk::MSG_MSC_PAUSE();
+    pself = ObjDerefVis(oself);
+
+    /*
+     *	Extract the VM handle of the MSetCalcParameters block
+     */
+    mspP = VMLock(pself->MSI_vmFile,
+		  pself->MSI_msetVMBlock,
+		  &mspH);
+    mscpVM = mspP->MSP_calcBlock;
+    VMUnlock(mspH);
+
+    /*
+     *	Lock it down, returning the handle and pointer in mscpHP and mscpPP
+     */
+    *mscpPP = VMLock(pself->MSI_vmFile,
+		     mscpVM,
+		     mscpHP);
+
+    return pself;
+}	/* End of EnterCalcParams.	*/
+
+/***********************************************************************
+ *		ExitParams
+ ***********************************************************************
+ * SYNOPSIS:	Common code for routines which modify fields of the
+ *		MSetParameters block.
+ *		
+ * CALLED BY:	LOCAL
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	Dirties and unlocks the passed vm block.
+ *	@sends a notification of parameter change to the controllers
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	9/ 9/93   	Initial Revision
+ *
+ ***********************************************************************/
+static void
+ExitParams (optr		oself,
+	    MSetInstance*	pself,
+	    MemHandle		mspH)
+{
+    VMDirty(mspH);
+    VMUnlock(mspH);
+    
+    @send oself::MSG_MSET_SEND_NOTIFICATION_OF_PARAM_CHANGE();
+}	/* End of ExitParams.	*/
+
+/***********************************************************************
+ *		ExitCalcParams
+ ***********************************************************************
+ * SYNOPSIS:	Common code for routines which modify fields of the
+ *		MSetCalcParameters block.
+ *
+ * CALLED BY:	LOCAL
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	Dirties and unlocks the passed vm block.
+ *	@calls a MSG_MSC_RESTART to the calculation thread.
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	9/ 9/93   	Initial Revision
+ *
+ ***********************************************************************/
+static void
+ExitCalcParams (optr		oself,
+		MSetInstance*	pself,
+		MemHandle	mspH)
+{
+    VMDirty(mspH);
+    VMUnlock(mspH);
+    
+    /*
+     * Clear out the data blocks and start over again
+     */
+    @call oself::MSG_MSET_RESET_CALCULATION();
+    @call oself::MSG_MSET_CONTINUE_CALCULATION();
+}	/* End of ExitCalcParams.	*/
+
+/***********************************************************************
+ *		MSG_MSET_SET_PRIORITY for MSetClass
+ ***********************************************************************
+ * SYNOPSIS:	Set priority of the calculation thread
+ * PARAMETERS:	word	threadPriority
+ * RETURN:	void
+ * SIDE EFFECTS:
+ *	Modifies the priority of the calculation thread
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	9/ 3/93   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method MSetClass, MSG_MSET_SET_PRIORITY
+{
+    MSetParameters*	mspP;
+    MemHandle		mspH;
+
+    if(!pself->MSI_initialized) {
+	EC_WARNING(WARNING_MESSAGING_UNINITIALIZED_MSET);
+	return;
+    }
+
+    pself = EnterParams(oself, pself, &mspP, &mspH);
+
+    mspP->MSP_threadPriority = newPriority;
+    ThreadModify(pself->MSI_calcThread, newPriority, TMF_BASE_PRIO);
+
+    ExitParams(oself, pself, mspH);
+}	/* End of MSG_MSET_SET_PRIORITY.	*/
+
+/***********************************************************************
+ *		MSG_MSET_SET_COLOR_SCHEME for MSetClass
+ ***********************************************************************
+ * SYNOPSIS:	 Set the coloring scheme
+ * PARAMETERS:	 MSetColor	newColorScheme
+ * RETURN:       void
+ * SIDE EFFECTS: 
+ *	Alters the colorScheme field of the MSetParameters block.
+ *	Forces the MSet object to redraw itself.
+ *
+ * STRATEGY:
+ *	Don't forget the redraw after setting the color scheme.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	TL	8/11/93   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method MSetClass, MSG_MSET_SET_COLOR_SCHEME
+{
+    MSetParameters*	mspP;
+    MemHandle		mspH;
+
+    if(!pself->MSI_initialized) {
+	EC_WARNING(WARNING_MESSAGING_UNINITIALIZED_MSET);
+	return;
+    }
+
+    pself = EnterParams(oself, pself, &mspP, &mspH);
+    mspP->MSP_colorScheme = newColorScheme;
+    ExitParams(oself, pself, mspH);
+
+    @send oself::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+}	/* End of MSG_MSET_SET_COLOR_SCHEME.	*/
+
+/***********************************************************************
+ *		MSG_VIS_SET_SIZE for MSetClass
+ ***********************************************************************
+ * SYNOPSIS:	Changes the width and height of the MSet
+ * PARAMETERS:	word	width
+ *		word	height
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	Modifies MSCP_pixelWidth, MSCP_pixelHeight
+ *	Modifies MSP_pixelWidth, MSP_pixelHeight to match.
+ *	Restarts the calculation from scratch.
+ *
+ * STRATEGY:
+ *	Remember to modify both copies of pixelWidth and pixelHeight.
+ *	We keep two copies around because the both the drawing and
+ *	calculation code need to know the screen dimensions of the mset.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	9/ 8/93   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method MSetClass, MSG_VIS_SET_SIZE
+{
+    MSetCalcParameters*	mscpP;
+    MSetParameters*	mspP;
+    MemHandle		mspH, mscpH;
+
+    /*
+     *	Note that sending this message to an uninitialized MSet doesn't
+     *	provoke a warning -- it shouldn't be all that unusual for an
+     *	uninitialized MSet's size to be changed.
+     */
+    if(pself->MSI_initialized)
+    {
+	pself = EnterCalcParams(oself, pself, &mscpP, &mscpH);
+	mscpP->MSCP_pixelWidth = width;
+	mscpP->MSCP_pixelHeight = height;
+	ExitCalcParams(oself, pself, mscpH);
+
+	pself = EnterParams(oself, pself, &mspP, &mspH);
+	mspP->MSP_pixelWidth = width;
+	mspP->MSP_pixelHeight = height;
+	ExitParams(oself, pself, mspH);
+    }
+
+    @callsuper();
+}	/* End of MSG_VIS_SET_SIZE.	*/
+
+/***********************************************************************
+ *		MSG_MSET_SET_POSITION for MSetClass
+ ***********************************************************************
+ * SYNOPSIS:	Sets the top-left coordinate of the MSet
+ * PARAMETERS:	FixNum*	newLeft
+ *		FixNum* newTop
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	Modifies MSCP_left, MSCP_top
+ *	Restarts the calculation from scratch.
+ *
+ * STRATEGY:
+ * BUGS/IDEAS:
+ *	Could massage and move around the data already in the data blocks if
+ *	any already-calculated data can be re-used.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	9/ 9/93   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method MSetClass, MSG_MSET_SET_POSITION
+{
+    MSetCalcParameters*	mscpP;
+    MemHandle		mscpH;
+
+    if(!pself->MSI_initialized) {
+	EC_WARNING(WARNING_MESSAGING_UNINITIALIZED_MSET);
+	return;
+    }
+
+    pself = EnterCalcParams(oself, pself, &mscpP, &mscpH);
+
+    mscpP->MSCP_left.FN_high = newLeft->FN_high;
+    mscpP->MSCP_left.FN_middle = newLeft->FN_middle;
+    mscpP->MSCP_left.FN_low = newLeft->FN_low;
+
+    mscpP->MSCP_top.FN_high = newTop->FN_high;
+    mscpP->MSCP_top.FN_middle = newTop->FN_middle;
+    mscpP->MSCP_top.FN_low = newTop->FN_low;
+
+    ExitCalcParams(oself, pself, mscpH);
+}	/* End of MSG_MSET_SET_POSITION.	*/
+
+/***********************************************************************
+ *		MSG_MSET_SET_RESOLUTION for MSetClass
+ ***********************************************************************
+ * SYNOPSIS:	Sets the resolution (magnification) of the MSet,
+ * PARAMETERS:	FixNum*	newHRes,
+ *		FixNum* newVRes
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	Modifies MSCP_left, MSCP_top
+ *	Restarts the calculation from scratch.
+ *
+ * STRATEGY:
+ * BUGS/IDEAS:
+ *	Could massage and move around the data already in the data blocks if
+ *	any already-calculated data can be re-used.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	9/ 9/93   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method MSetClass, MSG_MSET_SET_RESOLUTION
+{
+    MSetCalcParameters*	mscpP;
+    MemHandle		mscpH;
+
+    if(!pself->MSI_initialized) {
+	EC_WARNING(WARNING_MESSAGING_UNINITIALIZED_MSET);
+	return;
+    }
+
+    pself = EnterCalcParams(oself, pself, &mscpP, &mscpH);
+
+    mscpP->MSCP_hRes.FN_high = newHRes->FN_high;
+    mscpP->MSCP_hRes.FN_middle = newHRes->FN_middle;
+    mscpP->MSCP_hRes.FN_low = newHRes->FN_low;
+
+    mscpP->MSCP_vRes.FN_high = newVRes->FN_high;
+    mscpP->MSCP_vRes.FN_middle = newVRes->FN_middle;
+    mscpP->MSCP_vRes.FN_low = newVRes->FN_low;
+
+    ExitCalcParams(oself, pself, mscpH);
+}	/* End of MSG_MSET_SET_RESOLUTION.	*/
+
+/***********************************************************************
+ *		MSG_MSET_SET_PRECISION for MSetClass
+ ***********************************************************************
+ * SYNOPSIS:	Sets the resolution (magnification) of the MSet,
+ * PARAMETERS:	MSetPrecision	newPrecision
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	Modifies MSP_precision and sets up the proper vectors to
+ *	math routines in the MSetCalcParameters block.
+ *	Restarts the calculation from scratch.
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	9/ 9/93   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method MSetClass, MSG_MSET_SET_PRECISION
+{
+    MSetParameters*	mspP;
+    MSetCalcParameters*	mscpP;
+    MemHandle		mscpH, mspH;
+
+    if(!pself->MSI_initialized) {
+	EC_WARNING(WARNING_MESSAGING_UNINITIALIZED_MSET);
+	return;
+    }
+
+    pself = EnterParams(oself, pself, &mspP, &mspH);
+    mspP->MSP_precision = newPrecision;
+    ExitParams(oself, pself, mspH);
+
+    pself = EnterCalcParams(oself, pself, &mscpP, &mscpH);
+    MSSetupCalcVectors(mscpP, newPrecision);
+    ExitCalcParams(oself, pself, mscpH);
+}	/* End of MSG_MSET_SET_PRECSISION.	*/
+
+/***********************************************************************
+ *		MSG_MSET_SET_SELECT_XY for MSetClass
+ ***********************************************************************
+ * SYNOPSIS:	Sets the user-selected point; stored as an offset from the
+ *		top-left corner of the MSet so that it stays valid even if
+ *		the object is moved around the screen
+ *
+ * PARAMETERS:	sword	newX,
+ *		sword	newY
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	Modifies MSP_selectedX, MSP_selectedY.
+ *
+ * STRATEGY:
+ *	Don't use ExitParams since we don't really want to dirty the VM file
+ *	for something this trivial...
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	9/ 9/93   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method MSetClass, MSG_MSET_SET_SELECT_XY
+{
+    MSetParameters*	mspP;
+    MemHandle		mspH;
+    Rectangle		bounds;
+
+    if(!pself->MSI_initialized) {
+	EC_WARNING(WARNING_MESSAGING_UNINITIALIZED_MSET);
+	return;
+    }
+
+    pself = EnterParams(oself, pself, &mspP, &mspH);
+
+    @call self::MSG_VIS_GET_BOUNDS(&bounds);
+
+    mspP->MSP_selectedX = newX - bounds.R_left;
+    mspP->MSP_selectedY = newY - bounds.R_top;
+
+    VMUnlock(mspH);
+    @send oself::MSG_MSET_SEND_NOTIFICATION_OF_PARAM_CHANGE();
+}	/* End of MSG_MSET_SET_SELECT_XY.	*/
+
+/***********************************************************************
+ *		MSG_MSET_SET_MAX_DWELL for MSetClass
+ ***********************************************************************
+ * SYNOPSIS:	Sets the maximum dwell in MSetParameters and 
+ *		MSetCalcParameters block
+ * PARAMETERS:	word	newMaxDwell
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	Modifies MSP_maxDwell, MSCP_maxDwell
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	10/25/93   	Initial Revision
+ *
+ ***********************************************************************/
+@extern method MSetClass, MSG_MSET_SET_MAX_DWELL
+{
+    MSetParameters*	mspP;
+    MSetCalcParameters*	mscpP;
+    MemHandle		mspH, mscpH;
+
+    pself = EnterParams(oself, pself, &mspP, &mspH);
+    mspP->MSP_maxDwell = newMaxDwell;
+    ExitParams(oself, pself, mspH);
+
+    pself = EnterCalcParams(oself, pself, &mscpP, &mscpH);
+    mscpP->MSCP_maxDwell = newMaxDwell;
+    ExitCalcParams(oself, pself, mscpH);
+}	/* End of MSG_MSET_SET_MAX_DWELL.	*/
+

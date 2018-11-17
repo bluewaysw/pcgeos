@@ -1,0 +1,89 @@
+#!/bin/sh -
+#
+# A utility to print what the correct directory for a Responder product is.
+#
+# Usage: respdir <product>
+#        respdir [-x] [-h <hardware>]
+#
+# $Id: respdir,v 1.1 95/12/21 18:17:56 weber Exp $
+#
+
+xip="no"
+hardware="PC"
+
+product="$1"
+while [ -n "$product" ]; do
+    if  [ "$product" = "-x" ]; then
+	    xip="XIP"
+    elif  [ "$product" = "-h" -a "X$2" != "X" ]; then
+	    hardware="$2"
+	    shift
+    elif [ "$product" = "RESPG2XIP" ]; then
+	    xip="XIP"
+	    hardware="G2"
+    elif [ "$product" = "RESPG2" ]; then
+	    xip="no"
+	    hardware="G2"
+    elif [ "$product" = "RESPDEMOXIP" ]; then
+	    xip="XIP"
+	    hardware="PC"
+    elif [ "$product" = "RESPDEMO" ]; then
+	    xip="no"
+	    hardware="PC"
+    elif [ "$product" = "RESPXIP" ]; then
+	    xip="XIP"
+	    hardware="FINAL"
+    elif [ "$product" = "RESPONDER" ]; then
+	    xip="no"
+	    hardware="FINAL"
+    else
+	echo "Usage: respdir <product>"
+	echo "       respdir [-x] [-h <hardware>]"
+	echo
+	echo "<product> is RESPG2XIP, RESPG2, RESPDEMOXIP, RESPDEMO, RESPXIP, or RESPONDER"
+	echo "<hardware> is PC, G2, or FINAL"
+	echo "-x means use XIP version, if one exists"
+	echo "default is non-XIP PC"
+	exit 1
+    fi
+    shift
+    product="$1";
+done
+
+if [ "$hardware" = "G2" -o "$hardware" = "g2" ]; then
+    if [ "$xip" = "XIP" -o "$xip" = "xip" ]; then
+	if   [ -d RESPG2XIP ];		then subDir=RESPG2XIP
+	elif [ -d RESPXIP ]; 		then subDir=RESPXIP
+	elif [ -d XIP ];		then subDir=XIP
+	fi
+    fi
+    if [ ! -n "$subDir" ]; then
+	if   [ -d RESPG2 ]; 		then subDir=RESPG2
+	elif [ -d RESPONDER ];		then subDir=RESPONDER
+	fi
+    fi
+elif [ "$hardware" = "FINAL" -o "$hardware" = "final" ]; then
+    if [ "$xip" = "XIP" -o "$xip" = "xip" ]; then
+	if   [ -d RESPXIP ]; 		then subDir=RESPXIP
+	elif [ -d XIP ];		then subDir=XIP
+	fi
+    fi
+    if [ ! -n "$subDir" ]; then
+	if   [ -d RESPONDER ];		then subDir=RESPONDER
+	fi
+    fi
+else
+    if [ "$xip" = "XIP" -o "$xip" = "xip" ]; then
+	if   [ -d RESPDEMOXIP ];	then subDir=RESPDEMOXIP
+	elif [ -d RESPXIP ]; 		then subDir=RESPXIP
+	elif [ -d XIP ];		then subDir=XIP
+	fi
+    fi
+    if [ "X$subDir" = "X" ]; then
+	if   [ -d RESPDEMO ]; 		then subDir=RESPDEMO
+	elif [ -d RESPONDER ];		then subDir=RESPONDER
+	fi
+    fi
+fi
+echo $subDir
+

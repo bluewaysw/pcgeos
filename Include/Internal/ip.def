@@ -1,0 +1,183 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+			GEOWORKS CONFIDENTIAL
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		ip.def
+
+AUTHOR:		Jennifer Wu, Jul  8, 1994
+
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jwu	7/ 8/94		Initial revision
+
+
+DESCRIPTION:
+	
+		
+	$Id: ip.def,v 1.1 97/04/04 14:13:31 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef __TCPIPDR
+
+StartDriver tcpip
+
+UseDriver Internal/socketDr.def
+
+TCPIP_PROTO_MAJOR	equ	SOCKET_PROTO_MAJOR+0
+TCPIP_PROTO_MINOR	equ	SOCKET_PROTO_MINOR+1
+
+;---------------------------------------------------------------------------
+;		Internet Protocol Header Definitions
+;---------------------------------------------------------------------------
+IpHeaderAndVersion	record
+	IHAV_version:4				; IP version number
+	IHAV_hdrLen:4				; IP header length (in dwords)
+IpHeaderAndVersion	end
+
+IpServiceType		record
+	IST_precedence:3
+	IST_delay:1				; set for low delay
+	IST_throughput:1			; set for high throughput
+	IST_reliability:1			; set for high reliability
+	:2=0					
+IpServiceType		end
+
+IpOffsetAndFlags	record
+	:1=0
+	IOAF_dontFrag:1				; don't fragment bit
+	IOAF_moreFrags:1			; more fragments bit
+	IOAF_fragOff:13				; fragment offset (in 8-bytes)
+IpOffsetAndFlags	end
+
+IpHeader	struct
+	IH_hlAndVer	IpHeaderAndVersion
+	IH_tos		IpServiceType		; type of service 
+	IH_length	sword			; total length
+	IH_id		word			; identification
+	IH_off		IpOffsetAndFlags	; fragment offset field and flags
+	IH_ttl		byte			; time to live
+	IH_protocol	byte			
+	IH_checksum	word
+	IH_source	IPAddr			; source IP address
+	IH_dest		IPAddr			; destination IP address
+IpHeader	ends
+
+;
+; Minimum header size (in bytes) required for protocol headers (no options).
+;
+IP_MIN_HEADER		equ	size IpHeader
+TCP_MIN_HEADER		equ	20
+UDP_MIN_HEADER		equ	8
+TCPIP_MIN_HEADER		equ	TCP_MIN_HEADER + IP_MIN_HEADER
+UDPIP_MIN_HEADER		equ	UDP_MIN_HEADER + IP_MIN_HEADER
+
+
+;---------------------------------------------------------------------------
+;		IP Protocol Numbers
+;---------------------------------------------------------------------------
+IP_PROTO_IP		equ	0
+IP_PROTO_ICMP		equ	1
+IP_PROTO_TCP		equ	6
+IP_PROTO_UDP		equ	17
+IP_PROTO_RAW		equ	255
+
+;---------------------------------------------------------------------------
+;		TCP Port Assignments
+;---------------------------------------------------------------------------
+
+;
+; TCP treats any connectino with this port number as a link connection.
+; Same port is used for local and remote side because loopback is not
+; allowed for link connections. 
+;
+GEOS_WELL_KNOWN_TCP_PORT	equ	0xdead  ; change this later
+
+
+
+COMMENT |------------------------------------------------------------------
+		TCP/IP Driver Extensions
+  
+  Any clients using the TCP/IP functions is expected to be informed 
+  about the internet protocols, the PacketHeader struct defined in 
+  Internal/socketInt.def, definitions in Internal/socketDr.def and
+  all other details pertaining to socket drivers.  Otherwise, clients
+  should use the socket library to access the socket drivers.
+
+  Any client using the TCP/IP TcpipFunction must supply an entry point for 
+  SocketClientOperations.  The interface for SCO calls is as defined in 
+  socketInt.def with the following exceptions.
+
+  SCO_RECEIVE_PACKET
+	The packet will always include the IP header as well as any
+	IP options.  Fields in the IP header has already been converted 
+	to host format.  No error should be returned.  If client cannot 
+	use packet, drop it.
+
+  SCO_ERROR
+	bx parameter is unused for raw ip clients.
+
+--------------------------------------------------------------------------|
+
+TcpipDriverType	etype	byte, SocketDriverType, 1
+TDT_RAW_IP		enum	TcpipDriverType
+
+RawIpFlags 	record
+	:7=0					; must be zero
+	RIF_IP_HEADER:1				; set if IP header included
+RawIpFlags	end
+
+;---------------------------------------------------------------------------
+;		Extended Socket Functions for TCP/IP
+;---------------------------------------------------------------------------
+
+TCPIP_FUNCTION_BASE equ	8000h
+
+.assert (TCPIP_FUNCTION_BASE ge SOCKET_DR_FIRST_SPEC_FUNC)
+
+TcpipFunction	etype	word, TCPIP_FUNCTION_BASE, 2
+
+;DR_SOCKET_REGISTER		
+;	SYNOPSIS: Function for client to register with driver.
+;	
+;	PASS:	bx	= domain 
+;		cl	= TcpipDriverType
+;		dx:bp	= client entry point (virtual fptr)
+;
+;	RETURN:	carry set if error
+;		ax	= SocketDrError (SDE_ALREADY_REGISTERED)
+;		bx	= client handle
+;		ch	= min header size for outgoing packets
+
+;DR_SOCKET_UNREGISTER		
+;	SYNOPSIS: Function for client to unregister with driver.  Client
+;		should unregister as soon as data transfers are complete
+;		to allow other clients use of the driver.
+;
+;	PASS:	bx	= client handle
+;	RETURN:	bx	= domain handle
+
+DR_TCPIP_SEND_RAW_IP		enum	TcpipFunction
+;	SYNOPSIS: Send a raw IP packet.  The PH_flags field MUST be set
+;		to RawIpFlags.  If IP header is included, IP length
+;		field must be in host order.  If IP header is not included,
+;		the DPH_addrSize and DPH_addrOffset fields must be set.
+;		Conversion to network order will be done by IP output routine
+;		prior to computation of checksum.
+;	
+;	PASS:	dx:bp	= optr of databuffer containing IP datagram.
+;		ds:si	= remote IP address (non-null terminated)
+;		ax	= address size
+;		bx	= client handle
+;	RETURN:	carry set if error
+;		ax = SocketDrError
+;	DESTROYS: nothing
+
+
+EndDriver	tcpip

@@ -1,0 +1,483 @@
+/***********************************************************************
+ *
+ * PROJECT:   VacMan
+ * MODULE:    objects definition and declaration
+ * FILE:      appui.goc
+ *
+ * AUTHOR:    
+ *
+ * REVISION HISTORY:
+ *  Date        Name                Description
+ *  ----        ----                -----------
+ *  ed			???						wrote game for Breadbox
+ *	 jfh			1/3/00					re-write - changing Ed's method of bit
+ *												fiddling the entire bitmap to drawing
+ *												individual components - so that we could
+ *												do 256 color graphics and resize things
+ *                                  more easily
+ ************************************************************************/
+/**********************************************************************
+ * Includes                                                           *
+ **********************************************************************/
+
+@include <stdapp.goh>
+@include <game.goh>
+
+#include <ansi/stdlib.h>
+#include <graphics.h>
+#include <gstring.h>
+
+@include "global.goh"
+
+@include "art/vacicon.goh"
+
+/**********************************************************************
+ * AppResource                                                        *
+ **********************************************************************/
+
+@start AppResource;
+
+@object VacApplicationClass VacManApp = {
+  GI_visMoniker = list {@VacManTextMoniker, @Moniker0, @Moniker1};
+  GI_comp = @VacManPrimary;
+  gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = @VacManPrimary;
+  gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST) = @HighScoreControl;
+  gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_STARTUP_LOAD_OPTIONS) =
+    @Difficulty, @SoundGroup, @ControlGroup;
+  ATTR_GEN_HELP_FILE = "VacHelp";
+}
+
+@visMoniker VacManTextMoniker = "VacMan";
+@localize {"Game Title"};
+
+@end AppResource;
+
+/**********************************************************************
+ * Interface                                                          *
+ **********************************************************************/
+
+@start Interface;
+
+@object GenPrimaryClass VacManPrimary = {
+  GI_visMoniker = "VacMan";
+  @localize {"Name of the game"};
+  GI_comp = @GameMenu, @OptionsMenu, @MainGroup, @QTipsDialogBox;
+  GI_attrs = @default | GA_KBD_SEARCH_PATH;
+  ATTR_GEN_HELP_CONTEXT = "TOC";
+  HINT_SIZE_WINDOW_AS_DESIRED;
+  HINT_CENTER_WINDOW;
+  HINT_CENTER_CHILDREN_HORIZONTALLY;
+  HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenInteractionClass GameMenu = {
+  GI_visMoniker = 'G', "Game";
+  @localize {"Name of the menu with game controls"};
+  GI_attrs = @default | GA_KBD_SEARCH_PATH;
+  GI_comp = @NewGame, @PauseGame, @ContinueGame, @QTipsTrigger,
+            @HighScoreControl;
+  GII_visibility = GIV_POPUP;
+  ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+  HINT_SEEK_MENU_BAR;
+}
+
+@object GenTriggerClass QTipsTrigger = {
+  GI_visMoniker   = 'Q', "Quick Tips" ;
+  GTI_destination = @QTipsDialogBox;
+  GTI_actionMsg   = MSG_GEN_INTERACTION_INITIATE ;
+  HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+
+@object GenTriggerClass NewGame = {
+  GI_visMoniker = 'N', "New Game";
+  @localize {"Start a new game"};
+  GI_attrs = @default | GA_KBD_SEARCH_PATH;
+  GTI_destination = @VacGameContent;
+  GTI_actionMsg = MSG_GAME_START_NEW_GAME;
+}
+
+@object GenTriggerClass PauseGame = {
+  GI_visMoniker = 'P', "Pause Game";
+  @localize {"Pause the game in progress"};
+  GI_kbdAccelerator = control 'p';
+  GI_attrs = @default | GA_KBD_SEARCH_PATH;
+  GTI_destination = @VacGameContent;
+  GTI_actionMsg = MSG_GAME_PAUSE_GAME;
+  GI_states = @default & ~GS_ENABLED;
+}
+
+@object GenTriggerClass ContinueGame = {
+  GI_visMoniker = 'C', "Continue Game";
+  @localize {"Start a new game"};
+  GI_kbdAccelerator = control 'c';
+  GI_attrs = @default | GA_KBD_SEARCH_PATH;
+  GTI_destination = @VacGameContent;
+  GTI_actionMsg = MSG_GAME_CONTINUE_GAME;
+  GI_states = @default & ~GS_ENABLED;
+}
+
+@object HighScoreClass HighScoreControl = {
+  HSI_fileName = "VacMan High Scores";
+  HSI_creator = {"VACM", 16431};  /* jfh - bbox mfr id */
+  HSI_highScoreTitle = "VacMan High Scores";
+  @localize {"Title of high score window"};
+}
+
+@object GenInteractionClass MainGroup = {
+  GI_comp = @StatusGroup, @VacGameView;
+  HINT_NO_WIDER_THAN_CHILDREN_REQUIRE;
+  HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+}
+
+@object GenInteractionClass StatusGroup = {
+  GI_comp = @NewGameButton, @Score, @GameLevel, @Lives;
+  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+  HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass NewGameButton = {
+  GI_visMoniker = 'N', "New";
+  @localize {"Start a new game"};
+  GTI_destination = @VacGameContent;
+  GTI_actionMsg = MSG_GAME_START_NEW_GAME;
+}
+
+@object GenValueClass Score = {
+  GI_visMoniker = "Score:";
+  GI_attrs = @default | GA_READ_ONLY;
+  GVLI_displayFormat = GVDF_INTEGER;
+  HINT_VALUE_DIGITAL_DISPLAY;
+  HINT_VALUE_NOT_INCREMENTABLE;
+  HINT_VALUE_NOT_DIGITALLY_EDITABLE;
+  HINT_PLACE_MONIKER_TO_LEFT;
+}
+
+@object GenValueClass GameLevel = {
+  GI_visMoniker = "Level:";
+  GI_attrs = @default | GA_READ_ONLY;
+  GVLI_displayFormat = GVDF_INTEGER;
+  GVLI_value = MakeWWFixed(1.0);
+  HINT_VALUE_DIGITAL_DISPLAY;
+  HINT_VALUE_NOT_INCREMENTABLE;
+  HINT_VALUE_NOT_DIGITALLY_EDITABLE;
+  HINT_PLACE_MONIKER_TO_LEFT;
+}
+
+@object GenValueClass Lives = {
+  GI_visMoniker = "Lives:";
+  GI_attrs = @default | GA_READ_ONLY;
+  GVLI_displayFormat = GVDF_INTEGER;
+  HINT_VALUE_DIGITAL_DISPLAY;
+  HINT_VALUE_NOT_INCREMENTABLE;
+  HINT_VALUE_NOT_DIGITALLY_EDITABLE;
+  HINT_PLACE_MONIKER_TO_LEFT;
+}
+
+@object GenViewClass VacGameView = {
+  GVI_attrs = @default | GVA_CONTROLLED;
+  GVI_horizAttrs = @default |
+					  GVDA_NO_SMALLER_THAN_CONTENT |
+					  GVDA_NO_LARGER_THAN_CONTENT ;
+  GVI_vertAttrs    = @default |
+					  GVDA_NO_SMALLER_THAN_CONTENT |
+					  GVDA_NO_LARGER_THAN_CONTENT ;
+  GVI_content      = @VacGameContent;
+  GVI_docBounds    = {0, 0, BOARD_WIDTH*SQUARE, BOARD_HEIGHT*SQUARE};
+  GVI_color = {C_BLACK, CF_INDEX, 0, 0};
+}
+
+@object VacContentClass VacGameContent = {
+  VCNI_view = VacGameView ;
+  VCNI_attrs = @default | VCNA_SAME_WIDTH_AS_VIEW |
+									 VCNA_SAME_HEIGHT_AS_VIEW;
+}
+
+
+@object GenInteractionClass OptionsMenu = {
+  GI_attrs = @default | GA_KBD_SEARCH_PATH;
+  GI_comp = @DifficultyGroup, @ControlOptionsGroup, @SoundOptionsGroup;
+  GII_visibility = GIV_POPUP;
+  ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU);
+  HINT_SEEK_MENU_BAR;
+}
+
+
+@object GenInteractionClass DifficultyGroup = {
+  GI_visMoniker = 'G', "Game Speed";
+  GI_comp = @Difficulty;
+  GII_visibility = GIV_POPUP;
+}
+
+@object GenItemGroupClass Difficulty = {
+  GI_comp = @DifficultyEasy, @DifficultyMedium, @DifficultyHard;
+  GIGI_selection = SPEED_SLOW;
+  GIGI_destination = process;
+  ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_DIFFICULTY_CHANGED;
+}
+
+@object GenItemClass DifficultyEasy = { 
+  GI_visMoniker = 'S', "Slow";
+  GII_identifier = SPEED_SLOW;
+}
+
+@object GenItemClass DifficultyMedium = {
+  GI_visMoniker = 'M', "Medium";
+  GII_identifier = SPEED_MED;
+}
+
+@object GenItemClass DifficultyHard = {
+  GI_visMoniker = 'F', "Fast";
+  GII_identifier = SPEED_FAST;
+}
+
+@object GenInteractionClass ControlOptionsGroup = {
+  GI_visMoniker = 'C', "Controls";
+  GI_comp = @ControlGroup;
+  GII_visibility = GIV_POPUP;
+}
+
+@object GenItemGroupClass ControlGroup = {
+  GI_comp = @ControlsManual, @ControlsAuto;
+  GIGI_selection = MOVE_MANUAL;
+  GIGI_destination = process;
+  ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_CONTROLS_CHANGED;
+}
+
+@object GenItemClass ControlsManual = {
+  GI_visMoniker = 'M', "Manual";
+  GII_identifier = MOVE_MANUAL;
+}
+
+@object GenItemClass ControlsAuto = {
+  GI_visMoniker = 'A', "Automatic";
+  GII_identifier = MOVE_AUTO;
+}
+
+@object GenInteractionClass SoundOptionsGroup = {
+  GI_visMoniker = 'S', "Sound";
+  GI_comp = @SoundGroup;
+  GII_visibility = GIV_POPUP;
+}
+
+@object GenItemGroupClass SoundGroup = {
+  GI_comp = @SoundOn, @SoundOff, @SystemPref ;
+  GIGI_selection   = SOUND_SYSTEM ;
+  GIGI_destination = process ;
+  ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_SOUND_CHANGED;
+}
+
+@object GenItemClass SoundOn = {
+  GI_visMoniker = 'S', "Sound On" ;
+  GII_identifier = SOUND_ON ;
+}
+
+@object GenItemClass SoundOff = {
+  GI_visMoniker = 'O', "Sound Off" ;
+  GII_identifier = SOUND_OFF ;
+}
+
+@object GenItemClass SystemPref = {
+  GI_visMoniker = 'P', "Use System Preference" ;
+  GII_identifier = SOUND_SYSTEM ;
+}
+
+@end Interface;
+
+/**********************************************************************
+ * Sprite Resource                                                    *
+ **********************************************************************/
+
+@start VacLeftResource;
+@include "art/8vac1l.goh"
+@include "art/8vac2l.goh"
+@include "art/8vac3l.goh"
+@end VacLeftResource;
+
+@start VacRightResource;
+@include "art/8vac1r.goh"
+@include "art/8vac2r.goh"
+@include "art/8vac3r.goh"
+@end VacRightResource;
+
+@start VacUpResource;
+@include "art/8vac1u.goh"
+@include "art/8vac2u.goh"
+@include "art/8vac3u.goh"
+@end VacUpResource;
+
+@start VacDownResource;
+@include "art/8vac1d.goh"
+@include "art/8vac2d.goh"
+@include "art/8vac3d.goh"
+@end VacDownResource;
+
+@start BunBagResource;
+@include "art/8bun.goh"
+@include "art/8bag.goh"
+@end BunBagResource;
+
+@start CloudResource;
+@include "art/cloud1.goh"
+@include "art/cloud2.goh"
+@include "art/cloud3.goh"
+@end CloudResource;
+
+@start BoardResource, data;
+
+@include "art/boards.goh"
+
+@end BoardResource;
+
+@start CurrentBoardResource, data;
+
+@chunk char CurrentBoard[13][21] = {
+  "                    ",
+  "                    ",
+  "                    ",
+  "                    ",
+  "                    ",
+  "                    ",
+  "                    ",
+  "                    ",
+  "                    ",
+  "                    ",
+  "                    ",
+  "                    ",
+  "                    "
+};
+
+@end CurrentBoardResource;
+
+@start StringsResource, data;
+
+@chunk char GameOver[] = "Game Over.";
+@localize {"End of game - player loses"};
+
+@chunk char YouWin[] = "You Win!";
+@localize {"End of game - player wins"};
+
+@chunk char PausedText[] = "Paused";
+
+@end StringsResource;
+
+
+
+@start QTipsResource;
+@include "art/QTip1.goh"
+@include "art/QTip2.goh"
+@include "art/QTip3.goh"
+
+@object GenInteractionClass QTipsDialogBox = {
+  GI_visMoniker = "VacMan Quick Tips";
+  GI_comp = @GoalText,@QuickTipsGroup,@ShowOnStartupGroup,@OKTipsButton;
+  GII_visibility = GIV_DIALOG ;
+  GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+  HINT_CENTER_CHILDREN_HORIZONTALLY ;
+  ATTR_GEN_HELP_CONTEXT = "TOC";
+}
+
+@object GenTextClass GoalText = {
+  GI_attrs = @default | GA_READ_ONLY;
+  GTXI_text = "The goal of this game is to vacuum up the dust balls without letting the dust bunnies clog your vacuum. You score points by eating the dust balls, but you only have 3 lives to eat them all.";
+  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+}
+
+@object GenBooleanGroupClass ShowOnStartupGroup = {
+  GI_comp = @ShowOnStartupBoolean;
+}
+
+@object GenBooleanClass ShowOnStartupBoolean = {
+  GI_visMoniker = 'S', "Show this Dialog box when VacMan starts";
+  GBI_identifier = SHOW_ON_STARTUP;
+}
+
+@object GenTriggerClass OKTipsButton = {
+  GI_visMoniker   = 'O', "OK";
+  GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+  HINT_SEEK_REPLY_BAR;
+  HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenInteractionClass QuickTipsGroup = {
+  GI_comp = @QTip1, @QTip2, @QTip3;
+}
+
+@object GenInteractionClass QTip1 = {
+  GI_comp = @QTip1GlyphHolder, @QTip1Text ;
+  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+  HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenInteractionClass QTip1GlyphHolder = {
+  GI_comp = @QTip1Glyph;
+  HINT_CENTER_CHILDREN_HORIZONTALLY;
+  HINT_CENTER_CHILDREN_VERTICALLY;
+  HINT_FIXED_SIZE = {SST_PIXELS | 80, 0,0};
+  /* ^^^ is based on the width of the widest icon */
+}
+
+@object GenGlyphClass QTip1Glyph = {
+  GI_visMoniker = list { @QTip1Moniker };
+}
+
+@object GenTextClass QTip1Text = {
+  GI_attrs = @default | GA_READ_ONLY;
+  GTXI_text = "Use the arrow keys on your keyboard to move the vacuum cleaner.";
+  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+  HINT_MINIMUM_SIZE = {SST_PIXELS | 325, 0, 0};
+}
+
+@object GenInteractionClass QTip2 = {
+  GI_comp = @QTip2GlyphHolder, @QTip2Text ;
+  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+  HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenInteractionClass QTip2GlyphHolder = {
+  GI_comp = @QTip2Glyph;
+  HINT_CENTER_CHILDREN_HORIZONTALLY;
+  HINT_CENTER_CHILDREN_VERTICALLY;
+  HINT_FIXED_SIZE = {SST_PIXELS | 80, 0,0};
+  /* ^^^ is based on the width of the widest icon */
+}
+
+@object GenGlyphClass QTip2Glyph = {
+  GI_visMoniker = list { @QTip2Moniker };
+}
+
+@object GenTextClass QTip2Text = {
+  GI_attrs = @default | GA_READ_ONLY;
+  GTXI_text = "The dust bunnies chase your vacuum cleaner, and each time it gets caught you lose a life. You can vacuum up a dust bunny, but only when you get a new vacuum bag to gain extra power.";
+  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+  HINT_MINIMUM_SIZE = {SST_PIXELS | 325, 0, 0};
+}
+
+@object GenInteractionClass QTip3 = {
+  GI_comp = @QTip3GlyphHolder, @QTip3Text ;
+  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+  HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenInteractionClass QTip3GlyphHolder = {
+  GI_comp = @QTip3Glyph;
+  HINT_CENTER_CHILDREN_HORIZONTALLY;
+  HINT_CENTER_CHILDREN_VERTICALLY;
+  HINT_FIXED_SIZE = {SST_PIXELS | 80, 0,0};
+  /* ^^^ is based on the width of the widest icon */
+}
+
+@object GenGlyphClass QTip3Glyph = {
+  GI_visMoniker = list { @QTip3Moniker };
+}
+
+@object GenTextClass QTip3Text = {
+  GI_attrs = @default | GA_READ_ONLY;
+  GTXI_text = "Don't get trapped by the dust bunnies! There are escape exits on the game board that allow you to go to the other end of the board.";
+  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+  HINT_MINIMUM_SIZE = {SST_PIXELS | 325, 0, 0};
+}
+
+@end QTipsResource
+

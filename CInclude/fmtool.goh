@@ -1,0 +1,219 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1993 -- All Rights Reserved
+ *
+ * PROJECT:	  
+ * MODULE:	  
+ * FILE:	  fmtool.goh
+ *
+ * AUTHOR:  	  Adam de Boor: Feb 15, 1993
+ *
+ * REVISION HISTORY:
+ *	Name	  Date	    Description
+ *	----	  ----	    -----------
+ *	ardeb	  2/15/93	    Initial version
+ *
+ * DESCRIPTION:
+ *	Interface description for installable file-manager tools.
+ *
+ *
+ * 	$Id: fmtool.goh,v 1.1 97/04/04 15:57:40 newdeal Exp $
+ *
+ ***********************************************************************/
+
+/*
+ * Protocol numbers for this interface definition. This must be assigned to
+ * the _PROTO variable in the local.mk file. For example, if
+ * FMTOOL_PROTO_MAJOR is defined as 1, and FMTOOL_PROTO_MINOR is 0, your
+ * local.mk file would include this line:
+ *
+ * _PROTO = 1.0
+ */ 
+#define FMTOOL_PROTO_MAJOR	1
+#define FMTOOL_PROTO_MINOR	0
+
+/*
+ * This is the superclass for all file manager applications that wish to support
+ * installable tools. The file manager should subclass this for its own process
+ * class definitions.
+ */ 
+@class FileManagerClass, GenProcessClass;
+
+@message MemHandle MSG_FM_GET_SELECTED_FILES() = ax;
+/* Fetch the block of files/directories selected by the user.
+ *
+ * Context:	Called by tools to determine on what files they should operate
+ *		once the user has activated them.
+ * Source:	Called by installable tool
+ * Destination:  File manager process
+ * Interception: not intercepted
+ *
+ * Pass:	nothing
+ *
+ * Return:
+ *		handle of block with FileQuickTransferHeader followed
+ *		by array of FileOperationInfoEntry structures (0 if
+ *		     couldn't allocate block)
+ */
+
+@message Boolean MSG_FM_OPEN_FILES(MemHandle fqth = cx) = carry;
+/* Performs the same operation as the Open entry of the File menu of a typical
+ * file manager, to wit: if the item is an application it is launched; if it's
+ * a document, its creator is told to open it; if it's a directory, a folder
+ * window is opened for it.
+ *
+ * Context:	Called by installable tool when it wants to display a file
+ *		it has found, or the like.
+ * Source:	Installable tool library
+ * Destination:  File manager
+ * Interception: not intercepted
+ *
+ * Pass		handle of first block with a FileQuickTransferHeader and
+ *		following array of FileOperationInfoEntry structures.
+ *		More than one block of files may be passed by linking
+ *		successive blocks through their FQTH_nextBlock fields.
+ *		The final block must have an FQTH_nextBlock of 0.
+ *
+ * Return:
+ *		TRUE on error (all things that could be opened will have
+ *		    been opened, however)
+ *		All blocks in the chain are freed, regardless of the success
+ *		    of the operation.
+ */
+
+@message optr MSG_FM_DUP_AND_ADD(optr root = cx:dx, FileManagerParent parent = bp) = cx:dx;
+/* Duplicates a template resource and adds an object in it as the last generic
+ * child of a particular object in the file manager. The FileManagerParent
+ * enumerated type defines the objects within the file manager to which a tool
+ * is allowed to add objects.
+ *
+ * The duplicated resource is run by the same thread as its parent, as you'd
+ * expect. The tool should not rely on which of the file manager's threads is
+ * actually running the objects.
+ *
+ * If the duplicated resource uses subclasses defined in the tool library,
+ * the resource must have LMF_DETACHABLE clear.
+ * 
+ * Context:	Called by a tool when it wishes to display UI to the user.
+ * Source:	Installable tool.
+ * Destination:  File manager process
+ * Interception: Not intercepted, usually.
+ *
+ * Pass:	root	- object to add as generic child, after its resource
+ *			  has been duplicated
+ *		parent - FileManagerParent to which to add the duplicated object
+ *			
+ * Return:	duplicated object
+ */
+
+typedef enum {
+    FMP_APPLICATION,	/* GenApplication */
+    FMP_DISPLAY_GROUP,	/* GenDisplayGroup */
+} FileManagerParent;
+
+@endc
+
+/*
+ * information about a file selected for a file operation
+ */
+typedef	struct {
+	FileLongName		FOIE_name;
+    	GeosFileType		FOIE_type;
+	FileAttrs		FOIE_attrs;
+	GeosFileHeaderFlags	FOIE_flags;
+	DirPathInfo		FOIE_pathInfo;
+	GeodeToken		FOIE_creator;
+	word			FOIE_info;	/* This is a generic word of
+						 * info -- in Workplace Shell,
+						 * this word contains the
+						 * WShellObjectType of
+						 * the file.
+						 */
+
+} FileOperationInfoEntry;
+
+/*
+ * direct manipulation packet header
+ *	(packet is header followed by array of FileOperationInfoEntry's)
+ */
+
+typedef WordFlags FQTHFlags;
+#define FQTHF_UIFA  	0xff00	/* UIFunctionsActive record */
+#define FQTHF_PRIVATE  	0x00ff	/* Must be zero */
+/*
+ * The FQTHF_private bits are used internally by WShell & WShellBA for
+ * special transfer operations.  For general purposes, these bits
+ * should *always* be cleared.  See wshell.def for how the
+ * FQTHF_PRIVATE flags are used by WShellBA (BATransferType).
+ */
+
+typedef struct {
+	word	    FQTH_nextBlock;	/* next transfer data block (0 if
+					 * none) */
+	FQTHFlags   FQTH_UIFA;
+	word	    FQTH_numFiles;  	/* Number of following
+					 * FileOperationInfoEntry structs */
+	word	    FQTH_diskHandle;	/* Handle of disk on which FQTH_pathname
+					 * sits */
+	PathName    FQTH_pathname;  	/* pathname of files */
+} FileQuickTransferHeader;
+
+
+/*
+ * The interface from the file manager to the tool is completely driven by
+ * a table that the library returns when it's asked for it.
+ *
+ * A tool may have multiple entries in the Tool menu. Each one is described
+ * by an FMToolStruct descriptor. 
+ */
+typedef enum {
+    FMTT_TRIGGER,	/* A trigger that performs the tool's action immediately
+			 *  upon selection. */
+    FMTT_DIALOG,	/* Something that brings up a dialog box to gather
+			 * further information from the user. */
+} FMToolType;
+
+typedef WordFlags FMToolFlags;
+#define FMTF_SELECTED_ONLY  0x0008	/* set if tool should be active only
+					 * when there are files selected */
+#define FMTF_TYPE   	    0x0007	/* type of tool (FMToolType) */
+
+typedef struct {
+    optr	FMTS_moniker;	    	/* Moniker to use for the entry
+					 * in the Tool menu */
+    FMToolFlags	FMTS_flags;		/* Flags governing how it builds,
+					 * etc. */
+    word	FMTS_routineNumber;	/* Library routine in tool to call when
+					 * entry activated. Routine is called
+					 * using FMToolProc prototype */
+
+} FMToolStruct;
+
+typedef void _pascal _export FMToolProc(
+				GeodeHandle filemgr,	/* Process that is
+							 * subclass of
+							 * FileManagerClass */
+				word toolNum,	/* Entry # of activated tool
+						 * within table returned by
+						 * FMTF_FETCH_TOOLS */
+				word entryNum);	/* Entry # of the routine being
+						 * called */
+
+/*
+ * Routines that must be exported from a tool library, in this order.
+ */
+typedef enum {
+    FMTF_FETCH_TOOLS,
+    /*	Desc:	Fetch the table of tools the library wishes to place in the
+     *		menu. Called with FMFetchToolsProc prototype.
+     *	Pass:	nothing
+     *	Return:	*tablePtr = virtual far pointer to array of FMToolStruct
+     *			    structures describing the tools.
+     *	    	# of entries in that table.
+     */
+} FMToolFunction;
+
+
+typedef word _pascal _export FMFetchToolsProc(FMToolStruct **tablePtr);
+
+ 

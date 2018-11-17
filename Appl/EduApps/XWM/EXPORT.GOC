@@ -1,0 +1,628 @@
+/***********************************************************************
+ *Copyright 1994-2001 Breadbox Computer Company LLC  All Rights Reserved
+ *
+ * PROJECT:	Breadbox Crossword Maker
+ * FILE:		export.goc
+ * AUTHOR:	John Howard   11/01
+ *
+ *
+ *
+ *
+ ***********************************************************************/
+
+@include "xwm.goh"
+@include "externs.goh"
+
+/***********************************************************************
+ *
+ * FUNCTION:	PZLFileWrite (char* buffer, FileHandle fh)
+ *
+ * CALLED BY:	MSG_XWM_PROCESS_MAKE_PZL
+ *      	
+ *
+ * STRATEGY:    returns FALSE for no error TRUE for error
+ *		
+ *
+ ***********************************************************************/
+Boolean PZLFileWrite (char* buffer, FileHandle fh)
+{
+word			length, fileCloseError;
+
+
+	/* now write the line to the .PZL file */
+	length = FileWrite(fh,
+			  buffer,
+			  strlen(buffer),
+			  FALSE);
+	/* check for write error */
+	if (length != strlen(buffer))  {
+		/* show message and bail out */
+		NotifyDBox(0, @ExpWriteErrMsg);
+		fileCloseError = FileClose(fh, FALSE);
+		if (fileCloseError) NotifyDBox(0, @ExpCloseErrMsg);
+		FilePopDir();
+		@send XWMApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+		return (TRUE);
+		}
+	 else
+	 	return (FALSE);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_XWM_PROCESS_OPEN_EXPORT_DB for XWMProcessClass
+ *
+ * PARAMETERS:  (GEN_TRIGGER_ACTION)
+ *               optr	trigger
+ *
+ *
+ * DESCRIPTION:	Sets up the UI for the appropriate export
+ *                  and opens the dbox
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method XWMProcessClass, MSG_XWM_PROCESS_OPEN_EXPORT_DB
+{
+ word			count;
+ char			nameStr[15];
+ XWMHelpContext	hContext = {0};
+
+
+	@call XWMExportDialog::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	@send XWMExportDialog::MSG_META_DELETE_VAR_DATA(ATTR_GEN_HELP_CONTEXT);
+	MemLock(OptrToHandle(@XWDDBoxHelp));
+	if (trigger == @XWMMakeCrosswordTrigger) {
+		@send XWDFileName::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send PZLFileName::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send PZLNameWarn::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send PZLTitle::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send PZLFileSel::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send XWDFileSel::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send MakePZLTrigger::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send MakeXWDTrigger::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		/* open file sel in Document/Crossword Puzzles */
+		if (@call XWDFileSel::MSG_GEN_PATH_SET(LMemDeref(@XWFolderTxt), SP_DOCUMENT))
+         /* or Doc if the other isn't there */
+			@call XWDFileSel::MSG_GEN_PATH_SET(".", SP_DOCUMENT);
+		/* the dbox visMoniker */
+		@send XWMExportDialog::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@MakeXWDMoniker),
+																 VUM_DELAYED_VIA_APP_QUEUE);
+		/* the appropriate help context */
+		strcpy(hContext.XWMHC_name, LMemDeref(@XWDDBoxHelp));
+		}
+	else {
+		@send XWDFileName::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send PZLFileName::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send PZLNameWarn::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send PZLTitle::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send PZLFileSel::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send XWDFileSel::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send MakePZLTrigger::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		@send MakeXWDTrigger::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		/* open file sel in Document */
+		@send PZLFileSel::MSG_GEN_PATH_SET(".", SP_DOCUMENT);
+		/* the dbox visMoniker */
+		@send XWMExportDialog::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@MakePZLMoniker),
+																 VUM_DELAYED_VIA_APP_QUEUE);
+		/* the appropriate help context */
+		strcpy(hContext.XWMHC_name, LMemDeref(@PZLDBoxHelp));
+		}
+	MemUnlock(OptrToHandle(@XWDDBoxHelp));
+	@call XWMExportDialog::MSG_META_ADD_VAR_DATA(
+					(ATTR_GEN_HELP_CONTEXT | VDF_SAVE_TO_STATE),
+					sizeof(XWMHelpContext),
+					&hContext);
+	@call XWMExportDialog::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+
+	/* Open the dialog box */
+	@call XWMExportDialog::MSG_GEN_INTERACTION_INITIATE();
+
+	if (trigger == @XWMMakePuzzleTrigger) {
+		/* set default name */
+		MemLock (OptrToHandle(@DefaultPZL));
+		@call PZLFileName::MSG_VIS_TEXT_REPLACE_ALL_PTR(LMemDeref(@DefaultPZL), 0);
+		MemUnlock (OptrToHandle(@DefaultPZL));
+		/* select UNNAMED part of default PZL name */
+		@call PZLFileName::MSG_VIS_TEXT_GET_ALL_PTR(nameStr);
+		count = 0;
+		while (nameStr[count] != '.')  count++;
+		@send PZLFileName::MSG_META_GRAB_FOCUS_EXCL();
+		@send PZLFileName::MSG_META_GRAB_TARGET_EXCL();
+		@send PZLFileName::MSG_VIS_TEXT_SELECT_RANGE_SMALL(0, count);
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_XWM_PROCESS_MAKE_PZL for XWMProcessClass
+ *
+ * DESCRIPTION:	 Creates the selected file and does the export
+ *              
+ *     
+ *              
+ *
+ ***********************************************************************/
+@extern method XWMProcessClass, MSG_XWM_PROCESS_MAKE_PZL
+{
+char			PZLName[13], inputStr[51];
+char			PZLPath[PATH_BUFFER_SIZE];
+char			lineBuffer[CLUE_ELEMENT_SIZE];
+FileHandle		PZLFileHandle;
+DiskHandle		PZLDiskhandle;
+word			fileCloseError, row, col, i, numWords, cellNum, clues;
+MemHandle		mhGrid, mhList, mhAnsw;
+VMBlockHandle	vmbh;
+optr				oWordGrid;
+char				c, cellNumStr[13];
+XWMListElement	*pElement;
+XWMAnswerElement		*pAns;
+DosCodePage		codePage;
+
+
+	/* get the pzl file name */
+	@call PZLFileName::MSG_VIS_TEXT_GET_ALL_PTR(PZLName);
+
+	/* get the file's path and disk handle */
+	@call PZLFileSel::MSG_GEN_PATH_GET(PZLPath, sizeof(PZLPath));
+	PZLDiskhandle = @call PZLFileSel::MSG_GEN_PATH_GET_DISK_HANDLE();
+
+	FilePushDir();
+
+	/* and set the PZL file dir  - FileSel doesn't do this */
+	FileSetCurrentPath(PZLDiskhandle, PZLPath);
+
+	/* and create the PZL file */
+	PZLFileHandle = FileCreate(PZLName,
+			       ((FILE_CREATE_ONLY | FCF_NATIVE)
+			       | (FILE_ACCESS_RW | FILE_DENY_RW)),
+			       0);
+	if (PZLFileHandle == NullHandle)  {
+		/* if file exists just tell user & wait for new name */
+		if (ThreadGetError() == ERROR_FILE_EXISTS)  {
+			NotifyDBox(0, @FileExistsErrMsg);
+			}
+		/* for any other error - bail out */
+		else  {
+			NotifyDBox(0, @ExpCreateErrMsg);
+			@send XWMExportDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+			}
+	  FilePopDir();
+	  return;
+       }
+
+	/* dismiss the file selector box now */
+	@send XWMExportDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+	/* mark app busy */
+	@send XWMApp::MSG_GEN_APPLICATION_MARK_BUSY();
+
+	/* do the header stuff */
+	codePage = LocalGetCodePage();
+	UtilHex32ToAscii(inputStr, (dword)codePage, UHTAF_NULL_TERMINATE);
+	strcpy(lineBuffer, "CODEPAGE=");
+	strcat(lineBuffer, inputStr);
+	strcat(lineBuffer, "\r\n");
+	if (PZLFileWrite (lineBuffer, PZLFileHandle)) return;
+	strcpy(lineBuffer, "COPYRIGHT=");
+	@call ExpCopyright::MSG_VIS_TEXT_GET_ALL_PTR(inputStr);
+	strcat(lineBuffer, inputStr);
+	strcat(lineBuffer, "\r\n");
+	if (PZLFileWrite (lineBuffer, PZLFileHandle)) return;
+	strcpy(lineBuffer, "AUTHOR=");
+	@call ExpAuthor::MSG_VIS_TEXT_GET_ALL_PTR(inputStr);
+	strcat(lineBuffer, inputStr);
+	strcat(lineBuffer, "\r\n");
+	if (PZLFileWrite (lineBuffer, PZLFileHandle)) return;
+	strcpy(lineBuffer, "RATING=1\r\n");
+	if (PZLFileWrite (lineBuffer, PZLFileHandle)) return;
+	strcpy(lineBuffer, "SOURCE=");
+	@call ExpSource::MSG_VIS_TEXT_GET_ALL_PTR(inputStr);
+	strcat(lineBuffer, inputStr);
+	strcat(lineBuffer, "\r\n");
+	if (PZLFileWrite (lineBuffer, PZLFileHandle)) return;
+	strcpy(lineBuffer, "TITLE=");
+	@call PZLTitle::MSG_VIS_TEXT_GET_ALL_PTR(inputStr);
+	strcat(lineBuffer, inputStr);
+	strcat(lineBuffer, "\r\n");
+	if (PZLFileWrite (lineBuffer, PZLFileHandle)) return;
+
+   /* start of grid marker */
+	strcpy(lineBuffer, "***\r\n");
+	if (PZLFileWrite (lineBuffer, PZLFileHandle)) return;
+	vmbh = VMFind(g_fhDocument, 0, GRID);
+	VMLock(g_fhDocument, vmbh, &mhGrid);
+	oWordGrid = ConstructOptr(mhGrid, g_chDocWordGrid);
+	for (row = 0; row < g_height; row ++) {
+		for (col = 0; col < g_width; col ++) {
+			c = XWMGetLetter(oWordGrid, col, row);
+			if (c == ' ') c = '.';
+			lineBuffer[col] = c;
+			}
+		lineBuffer[col] = 0;
+		strcat(lineBuffer, "\r\n");
+		if (PZLFileWrite (lineBuffer, PZLFileHandle)) {
+			VMUnlock(mhGrid);
+			return;
+			}
+		}
+	VMUnlock(mhGrid);
+
+	/* start of across clues marker */
+	strcpy(lineBuffer, "***\r\n");
+	if (PZLFileWrite (lineBuffer, PZLFileHandle)) return;
+	vmbh = VMFind(g_fhDocument, 0, LIST);
+	VMLock(g_fhDocument, vmbh, &mhList);
+	vmbh = VMFind(g_fhDocument, 0, ANSW);
+	VMLock(g_fhDocument, vmbh, &mhAnsw);
+	/* find across word starts */
+	clues = 0;
+	numWords = ChunkArrayGetCountHandles(mhList, g_chDocWordList);
+	for (row = 0; row < g_height; row ++) {
+		for (col = 0; col < g_width; col ++) {
+			for (i = 0; i < numWords; i++) {
+				pAns = ChunkArrayElementToPtrHandles(mhAnsw, g_chDocAnswers, i, 0);
+				if (pAns->XWMAE_row == row && pAns->XWMAE_column == col
+						 && pAns->XWMAE_direction == 0) {
+					/* we have an across word start - so grab the cell number */
+               cellNum = g_geosCellNumArray[row][col];
+					UtilHex32ToAscii(cellNumStr, (dword)cellNum, UHTAF_NULL_TERMINATE);
+					strcpy(lineBuffer, cellNumStr);
+					strcat(lineBuffer, " ");
+					/* and the clue text */
+					pElement = ChunkArrayElementToPtrHandles(
+										mhList, g_chDocWordList, pAns->XWMAE_wordNum, 0);
+					strcat(lineBuffer, pElement->XWMLE_clue);
+					strcat(lineBuffer, "\r\n");
+					clues++;
+					if (PZLFileWrite (lineBuffer, PZLFileHandle)) {
+						VMUnlock(mhAnsw);
+						VMUnlock(mhList);
+						return;
+						}
+					break;
+					}  /* end of found across start if */
+				}  /* end of numWords (i) for */
+			}  /* end of col for */
+		}  /* end of row for */
+
+	/* start of down clues marker */
+	strcpy(lineBuffer, "***\r\n");
+	if (PZLFileWrite (lineBuffer, PZLFileHandle)) return;
+	/* find down word starts */
+	for (row = 0; row < g_height; row ++) {
+		for (col = 0; col < g_width; col ++) {
+			for (i = 0; i < numWords; i++) {
+				pAns = ChunkArrayElementToPtrHandles(mhAnsw, g_chDocAnswers, i, 0);
+				if (pAns->XWMAE_row == row && pAns->XWMAE_column == col
+						 && pAns->XWMAE_direction == 1) {
+					/* we have a down word start - so grab the cell number */
+					cellNum = g_geosCellNumArray[row][col];
+					UtilHex32ToAscii(cellNumStr, (dword)cellNum, UHTAF_NULL_TERMINATE);
+					strcpy(lineBuffer, cellNumStr);
+					strcat(lineBuffer, " ");
+					/* and the clue text */
+					pElement = ChunkArrayElementToPtrHandles(
+										mhList, g_chDocWordList, pAns->XWMAE_wordNum, 0);
+					strcat(lineBuffer, pElement->XWMLE_clue);
+					strcat(lineBuffer, "\r\n");
+					clues++;
+					if (PZLFileWrite (lineBuffer, PZLFileHandle)) {
+						VMUnlock(mhAnsw);
+						VMUnlock(mhList);
+						return;
+						}
+					break;
+					}  /* end of found across start if */
+				}  /* end of numWords (i) for */
+			if (clues == numWords) break;
+			}  /* end of col for */
+		if (clues == numWords) break;
+		}  /* end of row for */
+
+	VMUnlock(mhAnsw);
+	VMUnlock(mhList);
+
+	/* end of file marker */
+	strcpy(lineBuffer, "***\r\n");
+	if (PZLFileWrite (lineBuffer, PZLFileHandle)) return;
+
+
+	/* Done so close the file */
+	fileCloseError = FileClose(PZLFileHandle, FALSE);
+	if (fileCloseError) NotifyDBox(0, @ExpCloseErrMsg);
+	FilePopDir();
+	@send XWMApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_XWM_PROCESS_MAKE_XWORD for XWMProcessClass
+ *
+ * DESCRIPTION:	 Creates the selected file and does the export
+ *              
+ *     
+ *              
+ *
+ ***********************************************************************/
+@extern method XWMProcessClass, MSG_XWM_PROCESS_MAKE_XWORD
+{
+char			PZLName[33], inputStr[51];
+char			PZLPath[PATH_BUFFER_SIZE];
+char			lineBuffer[CLUE_ELEMENT_SIZE];
+char			headerBuf[250];
+FileHandle		PZLFileHandle;
+DiskHandle		PZLDiskhandle;
+word			fileCloseError, row, col, i, numWords, cellNum, clues;
+word			headerSize, gridSize, aClueSize, dClueSize, unCompSize, compSize;
+word			clueSize;
+MemHandle		mhGrid, mhList, mhAnsw;
+VMBlockHandle	vmbh;
+optr				oWordGrid/*, oWordList, oAnswers*/;
+char				c, cellNumStr[13], clueSizeStr[13];
+XWMListElement	*pElement;
+XWMAnswerElement		*pAns;
+MemHandle	destMH, cluesMH, compMH;
+char			*destAddr, *cluesAddr;
+void			*compAddr;
+GeodeToken	cwAppToken = {"CWRD", MANUFACTURER_ID_GEOWORKS};
+GeodeToken	cwDocToken = {"CW00", MANUFACTURER_ID_GEOWORKS};
+ProtocolNumber		cwDocProtoNum;
+
+
+	/* get the pzl file name */
+	if (!@call XWDFileName::MSG_VIS_TEXT_GET_ALL_PTR(PZLName)) {
+      NotifyDBox(0, @XWDFileNameMsg);
+		return;
+		}
+
+	/* get the file's path and disk handle */
+	@call XWDFileSel::MSG_GEN_PATH_GET(PZLPath, sizeof(PZLPath));
+	PZLDiskhandle = @call PZLFileSel::MSG_GEN_PATH_GET_DISK_HANDLE();
+
+	FilePushDir();
+
+	/* and set the PZL file dir  - FileSel doesn't do this */
+	FileSetCurrentPath(PZLDiskhandle, PZLPath);
+
+	/* create the puzzle file */
+	PZLFileHandle = FileCreate(PZLName,
+					 ((FILE_CREATE_ONLY)
+			       | (FILE_ACCESS_RW | FILE_DENY_RW)),
+					 0);
+	if (PZLFileHandle == NullHandle)  {
+		/* if file exists just tell user & wait for new name */
+		if (ThreadGetError() == ERROR_FILE_EXISTS)  {
+			NotifyDBox(0, @FileExistsErrMsg);
+			}
+		/* for any other error - bail out */
+		else  {
+			NotifyDBox(0, @ExpCreateErrMsg);
+			@send XWMExportDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+			}
+	  FilePopDir();
+	  return;
+		 }
+
+	/* dismiss the file selector box now */
+	@send XWMExportDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+	/* this part comes sort of from concword.asm */
+
+	/* allocate the destination mem block */
+	destMH = MemAlloc(4096, HF_SWAPABLE, HAF_ZERO_INIT | HAF_LOCK);
+	destAddr = (char *) MemDeref(destMH);
+	unCompSize = 0;
+	/* first the header stuff */
+	@call ExpCopyright::MSG_VIS_TEXT_GET_ALL_PTR(headerBuf);
+	strcat(headerBuf, "\r\n");
+	strcat(headerBuf, "Title\r\n");   /* not used by Crossword app */
+	@call ExpAuthor::MSG_VIS_TEXT_GET_ALL_PTR(inputStr);
+	strcat(headerBuf, inputStr);
+	strcat(headerBuf, "\r\n");
+	@call ExpSource::MSG_VIS_TEXT_GET_ALL_PTR(inputStr);
+	strcat(headerBuf, inputStr);
+	strcat(headerBuf, "\r\n");
+	strcat(headerBuf, "Kids\r\n");    /* rating */
+
+	/* now the puzzle size */
+	UtilHex32ToAscii(cellNumStr, (dword)g_width, UHTAF_NULL_TERMINATE);
+	strcat(headerBuf, cellNumStr);
+	strcat(headerBuf, "x");
+	UtilHex32ToAscii(cellNumStr, (dword)g_height, UHTAF_NULL_TERMINATE);
+	strcat(headerBuf, cellNumStr);
+	strcat(headerBuf, "\r\n");
+
+	/* the above header size in bytes (in ascii) goes at the beginning of
+		the entire header */
+	headerSize = strlen(headerBuf);
+	UtilHex32ToAscii(cellNumStr, (dword)headerSize, UHTAF_NULL_TERMINATE);
+	strcat(cellNumStr, "\r\n");
+	strcpy(destAddr, cellNumStr);
+	/* and the header to the mem block */
+	strcat(destAddr, headerBuf);
+	headerSize += strlen(cellNumStr);
+	unCompSize += headerSize;
+
+	/* next to the block is the puzzle grid */
+	/* first part of this is the puzzle size (bytes) adding CRLF to each row */
+	gridSize = (g_width + 2) * g_height;
+	UtilHex32ToAscii(cellNumStr, (dword)gridSize, UHTAF_NULL_TERMINATE);
+	strcat(cellNumStr, "\r\n");
+	strcat(destAddr, cellNumStr);
+	gridSize += strlen(cellNumStr);
+	unCompSize += gridSize;
+	/* now the grid - row by row */
+	vmbh = VMFind(g_fhDocument, 0, GRID);
+	VMLock(g_fhDocument, vmbh, &mhGrid);
+	oWordGrid = ConstructOptr(mhGrid, g_chDocWordGrid);
+	for (row = 0; row < g_height; row ++) {
+		for (col = 0; col < g_width; col ++) {
+			c = XWMGetLetter(oWordGrid, col, row);
+			if (c == ' ') c = '.';
+			lineBuffer[col] = c;
+			}
+		lineBuffer[col] = 0;
+		strcat(lineBuffer, "\r\n");
+		strcat(destAddr, lineBuffer);
+		}
+	VMUnlock(mhGrid);
+
+	/* next to the block are the across clues */
+	/* first part of this is the number of bytes adding CRLF to each clue, so
+		we'll dump the clues into a separate mem block, get the size, and then
+		copy the size and that clue block to our destination block */
+	/* allocate the destination mem block */
+	cluesMH = MemAlloc(4096, HF_SWAPABLE, HAF_ZERO_INIT | HAF_LOCK);
+	cluesAddr = (char *) MemDeref(cluesMH);
+	/* lock our data stuff */
+	vmbh = VMFind(g_fhDocument, 0, LIST);
+	VMLock(g_fhDocument, vmbh, &mhList);
+	vmbh = VMFind(g_fhDocument, 0, ANSW);
+	VMLock(g_fhDocument, vmbh, &mhAnsw);
+	/* find across word starts */
+	clues = 0;
+	aClueSize = 0;
+	numWords = ChunkArrayGetCountHandles(mhList, g_chDocWordList);
+	for (row = 0; row < g_height; row ++) {
+		for (col = 0; col < g_width; col ++) {
+			for (i = 0; i < numWords; i++) {
+				pAns = ChunkArrayElementToPtrHandles(mhAnsw, g_chDocAnswers, i, 0);
+				if (pAns->XWMAE_row == row && pAns->XWMAE_column == col
+						 && pAns->XWMAE_direction == 0) {
+					/* we have an across word start - so grab the cell number & clue */
+					cellNum = g_geosCellNumArray[row][col];
+					UtilHex32ToAscii(cellNumStr, (dword)cellNum, UHTAF_NULL_TERMINATE);
+					pElement = ChunkArrayElementToPtrHandles(
+										mhList, g_chDocWordList, pAns->XWMAE_wordNum, 0);
+					/* the clue line starts with a "1," string */
+					strcpy(lineBuffer, "1,");
+					/* followed by the clue # */
+					strcat(lineBuffer, cellNumStr);
+					/* followed by another comma */
+					strcat(lineBuffer, ",");
+					/* followed by the # of bytes in the clue (in ASCII) */
+					clueSize = strlen(cellNumStr) + 2 + strlen(pElement->XWMLE_clue);
+					UtilHex32ToAscii(clueSizeStr, (dword)clueSize, UHTAF_NULL_TERMINATE);
+					strcat(lineBuffer, clueSizeStr);
+					/* followed by another comma */
+					strcat(lineBuffer, ",");
+					/* and the clue text with number and . */
+					strcat(lineBuffer, cellNumStr);
+					strcat(lineBuffer, ". ");
+					strcat(lineBuffer, pElement->XWMLE_clue);
+					strcat(lineBuffer, "\r\n");
+					clues++;
+					aClueSize += strlen(lineBuffer);
+					strcat(cluesAddr, lineBuffer);
+					break;
+					}  /* end of found across start if */
+				}  /* end of numWords (i) for */
+			}  /* end of col for */
+		}  /* end of row for */
+	/* ok - the size... */
+	UtilHex32ToAscii(cellNumStr, (dword)aClueSize, UHTAF_NULL_TERMINATE);
+	strcat(cellNumStr, "\r\n");
+	memcpy(destAddr+unCompSize, cellNumStr, strlen(cellNumStr));
+	aClueSize += strlen(cellNumStr);
+	/* and the across clues */
+	memcpy(destAddr+unCompSize+strlen(cellNumStr), cluesAddr, aClueSize);
+	unCompSize += aClueSize;
+
+	/* now reset some things and do the down clues similarly */
+	memset(cluesAddr, 0, aClueSize);
+	dClueSize = 0;
+	/* find down word starts */
+	for (row = 0; row < g_height; row ++) {
+		for (col = 0; col < g_width; col ++) {
+			for (i = 0; i < numWords; i++) {
+				pAns = ChunkArrayElementToPtrHandles(mhAnsw, g_chDocAnswers, i, 0);
+				if (pAns->XWMAE_row == row && pAns->XWMAE_column == col
+						 && pAns->XWMAE_direction == 1) {
+					/* we have a down word start - so grab the cell number */
+					cellNum = g_geosCellNumArray[row][col];
+					UtilHex32ToAscii(cellNumStr, (dword)cellNum, UHTAF_NULL_TERMINATE);
+					pElement = ChunkArrayElementToPtrHandles(
+										mhList, g_chDocWordList, pAns->XWMAE_wordNum, 0);
+					/* the clue line starts with a "1," string */
+					strcpy(lineBuffer, "1,");
+					/* followed by the clue # */
+					strcat(lineBuffer, cellNumStr);
+					/* followed by another comma */
+					strcat(lineBuffer, ",");
+					/* followed by the # of bytes in the clue (in ASCII) */
+					clueSize = strlen(cellNumStr) + 2 + strlen(pElement->XWMLE_clue);
+					UtilHex32ToAscii(clueSizeStr, (dword)clueSize, UHTAF_NULL_TERMINATE);
+					strcat(lineBuffer, clueSizeStr);
+					/* followed by another comma */
+					strcat(lineBuffer, ",");
+					/* and the clue text with number and . */
+					strcat(lineBuffer, cellNumStr);
+					strcat(lineBuffer, ". ");
+					strcat(lineBuffer, pElement->XWMLE_clue);
+					strcat(lineBuffer, "\r\n");
+					clues++;
+					dClueSize += strlen(lineBuffer);
+					strcat(cluesAddr, lineBuffer);
+					break;
+					}  /* end of found across start if */
+				}  /* end of numWords (i) for */
+			if (clues == numWords) break;
+			}  /* end of col for */
+		if (clues == numWords) break;
+		}  /* end of row for */
+	VMUnlock(mhAnsw);
+	VMUnlock(mhList);
+	/* ok - the size... */
+	UtilHex32ToAscii(cellNumStr, (dword)dClueSize, UHTAF_NULL_TERMINATE);
+	strcat(cellNumStr, "\r\n");
+	memcpy(destAddr+unCompSize, cellNumStr, strlen(cellNumStr));
+	dClueSize += strlen(cellNumStr);
+	/* and the down clues */
+	memcpy(destAddr+unCompSize+strlen(cellNumStr), cluesAddr, dClueSize);
+	/* done with this block */
+	MemFree(cluesMH);
+	unCompSize += dClueSize;
+
+	/* compress it all */
+	/* allocate the compressed mem block */
+	compMH = MemAlloc(4096, HF_SWAPABLE, HAF_ZERO_INIT | HAF_LOCK);
+	compAddr = (void *)MemDeref(compMH);
+	compSize = CompressDecompress(CLF_SOURCE_IS_BUFFER |
+											CLF_DEST_IS_BUFFER,
+							 0, destAddr,
+							 unCompSize,
+							 0, compAddr);
+
+	/* copy the data to the file */
+	UtilHex32ToAscii(cellNumStr, (dword)compSize, UHTAF_NULL_TERMINATE);
+	strcat(cellNumStr, "\r\n");
+	FileWrite(PZLFileHandle, cellNumStr, strlen(cellNumStr), FALSE);
+	FileWrite(PZLFileHandle, compAddr, compSize, FALSE);
+	/* and set the attributes for a crossword data file */
+	FileSetHandleExtAttributes(PZLFileHandle, FEA_CREATOR,
+										&cwAppToken, sizeof(GeodeToken));
+	FileSetHandleExtAttributes(PZLFileHandle, FEA_TOKEN,
+										&cwDocToken, sizeof(GeodeToken));
+	cwDocProtoNum.PN_major = XWM_DOCUMENT_PROTOCOL_MAJOR;
+	cwDocProtoNum.PN_minor = XWM_DOCUMENT_PROTOCOL_MINOR;
+	FileSetHandleExtAttributes(PZLFileHandle, FEA_PROTOCOL,
+										&cwDocProtoNum, sizeof(ProtocolNumber));
+
+	/* Done so close the file */
+	fileCloseError = FileClose(PZLFileHandle, FALSE);
+	if (fileCloseError) NotifyDBox(0, @ExpCloseErrMsg);
+	FilePopDir();
+
+	/* and done with the blocks */
+	MemFree(destMH);
+	MemFree(compMH);
+
+}
+
+
+

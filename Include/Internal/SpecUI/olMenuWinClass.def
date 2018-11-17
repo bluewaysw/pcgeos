@@ -1,0 +1,273 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	SPUI
+MODULE:		
+FILE:		olMenuWinClass.def
+
+AUTHOR:		David Litwin, Oct  5, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	10/ 5/94   	Initial revision
+
+
+DESCRIPTION:
+	Definition of OLMenuWinClass
+		
+	$Id: olMenuWinClass.def,v 1.1 97/04/04 14:12:06 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+	;
+	;	For documentation of the OLMenuWinClass see:
+	;	/staff/pcgeos/Spec/olMenuWinClass.doc
+	; 
+
+OLMenuWinClass	class	OLPopupWinClass
+	uses	GenClass
+
+;------------------------------------------------------------------------------
+;			Method Declarations
+;------------------------------------------------------------------------------
+
+MSG_MO_MW_ENTER_STAY_UP_MODE	message
+;	This method is sent by the OLMenuButton object which opens this menu,
+;	when it determines we are entering stay-up mode. We setup a pre-passive
+;	mouse grab, so we know when to exit stay-up mode, and we set some state
+;	bits, so that the SelectMyControlsOnly mechanism continues after
+;	the mouse button is released.
+;	Pass:	cx	= TRUE to force release of current GADGET EXCL owner,
+;			  so that high-level menus close.
+
+MSG_MO_MW_LEAVE_STAY_UP_MODE	message
+;	This method is sent by this object to itself, when the user ends
+;	stay-up mode by pressing a mouse button. We reset some state bits so
+;	the SelectMyControlsOnly knows to END_GRAB for this window.
+
+MSG_MO_MW_GET_MENU_CENTER	message
+;	Sets up menu center instance data.  Called by child OLCtrl objects 
+;	during MSG_VIS_UPDATE_GEOMETRY.
+;
+;	Pass:	nothing
+; 	Return:	cx -- largest moniker width
+;		dx -- largest accelerator width
+;
+
+if	 _CASCADING_MENUS
+MSG_MO_MW_CASCADE_MODE	message
+;	Enables or disables cascade mode for this menu.  Called from
+;	child of menu (button or item).  OLMenuButtons (which open sub-menus)
+;	should enable cascade mode, while everything else in the menu should
+;	disable cascade mode.  Will automatically start the grab if the result
+;	of this call closes a menu.
+;
+; Context:	Internal.
+; Source:	Children of OLMenuWinClass objects.
+; Destination:  OLMenuWinClass objects only.
+; Interception: Shouldn't.
+;
+; Pass:		cl	= OLMenuWinCascadeModeOptions
+;			    OMWCMO_CASCADE
+;				True=Enable/False=Disable cascade mode.
+;			    OMWCMO_START_GRAB
+;			    	If TRUE, will take the grabs and take the gadget
+;				exclusive after setting the cascade mode.
+;			
+;		if OMWCMO_CASCADE = TRUE
+;		    ^ldx:bp = optr to submenu
+;		else
+;		    dx, bp are ignored
+;		    
+; Return:	Nothing
+;
+;	dx, bp - unchanged
+;	ax, cx - destroyed
+;
+
+MSG_MO_MW_GUP_SUBMENU_REQUESTS_CLOSE	message
+;	Sent by submenu (a Gen child of this menu) to request the submenu
+;	and all of the menus above the submenu in the gentree be closed. Unless
+;	the OMWMSS_IGNORE_SUBMENU_CLOSE_REQUEST flag is true, then this menu is
+;	closed and, if the generic parent of this menu builds out to be an
+;	OLMenuWinClass object, the message is passed up.  If the flag
+;	is false, the submenu's request is ignored, and the message is not
+;	passed up the tree.
+;
+; Context:	Internal.
+; Source:	Submenu.
+; Destination:  OLMenuWinClass objects only.
+; Interception: Shouldn't.
+;
+; Pass:		Nothing
+;			
+; Return:	Nothing
+;
+;	cx, dx, bp - unchanged
+;	ax - destroyed
+;
+
+MSG_MO_MW_CLOSE_ALL_MENUS_IN_CASCADE	message
+;	Sent to any menu.  All the menus in the cascade (chain of menus) that
+;	the destination	menu belongs to will be closed.
+;
+; Context:	Used when selecting other menus from menu bar.
+; Source:	OLMenuButtonEnsureMenuOpen
+; Destination:  OLMenuWinClass objects only.
+; Interception: Shouldn't
+;
+; Pass:		Nothing
+;			
+; Return:	Nothing
+;
+;	dx - unchanged
+;	ax, cx, bp - destroyed
+;
+
+endif	;_CASCADING_MENUS
+
+MSG_OL_MENU_WIN_UPDATE_SCROLLABLE_MENU	message
+;
+; Update scrollable menu to ensure focus object is visible
+;
+
+
+;------------------------------------------------------------------------------
+;			Hint Declarations
+;------------------------------------------------------------------------------
+;Specific Hints:
+
+HINT_IS_EXPRESS_MENU	vardata
+; This hint is placed on the EXPRESS menu (see cspecCUAS.ui, etc), so that
+; its menu button is created as the second visible child of the GenPrimary.
+
+ATTR_OL_MENU_WIN_EXIT_TRIGGER	vardata	optr
+; This holds the optr of the exit trigger (child GenTrigger marked with
+; ATTT_GEN_TRIGGER_INTERACTION_COMMAND {word IC_EXIT}), if any.
+
+if	 _CASCADING_MENUS
+ATTR_OL_MENU_WIN_CASCADED_MENU	vardata	optr
+; If this menu is being cascaded, then this holds the optr of the child that
+; is open.
+endif	;_CASCADING_MENUS
+
+MenuWinScrollerStruct	struct
+    MWSS_upScroller	lptr
+    MWSS_downScroller	lptr
+MenuWinScrollerStruct	ends
+
+TEMP_OL_MENU_WIN_SCROLLERS	vardata	MenuWinScrollerStruct
+; This hint is used to store the chunk handles of the up/down scrollers.
+
+;------------------------------------------------------------------------------
+;			Attributes
+;------------------------------------------------------------------------------
+;Specific State info for menu windows:
+
+OLMenuWinSpecState	record
+    OMWSS_WAS_PINNED:1	;set if menu was pinned, then opened as a regular
+			;menu. When menu closes, will be restored to pinned
+			;state in old location.
+
+    OMWSS_RE_PINNING:1	;set TRUE when a pinned menu, which has been opened
+			;under the menu button, is now returning to regular
+			;pinned state. This flag is required so that the
+			;gadget exclusive does not cause menu to close.
+
+    OMWSS_IN_STAY_UP_MODE:1
+			;set when this menu is in stay-up mode. Causes us
+			;to hold onto the WindowGrab when the user releases
+			;the mouse button. When the button is pressed again,
+			;we determine if it is 1) over the menu, 2) over the
+			;menu button, or 3) somewhere else. We do the right thg
+    OMWSS_FILE_MENU:1
+			;set if this is a file menu (this should really be an
+			;attribute, but why waste these free bits?)
+    OMWSS_EXIT_CREATED:1
+			;set if this is a file menu and we created an exit
+			;trigger for it
+    OMWSS_INFREQUENT_USAGE:1
+			;set for submenus in PM which do not cascade
+			;automatically.  The mouse pointer must be moved over
+			;the right arrow mark to open the submenu.
+    OMWSS_CUSTOM_SYS_MENU:1
+			;set if menu is the app specific system menu
+    OMWSS_ADDING_SYS_MENU:1
+			;set if we are about to add the standard sys menu as a
+			;visible child of the app specific sys menu.
+OLMenuWinSpecState	end
+
+if	 _CASCADING_MENUS
+; More spec state flags used with cascading menus.
+OLMenuWinMoreSpecState	record
+    OMWMSS_IS_CASCADING:1
+    			;set if this menu is being cascaded.  That is,
+			;a sub-menu is open, and this menu should stay open.
+    OMWMSS_IGNORE_SUBMENU_CLOSE_REQUEST:1
+    			;ignore close request from child and prevents
+			;the MSG_MO_MW_GUP_SUBMENU_REQUESTS_CLOSE message
+			;from being passed up the generic tree.
+    OMWMSS_DONT_SEND_REQUEST:1
+    			;prevents the MSG_MO_MW_GUP_SUBMENU_REQUESTS_CLOSE
+			;message from being sent up.  This is used to
+			;ensure that this message isn't sent up too
+			;many times because of a possible recursion.
+    :5
+OLMenuWinMoreSpecState	end
+
+; Flags passed to MSG_MO_MW_CASCADE_MODE.
+OLMenuWinCascadeModeOptions	record
+    OMWCMO_CASCADE:1	;True=Enable/False=Disable cascade mode.
+    OMWCMO_START_GRAB:1	;If TRUE, will take the grabs and take the gadget
+			;exclusive after setting the cascade mode.
+    :6
+OLMenuWinCascadeModeOptions	end
+endif	;_CASCADING_MENUS
+
+;------------------------------------------------------------------------------
+;			Instance Data
+;------------------------------------------------------------------------------
+
+    OLMWI_specState	OLMenuWinSpecState <>
+    OLMWI_monikerSpace	sword
+    OLMWI_accelSpace	sword
+if	 _CASCADING_MENUS
+    OLMWI_moreSpecState	OLMenuWinMoreSpecState <>
+endif	;_CASCADING_MENUS
+
+OLMenuWinClass	endc
+
+
+;-----------------------------------------------------------------------------
+;	MenuWinScrollerClass
+;-----------------------------------------------------------------------------
+;
+;  This class is used for the menu scrollers
+;
+
+MenuWinScrollerClass	class	MetaClass
+
+MSG_MENU_WIN_SCROLLER_TIMER_EXPIRED	message
+;
+; Repeat scroll timer expired meessage.
+;
+; Pass:		nothing
+; Return:	nothing
+; Destroyed:	ax, cx, dx, bp
+;
+
+    MWSI_menu		lptr	; chunk handle of OLMenuWinClass object
+    MWSI_delta		word	; amount to scroll when scroller is selected
+    MWSI_window		hptr	; handle of scroller window
+    MWSI_bitmap		nptr	; offset of bitmap to draw for scroller window
+    MWSI_timerID	word	; ID of timer used to repeat scroll
+    MWSI_timerHandle	hptr	; ^h of timer used to repeat scroll
+    MWSI_top		word	; top bound of scroller
+    MWSI_bottom		word	; bottom bound of scroller
+MenuWinScrollerClass	endc

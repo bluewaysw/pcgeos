@@ -1,0 +1,509 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1993 -- All Rights Reserved
+
+PROJECT:	PC/GEOS
+MODULE:		Power Drivers
+FILE:		apmConstant.def
+
+AUTHOR:		Todd Stumpf, May 26, 1993
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	TS	5/26/93   	Initial revision
+
+
+DESCRIPTION:
+	This file contains the common APM commands and records that
+	are needed to interface with the BIOS level APM code.
+		
+	$Id: apmConstant.def,v 1.1 97/04/18 11:48:24 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+APM_VERSION	equ	((APM_MAJOR_VERSION shl 8) or APM_MINOR_VERSION)
+
+APM_COMMAND_IRQ		equ	15h
+
+APM_MAJOR_COMMAND	equ	53h
+
+APMSubCommand		etype	byte
+
+	APMSC_CHECK_EXISTANCE			enum	APMSubCommand, 000h
+	;
+	;  Call:
+	;	ah = APM_MAJOR_COMMAND			(053h)
+	;	al = APMSC_CHECK_EXISTANCE		(000h)
+	;	BX = APMDID_SYSTEM_BIOS			(00000h)
+	;
+	;  Returns:
+	;	carry set
+	;	ah = APMEC_APM_NOT_PRESENT
+	;
+	;	- or -
+	;
+	;	carry clear
+	;	ah = major version number (BCD)
+	;	al = minor version number (BCD)
+	;	bh = 'P'
+	;	bl = 'M'
+	;	cx = APMSupportFlags
+	;
+
+
+APMSupportFlag		record
+	:12
+	APMSF_BIOS_POWER_MANAGER_DISABLED:1
+	APMSF_CPU_IDLE_SLOWS_PROCESSOR:1
+	APMSF_32_BIT_PROTECTED_MODE_ALLOWED:1
+	APMSF_16_BIT_PROTECTED_MODE_ALLOWED:1
+APMSupportFlag		end
+
+
+	APMSC_ESTABLISH_CONNECTION		enum	APMSubCommand, 001h
+	;
+	;  Call:
+	;	ah = APM_MAJOR_COMMAND			(053h)
+	;	al = APMSC_ESTABLISH_CONNECTION 	(001h)
+	;	bx = APMDID_SYSTEM_BIOS			(00000h)
+	;
+	;  Returns:
+	;	carry set
+	;	ah = APMEC_CONNECTION_ALREADY_ESTABLISHED,
+	;	     APMEC_UNRECOGNIZED_DEVICE_ID
+	;
+	;	- or -
+	;
+	;	carry clear on success
+
+	APMSC_ESTABLISH_16_BIT_CONNECTION	enum	APMSubCommand, 002h
+	;
+	;  Call:
+	;	ah = APM_MAJOR_COMMAND			(053h)
+	;	al = APMSC_ESTABLISH_16_BIT_CONNECTION	(002h)
+	;	bx = APMDID_SYSTEM_BIOS			(00000h)
+	;
+	;  Returns:
+	;	carry set
+	;	ah = APMEC_UNRECOGNIZED_DEVICE_ID,
+	;	     APMEC_16_BIT_CONNECTION_ALREADY_ESTABLISHED
+	;	     APMEC_16_BIT_CONNECTION_NOT_SUPPORTED
+	;
+	;	- or -
+	;	carry clear
+	;	ax = PM 16-bit code segment (real mode segment base address)
+	;	bx = offset of entry point
+	;	cx = PM 16-bit data segment (real mode segment base address)
+	;
+	;  Note:
+	;	See APM spec pg. 8-9 for more detail
+	;	
+
+
+	APMSC_ESTABLISH_32_BIT_CONNECTION	enum	APMSubCommand, 003h
+	;
+	;  Call:
+	;	ah = APM_MAJOR_COMMAND			(053h)
+	;	al = APMSC_ESTABLISH_32_BIT_CONNECTION	(003h)
+	;	bx = APMDID_SYSTEM_BIOS			(00000h)
+	;
+	;  Returns:
+	;	carry set
+	;	ah = APMEC_UNRECOGNIZED_DEVICE_ID,
+	;	     APMEC_32_BIT_CONNECTION_ALREADY_ESTABLISHED
+	;	     APMEC_32_BIT_CONNECTION_NOT_SUPPORTED
+	;
+	;	- or -
+	;	carry clear
+	;	ax = PM 16-bit code segment (real mode segment base address)
+	;	ebx = offset of entry point
+	;	cx = PM 16-bit code segment (real mode segment base address)
+	;	dx = PM data segment (real mode degment base address)
+	;
+	;  Note:
+	;	See APM spec pg. 9-10 for more detail
+	;	
+
+	APMSC_DISCONNECT			enum	APMSubCommand, 004h
+	;
+	;  Call:
+	;	ah = APM_MAJOR_COMMAND			(053h)
+	;	al = APMSC_DISCONNECT			(004h)
+	;	bx = APMDID_SYSTEM_BIOS			(00000h)
+	;
+	;  Returns:
+	;	carry set
+	;	ah = APMEC_NOT_CONNECTED,
+	;	     APMEC_UNRECOGNIZED_DEVICE_ID
+	;
+	;	- or -
+	;
+	;	carry clear
+	;
+	;  Note:
+	;	Disconnects any 16-bit or 32-bit connection as well.
+	;
+
+	APMSC_CPU_IDLE				enum	APMSubCommand, 005h
+	;
+	;  Call:
+	;	ah = APM_MAJOR_COMMAND			(053h)
+	;	al = APMSC_CPU_IDLE			(005h)
+	;
+	;  Returns:
+	;	carry clear
+	;
+
+	APMSC_CPU_BUSY				enum	APMSubCommand, 006h
+	;
+	;  Call:
+	;	ah = APM_MAJOR_COMMAND			(053h)
+	;	al = APMSC_CPU_BUSY			(006h)
+	;
+	;  Returns:
+	;	carry clear
+	;
+
+	APMSC_SET_DEVICE_STATE			enum	APMSubCommand, 007h
+	;
+	;  Call:
+	;	ah = APM_MAJOR_COMMAND			(053h)
+	;	al = APMSC_SET_DEVICE_STATE		(007h)
+	;	bx = APMDeviceID
+	;	cx = APMState
+	;
+	;  Returns:
+	;	carry set
+	;	ah = APMEC_FUNCTIONALITY_DISABLED,
+	;	     APMEC_UNRECOGNIZED_DEVICE_ID,
+	;	     APMEC_CX_PARAMETER_OUT_OF_RANGE
+	;	     APMEC_CAN_NOT_ENTER_STATE
+	;
+	;  	- or -
+	;
+	;	carry clear
+	;
+
+APMState		etype	word, 0, 1
+	APMS_READY	enum	APMState
+	APMS_STAND_BY	enum	APMState
+	APMS_SUSPEND	enum	APMState
+	APMS_OFF	enum	APMState
+if	APM_VERSION ge 0x0101		; v1.1 or above
+	APMS_REQUEST_PROCESSING		enum	APMState
+	APMS_REQUEST_REJECTED		enum	APMState
+endif	; APM_VERSION ge 0x0101
+
+	APMSC_ENTER_SUSPEND_STATE		enum	APMSubCommand, 007h
+	;
+	;  Call:
+	;	ah = APM_MAJOR_COMMAND			(053h)
+	;	al = APMSC_ENTER_SUSPEND_STATE		(007h)
+	;	bx = 00001h
+	;	cx = 00002h
+	;
+	;  Returns:
+	;	nothing
+	;
+	;  Note:
+	;	This is the same command # as APMSC_SET_DEVICE_STATE,
+	;	but with a special device & state number.
+	;
+
+	APMSC_TOGGLE_BIOS_POWER_MANAGER_CONTROL	enum	APMSubCommand, 008h
+	;
+	;  Call:
+	;	ah = APM_MAJOR_COMMAND			(053h)
+	;	al = APMSC_TOGGLE_BIOS_POWER_MANAGER_CONTROL (008h)
+	;	bx = APMDID_EVERYTHING			(0ffffh)
+	;	cx = ENABLE_BIOS_CONTROL or
+	;	     DISABLE_BIOS_CONTROL
+	;
+	;  Returns:
+	;	carry set
+	;	ah = APMEC_FUNCTIONALITY_DISABLED,
+	;	     APMEC_UNRECOGNIZED_DEVICE_ID,
+	;	     APMEC_CX_PARAMETER_OUT_OF_RANGE
+	;
+
+ENABLE_BIOS_CONTROL	equ	1
+DISABLE_BIOS_CONTROL	equ	0
+
+	APMSC_RESTORE_POWER_ON_DEFAULTS		enum	APMSubCommand, 009h
+	;
+	;  Call:
+	;	ah = APM_MAJOR_COMMAND			(053h)
+	;	al = APMSC_RESTORE_POWER_ON_DEFAULTS	(009h)
+	;	bx = APMDID_EVERYTHING			(0ffffh)
+	;
+	;  Returns:
+	;	carry set
+	;	ah = APMEC_UNRECOGNIZED_DEVICE_ID
+	;
+	;	- or -
+	;
+	;	carry clear
+	;
+
+	APMSC_GET_POWER_STATUS			enum	APMSubCommand, 00ah
+	;
+	;  Call:
+	;	ah = APM_MAJOR_COMMAND			(053h)
+	;	al = APMSC_GET_POWER_STATUS		(00ah)
+	;	bx = APMDID_ALL_BIOS_DEVICES		(00001h)
+	;
+	;  Returns:
+	;	carry set
+	;	ah = APMEC_UNRECOGNIZED_DEVICE_ID
+	;
+	;	- or -
+	;
+	;	bh = ACLineStatus
+	;	bl = BatteryStatus
+	;	cl = remaining charge (0-100% or 255 for unknown)
+	;	dx = BatteryTime
+	;
+
+ACLineStatus		etype	byte
+	ACLS_OFF_LINE	enum	ACLineStatus, 000h
+	ACLS_ON_LINE	enum	ACLineStatus, 001h
+	ACLS_UNKNOWN	enum	ACLineStatus, 0ffh
+
+BatteryStatus		etype	byte
+	BS_HIGH		enum	BatteryStatus, 000h
+	BS_LOW		enum	BatteryStatus, 001h
+	BS_CRITICAL	enum	BatteryStatus, 002h
+	BS_CHARGING	enum	BatteryStatus, 003h
+	BS_UNKNOWN	enum	BatteryStatus, 0ffh
+
+	APMSC_GET_PM_EVENT			enum	APMSubCommand, 00bh
+	;
+	;  Call:
+	;	ah = APM_MAJOR_COMMAND			(053h)
+	;	al = APMSC_GET_PM_EVENT			(00bh)
+	;
+	;  Returns:
+	;	carry set
+	;	ah = APMEC_NOT_CONNECTED,
+	;	     APMEC_NO_EVENTS_PENDING
+	;
+	;	- or -
+	;
+	;	carry clear
+	;	bx = APMEvent
+
+
+BatteryTime	record
+	BT_TIME_IN_MINUTES:1	;TRUE: time is in minutes, else seconds
+	BT_TIME:15
+BatteryTime	end
+
+BT_TIME_UNKNOWN		equ	0xffff
+
+
+APMEvent			etype	word
+	APME_STAND_BY_REQUEST	enum	APMEvent, 00001h
+	APME_SUSPEND_REQUEST	enum	APMEvent, 00002h
+	APME_NORMAL_RESUME	enum	APMEvent, 00003h
+	APME_CRITICAL_RESUME	enum	APMEvent, 00004h
+	APME_BATTERY_LOW	enum	APMEvent, 00005h
+if	APM_VERSION ge 0x0101		; v1.1 or above
+	APME_POWER_STATUS_CHANGE enum	APMEvent, 00006h
+	APME_UPDATE_TIME	enum	APMEvent, 00007h
+	APME_CRITICAL_SUSPEND	enum	APMEvent, 00008h
+	APME_USER_STANDBY_REQUEST enum	APMEvent, 00009h
+	APME_USER_SUSPEND_REQUEST enum	APMEvent, 0000ah
+	APME_STANDBY_RESUME	enum	APMEvent, 0000bh
+endif	; APM_VERSION ge 0x0101
+if	APM_VERSION ge 0x0102		; v1.2 or above
+	APME_CAPABILITIES_CHANGE enum	APMEvent, 0000ch
+endif	; APM_VERSION ge 0x0102
+
+if	APM_VERSION ge 0x0101		; v1.1 or above
+
+	APMSC_GET_POWER_STATE			enum	APMSubCommand, 00ch
+
+	APM_ENABLE_DISABLE_DEVICE_POWER_MGNT	enum	APMSubCommand, 00dh
+
+	APMSC_DRIVER_VERSION			enum	APMSubCommand, 00eh
+	;
+	;  Call:
+	;	ah = APM_MAJOR_COMMAND			(053h)
+	;	al = APMSC_DRIVER_VERSION		(00eh)
+	;	bx = APMDID_SYSTEM_BIOS			(00000h)
+	;	ch = APM driver major version number (in BCD)
+	;	cl = APM driver minor version number (in BCD)
+	;
+	;  Returns:
+	;	carry set
+	;	ah = APMEC_NOT_CONNECTED
+	;	     APMEC_UNRECOGNIZED_DEVICE_ID
+	;	     APMEC_INTERFACE_NOT_ENGAGED
+	;
+	;	- or -
+	;
+	;	carry clear
+	;	ah = APM connection major version number (in BCD)
+	;	al = APM connection minor version number (in BCD)
+	;
+
+	APMSC_ENGAGE_DISENGAGE_POWER_MGNT	enum	APMSubCommand, 00fh
+
+endif	; APM_VERSION ge 0x0101
+
+if	APM_VERSION ge 0x0102		; v1.2 or above
+
+	APMSC_GET_CAPABILITIES			enum	APMSubCommand, 010h
+
+	APMSC_GET_SET_DISABLE_RESUME_TIMER	enum	APMSubCommand, 011h
+
+	APMSC_ENABLE_DISABLE_RESUME_ON_RING_INDICATOR enum APMSubCommand, 012h
+
+	APMSC_ENABLE_DISABLE_TIMER_BASED_REQUESTS enum	APMSubCommand, 013h
+
+endif	; APM_VERSION ge 0x0102
+
+
+	
+;-----------------------------------------------------------------------------
+;			APM ERROR CODES
+;-----------------------------------------------------------------------------
+
+APMErrorCode					etype	byte
+APMEC_FUNCTIONALITY_DISABLED			enum	APMErrorCode, 001h
+APMEC_CONNECTION_ALREADY_ESTABLISHED		enum	APMErrorCode, 002h
+APMEC_NOT_CONNECTED				enum	APMErrorCode, 003h
+APMEC_16_BIT_CONNECTION_ALREADY_ESTABLISHED	enum	APMErrorCode, 005h
+APMEC_16_BIT_CONNECTION_NOT_SUPPORTED		enum	APMErrorCode, 006h
+APMEC_32_BIT_CONNECTION_ALREADY_ESTABLISHED	enum	APMErrorCode, 007h
+APMEC_32_BIT_CONNECTION_NOT_SUPPORTED		enum	APMErrorCode, 008h
+APMEC_UNRECOGNIZED_DEVICE_ID			enum	APMErrorCode, 009h
+APMEC_CX_PARAMETER_OUT_OF_RANGE			enum	APMErrorCode, 00ah
+if	APM_VERSION ge 0x0101		; v1.1 or above
+APMEC_INTERFACE_NOT_ENGAGED			enum	APMErrorCode, 00bh
+endif	; APM_VERSION ge 0x0101
+if	APM_VERSION ge 0x0102		; v1.2 or above
+APMEC_FUNCTION_NOT_SUPPORTED			enum	APMErrorCode, 00ch
+APMEC_RESUME_TIMER_DISABLED			enum	APMErrorCode, 00dh
+endif	; APM_VERSION ge 0x0102
+APMEC_CAN_NOT_ENTER_STATE			enum	APMErrorCode, 060h
+APMEC_NO_EVENTS_PENDING				enum	APMErrorCode, 080h
+APMEC_APM_NOT_PRESENT				enum	APMErrorCode, 086h
+
+
+;-----------------------------------------------------------------------------
+;			APM DEVICE ID MAP
+;-----------------------------------------------------------------------------
+APMDeviceID		etype	word
+	APMDID_SYSTEM_BIOS			enum	APMDeviceID, 0000h
+	APMDID_ALL_BIOS_DEVICES			enum	APMDeviceID, 0001h
+
+	APMDID_DISPLAY				enum	APMDeviceID, 0100h
+	APMDID_DISPLAY_ALL			enum	APMDeviceID, 01ffh
+
+	APMDID_SECONDARY_STORAGE_DRIVE_A	enum	APMDeviceID, 0200h
+	APMDID_SECONDARY_STORAGE_DRIVE_B	enum	APMDeviceID, 0201h
+	APMDID_SECONDARY_STORAGE_DRIVE_C	enum	APMDeviceID, 0202h
+	APMDID_SECONDARY_STORAGE_DRIVE_D	enum	APMDeviceID, 0203h
+	APMDID_SECONDARY_STORAGE_DRIVE_E	enum	APMDeviceID, 0204h
+	APMDID_SECONDARY_STORAGE_DRIVE_F	enum	APMDeviceID, 0205h
+	APMDID_SECONDARY_STORAGE_DRIVE_G	enum	APMDeviceID, 0206h
+	APMDID_SECONDARY_STORAGE_ALL		enum	APMDeviceID, 02ffh
+
+	APMDID_PARALLEL_PORT_LPT1		enum	APMDeviceID, 0300h
+	APMDID_PARALLEL_PORT_LPT2		enum	APMDeviceID, 0301h
+	APMDID_PARALLEL_PORT_LPT3		enum	APMDeviceID, 0302h
+	APMDID_PARALLEL_PORT_LPT4		enum	APMDeviceID, 0303h
+	APMDID_PARALLEL_PORTS_ALL		enum	APMDeviceID, 03ffh
+
+	APMDID_SERIAL_PORT_COM1			enum	APMDeviceID, 0400h
+	APMDID_SERIAL_PORT_COM2			enum	APMDeviceID, 0401h
+	APMDID_SERIAL_PORT_COM3			enum	APMDeviceID, 0402h
+	APMDID_SERIAL_PORT_COM4			enum	APMDeviceID, 0403h
+	APMDID_SERIAL_PORTS_ALL			enum	APMDeviceID, 04ffh
+
+	APMDID_EVERYTHING			enum	APMDeviceID, 0ffffh
+
+;-----------------------------------------------------------------------------
+;	Misc. constants and such
+;-----------------------------------------------------------------------------
+
+	APM_MAX_CALL_BACKS		equ	10
+
+	SUSPEND_REQUEST_COUNTDOWN_VALUE	equ	20	; 20 times, then click!
+
+	NUM_OF_DEVICES		=	NUM_SERIAL_PORTS + \
+					NUM_PARALLEL_PORTS + \
+					NUM_PCMCIA_PORTS + \
+					NUM_DISPLAY_CONTROLS + \
+					NUM_SPEAKER_CONTROLS
+
+;-----------------------------------------------------------------------------
+;		Interesting Records
+;-----------------------------------------------------------------------------
+SuspendRestriction		record
+	SR_RESTRICTED:1			; no power-off while device on?
+	SR_DEVICE_ON:1			; is serial on?
+SuspendRestriction		end
+
+ActionOnIdleState		record
+	AOIS_SUSPEND:1			; should suspend on next Idle?
+	AOIS_STAND_BY:1			; should go to stand-by on Idle?
+	AOIS_ON_STAND_BY:1		; are we currently on Stand-By?
+	:5
+ActionOnIdleState		end
+
+MiscState			record
+	MS_ON_OFF_PRESS:1		; someone pressed the on-off button
+	:7
+MiscState			end
+;-----------------------------------------------------------------------------
+;		Register Maps and Such
+;-----------------------------------------------------------------------------
+
+	APM_STATUS_ADDRESS		equ	 24h
+
+;-----------------------------------------------------------------------------
+;				MACROS
+;-----------------------------------------------------------------------------
+
+CallAPM		macro	command
+		; ah <- APM_MAJOR_COMMAND
+		; al <- command
+	mov	ax, command or (APM_MAJOR_COMMAND shl 8)
+	int	APM_COMMAND_IRQ
+endm
+
+DefFunction	macro	funcCode, routine
+if ($-powerFunctions) ne funcCode
+	ErrMessage <routine not in proper slot for funcCode>
+endif
+	nptr	routine
+endm
+
+;------------------------------------------------------------------------------
+;		Internal messages
+;------------------------------------------------------------------------------
+DummyClass	class	MetaClass	; just so we can define our messages
+
+MSG_META_APP_VERIFY_SUSPEND_DIALOG_RESPONDED	message	MetaApplicationMessages
+
+if	RESUSPEND_IF_REBOOTED_WHILE_IN_SUSPEND_MODE
+MSG_META_APP_VERIFY_RESUSPEND_DIALOG_RESPONDED	message	MetaApplicationMessages
+endif	; RESUSPEND_IF_REBOOTED_WHILE_IN_SUSPEND_MODE
+
+DummyClass	endc
+
+;------------------------------------------------------------------------------
+;		Fatal errors
+;------------------------------------------------------------------------------
+
+if	ERROR_CHECK
+
+SOCKET_POWER_COUNT_UNDERFLOW					enum FatalErrors
+SOCKET_POWER_COUNT_OVERFLOW					enum FatalErrors
+
+RETRYING_ESTABLISH_CONNECTION_WITH_BIOS				enum Warnings
+
+endif

@@ -1,0 +1,989 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1991 -- All Rights Reserved
+ *
+ * PROJECT:	GEOS
+ * MODULE:	DBSamp (Sample GEOS application)
+ * FILE:	DBSamp.goc
+ * AUTHOR:	David J. Noha,   March 1994
+ *
+ * DESCRIPTION:
+ *	This file source code for the DBSamp application. This code will
+ *	be compiled by GOC, and then linked by the GLUE linker to produce
+ *	a runnable .geo application file.
+ *
+ *  DBSamp illustrates the use of the Database (DB) library.  The
+ *  application's primary window contains two lists: the left list
+ *  contains all the groups in the database, and the right list
+ *  contains the items within the group selected from the left list.
+ *
+ *      This sample app assumes some basic knowledge of basic GEOS programming.
+ *      To see more commented examples of a GenView, GenPrimary,
+ *      GenApplication, etc., see SDK_C/Hello.
+ *
+ * RCS STAMP:
+ *   $Id: dbsamp.goc,v 1.1 97/04/04 16:39:55 newdeal Exp $
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+#include <string.h>
+#include <stdio.h>
+
+/*
+ ***************************************************************************
+ *		Global variables and definitions
+ ***************************************************************************
+ */
+
+#define MAX_NAME_LEN   50
+#define DB_FILENAME   "dbsamp.vm"
+
+VMFileHandle  dbfile = 0;           /* handle to the database file. */
+
+word  currentDept = GIGS_NONE;      /* the currently selected department */
+
+word  currentEmployee = GIGS_NONE;  /* the currently selected employee */
+
+/*
+ ***************************************************************************
+ *		Structure Definitions
+ ***************************************************************************
+ */
+
+/*
+ * DeptStruct
+ *
+ * These structures contain pertinent information about a DB Group,
+ * and are stored in an array in the DB Map item.
+ */
+
+typedef struct {
+
+    DBGroup     DS_group;               /* DB Group ID for this dept */
+    DBItem      DS_head;                /* First item in the group */
+    word        DS_size;                /* Number of items in this group */
+    char        DS_name[MAX_NAME_LEN];  /* Name of this dept */
+
+} DeptStruct;
+
+/*
+ * EmployeeStruct
+ *
+ * These structures are stored in individual DB items.  They form a
+ * linked list; the "next pointer" is, in this case, a DBItem in the
+ * same group.
+ *
+ */
+
+typedef struct {
+
+    DBItem      ES_next;                /* Next item in this DB group */
+    char        ES_name[MAX_NAME_LEN];  /* Name of this employee */
+    char        ES_addr[50];            /* Address text */
+
+} EmployeeStruct;
+
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+
+@class	DBSampProcessClass, GenProcessClass ;
+
+/* Messages for creating new DB items & groups */
+@message (GEN_TRIGGER_ACTION) MSG_DBSP_NEW_DEPT;
+@message (GEN_TRIGGER_ACTION) MSG_DBSP_NEW_EMPLOYEE;
+
+/* Message to modify DB Item data */
+@message (GEN_TRIGGER_ACTION) MSG_DBSP_SET_EMPLOYEE_DATA;
+
+/* Messages for deleting DB items & groups */
+@message (GEN_TRIGGER_ACTION) MSG_DBSP_DELETE_DEPT;
+@message (GEN_TRIGGER_ACTION) MSG_DBSP_DELETE_EMPLOYEE;
+
+/* Messages for setting the monikers in the lists */
+@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_DBSP_GROUP_DLIST_MONIKER_QUERY;
+@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_DBSP_ITEM_DLIST_MONIKER_QUERY;
+
+/* Messages for handling selections in the lists */
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_DBSP_GROUP_DLIST_APPLY;
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_DBSP_ITEM_DLIST_APPLY;
+
+@endc
+
+@classdecl	DBSampProcessClass, neverSaved ;
+
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+@start  AppResource;
+@object GenApplicationClass DBSampApp = {
+    GI_visMoniker = "C DBSamp Sample Application";
+    GI_comp = @DBSampPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @DBSampPrimary;
+}
+@end AppResource;
+
+
+
+@start	Interface;
+@object GenPrimaryClass DBSampPrimary = {
+    GI_comp = @ListGroup, @TriggerGroup, @ShowAddress,
+              @EmployeeDialog, @DeptDialog;
+    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+/*
+ * Dynamic Lists
+ */
+
+@object	GenInteractionClass ListGroup = {
+    GI_comp = @DBGroupDList, @DBItemDList;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_DIVIDE_WIDTH_EQUALLY;
+}
+
+@object GenDynamicListClass DBGroupDList = {
+    GI_visMoniker = "Department";
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+
+    /* Initialize list to have no items. */
+    GDLI_numItems = 0;
+
+    /* Message and destination for sending applies to changes in the list */
+    GIGI_applyMsg = MSG_DBSP_GROUP_DLIST_APPLY;
+    GIGI_destination = process;
+
+    /* Message to send to destination to query for monikers */
+    GDLI_queryMsg = MSG_DBSP_GROUP_DLIST_MONIKER_QUERY;
+}
+
+@object GenDynamicListClass DBItemDList = {
+    /*
+     * Same setup as above list.
+     */
+    GI_visMoniker = "Employee";
+    HINT_PLACE_MONIKER_ABOVE;
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    GDLI_numItems = 0;
+    GIGI_destination = process;
+    GIGI_applyMsg = MSG_DBSP_ITEM_DLIST_APPLY;
+    GDLI_queryMsg = MSG_DBSP_ITEM_DLIST_MONIKER_QUERY;
+}
+
+/*
+ * Triggers
+ */
+
+@object	GenInteractionClass TriggerGroup = {
+    GI_comp = @NewDeptTrigger, @NewEmployeeTrigger,
+              @SetEmployeeDataTrigger,
+              @DeleteDeptTrigger, @DeleteEmployeeTrigger;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_WRAP_AFTER_CHILD_COUNT = 3;
+}
+
+@object GenTriggerClass NewDeptTrigger = {
+    GI_visMoniker = "Create Dept";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_DBSP_NEW_DEPT;
+}
+
+@object GenTriggerClass NewEmployeeTrigger = {
+    GI_visMoniker = "Create Employee";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_DBSP_NEW_EMPLOYEE;
+}
+
+@object GenTriggerClass SetEmployeeDataTrigger = {
+    GI_visMoniker = "Set Address";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_DBSP_SET_EMPLOYEE_DATA;
+}
+
+@object GenTriggerClass DeleteDeptTrigger = {
+    GI_visMoniker = "Delete Dept";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_DBSP_DELETE_DEPT;
+}
+
+@object GenTriggerClass DeleteEmployeeTrigger = {
+    GI_visMoniker = "Delete Employee";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_DBSP_DELETE_EMPLOYEE;
+}
+
+/*
+ * Data Fields
+ */
+
+@object GenGlyphClass ShowAddress = {
+    GI_visMoniker = "Address:";
+}
+
+@object GenInteractionClass DeptDialog = {
+    GI_visMoniker = "Create Department";
+    GI_comp = @DeptNameField;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_PROPERTIES;
+    GII_attrs = @default | GIA_MODAL | GIA_INITIATED_VIA_USER_DO_DIALOG;
+}
+
+@object GenTextClass DeptNameField = {
+    GI_visMoniker = "Name of new department:";
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    HINT_PLACE_MONIKER_ABOVE;
+}
+
+
+@object GenInteractionClass EmployeeDialog = {
+    GI_visMoniker = "Employee Data";
+    GI_comp = @NameField, @AddrField;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_PROPERTIES;
+    GII_attrs = @default | GIA_MODAL | GIA_INITIATED_VIA_USER_DO_DIALOG;
+    HINT_CENTER_CHILDREN_ON_MONIKERS;
+}
+
+@object GenTextClass NameField = {
+    GI_visMoniker = "Name:";
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+}
+
+@object GenTextClass AddrField = {
+    GI_visMoniker = "Address:";
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+}
+
+@end Interface;
+
+
+/*
+ ***************************************************************************
+ *		Code for DBSampProcessClass
+ ***************************************************************************
+ */
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_PROCESS_OPEN_APPLICATION for DBSampProcessClass
+ *
+ * DESCRIPTION:	Called when the app is launched.
+ *
+ * PARAMETERS:
+ *
+ * STRATEGY:  Opens the DB file and initializes the Group list.
+ *            If the DB file does not exist, it creates it and the map
+ *            item to contain the array of DeptStructs.
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	noha	3/1/94		Initial Revision
+ *
+ ***********************************************************************/
+@method DBSampProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+    DBGroupAndItem   mapitem;
+    word             *map;
+
+    @callsuper();
+
+    /* Open the DB file, creating it if necessary. */
+    dbfile = VMOpen(DB_FILENAME, 0, VMO_CREATE, 0);
+EC( ECVMCheckVMFile( dbfile ); )
+
+    /* Get the map item; in this application, it is an ungrouped item. */
+    mapitem = DBGetMap(dbfile);
+
+    /* If the file was just created, the map item does not yet exist. */
+    if ( mapitem == NULL ) {
+
+        /* Create an ungrouped item to use for map item. */
+        mapitem = DBAllocUngrouped(dbfile, sizeof(word));
+
+        /* Set the map item to our new item. */
+        DBSetMapUngrouped(dbfile, mapitem);
+
+        /*
+         * Now initialize the map item.  In this app, our map item is
+         * a single word specifying the number of DB groups, followed
+         * by an array of DeptStruct structures, one for each DB Group.
+         */
+        map = (word *) DBLockUngrouped(dbfile, mapitem);
+        *map = 0;
+
+        /* Mark the map item as dirty. */
+        DBDirty(map);
+
+    }
+    else {
+
+        /* ...otherwise we just lock the map item. */
+        map = (word *) DBLockMap(dbfile);
+    }
+
+    /* Set the number of items in the dep't. list. */
+    @send DBGroupDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(*map);
+
+    /* Always remember to unlock the DBItem after you are done with it. */
+    DBUnlock(map);
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_PROCESS_CLOSE_APPLICATION for DBSampProcessClass
+ *
+ * DESCRIPTION:	Called when the app is shut down.
+ *
+ * PARAMETERS:
+ *
+ * STRATEGY:  Closes the DB file.
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	noha	3/1/94		Initial Revision
+ *
+ ***********************************************************************/
+
+@method DBSampProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+    /* Update the VM file (note: this is redundant; VMClose calls VMUpdate). */
+EC( ECVMCheckVMFile( dbfile ); )
+    VMUpdate(dbfile);
+
+    /* Close the DB file, specifying that we will accept errors. */
+    VMClose(dbfile, FALSE);
+
+    @callsuper();
+    return( NULL );
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DBSP_NEW_DEPT for DBSampProcessClass
+ *
+ * DESCRIPTION:	Creates a new DB group.
+ *
+ * PARAMETERS:
+ *
+ * STRATEGY:    Creates the new group and writes out the appropriate
+ *              data structures.
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	noha	3/1/94		Initial Revision
+ *
+ ***********************************************************************/
+
+@method DBSampProcessClass, MSG_DBSP_NEW_DEPT
+{
+    DeptStruct        *dept;
+    DBGroupAndItem    mapitem;
+    word              *map;
+    word              mapsize;
+    char              name[MAX_NAME_LEN+1];
+
+    /* Invoke the "New Department" dialog, and exit if it is cancelled. */
+    if (UserDoDialog(@DeptDialog) != IC_APPLY) {
+        return;
+    }
+
+    @call DeptNameField::MSG_VIS_TEXT_GET_ALL_PTR(name);
+
+    /* Exit if dep't. is unnamed. */
+    if (*name == 0) {
+        return;
+    }
+
+    /* Lock the map item, read the array size, and unlock it. */
+EC( ECVMCheckVMFile( dbfile ); )
+    mapitem = DBGetMap(dbfile);
+    map = DBLockUngrouped(dbfile, mapitem);
+    mapsize = *map;
+    DBUnlock(map);
+
+    /* Expand the map item. */
+    DBReAllocUngrouped(dbfile, mapitem,
+                sizeof(word) + ((mapsize + 1) * sizeof(DeptStruct)));
+
+    /* Lock the map again. */
+    map = DBLockUngrouped(dbfile, mapitem);
+
+    /* Get the beginning of the array of dep't. structures. */
+    dept = (DeptStruct *) (map + 1);
+
+    /* Initialize the new structure (remember mapsize is old array size). */
+    strcpy(dept[mapsize].DS_name, name);
+    dept[mapsize].DS_head = NULL;
+    dept[mapsize].DS_size = 0;
+
+    /* Create the new DB group. */
+    dept[mapsize].DS_group = DBGroupAlloc(dbfile);
+
+    /* Increase the array size. */
+    (*map)++;
+
+    /* Mark the map item as dirty. */
+    DBDirty(map);
+    DBUnlock(map);
+
+    /* Let the list in on the whole affair. */
+    @send DBGroupDList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(mapsize,1);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DBSP_NEW_EMPLOYEE for DBSampProcessClass
+ *
+ * DESCRIPTION:	Creates a new DB item.
+ *
+ * PARAMETERS:
+ *
+ * STRATEGY:    Allocate the new item and fill it in with an EmployeeStruct.
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	noha	3/1/94		Initial Revision
+ *
+ ***********************************************************************/
+
+@method DBSampProcessClass, MSG_DBSP_NEW_EMPLOYEE
+{
+    DeptStruct        *dept;
+    EmployeeStruct    *employee;
+    DBItem            empitem;
+    DBGroup           divgroup;
+    word              *map;
+    char              name[MAX_NAME_LEN+1];
+    char              addr[MAX_NAME_LEN+1];
+
+    /* If we have no selected dept, exit. */
+    if ( currentDept == GIGS_NONE ) {
+        return;
+    }
+
+    /* Initialize the Employee data dialog. */
+    @call NameField::MSG_VIS_TEXT_REPLACE_ALL_PTR("",0);
+    @call AddrField::MSG_VIS_TEXT_REPLACE_ALL_PTR("",0);
+
+    /* Invoke the Employee data dialog, and exit if it is cancelled. */
+    if (UserDoDialog(@EmployeeDialog) != IC_APPLY) {
+        return;
+    }
+
+    /* Retrieve the name and address of the new item. */
+    @call NameField::MSG_VIS_TEXT_GET_ALL_PTR(name);
+    @call AddrField::MSG_VIS_TEXT_GET_ALL_PTR(addr);
+
+    /* Exit if employee is unnamed. */
+    if (*name == 0) {
+        return;
+    }
+
+    /* Lock the map item */
+    map = DBLockMap(dbfile);
+
+    /* Get the dept's DBGroup */
+    dept = (DeptStruct *) (map + 1);
+    divgroup = dept[currentDept].DS_group;
+
+    /* create the new Employee DBItem */
+    empitem = DBAlloc(dbfile, divgroup, sizeof(EmployeeStruct));
+
+    /* Lock new employee DBItem. */
+    employee = DBLock(dbfile, divgroup, empitem);
+
+    /* Now, because we've DBAlloc'd a new item, other things may have
+     * moved.  However, the map item is "ungrouped", which means it is
+     * in a separate item block from any "grouped" items.  Only items
+     * within the same group (or fellow ungrouped items) can reside in
+     * the same physical item block.  A DBAlloc in one block cannot
+     * affect the location of another LOCKED block.  In this case, the
+     * map item is locked, so it is safe and does not need to be
+     * dereferenced.
+     */
+
+    /* Insert new empl. into the empl. list (at head, which is easiest). */
+    employee->ES_next = dept[currentDept].DS_head;
+    dept[currentDept].DS_head = empitem;
+
+    /* Increase the dept size (population count). */
+    dept[currentDept].DS_size++;
+
+    /* Mark the map item as dirty. */
+    DBDirty(map);
+    DBUnlock(map);
+
+    /* Initialize employee. */
+    strcpy(employee->ES_name, name);
+    strcpy(employee->ES_addr, addr);
+
+    /* Let the list know about the whole deal. */
+    @send DBItemDList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(0,1);
+
+    /* Mark the employee item as dirty and unlock it. */
+    DBDirty(employee);
+    DBUnlock(employee);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DBSP_DELETE_DEPT for DBSampProcessClass
+ *
+ * DESCRIPTION:	Deletes the current dept.
+ *
+ * PARAMETERS:
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	noha	3/1/94		Initial Revision
+ *
+ ***********************************************************************/
+
+@method DBSampProcessClass, MSG_DBSP_DELETE_DEPT
+{
+    DeptStruct    *dept;
+    DBGroupAndItem    mapitem;
+    word              *map;
+    word              mapsize;
+
+    /* If we have no selected dept, we exit. */
+    if (currentDept == GIGS_NONE) {
+        return;
+    }
+
+    /* Do our standard setup. */
+EC( ECVMCheckVMFile( dbfile ); )
+    mapitem = DBGetMap(dbfile);
+    map = DBLockUngrouped(dbfile, mapitem);
+    dept = (DeptStruct *) (map + 1);
+
+    /* Delete the current dept's DBGroup. */
+    DBGroupFree(dbfile, dept[currentDept].DS_group);
+
+    /* Now decrement size of map array and save size for later. */
+    mapsize = --(*map);
+    DBDirty(map);
+    DBUnlock(map);
+
+    /* Now we contract the map item.  DBDeleteAt removes bytes from
+       within the specified item, moving bytes after it backwards. */
+    DBDeleteAtUngrouped(dbfile, mapitem,
+         sizeof(word) + (currentDept * sizeof(DeptStruct)),
+         sizeof(DeptStruct));
+
+    /* Let the lists in on what's going on. */
+    @send DBGroupDList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(currentDept,1);
+    @send DBItemDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+
+    /* Set the address glyph to be nothing. */
+    @call ShowAddress::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Address:",VUM_NOW);
+
+    currentDept = GIGS_NONE;
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DBSP_DELETE_EMPLOYEE for DBSampProcessClass
+ *
+ * DESCRIPTION:	Deletes selected employee (DBItem).
+ *
+ * PARAMETERS:  void (otpr trigger)
+ *
+ * STRATEGY:    Since the employee DBItems are in a linked list, the
+ *              list must be traversed to remove the item.
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	noha	3/1/94		Initial Revision
+ *
+ ***********************************************************************/
+
+@method DBSampProcessClass, MSG_DBSP_DELETE_EMPLOYEE
+{
+    DeptStruct        *dept;
+    EmployeeStruct    *employee, *tmp;
+    DBItem            empitem, previtem;
+    DBGroup           divgroup;
+    word              *map;
+    word              i;
+
+    /* Exit if no employee selected. */
+    if (currentEmployee == GIGS_NONE)
+        return;
+
+    /* Standard setup... */
+EC( ECVMCheckVMFile( dbfile ); )
+    map = DBLockMap(dbfile);
+    dept = (DeptStruct *) (map + 1);
+    divgroup = dept[currentDept].DS_group;
+
+    /* Find the employee record, starting with head of list. */
+    empitem = dept[currentDept].DS_head;
+    employee = DBLock(dbfile, divgroup, empitem);
+
+    /* If item is first, dept record must be modified (new list head). */
+    if (currentEmployee == 0) {
+        dept[currentDept].DS_head = employee->ES_next;
+    }
+    else {
+        /* Loop into linked list. */
+        for (i=0; i < currentEmployee; i++) {
+            previtem = empitem;
+            empitem = employee->ES_next;
+            tmp = DBLock(dbfile, divgroup, empitem);
+            DBUnlock(employee);
+            employee = tmp;
+        }
+        /* Relock previous (in previtem). */
+        tmp = DBLock(dbfile, divgroup, previtem);
+
+        /* Fix next pointer in previous item. */
+        tmp->ES_next = employee->ES_next;
+
+        /* Mark previous item as dirty and unlock. */
+        DBDirty(tmp);
+        DBUnlock(tmp);
+    }
+
+    /* We no longer need access to the item to be deleted. */
+    DBUnlock(employee);
+
+    /* Now linked list is patched up, we merely need to delete item. */
+    DBFree(dbfile, divgroup, empitem);
+
+    /* Decrease the dept size. */
+    dept[currentDept].DS_size--;
+
+    /* Unlock map item. */
+    DBDirty(map);
+    DBUnlock(map);
+
+    /* Inform the list of changes. */
+    @send DBItemDList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(currentEmployee,1);
+
+    /* Set the address glyph to be nothing. */
+    @call ShowAddress::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Address:",VUM_NOW);
+
+    currentEmployee = GIGS_NONE;
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DBSP_GROUP_DLIST_MONIKER_QUERY for DBSampProcessClass
+ *
+ * DESCRIPTION:	Queries for monikers for dept list.
+ *
+ * PARAMETERS:  void (optr list, word item)
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	noha	3/1/94		Initial Revision
+ *
+ ***********************************************************************/
+
+@method DBSampProcessClass, MSG_DBSP_GROUP_DLIST_MONIKER_QUERY
+{
+    DeptStruct    *dept;
+    word          *map;
+
+    /* Lock the map item. */
+EC( ECVMCheckVMFile( dbfile ); )
+    map = DBLockMap(dbfile);
+
+    /* Get the beginning of the array of structures. */
+    dept = (DeptStruct *) (map + 1);
+
+    /* Set the text in the list item. */
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item,dept[item].DS_name);
+
+    /* Unlock the map item. */
+    DBUnlock(map);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DBSP_ITEM_LIST_MONIKER_QUERY for DBSampProcessClass
+ *
+ * DESCRIPTION:	Queries for monikers for employee list.
+ *
+ * PARAMETERS:  void (optr list, word item)
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	noha	3/1/94		Initial Revision
+ *
+ ***********************************************************************/
+
+@method DBSampProcessClass, MSG_DBSP_ITEM_DLIST_MONIKER_QUERY
+{
+    DeptStruct         *dept;
+    EmployeeStruct     *employee, *tmp;
+    DBGroup            divgroup;
+    word               *map, i;
+    DBItem             head;
+
+    /* If no dept has been selected, exit. */
+    if (currentDept == GIGS_NONE) {
+        return;
+    }
+
+    /* Lock the map item. */
+EC( ECVMCheckVMFile( dbfile ); )
+    map = DBLockMap(dbfile);
+
+    /* Get the beginning of the array of structures. */
+    dept = (DeptStruct *) (map + 1);
+    divgroup = dept[currentDept].DS_group;
+
+    /* We merely need to extract the iem handle for the first employee. */
+    head = dept[currentDept].DS_head;
+
+    /* Now we are done with the map item. */
+    DBUnlock(map);
+
+    /* Lock down the head of the item list. */
+    employee = DBLock(dbfile, divgroup, head);
+
+    /* Loop over linked list of employees to get to item'th one.
+     * We are assuming it is impossible to have an illegal index.
+     */
+
+    for (i=0; i < item; i++) {
+
+        /* Lock next employee and unlock current one. */
+        tmp = DBLock(dbfile, divgroup, employee->ES_next);
+        DBUnlock(employee);
+        employee = tmp;
+    }
+
+    /* Set the text in the list item. */
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, employee->ES_name);
+
+    DBUnlock(employee);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DBSP_GROUP_DLIST_APPLY for DBSampProcessClass
+ *
+ * DESCRIPTION:	Handles an apply of user changes to the dept list.
+ *
+ * PARAMETERS:  void (word selection, numSelections, flags)
+ *
+ * STRATEGY:    Enable various UI objects and setup the employee list.
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	noha    3/1/94		Initial Revision
+ *
+ ***********************************************************************/
+
+@method DBSampProcessClass, MSG_DBSP_GROUP_DLIST_APPLY
+{
+    DeptStruct    *dept;
+    word          *map;
+
+    /* Set the current dept global variable. */
+    currentDept = selection;
+    currentEmployee = GIGS_NONE;
+
+    /* (Perform the same setup procedure as above). */
+    map = DBLockMap(dbfile);
+    dept = (DeptStruct *) (map + 1);
+
+    /* Now set the number of items in the item list. */
+    @send DBItemDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(dept[selection].DS_size);
+
+    /* Set the address glyph to be nothing. */
+    @call ShowAddress::MSG_GEN_REPLACE_VIS_MONIKER_TEXT("Address:",VUM_NOW);
+
+    DBUnlock(map);
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DBSP_ITEM_DLIST_APPLY for DBSampProcessClass
+ *
+ * DESCRIPTION:	Handles an apply of user changes to the employee list.
+ *
+ * PARAMETERS:  void (word selection, numSelections, flags)
+ *
+ * STRATEGY:    Enable various UI items and set values in the text fields.
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	noha	3/1/94		Initial Revision
+ *
+ ***********************************************************************/
+
+@method DBSampProcessClass, MSG_DBSP_ITEM_DLIST_APPLY
+{
+    DeptStruct        *dept;
+    EmployeeStruct    *employee, *tmp;
+    DBGroup           divgroup;
+    word              *map;
+    word              i;
+    char              addr[MAX_NAME_LEN+10];
+
+    /* (Perform the same setup procedure as above.) */
+EC( ECVMCheckVMFile( dbfile ); )
+    map = DBLockMap(dbfile);
+    dept = (DeptStruct *) (map + 1);
+    divgroup = dept[currentDept].DS_group;
+    employee = DBLock(dbfile, divgroup, dept[currentDept].DS_head);
+    DBUnlock(map);
+
+    /* Set the current employee global variable. */
+    currentEmployee = selection;
+
+    /* Scan to new item, starting from list head. */
+    for ( i=0; i < currentEmployee; i++ ) {
+        tmp = DBLock(dbfile, divgroup, employee->ES_next);
+        DBUnlock(employee);
+        employee = tmp;
+    }
+
+    /* Set the address glyph. */
+    sprintf(addr, "Address: %s", employee->ES_addr);
+    @call ShowAddress::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(addr, VUM_NOW);
+
+    DBUnlock(employee);
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DBSP_SET_EMPLOYEE_DATA for DBSampProcessClass
+ *
+ * DESCRIPTION:	Updates current employee record based on text fields.
+ *
+ * PARAMETERS:  void (otpr trigger)
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	noha	3/2/94		Initial Revision
+ *
+ ***********************************************************************/
+
+@method DBSampProcessClass, MSG_DBSP_SET_EMPLOYEE_DATA
+{
+    DeptStruct        *dept;
+    EmployeeStruct    *employee, *tmp;
+    DBGroup           divgroup;
+    word              *map;
+    word              i;
+    char              addr[MAX_NAME_LEN+10];
+
+    /* Do nothing if no employee selected. */
+    if ( currentEmployee == GIGS_NONE ) {
+        return;
+    }
+
+    /* (Perform the same setup procedure as above) */
+    map = DBLockMap(dbfile);
+    dept = (DeptStruct *) (map + 1);
+    divgroup = dept[currentDept].DS_group;
+    employee = DBLock(dbfile, divgroup, dept[currentDept].DS_head);
+    DBUnlock(map);
+
+    /* Scan forward to selected employee */
+    for ( i=0; i < currentEmployee; i++ ) {
+        tmp = DBLock(dbfile, divgroup, employee->ES_next);
+        DBUnlock(employee);
+        employee = tmp;
+    }
+
+    /* Set up fields based on employee. */
+    @call AddrField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		employee->ES_addr, strlen(employee->ES_addr));
+
+    @call NameField::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+		employee->ES_name, strlen(employee->ES_name));
+
+    /* Invoke the Employee Data dialog. */
+    if (UserDoDialog(@EmployeeDialog) != IC_APPLY) {
+        DBUnlock(employee);
+        return;
+    }
+
+    /* Now we set employee statistic(s) based on fields. */
+    @call AddrField::MSG_VIS_TEXT_GET_ALL_PTR(employee->ES_addr);
+
+    @call NameField::MSG_VIS_TEXT_GET_ALL_PTR(employee->ES_name);
+
+    /* ...and update the UI based on the new info. */
+    @call DBItemDList::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
+        currentEmployee, employee->ES_name );
+
+    sprintf(addr, "Address: %s", employee->ES_addr);
+    @call ShowAddress::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(addr, VUM_NOW);
+
+    /* Mark as dirty and unlock changed employee record. */
+    DBDirty(employee);
+    DBUnlock(employee);
+}
+

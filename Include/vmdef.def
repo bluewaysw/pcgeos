@@ -1,0 +1,398 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+FILE:		lmemdef.def
+
+DECLARER:	Kernel
+
+INTENDED USERS:	No restrictions
+OVERRIDE CONST:	-
+
+REQUIRES:
+	vmdef.def
+
+MACROS:
+	Name			Description
+	----			-----------
+	DefVMFile		Define a VM file
+
+	DefVMBlock		Define a VM block
+	EndVMBlock		End definition of a VM block
+
+DESCRIPTION:
+	This file defines macros for making local memory blocks.
+
+	$Id: vmdef.def,v 1.1 97/04/04 14:23:42 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__VMDEF
+
+include vm.def
+include lmem.def
+_DECLARER_ = -1	; PRETEND
+include library.def
+include dbase.def
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DefVMFile
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Declare a vm file
+
+PASS:		mapBlock	- Name of map block
+		attr		- special attributes for the file, from
+				  VMAttributes record (remember to put the
+				  thing in <>s)
+		compaction	- compaction threadhold, as a percentage
+
+AUTHOR:		Tony Requist
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+DefVMFile	macro	mapBlock, attr, compaction
+
+;
+; Let linker know of any special compaction required
+; by the file. We don't need to declare these public or anything, as Esp
+; automatically transmits EQU-defined constants to the linker.
+;
+ifnb <compaction>
+COMPACTION	equ compaction
+endif
+
+ifnb <attr>
+ATTRIBUTES	equ	attr
+endif
+
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DefVMBlock
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Declare a vm block
+
+PASS:		blockName	- Name for vm block
+		userID		- User ID for block. If not given, 0 is
+				  assumed
+
+AUTHOR:		Tony Requist
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+DefVMBlock	macro	blockName, userID
+
+blockName	segment para 'VMBLOCK'
+
+;
+; Tell the linker the ID to give the block if we're given one.
+;
+; Other constants that can be set, but whose use is rare enough that we don't
+; bother to have macro arguments:
+; 	blockName&LMEM		set 0 or 1 to mark the block as not or as lmem,
+;				respectively, overriding whether Esp thinks the
+;				segment is lmem
+;	blockName&PRESERVE	set 0 or 1 to mark the block as not needing or
+;				needing, respectively, to have its memory handle
+;				preserved once it's been read into memory.
+;				This overrides Glue's notion of whether the
+;				segment is an object block.
+;
+ifnb <userID>
+blockName&ID	equ userID
+endif
+
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		EndVMBlock
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	End a vm block
+
+PASS:		blockName	- Name for vm block
+
+AUTHOR:		Tony Requist
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+EndVMBlock	macro	blockName
+
+blockName	ends
+
+endm
+
+ContinueVMBlock	macro	blockName
+blockName	segment
+endm
+
+;------------------------------------------------------------------------------
+;
+;			   DATABASE MACROS
+;
+; A database is a VM file with a special structure. One block is automatically
+; created by the macros and is called "__DBMapBlock". It contains the map
+; information required by the database routines. This should not be confused
+; with the map item in the database, which is user-defined.
+;
+; The data in the database are split into various groups according to the
+; user's taste, need, desire, or zodiacal sign. The data blocks associated with
+; each group are automatically allocated by the macros with a new one being
+; allocated when the current one reaches a certain size (8K by default, but
+; this can be set when the group is defined).
+;
+; To accomplish this, the macros use a set of numeric and string equates for
+; each group. These are:
+;	BLOCK_NUM_<group>	The number of the current block for the group
+;				This number is used to form the name of the
+;				item block (<group>Data<num>)
+;	<group>CurInfo		Contains the name of the label for the
+;				DBItemBlockInfo describing the current
+;				item block. This is a string equate, so
+;				whenever it is used, the proper label is
+;				interpolated by the assembler.
+;	WANT_NEW_BLOCK_<group>	When an item is finished, if the current item
+;				block is full, this numeric equate is set to
+;				1, causing the next item allocation to be
+;				performed in a new item block.
+;	DESIRED_SIZE_<group>	Contains the approximate maximum size for
+;				an item block in the group. The macros do
+;				not guarantee a block will never be
+;				larger than this, as they have no control
+;				over the actual amount of data stored in
+;				an item.
+;	<group>CurCount		String equate holding the name of a numeric
+;				equate that counts the number of items in
+;				the block. This is needed to force the
+;				assembler to evaluate the counter only after
+;				all the source has been read.
+;	<group>CurBlock		Name of the current item block segment for the
+;				group.
+;------------------------------------------------------------------------------
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DefDBFile
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Declare a database file
+
+PASS:		mapGroup	- Name of map group
+		mapItem		- Name of map item
+		attr		- special attributes for the file, from
+				  VMAttributes record (be sure to enclose
+				  in <>s)
+		compaction	- compaction threadhold, as a percentage
+
+AUTHOR:		Tony Requist
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+DefDBFile	macro	mapGroup, mapItem, attr, compaction
+
+	DefVMFile	__DBMapBlock, <attr>, <compaction>
+
+	DefVMBlock	__DBMapBlock, DB_MAP_ID
+		DBMapBlock <__DBMapBlock,0,mapGroup,mapItem,__UNGROUP>
+	EndVMBlock	__DBMapBlock
+
+	; Create a group for placing ungrouped items in should the
+	; user want to allocate things in it.
+	DefDBGroup	__UNGROUP, <>, ungroup
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DefDBGroup
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Declare a database group
+
+PASS:		groupName	- Name of group
+		maxSize		- suggested upper bound on an item block
+		flags		- "ungroup" if the group is the ungrouped
+				  group for the file.
+
+AUTHOR:		Tony Requist
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+DefDBGroup	macro	groupName, maxSize, flags
+
+	DefVMBlock groupName, DB_GROUP_ID
+if <flags> eq <ungroup>
+	DBGroupHeader <groupName,0,<1>,groupName&HeadBlock,0,0,SIZE groupName>
+else
+	DBGroupHeader <groupName,0,<>,groupName&HeadBlock,0,0,SIZE groupName>
+endif
+	EndVMBlock groupName
+
+	;
+	; Default to no blocks in the chain. NOTE: This must be defined after
+	; the DBGroupHeader to force the assembler to evaluate it after
+	; all the blocks have been defined.
+	; 
+	groupName&HeadBlock = 0
+
+ifnb <maxSize>
+	DESIRED_SIZE_&groupName = maxSize
+else
+	DESIRED_SIZE_&groupName = DB_ITEM_BLOCK_DESIRED_SIZE-32
+endif
+	;
+	; Initialize state variables for the block to start item block names
+	; from 1. groupName&CurInfo is set to the string <0> to properly
+	; null-terminate the item block chain (the thing is sort of a pointer
+	; variable, in that it normally holds the name of the info record
+	; for the current block, rather than the address of the info record
+	; itself, so it can be used for a label).
+	;
+	; Set the new-block-needed flag for the group so an initial block is
+	; allocated automatically.
+	; 
+	BLOCK_NUM_&groupName = 0
+	groupName&CurInfo equ <0>
+	WANT_NEW_BLOCK_&groupName = 1
+	;
+	; Define CurBlock as a string equate so we can re-assign it as one
+	; later.
+	; 
+	groupName&CurBlock equ <>
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DefDBItem
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Declare a vm file
+
+PASS:		groupName	- Name of group for item
+		itemName	- Name of item
+
+AUTHOR:		Tony Requist
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;
+; Set _dbname to be the blockNum'th data block for the given group. Required
+; so we can get the value of a named constant, rather than its name...
+; 
+_MakeDBIBName	macro groupName, blockNum
+_dbname	catstr <groupName>, <Data>, <blockNum>
+		endm
+_DBSetID	macro segname
+segname&ID	equ	DB_ITEM_BLOCK_ID
+		endm
+
+_next 		equ <>	; Initial definition as string equate so we
+			; can safely reassign it later...
+
+DefDBItem	macro	groupName, itemName
+;
+; See if the group needs a new item data block
+;
+if WANT_NEW_BLOCK_&groupName
+    ;
+    ; Yes. Up the block number counter for the group by one and reset the
+    ; block-needed flag.
+    ;
+    BLOCK_NUM_&groupName = BLOCK_NUM_&groupName + 1
+    WANT_NEW_BLOCK_&groupName = 0
+
+    ;
+    ; Figure the name for the new item block. _MakeDBIBName leaves the result
+    ; in the string-equate "_dbname"
+    ;
+    _MakeDBIBName groupName, %BLOCK_NUM_&groupName
+    _next equ groupName&CurInfo
+    groupName&CurInfo catstr _dbname, <Info>
+    ;
+    ; Initialize the DB-specific fields of the block header, setting the
+    ; VM ID for the block to be DB_ITEM_BLOCK_ID.
+    ;
+    ; Sets the symbol groupName&CurInfo to be an equate containing the name
+    ; of the label to use for the ItemBlockInfo record that describes this
+    ; block.
+    ;
+    _dbname segment lmem LMEM_TYPE_DB_ITEMS
+    _DBSetID %_dbname
+    		word	_dbname		;DBIBH_vmHandle
+		word	groupName&CurInfo;DBIBH_infoStruct
+    _dbname ends
+
+    ;
+    ; Define the ItemBlockInfo record for the new block. NOTE: This must
+    ; be done before an initial value is assigned to the counter variable
+    ; for the segment (whose name ends up in groupName&CurCount) to force
+    ; the assembler to evaluate the count variable after all the items have
+    ; been defined.
+    ; 
+    groupName	segment
+    groupName&CurCount	catstr _dbname, <Count>
+
+    groupName&CurInfo	DBItemBlockInfo <_next,_dbname,groupName&CurCount>
+    groupName	ends
+
+    ;
+    ; Initialize the item counter for the data block and record its name as
+    ; the current one
+    ; 
+    groupName&CurCount = 0
+    groupName&CurBlock equ _dbname
+    ;
+    ; Make this block the head block by setting the HeadBlock symbol for
+    ; the group to match the offset of the DBItemBlockInfo record for this
+    ; block.
+    ; 
+    groupName&HeadBlock = groupName&CurInfo
+endif
+
+;
+; Record another item in the block, add another ItemInfo record to the
+; group block, giving *it* the item name -- the data chunk gets another name
+; as that's the most useful way to do it.
+; 
+groupName&CurCount = groupName&CurCount + 1
+groupName	segment
+itemName	DBItemInfo <groupName&CurInfo,itemName&Chunk>
+groupName	ends
+
+;
+; Define the data chunk. We give it type byte since we don't know what else
+; to do.
+; 
+groupName&CurBlock	segment
+
+itemName&Chunk	chunk	byte
+		endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		EndDBItem
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Finish the definition of a database item
+
+PASS:		groupName	- Name of group for item
+		itemName	- Name of item
+
+AUTHOR:		Tony Requist
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+EndDBItem	macro	groupName, itemName
+if SIZE @CurSeg ge DESIRED_SIZE_&groupName
+WANT_NEW_BLOCK_&groupName = 1
+endif
+
+itemName&Chunk	endc
+
+groupName&CurBlock ends
+
+endm

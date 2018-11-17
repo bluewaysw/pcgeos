@@ -1,0 +1,324 @@
+@define JPEG_SUPPORT
+@define GIFLIB_SUPPORT
+
+/*********************************************************************/
+
+@include <stdapp.goh>
+#include "impbmp\imp_bmp.h"
+#include "impbmp\ibcommon.h"
+@include "statbar\statbar.goh"
+#include <ansi\string.h>
+
+#include "impbmp\imppcx.h"
+#include "impbmp\impbmp.h"
+
+#include <ansi\stdio.h>
+@ifdef JPEG_SUPPORT
+#include "jpeglib.h"
+@endif /* JPEG_SUPPORT */
+
+@ifdef GIFLIB_SUPPORT
+@include <giflib.goh>
+@else /* GIFLIB_SUPPORT */
+#include "impbmp\impgif.h"
+@endif /* GIFLIB_SUPPORT */
+
+/*********************************************************************/
+
+/* Import formats */
+
+/*
+ImpBmpStatus _pascal ImpTIFFProcessFile(ImpBmpParams *params);
+*/
+
+@ifdef JPEG_SUPPORT
+ImpBmpStatus _pascal ImpJPEGProcessFile(ImpBmpParams *params);
+@endif /* JPEG_SUPPORT */
+
+/* Format tests */
+/*
+ImpBmpStatus _pascal ImpTIFFTestFile(FileHandle file);
+*/
+
+@ifdef JPEG_SUPPORT
+ImpBmpStatus _pascal ImpJPEGTestFile(FileHandle file);
+@endif  /* JPEG_SUPPORT */
+
+/* Declaration of functions */
+
+/*********************************************************************/
+
+ImpBmpStatus _pascal Imp_BmpProcessFile(ImpBmpParams *params,ImpBmpFormat format)
+{
+  ImpBmpStatus status;
+
+  if(format == IBF_AUTO)
+  {
+	 format = Imp_BmpTestFile(params->IBP_source);
+	 if(format == 0) return(IBS_UNKNOWN_FORMAT);
+  };
+
+  if(format == IBF_BMP)
+	 status = ImpBMPProcessFile(params);
+
+  if(format == IBF_PCX)
+	 status = ImpPCXProcessFile(params);
+/*
+  if(format == IBF_TIFF)
+	 status = ImpTIFFProcessFile(params);
+*/
+@ifdef JPEG_SUPPORT
+  if(format == IBF_JPEG)
+	 status = ImpJPEGProcessFile(params);
+@endif /* JPEG_SUPPORT */
+
+  if(format ==  IBF_GIF)
+@ifndef GIFLIB_SUPPORT
+	 status = ImpGIFProcessFile(params);
+@else /* GIFLIB_SUPPORT */
+  {
+    GifError stat = GE_NO_ERROR;
+
+	params->IBP_bitmap =  
+    GifImportBitmapFHandle(params->IBP_source, params->IBP_dest, 
+				&stat);
+   strcpy(params->IBP_impForm, ".GIF"); 
+
+	if(stat == GE_NO_ERROR)
+		return(IBS_NO_ERROR);
+	else
+		return(IBS_SYS_ERROR);
+  }
+@endif /* GIFLIB_SUPPORT */
+
+  return(status);
+};
+
+/*********************************************************************/
+
+ImpBmpFormat _pascal Imp_BmpTestFile(FileHandle file)
+{
+  ImpBmpStatus status;
+@ifdef GIFLIB_SUPPORT
+  GifError stat = GE_NO_ERROR;
+@endif /* GIFLIB_SUPPORT */
+  status = ImpBMPTestFile(file);
+  if(status == IBS_NO_ERROR) return(IBF_BMP);
+
+  status = ImpPCXTestFile(file);
+  if(status == IBS_NO_ERROR) return(IBF_PCX);
+/*
+  status = ImpTIFFTestFile(file);
+  if(status == IBS_NO_ERROR) return(IBF_TIFF);
+*/
+@ifdef JPEG_SUPPORT 
+  status = ImpJPEGTestFile(file);
+  if(status == IBS_NO_ERROR) return(IBF_JPEG);
+@endif /* JPEG_SUPPORT */
+
+@ifdef GIFLIB_SUPPORT
+  stat = GifImportTestBitmapFHandle(file);
+  if(stat == GE_NO_ERROR) return(IBF_GIF);
+@else /* GIFLIB_SUPPORT */
+  status = ImpGIFTestFile(file);
+  if(status == IBS_NO_ERROR) return(IBF_GIF);
+@endif /* GIFLIB_SUPPORT */
+
+  return(0); /* for unknown format */
+};
+
+/* shared to modules */
+
+/* import functions */
+
+/*********************************************************************/
+
+/*
+ImpBmpStatus _pascal ImpTIFFProcessFile(ImpBmpParams *params)
+{
+  return(IBS_UNKNOWN_FORMAT);
+};
+*/
+
+/*********************************************************************/
+
+@ifdef JPEG_SUPPORT  
+ImpBmpStatus _pascal ImpJPEGProcessFile(ImpBmpParams *params)
+{
+  /* This struct contains the JPEG decompression parameters and pointers to
+   * working space (which is allocated as needed by the JPEG library).
+   */
+  struct jpeg_decompress_struct cinfo;
+  struct jpeg_error_mgr jerr;
+  /* More stuff */
+  FILE * infile;        /* source file */
+  JSAMPARRAY buffer;        /* Output row buffer */
+  int row_stride;       /* physical row width in output buffer */
+  int x;
+
+  ImpBmpStatus status;
+  GStateHandle bmstate;
+  VMBlockHandle bmblock;
+  word size;
+  void *lineptr;
+  Boolean flag;
+
+  status = IBS_NO_ERROR;
+
+	if(params->IBP_source == 0)
+		FatalError(2000);
+
+  if(FilePos(params->IBP_source, 0, FILE_POS_START)!=0)
+	FatalError(254);
+
+  infile = fdopen(params->IBP_source, "r");
+
+	if(infile == 0)
+		FatalError(255);
+
+  /* switch in status bar */
+  if(params->IBP_status != 0)  
+	@call params->IBP_status::MSG_SB_START_PROCESS();
+
+  cinfo.err = jpeg_std_error(&jerr);
+
+  jpeg_create_decompress(&cinfo);
+  jpeg_stdio_src(&cinfo, infile);
+  (void) jpeg_read_header(&cinfo, TRUE);
+  (void) jpeg_start_decompress(&cinfo);
+
+  /* create output HugeBitmap in the VM file now */
+  bmblock = GrCreateBitmap(BMF_24BIT|BMT_COMPLEX|BMT_PALETTE,
+						   cinfo.output_width,
+						   cinfo.output_height,
+						   params->IBP_dest, 0, &bmstate);
+  if(bmblock == 0)
+	FatalError(256);
+  GrDestroyBitmap(bmstate, BMD_LEAVE_DATA);
+
+  params->IBP_bitmap = bmblock;
+  params->IBP_width =  cinfo.output_width;
+  params->IBP_height = cinfo.output_height;
+  params->IBP_format = IBF_JPEG;
+  strcpy(params->IBP_impForm, ".JPG");
+
+  /* JSAMPLEs per row in output buffer */
+  row_stride = cinfo.output_width * cinfo.output_components;
+  /* Make a one-row-high sample array that will go away when done with image */
+  buffer = MCALL4(alloc_sarray, cinfo.mem,
+				  (j_common_ptr) &cinfo, JPOOL_IMAGE, row_stride, 1);
+
+  /* Step 6: while (scan lines remain to be read) */
+  /*           jpeg_read_scanlines(...); */
+
+  /* Here we use the library's state variable cinfo.output_scanline as the
+   * loop counter, so that we don't have to keep track ourselves.
+   */
+  while ((cinfo.output_scanline < cinfo.output_height) &&
+  (status == IBS_NO_ERROR))
+  {
+	/* jpeg_read_scanlines expects an array of pointers to scanlines.
+	 * Here the array is only one element long, but you could ask for
+	 * more than one scanline at a time if that's more convenient.
+	 */
+   (void) jpeg_read_scanlines(&cinfo, buffer, 1);
+
+	HugeArrayLock(params->IBP_dest, bmblock,
+				  (dword)cinfo.output_scanline - 1,&lineptr,&size);     
+
+	if(lineptr == 0)
+		FatalError(257);
+
+	memcpy(lineptr, buffer[0], size);
+	
+	HugeArrayDirty(lineptr);
+	HugeArrayUnlock(lineptr);  
+
+		if(params->IBP_status != NULL)
+		  flag = @call params->IBP_status::
+				  MSG_SB_SET_STATUS_VALUE(((dword)cinfo.output_scanline)*100/params->IBP_height);
+		if(flag == FALSE)
+		  status = IBS_IMPORT_STOPPED;
+
+  }
+
+  /* Step 7: Finish decompression */
+
+  (void) jpeg_finish_decompress(&cinfo);
+  /* We can ignore the return value since suspension is not possible
+   * with the stdio data source.
+   */
+
+  /* Step 8: Release JPEG decompression object */
+
+  /* This is an important step since it will release a good deal of memory. */
+  jpeg_destroy_decompress(&cinfo);
+
+  fdclose(infile);
+
+  /* At this point you may want to check to see whether any corrupt-data
+   * warnings occurred (test whether jerr.pub.num_warnings is nonzero).
+   */
+
+  if(params->IBP_status != NULL)
+	 @call params->IBP_status::MSG_SB_STOP_PROCESS();
+
+  return (IBS_NO_ERROR);
+};
+@endif
+
+/*********************************************************************/
+
+/* Format tests */
+/*
+ImpBmpStatus _pascal ImpTIFFTestFile(FileHandle file)
+{
+  return(IBS_WRONG_FORMAT);
+};
+*/
+
+/*********************************************************************/
+
+@ifdef JPEG_SUPPORT
+
+ImpBmpStatus _pascal ImpJPEGTestFile(FileHandle file)
+{
+
+/* This was Falk's code...
+int result;
+byte read[4];
+
+  if(FilePos(file, 6, FILE_POS_START)!=6)
+	 return(IBS_WRONG_FILE);
+  result = FileRead(file, &read, 4, 0);
+  if(result == -1)
+	 return(IBS_SYS_ERROR);
+  if(result != 4)
+	 return(IBS_WRONG_FILE);
+  if(strncmp(read, "JFIF", 4) == 0)
+	 return(IBS_NO_ERROR);
+  return(IBS_WRONG_FORMAT);
+*/
+/* here's my mod to use newer jpg's.  It's based on the !JFIF_ONLY
+ * code in the jpg impex library (library\breadbox\impex\jpeg\xlat\impjpeg.goc
+ * jfh 9/9/02 */
+int result;
+byte read[3];
+
+
+	if(FilePos(file, 0, FILE_POS_START)!=0)
+		return(IBS_WRONG_FILE);
+	result = FileRead(file, &read, 3, 0);
+	if(result == -1)
+		return(IBS_SYS_ERROR);
+	if(result != 3)
+		return(IBS_WRONG_FILE);
+	if ((read[0] == 0xff) && (read[1] == 0xd8) && (read[2] == 0xff))
+		return(IBS_NO_ERROR);
+	return(IBS_WRONG_FORMAT);
+
+
+};
+@endif
+
+/*********************************************************************/

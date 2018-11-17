@@ -1,0 +1,607 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT: Breadbox Test Taker
+ * FILE:        ttkr_ui.goc
+ * AUTHOR:  John F. Howard    01/03
+ *
+ * DESCRIPTION:
+ *  This is the UI code for the Test Taker application.
+ *
+ * WHATS NEW:  Beginning of version 0.0
+ *    01/10/03		jfh	Initial version
+ *
+ *
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *      Include files
+ ***************************************************************************
+ */
+
+@include "ttkr.goh"
+@include "art\bboxreg.goh"
+@include "art\ttkicons.goh"
+
+/*
+ ***************************************************************************
+ *      UI Objects
+ ***************************************************************************
+ */
+
+@start  AppResource;
+@object GenApplicationClass TTkrApp = {
+    GI_visMoniker = list {
+			@TTkrTextMoniker,
+			@TTLCAppIconMoniker,
+			@TTTinyAppIconMoniker 
+     }
+	 GI_comp = @TTkrPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) =
+					 @TTkrPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) =
+					 @TTkrDocumentControl;
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) =
+					 @TTkrDocumentControl;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS ) =
+			 @TTkrDocumentControl;
+	 ATTR_GEN_HELP_FILE = "TTkrHelp";
+}
+
+@visMoniker TTkrTextMoniker = "Test Taker";
+
+@end AppResource
+
+
+@start  Interface;
+@object GenPrimaryClass TTkrPrimary = {
+	 GI_comp = @TTkrFileMenu, @TTkrMainGroup/*,
+	           @TTkrDialogs*/;
+    GI_attrs = @default | GA_TARGETABLE
+                    | GA_KBD_SEARCH_PATH;
+    ATTR_GEN_HELP_CONTEXT = "TOC";
+}
+
+@object GenInteractionClass TTkrFileMenu = {
+	 GI_comp = @TTkrDocumentControl, @AboutDBox, @UnFinishDBox;
+	 GI_attrs = @default | GA_TARGETABLE
+						  | GA_KBD_SEARCH_PATH;
+	 GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+}
+
+@object GenDocumentControlClass TTkrDocumentControl = {
+    GI_attrs = @default | GA_TARGETABLE
+						  | GA_KBD_SEARCH_PATH;
+	 /* this keeps the doc from opening up dirty */
+	 GDCI_attrs = @default & ~(GDCA_SUPPORTS_SAVE_AS_REVERT);
+	 GDCI_documentToken = {"TTd1", 16431};
+    GDCI_noNameText = "No File";
+	 GDCI_features = @default & ~(GDCF_SUPPORTS_TEMPLATES
+					| GDCF_SUPPORTS_USER_SETTABLE_EMPTY_DOCUMENT
+					| GDCF_SUPPORTS_USER_SETTABLE_DEFAULT_DOCUMENT
+					| GDCF_SUPPORTS_USER_MAKING_SHARED_DOCUMENTS);
+	 GDCI_documentGroup = TTkrDocumentGroup;
+	 GDCI_enableDisableList = TTkrEnableList;
+    /* keep the File menu simple! */
+	 ATTR_GEN_CONTROL_PROHIBIT_UI = GDCF_NEW
+											  | GDCF_SAVE
+											  | GDCF_QUICK_BACKUP
+											  | GDCF_SAVE_AS
+											  | GDCF_COPY
+											  | GDCF_EXPORT
+											  | GDCF_REVERT
+											  | GDCF_RENAME
+											  | GDCF_EDIT_USER_NOTES
+											  | GDCF_SET_TYPE
+											  | GDCF_SET_PASSWORD
+											  | GDCF_SAVE_AS_TEMPLATE
+											  | GDCF_SET_EMPTY_DOCUMENT
+											  | GDCF_SET_DEFAULT_DOCUMENT;
+	 /* This is a tweak to keep New item from appearing in the main file dbox.
+		It tells DocCtrl that it needs to be at user level 5 to show New, and
+		since there is no level 5 it won't show up :-)  */
+	 ATTR_GEN_DOCUMENT_CONTROL_NO_EMPTY_DOC_IF_NOT_ABOVE = 5;
+
+}
+
+@chunk optr TTkrEnableList[] = {
+	 @TTkrMainGroup
+};
+
+@object GenInteractionClass AboutDBox = {
+    GI_visMoniker = 'b', "About";
+    GI_comp = @AppName, @Beta, @By, @BreadBoxLogo, @Visit,
+		    @Web, @Copyright;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_NOTIFICATION;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass AppName = {
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "Test Taker";
+	 ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @AppNameCharAttrs;
+}
+
+@chunk VisTextCharAttr AppNameCharAttrs =
+	CHAR_ATTR_FONT_SIZE_STYLE(
+		FID_DTC_URW_SANS, 24, TS_BOLD);
+
+@object GenGlyphClass Beta = {
+  GI_visMoniker = "An Educational Product";
+}
+
+@object GenGlyphClass By = {
+  GI_visMoniker = "from";
+}
+
+@object GenGlyphClass BreadBoxLogo = {
+  GI_visMoniker = list { @BreadboxLogoMoniker}
+}
+
+@object GenGlyphClass Copyright = {
+  GI_visMoniker = "Copyright 1994-2003 Breadbox Computer Company LLC";
+}
+
+@object GenGlyphClass Visit = {
+  GI_visMoniker = "Visit us at...";
+}
+
+@object GenGlyphClass Web = {
+  GI_visMoniker = "www.breadbox.com";
+}
+
+/* This dialog box an be activated only by its kbdAccelerator
+	as a backdoor for teachers to undo a student marking the test
+	as completed */
+@object GenInteractionClass UnFinishDBox = {
+	 GI_visMoniker = "UnFinish";
+	 GI_kbdAccelerator = shift ctrl 'u';
+	 GI_comp = @UnFinishGlyph1, @UnFinishGlyph2,
+				  @UnFinishTrig, @UnFinishCanx;
+	 GI_attrs = @default | GA_TARGETABLE
+						  | GA_KBD_SEARCH_PATH;
+	 GII_visibility = GIV_DIALOG;
+	 GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenGlyphClass UnFinishGlyph1 = {
+  GI_visMoniker = "Clicking the UnFinish button will reset";
+}
+
+@object GenGlyphClass UnFinishGlyph2 = {
+  GI_visMoniker = "the test so that answers can be added or changed.";
+}
+
+@object GenTriggerClass UnFinishTrig = {
+	 GI_visMoniker = "UnFinish";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_TTKR_DOCUMENT_TEST_NOT_COMPLETED;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TTkrDocumentClass};
+	 HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass UnFinishCanx = {
+	 GI_visMoniker = "Cancel";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	 HINT_SEEK_REPLY_BAR;
+}
+
+@end Interface;
+
+/* -------------------------------------------------------------*/
+@start DocumentUI;
+@object GenDocumentGroupClass TTkrDocumentGroup ={
+	 GDGI_untitledName = "Untitled Test";
+	 GDGI_protocolMajor = 1;
+    GDGI_protocolMinor = 0;
+	 GDGI_documentClass = &TTkrDocumentClass;
+	 GDGI_documentControl = TTkrDocumentControl;
+}
+@end DocumentUI;
+
+@start Interface;
+/*---------------------------------------------------------------------*/
+@object GenInteractionClass TTkrMainGroup = {
+	 GI_comp = @MESummaryGroup, @MEQuestionAnswerGroup;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass MESummaryGroup = {
+	 GI_comp = @MESNameDateGroup, @MESBreakdownGroup, @MESummaryDList,
+				  @MESummaryButtons;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	 HINT_DRAW_IN_BOX;
+}
+
+@object GenInteractionClass MESNameDateGroup = {
+	 GI_visMoniker = "Student Information";
+	 GI_comp = @MESNameText, @MESDateText;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 HINT_PLACE_MONIKER_ABOVE;
+	 HINT_DRAW_IN_BOX;
+	 HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	 HINT_CENTER_CHILDREN_VERTICALLY;
+	 HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	 HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+}
+
+@object GenTextClass MESNameText = {
+	 GI_visMoniker = "Name: ";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_maxLength = MAX_TITLE_LENGTH - 1;
+	 HINT_TEXT_WHITE_WASH_COLOR ;
+}
+
+@object GenTextClass MESDateText = {
+	 GI_visMoniker = "Date: ";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_maxLength = MAX_TITLE_LENGTH - 1;
+	 HINT_TEXT_WHITE_WASH_COLOR ;
+}
+
+@object GenInteractionClass MESBreakdownGroup = {
+	 GI_visMoniker = "Test Information";
+	 GI_comp = @MESInfoGroup, @MESNumberGroup, @MESGradeGroup;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 HINT_PLACE_MONIKER_ABOVE;
+	 HINT_DRAW_IN_BOX;
+	 HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	 HINT_CENTER_CHILDREN_VERTICALLY;
+	 HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	 HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+}
+
+@object GenInteractionClass MESInfoGroup = {
+	 GI_comp = @MESInfo1, @MESInfo2, @MESInfo3;
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenGlyphClass MESInfo1 = {
+}
+@object GenGlyphClass MESInfo2 = {
+}
+@object GenGlyphClass MESInfo3 = {
+}
+
+@object GenInteractionClass MESNumberGroup = {
+	 GI_comp = @MESBAnsNumber, @MESBTotNumber;
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass MESBAnsNumber = {
+	 GI_visMoniker = "Questions Answered: ";
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "0";
+}
+
+@object GenTextClass MESBTotNumber = {
+	 GI_visMoniker = "Total Questions: ";
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "0";
+}
+
+@object GenInteractionClass MESGradeGroup = {
+	 GI_comp = @MESBCorrect, @MESBScore;
+	 GI_states = @default & ~GS_USABLE;
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass MESBCorrect = {
+	 GI_visMoniker = "Correct Answers: ";
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+}
+
+@object GenTextClass MESBScore = {
+	 GI_visMoniker = "Score: ";
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+}
+
+@object TTkrGenDynamicListClass MESummaryDList = {
+	GI_visMoniker = "Questions";
+	GIGI_destination = (TO_APP_MODEL);
+	GIGI_numSelections = 0;
+	GDLI_queryMsg = MSG_TTKR_DOCUMENT_SUMMARY_DLIST_MONIKER_QUERY;
+	GDLI_numItems = 0;
+	ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_TTKR_DOCUMENT_SUMMARY_DLIST_STATUS;
+	ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS = MSG_TTKR_DOCUMENT_OPEN_QA_FORM;
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TTkrDocumentClass};
+	HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object GenInteractionClass MESummaryButtons = {
+	 GI_comp = @MESBAnswerQButton, @MESBGradeButton, @MESBCompletedButton;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	 HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	 HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+}
+
+@visMoniker MESBAnswerQButtonAnsMoniker = "Answer Question";
+@visMoniker MESBAnswerQButtonViewMoniker = "View Question & Answer";
+@object GenTriggerClass MESBAnswerQButton = {
+	 GI_visMoniker = @MESBAnswerQButtonAnsMoniker;
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_TTKR_DOCUMENT_OPEN_QA_FORM;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TTkrDocumentClass};
+}
+
+@object GenTriggerClass MESBGradeButton = {
+	 GI_visMoniker = "Grade Test";
+	 GI_states = @default & ~GS_USABLE;
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_TTKR_DOCUMENT_GRADE_TEST;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TTkrDocumentClass};
+}
+
+@object GenTriggerClass MESBCompletedButton = {
+	 GI_visMoniker = "Mark Test Completed";
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_TTKR_DOCUMENT_TEST_COMPLETED;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TTkrDocumentClass};
+}
+
+/*---------------------------------------------------------------------*/
+@object TTkrQAInteractionClass MEQuestionAnswerGroup = {
+	 GI_visMoniker = @MESBAnswerQButtonAnsMoniker;
+	 GI_comp = @MEQAQuestions, @MEQAAnswers,
+				  @MEQARightWrong, @MEQAButtons;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+    GII_attrs = @default | GIA_MODAL; 
+	 GII_type = GIT_ORGANIZATIONAL;
+	 GII_visibility = GIV_DIALOG;
+	 GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+	 ATTR_GEN_HELP_CONTEXT = "AnswerQDB";
+    HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+}
+
+@object GenInteractionClass MEQAQuestions = {
+	 GI_visMoniker = "Question";
+	 GI_comp = @MEQAQuestionNum, @MEQAQuestionType, @MEQAQuestionText,
+				  @MEQAMCQuestionChoice;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_DRAW_IN_BOX;
+}
+
+@object GenTextClass MEQAQuestionNum = {
+	 GI_visMoniker = "Number: " ;
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenTextClass MEQAQuestionType = {
+	 GI_visMoniker = "Type: " ;
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenTextClass MEQAQuestionText = {
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_INIT_SCROLLING;
+	 GTXI_maxLength = MAX_QUESTION_LENGTH - 1;
+	 ATTR_GEN_TEXT_SET_OBJECT_ENABLED_WHEN_TEXT_EXISTS = @MEQAEnterButton;
+	 HINT_MINIMUM_SIZE = {0, SST_LINES_OF_TEXT | 4, 0};
+	 HINT_TEXT_WHITE_WASH_COLOR ;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenInteractionClass MEQAMCQuestionChoice = {
+	 GI_comp = @MEQAMCQSelectA, @MEQAMCQSelectB, @MEQAMCQSelectC,
+				  @MEQAMCQSelectD, @MEQAMCQSelectE, @MEQAMCQSelectF;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    HINT_CENTER_CHILDREN_ON_MONIKERS;
+}
+
+@object GenTextClass MEQAMCQSelectA = {
+	 GI_visMoniker = "A:";
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_maxLength = MAX_CHOICE_LENGTH - 1;
+	 HINT_TEXT_WHITE_WASH_COLOR ;
+	 HINT_TEXT_FRAME;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenTextClass MEQAMCQSelectB = {
+	 GI_visMoniker = "B:";
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_maxLength = MAX_CHOICE_LENGTH - 1;
+	 HINT_TEXT_WHITE_WASH_COLOR ;
+	 HINT_TEXT_FRAME;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenTextClass MEQAMCQSelectC = {
+	 GI_visMoniker = "C:";
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_maxLength = MAX_CHOICE_LENGTH - 1;
+	 HINT_TEXT_WHITE_WASH_COLOR ;
+	 HINT_TEXT_FRAME;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenTextClass MEQAMCQSelectD = {
+	 GI_visMoniker = "D:";
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_maxLength = MAX_CHOICE_LENGTH - 1;
+	 HINT_TEXT_WHITE_WASH_COLOR ;
+	 HINT_TEXT_FRAME;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenTextClass MEQAMCQSelectE = {
+	 GI_visMoniker = "E:";
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_maxLength = MAX_CHOICE_LENGTH - 1;
+	 HINT_TEXT_WHITE_WASH_COLOR ;
+	 HINT_TEXT_FRAME;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenTextClass MEQAMCQSelectF = {
+	 GI_visMoniker = "F:";
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_maxLength = MAX_CHOICE_LENGTH - 1;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 HINT_TEXT_WHITE_WASH_COLOR ;
+	 HINT_TEXT_FRAME;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+/*------------------------------------------------------*/
+@object GenInteractionClass MEQAAnswers = {
+	 GI_visMoniker = "Answer";
+	 GI_comp = @MEQAMCAnswer, @MEQATFAnswer, @MEQAFillAnswerGroup;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_DRAW_IN_BOX;
+}
+
+@object GenItemGroupClass MEQAMCAnswer = {
+	 GI_comp = @MEQMCASelectA, @MEQMCASelectB, @MEQMCASelectC,
+				  @MEQMCASelectD, @MEQMCASelectE, @MEQMCASelectF;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 GIGI_selection = GIGS_NONE;
+	 GIGI_behaviorType = GIGBT_EXCLUSIVE_NONE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+}
+
+@object GenItemClass MEQMCASelectA = {
+	 GI_visMoniker = "A" ;
+	 GII_identifier = MC_SELECT_A ;
+}
+
+@object GenItemClass MEQMCASelectB = {
+	 GI_visMoniker = "B" ;
+	 GII_identifier = MC_SELECT_B ;
+}
+
+@object GenItemClass MEQMCASelectC = {
+	 GI_visMoniker = "C" ;
+	 GII_identifier = MC_SELECT_C ;
+}
+
+@object GenItemClass MEQMCASelectD = {
+	 GI_visMoniker = "D" ;
+	 GII_identifier = MC_SELECT_D ;
+}
+
+@object GenItemClass MEQMCASelectE = {
+	 GI_visMoniker = "E" ;
+	 GII_identifier = MC_SELECT_E ;
+}
+
+@object GenItemClass MEQMCASelectF = {
+	 GI_visMoniker = "F" ;
+	 GII_identifier = MC_SELECT_F ;
+}
+
+@object GenItemGroupClass MEQATFAnswer = {
+	 GI_states = @default & ~GS_USABLE;
+	 GI_comp = @MEQTFATrue, @MEQTFAFalse;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 GIGI_selection = GIGS_NONE;
+	 GIGI_behaviorType = GIGBT_EXCLUSIVE_NONE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	 HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+}
+
+@object GenItemClass MEQTFATrue = {
+	 GI_visMoniker = "True" ;
+	 GII_identifier = TF_TRUE ;
+}
+
+@object GenItemClass MEQTFAFalse = {
+	 GI_visMoniker = "False" ;
+	 GII_identifier = TF_FALSE ;
+}
+
+@object GenInteractionClass MEQAFillAnswerGroup = {
+	 GI_comp = @MEQAFillAnswer;
+	 GI_states = @default & ~GS_USABLE;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+}
+
+@object GenTextClass MEQAFillAnswer = {
+	 GTXI_attrs = @default | GTA_INIT_SCROLLING;
+	 GTXI_maxLength = MAX_QUESTION_LENGTH - 1;
+	 HINT_MINIMUM_SIZE = {0, SST_LINES_OF_TEXT | 4, 0};
+	 HINT_TEXT_WHITE_WASH_COLOR ;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenTextClass MEQARightWrong = {
+	 GI_attrs = @default | GA_READ_ONLY;
+//	 HINT_MINIMUM_SIZE = {0, SST_LINES_OF_TEXT | 4, 0};
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenInteractionClass MEQAButtons = {
+	 GI_comp = @MEQAEnterButton, @MEQACancelButton;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 HINT_MAKE_REPLY_BAR;
+}
+
+@visMoniker EnterButtonSaveMoniker = "Save Answer";
+@visMoniker EnterButtonNextMoniker = "Next";
+@object GenTriggerClass MEQAEnterButton = {
+	 GI_visMoniker = @EnterButtonSaveMoniker;
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_TTKR_DOCUMENT_SAVE_ENTRY;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TTkrDocumentClass};
+}
+
+@object GenTriggerClass MEQACancelButton = {
+	 GI_visMoniker = "Cancel";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+}
+
+@end Interface;
+
+
+
+
+
+

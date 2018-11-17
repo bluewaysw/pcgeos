@@ -1,0 +1,284 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1993 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		gfsConstant.def
+
+AUTHOR:		Adam de Boor, Apr 13, 1993
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	4/13/93		Initial revision
+
+
+DESCRIPTION:
+	Constants & structures
+		
+	$Id: gfsConstant.def,v 1.1 97/04/18 11:46:28 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+INVALID_FS_FUNCTION					enum FatalErrors
+INVALID_DOS_SECONDARY_FS_FUNCTION			enum FatalErrors
+FILE_ALREADY_CLOSED					enum FatalErrors
+FILE_NOT_OPEN						enum FatalErrors
+CUSTOM_ATTRIBUTES_MUST_BE_PASSED_AS_FEA_MULTIPLE	enum FatalErrors
+ILLEGAL_EXTENDED_ATTRIBUTE				enum FatalErrors
+CANNOT_MAP_ZERO_LENGTH_NAME				enum FatalErrors
+TAIL_DOESNT_START_WITH_BACKSLASH			enum FatalErrors
+CANNOT_FIND_GFS_DISK					enum FatalErrors
+
+CANNOT_ADOPT_BOOTSTRAP_EXEC_FILE_BECAUSE_SERIAL_NUMBER_DIFFERS enum Warnings
+
+;------------------------------------------------------------------------------
+;  FULL_EXECUTE_IN_PLACE : Indicates that the gfs driver is going to
+;	be used in a system where all geodes (or most, at any rate)
+;	are to be executed out of ROM.  
+;------------------------------------------------------------------------------
+ifndef FULL_EXECUTE_IN_PLACE
+	FULL_EXECUTE_IN_PLACE		equ	FALSE
+endif
+
+;------------------------------------------------------------------------------
+;  The .GP file only understands defined/not defined;
+;  it can not deal with expression evaluation.
+;  Thus, for the TRUE/FALSE conditionals, we define
+;  GP symbols that _only_ get defined when the
+;  condition is true.
+;-----------------------------------------------------------------------------
+if	FULL_EXECUTE_IN_PLACE
+	GP_FULL_EXECUTE_IN_PLACE	equ	TRUE
+endif
+
+;
+; unassigned FileAttrs bit used to know if a file is a geos file.
+; 
+FA_GEOS		equ	0x80
+
+;
+; The FSDFlags that describe this driver's capabilities.
+;
+FSD_FLAGS	equ	FSDFlags	<
+		0,	; FSDF_NETWORK
+		0,	; FSDF_PRIMARY
+		0,	; FSDF_SKELETON
+		0,	; FSDF_CAN_FORMAT
+		0	; FSDF_CAN_COPY
+	>
+
+GFSLongName	type	FILE_LONGNAME_LENGTH dup(TCHAR)
+GFSDosName	type	DOS_NO_DOT_FILE_NAME_LENGTH dup(char)
+
+GeosFileTypeByte	record	GFTB_TYPE GeosFileType:8
+
+;
+; Private data stored at FP_private in each path block.
+; 
+GFSPathPrivate	struct
+    GPP_dirEnts		dword	; offset of directory entries for files
+				;  in the directory
+    GPP_size		word	; number of entries in the directory
+    GPP_attrs		dword	; offset of extended attrs for this
+				;  directory itself
+GFSPathPrivate	ends
+
+;
+; File header
+;
+
+GFS_PROTO_MAJOR		equ	1
+GFS_PROTO_MINOR		equ	0
+
+GFSFileHeader	struct
+    GFSFH_signature	char	4 dup (?)	; "GFS:"
+    GFSFH_checksum	char	8 dup (?)	; 32 bit checksum
+						; in hex digits
+    GFSFH_crlfcrlf	char	4 dup (?)	; C_CR, C_LF, C_CR, C_LF
+    GFSFH_description	char	100 dup (?)	; terminated by Ctrl-Z
+    GFSFH_versionMajor	word
+    GFSFH_versionMinor	word
+    GFSFH_totalSize	dword
+    GFSFH_reserved	byte	16 dup (?)
+GFSFileHeader	ends
+
+;
+; Data kept for each open file. Free slots are indicated by a reference count
+; of 0.
+; 
+GFSFileEntry	struct
+    GFE_extAttrs	dword	; offset of GFSExtAttrs
+    GFE_data		dword	; offset of file data
+    GFE_size		dword	; total size of file, to avoid reading
+				;  past the end
+    GFE_curPos		dword	; current position in the file (relative
+				;  to GFE_data)
+    GFE_refCount	byte	; number of file handles that reference
+				;  this structure
+    GFE_fileType	GeosFileTypeByte	; so we don't have
+				;  to get to the extended attributes
+				;  for an open file when loading a
+				;  geode, just to confirm it's
+				;  GFT_EXECUTABLE
+if _PCMCIA
+    GFE_socket	nptr.PGFSSocketInfo ; Pointer to socket information
+				    ; for this file
+endif
+GFSFileEntry	ends
+
+;
+; File entries are allocated in fixed blocks of structure GFSFileTableBlock.
+; The blocks are chained together for the purpose of finding a free entry.
+; Private data returned is the segment of the GFTB, while the SFN is the
+; index into the block.
+; 
+GFS_FILE_ENTRIES_PER_BLOCK	equ	 17 	; 17 * 17 + 2 = 270 = 17 paras
+GFSFileTableBlock	struct
+    GFTB_next		sptr.GFSFileTableBlock
+    GFTB_entries	GFSFileEntry GFS_FILE_ENTRIES_PER_BLOCK dup(<>)
+GFSFileTableBlock	ends
+    
+
+;
+; Structure kept for each file in the filesystem in the extended directory
+; listing that follows each directory, after taking into account any alignment
+; details of the medium in which the filesystem is stored.
+; 
+GFSExtAttrs	struct
+    GEA_longName	GFSLongName				  ; 32
+    GEA_dosName		GFSDosName				  ; 11
+    GEA_attrs		FileAttrs				  ; 1
+    GEA_type		GeosFileType				  ; 2
+    GEA_flags		GeosFileHeaderFlags			  ; 2
+    GEA_release		ReleaseNumber				  ; 8
+    GEA_protocol	ProtocolNumber				  ; 4
+    GEA_token		GeodeToken				  ; 6
+    GEA_creator		GeodeToken				  ; 6
+    GEA_userNotes	FileUserNotes				  ; 100
+    GEA_notice		FileCopyrightNotice			  ; 32
+    GEA_created		FileDateAndTime				  ; 4
+    GEA_desktop		FileDesktopInfo				  ; 16
+    GEA_modified	FileDateAndTime				  ; 4
+    GEA_size		dword					  ; 4
+    GEA_targetID	FileID		; links only		  ; 4
+    GEA_geodeAttrs	GeodeAttrs	; 0 unless executable     ; 2
+
+								  ; 238
+if GFS_ALIGN
+	align	256
+endif
+
+GFSExtAttrs	ends
+
+;
+; Structure kept for each file/link/subdir within a directory. All these
+; structures for a particular directory are kept in a contiguous array.
+; 
+GFSDirEntry	struct
+    GDE_longName	GFSLongName				  ; 32
+    GDE_dosName		GFSDosName				  ; 11
+    GDE_attrs		FileAttrs				  ; 1
+    GDE_data		dword					  ; 4
+    GDE_size		dword					  ; 4
+    GDE_fileType	GeosFileTypeByte			  ; 1
+								  ; 53
+GFSDirEntry	ends
+
+;
+; Structure of a link file.
+; 
+GFSLinkData	struct
+    GLD_diskSize	word		; number of bytes in the saved disk
+					;  handle
+    GLD_pathSize	word		; number of bytes in the null-term
+					;  target path
+    GLD_extraDataSize	word		; number of bytes of extra data
+    GLD_savedDisk	label	byte	; followed by target, followed by
+					;  extra data.
+GFSLinkData	ends
+
+;==============================================================================
+;			   FILE ENUM/GET EXT ATTRIBUTES STUFF
+;
+; One of these blocks is allocated for DR_FS_FILE_ENUM; to field the
+; FSPOF_GET_EXT_ATTRIBUTES function of DR_FS_PATH_OP; and for the
+; FSHOF_GET_EXT_ATTRIBUTES function of DR_FS_HANDLE_OP. Because of its triple
+; use, it contains information that's not needed for getting the extended
+; attributes, but is needed by DR_FS_FILE_ENUM.
+;==============================================================================
+
+GGEAFlags	record
+    GGEAF_CLEAR_VALUE_SEG_IF_ABSENT:1	; set if FEAD_value.segment for an
+					;  attribute should be cleared if the
+					;  attribute is awol, rather than
+					;  returning ERROR_ATTR_NOT_FOUND.
+
+GGEAFlags	end
+
+
+GFSEnumData	struct
+    GED_callback	fptr.far		; routine in kernel to
+						; call back
+    GED_kernelFrame	word			; bp for kernel callback
+    GED_numEntries	word			; number of entries in dir
+    GED_eaOffset	dword			; address of current ea
+GFSEnumData	ends
+
+GFSGetExtAttrSpecData	union
+    GGEASD_enum		GFSEnumData
+GFSGetExtAttrSpecData	end
+
+GFSGetExtAttrData	struct
+    GGEAD_block		hptr			; the handle of this block
+    GGEAD_disk		word			; disk on which the file
+						;  resides (for calling
+						;  secondary)
+    GGEAD_error		FileError		; error to return to caller,
+						;  if you're into that sort
+						;  of thing...
+    GGEAD_flags		GGEAFlags		; indication of what we've
+						;  got where
+    ;
+    ; Extra data for the caller of DOSVirtGetExtAttrsLow
+    ; 
+    GGEAD_spec		GFSGetExtAttrSpecData
+
+    ;
+    ; Attributes to fetch.
+    ; 
+    GGEAD_attrs		fptr.FileExtAttrDesc	; attributes to get
+    GGEAD_numAttrs	word			; number of attributes to get
+
+    ;
+    ; Extended attributes for the file.
+    ; 
+    GGEAD_header	fptr.GFSExtAttrs	; Header for file, if required
+    GGEAD_pathInfo	DirPathInfo		; DirPathInfo record for
+						;  current path
+
+GFSGetExtAttrData	ends
+
+
+GFSDevLockFlags	record
+    GDLF_DISK:1
+    ; For PCMCIA driver only -- if set, then ES:SI
+    ; contains a DiskDesc structure which the driver should use to
+    ; extract the current socket number
+
+    GDLF_FILE:1
+    ; FOr PCMCIA driver only -- if set, then ES:BX points
+    ; to a GFSFileEntry structure that can be used to fetch the socket
+    ; number.
+
+    GDLF_SCANNING:1
+    ; For Megafile driver -- if set, caller is about to perform a
+    ; directory scan
+
+    :5
+GFSDevLockFlags	end

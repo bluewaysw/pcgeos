@@ -1,0 +1,87 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1990 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Script
+FILE:		scriptVariable.def
+
+AUTHOR:		Dennis Chow, January 31, 1990
+
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dc      01/31/90        Initial revision.
+
+
+DESCRIPTION:
+	Variables local to this module.
+		
+	$Id: scriptVariable.def,v 1.1 97/04/04 16:56:03 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+if DBCS_PCGEOS
+idata	segment
+;place in idata so we can use MSG_READ_BUFFER w/o worrying about buffer
+;going away
+singleByteEscape	byte	JIS_ESCAPE_TO_SINGLE_1, \
+				JIS_ESCAPE_TO_SINGLE_2, \
+				JIS_ESCAPE_TO_SINGLE_3, \
+				0, 0 ; null word to force escape to be processed
+doubleByteEscape	byte	JIS_ESCAPE_TO_DOUBLE_1, \
+				JIS_ESCAPE_TO_DOUBLE_2, \
+				JIS_ESCAPE_TO_DOUBLE_3, \
+				0, 0 ; null word to force escape to be processed
+idata	ends
+endif
+
+udata	segment
+
+;------------------------------------------------------------------------------
+;			VARIABLES USED BY TERM THREAD
+;------------------------------------------------------------------------------
+;These variables are accessed exclusively by the Term thread, as it is
+;executing a method handler for TermClass, or a routine called by such
+;a method handler.
+
+scriptMode	ScriptMode	;status of script execution, in terms
+				;of what the Term thread is doing.
+
+;misc variables:
+
+restartPtr	dw	(?)	;where to restart the script
+
+scriptTimerHandle dw	(?)	;handle of PAUSE and PROMPT timer
+scriptTimerId	dw	(?)	;ID of PAUSE and PROMPT timer 
+
+scriptSeg	dw	(?)	;segment of script buffer 
+scriptHandle	dw	(?)	;handle of script buffer
+scriptSize	dw	(?)	;size of script buffer
+scriptEnd	dw	(?)	;end of script file
+scriptDisp	optr	(?)	;ptr to display object
+
+
+;------------------------------------------------------------------------------
+;			VARIABLES USED BY TERM AND SERIAL THREADS
+;------------------------------------------------------------------------------
+;These variables are accessed both by the Term thread and the Serial thread.
+;We take care to make sure the threads are not stomping on each other.
+;
+;This table holds the list of strings we are attempting to match the
+;input stream to. Format:
+;
+;	[chars] 0 2 [address]
+;
+;	chars	= any number of characters (the match string)
+;	address	= the offset to the "GOTO <label>" string in the script,
+;		in the dgroup segment.
+
+matchTable	db MATCH_TABLE_SIZE dup (?)
+
+matchTableHead	dw	(?)	;offset into dgroup to the end of the
+				;strings in [matchTable]. This pointer can
+				;be used to add more strings to the table.
+
+udata	ends

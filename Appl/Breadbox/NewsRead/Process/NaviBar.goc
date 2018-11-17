@@ -1,0 +1,517 @@
+@include <StdApp.goh>
+
+@include "NewsRead.goh"
+@include "NewsData.goh"
+@include "Extern.goh"
+@include "Localize/Strings.goh"
+
+
+/*************************************************************************/
+
+extern byte G_mainListLevel ;
+
+extern word G_mainListPath[] ;
+
+extern word G_mainListMessage ;
+
+
+@ifdef COMPILE_OPTION_RIGHT_TOOLS
+
+/*************************************************************************/
+
+@extern method NewsProcessClass, MSG_NP_NAVIGATION_BAR_READ_NEXT {
+
+    word foundGroup, foundThread, foundArticle ;
+    word startGroup, startThread, startArticle ;
+
+    @send application::MSG_GEN_APPLICATION_MARK_BUSY();
+
+    /* determine the start */
+    if(G_mainListLevel == 0) {
+    
+        startGroup = 0xFFFF ;
+        startThread = 0xFFFF ;
+        startArticle = 0xFFFF ;
+
+    } else if(G_mainListLevel == 1) {
+    
+        startGroup = G_mainListPath[0] ;
+        
+        if(G_mainListMessage == 0xFFFF) {
+            
+            startThread = 0xFFFF ;
+            startArticle = 0xFFFF ;
+            
+        } else {
+
+            startThread = G_mainListMessage - 1 ;
+            startArticle = 0 ;
+            
+        }
+            
+    } else {
+    
+        startGroup = G_mainListPath[0] ;
+        startThread = G_mainListPath[1] ;
+
+        if(G_mainListMessage == 0xFFFF)
+            startArticle = NEWS_DATA_ARTICLE_NONE ;
+        else
+            startArticle = G_mainListMessage - 1 ;
+    }
+
+    foundGroup = startGroup ;
+    foundThread = startThread ;
+    foundArticle = startArticle ;
+
+    NewsDataLock() ;
+
+    if(trigger) {
+    
+        if(foundGroup != 0xFFFF)
+            if(foundThread != 0xFFFF)
+                if(foundArticle != 0xFFFF) {
+
+                    /* mark the current one read */
+                    NewsDataSelectGroup(foundGroup) ;
+                    NewsDataGroupSelectThread(foundThread) ;
+                    NewsDataArticleMarkRead(foundArticle) ;
+                    NewsDataGroupUnselectThread() ;
+                    NewsDataUnselectGroup() ;
+    
+                    /* update the moniker */
+                    if(G_mainListLevel == 2)
+                        @send oself::MSG_NP_MAIN_LIST_MONIKER_QUERY(
+                                    @NewsArticleList, G_mainListMessage);
+                    else                                
+                        @send oself::MSG_NP_MAIN_LIST_MONIKER_QUERY(
+                                    @NewsArticleList, G_mainListMessage);
+                }
+    }
+        
+    /* find the next unread message */
+    do {
+        
+        /* next message */
+        if(foundGroup == 0xFFFF) {
+        
+            foundGroup = 0 ;
+        
+            if(foundGroup < NewsDataCountNewsgroups()) {
+
+                foundThread = 0xFFFF ;
+                foundArticle = 0xFFFF ;
+
+            } else {
+
+                foundGroup = 0xFFFF ;
+
+                break ;        
+            }
+
+        } else if(foundThread == 0xFFFF) {
+        
+            foundThread++ ;
+
+            NewsDataSelectGroup(foundGroup) ;
+
+            if(foundThread < NewsDataGroupCountThreads()) {
+
+                foundArticle = 0;
+
+            } else {
+
+                foundThread = 0xFFFF ;
+                foundArticle = 0xFFFF ;
+
+                foundGroup++ ;
+
+                if(foundGroup >= NewsDataCountNewsgroups()) 
+                    foundGroup = 0xFFFF ;
+            }
+
+            NewsDataUnselectGroup() ;
+        
+        } else if(foundArticle == 0xFFFF) {
+        
+            foundArticle = 0 ;
+
+        } else {
+
+            foundArticle++ ;
+        
+            NewsDataSelectGroup(foundGroup) ;
+            NewsDataGroupSelectThread(foundThread) ;
+
+            if(foundArticle >= NewsDataThreadCountArticles()) {
+
+                foundThread++ ;
+
+                if(foundThread >= NewsDataGroupCountThreads()) {
+
+                    foundGroup++ ;
+
+                    if(foundGroup >= NewsDataCountNewsgroups())
+                        foundGroup = 0xFFFF ;
+
+                    foundThread = 0xFFFF ;
+                }
+                
+                foundArticle = 0xFFFF ;
+            }
+
+            NewsDataGroupUnselectThread() ;
+            NewsDataUnselectGroup() ; 
+        }
+
+        /* stop if this is the start one */
+        if( (startArticle == foundArticle) &&
+            (startThread == foundThread) &&
+            (startGroup == foundGroup)  ) {
+        
+            foundGroup = 0xFFFF ;
+
+            break;
+        }
+
+        /* check for read */
+        if(foundGroup != 0xFFFF)
+            if(foundThread != 0xFFFF)
+                if(foundArticle != 0xFFFF) {
+
+                    Boolean found ;
+
+                    NewsDataSelectGroup(foundGroup) ;
+                    NewsDataGroupSelectThread(foundThread) ;
+                    NewsDataThreadSelectArticle(foundArticle) ;
+   
+                    found = !(G_article->AE_flags & AEF_READ) ;
+
+                    NewsDataThreadUnselectArticle() ;
+                    NewsDataGroupUnselectThread() ;
+                    NewsDataUnselectGroup() ;
+                
+                    if(found)
+                        break ;
+                }
+
+    } while(TRUE) ;
+
+    NewsDataUnlock() ;
+
+    if(foundGroup != 0xFFFF) {
+
+        /* bring it up */
+        if(foundArticle != 0) {
+
+            G_mainListLevel = 2 ;
+            G_mainListPath[0] = foundGroup ;
+            G_mainListPath[1] = foundThread ;
+        
+        } else {
+
+            G_mainListLevel = 1 ;
+            G_mainListPath[0] = foundGroup ;
+        
+            foundArticle = foundThread ;
+        }
+
+        G_mainListMessage = 0xFFFF ;
+        @send oself::MSG_NP_MAIN_LIST_INITIALIZE() ;
+
+        @send NewsArticleList::
+                    MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(foundArticle + 1, FALSE) ;
+
+        @send oself::MSG_NP_MAIN_LIST_SELECTION(foundArticle + 1, 1, FALSE);
+
+//        if(trigger) {
+    
+@ifdef COMPILE_OPTION_TOP_TOOLS
+            /* get the body, if online mode */
+            if(@call OnlineModeGroup::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS()) {
+            
+                @send oself::MSG_NEWS_DOWNLOAD_ARTICLE();
+            }
+@endif
+//        }
+
+    } else {
+
+        /* message: no news */
+        NotifyMessage(@NoNewsInDatabase) ;
+    }
+
+    BucketHugeArraySave();
+    VMSave(G_databaseVMFH) ;
+
+    @send application::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+}
+
+/*************************************************************************/
+
+@extern method NewsProcessClass, MSG_SEARCH {
+
+	SearchReplaceStruct *srPtr;
+    word foundGroup, foundThread, foundArticle ;
+    word startGroup, startThread, startArticle ;
+
+    @send application::MSG_GEN_APPLICATION_MARK_BUSY();
+
+	// if there is at ext field to start with
+	srPtr = MemLock(searchInfo);
+
+	if(srPtr)
+	{
+        char *matchString;
+
+		matchString = (char*) &(((byte*) srPtr)[sizeof(SearchReplaceStruct)]); 
+
+        /* determine the start */
+        if(G_mainListLevel == 0) {
+    
+            startGroup = 0xFFFF ;
+            startThread = 0xFFFF ;
+            startArticle = 0xFFFF ;
+
+        } else if(G_mainListLevel == 1) {
+    
+            startGroup = G_mainListPath[0] ;
+        
+            if(G_mainListMessage == 0xFFFF) {
+            
+                startThread = 0xFFFF ;
+                startArticle = 0xFFFF ;
+            
+            } else {
+
+                startThread = G_mainListMessage - 1 ;
+                startArticle = 0 ;
+            
+            }
+            
+        } else {
+    
+            startGroup = G_mainListPath[0] ;
+            startThread = G_mainListPath[1] ;
+
+            if(G_mainListMessage == 0xFFFF)
+                startArticle = NEWS_DATA_ARTICLE_NONE ;
+            else
+                startArticle = G_mainListMessage - 1 ;
+        }
+
+        foundGroup = startGroup ;
+        foundThread = startThread ;
+        foundArticle = startArticle ;
+
+        NewsDataLock() ;
+
+        if(foundGroup != 0xFFFF)
+            if(foundThread != 0xFFFF)
+                if(foundArticle != 0xFFFF) {
+
+                    /* mark the current one read */
+                    NewsDataSelectGroup(foundGroup) ;
+                    NewsDataGroupSelectThread(foundThread) ;
+                    NewsDataArticleMarkRead(foundArticle) ;
+                    NewsDataGroupUnselectThread() ;
+                    NewsDataUnselectGroup() ;
+            
+                }
+        
+        /* find the next unread message */
+        do {
+        
+            /* next message */
+            if(foundGroup == 0xFFFF) {
+        
+                foundGroup = 0 ;
+        
+                if(foundGroup < NewsDataCountNewsgroups()) {
+
+                    foundThread = 0xFFFF ;
+                    foundArticle = 0xFFFF ;
+
+                } else {
+
+                    foundGroup = 0xFFFF ;
+
+                    break ;        
+                }
+
+            } else if(foundThread == 0xFFFF) {
+        
+                foundThread++ ;
+
+                NewsDataSelectGroup(foundGroup) ;
+
+                if(foundThread < NewsDataGroupCountThreads()) {
+
+                    foundArticle = 0;
+
+                } else {
+
+                    foundThread = 0xFFFF ;
+                    foundArticle = 0xFFFF ;
+
+                    foundGroup++ ;
+
+                    if(foundGroup >= NewsDataCountNewsgroups()) 
+                        foundGroup = 0xFFFF ;
+                }
+
+                NewsDataUnselectGroup() ;
+        
+            } else if(foundArticle == 0xFFFF) {
+        
+                foundArticle = 0 ;
+
+            } else {
+
+                foundArticle++ ;
+        
+                NewsDataSelectGroup(foundGroup) ;
+                NewsDataGroupSelectThread(foundThread) ;
+
+                if(foundArticle >= NewsDataThreadCountArticles()) {
+
+                    foundThread++ ;
+
+                    if(foundThread >= NewsDataGroupCountThreads()) {
+
+                        foundGroup++ ;
+
+                        if(foundGroup >= NewsDataCountNewsgroups())
+                            foundGroup = 0xFFFF ;
+
+                        foundThread = 0xFFFF ;
+                    }
+                
+                    foundArticle = 0xFFFF ;
+                }
+
+                NewsDataGroupUnselectThread() ;
+                NewsDataUnselectGroup() ; 
+            }
+
+            /* stop if this is the start one */
+            if( (startArticle == foundArticle) &&
+                (startThread == foundThread) &&
+                (startGroup == foundGroup)  ) {
+        
+
+                /* search the beginning part */
+                foundGroup = 0xFFFF ;
+
+                break;
+            }
+
+            /* check for read */
+            if(foundGroup != 0xFFFF)
+                if(foundThread != 0xFFFF)
+                    if(foundArticle != 0xFFFF) {
+
+                        Boolean found ;
+                        word foundLen ;
+
+                        NewsDataSelectGroup(foundGroup) ;
+                        NewsDataGroupSelectThread(foundThread) ;
+                        NewsDataThreadSelectArticle(foundArticle) ;
+   
+                        /* check the header */
+
+                        found = (
+                            BucketHugeArrayTextSearch(
+                                matchString, 
+                                0,
+				                0, 
+                                0,
+				                BucketHugeArrayGetCount(G_databaseVMFH, G_article->AE_body), 
+				                G_databaseVMFH,
+				                G_article->AE_body,
+								srPtr->params,
+								&foundLen) != 0);
+                       
+                        /* check the body */
+                        NewsDataThreadUnselectArticle() ;
+                        NewsDataGroupUnselectThread() ;
+                        NewsDataUnselectGroup() ;
+                
+                        if(found)
+                            break ;
+                    }
+
+        } while(TRUE) ;
+
+        NewsDataUnlock() ;
+
+        if(foundGroup != 0xFFFF) {
+
+            /* bring it up */
+            if(foundArticle != 0) {
+
+                G_mainListLevel = 2 ;
+                G_mainListPath[0] = foundGroup ;
+                G_mainListPath[1] = foundThread ;
+        
+            } else {
+
+                G_mainListLevel = 1 ;
+                G_mainListPath[0] = foundGroup ;
+        
+                foundArticle = foundThread ;
+            }
+
+            @send oself::MSG_NP_MAIN_LIST_INITIALIZE() ;
+
+            @send NewsArticleList::
+                        MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(foundArticle + 1, FALSE) ;
+
+            G_mainListMessage = 0xFFFF ;
+            @send oself::MSG_NP_MAIN_LIST_SELECTION(foundArticle + 1, 1, FALSE);
+
+@ifdef COMPILE_OPTION_TOP_TOOLS
+            /* get the body, if online mode */
+            if(@call OnlineModeGroup::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS()) {
+        
+                @send oself::MSG_NEWS_DOWNLOAD_ARTICLE();
+            }
+@endif
+
+        } else {
+
+            /* message: no news */
+            NotifyMessage(@NoNewsInDatabase) ;
+        }
+
+		MemUnlock(searchInfo);
+    }
+    
+    MemFree(searchInfo);
+    
+    @send application::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+}
+
+/*************************************************************************/
+
+@extern method NewsProcessClass, MSG_NP_NAVIGATION_BAR_LEVEL_APPLY {
+    
+    switch(selection) {
+    
+        case NEWS_VIEW_THREADS:
+            @send NewsgroupGroup::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE) ;
+            @send NewsArticleList2::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE) ;
+            break ;
+
+        case NEWS_VIEW_GROUPS: 
+            @send NewsgroupGroup::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE) ;
+            @send NewsArticleList2::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE) ;
+            break ;
+    }
+
+    @send oself::MSG_NP_ACTION_BAR_UPDATE_BUTTONS() ;
+}
+
+/*************************************************************************/
+
+@endif /* COMPILE_OPTION_RIGHT_TOOLS */

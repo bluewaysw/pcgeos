@@ -1,0 +1,408 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Berkeley Softworks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Screen Dump
+FILE:		dump.def
+
+AUTHOR:		Adam de Boor, Dec  4, 1989
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	12/ 4/89	Initial revision
+
+
+DESCRIPTION:
+	Common definitions for all modules of the screen-dumper
+		
+	$Id: dump.def,v 1.1 97/04/04 15:36:38 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;Standard include files
+
+include	geos.def
+include geode.def
+include resource.def
+
+include	ec.def
+include	library.def
+
+include object.def
+include	graphics.def
+include gstring.def
+include	win.def
+include lmem.def
+include timer.def
+include timedate.def
+include	system.def
+include	file.def
+include	fileEnum.def
+include	vm.def
+include char.def		;Need for C_CR and C_LF constants
+include localize.def		;for Resources file
+
+include heap.def
+
+;ACCESS_VIDEO_DRIVER	= 1
+;UseDriver videoDriver.def		; For DevInfo
+
+;------------------------------------------------------------------------------
+;			Libraries used
+;------------------------------------------------------------------------------
+ACCESS_INPUT_MANAGER=1
+include	Objects/inputC.def
+UseLib	ui.def
+UseLib	spool.def
+
+
+;------------------------------------------------------------------------------
+;			Macros
+;------------------------------------------------------------------------------
+
+_PENELOPE       = FALSE
+
+
+;----------------------------------------------------------------------------
+;			  Constants
+;----------------------------------------------------------------------------
+
+
+;  Right now these values are different, but equate to the same byte count.
+;  In DumpWriteNotes(), the stack buffer should be moved to MemLock() stuff.
+
+SBCS<MAX_NOTES_TEXT_LENGTH	equ	512			>
+DBCS<MAX_NOTES_TEXT_LENGTH	equ	256			>
+
+MAX_LENGTH_IMAGE_NAME	equ	30
+
+;----------------------------------------------------------------------------
+;			  Our process-class
+;----------------------------------------------------------------------------
+DumpClass		class	GenProcessClass
+
+;
+; Blinking-cursor control
+;
+MSG_DUMP_NO_BLINK	message		; Turn off blinking cursor and restart
+MSG_DUMP_BLINK_OK	message		; Re-enable blinking cursor, but don't
+					;  restart (it ain't a matter of life
+					;  and death, after all).
+;
+; Misc.
+;
+MSG_DUMP_NOTIFY_ERROR message		; Notify user of error on our own thread
+MSG_DUMP_ENABLE_ALL	message		; Enable all UI components so we
+					;  can make a picture of them.
+
+;
+; Output formats
+;
+MSG_DUMP_SET_FORMAT	message		; Set dump format. CX = format:
+DumpFormats		etype	word, 0, 4
+    DF_CLIPBOARD	enum	DumpFormats	; Dump straight to clipboard
+    DF_EPS		enum	DumpFormats	; Encapsulated PostScript
+    DF_TIFF		enum	DumpFormats	; TIFF
+    DF_EPS_TIFF		enum 	DumpFormats	; Merged EPS & TIFF for
+						;  PageMaker
+    DF_FULL_PS		enum	DumpFormats	; Full-page PostScript
+    DF_PCX		enum	DumpFormats	; PC-Paintbrush
+    DF_GIF		enum	DumpFormats	; GIF
+    DF_JPEG		enum	DumpFormats	; JPEG
+    DF_BMP		enum	DumpFormats	; BMP
+
+MSG_DUMP_BANISH	message		; Banish setup window
+
+;
+; External (outside selected windows but inside bounding box) color selection
+;
+MSG_DUMP_EXTERNAL_COLOR	message
+
+DumpExternalColor	etype	word
+DEC_BLACK		enum	DumpExternalColor	; Fill areas outside
+							;  selected windows
+							;  with black
+DEC_50PCT		enum	DumpExternalColor	; Fill with 50% grey
+							;  pattern
+DEC_WHITE		enum	DumpExternalColor	; Fill with white
+
+;
+; Messages sent to initiate a dump so the whole thing isn't performed on the
+; input-manager's thread.
+; 
+MSG_DUMP_SCREEN	message		; Full-screen (current screen)
+MSG_DUMP_RECT	message		; Dump defined rectangle
+MSG_DUMP_AGAIN	message		; Dump previous rectangle
+MSG_DUMP_WINDOW	message		; Dump window under pointer
+MSG_DUMP_WINDOW_NO_PTR message	; Dump window under pointer, but remove
+			  		;  the pointer image during the dump.
+MSG_DUMP_WINDOWS_IN_RECT message	; Dump the windows fully enclosed by
+			    		;  the current rectangle
+
+MSG_DUMP_SET_NUMBER	message		; Set number for next dump
+;
+; Annotation support
+;
+MSG_DUMP_ANNOTATION_STATUS	message
+;	Pass:	cx	= selected booleans (DumpAnnotationStatus)
+;		dx	= indeterminate booleans
+;		bp	= flags that have changed
+;
+DumpAnnotationStatus	record
+    :14
+    DAS_ENABLED:1			; set if annotation enabled
+    DAS_APPEND:1			; set if should append to existing
+					;  log, rather than truncating it when
+					;  it's first opened.
+DumpAnnotationStatus	end
+
+MSG_WRITE_NOTES	message		; Write text to log
+MSG_ABORT_DUMP	message		; Remove dump file and try again
+
+;============================================================================
+;			POSTSCRIPT PARAMETERS
+;
+; Color choices
+;
+MSG_PS_SET_COLOR	message		; Set color mapping. cx = PSColorScheme
+
+PSColorScheme	etype	word, 0, 6	;skip by 6 to index table in psc.asm
+    PSCS_GREY	enum	PSColorScheme	; Map pixels to equivalent greyscales
+    PSCS_RGB	enum	PSColorScheme	; Map pixels to equivalent RGB values
+    PSCS_CMYK	enum	PSColorScheme	; Map pixels to equivalent CMYK values
+					;  (for QMS ColorScript 100, anyway)
+;
+; Exclude visible portions of field window when dumping full screen?
+;
+MSG_PS_EXCLUDE_FIELD	message
+;	Pass:	cx	= TRUE/FALSE
+
+MSG_PS_NUM_PAGES	message		; Specify number of pages for full-page
+MSG_PS_ORIENTATION	message		; Set the orientation. cx = -1 to print
+					;  landscape, 0 to print vertically.
+
+MSG_PS_ASPECT_ADJUST	message		; Adjust displayed dimension to account
+					;  for display aspect ratio. cx:dx is
+					;  text object, bp is 0 for width, 1 for
+					;  height.
+MSG_PS_SET_IMAGE_WIDTH message	; Set final image width.
+MSG_PS_SET_IMAGE_HEIGHT message	; Set final image height
+
+;============================================================================
+;			   TIFF PARAMETERS
+;
+; Color choices
+;
+MSG_TIFF_SET_COLOR	message		; Set color mapping. cx =
+					;  TiffColorScheme
+TiffColorScheme	etype	word
+    TCS_PALETTE	enum	TiffColorScheme	; Leave pixels alone -- palette in the
+					;  file is sufficient info.
+    TCS_GRAY	enum	TiffColorScheme	; Map pixels to linear greyscale
+
+MSG_TIFF_SET_COMPRESSION message	; Set form of compression in image.
+					;  cx = TiffCompressionScheme
+TiffCompressionScheme etype word
+    TCS_NONE	enum	TiffCompressionScheme
+    TCS_PACKBITS enum	TiffCompressionScheme
+    TCS_LZW	enum	TiffCompressionScheme
+
+
+;============================================================================
+;			  INSTANCE VARIABLES
+;
+; These are the parameters saved to the state block when we quit.
+;
+			public		; all process instance variables are
+					;  public
+
+DI_format		DumpFormats	; Output format
+DI_dumpNumber		byte		; Current dump number
+DI_logging?		BooleanByte	; Logging enabled?
+DI_logAppend?		byte		; Append to log file? (contains
+					;  flag for FileCreate to control
+					;  whether the log file is truncated
+					;  when it is opened)
+
+;
+; PostScript-specific variables
+;
+DI_psExcludeField?	BooleanByte	; Exclude field window?
+DI_psNumPages		byte		; Number of times to print full-page
+					;  version
+DI_psRotate?		BooleanByte	; Rotate output 90 degrees?
+DI_psColorScheme	PSColorScheme	; How do we map colors?
+DI_psImageWidth		word		; Final image width
+DI_psImageHeight	word		; Final image height
+DI_psPageWidth		word		; Expected paper width (points).
+DI_psPageHeight		word		; Expected paper height (points).
+
+;
+; Tiff-specific variables
+;
+DI_tiffColorScheme	TiffColorScheme
+DI_tiffCompression	TiffCompressionScheme
+
+DumpClass	endc
+
+;----------------------------------------------------------------------------
+;			 Other Object Classes
+;----------------------------------------------------------------------------
+DumpApplicationClass	class	GenApplicationClass
+MSG_DA_REMOVE_FROM_EXPRESS	message
+MSG_DA_RETURN_TO_EXPRESS	message
+
+    DAI_removeTrigger	optr	0
+    DAI_returnTrigger	optr	0
+DumpApplicationClass	endc
+
+;----------------------------------------------------------------------------
+;			Fatal Errors
+;----------------------------------------------------------------------------
+
+SCREEN_MUST_BE_ONE_OR_FOUR_BITS_PER_PIXEL_FOR_PCX	enum	FatalErrors
+UNKNOWN_PRINTF2_CODE					enum	FatalErrors
+
+;----------------------------------------------------------------------------
+;		      Output-format definitions
+;----------------------------------------------------------------------------
+;
+; Record that indicates what state various format-dependent UI components
+; should assume when a given format is chosen. A 1 bit indicates the 
+; object should be enabled, a 0 that it should be disabled. This has the
+; rather appealing quality of allowing us to expand the record without having
+; to change any of the DumpProcs records besides the ones for which the
+; new components must be enabled, which we'd have had to change anyway....
+;
+DumpUIEnable	record
+   :8,
+   ; add more here, not at the end
+   DUI_ANNOTATION:1,		; AnnotateGroup
+   DUI_DESTDIR:1,		; DirSelect
+   DUI_BASENAME:1,		; NameText
+   DUI_DUMPNUMBER:1,		; DumpNumberRange
+   DUI_PAGESIZE:1,		; PaperControl
+   DUI_TIFFBOX:1,		; TiffBox
+   DUI_NUMPAGES:1,		; NumPagesRange
+   DUI_POSTSCRIPTBOX:1,		; PostscriptBox
+DumpUIEnable	end
+
+DumpProcs	struct
+    DP_preFreeze	fptr.far; preFreeze()
+				;    Whatever needs doing before the screen
+				;    is frozen (e.g. fetching data from
+				;    UI objects) should be done now.
+				;    If carry is returned set, the screen
+				;    will not be frozen.
+    DP_prologue		fptr.far; prologue(file, width, height, type)
+    				;    The output file is opened by the output-
+				;    independent code and the handle passed to
+				;    this function, along with the width,
+				;    height and depth of the dump being
+				;    created. Nothing has been written to
+				;    the file. The function is expected to
+				;    write whatever header information is
+				;    required of the output format.
+				;    MAY NOT DESTROY: bp
+    DP_slice		fptr.far; slice(file, bitmap, size)
+				;    Passed a file handle and the handle of
+				;    a block containing a bitmap slice, the
+				;    function should convert the bitmap to
+				;    the proper format and write it to
+				;    the output file, then free the block.
+				;    Note this allows the function to
+				;    simply hold onto all the pieces and
+				;    process them at the end. This is not
+				;    dictated by the interface, however.
+				;    MAY NOT DESTROY: dx, di, ds, bp
+    DP_epilogue		fptr.far; epilogue(file)
+				;    Finishes off the file, but does not
+				;    close it. Any trailing information
+				;    required by the format should be
+				;    written here.
+				;    MAY NOT DESTROY: bp
+SBCS<    DP_suffix	char	3 dup(0); suffix to place on the file	>
+DBCS<    DP_suffix	wchar	3 dup(0); suffix to place on the file	>
+    DP_enable	DumpUIEnable	; Components to enable.
+DumpProcs	ends
+
+idata	segment
+
+global	ClipboardProcs:DumpProcs
+global	EPSProcs:DumpProcs
+global 	TiffProcs:DumpProcs
+global	EPSTiffProcs:DumpProcs
+global	FPSProcs:DumpProcs
+global	PCXProcs:DumpProcs
+global	GIFProcs:DumpProcs
+global	JPEGProcs:DumpProcs
+global	BMPProcs:DumpProcs
+
+global	procVars:DumpInstance
+global	dumpProcs:fptr.DumpProcs
+
+idata	ends
+
+;------------------------------------------------------------------------------
+;			 GLOBAL DECLARATIONS
+;------------------------------------------------------------------------------
+
+udata	segment
+	global	vidDriver:fptr.DevInfo
+	global	dumpState:hptr		; state with exclusive access to
+					;  the screen
+	global	mousePos:Point
+	global 	rectBox:Rectangle
+
+	global	sliceHeight:word
+	global	screenRect:Rectangle
+
+udata	ends
+
+Application	segment lmem
+	global	DumpApp:chunk
+	global	JPEGEntry:chunk
+	global	GIFEntry:chunk
+	global	BMPEntry:chunk
+Application	ends
+
+Interface	segment lmem
+	global	DumpPrimary:chunk
+	global	DumpNumberRange:chunk
+	global	NameText:chunk
+	global	DirSelect:chunk
+Interface	ends
+
+Postscript	segment lmem
+	global	ImageName:chunk
+	global	PaperControl:chunk
+;	global	PaperList:chunk
+	global	EnableAll:chunk
+Postscript	ends
+
+Resident	segment	resource
+	global	InputMonitor:far
+	global	InputSwallowKeys:far
+	global	InputThaw:far
+Resident	ends
+
+Strings		segment	lmem
+if DBCS_PCGEOS
+	global	pscMissingWH:chunk wchar
+	global	dumpScrapName:chunk wchar
+else
+	global	pscMissingWH:chunk char
+	global	dumpScrapName:chunk char
+endif
+Strings		ends
+
+PSC		segment resource
+	global	PSCPreFreeze:far
+PSC		ends
+
+CommonCode	segment	resource
+	global	DumpError:far
+	global	DumpPreFreeze:far
+CommonCode	ends

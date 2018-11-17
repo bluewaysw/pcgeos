@@ -1,0 +1,1955 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+ *
+ * PROJECT:	PC GEOS
+ * FILE:	Text/tCtrlC.goh
+ * AUTHOR:	Tony Requist: February 12, 1991
+ *
+ * DECLARER:	UI / Text library
+ *
+ * DESCRIPTION:
+ *	This file defines VisTextClass
+ *
+ *	$Id: tCtrlC.goh,v 1.1 97/04/04 15:50:30 newdeal Exp $
+ *
+ ***********************************************************************/
+
+@ifndef	__TCTRLC
+@define __TCTRLC
+
+@include <ruler.goh>
+@include <Objects/colorC.goh>
+@include <Objects/styles.goh>
+
+@deflib text
+
+/******************************************************************************
+ *		TextStyleControlClass
+ *****************************************************************************/
+
+@class	TextStyleControlClass, GenControlClass;
+
+/*
+ *  Message(s) sent out:
+ *  MSG_VIS_TEXT_SET_TEXT_STYLE (a MetaTextMessage)
+ * 
+ *  Notification type(s) responded to:
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CHANGE: NotifyTextChange
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_STYLE_CHANGE: NotifyTextStyleChange
+ * 
+ *  GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+
+
+/*--------------------------------------------------------------------------
+ * 		Methods
+ *--------------------------------------------------------------------------*/
+
+/*--------------------------------------------------------------------------
+ * 		Internal methods
+ *--------------------------------------------------------------------------*/
+
+@message void MSG_TSC_PLAIN_TEXT_CHANGE();
+/*
+ *  Sent from "Plain" list entry on any change
+ * 
+ *  Pass:   nothing
+ */
+
+@message void MSG_TSC_STYLE_CHANGE(word selectedBooleans = cx,
+				   word changedBooleans = bp);
+/*
+ *  Sent from non-exclusive "Style" list on any change
+ * 
+ *  Pass:
+ * 	selectedBooleans - new state of style list
+ * 	changedBooleans - changed bits in style list
+ */
+
+@message void MSG_TSC_EXTENDED_STYLE_CHANGE(word selectedBooleans = cx,
+					    word changedBooleans = bp);
+/*
+ *  Sent from non-exclusive "Extended Style" list on any change
+ * 
+ *  Pass:
+ * 	selectedBooleans - new state of style list
+ * 	changedBooleans - changed bits in style list
+ */
+
+
+/* -------------------------------------------------------------------------
+ * 		Hints
+ * -------------------------------------------------------------------------*/
+
+/* -------------------------------------------------------------------------
+ * 		Constants & Structures
+ * -------------------------------------------------------------------------*/
+
+/*
+ *  Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+ *  ATTR_GEN_CONTROL_PROHIBIT_UI)
+ */
+typedef WordFlags TSCFeatures;
+#define TSCF_PLAIN		0x0800
+#define TSCF_BOLD		0x0400
+#define TSCF_ITALIC		0x0200
+#define TSCF_UNDERLINE		0x0100
+#define TSCF_STRIKE_THRU	0x0080
+#define TSCF_SUBSCRIPT		0x0040
+#define TSCF_SUPERSCRIPT	0x0020
+#define TSCF_BOXED		0x0010
+#define TSCF_BUTTON		0x0008
+#define TSCF_INDEX		0x0004
+#define TSCF_ALL_CAP		0x0002
+#define TSCF_SMALL_CAP		0x0001
+
+/*
+ *  Toolbox features flags (used with ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI and
+ *  ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI)
+ */
+typedef WordFlags TSCToolboxFeatures;
+#define TSCTF_PLAIN		0x0800
+#define TSCTF_BOLD		0x0400
+#define TSCTF_ITALIC		0x0200
+#define TSCTF_UNDERLINE		0x0100
+#define TSCTF_STRIKE_THRU	0x0080
+#define TSCTF_SUBSCRIPT		0x0040
+#define TSCTF_SUPERSCRIPT	0x0020
+#define TSCTF_BOXED		0x0010
+#define TSCTF_BUTTON		0x0008
+#define TSCTF_INDEX		0x0004
+#define TSCTF_ALL_CAP		0x0002
+#define TSCTF_SMALL_CAP		0x0001
+
+
+
+#define TSC_DEFAULT_FEATURES (TSCF_PLAIN | TSCF_BOLD \
+			| TSCF_ITALIC | TSCF_UNDERLINE \
+			| TSCF_SUBSCRIPT | TSCF_SUPERSCRIPT \
+			| TSCF_STRIKE_THRU | TSCF_BOXED | TSCF_BUTTON \
+			| TSCF_INDEX | TSCF_ALL_CAP | TSCF_SMALL_CAP)
+#define TSC_DEFAULT_TOOLBOX_FEATURES (TSCTF_PLAIN | TSCTF_BOLD \
+			| TSCTF_ITALIC | TSCTF_UNDERLINE)
+/*
+ *  Notification structure 
+ */
+typedef struct {
+    TextStyle			NTSC_styles;		/* TextStyle */
+    TextStyle			NTSC_indeterminates;	/* TextStyle */
+} NotifyTextStyleChange;
+
+/*---------------------------------------------------------------------------
+ * 		Instance Data
+ *---------------------------------------------------------------------------*/
+
+
+    @default GCI_output = (TO_APP_TARGET);
+    @default GI_attrs = (@default | GA_KBD_SEARCH_PATH);
+
+@endc
+
+
+/******************************************************************************
+ * 		FontControlClass
+ ******************************************************************************
+ * 
+ *  Message(s) sent out:
+ *  MSG_VIS_TEXT_SET_FONT_ID (a MetaTextMessage)
+ * 
+ *  Notification type(s) responded to:
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CHANGE: NotifyTextChange
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_FONT_CHANGE: NotifyFontChange
+ * 
+ *  GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+
+@class	FontControlClass, GenControlClass;
+
+
+/*---------------------------------------------------------------------------
+ * 		Methods
+ *---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+ * 		Internal methods
+ *---------------------------------------------------------------------------*/
+
+@message void MSG_FC_SET_FONT(word fontID = cx);
+/*
+ *  Handle a font set via the short list
+ * 
+ *  Pass:
+ * 	fontID - font ID
+ */
+
+@message void MSG_FC_SET_FONT_FROM_LIST(word fontID = cx);
+/*
+ *  Handle a font set via the long list
+ * 
+ *  Pass:
+ * 	fontID - font ID
+ */
+
+@message void MSG_FC_USER_CHANGED_FONT_FROM_LIST(word fontID = cx); 
+/*
+ *  Handles user change of a font in the long list
+ * 
+ *  Pass:
+ * 	fontID - font ID
+ */
+
+
+/*---------------------------------------------------------------------------
+ * 		Hints
+ *---------------------------------------------------------------------------*/
+
+    @vardata FontEnumFlags ATTR_FONT_CONTROL_SHORT_LIST_FONT_TYPE;
+    /*
+     *  This attribute sets the legal font types for the short font list
+     */
+
+    @vardata FontEnumFlags ATTR_FONT_CONTROL_LONG_LIST_FONT_TYPE;
+    /*
+     *  This attribute sets the legal font types for the long font list
+     */
+
+@protominor TextUIFont
+    @vardata void ATTR_FONT_CONTROL_INCLUDE_UI_FONT;
+    /*
+     * include the UI font at the start of the list(s)
+     */
+@protoreset
+
+
+/*--------------------------------------------------------------------------
+ * 		Constants & Structures
+ *--------------------------------------------------------------------------*/
+
+/*
+ *  Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+ *  ATTR_GEN_CONTROL_PROHIBIT_UI)
+ */
+typedef WordFlags FCFeatures;
+#define FCF_SHORT_LIST	0x0002
+#define FCF_LONG_LIST	0x0001
+
+
+/*
+ *  Toolbox features flags (used with ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI and
+ *  ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI)
+ */
+typedef WordFlags FCToolboxFeatures;
+#define FCTF_TOOL_LIST	0x0001
+
+
+#define FC_DEFAULT_FEATURES 	    (FCF_SHORT_LIST | FCF_LONG_LIST)
+#define FC_DEFAULT_TOOLBOX_FEATURES FCTF_TOOL_LIST
+
+/* 
+ * 	Notification structure
+ */
+typedef struct {
+    FontID			NFC_fontID;
+    byte			NFC_diffs;
+} NotifyFontChange;
+
+
+/*--------------------------------------------------------------------------
+ * 		Instance Data
+ *--------------------------------------------------------------------------*/
+    @default GCI_output = (TO_APP_TARGET);
+
+@endc
+
+
+/******************************************************************************
+ * 		PointSizeControlClass
+ ******************************************************************************
+ * 
+ *  Message(s) sent out:
+ *  MSG_VIS_TEXT_SET_POINT_SIZE (a MetaTextMessage)
+ * 
+ *  Notification type(s) responded to:
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CHANGE: NotifyTextChange
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_POINT_SIZE_CHANGE: NotifyPointSizeChange
+ * 
+ *  GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+
+@class	PointSizeControlClass, GenControlClass;
+
+
+@message void MSG_PSC_SET_POINT_SIZE(WWFixed size = dx:cx);
+/*
+ *  Pass:   size - WWFixed
+ */
+
+@message void MSG_PSC_SET_POINT_SIZE_FROM_LIST(word size = cx);	
+/*
+ *  Pass:   size - word
+ */
+
+@message void MSG_PSC_SMALLER_POINT_SIZE();
+
+@message void MSG_PSC_LARGER_POINT_SIZE();
+
+
+/*---------------------------------------------------------------------------
+ * 		Hints
+ *---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+ * 		Constants & Structures
+ *---------------------------------------------------------------------------*/
+
+/*
+ *  Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+ *  ATTR_GEN_CONTROL_PROHIBIT_UI)
+ */
+typedef WordFlags PSCFeatures;
+#define PSCF_9			0x0800
+#define PSCF_10			0x0400
+#define PSCF_12			0x0200
+#define PSCF_14			0x0100
+#define PSCF_18			0x0080
+#define PSCF_24			0x0040
+#define PSCF_36			0x0020
+#define PSCF_54			0x0010
+#define PSCF_72			0x0008
+#define PSCF_SMALLER		0x0004
+#define PSCF_LARGER		0x0002
+#define PSCF_CUSTOM_SIZE	0x0001
+
+/*
+ *  Toolbox features flags (used with ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI and
+ *  ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI)
+ */
+typedef WordFlags PSCToolboxFeatures;
+#define PSCTF_9			0x0400
+#define PSCTF_10		0x0200
+#define PSCTF_12		0x0100
+#define PSCTF_14		0x0080
+#define PSCTF_18		0x0040
+#define PSCTF_24		0x0020
+#define PSCTF_36		0x0010
+#define PSCTF_54    		0x0008
+#define PSCTF_72		0x0004
+#define PSCTF_SMALLER		0x0002
+#define PSCTF_LARGER		0x0001
+
+
+
+#define PSC_DEFAULT_FEATURES (PSCF_9 | PSCF_10 | PSCF_12 | PSCF_14 \
+			| PSCF_18 | PSCF_24 | PSCF_36 \
+			| PSCF_72 | PSCF_CUSTOM_SIZE \
+			| PSCF_SMALLER | PSCF_LARGER)
+#define PSC_DEFAULT_TOOLBOX_FEATURES (PSCTF_9 | PSCTF_10 | PSCTF_12 \
+			| PSCTF_14 | PSCTF_18 | PSCTF_24 \
+			| PSCTF_36 | PSCTF_72 \
+			| PSCTF_SMALLER | PSCTF_LARGER)
+/*
+ *	Notification structure
+ */
+typedef struct {
+    WWFixedAsDWord		NPSC_pointSize;
+    byte			NPSC_diffs;
+} NotifyPointSizeChange;
+
+
+/*---------------------------------------------------------------------------
+ * 		Instance Data
+ *--------------------------------------------------------------------------*/
+    @default GCI_output = (TO_APP_TARGET);
+    @default GI_attrs = (@default | GA_KBD_SEARCH_PATH);
+
+@endc
+
+
+/*****************************************************************************
+ * 		CharFGColorControlClass
+ *****************************************************************************
+ * 
+ *  Message(s) sent out:
+ *  MSG_VIS_TEXT_SET_CHAR_FG_COLOR (a MetaTextMessage)
+ * 
+ *  Notification type(s) responded to:
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CHANGE: NotifyTextChange
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_CHAR_FG_COLOR_CHANGE: NotifyColorChange
+ */
+
+@class	CharFGColorControlClass, ColorSelectorClass;
+
+/*---------------------------------------------------------------------------
+ * 		Methods
+ *--------------------------------------------------------------------------*/
+
+/*--------------------------------------------------------------------------
+ * 		Internal methods
+ *--------------------------------------------------------------------------*/
+
+/*--------------------------------------------------------------------------
+ * 		Hints
+ *--------------------------------------------------------------------------*/
+
+/*--------------------------------------------------------------------------
+ * 		Constants & Structures
+ *--------------------------------------------------------------------------*/
+
+
+/*  For now text patterns are not supported */
+
+#define CFGCC_DEFAULT_FEATURES (CSF_INDEX | CSF_RGB | CSF_DRAW_MASK | CSF_PATTERN)
+#define CFGCC_DEFAULT_TOOLBOX_FEATURES (CSTF_INDEX | CSTF_DRAW_MASK | CSTF_PATTERN)
+
+typedef union {		
+    VisTextCharAttrFlags	NCCFU_char;
+    VisTextParaAttrFlags	NCCFU_paragraph;
+    VisTextParaAttrBorderFlags	NCCFU_border;
+} NCCFlagsUnion;
+
+typedef struct {
+    ColorQuad		NCC_color;
+    SystemDrawMask	NCC_grayScreen;
+    GraphicPattern	NCC_pattern;
+    word		NCC_flags;
+    /*
+     * VTCAF_MULTIPLE_COLORS
+     * VTCAF_MULTIPLE_GRAY_SCREENS
+     * VTCAF_MULTIPLE_PATTERNS
+     * 	-or-
+     * VTCAF_MULTIPLE_BG_COLORS
+     * VTCAF_MULTIPLE_BG_GRAY_SCREENS
+     * VTCAF_MULTIPLE_BG_PATTERNS
+     * 	-or-
+     * VTPAF_MULTIPLE_BG_COLORS
+     * VTPAF_MULTIPLE_BG_GRAY_SCREENS
+     * VTPAF_MULTIPLE_BG_PATTERNS
+     * 	-or-
+     * VTPABF_MULTIPLE_BORDER_COLORS
+     * VTPABF_MULTIPLE_BORDER_GRAY_SCREENS
+     * VTPABF_MULTIPLE_BORDER_PATTERNS
+     */
+} NotifyColorChange;
+
+
+/*--------------------------------------------------------------------------
+ * 		Instance Data
+ *--------------------------------------------------------------------------*/
+
+    @default GI_states = @default & ~GS_ENABLED;
+    @default GCI_output = (TO_APP_TARGET);
+    @default CSI_toolboxPrefs = @default | (COO_LINE_ORIENTED << CTP_INDEX_ORIENTATION_OFFSET) | (COO_LINE_ORIENTED << CTP_DRAW_MASK_ORIENTATION_OFFSET) | (COO_LINE_ORIENTED << CTP_PATTERN_ORIENTATION_OFFSET);
+
+
+@endc
+
+
+/*****************************************************************************
+ * 		CharBGColorControlClass
+ *****************************************************************************
+ * 
+ *  Message(s) sent out:
+ *  MSG_VIS_TEXT_SET_CHAR_BG_COLOR (a MetaTextMessage)
+ * 
+ *  Notification type(s) responded to:
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CHANGE: NotifyTextChange
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_CHAR_BG_COLOR_CHANGE: NotifyColorChange
+ * 							-or-
+ * 						VisTextNotifyCharAttrChange
+ */
+
+
+@class	CharBGColorControlClass, ColorSelectorClass;
+
+
+/*---------------------------------------------------------------------------
+ * 		Methods
+ *---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+ * 		Internal methods
+ *--------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+ * 		Hints
+ *---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+ * 		Constants & Structures
+ *---------------------------------------------------------------------------*/
+
+
+#define CBGCC_DEFAULT_FEATURES (CSF_INDEX | CSF_RGB | CSF_DRAW_MASK | CSF_PATTERN)
+
+#define CBGCC_DEFAULT_TOOLBOX_FEATURES (CSTF_INDEX | CSTF_DRAW_MASK | CSTF_PATTERN)
+
+/*----------------------------------------------------------------------------
+ * 		Instance Data
+ *---------------------------------------------------------------------------*/
+
+    @default GI_states = @default & ~GS_ENABLED;
+    @default GCI_output = (TO_APP_TARGET);
+
+@endc
+
+
+/*****************************************************************************
+ * 		FontAttrControlClass
+ *****************************************************************************
+ * 
+ *  Message(s) sent out:
+ *  MSG_VIS_TEXT_SET_FONT_WEIGHT (a MetaTextMessage)
+ *  MSG_VIS_TEXT_SET_FONT_WIDTH (a MetaTextMessage)
+ *  MSG_VIS_TEXT_SET_TRACK_KERNING (a MetaTextMessage)
+ * 
+ *  Notification type(s) responded to:
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CHANGE: NotifyTextChange
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_FONT_ATTR_CHANGE: NotifyFontAttrChange
+ * 
+ *  GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+
+@class	FontAttrControlClass, GenControlClass;
+
+
+/*---------------------------------------------------------------------------
+ * 		Methods
+ *---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+ * 		Internal methods
+ *---------------------------------------------------------------------------*/
+
+@message void MSG_FAC_SET_FONT_WEIGHT(word weight = dx);
+/*
+ *  Handle a font weight setting
+ * 
+ *  Pass:
+ * 	 weight - font weight
+ */
+
+@message void MSG_FAC_SET_FONT_WIDTH(word width = dx);	
+/*
+ *  Handle a font width setting
+ * 
+ *  Pass:
+ * 	 width - font width
+ */
+
+@message void MSG_FAC_SET_TRACK_KERNING(word kern = dx);
+/*
+ *  Handle a track kerning setting
+ * 
+ *  Pass:
+ * 	kern - track kerning
+ */
+
+
+/*---------------------------------------------------------------------------
+ * 		Hints
+ *---------------------------------------------------------------------------*/
+
+/*--------------------------------------------------------------------------
+ * 		Constants & Structures
+ *--------------------------------------------------------------------------*/
+
+/*
+ *  Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+ *  ATTR_GEN_CONTROL_PROHIBIT_UI)
+ */
+typedef WordFlags FACFeatures;
+#define FACF_FONT_WEIGHT	0x0004
+#define FACF_FONT_WIDTH		0x0002
+#define FACF_TRACK_KERNING	0x0001
+
+/*
+ *  Toolbox features flags (used with ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI and
+ *  ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI)
+ */
+typedef WordFlags FACToolboxFeatures;
+
+
+#define FAC_DEFAULT_FEATURES (FACF_FONT_WEIGHT | FACF_FONT_WIDTH \
+						| FACF_TRACK_KERNING)
+#define FAC_DEFAULT_TOOLBOX_FEATURES 0
+
+/*	Notification structure */
+typedef struct {
+    byte	NFAC_fontWeight;
+    byte	NFAC_fontWeightDiffs;
+    byte	NFAC_fontWidth;
+    byte	NFAC_fontWidthDiffs;
+    word	NFAC_trackKerning;
+    byte	NFAC_trackKerningDiffs;
+} NotifyFontAttrChange;
+
+
+/*---------------------------------------------------------------------------
+ * 		Instance Data
+ *---------------------------------------------------------------------------*/
+    @default GCI_output = (TO_APP_TARGET);
+
+@endc
+
+
+/*****************************************************************************
+ * 		JustificationControlClass
+ *****************************************************************************
+ * 
+ *  Message(s) sent out:
+ *  MSG_VIS_TEXT_SET_PARA_ATTRIBUTES (a MetaTextMessage)
+ * 
+ *  Notification type(s) responded to:
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CHANGE: NotifyTextChange
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_JUSTIFICATION_CHANGE: NotifyJustificationChange
+ * 
+ *  GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+
+@class JustificationControlClass, GenControlClass;
+
+
+/*----------------------------------------------------------------------------
+ * 		Methods
+ *---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+ * 		Internal methods
+ *---------------------------------------------------------------------------*/
+
+@message void MSG_JC_SET_JUSTIFICATION();
+
+
+/*---------------------------------------------------------------------------
+ * 		Hints
+ *---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+ * 		Constants & Structures
+ *---------------------------------------------------------------------------*/
+
+/*
+ *  Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+ *  ATTR_GEN_CONTROL_PROHIBIT_UI)
+ */
+typedef WordFlags JCFeatures;
+#define JCF_FULL_CHAR	0x0010	    /* DBCS only */
+#define JCF_LEFT	0x0008
+#define JCF_RIGHT	0x0004
+#define JCF_CENTER	0x0002
+#define JCF_FULL	0x0001
+
+/*
+ *  Toolbox features flags (used with ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI and
+ *  ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI)
+ */
+typedef WordFlags JCToolboxFeatures;
+#define JCTF_FULL_CHAR	0x0010	    /* DBCS only */
+#define JCTF_LEFT	0x0008
+#define JCTF_RIGHT	0x0004
+#define JCTF_CENTER	0x0002
+#define JCTF_FULL	0x0001
+
+
+#define JC_DEFAULT_FEATURES  (JCF_LEFT | JCF_RIGHT | JCF_CENTER | JCF_FULL)
+#define JC_DEFAULT_TOOLBOX_FEATURES  (JCTF_LEFT | JCTF_RIGHT | \
+					JCTF_CENTER | JCTF_FULL)
+
+/* 	Notification structure */
+typedef struct {
+    Justification	NJC_justification;
+    byte		NJC_diffs;
+
+    /*
+     * if non-zero then use "general" in place
+     * of "full"
+     */
+    byte		NJC_useGeneral;
+} NotifyJustificationChange;
+
+    @default GCI_output = (TO_APP_TARGET);
+    @default GI_attrs = (@default | GA_KBD_SEARCH_PATH);
+
+@endc
+
+
+/*****************************************************************************
+ * 		ParaSpacingControlClass
+ *****************************************************************************
+ * 
+ *  Notification type(s) responded to:
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CHANGE: NotifyTextChange
+ * 
+ *  GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+
+@class ParaSpacingControlClass, GenControlClass;
+
+/*---------------------------------------------------------------------------
+ * 		Methods
+ *---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+ * 		Internal methods
+ *---------------------------------------------------------------------------*/
+
+@message void MSG_PASC_SET_SPACE_ON_TOP(word spacing = dx);
+@message void MSG_PASC_SET_SPACE_ON_BOTTOM(word spacing = dx);
+
+/*---------------------------------------------------------------------------
+ * 		Hints
+ *---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+ * 		Constants & Structures
+ *---------------------------------------------------------------------------*/
+
+/*
+ *  Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+ *  ATTR_GEN_CONTROL_PROHIBIT_UI)
+ */
+typedef WordFlags PASCFeatures;
+#define PASCF_SPACE_ON_TOP	0x0002
+#define PASCF_SPACE_ON_BOTTOM	0x0001
+
+
+/*
+ *  Toolbox features flags (used with ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI and
+ *  ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI)
+ */
+typedef WordFlags PASCToolboxFeatures;
+
+#define PASC_DEFAULT_FEATURES  (PASCF_SPACE_ON_TOP | PASCF_SPACE_ON_BOTTOM)
+#define PASC_DEFAULT_TOOLBOX_FEATURES  0
+
+/*---------------------------------------------------------------------------
+ * 		Instance Data
+ *---------------------------------------------------------------------------*/
+    @default GCI_output = (TO_APP_TARGET);
+
+@endc
+
+
+/*****************************************************************************
+ * 		LineSpacingControlClass
+ *****************************************************************************
+ * 
+ *  Notification type(s) responded to:
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CHANGE: NotifyTextChange
+ * 
+ *  GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+
+@class LineSpacingControlClass, GenControlClass;
+
+
+/*---------------------------------------------------------------------------
+ * 		Methods
+ *---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+ * 		Internal methods
+ *---------------------------------------------------------------------------*/
+
+@message void MSG_LASC_SET_LINE_SPACING(BBFixed spacing = cx);
+
+@message void MSG_LASC_SET_LINE_SPACING_WW_FIXED(WWFixed spacing = dx:cx);
+
+@message void MSG_LASC_SET_LEADING_TYPE(word leadingType = cx);
+
+@message void MSG_LASC_USER_CHANGED_LEADING_TYPE();
+
+@message void MSG_LASC_SET_MANUAL_LEADING(word leadingType = cx);
+
+
+/*---------------------------------------------------------------------------
+ * 		Hints
+ *---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+ * 		Constants & Structures
+ *---------------------------------------------------------------------------*/
+
+/*
+ *  Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+ *  ATTR_GEN_CONTROL_PROHIBIT_UI)
+ */
+typedef WordFlags LASCFeatures;
+#define LASCF_SINGLE		0x0010
+#define LASCF_ONE_AND_A_HALF	0x0008
+#define LASCF_DOUBLE		0x0004
+#define LASCF_TRIPLE		0x0002
+#define LASCF_CUSTOM   		0x0001
+
+/*
+ *  Toolbox features flags (used with ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI and
+ *  ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI)
+ */
+typedef WordFlags LASCToolboxFeatures;
+#define LASCTF_SINGLE	    	0x0008
+#define LASCTF_ONE_AND_A_HALF	0x0004
+#define LASCTF_DOUBLE	    	0x0002
+#define LASCTF_TRIPLE	    	0x0001
+
+
+
+#define LASC_DEFAULT_FEATURES  (LASCF_SINGLE | LASCF_ONE_AND_A_HALF | \
+				LASCF_DOUBLE | LASCF_TRIPLE | LASCF_CUSTOM)
+
+#define LASC_DEFAULT_TOOLBOX_FEATURES  (LASCTF_SINGLE | LASCTF_ONE_AND_A_HALF \
+					| LASCTF_DOUBLE | LASCTF_TRIPLE)
+
+/*---------------------------------------------------------------------------
+ * 		Instance Data
+ *---------------------------------------------------------------------------*/
+
+    @default GCI_output = (TO_APP_TARGET);
+
+@endc
+
+
+
+/*****************************************************************************
+ * 		DefaultTabsControlClass
+ *****************************************************************************
+ * 
+ *  Notification type(s) responded to:
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CHANGE: NotifyTextChange
+ * 
+ *  GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+
+@class DefaultTabsControlClass, GenControlClass;
+
+
+/*---------------------------------------------------------------------------
+ * 		Methods
+ *---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+ * 		Internal methods
+ *---------------------------------------------------------------------------*/
+
+/* check on dx:cx - dx.cx XXX */
+@message void MSG_DTC_SET_DEFAULT_TABS(WWFixed spacing = dx:cx);
+
+@message void MSG_DTC_SET_DEFAULT_TABS_VIA_LIST(word tabs = cx);
+
+
+/*---------------------------------------------------------------------------
+ * 		Hints
+ *---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+ * 		Constants & Structures
+ *---------------------------------------------------------------------------*/
+
+/*
+ *  Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+ *  ATTR_GEN_CONTROL_PROHIBIT_UI)
+ */
+typedef WordFlags DTCFeatures;
+#define DTCF_LIST	0x0002
+#define DTCF_CUSTOM	0x0001
+
+/*
+ *  Toolbox features flags (used with ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI and
+ *  ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI)
+ */
+typedef WordFlags DTCToolboxFeatures;
+
+
+#define DTC_DEFAULT_FEATURES  (DTCF_LIST | DTCF_CUSTOM)
+#define DTC_DEFAULT_TOOLBOX_FEATURES  0
+
+
+/*---------------------------------------------------------------------------
+ * 		Instance Data
+ *---------------------------------------------------------------------------*/
+
+    @default GCI_output = (TO_APP_TARGET);
+
+@endc
+
+
+/*****************************************************************************
+ * 		ParaBGColorControlClass
+ *****************************************************************************
+ * 
+ *  Message(s) sent out:
+ *  MSG_VIS_TEXT_SET_PARA_BG_COLOR (a MetaTextMessage)
+ * 
+ *  Notification type(s) responded to:
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CHANGE: NotifyTextChange
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_PARA_BG_COLOR_CHANGE: NotifyColorChange
+ */
+
+@class ParaBGColorControlClass, ColorSelectorClass;
+
+/*---------------------------------------------------------------------------
+ * 		Methods
+ *---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+ * 		Internal methods
+ *---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+ * 		Hints
+ *---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+ * 		Constants & Structures
+ *---------------------------------------------------------------------------*/
+
+
+#define PBGCC_DEFAULT_FEATURES  (CSF_INDEX | CSF_RGB | CSF_DRAW_MASK | CSF_PATTERN)
+
+#define PBGCC_DEFAULT_TOOLBOX_FEATURES (CSTF_INDEX | CSTF_DRAW_MASK | CSTF_PATTERN)
+
+
+/*---------------------------------------------------------------------------
+ * 		Instance Data
+ *---------------------------------------------------------------------------*/
+
+    @default GI_states = @default & ~GS_ENABLED;
+    @default GCI_output = (TO_APP_TARGET);
+
+@endc
+
+
+/*****************************************************************************
+ * 		ParaAttrControlClass
+ *****************************************************************************
+ * 
+ *  Notification type(s) responded to:
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CHANGE: NotifyTextChange
+ * 
+ *  GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+
+@class ParaAttrControlClass, GenControlClass;
+
+/*---------------------------------------------------------------------------
+ * 		Methods
+ *---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+ * 		Internal methods
+ *---------------------------------------------------------------------------*/
+
+@message void MSG_PAC_SET_PARA_ATTR();
+
+@message void MSG_PAC_SET_KEEP(word selectedBooleans = cx,
+			       word changedBooleans = bp);
+
+@message void MSG_PAC_USER_CHANGED_KEEP();
+@message void MSG_PAC_SET_KEEP_FIRST(word value = dx);
+@message void MSG_PAC_SET_KEEP_LAST(word value = dx);
+
+/*---------------------------------------------------------------------------
+ * 		Hints
+ *---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+ * 		Constants & Structures
+ *---------------------------------------------------------------------------*/
+
+
+/*
+ *  Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+ *  ATTR_GEN_CONTROL_PROHIBIT_UI)
+ */
+typedef WordFlags PACFeatures;
+#define PACF_WORD_WRAP	    	    0x0010
+#define PACF_HIDDEN_TEXT	    0x0008
+#define PACF_KEEP_PARA_WITH_NEXT    0x0004
+#define PACF_KEEP_PARA_TOGETHER	    0x0002
+#define PACF_KEEP_LINES		    0x0001
+
+/*
+ *  Toolbox features flags (used with ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI and
+ *  ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI)
+ */
+typedef WordFlags PACToolboxFeatures;
+
+
+
+#define PAC_DEFAULT_FEATURES  (PACF_WORD_WRAP | PACF_HIDDEN_TEXT | \
+				PACF_KEEP_PARA_WITH_NEXT | \
+				PACF_KEEP_PARA_TOGETHER | PACF_KEEP_LINES)
+#define PAC_DEFAULT_TOOLBOX_FEATURES  0
+
+
+/*---------------------------------------------------------------------------
+ * 		Instance Data
+ *---------------------------------------------------------------------------*/
+
+    @default GCI_output = (TO_APP_TARGET);
+
+@endc
+
+
+/*****************************************************************************
+ * 		BorderControlClass
+ *****************************************************************************
+ * 
+ *  Notification type(s) responded to:
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CHANGE: NotifyTextChange
+ * 
+ *  GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+
+@class BorderControlClass, GenControlClass;
+
+/*---------------------------------------------------------------------------
+ * 		Methods
+ *---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+ * 		Internal methods
+ *---------------------------------------------------------------------------*/
+
+@message void MSG_BC_SET_SIMPLE_BORDER();
+@message void MSG_BC_SET_BORDER_BITS();
+@message void MSG_BC_SET_BORDER_WIDTH();
+@message void MSG_BC_SET_BORDER_SPACING();
+@message void MSG_BC_SET_BORDER_TYPE();
+@message void MSG_BC_BORDER_TYPE_STATUS();
+@message void MSG_BC_SET_BORDER_ANCHOR();
+@message void MSG_BC_SET_SHADOW_WIDTH();
+@message void MSG_BC_BORDER_SIDES_STATUS();
+
+
+/*---------------------------------------------------------------------------
+ * 		Hints
+ *---------------------------------------------------------------------------*/
+
+/*---------------------------------------------------------------------------
+ * 		Constants & Structures
+ *---------------------------------------------------------------------------*/
+
+typedef WordFlags BCFeatures;
+#define BCF_LIST	0x0002
+#define BCF_CUSTOM	0x0001
+
+typedef WordFlags BCToolboxFeatures;
+
+
+
+#define BC_DEFAULT_FEATURES  (BCF_LIST | BCF_CUSTOM)
+#define BC_DEFAULT_TOOLBOX_FEATURES  0
+
+    @default GCI_output = (TO_APP_TARGET);
+
+@endc
+
+
+/******************************************************************************
+ * 		DropCapControlClass
+ ******************************************************************************
+ * 
+ *  Notification type(s) responded to:
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CHANGE: NotifyTextChange
+ * 
+ *  GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+
+@class DropCapControlClass, GenControlClass;
+
+@message void MSG_DCC_SET_DROP_CAP(word spacing = cx);
+@message void MSG_DCC_USER_CHANGED_DROP_CAP();
+@message void MSG_DCC_SET_DROP_CHARS(word value = dx);
+@message void MSG_DCC_SET_DROP_LINES(word value = dx);
+@message void MSG_DCC_SET_DROP_POSITION(word value = dx);
+
+typedef WordFlags DCCFeatures;
+#define DCCF_DROP_CAP	0x0001
+
+typedef WordFlags DCCToolboxFeatures;
+
+
+
+#define DCC_DEFAULT_FEATURES  DCCF_DROP_CAP
+#define DCC_DEFAULT_TOOLBOX_FEATURES  0
+
+    @default GCI_output = (TO_APP_TARGET);
+
+@endc
+
+/*****************************************************************************
+ * 		HyphenationControlClass
+ *****************************************************************************
+ * 
+ *  Notification type(s) responded to:
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CHANGE: NotifyTextChange
+ * 
+ *  GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+
+@class HyphenationControlClass, GenControlClass;
+
+@message void MSG_HC_SET_HYPHENATION(word spacing = cx);
+@message void MSG_HC_USER_CHANGED_HYPHENATION();
+@message void MSG_HC_SET_MAX_RANGE(word max = dx);
+@message void MSG_HC_SET_MIN_WORD(word min = dx);
+@message void MSG_HC_SET_MIN_PREFIX(word min = dx);
+@message void MSG_HC_SET_MIN_SUFFIX(word min = dx);
+
+typedef WordFlags HCFeatures;
+#define HCF_LIST	0x0001
+
+typedef WordFlags HCToolboxFeatures;
+#define HCTF_TOGGLE	0x0001
+
+
+#define HC_DEFAULT_FEATURES  HCF_LIST
+#define HC_DEFAULT_TOOLBOX_FEATURES  HCTF_TOGGLE
+
+    @default GCI_output = (TO_APP_TARGET);
+
+@endc
+
+/*****************************************************************************
+ * 		BorderColorControlClass
+ *****************************************************************************
+ * 
+ *  Message(s) sent out:
+ *  MSG_VIS_TEXT_SET_PARA_BG_COLOR (a MetaTextMessage)
+ * 
+ *  Notification type(s) responded to:
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CHANGE: NotifyTextChange
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_PARA_BG_COLOR_CHANGE: NotifyColorChange
+ */
+
+@class BorderColorControlClass, ColorSelectorClass;
+
+typedef WordFlags BCCToolboxFeatures;
+
+
+#define BCC_DEFAULT_FEATURES  (CSF_INDEX | CSF_RGB | CSF_DRAW_MASK | CSF_PATTERN)
+#define BCC_DEFAULT_TOOLBOX_FEATURES  0
+
+    @default GI_states = @default & ~GS_ENABLED;
+    @default GCI_output = (TO_APP_TARGET);
+    @default CSI_toolboxPrefs = (@default | (COO_LINE_ORIENTED << CTP_INDEX_ORIENTATION_OFFSET) | (COO_LINE_ORIENTED << CTP_DRAW_MASK_ORIENTATION_OFFSET));
+
+@endc
+
+/*****************************************************************************
+ * 		MarginControlClass
+ *****************************************************************************
+ * 
+ *  Message(s) sent out:
+ *  MSG_VIS_TEXT_SET_LEFT_MARGIN
+ *  MSG_VIS_TEXT_SET_PARA_MARGIN
+ *  MSG_VIS_TEXT_SET_RIGHT_MARGIN
+ * 
+ *  Notification type(s) responded to:
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CHANGE: NotifyTextChange
+ * 
+ *  GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+
+@class MarginControlClass, GenControlClass;
+
+@message void MSG_MC_SET_LEFT_MARGIN(WWFixed margin = dx:cx);
+@message void MSG_MC_SET_PARA_MARGIN(WWFixed margin = dx:cx);
+@message void MSG_MC_SET_RIGHT_MARGIN(WWFixed margin = dx:cx);
+
+typedef WordFlags MCFeatures;
+#define MCF_LEFT_MARGIN		0x0004
+#define MCF_PARA_MARGIN		0x0002
+#define MCF_RIGHT_MARGIN	0x0001
+
+typedef WordFlags MCToolboxFeatures;
+
+
+
+#define MC_DEFAULT_FEATURES  (MCF_LEFT_MARGIN | MCF_PARA_MARGIN \
+				| MCF_RIGHT_MARGIN)
+#define MC_DEFAULT_TOOLBOX_FEATURES  0
+
+    @default GCI_output = (TO_APP_TARGET);
+
+@endc
+
+
+/******************************************************************************
+ * 		TabControlClass
+ ******************************************************************************
+ * 
+ *  Message(s) sent out:
+ *  MSG_VIS_TEXT_SET_LEFT_MARGIN
+ *  MSG_VIS_TEXT_SET_PARA_MARGIN
+ *  MSG_VIS_TEXT_SET_RIGHT_MARGIN
+ * 
+ *  Notification type(s) responded to:
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CHANGE: VisTextNotifyParaAttrChange
+ * 
+ *  GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+
+@class TabControlClass, GenControlClass;
+
+@message void MSG_TC_SELECT_TAB();
+@message void MSG_TC_QUERY_TAB();
+@message void MSG_TC_SET_TAB_LINE();
+@message void MSG_TC_CLEAR_TAB();
+@message void MSG_TC_CLEAR_ALL_TABS();
+@message void MSG_TC_SET_TAB_TYPE();
+
+typedef WordFlags TCFeatures;
+#define TCF_LIST	0x0080
+#define TCF_POSITION	0x0040
+#define TCF_GRAY_SCREEN	0x0020
+#define TCF_TYPE	0x0010
+#define TCF_LEADER	0x0008
+#define TCF_LINE	0x0004
+#define TCF_CLEAR	0x0002
+#define TCF_CLEAR_ALL	0x0001
+
+typedef WordFlags TCToolboxFeatures;
+
+
+
+#define TC_DEFAULT_FEATURES  (TCF_LIST | TCF_POSITION | TCF_GRAY_SCREEN \
+				| TCF_TYPE  | TCF_LEADER | TCF_LINE \
+				| TCF_CLEAR | TCF_CLEAR_ALL)
+#define TC_DEFAULT_TOOLBOX_FEATURES  0
+
+
+/*---------------------------------------------------------------------------
+ * 		Instance Data
+ *---------------------------------------------------------------------------*/
+
+    @instance word	TCI_numberOfTabs;
+    @instance Tab	TCI_tabList[VIS_TEXT_MAX_TABS];
+    @instance word	TCI_selectedTab;
+
+    @default GCI_output = (TO_APP_TARGET);
+
+@endc
+
+/*****************************************************************************
+ * 		TextStyleSheetControlClass
+ *****************************************************************************/
+
+@class TextStyleSheetControlClass, StyleSheetControlClass;
+
+    @default SSCI_styledClass = (ClassStruct *)&VisTextClass;
+    @default SSCI_targetClass = (ClassStruct *)&VisTextClass;
+
+@endc
+
+
+/*****************************************************************************
+ * 		SearchReplaceControlClass
+ *****************************************************************************
+ * 
+ *  Message(s) sent out:
+ *  MSG_SEARCH (a MetaTextMessage)
+ *  MSG_REPLACE_CURRENT (a MetaTextMessage)
+ *  MSG_REPLACE_ALL_OCCURRENCES (a MetaTextMessage)
+ * 
+ *  Notification type(s) responded to:
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_SEARCH_SPELL_ENABLE_CHANGE
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_SELECT_STATE_CHANGE
+ * 
+ *  GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+
+@class SearchReplaceControlClass, GenControlClass;
+
+/*
+ * The following messages are internal to the SearchReplaceControl object...
+ */
+
+@message void MSG_SRC_SEND_EVENT_TO_SEARCH_TEXT(EventHandle event=bp);
+@message void MSG_SRC_SEND_EVENT_TO_REPLACE_TEXT(EventHandle event=bp);
+/*
+ * 	These messages send the passed events to the search/replace text objs
+ * 
+ * 	Pass: Event handle
+ * 	Return: from message
+ */
+
+@message void MSG_SRC_REPLACE_ALL_OCCURRENCES_QUERY_RESPONSE();
+/*
+ * 	This method is sent out by the standard dialog box put up when we are
+ * 	confirming a global delete.
+ */
+
+@message void MSG_SRC_REPLACE_ALL_OCCURRENCES_NO_QUERY();
+/*
+ * 	Same as MSG_REPLACE_ALL_OCCURRENCES, but doesn't query the user if the
+ * 	replace string is empty.
+ */
+
+@message void MSG_SRC_FIND_NEXT();
+@message void MSG_SRC_FIND_PREV();
+/*
+ * 	Initiates a forward or backward search.
+ */
+
+typedef enum {	
+    SC_WILDCARD = 0x0,
+    SC_WILDCHAR = 0x2,
+    SC_GRAPHIC = 0x4,
+    SC_CR = 0x6,
+    SC_PAGE_BREAK = 0x8,
+    SC_TAB = 0xa,
+} SpecialChar;
+
+@message void MSG_SRC_ADD_SPECIAL_CHAR_TO_FOCUS_TEXT(SpecialChar specialChar = cl);
+/*
+ * 	Adds a graphic representing the associated char to the search text.
+ * 
+ * 	Pass: cl - SpecialChar
+ */
+
+@message void MSG_SRC_UPDATE_SPECIAL_CHARS_BY_FOCUS_INFO();
+/*
+ * 	Updates various UI elements via the queue.
+ * 
+ * 	This is useful if we have found out that an object has lost the
+ * 	focus or target, and we want to wait to see what the new focus/target
+ * 	object is before updating the UI.
+ * 
+ * 	Pass: nothing
+ */
+
+@message void MSG_SRC_SEARCH_ABORTED();
+/*
+ * 	Method sent out if the search is aborted by a user action.
+ * 
+ * 	Pass: nothing
+ */
+
+@message void MSG_SRC_SEARCH_STRING_NOT_FOUND_FOR_SEARCH();
+@message void MSG_SRC_SEARCH_STRING_NOT_FOUND_FOR_REPLACE_ALL();
+@message void MSG_SRC_SEARCH_STRING_NOT_FOUND_FOR_REPLACE_ALL_IN_SELECTION();
+/*
+ * 	These methods are sent to the SearchReplaceController if the search
+ * 	string is not found in the document.
+ * 
+ * 	Pass: nothing
+ */
+
+@protominor TextNewForJedi
+@message void MSG_SRC_FIND_FROM_TOP();
+/*
+ * 	Initiates a search starting from top.
+ */
+
+@message  SearchNoteOptionType MSG_SRC_GET_NOTE_SEARCH_STATE() = cl;
+/*
+ *	Find out what note option is currently used 
+ *	(ie include/exclude notes or note only).
+ */	
+@protoreset
+
+/*---------------------------------------------------------------------------
+ * 		Hints
+ *---------------------------------------------------------------------------*/
+
+@vardata ChunkHandle	ATTR_SEARCH_CONTROL_SET_FIND_NEXT_MONIKER;
+@vardata ChunkHandle	ATTR_SEARCH_CONTROL_SET_FIND_PREV_MONIKER;
+@vardata ChunkHandle	ATTR_SEARCH_CONTROL_SET_REPLACE_CURRENT_MONIKER;
+@vardata ChunkHandle	ATTR_SEARCH_CONTROL_SET_REPLACE_ALL_MONIKER;
+@vardata ChunkHandle	ATTR_SEARCH_CONTROL_SET_REPLACE_ALL_IN_SELECTION_MONIKER;
+/*
+ * 	Vardata types that allow the app to change the name of these default
+ * 	triggers.
+ */
+
+
+@vardata void  	ATTR_SEARCH_CONTROL_INTERACT_ONLY_WITH_TARGETED_TEXT_OBJECTS;
+/*
+ * 	When this is present, the search controller will update its UI
+ * 	depending on whether or not there is a targeted text object.
+ */
+
+@vardata SelectionDataType  	ATTR_SEARCH_CONTROL_SELECTION_TYPE;
+/*
+ * 	When this is present, the search controller will use this type to
+ * 	enable and disable the "Replace All in Selection" trigger whenever
+ * 	a targeted object of the type has a selection.
+ */
+
+@protominor TextNewForJedi
+@vardata ChunkHandle	ATTR_SEARCH_CONTROL_SET_FIND_FROM_TOP_MONIKER;
+@vardata ChunkHandle	ATTR_SEARCH_CONTROL_SET_INCLUDE_NOTE_MONIKER;
+@vardata ChunkHandle	ATTR_SEARCH_CONTROL_SET_EXCLUDE_NOTE_MONIKER;
+@vardata ChunkHandle	ATTR_SEARCH_CONTROL_SET_NOTE_ONLY_MONIKER;
+/*
+ * Vardata types that allow the app to change the name of these default 
+ * monikers.
+ */
+@protoreset
+
+/*---------------------------------------------------------------------------
+ * 		Constants & Structures
+ *---------------------------------------------------------------------------*/
+
+#define SEARCH_REPLACE_MAX_WORD_LENGTH	65 	/* 64 chars + 1 null */
+
+
+typedef ByteFlags   SearchReplaceEnableFlags;
+#define	SREF_SEARCH 	0x2	/* Set if the object can handle searches */
+#define	SREF_REPLACE	0x1	/* Set if the object can handle replaces */
+
+
+typedef ByteEnum SearchReplaceFocusInfo;
+#define     SRFI_SEARCH_TEXT 	0
+#define     SRFI_REPLACE_TEXT 	1
+
+
+/*	Structure sent out with GWNT_SEARCH_REPLACE_ENABLE_CHANGE */
+typedef struct {
+    SearchReplaceEnableFlags	flags;
+} NotifySearchReplaceEnableChange;
+
+/* XXX */
+extern void	
+    _pascal TextSendSearchNotification (SearchReplaceEnableFlags flags);
+
+
+typedef WordFlags   SRCFeatures;
+#define    SRCF_NOTES_OPTIONS			    0x0800
+#define    SRCF_FIND_FROM_TOP			    0x0400
+#define	   SRCF_CLOSE	    	    	    	    0x0200
+#define    SRCF_FIND_NEXT   	    	   	    0x0100
+#define    SRCF_FIND_PREV   	    	    	    0x0080
+#define    SRCF_REPLACE_CURRENT	    		    0x0040
+#define    SRCF_REPLACE_ALL_IN_SELECTION 	    0x0020
+#define    SRCF_REPLACE_ALL 	    	 	    0x0010
+#define    SRCF_PARTIAL_WORDS	    	    	    0x0008
+#define    SRCF_IGNORE_CASE 	    	 	    0x0004
+#define    SRCF_WILDCARDS   	    	   	    0x0002
+#define    SRCF_SPECIAL_CHARS	    		    0x0001
+
+typedef	WordFlags   SRCToolboxFeatures;
+#define	SRCTF_SEARCH_REPLACE	0x0001
+
+#define	SRC_DEFAULT_FEATURES    (SRCF_FIND_NEXT |  SRCF_FIND_PREV |  SRCF_REPLACE_CURRENT |  SRCF_REPLACE_ALL |  SRCF_PARTIAL_WORDS |  SRCF_IGNORE_CASE |  SRCF_WILDCARDS |  SRCF_SPECIAL_CHARS | SRCF_REPLACE_ALL_IN_SELECTION | SRCF_CLOSE)
+
+#define SRC_SUGGESTED_BEGINNING_FEATURES    (SRCF_FIND_NEXT | SRCF_REPLACE_CURRENT | SRCF_REPLACE_ALL | SRCF_CLOSE)
+
+#define	SRC_DEFAULT_TOOLBOX_FEATURES   SRCTF_SEARCH_REPLACE
+
+
+/*---------------------------------------------------------------------------
+ * 		Instance Data
+ *---------------------------------------------------------------------------*/
+
+    /* Which object most recently had the focus */
+    @instance	SearchReplaceFocusInfo	SRCI_focusInfo = SRFI_SEARCH_TEXT;
+
+    /* Which options the current target handles */
+    @instance	SearchReplaceEnableFlags    SRCI_enableFlags = SREF_SEARCH | SREF_REPLACE;
+
+    /* 0 if no selection */
+    @instance	byte	SRCI_haveSelection = 0;
+
+    @default GCI_output = (TO_APP_TARGET);
+@endc
+
+
+
+/*****************************************************************************
+ * 		TextRulerClass
+ *****************************************************************************/
+
+@class TextRulerClass, VisRulerClass;
+
+#define TEXT_RULER_HEIGHT 	VIS_RULER_HEIGHT + 12
+#define TEXT_POS_INVALID 	0x80000000
+
+@message void MSG_TEXT_RULER_SET_GCN_CONTENT(optr content = cx:dx);
+/*
+ *  Set the content to attach to GCN lists for
+ * 
+ *  Pass:
+ * 	content - optr of content to attach
+ *  Return:
+ * 	none
+ */
+
+@message void MSG_TEXT_RULER_SET_CONTROLLED_ATTRS(
+				TextRulerControlAttributes attrs = cx);
+/*
+ *  Set the controlled bits
+ * 
+ *  Pass:
+ * 	attrs - TextRulerControlAttributes
+ *  Return:
+ * 	none
+ */
+
+
+
+typedef ByteFlags TextRulerFlags;
+#define TRF_ALWAYS_MOVE_BOTH_MARGINS	0x10
+#define TRF_ROUND_COORDINATES		0x08
+#define TRF_OBJECT_SELECTED		0x04
+#define TRF_SELECTING			0x02
+#define TRF_DRAGGING			0x01
+
+typedef ByteEnum TextRulerAction;
+#define     TRA_NULL 0
+#define     TRA_MOVE_TAB 1
+#define     TRA_COPY_TAB 2
+#define     TRA_MOVE_MARGIN 3
+
+/*---------------------------------------------------------------------------
+ * 		Instance Data
+ *---------------------------------------------------------------------------*/
+
+    @instance optr			TRI_tabControl;
+    @instance byte			TRI_valid;
+    @instance TextRulerFlags		TRI_flags;
+    @instance TextRulerAction		TRI_action;
+    @instance word			TRI_regionWidth;
+    @instance optr			TRI_gcnContent;
+    /*  Content to attach GCN list. 
+     *	0 to go up the visual tree, 1 to use application list.
+     */
+
+    @instance word			TRI_selectedTab;
+    /*  Position of selected tab */
+
+    @instance word			TRI_selectedObject;
+    /*  Structure offset */
+
+    @instance sword			TRI_selectX;
+    /*  X position of start select */
+
+    @instance VisTextParaAttrDiffs	TRI_diffs;
+
+    @instance VisTextMaxParaAttr	TRI_paraAttr;
+    /*  current attributes */
+
+@endc
+
+
+/******************************************************************************
+ *		TextHelpControlClass
+ ******************************************************************************
+ *
+ * Message(s) sent out:
+ * MSG_VIS_TEXT_SET_CONTEXT
+ * MSG_VIS_TEXT_DEFINE_CONTEXT
+ *
+ * Notification type(s) responded to:
+ * MANUFACTURER_ID_GEOWORKS.NSNT_TEXT_TYPE_CHANGE: VisTextNotifyTypeChange
+ *
+ * GenApplication GCN lists to be placed on:
+ *	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+
+@class TextHelpControlClass, GenControlClass;
+
+/******************************************************************************
+ *		Methods
+ *****************************************************************************/
+
+/******************************************************************************
+ *		Internal Methods
+ *****************************************************************************/
+
+@message void MSG_THC_ADD_CONTEXT();
+/*
+ *	Add a new context name.
+ */
+
+@message void MSG_THC_DELETE_CONTEXT();
+/*
+ *	Delete a context name.
+ */
+
+@message void MSG_THC_RENAME_CONTEXT();
+/*
+ *	Rename a context 
+ */
+
+@message void MSG_THC_SET_CONTEXT(word curSelection = cx);
+/*
+ *	User did a "Set Context"
+ */
+
+@message void MSG_THC_DC_GET_MONIKER(optr list = cx:dx);
+/*
+ *	Get a moniker for the Define Context list
+ */
+
+@message void MSG_THC_SC_GET_MONIKER(optr list = cx:dx);
+/*
+ *	Get a moniker for the Set Context list
+ */
+
+@message void MSG_THC_ADD_FILE();
+/*
+ *	Add a new file name
+ */
+
+@message void MSG_THC_DELETE_FILE();
+/*
+ *	Delete a file name
+ */
+
+@message void MSG_THC_RENAME_FILE();
+/*
+ *	Rename a file
+ */
+
+@message void MSG_THC_DF_GET_MONIKER(optr list = cx:dx);
+/*
+ *	Get a moniker for the Define File list
+ */
+
+@message void MSG_THC_DF_FILE_CHANGED(word curSelection = cx);
+/*
+ *	The user changed the file in the Define File box
+ */
+
+@message void MSG_THC_SH_FILE_CHANGED(word curSelection = cx);
+/*
+ *	The user changed the file in the Set Hyperlink box
+ */
+
+@message void MSG_THC_SET_HYPERLINK(word curSelection = cx);
+/*
+ *	User did a "Set Hyperlink"
+ */
+
+@message void MSG_THC_FOLLOW_HYPERLINK();
+/*
+ *	User did a "Follow Hyperlink"
+ */
+
+@message void MSG_THC_SH_GET_MONIKER(optr list = cx:dx);
+/*
+ *	Get a moniker for the context list in the Set Hyperlink box
+ */
+
+@message void MSG_THC_DC_CONTEXT_CHANGED(word curSelection = cx);
+/*
+ *	The user change the context in the Define Context box
+ */
+
+@protominor TextNewForHelpEditor
+@message void MSG_THC_DELETE_ALL_HYPERLINKS();
+/*
+ *	Delete all hyperlinks in the document.
+ *	User pressed the Delete All Hyperlinks trigger.
+ */
+
+@message void MSG_THC_UNSET_ALL_CONTEXTS();
+/*
+ *	Unset all contexts in the document.
+ *	User pressed the Unset All Contexts trigger.
+ */
+@protoreset
+
+
+/******************************************************************************
+ *		Hints
+ *****************************************************************************/
+
+    @vardata	word TEMP_CURRENT_CONTEXT_INDEX;    /* internal */
+
+
+/******************************************************************************
+ *		Constants & Structures
+ *****************************************************************************/
+
+typedef WordFlags   THCFeatures;
+#define THCF_CLEAR_ALL_CONTEXTS     0x0040
+#define THCF_CLEAR_ALL_HYPERLINKS   0x0020
+#define THCF_FOLLOW_HYPERLINK	    0x0010
+#define	THCF_SET_HYPERLINK  	    0x0008
+#define	THCF_SET_CONTEXT    	    0x0004
+#define	THCF_DEFINE_FILE    	    0x0002
+#define	THCF_DEFINE_CONTEXT 	    0x0001
+
+#define THC_DEFAULT_FEATURES equ (THCF_DEFINE_CONTEXT | THCF_DEFINE_FILE | \
+				  THCF_SET_HYPERLINK | THCF_SET_CONTEXT | \
+			  	  THCF_FOLLOW_HYPERLINK | \
+				  THCF_CLEAR_ALL_CONTEXTS | \
+				  THCF_CLEAR_ALL_HYPERLINKS)
+
+#define THC_DEFAULT_TOOLBOX_FEATURES equ 0
+
+/******************************************************************************
+ *		Instance Data
+ *****************************************************************************/
+
+    @instance	word	THCI_file;
+
+@endc
+
+
+/*****************************************************************************
+ * 		TextRulerControlClass
+ *****************************************************************************
+ * 
+ *  This controller *does not* get notifications from the text rulers.  The
+ *  controller maintains the state.
+ * 
+ *  Message(s) sent out:
+ *  MSG_TEXT_RULER_SET_CONTROLLED_ATTRS
+ * 
+ *  GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ * 	MGCNLT_ACTIVE_LIST
+ */
+
+@class TextRulerControlClass, GenControlClass;
+
+@message void MSG_TRCC_CHANGE_STATE(word selectedBooleans = cx,
+				    word changedBooleans = bp);
+
+
+typedef WordFlags TRCCFeatures;
+#define TRCCF_ROUND		0x8000
+#define TRCCF_IGNORE_ORIGIN	0x4000
+
+typedef WordFlags TRCCToolboxFeatures;
+
+
+
+#define TRCC_DEFAULT_FEATURES  (TRCCF_ROUND | TRCCF_IGNORE_ORIGIN)
+#define TRCC_DEFAULT_TOOLBOX_FEATURES  0
+
+
+typedef WordFlags TextRulerControlAttributes;
+#define TRCA_ROUND		0x8000
+#define TRCA_IGNORE_ORIGIN	0x4000
+
+    @instance TextRulerControlAttributes	TRCI_attrs = TRCA_ROUND;
+
+@endc;
+
+
+/******************************************************************************
+ * 		TextCountControlClass
+ ******************************************************************************
+ * 
+ *  Notification type(s) responded to:
+ *  MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_COUNT_CHANGE: NotifyTextChange
+ * 
+ *  GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+
+@class TextCountControlClass, GenControlClass;
+
+@message void MSG_TCC_RECALC();
+
+typedef WordFlags TCCFeatures;
+#define TCCF_CHARACTER	0x0010
+#define TCCF_WORD   	0x0008
+#define TCCF_LINE   	0x0004
+#define TCCF_PARAGRAPH	0x0002
+#define TCCF_RECALC 	0x0001
+
+typedef WordFlags TCCToolboxFeatures;
+
+#define TCC_DEFAULT_FEATURES (TCCF_CHARACTER | TCCF_WORD | \
+			      TCCF_LINE | TCCF_PARAGRAPH | TCCF_RECALC)
+
+#define TCC_DEFAULT_TOOLBOX_FEATURES 0
+
+@endc;
+
+/****************************************************************************
+ *	Macro for a Character menu
+ ****************************************************************************/
+
+#define CHARACTER_MENU_SELF_LOAD_OPTIONS \
+	MyFontControl, MyTextStyleControl, MyPointSizeControl,\
+	MyCharFGColorControl, MyCharBGColorControl, MyFontAttrControl
+
+@define CHARACTER_MENU_TOP \
+@object GenInteractionClass CharacterMenu = {\
+    GI_visMoniker = 'C', "Character";\
+    GI_comp = MyFontControl, MyTextStyleControl, MyPointSizeControl,\
+		   MyCharFGColorControl, MyCharBGColorControl,\
+		   MyFontAttrControl;\
+    GII_visibility = GIV_POPUP;\
+}
+
+@define CHARACTER_MENU_BODY \
+@object FontControlClass MyFontControl = {\
+    GI_visMoniker = 'F', "Fonts";\
+    GII_visibility = GIV_POPUP;\
+    HINT_GEN_CONTROL_USE_DEFAULT_TOOLS = -1;\
+}\
+\
+@object TextStyleControlClass MyTextStyleControl = {\
+    GI_visMoniker = 'S', "Styles";\
+    GII_visibility = GIV_POPUP;\
+    HINT_GEN_CONTROL_USE_DEFAULT_TOOLS = -1;\
+}\
+\
+@object PointSizeControlClass MyPointSizeControl = {\
+    GI_visMoniker = 'z', "Sizes";\
+    GII_visibility = GIV_POPUP;\
+    HINT_GEN_CONTROL_USE_DEFAULT_TOOLS = -1;\
+}\
+\
+@object CharFGColorControlClass MyCharFGColorControl = {\
+    GI_visMoniker = 'T', "Text Color";\
+    GII_type = GIT_PROPERTIES;\
+    GII_visibility = GIV_DIALOG;\
+    HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = {\
+	SWSS_RATIO | PCT_25,\
+	SWSS_RATIO | PCT_65\
+    };\
+}\
+\
+@object CharBGColorControlClass MyCharBGColorControl = {\
+    GI_visMoniker = 'B', "Text Background Color";\
+    GII_type = GIT_PROPERTIES;\
+    GII_visibility = GIV_DIALOG;\
+    HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = {\
+	SWSS_RATIO | PCT_35,\
+	SWSS_RATIO | PCT_65\
+    };\
+}\
+\
+@object FontAttrControlClass MyFontAttrControl = {\
+    GI_visMoniker = 'A', "Attributes";\
+    GII_type = GIT_PROPERTIES;\
+    GII_visibility = GIV_DIALOG;\
+    HINT_CENTER_WINDOW;\
+}
+
+/****************************************************************************
+ *	Macro for a Paragraph menu
+ ****************************************************************************/
+
+@define PARAGRAPH_MENU_ACTIVE \
+	MyTabControl
+
+@define PARAGRAPH_MENU_SELF_LOAD_OPTIONS \
+	MyJustificationControl, MyParaSpacingControl, MyParaBGColorControl,\
+	MyParaAttrControl, MyMarginControl, MyTabControl, MyDefaultTabsControl,\
+	MyBorderControl, MyBorderColorControl, MyDropCapControl,\
+	MyHyphenationControl
+
+@define PARAGRAPH_MENU_TOP \
+@object GenInteractionClass ParagraphMenu = {\
+    GI_visMoniker = 'P', "Paragraph";\
+    GI_comp = MyJustificationControl, MyParaSpacingControl,\
+	      MyParaBGColorControl, MyParaAttrControl, MyMarginControl,\
+	      MyTabControl, MyDefaultTabsControl, BorderSubMenu,\
+	      MyDropCapControl, MyHyphenationControl;\
+    GII_visibility = GIV_POPUP;\
+}
+
+@define PARAGRAPH_MENU_BODY \
+@object JustificationControlClass MyJustificationControl = {\
+    GII_visibility = GIV_SUB_GROUP;\
+    HINT_SAME_CATEGORY_AS_PARENT;\
+    HINT_GEN_CONTROL_USE_DEFAULT_TOOLS = -1;\
+}\
+\
+@object ParaSpacingControlClass MyParaSpacingControl = {\
+    GI_visMoniker = 'S', "Paragraph Spacing";\
+    GII_type = GIT_PROPERTIES;\
+    GII_visibility = GIV_DIALOG;\
+    HINT_CENTER_WINDOW;\
+}\
+\
+@object ParaBGColorControlClass MyParaBGColorControl = {\
+    GI_visMoniker = 'P', "Paragraph Color";\
+    GII_type = GIT_PROPERTIES;\
+    GII_visibility = GIV_DIALOG;\
+    HINT_CENTER_WINDOW;\
+}\
+\
+@object ParaAttrControlClass MyParaAttrControl = {\
+    GI_visMoniker = 'A', "Paragraph Attributes";\
+    GII_type = GIT_PROPERTIES;\
+    GII_visibility = GIV_DIALOG;\
+    HINT_CENTER_WINDOW;\
+}\
+\
+@object MarginControlClass MyMarginControl = {\
+    GI_visMoniker = 'M', "Margins";\
+    GII_type = GIT_PROPERTIES;\
+    GII_visibility = GIV_DIALOG;\
+    HINT_CENTER_WINDOW;\
+}\
+\
+@object TabControlClass MyTabControl = {\
+    GI_visMoniker = 'T', "Tabs";\
+    GII_type = GIT_PROPERTIES;\
+    GII_visibility = GIV_DIALOG;\
+    HINT_CENTER_WINDOW;\
+}\
+\
+@object DefaultTabsControlClass MyDefaultTabsControl = {\
+    GI_visMoniker = 'D', "Default Tabs";\
+    GII_type = GIT_PROPERTIES;\
+    GII_visibility = GIV_DIALOG;\
+    HINT_CENTER_WINDOW;\
+}\
+\
+@object GenInteractionClass BorderSubMenu = {\
+    GI_visMoniker = 'B', "Border";\
+    GI_comp = MyBorderControl, MyBorderColorControl;\
+    GII_visibility = GIV_POPUP;\
+}\
+\
+@object BorderControlClass MyBorderControl = {\
+}\
+\
+@object BorderColorControlClass MyBorderColorControl = {\
+    GI_visMoniker = 'B', "Border Color";\
+    GII_type = GIT_PROPERTIES;\
+    GII_visibility = GIV_DIALOG;\
+    HINT_CENTER_WINDOW;\
+}\
+\
+@object DropCapControlClass MyDropCapControl = {\
+    GI_visMoniker = 'D', "Drop Cap";\
+    GII_type = GIT_PROPERTIES;\
+    GII_visibility = GIV_DIALOG;\
+    HINT_CENTER_WINDOW;\
+}\
+\
+@object HyphenationControlClass MyHyphenationControl = {\
+    GI_visMoniker = 'H', "Hyphenation";\
+    GII_type = GIT_PROPERTIES;\
+    GII_visibility = GIV_DIALOG;\
+    HINT_CENTER_WINDOW;\
+}
+
+@ifdef __HIGHC__
+
+pragma Alias (TextSendSearchNotification, "TEXTSENDSEARCHNOTIFICATION");
+
+@endif
+
+@endlib
+
+@endif

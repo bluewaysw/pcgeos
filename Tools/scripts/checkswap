@@ -1,0 +1,49 @@
+#!/bin/sh -
+##############################################################################
+#
+# 	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+#
+# PROJECT:	PC GEOS
+# MODULE:	checkswap
+# AUTHOR: 	Tony Requist, June 6, 1992
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	tony	6/6/92		Initial Revision
+#
+# DESCRIPTION:
+#	A script to send mail to people whose machines don't have
+#	enough swap space.
+#
+#	$Id: checkswap,v 1.8 97/01/26 21:27:38 allen Exp $
+#
+###############################################################################
+USER=root
+export USER
+objects=`reginfo | egrep "swap space" | sed -e 's/\([a-zA-Z]*\) .*/\1/' -e 's/hydrogen//' -e 's/carbon//'`
+
+for i in $objects; do
+    cd /n/$i/lost+found/..
+    files=`echo * | sed -e 's/lost+found//g' -e 's/pcgeos//g' -e 's/mis//g' -e 's/seabugs//g'`
+    for j in $files; do
+	if [ -d /staff/$j -a "`ypmatch $j passwd.byname 2>/dev/null`" ]
+	then
+	    echo Sending swap space mail to $j about machine $i
+	    cat - << EOF | /usr/ucb/Mail -s "Swap space" $j
+The nightly check for swap space indicates that the machine on which
+your account resides ($i) is low on swap space and thus unavailable for
+exporting jobs.
+
+If this is a short term situation either kill some processes or type
+"moreswap".  If this happens frequently, ask MIS Staff (by sending
+mail to "mis-staff") to increase the ammount of swap space on your machine.
+
+Thanks for your help.
+
+The Swap Space Police :)
+
+EOF
+	fi
+    done
+done

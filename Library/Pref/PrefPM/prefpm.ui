@@ -1,0 +1,367 @@
+/*
+ *	Copyright (c) Designs in Light 2000 -- All Rights Reserved
+ *
+ * PROJECT:	
+ * MODULE:	
+ * FILE:	prefpm.ui
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	02/08/00   	Initial version
+ *
+ * DESCRIPTION:
+ *
+ * 	$Id$
+ *
+ */
+
+/**************************************************************************
+ *	Include files
+ **************************************************************************/ 
+
+#include "generic.uih"
+#include "config.uih"
+#include "Art/mkrPrefPM.ui"
+
+
+/**************************************************************************
+ *	class definitions
+ **************************************************************************/ 
+
+class	PrefPowerDialog = PrefDialog {
+    static wordComp : 0;
+    static hptrComp : null;
+}
+
+class DriverStatusDialog = GenInteraction {
+}
+
+/**************************************************************************
+ *	ui for power
+ **************************************************************************/ 
+start	PrefPowerUI;
+
+PrefPowerRoot = PrefPowerDialog {
+    moniker = "Power";
+    prefAttrs = default +rebootIfChanged;
+    attributes = default +modal, +notUserInitiatable;
+    visibility = dialog;
+    type = properties;
+    genStates = default -usable;
+    children =
+	PowerTitleGroup,
+	PowerSubgroup;
+    hints = {
+	HINT_INTERACTION_SINGLE_USAGE
+/*
+	ATTR_GEN_HELP_FILE { char "power",0 },
+	ATTR_GEN_HELP_CONTEXT { char "dbPowerMgt",0 }
+*/
+    }
+}
+
+
+/*-------------------------------------------------------------------------
+	PowerTitleGroup
+-------------------------------------------------------------------------*/
+
+PowerTitleGroup = GenInteraction {
+    children =
+	PrefPowerTitle,
+	PrefPowerHelp;
+    hints = {
+	HINT_ORIENT_CHILDREN_HORIZONTALLY
+    }
+}
+
+PrefPowerTitle = TitledGlyph {
+    moniker = list {
+	PrefPMTextMoniker,
+	PrefPMLCMoniker,
+	PrefPMLMMoniker
+   }
+}
+
+PrefPowerHelp = GenText {
+    genAttributes = readOnly;
+    text = "Use these options to select a power management driver.";
+    hints = {
+	HINT_FIXED_SIZE {
+	    SpecWidth <SST_PIXELS, 300>
+	    SpecHeight <>
+	}
+    }
+}
+
+
+/*-------------------------------------------------------------------------
+	PowerSubgroup
+-------------------------------------------------------------------------*/
+
+PowerSubgroup = PrefInteraction {
+    children =
+	PowerStatusGroup,
+	DriverStatusDB,
+	PMDriverList;
+    hints = {
+	HINT_CENTER_CHILDREN_HORIZONTALLY,
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT
+    }
+}
+
+PowerStatusGroup = PrefInteraction {
+    moniker = "Power Status";
+    children =
+	BatteryMeter,
+	PowerSource;
+    hints = {
+	HINT_PLACE_MONIKER_ABOVE,
+	HINT_DRAW_IN_BOX,
+	HINT_CENTER_CHILDREN_ON_MONIKERS,
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT
+    }
+}
+
+BatteryMeter = GenValue {
+    moniker = "Battery Level:";
+    displayFormat = percentage;
+    genAttributes = default +readOnly;
+    maximum = 100;
+    hints = {
+	HINT_VALUE_ANALOG_DISPLAY
+    }
+}
+
+PowerSource = GenText {
+    moniker = "Power Source:";
+    genAttributes = default +readOnly;
+    textDisplayAttributes = default +singleLineText;
+    hints = {
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT
+    }
+}
+
+PMDriverList = PrefTocList vardataReloc {
+    tokenChars = "'PWRD'";
+    moniker = "Power Management Driver";
+    prefAttrs = default +rebootIfChanged;
+    hints = {
+	HINT_ITEM_GROUP_SCROLLABLE,
+	HINT_PLACE_MONIKER_ABOVE,
+	HINT_DRAW_IN_BOX,
+	HINT_DEFAULT_FOCUS,
+	ATTR_GEN_INIT_FILE_CATEGORY { char "system",0 },
+	ATTR_GEN_INIT_FILE_KEY { char "power",0	},
+	ATTR_PREF_REBOOT_STRING {
+	    UN_OPTR	PowerDriverRebootString
+	},
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+	HINT_MINIMUM_SIZE {
+	    SpecWidth <SST_AVG_CHAR_WIDTHS, 32>
+	    SpecHeight <SST_LINES_OF_TEXT, 4>
+	    word	4
+	},
+	ATTR_GEN_PATH_DATA {
+	    GenFilePath <SP_POWER_DRIVERS>
+	},
+	ATTR_PREF_REQUIRED_FEATURES {
+	    word mask PMF_HARDWARE
+	},
+	ATTR_PREF_TOC_LIST_EXTRA_ENTRY_1 {
+	    PrefTocExtraEntry <PowerNoDevice, PowerNoDriver, 0>
+	}
+    }
+}
+
+chunk PowerNoDevice = "none";
+chunk PowerNoDriver = "none";
+
+/*-------------------------------------------------------------------------
+	Driver Info
+-------------------------------------------------------------------------*/
+
+DriverStatusDB = DriverStatusDialog {
+    moniker = 'I', "Driver Info";
+    attributes = default +modal;
+    visibility = dialog;
+    type = notification;
+    children =
+	PrefStatusHelp,
+	DSNameGroup,
+	DSStatusGroup;
+}
+
+PrefStatusHelp = GenText {
+    genAttributes = readOnly;
+    text = "Greyed out items: not supported by the current BIOS and/or driver. Selected items: supported and active.";
+    hints = {
+	HINT_FIXED_SIZE {
+	    SpecWidth <SST_PIXELS, 250>
+	    SpecHeight <>
+	}
+    }
+}
+
+DSNameGroup = GenInteraction {
+    children =
+	DSName,
+	DSProto,
+	DSRelease,
+	DSAPMProto;
+    hints = {
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+	HINT_CENTER_CHILDREN_ON_MONIKERS
+    }
+}
+
+DSName = GenText {
+    moniker = "Driver:";
+    genAttributes = default +readOnly;
+    textDisplayAttributes = default +singleLineText;
+    hints = {
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT
+    }
+}
+
+DSProto = GenText {
+    moniker = "Protocol:";
+    genAttributes = default +readOnly;
+    textDisplayAttributes = default +singleLineText;
+    hints = {
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT
+    }
+}
+
+DSAPMProto = GenText {
+    moniker = "APM BIOS:";
+    genAttributes = default +readOnly;
+    textDisplayAttributes = default +singleLineText;
+    hints = {
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT
+    }
+}
+
+DSRelease = GenText {
+    moniker = "Release:";
+    genAttributes = default +readOnly;
+    textDisplayAttributes = default +singleLineText;
+    hints = {
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT
+    }
+}
+
+DSStatusGroup = GenInteraction {
+    children =
+	DSPowerOnWarnings,
+	DSPollWarnings,
+	DSStatus,
+	DSChargePercent,
+	DSChargeMinutes;
+    hints = {
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT
+    }
+}
+
+DSPowerOnWarnings = GenBooleanGroup {
+    moniker = "Power on warnings:";
+    genAttributes = default +readOnly;
+    children =
+	DSPWMainBattery,
+	DSPWBackupBattery;
+    hints = {
+	HINT_ORIENT_CHILDREN_VERTICALLY,
+	HINT_PLACE_MONIKER_ABOVE
+    }
+}
+
+DSPWMainBattery = GenBoolean {
+    moniker = "Main Battery";
+    identifier = "mask PW_MAIN_BATTERY";
+}
+
+DSPWBackupBattery = GenBoolean {
+    moniker = "Backup Battery";
+    identifier = "mask PW_BACKUP_BATTERY";
+}
+
+DSPollWarnings = GenBooleanGroup {
+    moniker = "Poll warnings:";
+    genAttributes = default +readOnly;
+    children =
+	DSPLWMainBattery,
+	DSPLWBackupBattery;
+    hints = {
+	HINT_ORIENT_CHILDREN_VERTICALLY,
+	HINT_PLACE_MONIKER_ABOVE
+    }
+}
+
+DSPLWMainBattery = GenBoolean {
+    moniker = "Main Battery";
+    identifier = "mask PW_MAIN_BATTERY";
+}
+
+DSPLWBackupBattery = GenBoolean {
+    moniker = "Backup Battery";
+    identifier = "mask PW_BACKUP_BATTERY";
+}
+
+DSStatus = GenBooleanGroup {
+    moniker = "Status:";
+    genAttributes = default +readOnly;
+    children =
+	DSSACAdapter,
+	DSSCharging;
+    hints = {
+	HINT_ORIENT_CHILDREN_VERTICALLY,
+	HINT_PLACE_MONIKER_ABOVE
+    }
+}
+
+DSSACAdapter = GenBoolean {
+    moniker = "AC Adapter Connected";
+    identifier = "mask PS_AC_ADAPTER_CONNECTED";
+}
+
+DSSCharging = GenBoolean {
+    moniker = "Charging";
+    identifier = "mask PS_CHARGING";
+}
+
+DSChargeMinutes = GenValue {
+    moniker = "Charge in Minutes:";
+    genAttributes = default +readOnly;
+}
+
+DSChargePercent = GenValue {
+    moniker = "Charge:";
+    genAttributes = default +readOnly;
+    displayFormat = percentage;
+    maximum = 100;
+}
+
+end	PrefPowerUI;
+
+
+start	Strings, data;
+
+visMoniker PrefPMTextMoniker = "Power";
+
+visMoniker PrefPowerMonikerList = list {
+    PrefPMTextMoniker,
+    PrefPMLCMoniker,
+    PrefPMLMMoniker
+}
+
+chunk PowerDriverRebootString = "power management driver";
+
+chunk PowerBatteryString = "Battery";
+chunk PowerACString = "AC adapter";
+chunk PowerNoAPMString = "error: no driver loaded";
+chunk PowerNoPercentString = "error: battery % not supported";
+chunk PowerNoACString = "error: source not supported";
+
+chunk APMNotFoundErr = "Error: No compatible APM BIOS was found.";
+
+end	Strings;

@@ -1,0 +1,949 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ 
+ 	Copyright (c) Geoworks 1995.  U.S. Patent No. 5,327,529.
+ 	All rights reserved.
+ 
+  PROJECT:	GEOS
+  MODULE:	DataStore Library
+  FILE:	  	datastore.goh
+ 
+  AUTHOR:  	Cassie Hartzog: Oct  5, 1995
+ 
+ 
+  REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	cassie	10/ 5/95	Initial revision
+
+  DESCRIPTION:
+ 	DataStore Library definitions
+
+	$Id: datastor.goh,v 1.1 97/04/04 15:57:31 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+#ifndef	__DATASTORE_GOH
+#define __DATASTORE_GOH
+
+#include <file.h>
+@include <datax.goh>
+
+/* -----------------------------------------------------------------------
+ * 	    	    	Constants
+ * -----------------------------------------------------------------------*/
+
+typedef	    dword    	    RecordID;
+typedef	    RecordID        RecordNum;
+typedef	    byte    	    FieldID;
+
+#if !DBCS_GEOS
+typedef	    char    	    TCHAR;    /* TCHAR is not defined on Release20X */
+#endif
+
+#define	    NULL_FIELD		0xff	    /* FieldID for no field   */
+
+#define	    MAX_FIELD_NAME_LENGTH  40
+
+
+/* -----------------------------------------------------------------------
+ *                      Class definitions
+ * -----------------------------------------------------------------------*/
+
+@class  DSApplicationClass, DataXApplicationClass;
+@endc
+
+/* -----------------------------------------------------------------------
+ * 	    	    	Structures
+ * -----------------------------------------------------------------------*/
+
+typedef 	WordFlags 	DataStoreFlags;		
+#define DSF_PRIVATE	(0x8000)
+/*  may be opened by owner only */
+
+#define DSF_TIMESTAMP	(0x4000)
+/*  first field contains record timestamp */
+
+#define DSF_BACKUP	(0x2000)
+/*  is a backup file */
+
+#define DSF_ARCHIVE	(0x1000)
+/*  is an archive copy */
+
+#define DSF_RECORD_ID	(0x0800)
+/*  INTERNAL USE ONLY	*/
+
+#define DSF_NO_PRIMARY_KEY (0x0400)
+/* no primary key in this data store file */
+
+#define DSF_TRACK_MODS (0x0200)
+/* track change modifications using a transaction number */
+
+typedef     ByteEnum FieldType;		
+#define DSFT_FLOAT	0x0 	/* FloatNum 	    	    	*/
+#define DSFT_SHORT	0x1 	/* word     	    	    	*/
+#define DSFT_LONG	0x2 	/* dword    	    	    	*/
+#define DSFT_TIMESTAMP	0x3 	/* FileDateAndTime  	    	*/
+#define DSFT_DATE	0x4 	/* DataStoreDate    	    	*/
+#define DSFT_TIME	0x5 	/* DataStoreTime    	    	*/
+#define DSFT_STRING	0x6 	/* array of TCHAR, *not* null-terminated */
+#define DSFT_BINARY	0x7 	/* array of bytes   	    	*/
+#define DSFT_GRAPHICS	0x8     /* graphics image as an array of bytes */
+#define DTFT_INK	0x9	/* ink image as an array of bytes */
+
+typedef     ByteEnum FieldCategory;		
+#define FC_NONE	    	0x0
+#define FC_NAME	    	0x1
+#define FC_DATE	    	0x2
+#define FC_TELEPHONE	0x3
+#define FC_ADDRESS	0x4
+#define FC_EMAIL	0x5
+
+
+typedef ByteFlags FieldFlags;	
+#define FF_PRIMARY_KEY	(0x80)	    	    /* INTERNAL USE */
+/*  This field is part of primary key. */
+
+#define FF_DESCENDING	(0x40)
+/* If a key field, sort in descending order. Default is ascending order.  *
+ * This is the only field which may be passed in DataStoreAddField, or in *
+ * in the keyList when creating a datastore or index. 
+ */
+
+#define FF_TIMESTAMP	(0x20)	    	    /* INTERNAL USE */
+
+
+/*
+ *  Structures used to set and get data for Date and Time fields
+ */
+typedef struct {
+    byte    DST_hour;
+    byte    DST_minute;
+    byte    DST_second;
+} DataStoreTime;
+
+typedef struct {
+    word    DSD_year;
+    byte    DSD_month;
+    byte    DSD_day;
+} DataStoreDate;
+
+
+/*
+ *  Structure used to define fields and get field info
+ */
+typedef struct {		
+    FieldType	    	FD_type;
+    FieldCategory	FD_category;
+    FieldFlags	    	FD_flags;
+} FieldData;
+
+typedef struct {		
+    FieldData	    	FD_data;
+    TCHAR*  	    	FD_name;
+} FieldDescriptor;
+
+
+typedef ByteFlags DataStoreOpenFlags;
+/* 
+ * set if an app wants to open a datastore with exclusive access
+ */
+#define	DSOF_EXCLUSIVE 	(0x80)
+
+typedef 	ByteEnum SortOrder;
+#define	SO_ASCENDING		0
+#define	SO_DESCENDING		1
+
+
+/* -----------------------------------------------------------------------
+ * 	RecordHeader and FieldHeader
+ * -----------------------------------------------------------------------*/
+
+typedef struct {	
+    FieldID	FH_id;
+    /*  field name token */
+
+    word	FH_size;
+    /* # bytes in the field, counting the FieldHeader */
+
+    /* data follows the header */
+} FieldHeader;
+
+typedef struct {		
+    FieldID	FHF_id;	    	    	    
+    /* field name token */
+
+    /* data follows the header */
+} FieldHeaderFixed;
+
+typedef struct {		
+    RecordID	RH_id;
+    /*  The unique ID of this record */
+
+    word	RH_size;
+    /*  Size of the record, in bytes, including header size */
+
+    byte	RH_fieldCount;
+    /*  The number of fields in this record */
+
+    /*  The first FieldHeader follows the RecordHeader */
+} RecordHeader;
+
+
+/* ------------------------------------------------------------------------
+ *   			Index Array Block
+ * ------------------------------------------------------------------------*/
+
+/*
+ * Format of an IndexArray block. There is an array of 
+ * record numbers (low word only) that starts at the offest specified in
+ * IABH_array. Application-specific data may be stored after
+ * the IndexArrayBlockHeader. The size of this data is specified 
+ * when the index is created. 
+ */
+
+typedef struct {		
+    word        IALMBH_recCount;    /* count of records in array */
+    word	IALMBH_array;	    /* offset to array 	    	 */
+    FieldID 	IALMBH_indexField;  /* field to index on    	 */
+    SortOrder 	IALMBH_sortOrder;   /* order field was sorted in */
+} IndexArrayBlockHeader;
+
+
+/* -----------------------------------------------------------------------
+ * 	DataStore Change Notification structures
+ * -----------------------------------------------------------------------*/
+/*
+ *  When opening or creating a datastore, an app can add an object to the
+ *  GAGCNLT_DATASTORE_CHANGE list, in which case it will receive
+ *  notifications of type GWNT_DATASTORE_CHANGE with a block containing
+ *  a DataStoreChangeNotification structure.
+ */
+
+typedef enum {		
+    DSCT_RECORD_ADDED,
+    /*  Indicates that a record was added to the datastore */
+
+    DSCT_RECORD_CHANGED,
+    /*  Indicates that a record changed */
+
+    DSCT_RECORD_DELETED,
+    /*  Indicates that a record was deleted */
+
+    DSCT_FIELD_ADDED,
+    /*  Indicates that a field was added to the datastore */
+
+    DSCT_FIELD_RENAMED,
+    /*  Indicates that a field was renamed */
+
+    DSCT_FIELD_DELETED,
+    /*  Indicates that a field was deleted from the datastore */
+
+    DSCT_DATASTORE_CHANGED,
+    /*  Indicates that there were large-scale changes to the 
+     *  datastore (e.g. it is newly created, was deleted or restored
+     *  from backup).
+     */
+
+    DSCT_NAME_CHANGED,
+    /*  Indicates the datastore was renamed */
+
+    DSCT_NEXT_RECORD_ID_CHANGED,
+    /*  Indicates the record id that will be assigned to the next
+     *  new record is changed. ( changed explicitly, instead of 
+     *  through creating a new record.)
+     */
+} DataStoreChangeType;
+
+
+/* Notification sent out when a datastore is modified */
+typedef struct {	
+    TCHAR	    DSCN_name[FILE_LONGNAME_BUFFER_SIZE];
+    /*  The name of the datastore which just changed */
+
+    DataStoreChangeType	DSCN_action;
+    /*  Indicates the type of modification that just occurred */
+
+    RecordID	    DSCN_record;
+    /*  The record that was just added/modified/deleted.
+     * 	Filled in only if DSCN_action is DSCT_RECORD_DELETED, 
+     *  DSCT_RECORD_CHANGED, or DSCT_RECORD_ADDED
+     */
+
+    FieldID	    DSCN_field;
+    /*  The field that was just added or deleted.
+     * 	Filled in only if DSCN_action is DSCT_FIELD_ADDED or
+     *  DSCT_FIELD_DELETED.
+     */
+} DataStoreChangeNotification;
+
+
+/* -----------------------------------------------------------------------
+ * 	Error Codes
+ * -----------------------------------------------------------------------*/
+
+typedef enum {
+
+    DSE_NO_ERROR,
+    DSE_INVALID_TOKEN,
+    DSE_DATASTORE_LOCKED,
+    DSE_ACCESS_DENIED,
+    DSE_WRITE_ERROR,
+    DSE_MEMORY_FULL,
+    DSE_INVALID_RECORD_ID,
+    DSE_INVALID_NAME,
+    DSE_INVALID_KEY_LIST,
+    DSE_INVALID_FLAGS,
+    DSE_DUPLICATE_FIELD_NAME,	    /* duplicate field in create params */
+    DSE_CREATE_ERROR,
+    DSE_OPEN_ERROR,
+    DSE_CLOSE_ERROR,
+    DSE_UPDATE_ERROR,
+    DSE_DATASTORE_EXISTS,
+    DSE_DATASTORE_NOT_FOUND,
+    DSE_DATASTORE_ALREADY_OPEN,
+    DSE_PROTOCOL_ERROR,
+    DSE_CLOSE_WITH_LOCKED_RECORD,
+    DSE_INVALID_DATASTORE_FILE,
+    DSE_PRIVATE_DATASTORE,
+    DSE_BAD_SEARCH_PARAMS,
+    DSE_CANNOT_SET_NEXT_RECORD_ID_SMALLER,
+    DSE_NO_MATCH_FOUND,	    	    
+    DSE_NO_MORE_RECORDS,    	    /* last record was reached */
+} DataStoreError;
+
+
+typedef enum {	
+
+    DSSE_NO_ERROR,
+    DSSE_INVALID_TOKEN,
+    DSSE_DATASTORE_LOCKED,
+    DSSE_ACCESS_DENIED,
+    DSSE_WRITE_ERROR,
+    DSSE_MEMORY_FULL,
+    DSSE_TOO_MANY_FIELDS,
+    DSSE_INVALID_FIELD_ID,		
+    DSSE_INVALID_FIELD_NAME,			
+    DSSE_INVALID_FIELD_TYPE,
+    DSSE_INVALID_FIELD_CATEGORY,
+    DSSE_INVALID_FIELD_FLAGS,
+    DSSE_RECORD_BUFFER_NOT_EMPTY,
+    DSSE_FIELD_NAME_TOO_LONG,
+    DSSE_FIELD_NAME_EXISTS,
+    DSSE_FIELD_NOT_FOUND,
+    DSSE_TIME_STAMP_CANNOT_BE_ADDED,
+    DSSE_TIME_STAMP_CANNOT_BE_DELETED,
+    DSSE_INVALID_SORT_ORDER,
+    DSSE_NO_RECORDS_IN_DATASTORE,
+    DSSE_PARTIAL_INDEX_RETURNED,
+    DSSE_DELETE_PRIMARY_KEY,
+    DSSE_INDEX_RECORD_NUMBER_LIMIT_EXCEEDED,     
+} DataStoreStructureError;
+
+
+typedef enum {
+    DSDE_NO_ERROR,
+    DSDE_INVALID_TOKEN,
+    DSDE_DATASTORE_LOCKED,
+    DSDE_ACCESS_DENIED,
+    DSDE_WRITE_ERROR,
+    DSDE_MEMORY_FULL,
+    DSDE_INVALID_RECORD_ID,
+    DSDE_INVALID_FIELD_ID,		
+    DSDE_INVALID_FIELD_NAME,			
+    DSDE_INVALID_FIELD_TYPE,
+    DSDE_INVALID_FIELD_CATEGORY,
+    DSDE_INVALID_FIELD_FLAGS,
+    DSDE_RECORD_BUFFER_NOT_EMPTY,
+    DSDE_RECORD_BUFFER_EMPTY,
+    DSDE_INVALID_FIELD_DATA,
+    DSDE_DATASTORE_READ_ONLY,		
+    DSDE_INVALID_RECORD_NUMBER,		
+    DSDE_INVALID_DATA_SIZE,
+    DSDE_FIELD_DOES_NOT_EXIST,		
+    DSDE_RECORD_READ_ONLY,			
+    DSDE_RECORD_NOT_FOUND,			
+    DSDE_READ_ERROR,				
+    DSDE_EXCEEDS_BUFFER_SIZE,
+    DSDE_TOO_MANY_FIELDS,
+    DSDE_RECORD_IN_USE,
+    DSDE_INVALID_BLOCK_HANDLE,
+    DSDE_INVALID_CHUNK_HANDLE,
+    DSDE_RECORD_LOCKED,
+
+} DataStoreDataError;
+
+
+/* -----------------------------------------------------------------------
+ * 	Routine Definitions
+ * -----------------------------------------------------------------------*/
+
+
+typedef struct {		
+    TCHAR*	DSCP_name;
+    /*  name of datastore */
+
+    DataStoreFlags	DSCP_flags;
+    /* only DSF_PRIVATE, DSF_TIMESTAMP, DSF_NO_PRIMARY_KEY may be passed */
+
+    FieldDescriptor*	DSCP_keyList;
+    /*  ptr to list of fields in primary key - fields of type
+     *  DSFT_TIMESTAMP may not be in the primary key, and the only
+     *  FieldFlags which may be passed are FF_DESCENDING 
+     */
+
+    word	    	DSCP_keyCount;
+    /*  number of entries in keyList. If 0, DSF_NO_PRIMARY_KEY 
+     *  must be passed in DSCP_flags.
+     */
+
+    optr	    	DSCP_notifObject;
+    /*  object to notify if datastore changes */
+
+    DataStoreOpenFlags  DSCP_openFlags;
+
+} DataStoreCreateParams;
+
+
+extern DataStoreError
+    _pascal DataStoreCreate(DataStoreCreateParams* params, word* dsToken);
+/*
+ *  Creates a DataStore file.
+ */
+
+
+extern DataStoreError
+    _pascal DataStoreOpen(TCHAR* name, optr object, DataStoreOpenFlags flag,
+			  word* dsToken); 
+/*
+ *  Opens the named DataStore. If object is non-NULL, GWNT_DATASTORE_CHANGE 
+ *  notifications will be sent to that object whenever the datastore
+ *  changes. If the flag DSOF_EXCLUSIVE is passed, the app will open the file
+ *  with exclusive access if no other application has the datastore open.
+ *  If the datastore is already open by anyone else, will fail with 
+ *  DSE_ACCESS_DENIED.
+ *  Returns a datastore token in location pointed to by dsToken.
+ */
+
+
+extern DataStoreError
+    _pascal DataStoreClose(word dsToken);
+/*
+ *  Closes the DataStore associated with dsToken.
+ */
+
+
+extern DataStoreError
+    _pascal DataStoreDelete(TCHAR* name);
+/*
+ *  Deletes a DataStore file for the passed name, if it is not in use.
+ */
+
+
+extern DataStoreError
+    _pascal DataStoreRename(TCHAR* oldName, TCHAR* newName);
+/*
+ *  Renames a datastore.
+ */
+
+
+extern DataStoreError
+    _pascal DataStoreGetFieldCount(word dsToken, word* count);
+/*
+ *  Gets the number of fields defined in this datastore.
+ */
+
+
+extern DataStoreError
+    _pascal DataStoreGetRecordCount(word dsToken, dword* count);
+/*
+ *  Gets the number of records in this datastore.
+ */
+
+
+extern DataStoreError
+    _pascal DataStoreGetFlags(word dsToken, DataStoreFlags* flags);
+/*
+ *  Gets the DataStoreFlags for the datastore.
+ */
+
+
+extern DataStoreError
+    _pascal DataStoreGetOwner(word dsToken, GeodeToken* token);
+/*
+ *  Gets the GeodeToken of the datastore's owner.
+ */
+
+
+extern DataStoreError
+    _pascal DataStoreGetVersion(word dsToken, ProtocolNumber* version);
+/*
+ *  Gets the datstore's ProtocolNumber.
+ */
+
+extern DataStoreError
+    _pascal DataStoreSetVersion(word dsToken, ProtocolNumber version);
+/*
+ *  Sets the datstore's ProtocolNumber.
+ */
+
+
+extern DataStoreError
+    _pascal DataStoreGetExtraData(word dsToken, void *data, word *size);
+/*
+ *  Gets extra data from the datastore to the passed buffer, copying no more
+ *  than size bytes. Number of bytes actually copied is returned in size.
+ */
+
+extern DataStoreError
+    _pascal DataStoreSetExtraData(word dsToken, void *data, word size);
+/*
+ *  Stores extra data in the datastore, replacing any already there.
+ */
+
+
+extern DataStoreError
+    _pascal DataStoreGetTimeStamp(word dsToken, FileDateAndTime *dt);
+/*
+ *  Gets date and time of last of modification to the datastore.
+ */
+
+extern DataStoreError
+    _pascal DataStoreSetTimeStamp(word dsToken, FileDateAndTime dt);
+/*
+ *  Sets date and time of last of modification to the datastore.
+ */
+
+extern DataStoreError
+    _pascal DataStoreGetNextRecordID(word dsToken, RecordID *id);
+/*
+ *  Gets the RecordID that will be assigned to the next new record
+ */
+
+extern DataStoreError
+    _pascal DataStoreSetNextRecordID(word dsToken, RecordID id);
+/*
+ *  Sets the RecordID that will be assigned to the next new record
+ */
+
+extern DataStoreStructureError
+    _pascal DataStoreAddField(word dsToken, FieldDescriptor *field,
+			      FieldID* id);
+/*
+ *  Adds a field to the datastore schema. Returns the FieldID of the 
+ *  new field.
+ */
+
+
+extern DataStoreStructureError
+    _pascal DataStoreDeleteField(word dsToken, TCHAR *field, FieldID id);
+/*
+ *  Removes a field from the DataStore schema and from every record 
+ *  in the DataStore.
+ */
+
+
+extern DataStoreStructureError
+    _pascal DataStoreRenameField(word dsToken, TCHAR *newName, 
+		TCHAR *oldName, FieldID id);
+/*
+ *  Renames a field.
+ */
+
+
+extern DataStoreStructureError
+    _pascal DataStoreFieldNameToID(word dsToken, TCHAR* name, FieldID *id);
+/*
+ *  Gets ID of a field with a given name
+ */
+
+
+extern DataStoreStructureError
+    _pascal DataStoreFieldIDToName(word dsToken, FieldID id, 
+			TCHAR *name, word *size);
+/*
+ *  Gets the name of a field with a given ID. Size of the name buffer 
+ *  is passed in size, and number of bytes actually stored in name is
+ *  returned in size.
+ */
+
+
+extern DataStoreStructureError
+    _pascal DataStoreGetFieldInfo(word dsToken, 
+		FieldDescriptor *field,
+		FieldID id, 
+		word fieldNameSize);
+/*
+ *  Gets the information of a field with a given ID.  fieldNameSize
+ *  is the size of the buffer (in bytes) pointed to by field->FD_name,
+ *  or 0 if the field name is not wanted.
+ */
+
+
+extern DataStoreDataError
+    _pascal DataStoreNewRecord(word dsToken);
+/*
+ *  Creates a record with no fields and makes it the current
+ *  record. It is assigned a RecordID when it is saved.
+ */
+
+
+extern DataStoreDataError
+    _pascal DataStoreLoadRecord(word dsToken, RecordID id, RecordNum *num);
+/*
+ *  Loads the record with the passed RecordID into 
+ *  the record buffer for the passed session and makes it
+ *  the current record. Returns the record number in num.
+ */
+
+
+extern DataStoreDataError
+    _pascal DataStoreLoadRecordNum(word dsToken, RecordNum record, 
+					RecordID *id);
+/*
+ *  Save as DataStoreLoadRecord, but takes a record number and
+ *  returns its ID. 
+ */
+
+
+extern DataStoreDataError
+    _pascal DataStoreDiscardRecord(word dsToken);
+/*
+ *  Flushes the current record from the buffer without saving any changes
+ */
+
+
+extern DataStoreDataError
+    _pascal DataStoreSaveRecord(word dsToken, void *cbData,
+		PCB(sword, callback, (RecordHeader *rec1, 
+				      RecordHeader *rec2, 
+				      word dsToken,
+				      void *cbData)),
+		RecordNum *num, RecordID *id);
+/*
+ *  Saves any changes made to the current record to datastore file and
+ *  flushes the record from buffer. Passing 0 for callback will result
+ *  in records being sorted in key field order.
+ *
+ *  Declaration of callback routine:
+ *
+ *  sword SortCallback (RecordHeader *rec1, RecordHeader *rec2,
+ *	    	    	word dsToken, void *cbData);
+ */
+
+
+extern DataStoreDataError
+    _pascal DataStoreLockRecord(word dsToken, RecordHeader **record);
+/*
+ *  Locks the current record, setting the pointer to its RecordHeader
+ *  in the location pointed to by record. If there is no current record,
+ *  DSDE_RECORD_BUFFER_EMPTY is returned.
+ */
+
+
+extern void 
+    _pascal DataStoreUnlockRecord(word dsToken);
+/*
+ *  Unlocks the current record
+ */
+
+
+extern DataStoreDataError
+    _pascal DataStoreGetFieldPtr(word dsToken, RecordHeader *record, 
+		FieldID field, void **content, FieldType *type, word *size);
+/*
+ *  Returns a pointer to the desired field with the passed record.
+ */
+
+
+extern DataStoreDataError
+    _pascal DataStoreDeleteRecord(word dsToken, RecordID record);
+/*
+ *  Deletes a record from the database
+ */
+
+
+extern DataStoreDataError
+    _pascal DataStoreDeleteRecordNum(word dsToken, RecordNum record);
+/*
+ *  Deletes a record with given record number from the database
+ */
+
+
+extern DataStoreDataError
+    _pascal DataStoreGetRecordID(word dsToken, RecordID *record);
+/*
+ *  Gets the id of the current record.
+ */
+
+
+extern DataStoreDataError
+    _pascal DataStoreSetRecordID(word dsToken, RecordID id);
+/*
+ * If the new id is the same as the id stored in the datastore buffer, 
+ * then do nothing.
+ * Otherwise, change the RecordID for the current record to the 
+ * value passed if the datastore is opened for exclusive access.  The 
+ * record must be saved for the change to be permanent. If there already 
+ * exists a record with this RecordID, it will be overwritten.
+ * If the RecordID is greater than the next RecordID to be assigned to a 
+ * new record, the next RecordID will be updated to the passed RecordID 
+ * plus one. Record ID can be from the FIRST_RECORD_ID(inclusize)
+ * to LAST_RECORD_ID (exclusize)
+ */
+
+
+extern DataStoreDataError
+    _pascal DataStoreGetFieldSize(word dsToken, TCHAR *field, 
+				  FieldID id, word *size);
+/*
+ *  Gets the size of a field, return size 0 if field is not found.
+ */
+
+
+extern DataStoreDataError
+    _pascal DataStoreGetField(word dsToken, TCHAR *field, 
+			      FieldID id, void **data, word *size, 
+			      MemHandle *mh);
+/*
+ *  Gets the data from a field, return size 0 if field is not found.
+ */
+
+extern DataStoreDataError
+    _pascal DataStoreGetFieldChunk(word dsToken, TCHAR *field, 
+			      FieldID id, MemHandle mh, ChunkHandle *ch,
+			      word *size);
+/*
+ *  Gets the data from a field into a chunk
+ */
+
+			
+extern DataStoreDataError
+    _pascal DataStoreSetField(word dsToken, TCHAR *field, FieldID id, 
+			      void *data, word size);
+/*
+ *  Sets the data for the field
+ */
+
+
+extern DataStoreDataError
+    _pascal DataStoreRemoveFieldFromRecord(word dsToken, TCHAR *field, 
+					   FieldID id);
+/*
+ *  Removes a field from the current record
+ */
+
+
+extern DataStoreDataError
+    _pascal DataStoreMapRecordNumToID(word dsToken, RecordNum num, 
+				      RecordID *id);
+/*
+ *  Given a record number, gets the RecordID
+ */
+
+
+extern DataStoreDataError
+    _pascal DataStoreGetNumFields(word dsToken, word *count);
+/*
+ *  Gets the number of fields present in the current record
+ */
+
+
+typedef 	ByteEnum SearchType;
+#define	ST_ALL	 	1   	    	/* search all string fields */
+#define	ST_FIELD	2   		/* search by FieldID 	    */
+#define	ST_CATEGORY	3   	    	/* search by FieldCategory  */
+
+typedef ByteFlags SearchFlags;		
+#define SF_BACKWARDS		0x80
+#define SF_START_AT_END		0x40
+#define SF_IGNORE_CASE		0x20
+#define SF_NO_WILDCARDS	    	0x10
+#define SF_PARTIAL_WORD	    	0x08
+
+typedef struct {
+    SearchType		    	SP_searchType;
+
+    RecordNum   	    	SP_startRecord;
+    /* pass: 	record to start search in
+     * return: 	last record examined
+     */
+
+    dword    	   	    	SP_maxRecords;
+    /* pass:	maximum number of records to examine before halting */
+
+    FieldID 	   	    	SP_startField;	    
+    /* pass: 	id of field to start in, or if ST_FIELD, only field to examine
+     * return: 	id of last field examined
+     */
+						       	
+    FieldCategory		SP_category;	    
+    /* pass: 	category to search in, if ST_CATEGORY	    	    */
+
+    TCHAR *			SP_searchString;
+    /* pass:	null terminated string to search for 	    	    */
+
+    SearchFlags	    	    	SP_flags;
+
+} SearchParams;
+
+
+extern DataStoreError
+    _pascal DataStoreStringSearch(word dsToken, SearchParams *params);
+/*
+ *  Performs a string search on the datastore. DSE_NO_ERROR is 
+ *  returned if match is found and SP_startRecord is updated with
+ *  the number of the matching record. The id of the field where the
+ *  match was found is returned in SP_startField.
+ */
+
+
+typedef struct {
+        FieldID	    	       DSICP_indexField;
+	SortOrder              DSICP_sortOrder;
+	void                  *DSICP_cbData;
+	RecordHeader          *DSICP_rec1;
+	RecordHeader          *DSICP_rec2;
+} DataStoreIndexCallbackParams;
+
+extern DataStoreStructureError
+    _pascal DataStoreBuildIndex(word dsToken, MemHandle *indexHandle,
+			    word headerSize,
+			    DataStoreIndexCallbackParams *params,
+			    PCB(sword, callback, (word dsToken,
+			    DataStoreIndexCallbackParams *params)));
+/*
+ *  Creates an array of RecordNum (low word only), where records are sorted 
+ *  on the given field.  The array is stored in a block whose handle is
+ *  returned in indexHandle. The block has an IndexArrayBlockHeader,
+ *  followed by headerSize bytes of user data storage area, followed
+ *  by the index itself. If headerSize is less than the size of 
+ *  IndexArrayHeaderBlock, the standard header is used.
+ *
+ *  NOTE: The index contains only the low word of the record numbers, 
+ *  and may only be created on a DataStore which has 4000 records or less.
+ *
+ *  A callback can be used to modify the index order. It is called
+ *  for each pair of records which are compared while building the index.
+ *  If a callback is passed, DSICP_indexField and DSICP_sortOrder are 
+ *  ignored.
+ *  The callback should return:
+ *			 -1,  if record 1 comes before record 2 
+ *			  1,  if record 1 comes after record 2
+ *
+ *  Declaration of callback routine:
+ *
+ *  sword CallbackRoutine(word dsToken, DataStoreIndexCallbackParams *params);
+ */
+
+
+typedef	    WordFlags	DataStoreRecordEnumFlags;
+/* records should be enumerated in reverse order */
+#define	    DSREF_BACKWARDS 	(0x8000)	 
+
+/* disregard passed startRecord, and start at first or last record,
+   depending on DSREF_BACKWARDS flag */
+#define	    DSREF_START_AT_END	(0x4000)
+
+/* this bit is reserved for internal use only */
+#define     DSREF_RESERVED  	(0x0001)		
+
+
+extern DataStoreError
+    _pascal DataStoreRecordEnum(word dsToken, RecordNum *startRecord,
+				DataStoreRecordEnumFlags flags, void *enumData,
+				PCB(Boolean, callback, /* TRUE to stop enum */
+				(RecordHeader *record, void *enumData)));
+/*
+ *  Enumerates the records in a datastore, starting at startRecord unless
+ *  DSREF_START_AT_END is passed, in which case starts at first or last
+ *  record, depending on whether DSREF_BACKWARDS is passed. Enumerates the
+ *  records in storage order. If DSE_NO_MORE_RECORDS is returned, the 
+ *  first/last record was reached. If DSE_NO_ERROR is returned, startRecord 
+ *  is updated with the number of the last record examined.
+ *  No modifications may be made to the datastore during the enumeration.
+ *  To modify a record, the callback should be aborted by returning TRUE,
+ *  the desired record loaded, modified and saved. Then the enumeration 
+ *  can be continued by updating the startRecord value.
+ *
+ *  Declaration of callback routine:
+ *
+ *  Boolean CallbackRoutine(RecordHeader *record, void *enumData);
+ */
+
+
+extern DataStoreError
+    _pascal DataStoreFieldEnum(word dsToken, RecordHeader *rec, void *enumData,
+			       PCB(Boolean, callback, /* TRUE to stop enum */
+			       (void *content, word size, FieldType type, 
+				FieldCategory cat, FieldID fid, 
+				FieldFlags flags, void *enumData)));
+/*
+ *  Enumerates all fields in the current record
+ *
+ *  Declaration of callback routine:
+ *
+ *  Boolean CallbackRoutine(void *content,word size, FieldType type, 
+ *         FieldCategory cat, FieldID fid, FieldFlags flags, void *enumData)
+ */
+
+
+extern DataStoreError
+    _pascal DataStoreGetCurrentTransactionNumber(word dsToken);
+/*
+ *  Returns the number of the last transaction, if Modification Tracking 
+ *  is in use.
+ */
+
+
+#ifdef __HIGHC__
+
+pragma Alias(DataStoreCreate, "DATASTORECREATE");
+pragma Alias(DataStoreOpen, "DATASTOREOPEN");
+pragma Alias(DataStoreClose, "DATASTORECLOSE");
+pragma Alias(DataStoreDelete, "DATASTOREDELETE");
+pragma Alias(DataStoreRename, "DATASTORERENAME");
+pragma Alias(DataStoreGetFieldCount, "DATASTOREGETFIELDCOUNT");
+pragma Alias(DataStoreGetRecordCount, "DATASTOREGETRECORDCOUNT");
+pragma Alias(DataStoreGetFlags, "DATASTOREGETFLAGS");
+pragma Alias(DataStoreGetOwner, "DATASTOREGETOWNER");
+pragma Alias(DataStoreSetVersion, "DATASTORESETVERSION");
+pragma Alias(DataStoreGetVersion, "DATASTOREGETVERSION");
+pragma Alias(DataStoreSetExtraData, "DATASTORESETEXTRADATA");
+pragma Alias(DataStoreGetExtraData, "DATASTOREGETEXTRADATA");
+pragma Alias(DataStoreSetTimeStamp, "DATASTORESETTIMESTAMP");
+pragma Alias(DataStoreGetNextRecordID, "DATASTOREGETNEXTRECORDID");
+pragma Alias(DataStoreSetNextRecordID, "DATASTORESETNEXTRECORDID");
+pragma Alias(DataStoreAddField, "DATASTOREADDFIELD");
+pragma Alias(DataStoreDeleteField, "DATASTOREDELETEFIELD");
+pragma Alias(DataStoreRenameField, "DATASTORERENAMEFIELD");
+pragma Alias(DataStoreFieldNameToID, "DATASTOREFIELDNAMETOID");
+pragma Alias(DataStoreFieldIDToName, "DATASTOREFIELDIDTONAME");
+pragma Alias(DataStoreGetFieldInfo, "DATASTOREGETFIELDINFO");
+pragma Alias(DataStoreNewRecord, "DATASTORENEWRECORD");
+pragma Alias(DataStoreLoadRecord, "DATASTORELOADRECORD");
+pragma Alias(DataStoreLoadRecordNum, "DATASTORELOADRECORDNUM");
+pragma Alias(DataStoreDiscardRecord, "DATASTOREDISCARDRECORD");
+pragma Alias(DataStoreSaveRecord, "DATASTORESAVERECORD");
+pragma Alias(DataStoreLockRecord, "DATASTORELOCKRECORD");
+pragma Alias(DataStoreUnlockRecord, "DATASTOREUNLOCKRECORD");
+pragma Alias(DataStoreGetFieldPtr, "DATASTOREGETFIELDPTR");
+pragma Alias(DataStoreDeleteRecord, "DATASTOREDELETERECORD");
+pragma Alias(DataStoreDeleteRecordNum, "DATASTOREDELETERECORDNUM");
+pragma Alias(DataStoreGetFieldSize, "DATASTOREGETFIELDSIZE");
+pragma Alias(DataStoreGetField, "DATASTOREGETFIELD");
+pragma Alias(DataStoreGetFieldChunk, "DATASTOREGETFIELDCHUNK");
+pragma Alias(DataStoreSetField, "DATASTORESETFIELD");
+pragma Alias(DataStoreRemoveFieldFromRecord, "DATASTOREREMOVEFIELDFROMRECORD");
+pragma Alias(DataStoreMapRecordNumToID, "DATASTOREMAPRECORDNUMTOID");
+pragma Alias(DataStoreGetNumFields, "DATASTOREGETNUMFIELDS");
+pragma Alias(DataStoreStringSearch, "DATASTORESTRINGSEARCH");
+pragma Alias(DataStoreBuildIndex, "DATASTOREBUILDINDEX");
+pragma Alias(DataStoreRecordEnum, "DATASTORERECORDENUM");
+pragma Alias(DataStoreFieldEnum, "DATASTOREFIELDENUM");
+pragma Alias(DataStoreGetTimeStamp, "DATASTOREGETTIMESTAMP");
+pragma Alias(DataStoreGetRecordID, "DATASTOREGETRECORDID");
+pragma Alias(DataStoreSetRecordID, "DATASTORESETRECORDID");
+pragma Alias(DataStoreGetCurrentTransactionNumber, "DATASTOREGETCURRENTTRANSACTIONNUMBER");
+
+#endif
+
+#endif

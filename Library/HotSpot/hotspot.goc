@@ -1,0 +1,700 @@
+/****************************************************************************
+ *
+ *              Copyright (c)   GeoWorks 1994   -- All Rights Reserved
+ *
+ *  PROJECT:            GEOS
+ *  FILE:               hotspot.goc
+ *  AUTHOR:             Edwin Yu
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      Edwin  4/13/94         Initial version.
+ *
+ *  DESCRIPTION:    This file contains code for GenHotSpot subclasses:
+ *                  HotSpotRectClass, HotSpotSplineClass, 
+ *		    HotSpotSplineGuardianClass, HotSpotSplineWardClass, 
+ *		    HotSpotGroupClass
+ *      
+ *      $Id: hotspot.goc,v 1.1 97/04/04 18:09:03 newdeal Exp $
+ *
+ ***************************************************************************/
+
+@include <stdapp.goh>
+@include <hotspot.goh>
+#include <object.h>
+#include "hserrors.h"
+
+@classdecl      HotSpotRectClass ;
+@classdecl      HotSpotSplineGuardianClass ;
+@classdecl      HotSpotSplineWardClass;
+@classdecl      HotSpotPointerClass;
+@classdecl      HotSpotGroupClass;
+
+@extern chunk @DeleteHotSpotString;
+
+/*-------------------------------------------------------------------------
+		  Routines for GenHotSpot subclasses
+---------------------------------------------------------------------------*/
+void GetTextNBody(optr HotSpot, optr *Text, optr *GBody);
+void GetText(optr HotSpot, optr *Text);
+
+void ClearHotSpot(optr oself, word token);
+void StartUndoChain(optr oself, optr undoString);
+void EndUndoChain();
+void UpdateHotSpotPosition(optr oself);
+
+
+/* --------------------------------------------------------------------------
+		    Methods for HotSpotRectClass
+----------------------------------------------------------------------------*/
+
+/****************************************************************************
+ *              MSG_GO_UNDO_REPLACE_GEOMETRY_INSTANCE_DATA
+ **************************************************************************** 
+ *  SYNOPSIS:   notify HotSpotTextClass of hotspot's new position after
+ *	    	the undo
+ *                                      
+ *  CALLED BY:
+ *  PARAMETERS:     
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      ----    ----                    -----------
+ *      Edwin   5/11/94                 Initial Revision
+ *
+ ***************************************************************************/
+@method HotSpotRectClass, MSG_GO_UNDO_REPLACE_GEOMETRY_INSTANCE_DATA
+{
+    /* let our superclass set the new geometry */
+    @callsuper();
+
+    /* tell HSText about it */
+    UpdateHotSpotPosition(oself);
+    return;
+}
+
+/****************************************************************************
+ *              MSG_META_RESOLVE_VARIANT_SUPERCLASS for HotSpotRectClass
+ **************************************************************************** 
+ *  SYNOPSIS: Set the superclass of HotSpotRectClass to be RectClass
+ *                                      
+ *  CALLED BY:
+ *  PARAMETERS:     ClassStruct *(word MasterOffset)
+ *                                      
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *          Name    Date                    Description
+ *          ----    ----                    -----------
+ *          Edwin   4/20/94         Initial Revision
+ ***************************************************************************/
+@method HotSpotRectClass, MSG_META_RESOLVE_VARIANT_SUPERCLASS
+{
+    return &RectClass;
+}
+
+/****************************************************************************
+ *                  MSG_GO_CLEAR 
+ **************************************************************************** 
+ *  SYNOPSIS:   Delete a rectangle hotspot.
+ *                                      
+ *  CALLED BY:
+ *  PARAMETERS:     void ()
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      ----    ----                    -----------
+ *      Edwin   5/4/94                  Initial Revision
+ *
+ ***************************************************************************/
+@method HotSpotRectClass, MSG_GO_CLEAR
+{
+    ClearHotSpot(oself, pself->GHSI_token);
+}
+
+/* --------------------------------------------------------------------------
+		    Methods for HotSpotSplineGuardianClass
+----------------------------------------------------------------------------*/
+
+/****************************************************************************
+ *      MSG_META_RESOLVE_VARIANT_SUPERCLASS for HotSpotSplineGuardianClass
+ **************************************************************************** 
+ *  SYNOPSIS:   Set the superclass of HotSpotSplineGuardianClass to be 
+ *              SplineGuardianClass
+ *                                      
+ *  CALLED BY:
+ *  PARAMETERS: ClassStruct *(word MasterOffset)
+ *                                      
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      Edwin   4/20/94         Initial Revision
+ *
+ ***************************************************************************/
+@method HotSpotSplineGuardianClass, MSG_META_RESOLVE_VARIANT_SUPERCLASS
+{
+    return &SplineGuardianClass;
+}
+
+/****************************************************************************
+ *          MSG_GOVG_CREATE_VIS_WARD for HotSpotSplineGuardianClass
+ **************************************************************************** 
+ *  SYNOPSIS:   Intercept the message and replace the GOVGI_class field 
+ *              with the right ward class.  To be specific, replace 
+ *              GrObjSplineClass with HotSpotSplineWardClass.
+ *  CALLED BY:
+ *  PARAMETERS: optr (MemHandle warBlock);
+ *                                      
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      ----    ----                    -----------
+ *      Edwin   5/2/94                  Initial Revision
+ *
+ ***************************************************************************/
+@method HotSpotSplineGuardianClass, MSG_GOVG_CREATE_VIS_WARD
+{
+    MySpline *Mspline;
+
+    Mspline = (MySpline *)ObjDeref1(oself);
+    Mspline->GOVGI_class = &HotSpotSplineWardClass;
+    return @callsuper();
+}
+
+
+/****************************************************************************
+ *  MSG_GOVG_NOTIFY_VIS_WARD_CHANGE_BOUNDS for HotSpotSplineGuardianClass
+ **************************************************************************** 
+ *  SYNOPSIS:   Intercept the message and notify the text that  
+ *              geometry of the hotspot has changed.
+ *  CALLED BY:
+ *  PARAMETERS: void (Rectangle *desireBounds)
+ *                                      
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      ----    ----                    -----------
+ *      Edwin   6/1/94                  Initial Revision
+ ***************************************************************************/
+@method HotSpotSplineGuardianClass, MSG_GOVG_NOTIFY_VIS_WARD_CHANGE_BOUNDS
+{
+    word            token = pself->GHSI_token;
+    MemHandle       data;
+    optr            Text;
+    PointDWFixed    position;
+
+    @callsuper();
+
+    data =  @call self::MSG_GHS_GET_INSTANCE_DATA();
+    @call self::MSG_GHS_GET_UPPERLEFT_CORNER(&position);
+
+    GetText(oself, &Text);
+    @call Text::MSG_HSTEXT_UPDATE_HOT_SPOT(token,data,position);
+
+    return;
+}
+
+/****************************************************************************
+ *              MSG_GO_UNDO_REPLACE_GEOMETRY_INSTANCE_DATA
+ **************************************************************************** 
+ *  SYNOPSIS:   notify HotSpotTextClass of hotspot's new position after
+ *	    	the undo
+ *                                      
+ *  CALLED BY:
+ *  PARAMETERS:     
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      ----    ----                    -----------
+ *      Edwin   5/11/94                 Initial Revision
+ *
+ ***************************************************************************/
+@method HotSpotSplineGuardianClass, MSG_GO_UNDO_REPLACE_GEOMETRY_INSTANCE_DATA
+{
+    /* let our superclass set the new geometry */
+    @callsuper();
+
+    /* tell HSText about it */
+    UpdateHotSpotPosition(oself);
+    return;
+}
+
+/****************************************************************************
+ *                  MSG_GO_CLEAR 
+ **************************************************************************** 
+ *  SYNOPSIS:   Delete a spline hotspot.
+ *                                      
+ *  CALLED BY:
+ *  PARAMETERS:     void ()
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      ----    ----                    -----------
+ *      Edwin   5/4/94                  Initial Revision
+ *
+ ***************************************************************************/
+@method HotSpotSplineGuardianClass, MSG_GO_CLEAR
+{
+    ClearHotSpot(oself, pself->GHSI_token);
+}
+
+
+/* --------------------------------------------------------------------------
+		    Methods for HotSpotSplineWardClass
+----------------------------------------------------------------------------*/
+/****************************************************************************
+ *              MSG_META_PTR for HotSpotSplineWardClass
+ **************************************************************************** 
+ *  SYNOPSIS:   Intercept the message and make sure that the new anchor 
+ *              point is within the boundaries of a graphics.
+ *                              
+ *  CALLED BY:
+ *  PARAMETERS: void (MouseReturnFlags *retVal, sword xPosition, 
+ *                    sword yPosition, word inputState)
+ *              (xPosition, yPosition) = offset from the first anchor point
+ *
+ *  SIDE EFFECTS:
+ *  STRATEGY:   If the new anchor point is outside the graphic, then modify 
+ *              xPosition and yPosition before calling super.
+ *              Note: OT_center in normal/spriteTransform for spineGuardian
+ *                    is the coordinates of the first anchor point.
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Edwin   5/2/94                  Initial Revision
+ ***************************************************************************/
+@method HotSpotSplineWardClass, MSG_META_PTR, MSG_META_START_SELECT
+{
+    RectDWFixed graphicBound;
+    word        token;
+    optr        Text;
+    PointDWFixed position, firstAnchor;
+
+    /* Get the last(latest) mouse position */
+    @send @visParent::MSG_HOT_SPOT_MANAGER_GET_LAST_POINTER_EVENT(&position); 
+
+    /* Get the position of the very first anchor point of the spline */
+    firstAnchor.PDF_x.DWF_frac = firstAnchor.PDF_y.DWF_frac = 0;
+    firstAnchor.PDF_x.DWF_int  = position.PDF_x.DWF_int - xPosition;
+    firstAnchor.PDF_y.DWF_int  = position.PDF_y.DWF_int - yPosition;
+
+    /* Get the boundaries of the graphic */ 
+    GetText(oself, &Text);
+    token = @call Text::MSG_HSTEXT_GET_GRAPHIC_AT_POSITION(firstAnchor, 
+							   &graphicBound);
+    EC_ERROR_IF(token == NULL_HOT_SPOT_TOKEN,
+		ERROR_FIRST_ANCHOR_SHOULD_NOT_BE_OUTSIDE_THE_GRAPHIC);
+
+    if (position.PDF_x.DWF_int - MEDIUM_DESIRED_HANDLE_SIZE < 
+	graphicBound.RDWF_left.DWF_int) 
+	    xPosition = graphicBound.RDWF_left.DWF_int - 
+		    firstAnchor.PDF_x.DWF_int;
+    else if (position.PDF_x.DWF_int + MEDIUM_DESIRED_HANDLE_SIZE > 
+	graphicBound.RDWF_right.DWF_int) 
+	    xPosition = graphicBound.RDWF_right.DWF_int - 
+		    firstAnchor.PDF_x.DWF_int;
+    if (position.PDF_y.DWF_int - MEDIUM_DESIRED_HANDLE_SIZE < 
+	graphicBound.RDWF_top.DWF_int) 
+	    yPosition = graphicBound.RDWF_top.DWF_int - 
+		    firstAnchor.PDF_y.DWF_int;
+    else if (position.PDF_y.DWF_int + MEDIUM_DESIRED_HANDLE_SIZE > 
+	graphicBound.RDWF_bottom.DWF_int) 
+	    yPosition = graphicBound.RDWF_bottom.DWF_int - 
+		    firstAnchor.PDF_y.DWF_int;
+
+    if (xPosition % 2 != 0)     /* Since we don't want the normalTransform */
+	xPosition++;            /* to have the fractional part, we need to */
+    if (yPosition % 2 != 0)     /* make xPosition and yPosition even.      */
+	yPosition++;
+
+    @callsuper();
+}
+
+
+/****************************************************************************
+ *              MSG_HSSW_COPY_SPLINE_POINTS for HotSpotSplineWardClass
+ **************************************************************************** 
+ *      SYNOPSIS:       Copy the passed spline point array (SplinePointStruct)  
+ *              The ward will allocate in its own block a chunk of the 
+ *              passed size to copy the array.
+ *                                      
+ *      CALLED BY:
+ *      PARAMETERS:     void (word arraySize, byte *sourceArray)
+ *                              arraySize - size of sourceArray in byte 
+ *              sourceArray - chunkArray of SplinePointStruct
+ *              Note: sourceArray must be locked by the caller.
+ *
+ *      SIDE EFFECTS:
+ *      STRATEGY:
+ *      REVISION HISTORY:
+ *              Name    Date                    Description
+ *              ----    ----                    -----------
+ *              Edwin   6/2/94              Initial Revision
+ ***************************************************************************/
+@method HotSpotSplineWardClass, MSG_HSSW_COPY_SPLINE_POINTS
+{
+    word    i;
+    byte    *destArray;
+    ChunkHandle pointsChunk;
+
+    pointsChunk = LMemAlloc(OptrToHandle(oself), arraySize);
+    destArray = (byte *)LMemDeref(ConstructOptr(OptrToHandle(oself),
+				  pointsChunk));
+    for (i = 0; i != arraySize; i++, sourceArray++, destArray++)
+	    *destArray = *sourceArray;
+    @call self::MSG_SPLINE_REPLACE_POINTS(ConstructOptr(OptrToHandle(oself),
+					  pointsChunk));
+}
+
+
+/****************************************************************************
+ *              MSG_SPLINE_GET_ENDPOINT_INFO for HotSpotSplineWardClass
+ **************************************************************************** 
+ *  SYNOPSIS:  
+ *                                      
+ *  CALLED BY:
+ *  PARAMETERS:    Boolean (SplineEndPointInfoParams *retVal = axbpcxdx,
+ *		    	    GetEndpointType type = cl) = carry;
+ *
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *          Name    Date                    Description
+ *          ----    ----                    -----------
+ *          Cassie  9/12/94 	    	    Initial Revision
+ *
+ ***************************************************************************/
+@method HotSpotSplineWardClass, MSG_SPLINE_GET_ENDPOINT_INFO
+{
+    return(FALSE);
+}
+
+/* --------------------------------------------------------------------------
+		    Methods for HotSpotPointerClass
+----------------------------------------------------------------------------*/
+/****************************************************************************
+ *              MSG_GO_PTR_CHOOSE_ABS for HotSpotPointerClass
+ **************************************************************************** 
+ *  SYNOPSIS:   Intercept the message and make sure that the pointer's bound 
+ *              is within the boundaries of a graphics.
+ *                              
+ *  CALLED BY:
+ *  PARAMETERS: MouseReturnFlags (GrObjMouseData *mouseData)
+ *
+ *  SIDE EFFECTS:
+ *  STRATEGY:   If the new anchor point is outside the graphic, then modify 
+ *              mouseData before calling super.
+ *
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Edwin   6/9/94                  Initial Revision
+ ****************************************************************************/
+@method HotSpotPointerClass, MSG_GO_PTR_CHOOSE_ABS, MSG_GO_END_CHOOSE_ABS
+{
+    RectDWFixed graphicBound;
+    word        token;
+    optr        GBody, Text;
+    PointDWFixed *position;
+    ChunkHandle chunk;
+    MyGrObj     *mgrobj;
+    optr        handle = OptrToHandle(oself);
+    ObjectTransform *transformN;
+    MouseReturnFlags flag;
+
+    GetTextNBody(oself, &Text, &GBody);
+
+    /* Get the mouse event */
+    position = &(mouseData->GOMD_point);
+    /* 
+     *  Get the graphic's bound.  Note: OT_center is a valid point inside
+     *  the graphic, so use it to get the graphic's bound.
+     */
+    mgrobj = (MyGrObj *)ObjDeref1(oself);
+    chunk = mgrobj->GOI_normalTransform;
+    transformN = LMemDeref(ConstructOptr(handle, chunk));
+    token = @call Text::MSG_HSTEXT_GET_GRAPHIC_AT_POSITION(
+						transformN->OT_center, 
+					    	&graphicBound);
+    EC_ERROR_IF(token == NULL_HOT_SPOT_TOKEN,
+		ERROR_FIRST_ANCHOR_SHOULD_NOT_BE_OUTSIDE_THE_GRAPHIC);
+
+    if (position->PDF_x.DWF_int < graphicBound.RDWF_left.DWF_int) 
+	    position->PDF_x.DWF_int = graphicBound.RDWF_left.DWF_int;
+    else if (position->PDF_x.DWF_int > graphicBound.RDWF_right.DWF_int) 
+	    position->PDF_x.DWF_int = graphicBound.RDWF_right.DWF_int;
+    if (position->PDF_y.DWF_int < graphicBound.RDWF_top.DWF_int) 
+	    position->PDF_y.DWF_int = graphicBound.RDWF_top.DWF_int;
+    else if (position->PDF_y.DWF_int > graphicBound.RDWF_bottom.DWF_int) 
+	    position->PDF_y.DWF_int = graphicBound.RDWF_bottom.DWF_int;
+
+    flag = @callsuper();
+
+    if (message == MSG_GO_END_CHOOSE_ABS && 
+	    @call GBody::MSG_GB_GET_NUM_SELECTED_GROBJS() > 1) 
+	@call GBody::MSG_GB_GROUP_SELECTED_GROBJS();
+
+    return flag;
+}
+
+
+
+/* --------------------------------------------------------------------------
+		    Methods for HotSpotGroupClass
+----------------------------------------------------------------------------*/
+
+/****************************************************************************
+ *      MSG_META_RESOLVE_VARIANT_SUPERCLASS for HotSpotGroupClass
+ **************************************************************************** 
+ *  SYNOPSIS:   Set the superclass of HotSpotGropuClass to be 
+ *              GroupClass
+ *                                      
+ *  CALLED BY:
+ *  PARAMETERS: ClassStruct *(word MasterOffset)
+ *                                      
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      Edwin   4/20/94         Initial Revision
+ *
+ ***************************************************************************/
+@method HotSpotGroupClass, MSG_META_RESOLVE_VARIANT_SUPERCLASS
+{
+    return &GroupClass;
+}
+
+/****************************************************************************
+ *		MSG_META_TEXT_SET_HYPERLINK for HotSpotGroupClass    
+ **************************************************************************** 
+ *  SYNOPSIS:       Apply the hyperlink to a group of hotspots
+ *                  NOTE: This method won't be called at the time I wrote
+ *			this, because MSG_HOT_SPOT_MANAGER_SELECTION_
+ *			CHANGE_NOTIFICATION won't send "enable follow 
+ *			hyperlink" notification for a group of hotspot.
+ *  CALLED BY:
+ *  PARAMETERS:     void (word file, word context)
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      ----    ----                    -----------
+ *      Edwin   6/8/94                  Initial Revision
+ *
+ ***************************************************************************/
+@method HotSpotGroupClass, MSG_META_TEXT_SET_HYPERLINK
+{
+    optr		GBody;
+    CallBackMessageData	cbData;
+    /*
+     *  If we're setting a hyperlink to a group, then pass MSG_META_TEXT_SET_
+     *  HYPERLINK to each hotspot in the group.
+     */
+    GBody = @call self::MSG_META_GET_OBJ_BLOCK_OUTPUT();
+    cbData.CBMD_callBackOD = GBody;
+    cbData.CBMD_callBackMessage=MSG_HOT_SPOT_MANAGER_GROUP_SET_HYPERLINK;
+    cbData.CBMD_groupOD = cbData.CBMD_childOD = NULL;
+    cbData.CBMD_extraData1 = file;
+    cbData.CBMD_extraData2 = context;
+    @call self::MSG_GROUP_PROCESS_ALL_GROBJS_SEND_CALL_BACK_MESSAGE(&cbData);
+    return;
+}
+
+
+/****************************************************************************
+ *		MSG_META_TEXT_SET_HYPERLINK for HotSpotGroupClass    
+ **************************************************************************** 
+ *  SYNOPSIS:     
+ *  CALLED BY:
+ *  PARAMETERS:     
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      ----    ----                    -----------
+ *      Edwin   6/8/94                  Initial Revision
+ *
+ ***************************************************************************/
+@method HotSpotGroupClass, MSG_META_TEXT_FOLLOW_HYPERLINK
+{
+    EC_ERROR(ERROR_GROUPS_CANNOT_HAVE_HYPERLINKS);
+    return;
+}
+
+
+/****************************************************************************
+ *              MSG_GHS_NOTIFY_TEXT_RESIZE
+ **************************************************************************** 
+ *  SYNOPSIS:   This can be called when ungrouping a group.  We don't
+ *              really want to resize the group, so just ignore this message.
+ *  CALLED BY:  
+ *  PARAMETERS:     Pass:   nothing
+ *                  Return: optr of group
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Edwin   6/20/94                 Initial Revision
+ ***************************************************************************/
+@method HotSpotGroupClass, MSG_GHS_NOTIFY_TEXT_RESIZE
+{
+    return;
+}
+
+
+/****************************************************************************
+ *              MSG_HSGROUP_GET_OPTR
+ **************************************************************************** 
+ *  SYNOPSIS:   return the optr of the HotSpotGroup
+ *              
+ *                                      
+ *  CALLED BY:  
+ *  PARAMETERS: Pass:   nothing
+ *                  Return: optr of group
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Edwin   6/20/94                 Initial Revision
+ ***************************************************************************/
+@method HotSpotGroupClass, MSG_HSGROUP_GET_OPTR
+{
+    return oself;
+}
+
+
+/*----------------------------------------------------------------------------
+  	    	ROUTINES
+ ----------------------------------------------------------------------------*/
+
+/****************************************************************************
+ *                  ClearHotSpot
+ **************************************************************************** 
+ *  SYNOPSIS:   Do all the work of deleting a hotspot.
+ *                                      
+ *  CALLED BY:	    MSG_GO_CLEAR
+ *  PARAMETERS:     void (optr oself, word token)
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      ----    ----                    -----------
+ *      Cassie  10/6/94                 Initial Revision
+ *
+ ***************************************************************************/
+void ClearHotSpot(optr oself, word token)
+{
+    optr    Text;
+
+    /* start an undo chain */
+    StartUndoChain(oself, @DeleteHotSpotString);
+
+    /* now destroy this object, without generating an undo chain */
+    @call self::MSG_GO_CLEAR_SANS_UNDO();
+
+    /* delete it's graphic char from the text */
+    GetText(oself, &Text);
+    @call Text::MSG_HSTEXT_DELETE_HOT_SPOT(token);
+
+    /* end the undo chain */
+    EndUndoChain();
+
+    return;
+}
+
+
+/****************************************************************************
+ *                  StartUndoChain
+ **************************************************************************** 
+ * SYNOPSIS:	Start an undo chain for this object, setting the string
+ *		to "Delete".
+ *                                      
+ *  CALLED BY:	    ClearHotSpot
+ *  PARAMETERS:     void (optr oself, optr undoString)
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      ----    ----                    -----------
+ *      Cassie  10/6/94                 Initial Revision
+ *
+ ***************************************************************************/
+void StartUndoChain(optr oself, optr undoString)
+{
+    @call process::MSG_GEN_PROCESS_UNDO_START_CHAIN(undoString, oself);
+}
+
+
+/****************************************************************************
+ *                  EndUndoChain
+ **************************************************************************** 
+ *
+ * SYNOPSIS:	End undo chain. 
+ *                                      
+ *  CALLED BY:	    ClearHotSpot
+ *  PARAMETERS:     void (optr oself)
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      ----    ----                    -----------
+ *      Cassie  10/6/94                 Initial Revision
+ *
+ ***************************************************************************/
+void EndUndoChain()
+{
+    @call process::MSG_GEN_PROCESS_UNDO_END_CHAIN(TRUE);
+}
+
+
+/****************************************************************************
+ *                  UpdateHotSpotPosition
+ **************************************************************************** 
+ *
+ *  SYNOPSIS:	A rect or spline has had its geometry changes undone.
+ *	    	Notify HSText of the new data.
+ *                                      
+ *  CALLED BY:	    INTERNAL
+ *  PARAMETERS:     void (optr oself)
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      ----    ----                    -----------
+ *      Cassie  10/6/94                 Initial Revision
+ *
+ ***************************************************************************/
+void UpdateHotSpotPosition(optr oself)
+{
+    MemHandle       data;
+    word            token;
+    optr            Text;
+    PointDWFixed    position;
+
+    /*
+     * Send a message to HotSpotTextClass about the changes to hotspot's 
+     * position
+     */
+    GetText(oself, &Text);
+    @call self::MSG_GHS_GET_TOKEN(&token);
+    data = @call self::MSG_GHS_GET_INSTANCE_DATA();
+    @call self::MSG_GHS_GET_UPPERLEFT_CORNER(&position);
+    @call Text::MSG_HSTEXT_UPDATE_HOT_SPOT(token, data, position);
+    return;
+}
+
+
+
+

@@ -1,0 +1,807 @@
+/***********************************************************************
+ *
+ *  Copyright (c) Cool Lava Productions 1998 -- All Rights Reserved
+ *                Breadbox Computer Company
+ * PROJECT:   Kids' NUMBERS
+ * MODULE:    Main UI
+ * FILE:      main.goc
+ *
+ * AUTHOR:    Duane E. Char
+ *
+ * REVISION HISTORY:
+ *  Date        Name                Description
+ *  ----        ----                -----------
+ *  08/99      dh			Dave did some fixups
+ *  08/99      jfh		cleaned up for release
+ *  10/01		jfh		more cleanup including removing help and next
+ *                        page buttons and redoing var names to fit Geos
+ *                        conventions
+ *                      change scoring to end of drill vs every 3rd page
+ *                      fixed randomizing of color and shape
+ *                      added replay/new drill/exit buttons to score dbox
+ *                      changed dropping #'s to be for right answers &
+ *                        fixed the color so it != background
+ *                      added soud effects - ripped off from ThinkerPro
+ *
+ *
+ *
+ ************************************************************************/
+
+
+@include <stdapp.goh>
+#include <ansi/string.h>
+#include <gstring.h>    /* needed for gstring moniker manipulations */
+#include <graphics.h>
+#include <timer.h>
+@include "hlapp.goh"
+
+@define __NUMBERS_MAIN_GOC
+@include "numbers.goh"
+@include "passwdui.goh"
+@include "bboxreg.goh"
+
+/*
+ ***************************************************************************
+ *      Global Vars - boy we got a lot here!
+ ***************************************************************************
+ */
+
+char g_fileName[FILE_LONGNAME_BUFFER_SIZE];
+VMFileHandle g_dbFileHan = 0;
+int g_numPages = 0;
+Boolean g_appOpening = TRUE;
+Boolean g_wordBoxPressed = FALSE;
+Boolean g_defBoxPressed = FALSE;
+int g_selectedWordBox;
+int g_selectedDefBox;
+sword g_defboxVertMidpoint = 0;
+sword g_defboxHorizMidpoint = 0;
+sword g_wordboxVertMidpoint = 0;
+sword g_wordboxHorizMidpoint = 0;
+int g_defbox1Val;
+int g_defbox2Val;
+int g_defbox3Val;
+int g_defbox4Val;
+int g_defbox5Val;
+int g_defbox6Val;
+int g_defbox7Val;
+char g_dbWord1[20];
+char g_dbWord2[20];
+char g_dbWord3[20];
+char g_dbWord4[20];
+char g_dbWord5[20];
+char g_dbWord6[20];
+char g_dbWord7[20];
+char g_dbDef1[40];
+char g_dbDef2[40];
+char g_dbDef3[40];
+char g_dbDef4[40];
+char g_dbDef5[40];
+char g_dbDef6[40];
+char g_dbDef7[40];
+dword g_randomX;
+int g_whatShape;
+int g_linesDrawn = 0;
+word g_pageNumber = 0;
+int g_correct = 0;
+int g_incorrect = 0;
+Boolean g_flashMessage = 0;
+Boolean g_playingGame = FALSE;
+Boolean g_onYago;
+Boolean g_isColor;
+byte g_shuffledPages[MAX_PAGES];
+byte g_color = 2;
+Boolean g_rightAns = FALSE;
+/*
+ ***************************************************************************
+ *      UI Objects
+ ***************************************************************************
+ */
+
+
+@start  AppResource ;
+
+@object GenApplicationClass NumbersApp = {
+	GI_visMoniker = list { @NumbersTextMoniker,
+					@appSCMoniker, @appSCGAMoniker, @AppTinyCMoniker };
+	GI_comp = @NumbersPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @NumbersPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) =
+			 @VMEEditor, @DocumentControl;
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) =
+			 @DocumentControl;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+			 @DocumentControl;
+	ATTR_GEN_HELP_FILE = "KNHelp";
+}
+
+@visMoniker NumbersTextMoniker = "Kids' Numbers";
+
+@end    AppResource;
+
+
+@start DocMonikerResource, data;
+
+@visMoniker NumbersDocIconList = list { @DocSCMoniker,
+													 @DocSCGAMoniker,
+													 @DocTCMoniker };
+
+@end DocMonikerResource;
+
+
+@start  Interface       /* this resource is for misc UI objects */ ;
+
+@object GenPrimaryClass NumbersPrimary  = {
+	GI_comp = @NumbersFileMenu, @NumbersOptionsMenu, @NumbersView/*AndBar*/,
+	 @VMEEditor, @ScoreDialog,
+	 @PwdAskPasswordDialog, @PwdChangePasswordDialog;
+	ATTR_GEN_HELP_CONTEXT = "TOC"; 
+	 HINT_SIZE_WINDOW_AS_DESIRED;
+//    HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = {
+//		 SWSS_RATIO | PCT_5,  SWSS_RATIO | PCT_5 };
+	HINT_NO_WIDER_THAN_CHILDREN_REQUIRE;
+	HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+}
+
+@object GenInteractionClass NumbersFileMenu = {
+	GI_comp = @DocumentControl, @AboutDBoxGroup;
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+}
+
+@object KNDocCtrlClass DocumentControl = {
+    GDCI_features = @default & ~GDCF_SUPPORTS_TEMPLATES;
+    GDCI_noNameText = "No File";
+    GDCI_documentToken = {"KNd1", 16431};
+    GDCI_dialogNewText = "New:\rCreate a new, empty Kids' Numbers Drill";
+    GDCI_dialogOpenText = "Open:\rOpen an existing Kids' Numbers Drill";
+    GDCI_documentGroup = DocumentGroup;
+}
+
+/* ---------------------------------------------------------------- */
+@object GenInteractionClass AboutDBoxGroup = {
+	GI_comp = @AboutDBox;
+	GII_visibility = GIV_SUB_GROUP;
+}
+
+@object GenInteractionClass AboutDBox = {
+	 GI_visMoniker = 't', "About";
+    GI_comp = @AppName, @Beta, @By, @BreadBoxLogo, @Visit,
+		    @Web, @Copyright;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_NOTIFICATION;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass AppName = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "Kids' Numbers";
+	 ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @AppNameCharAttrs;
+}
+
+@chunk VisTextCharAttr AppNameCharAttrs =
+	CHAR_ATTR_FONT_SIZE_STYLE(
+		FID_DTC_URW_SANS, 24, TS_BOLD);
+
+@object GenGlyphClass Beta = {
+  GI_visMoniker = "An Educational Product";
+}
+
+@object GenGlyphClass By = {
+  GI_visMoniker = "from";
+}
+
+@object GenGlyphClass BreadBoxLogo = {
+  GI_visMoniker = list { @BreadboxLogoMoniker}
+}
+
+@object GenGlyphClass Copyright = {
+  GI_visMoniker = "Copyright 1994-2001 Breadbox Computer Company LLC";
+}
+
+@object GenGlyphClass Visit = {
+  GI_visMoniker = "Visit us at...";
+}
+
+@object GenGlyphClass Web = {
+  GI_visMoniker = "www.breadbox.com";
+}
+
+@object GenInteractionClass NumbersOptionsMenu = {
+	 GI_visMoniker = 'O', "Options";
+	GI_comp = @EditorTrigger, @NumbersSoundOnOff;
+	GII_visibility = GIV_POPUP;
+}
+
+@object GenTriggerClass EditorTrigger = {
+	 GI_visMoniker = 'E', "Editor";
+	 GTI_destination = process;
+	 GTI_actionMsg = MSG_OPEN_PWORD_TO_EDITOR;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+/*---------------------------------------------------------------------*/
+	 @object GenTriggerClass NumbersSoundOnOff = {
+        GI_visMoniker = 'o', "Sound is ON";
+		  GTI_actionMsg = MSG_KN_PROCESS_TOGGLE_SOUND_ON_OFF;
+        GTI_destination = process;
+    }
+    /*---------------------------------------------------------------------*/
+    @visMoniker SoundOnMoniker = 'o', "Sound is ON" ;
+    @visMoniker SoundOffMoniker = 'o', "Sound is OFF" ;
+    /*---------------------------------------------------------------------*/
+
+@end Interface;
+
+@start DocumentUI;
+@object GenDocumentGroupClass DocumentGroup ={
+    GDGI_untitledName = "Kids' Numbers Untitled";
+    GDGI_protocolMajor = 0;
+    GDGI_protocolMinor = 0;
+    GDGI_documentClass = &KNDocumentClass;
+    GDGI_documentControl = DocumentControl;
+}
+@end DocumentUI;
+
+/*
+ *      GenView object
+ */
+
+@start Interface ;
+
+/*@object GenInteractionClass NumbersViewAndBar = {
+	 GI_comp = @NumbersView, @bottombar;
+}
+*/
+@object GenViewClass NumbersView = {
+	GI_states = @default;
+    GVI_docBounds = {0, 0, 620, 380};
+/*	GVI_content = @NumbersContent;*/
+/*	GVI_color = { C_LIGHT_GRAY, 0, 0, 0 };*/
+    GVI_attrs = @default | GVA_SAME_COLOR_AS_PARENT_WIN;
+	GVI_horizAttrs = @default| GVDA_NO_SMALLER_THAN_CONTENT
+				|GVDA_NO_LARGER_THAN_CONTENT;
+	GVI_vertAttrs  = @default | GVDA_NO_SMALLER_THAN_CONTENT
+				|GVDA_NO_LARGER_THAN_CONTENT;
+
+}
+
+/*@object GenInteractionClass bottombar = {
+	GI_comp =  @FirstHelpBox, @nextpage;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	HINT_DONT_INCLUDE_ENDS_IN_CHILD_SPACING;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass FirstHelpBox = {
+	GI_visMoniker = list {@HelpMeSCMoniker, @HelpMeSCGAMoniker};
+	GII_type = GIT_NOTIFICATION;
+	GI_comp = @HelpMeGlyph1, @HelpMeGlyph2, @HelpMeGlyph3,
+			@HelpMeGlyph4, @HelpMeGlyph5;
+	GII_visibility = GIV_DIALOG;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+@object GenGlyphClass HelpMeGlyph1 = {
+	GI_visMoniker = "Make a match by clicking on a numbers";
+}
+
+@object GenGlyphClass HelpMeGlyph2 = {
+	GI_visMoniker = " button in the left column, and then the";
+}
+
+@object GenGlyphClass HelpMeGlyph3 = {
+	GI_visMoniker = "correct number counterpart in the right column.";
+}
+
+@object GenGlyphClass HelpMeGlyph4 = {
+	GI_visMoniker = "For more help, click on the blue question mark";
+}
+
+@object GenGlyphClass HelpMeGlyph5 = {
+	GI_visMoniker = "in the upper right hand corner of the window.";
+}
+
+
+@object GenTriggerClass nextpage = {
+	GI_states = @default;
+	GI_visMoniker = list { @nextpageSCMoniker, @nextpageSCGAMoniker };
+	GTI_destination = process;
+	GTI_actionMsg = MSG_PROCESS_GET_DB_INFO;
+	ATTR_GEN_TRIGGER_ACTION_DATA = FALSE;
+}
+
+/* ---------------------------------------------------------------- */
+
+@object GenInteractionClass ScoreDialog = 
+{
+    GI_visMoniker = "Your Score";
+	 GI_comp = @SDStatic1, @SDStatic2, /*@SDStatic3, @SDStatic4, @SDStatic5,
+      @SDStatic5,*/ @SDStaticCorrect, @SDStaticIncorrect, @SDStatic6,
+		@SDStaticFinal, @SDAgain, @SDNew, @SDExit;
+    GII_visibility = GIV_DIALOG;
+ //   GII_type = GIT_NOTIFICATION;
+    GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenGlyphClass SDStatic1 =
+{
+	 GI_visMoniker = "Highest Possible Score:  100";
+}
+
+@object GenGlyphClass SDStatic2 =
+{
+    GI_visMoniker = " ";
+}
+
+/*@object GenGlyphClass SDStatic3 =
+{
+    GI_visMoniker = "A score of 105, six times in a row";
+}
+
+@object GenGlyphClass SDStatic4 =
+{
+    GI_visMoniker = "means you need some new equations.";
+}
+
+@object GenGlyphClass SDStatic5 =
+{
+    GI_visMoniker = " ";
+}
+*/
+@object GenGlyphClass SDStaticCorrect =
+{
+}
+
+@object GenGlyphClass SDStaticIncorrect =
+{
+}
+
+@object GenGlyphClass SDStatic6 =
+{
+    GI_visMoniker = "-------------------------------";
+}
+
+@object GenGlyphClass SDStaticFinal =
+{
+}
+
+@object GenTriggerClass SDAgain =
+{
+	GI_visMoniker = "Same Drill";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_destination = process;
+	GTI_actionMsg = MSG_RESTART_SAME_DRILL;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass SDNew =
+{
+	GI_visMoniker = "New Drill";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_destination = @DocumentControl;
+	GTI_actionMsg = MSG_GEN_DOCUMENT_CONTROL_INITIATE_OPEN_DOC;
+	HINT_SEEK_REPLY_BAR;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass SDExit =
+{
+	GI_visMoniker = "Exit";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_destination = NumbersApp;
+	GTI_actionMsg = MSG_META_QUIT;
+	HINT_SEEK_REPLY_BAR;
+}
+
+
+@end Interface;
+
+
+/*
+ ***************************************************************************
+ *      Editor UI Objects
+ ***************************************************************************
+ */
+
+@start Editor;
+
+@object VMEEditorClass VMEEditor = {
+    GI_visMoniker = 'E', "Editor";
+	GI_comp =  @VMETitleAndPageGroup, @VMEInputGroup, @VMEReplyBar,
+	  @UserMsgBox;
+    GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_COMMAND;
+    ATTR_GEN_HELP_CONTEXT = "Editor";
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	HINT_INTERACTION_DEFAULT_ACTION_IS_NAVIGATE_TO_NEXT_FIELD;
+}
+
+@object GenInteractionClass VMETitleAndPageGroup = {
+    GI_comp = @VMEPageGroup;
+	GI_states = @default & ~GS_ENABLED;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_CUSTOM_CHILD_SPACING = { SST_AVG_CHAR_WIDTHS | 3 };
+}
+
+@object GenInteractionClass VMEPageGroup = {
+    GI_comp = @VMEPage, @VMEPageCount;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenValueClass VMEPage = {
+    GI_visMoniker = 'P', "Page";
+	GVLI_destination = process;
+    GVLI_applyMsg = MSG_VME_VALUE_APPLY;
+	GVLI_value = MakeWWFixed( 1 );
+	GVLI_maximum = MakeWWFixed(1.0);
+	GVLI_minimum = MakeWWFixed(1.0);
+	GVLI_increment = MakeWWFixed(1.0);
+	GVLI_displayFormat = GVDF_INTEGER;
+}
+
+@object GenTextClass VMEPageCount = {
+    GI_visMoniker = " of";
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "1";
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = 4;
+    HINT_TEXT_NO_FRAME;
+}
+
+@object GenInteractionClass VMEReplyBar = {
+    GI_comp = @VMEAddTrigger, @VMEDeleteTrigger,
+	 @VMECloseTrigger;
+    HINT_MAKE_REPLY_BAR;
+}
+
+@object GenTriggerClass VMEAddTrigger = {
+	GI_visMoniker = 'N', "New Page";
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = process;
+	GTI_actionMsg = MSG_VME_ADD_PAGE;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass VMEDeleteTrigger = {
+	GI_visMoniker = 'D', "Delete Page";
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = process;
+	GTI_actionMsg = MSG_VME_DELETE_PAGE;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass VMECloseTrigger = {
+    GI_visMoniker = 'C', "Close";
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_DISMISS;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenInteractionClass VMEInputGroup = {
+	GI_comp = @VMETitleGroup, @VMEInputGroup2, @VMEInputGroup3, @VMEInputGroup4,
+	  @VMEInputGroup5, @VMEInputGroup6, @VMEInputGroup7;
+	GI_states = @default & ~GS_ENABLED;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenInteractionClass VMETitleGroup = {
+	GI_comp = @VMETextGroup1, @VMEDefGroup1;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass VMETextGroup1 = {
+    GI_comp = @VMETitleTwo, @VMEText1;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenInteractionClass VMEDefGroup1 = {
+    GI_comp = @VMETitleThree, @VMEDef1;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenInteractionClass VMEInputGroup2 = {
+	GI_comp = @VMEText2, @VMEDef2;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass VMEInputGroup3 = {
+	GI_comp = @VMEText3, @VMEDef3;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass VMEInputGroup4 = {
+	GI_comp = @VMEText4, @VMEDef4;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass VMEInputGroup5 = {
+	GI_comp = @VMEText5, @VMEDef5;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass VMEInputGroup6 = {
+	GI_comp = @VMEText6, @VMEDef6;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass VMEInputGroup7 = {
+	GI_comp = @VMEText7, @VMEDef7;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenGlyphClass VMETitleTwo = {
+	GI_visMoniker = "     Question";
+}
+
+@object TextModifiedClass VMEText1 = {
+    GI_visMoniker = "1.";
+	GI_attrs = @default | GA_TARGETABLE;
+	GTXI_maxLength = 19;
+	GTXI_attrs = @default |GTA_SINGLE_LINE_TEXT;
+	GTXI_destination = process;
+	ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR =
+      ((VTDS_12 << VTDCA_SIZE_OFFSET) | VTDF_URW_SANS);
+	ATTR_GEN_TEXT_SELECTABLE;
+	ATTR_GEN_TEXT_STATUS_MSG = MSG_VME_TEXT_STATUS;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_MAXIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 18 };
+	HINT_MINIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 9 };
+	HINT_DEFAULT_FOCUS;
+}
+
+@object TextModifiedClass VMEText2 = {
+    GI_visMoniker = "2.";
+	GI_attrs = @default | GA_TARGETABLE;
+	GTXI_maxLength = 19;
+	GTXI_attrs = @default |GTA_SINGLE_LINE_TEXT;
+	GTXI_destination = process;
+	ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR =
+      ((VTDS_12 << VTDCA_SIZE_OFFSET) | VTDF_URW_SANS);
+	ATTR_GEN_TEXT_SELECTABLE;
+	ATTR_GEN_TEXT_STATUS_MSG = MSG_VME_TEXT_STATUS;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_MAXIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 18 };
+	HINT_MINIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 9 };
+}
+
+@object TextModifiedClass VMEText3 = {
+    GI_visMoniker = "3.";
+	GI_attrs = @default | GA_TARGETABLE;
+	GTXI_maxLength = 19;
+	GTXI_attrs = @default |GTA_SINGLE_LINE_TEXT;
+	GTXI_destination = process;
+	ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR =
+      ((VTDS_12 << VTDCA_SIZE_OFFSET) | VTDF_URW_SANS);
+	ATTR_GEN_TEXT_SELECTABLE;
+	ATTR_GEN_TEXT_STATUS_MSG = MSG_VME_TEXT_STATUS;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_MAXIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 18 };
+	HINT_MINIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 9 };
+}
+
+@object TextModifiedClass VMEText4 = {
+    GI_visMoniker = "4.";
+	GI_attrs = @default | GA_TARGETABLE;
+	GTXI_maxLength = 19;
+	GTXI_attrs = @default |GTA_SINGLE_LINE_TEXT;
+	GTXI_destination = process;
+	ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR =
+      ((VTDS_12 << VTDCA_SIZE_OFFSET) | VTDF_URW_SANS);
+	ATTR_GEN_TEXT_SELECTABLE;
+	ATTR_GEN_TEXT_STATUS_MSG = MSG_VME_TEXT_STATUS;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_MAXIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 18 };
+	HINT_MINIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 9 };
+}
+
+@object TextModifiedClass VMEText5 = {
+    GI_visMoniker = "5.";
+	GI_attrs = @default | GA_TARGETABLE;
+	GTXI_maxLength = 19;
+	GTXI_attrs = @default |GTA_SINGLE_LINE_TEXT;
+	GTXI_destination = process;
+	ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR =
+      ((VTDS_12 << VTDCA_SIZE_OFFSET) | VTDF_URW_SANS);
+	ATTR_GEN_TEXT_SELECTABLE;
+	ATTR_GEN_TEXT_STATUS_MSG = MSG_VME_TEXT_STATUS;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_MAXIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 18 };
+	HINT_MINIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 9 };
+}
+
+@object TextModifiedClass VMEText6 = {
+    GI_visMoniker = "6.";
+	GI_attrs = @default | GA_TARGETABLE;
+	GTXI_maxLength = 19;
+	GTXI_attrs = @default |GTA_SINGLE_LINE_TEXT;
+	GTXI_destination = process;
+	ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR =
+      ((VTDS_12 << VTDCA_SIZE_OFFSET) | VTDF_URW_SANS);
+	ATTR_GEN_TEXT_SELECTABLE;
+	ATTR_GEN_TEXT_STATUS_MSG = MSG_VME_TEXT_STATUS;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_MAXIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 18 };
+	HINT_MINIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 9 };
+}
+
+@object TextModifiedClass VMEText7 = {
+    GI_visMoniker = "7.";
+	GI_attrs = @default | GA_TARGETABLE;
+	GTXI_maxLength = 19;
+	GTXI_attrs = @default |GTA_SINGLE_LINE_TEXT;
+	GTXI_destination = process;
+	ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR =
+      ((VTDS_12 << VTDCA_SIZE_OFFSET) | VTDF_URW_SANS);
+	ATTR_GEN_TEXT_SELECTABLE;
+	ATTR_GEN_TEXT_STATUS_MSG = MSG_VME_TEXT_STATUS;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_MAXIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 18 };
+	HINT_MINIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 9 };
+}
+
+@object GenGlyphClass VMETitleThree = {
+	GI_visMoniker = "Answer";
+}
+
+@object TextModifiedClass VMEDef1 = {
+	GI_attrs = @default | GA_TARGETABLE;
+	GTXI_maxLength = 25;
+	GTXI_attrs = @default |GTA_SINGLE_LINE_TEXT;
+	GTXI_destination = process;
+	ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR =
+      ((VTDS_12 << VTDCA_SIZE_OFFSET) | VTDF_URW_SANS);
+	ATTR_GEN_TEXT_SELECTABLE;
+	ATTR_GEN_TEXT_STATUS_MSG = MSG_VME_TEXT_STATUS;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_MAXIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 25 };
+	HINT_MINIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 18 };
+	HINT_ALIGN_TOP_EDGE_WITH_OBJECT = @VMEText1;
+}
+
+@object TextModifiedClass VMEDef2 = {
+	GI_attrs = @default | GA_TARGETABLE;
+	GTXI_maxLength = 25;
+	GTXI_attrs = @default |GTA_SINGLE_LINE_TEXT;
+	GTXI_destination = process;
+	ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR =
+      ((VTDS_12 << VTDCA_SIZE_OFFSET) | VTDF_URW_SANS);
+	ATTR_GEN_TEXT_SELECTABLE;
+	ATTR_GEN_TEXT_STATUS_MSG = MSG_VME_TEXT_STATUS;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_MAXIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 25 };
+	HINT_MINIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 18 };
+	HINT_ALIGN_TOP_EDGE_WITH_OBJECT = @VMEText2;
+}
+
+@object TextModifiedClass VMEDef3 = {
+	GI_attrs = @default | GA_TARGETABLE;
+	GTXI_maxLength = 25;
+	GTXI_attrs = @default |GTA_SINGLE_LINE_TEXT;
+	GTXI_destination = process;
+	ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR =
+      ((VTDS_12 << VTDCA_SIZE_OFFSET) | VTDF_URW_SANS);
+	ATTR_GEN_TEXT_SELECTABLE;
+	ATTR_GEN_TEXT_STATUS_MSG = MSG_VME_TEXT_STATUS;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_MAXIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 25 };
+	HINT_MINIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 18 };
+	HINT_ALIGN_TOP_EDGE_WITH_OBJECT = @VMEText3;
+}
+
+@object TextModifiedClass VMEDef4 = {
+	GI_attrs = @default | GA_TARGETABLE;
+	GTXI_maxLength = 25;
+	GTXI_attrs = @default |GTA_SINGLE_LINE_TEXT;
+	GTXI_destination = process;
+	ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR =
+      ((VTDS_12 << VTDCA_SIZE_OFFSET) | VTDF_URW_SANS);
+	ATTR_GEN_TEXT_SELECTABLE;
+	ATTR_GEN_TEXT_STATUS_MSG = MSG_VME_TEXT_STATUS;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_MAXIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 25 };
+	HINT_MINIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 18 };
+	HINT_ALIGN_TOP_EDGE_WITH_OBJECT = @VMEText4;
+}
+
+@object TextModifiedClass VMEDef5 = {
+	GI_attrs = @default | GA_TARGETABLE;
+	GTXI_maxLength = 25;
+	GTXI_attrs = @default |GTA_SINGLE_LINE_TEXT;
+	GTXI_destination = process;
+	ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR =
+      ((VTDS_12 << VTDCA_SIZE_OFFSET) | VTDF_URW_SANS);
+	ATTR_GEN_TEXT_SELECTABLE;
+	ATTR_GEN_TEXT_STATUS_MSG = MSG_VME_TEXT_STATUS;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_MAXIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 25 };
+	HINT_MINIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 18 };
+	HINT_ALIGN_TOP_EDGE_WITH_OBJECT = @VMEText5;
+}
+
+@object TextModifiedClass VMEDef6 = {
+	GI_attrs = @default | GA_TARGETABLE;
+	GTXI_maxLength = 25;
+	GTXI_attrs = @default |GTA_SINGLE_LINE_TEXT;
+	GTXI_destination = process;
+	ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR =
+      ((VTDS_12 << VTDCA_SIZE_OFFSET) | VTDF_URW_SANS);
+	ATTR_GEN_TEXT_SELECTABLE;
+	ATTR_GEN_TEXT_STATUS_MSG = MSG_VME_TEXT_STATUS;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_MAXIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 25 };
+	HINT_MINIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 18 };
+	HINT_ALIGN_TOP_EDGE_WITH_OBJECT = @VMEText6;
+}
+
+@object TextModifiedClass VMEDef7 = {
+	GI_attrs = @default | GA_TARGETABLE;
+	GTXI_maxLength = 25;
+	GTXI_attrs = @default |GTA_SINGLE_LINE_TEXT;
+	GTXI_destination = process;
+	ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR =
+      ((VTDS_12 << VTDCA_SIZE_OFFSET) | VTDF_URW_SANS);
+	ATTR_GEN_TEXT_SELECTABLE;
+	ATTR_GEN_TEXT_STATUS_MSG = MSG_VME_TEXT_STATUS;
+	HINT_TEXT_WHITE_WASH_COLOR;
+	HINT_MAXIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 25 };
+	HINT_MINIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 18 };
+	HINT_ALIGN_TOP_EDGE_WITH_OBJECT = @VMEText7;
+}
+
+@object GenInteractionClass UserMsgBox = {
+	GI_visMoniker = "Warning Box";
+	GI_states = @default; 
+	GI_comp =  @TheMsg;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE 
+	  | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_MODAL;
+	GII_type = GIT_NOTIFICATION;
+	GII_visibility = GIV_DIALOG;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenGlyphClass TheMsg = {
+	GI_visMoniker = list { @Moniker1 }
+}
+
+@visMoniker Moniker1 = "Sorry, you already have the maximum allowance of 20 pages.";
+@visMoniker Moniker2 = "The first page is the anchor. You may change it, but not delete or move it.";
+@visMoniker Moniker3 = "The page you asked for does not exist.";
+
+@end Editor;
+
+
+@start StringResource, data;
+
+@chunk char WrongPasswordText[] = "The password you typed is incorrect.";
+@chunk char PasswordChangedText[] = "The password was successfully changed.";
+@chunk char PasswordMismatchText[] = "The new passwords don't match.  Please enter them again";
+@chunk char WrongOldPasswordText[] = "The old password you typed is incorrect.";
+
+@chunk char KNFolderTxt[] = "Kids Numbers Drills";
+@localize "the name of the folder holding the game document files";
+@chunk char YagoKNFolder[] = "\\GEOWORKS\\DOCUMENT\\Kids Numbers Drills";
+@localize "translate only the *Kids Numbers Drills* part of this string";
+@chunk char YagoDocFolder[] = "\\GEOWORKS\\DOCUMENT";
+@localize not;
+
+@chunk char fakeoutString[] = "What should this be?";
+@chunk char ofString[] = " of ";
+
+@chunk char MessageTxt[] = "Good Going*Great Job*Excellent*You got it*Well Done*Very Good*Wonderful*Nice Work*Good Job*Way to go*Is it easy?*Looking good*Awesome*";
+@localize "End each congratulatory phrase with a * (including the last character).  You may have more or fewer than the 13 English ones.";
+
+@chunk char SDCorrectText[] = "Correct Answers:  %d";
+@localize "do not translate anything after the :";
+@chunk char SDIncorrectText[] = "Incorrect Answers:  %d";
+@localize "do not translate anything after the :";
+@chunk char SDFinalText[] = "Your Final Score:  %d";
+@localize "do not translate anything after the :";
+
+@end StringResource;

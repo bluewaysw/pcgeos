@@ -1,0 +1,385 @@
+	$Id: README,v 1.6.18.1 97/03/29 03:57:57 canavese Exp $
+
+This file contains notes of general interest for anyone working in the PC/GEOS
+kernel. It is somewhat haphazardly divided up into sections as the author(s)
+see fit.
+
+Sections:
+	- Synchronization
+	- File System Synchronization
+	- VM Modes and Synchronization
+
+******************************************************************************
+*                                                                            *
+*			       Synchronization				     *
+*									     *
+******************************************************************************
+
+Synchronization is one of those fun topics that are prevalent in any pre-
+emptive multi-threaded system, and ours is no exception.
+
+The current synchronization model for the kernel involves 3 thread locks, 12
+semaphores, and various things that can be locked for shared or exclusive
+access (all of these last are file-system related).
+
+To avoid deadlock, most systems codify the various synchronization points into
+a hierarchy of locks. If you need to grab more than one lock, you must grab
+them in hierarchical order, from the top to the bottom, and *never* go for a
+higher lock while holding a lower. The order in which you release locks
+matters only if you will be grabbing another lock before you have released all
+the ones you had before, but usually, for clarity of code, one tends to
+release the locks in the reverse order they were grabbed.
+
+The hierarchy within the PC/GEOS kernel is as follows (from top to bottom):
+
+				  Geode Lock
+				      |
+		       FSInfoResource shared/excl lock
+				      |
+				  Heap Lock
+				      |
+			   Drive shared/excl locks
+				      |
+				  BIOS Lock
+
+
+What the locks do:
+
+	Geode Lock		When grabbed, this provides the thread the
+				exclusive right to load or unload one or more
+				geodes until it releases the lock. This is a
+				ThreadLock so it may be grabbed by the same
+				thread as many times as it needs.
+
+	FSInfoResource lock	Unlike the previous two, this is a shared/ex-
+				clusive lock on a single memory resource of
+				the kernel: the FSInfoResource. As you'd
+				expect from the name, multiple threads may
+				have shared locks on the block, but only one
+				thread may have an exclusive lock on it. When
+				the block is locked for exclusive access, no
+				threads are allowed to have a shared lock on
+				the block.
+
+				While the actual lock and unlock is managed
+				via the MemLockShared/MemLockExcl family of
+				functions, all locking and unlocking is done
+				through routines in the FSD module (named
+				FSDLockInfoShared, FSDLockInfoExcl, etc.).
+				This is to allow nested locks and automatic
+				upgrading of shared to exclusive, and vice
+				versa as the demands of the thread require.
+
+	Heap Lock		When grabbed, this provides the thread the
+				exclusive right to move blocks around on the
+				heap, compacting it, swapping things in and
+				out, or discarding or faulting-in blocks. This
+				lock is also grabbed, to ensure consistency,
+				by any function that must traverse all the
+				memory blocks on the heap. This is also a
+				ThreadLock.
+				
+				The PHeap routine grabs the FSIR shared before
+				grabbing this lock, to avoid deadlock when
+				swapping blocks out. If you're not going to 
+				cause swapping, you can call PHeapNoFSIR and
+				VHeapNoFSIR instead of PHeap and VHeap.
+
+	Drive locks		Each drive allocated in the drive list within
+				the FSInfoResource may be locked either for
+				shared or exclusive access, with a special
+				difference from the straight-up shared/exclusive
+				access used for the FSInfoResource: When a
+				drive is locked for shared access, it is
+				locked for shared access *for a particular
+				disk*. Multiple threads may lock the drive
+				shared for the same disk, but if two threads
+				attempt to lock it shared for different disks,
+				one will have to wait until the other has
+				unlocked the disk.
+
+				If another thread requests exclusive access to
+				the drive while the second thread is waiting
+				for shared access with its disk, the second
+				thread will take precedence, regardless of the
+				relative priorities of the two threads.
+
+				Unlike the FSInfoResource, there are no
+				front-end routines to allow a thread with a
+				shared lock on a drive to promote its lock to
+				be exclusive and demote the exclusive lock to
+				shared when the operation that required the
+				exclusive access completes. If you attempt to
+				gain exclusive access to a drive while you've
+				got it locked shared, DriveLockExcl will
+				return an error.
+
+	BIOS Lock		This is a standard ThreadLock that is grabbed
+				with the SysLockBIOS function and released
+				with the SysUnlockBIOS function. DOS-based IFS
+				drivers will grab this lock before calling
+				DOS, while other drivers and weird libraries
+				must grab it before calling out to any TSR or
+				device driver external to PC/GEOS.
+
+
+Other free-standing synchronization points are:
+
+	diskRegisterSem		A mutual-exclusion semaphore granting the
+				right to register a disk in any drive. Only
+				one thread may be registering a disk in the
+				system at a time. In effect, this gives
+				exclusive access to the fsdSkeletonDisk
+				chunk in the FSInfoResource
+
+	errorSem		This is a semaphore that gives a thread the
+				exclusive right to put up a SysNotify box.
+
+	fileListSem		This is a semaphore that gives a thread the
+				exclusive right to traverse the list of open
+				files.
+
+	GCNListBlock		This is the block that contains the system
+				GCN lists. It gets PLocked to access it.  This
+				sits just above the heap semaphore in the
+				synchronization hierarchy.
+
+	logFileSem		This is a semaphore that gives a thread the
+				exclusive right to write a string to the
+				system log file.
+
+	privSem			This is a semaphore that gives a thread the
+				exclusive right to allocate space in
+				geode-private data.
+
+	scrubSem		This is a scheduling semaphore on which the
+				scrub thread performs a timed-wait. If some
+				thread detects the heap needs scrubbing, it
+				will V this semaphore to allow the scrub
+				thread to run when it can. Else the scrub
+				thread times out on its PTimedSem of this
+				semaphore and scrubs the heap anyway.
+
+	semMonChain		This is a semaphore that gives a thread the
+				exclusive right to traverse the input-monitor
+				chain maintained and used by the Input Manager
+				thread of the kernel.
+
+	semPtrImage		This is a semaphore that gives a thread the
+				exclusive right to change the pointer-image
+				maintained by the Input Manager thread of the
+				kernel.
+
+	threadSem		This is a semaphore that gives a thread the
+				exclusive right to create or destroy a thread.
+				Grabbed before broadcasting a message to all
+				threads, primarily.
+
+	vmSem			This is a semaphore that gives a thread the
+				exclusive right to open or close a VM file.
+
+	winPtrImageSem		This is a semaphore that gives a thread the
+				exclusive right to ... doug?
+
+	winTreeSem		This is a semaphore that gives a thread the
+				exclusive right to change the window tree,
+				moving windows around within it, opening new
+				ones, closing old ones, etc.
+
+
+******************************************************************************
+*                                                                            *
+*			 File Subsystem Synchronization			     *
+*									     *
+******************************************************************************
+
+While synchronization hierarchies are nice and clean on the surface, they are
+difficult to maintain, I've found, and usually have at least one exception
+that can easily lead to deadlock if one isn't careful. In addition, there are
+often unanticipated interactions between routines that use different
+synchronization points, and this too can lead to deadlock.
+
+
+			      The FSInfoResource
+
+All access to the file systems of the machine passes through the
+FSInfoResource, an LMem-managed resource of the kernel that contains three
+lists:
+	* known IFS (Installable File System) drivers
+	* known drives, each of which points to the record for the driver that
+	  manages the drive.
+	* registered disks, each of which points to the drive in which it was
+	  registered.
+
+Each disk and each drive can have an arbitrary amount of driver-private data
+associated with it, and drive entries are variable-sized, as drive names can
+be multiple characters long. Once created, however, these structures are
+seldom if ever deleted, so there is no need for the FSInfoResource to use LMem
+chunk handles, and so it doesn't.
+
+Most of the time, when a thread is accessing the FSInfoResource, it is doing
+so in a way that won't interfere with other threads, so all may lock the
+resource and use its segment without problems. A problem arises, however, when
+one thread is registering a new disk in a drive and a new disk descriptor must
+be allocated in the resource. To do this, the thread must gain exclusive
+access to the FSIR. Thus we have the first major synchronization point in the
+file subsystem, as well as the first ground-rule:
+
+	Rule (1):	If you're going to be doing anything to the FSIR that
+			could cause it to move, you must gain exclusive access
+			to it by calling FSDLockInfoExcl.
+
+Here, too, we have our first hidden dependency. Because the Heap subsystem
+can, through the use of the "disk" swap driver, require the use of the File
+subsystem to swap blocks out of memory, and because allocating a chunk in
+the FSIR might require enlarging the FSIR and that requires the heap lock, we
+have an excellent recipe for deadlock, unless the following Corollary to Rule
+1 is followed:
+
+	Corollary (1):	If you're going to be doing anything in the heap
+			that may cause swapping, you should lock the FSIR
+			shared first. This is automatically done by the
+			PHeap utility routine.
+
+
+			    Drive Synchronization
+
+The second synchronization point in the File subsystem is a plural one and
+lies in the descriptors for the drives known to the system.
+
+Like the FSIR, each drive can be locked either shared or exclusive. Most
+accesses require only a shared lock, allowing the maximum throughput for the
+drive, for those filesystems that allow multiple requests to occur at once.
+Examples of operations that require exclusive access to the drive are:
+	* formatting a disk in the drive
+	* registering a disk in the drive
+	* copying disks with the drive
+	* undeleting a file on a disk in the drive
+
+Unlike the FSIR, however, it's not threads that vie for control of the drive,
+but disks. When a shared lock on a drive is gained by a thread, all threads
+wishing a shared lock on the drive for accessing that same disk will be
+granted the shared lock, while a thread wishing shared access for a different
+disk will be locked out until all threads using the current disk are done, at
+which point it will be allowed to continue.
+
+The synchronization hierarchy given above dictates rule 2:
+
+	Rule (2):	Whenever a thread has a drive locked, it must also
+			have the FSIR locked for the duration.
+
+As I mentioned above, these things tend always to have at least one exception,
+and the exception in our case lies in the disk formatting function of the kernel
+or any other application that requires exclusive access to a particular drive,
+but not exclusive access to the file system as a whole. For such long-term
+operations, if the thread were required to retain shared control of the FSIR
+until the operation completed, other threads that might require exclusive
+access to the FSIR, to register a disk in another drive, for example, would be
+locked out.
+
+To deal with this, a couple rules:
+
+	Rule (3):	When locking a drive for exclusive access, the thread
+			must gain exclusive access to the FSIR, then perform
+			a non-blocking PSem (PTimedSem with a wait of 0)
+			on the exclusive-access semaphore of the drive. If
+			the P fails, the lock fails.
+
+	Rule (4):	A drive that is locked for exclusive access for a
+			long-term operation must be marked as busy before
+			the FSIR is released. When an abortable shared lock
+			is attempted on a busy drive, the lock will fail
+			with ERROR_DISK_UNAVAILABLE.
+
+
+			     Miscellaneous Notes
+
+The exclusive for the FSInfoResource is used in one other seemingly-random
+place: to ensure consistency of all the threads' directory stacks when seeing
+if a directory is in-use. It proved too difficult to have a separate semaphore
+that could be grabbed when changing a thread's directory stack and when
+traversing the directory stack of every thread in the system. So instead, when
+the IFS driver needs to perform such a traversal, the FileForEachPath function
+in the kernel locks the FSIR for exclusive access, while all the functions
+that manipulate the path stack must lock the FSIR for shared access to invoke
+the appropriate functions (DR_FS_CUR_PATH_SET, DR_FS_CUR_PATH_DELETE) in the
+IFS driver.
+
+******************************************************************************
+*                                                                            *
+*		       VM Modes and Synchronization			     *
+*									     *
+******************************************************************************
+
+A VM file is a type of memory mapped file that treats the file as a heap and
+caches blocks of the file in blocks of memory.  This caching forces VM files
+to have more complex access modes and synchronization mechanisms than normal
+files do.
+
+Normal files are opened for reading and/or writing and can be opened "deny
+read" and/or "deny write" also.  Network operating systems propagate these
+modes over the network to the server, where they are enforced.  Using these
+mechanisms for VM files (as was done in 1.X), however, does not work
+transparently over the network because of the caching involved.
+
+To solve this problem VM files are treated specially.
+
+VM files have two attributes that control the way that the VM file behaves.
+These flags are stored in the FEA_FLAGS extended attribute (of type
+GeosFileHeaderFlags):
+
+GFHF_SHARED_MULTIPLE:
+	Indicates that the file can be opened for writing multiple
+	times.  Any access of the file must be within VMStartExclusive
+	and VMEndExclusive.  All changes are flushed to the file by
+	VMEndExclusive.  Not all applications will support this
+	behavior. The default open mode for this type of file is read/write.
+
+GFHF_SHARED_SINGLE:
+	Indicates that the file will primarily be viewed on the
+	network and therefore:
+	- the default for opening the file is read-only
+	- readers of the file need to read in all parts of the file at once
+	  (relying on swap space to hold them) while holding exclusive access
+	  to the file; writers must gain exclusive access to the file during
+	  any save/save-as/revert operation, but otherwise may demand-page the
+	  file.
+
+When a VM file is opened (via VMOpen), the following flags are passed:
+
+	; If neither VMAF_FORCE_READ_ONLY or VMAF_FORCE_READ_WRITE are passed,
+	; then the file is opened in the default mode based on the file
+	; attributes (GFHF_SHARED_MULTIPLE and GFHF_SHARED_SINGLE).
+
+VMAccessFlags	record
+    VMAF_FORCE_READ_ONLY:1
+	; If set then force the file to be opened read only, even if
+	; the default would be to open the file read/write.
+    VMAF_FORCE_READ_WRITE:1
+	; If set then force the file to be opened read-write, even if
+	; the default would be to open the file read-only
+    VMAF_FORCE_DENY_WRITE:1
+	; If set then open file deny write
+    VMAF_DISALLOW_SHARED_MULTIPLE:1
+	; If set then files with the SHARED_MULTIPLE attribute cannot be
+	; opened
+    VMAF_USE_BLOCK_LEVEL_SYNCHRONIZATION:1
+	; If set then the block-level synchronization of the VM
+	; code is assumed to be sufficient and the {Start/End}Exclusive
+	; mechanism is not used.  This is primarily intended for system
+	; software and should be used only for files that are known to
+	; not be accessed over a network.
+    :3
+VMAccessFlags	end
+
+
+The routine MapVMModeToFlags is used to map the flags passed to
+VMOpen, the file's type and other information into internal flags used
+for the file.
+
+	Inputs			Output
+	------			------
+
+Mode	File Status
+----	-----------
+

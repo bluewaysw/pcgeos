@@ -1,0 +1,282 @@
+/*
+ * Project:	PC/GEOS
+ * Module:	TEdit (Sample PC/GEOS application)
+ * File:	cteditui.goc
+ *
+ * Author:	Tony Requist
+ *
+ * Ported to GOC 10/13/04 jfh
+ */
+
+/* ----------------------------------------------------------------------------
+	Include files
+-----------------------------------------------------------------------------*/
+
+@include "ctedit.goh"
+@include "Art/icons.goh"
+
+
+/* ----------------------------------------------------------------------------
+	Application Object
+-----------------------------------------------------------------------------*/
+
+@start	AppResource;
+
+@object GenApplicationClass TEApp = {
+	GI_comp = @TEPrimary;
+	GI_visMoniker = list {@TextEditorTextMoniker, @TextEditorLCMoniker,
+		@TextEditorSCMoniker, @TextEditorTinyTCMoniker};
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @TEPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) = @TEDocumentControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) =
+		@TEDocumentControl,
+		@TEDisplayControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+		@TEDocumentControl,
+		@TEPrintControl,
+		@TEDisplayControl,
+		@TESearchReplaceControl,
+		@TESpellControl,
+		@SizesMenu,
+		@TEEditControl;
+
+	ATTR_GEN_INIT_FILE_CATEGORY = "ctedit";
+	ATTR_GEN_APPLICATION_PRINT_CONTROL = @TEPrintControl;
+}
+
+@visMoniker TextEditorTextMoniker = "CText File Editor";
+
+@end	AppResource;
+
+/* ----------------------------------------------------------------------------
+	 Primary window.
+-----------------------------------------------------------------------------*/
+
+/*
+ * The GenDocumentControl must be a child of the primary, and must be
+ * on the active list.
+ */
+
+@start	Interface;		/* this resource is for misc UI objects */
+
+@object GenPrimaryClass TEPrimary = {
+	GI_comp = @FileMenu, @EditMenu, @SizesMenu, @TEDisplayControl,
+		@TEDisplayGroup;
+	GI_attrs = @default | GA_TARGETABLE | GA_KBD_SEARCH_PATH;
+	HINT_SIZE_WINDOW_AS_DESIRED;
+	ATTR_GEN_HELP_CONTEXT = "TOC";
+}
+
+@object GenInteractionClass FileMenu = {
+	GI_comp = @TEDocumentControl, @TEPrintControl;
+	GI_attrs = @default | GA_TARGETABLE | GA_KBD_SEARCH_PATH;
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+}
+
+@object PrintControlClass TEPrintControl = {
+	GI_states = @default | GS_ENABLED;
+	PCI_docNameOutput = @TEDocumentGroup;
+	PCI_attrs = @default & ~PCA_PAGE_CONTROLS;
+	PCI_output = (TO_APP_MODEL);
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TEDocumentClass};
+}
+
+@object GenInteractionClass EditMenu = {
+	GI_comp = @TEEditControl, @TESearchReplaceControl, @TESpellControl;
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_EDIT_MENU);
+}
+
+@object GenEditControlClass TEEditControl = {
+	ATTR_GEN_CONTROL_PROHIBIT_UI = GECF_CLIP_ART | GECF_CHAR_MAP;
+}
+
+@object SearchReplaceControlClass TESearchReplaceControl =  {
+	GI_visMoniker = 'F', "Find and Replace";
+	GI_kbdAccelerator = ctrl 'f'; 
+	GII_visibility = GIV_DIALOG;
+	ATTR_SEARCH_CONTROL_INTERACT_ONLY_WITH_TARGETED_TEXT_OBJECTS;
+	ATTR_SEARCH_CONTROL_SELECTION_TYPE = SDT_TEXT;
+}
+
+@object SpellControlClass TESpellControl = {
+	GI_visMoniker = 'h', "Check Spelling";
+//	GI_kbdAccelerator = specificUI F7;
+	GII_visibility = GIV_DIALOG;
+	ATTR_SPELL_CONTROL_INTERACT_ONLY_WITH_TARGETED_TEXT_OBJECTS;
+}
+
+@object PointSizeControlClass SizesMenu = {
+	GI_visMoniker = 'z', "Sizes";
+	GI_attrs = @default | GA_TARGETABLE | GA_KBD_SEARCH_PATH;
+	GII_visibility = GIV_POPUP;
+	GCI_output = (TO_APP_MODEL);	/* Send to the document object */
+	ATTR_GEN_CONTROL_PROHIBIT_UI = PSCF_10 | PSCF_18 | PSCF_24 |
+											 PSCF_36 | PSCF_54 | PSCF_72 | PSCF_SMALLER |
+											 PSCF_LARGER | PSCF_CUSTOM_SIZE;
+}
+
+@object GenDisplayControlClass TEDisplayControl = {
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_WINDOW_MENU);
+	HINT_DISPLAY_CONTROL_NO_FEATURES_IF_TRANSPARENT_DOC_CTRL_MODE;
+}
+
+/* ----------------------------------------------------------------------------
+	 UI Document Control
+-----------------------------------------------------------------------------*/
+
+/*
+ * The GenDocumentControl should be put in the same resource as the
+ * GenPrimary (for efficiency).  The GenDocumentControl will build the
+ * file menu.
+ */
+
+@object GenDocumentControlClass TEDocumentControl = {
+	GI_attrs = @default | GA_TARGETABLE | GA_KBD_SEARCH_PATH;
+	/* Special attributes for working with DOS files */
+	GDCI_attrs = ((GDCM_SHARED_SINGLE << GDCA_MODE_OFFSET) |
+			 GDCA_SUPPORTS_SAVE_AS_REVERT |
+			 (GDCT_NEW << GDCA_CURRENT_TASK_OFFSET) |
+			 GDCA_NATIVE | GDCA_MULTIPLE_OPEN_FILES);
+	GDCI_features = GDCF_READ_ONLY_SUPPORTS_SAVE_AS_REVERT |
+			 GDCF_SINGLE_FILE_CLEAN_CAN_NEW_OPEN;
+	GDCI_noNameText  = "No File";
+	GDCI_documentGroup = TEDocumentGroup;
+	GDCI_enableDisableList = TEUIEnableList;
+	ATTR_GEN_CONTROL_PROHIBIT_UI = GDCF_QUICK_BACKUP ;
+}
+
+@chunk optr TEUIEnableList[] = {@TEPrintControl};
+
+@end Interface;
+
+/* ----------------------------------------------------------------------------
+	 Document Group
+-----------------------------------------------------------------------------*/
+
+/*
+ * The GenDocumentGroup should be put in a resource of its own run by
+ * the application thread.
+ */
+
+@start DocumentUI;
+
+@object GenDocumentGroupClass TEDocumentGroup = {
+	GI_attrs = @default | GA_TARGETABLE | GA_KBD_SEARCH_PATH;
+	/* Special attributes for working with DOS files */
+	GDGI_attrs = (GDGA_APPLICATION_THREAD |
+					GDGA_AUTOMATIC_UNDO_INTERACTION |
+					GDGA_CONTENT_DOES_NOT_MANAGE_CHILDREN |
+					GDGA_NATIVE |
+					GDGA_LARGE_CONTENT);
+	GDGI_untitledName = "BLANK";
+	GDGI_documentClass = &TEDocumentClass;
+	GDGI_genDisplayGroup = TEDisplayGroup;
+	GDGI_genDisplay = TEDisplay;
+	GDGI_genView = TEView;
+	GDGI_documentControl = TEDocumentControl;
+}
+
+@end DocumentUI;
+
+/*-----------------------------------------------------------------------------
+	GenDisplayGroup object
+-----------------------------------------------------------------------------*/
+
+@start Interface;
+
+@object GenDisplayGroupClass TEDisplayGroup = {
+	GI_attrs = @default | GA_TARGETABLE | GA_KBD_SEARCH_PATH;
+	HINT_DEFAULT_FOCUS;
+	HINT_DEFAULT_TARGET;
+	HINT_INITIAL_SIZE = {SST_PCT_OF_FIELD_WIDTH | PCT_70,
+			SST_PCT_OF_FIELD_HEIGHT | PCT_55, 0};
+}
+
+@end Interface;
+
+/*-----------------------------------------------------------------------------
+	Block to duplicate for each document
+-----------------------------------------------------------------------------*/
+
+@start DisplayUI;
+
+@object GenDisplayClass TEDisplay = {
+	GI_comp = @TEView;
+	/* The display starts not usable since it is not in the generic tree.
+		It will be set usable after being added to the display control. */
+	GI_states = @default & ~GS_USABLE;
+	GI_attrs = @default | GA_TARGETABLE | GA_KBD_SEARCH_PATH;
+	ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+}
+
+@object GenViewClass TEView = {
+	GI_attrs = @default | GA_TARGETABLE | GA_KBD_SEARCH_PATH;
+	GVI_horizAttrs = GVDA_SCROLLABLE | GVDA_DONT_DISPLAY_SCROLLBAR;
+	GVI_vertAttrs = GVDA_SCROLLABLE;
+	GVI_attrs = GVA_DRAG_SCROLLING | GVA_WINDOW_COORDINATE_MOUSE_EVENTS |
+			 GVA_DONT_SEND_KBD_RELEASES | GVA_FOCUSABLE;
+	HINT_DEFAULT_TARGET;
+	HINT_DEFAULT_FOCUS;
+	/* try a content */
+//	GVI_content = @TEContent;
+}
+
+/* let's try the content */
+/*@object VisContentClass TEContent = {
+	 VCNI_view = @TEView;
+    VCNI_attrs = @default | VCNA_LARGE_DOCUMENT_MODEL
+	    	    	 | VCNA_WINDOW_COORDINATE_MOUSE_EVENTS
+			 | VCNA_SAME_WIDTH_AS_VIEW;
+    VI_attrs = @default & ~VA_MANAGED;
+    VI_optFlags = @default & ~(VOF_GEOMETRY_INVALID | VOF_GEO_UPDATE_PATH);
+    VI_geoAttrs = @default | VCGA_CUSTOM_MANAGE_CHILDREN;
+}
+*/
+@object TELargeTextClass TETextEdit = {
+	VTI_features = VTF_ALLOW_UNDO;
+	VTI_state = VTS_EDITABLE | VTS_SELECTABLE | VTS_TARGETABLE;
+	VTI_filters = (VTF_FILTER_CLASS & VTFC_DOS_CHARACTER_SET);
+	VTI_output = process;
+	VTI_charAttrRuns = ((VTDS_9 << VTDCA_SIZE_OFFSET) | VTDF_URW_MONO);
+	VLTI_displayMode = VLTDM_DRAFT_WITHOUT_STYLES;
+	VLTI_attrs = VLTA_EXACT_HEIGHT;
+	VLTI_regionArray = @TETextRegionArray;
+	ATTR_VIS_TEXT_DO_NOT_NOTIFY_CONTENT;
+}
+
+@chunk ChunkArrayHeader TETextRegionArray = {
+    0,
+    sizeof(VisLargeTextRegionArrayElement),
+    0,
+    sizeof(ChunkArrayHeader)
+};
+
+@end DisplayUI;
+
+/*-----------------------------------------------------------------------------
+	Strings
+-----------------------------------------------------------------------------*/
+
+@start StringsUI, data;
+
+@chunk char CharactersFilteredString[] =
+	"\"\001\" contains characters that cannot be displayed. If you choose to save this file, these characters will be deleted.";
+
+@chunk char FileReadErrorString[] =
+	"Unable to read from file \"\001\".";
+
+@chunk char FileWriteErrorString[] =
+	"Unable to write to file \"\001\".";
+
+@chunk char FileTooBigString[] =
+	"The file \"\001\" is too big to fit entirely in "
+	"memory. Only part of it will be shown. If you choose "
+	"to save this file, it will be truncated.";
+
+
+@chunk char nonDosCharsString[] = "The text that was pasted contained non-DOS characters that were replaced with underscores (_).";
+
+@end StringsUI;

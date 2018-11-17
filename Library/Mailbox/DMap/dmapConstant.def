@@ -1,0 +1,88 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1994 -- All Rights Reserved
+
+PROJECT:	Clavin
+MODULE:		Driver map -- constants & structures
+FILE:		dmapConstant.def
+
+AUTHOR:		Adam de Boor, Mar 30, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	3/30/94		Initial revision
+
+
+DESCRIPTION:
+	
+		
+	$Id: dmapConstant.def,v 1.1 97/04/05 01:19:36 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+DriverMapFlags	record
+    DMF_HAVE_CALLBACK:1		; set if there's a callback registered for
+				;  the map.
+    DMF_DRIVER_DIR_CHANGED:1	; set if driver directory has changed in
+				;  some way that might have made additional
+				;  drivers available. Cleared when an attempt
+				;  to find a driver token fails, meaning the
+				;  entire driver directory contents have been
+				;  enumerated.
+    DMF_AUTO_DETECT:1		; set if should look for new drivers when the
+				;  map is reinitialized and should look for
+				;  new drivers whenever the directory changes
+    :5
+DriverMapFlags	end
+
+.assert	offset DMF_AUTO_DETECT eq offset DMAPF_AUTO_DETECT
+
+DriverMapHeader	struct
+    DMH_meta		LMemBlockHeader
+    DMH_init		word			; entry number of routine to
+						;  call when driver added to map
+    DMH_token		GeodeToken		; token of drivers managed by us
+    DMH_protocol 	ProtocolNumber		; protocol number expected when
+						;  loading a driver
+    DMH_callbacks	lptr.ChunkArrayHeader	; Array of DriverMapCallback
+						;  structures of routines to
+						;  call when a particular
+						;  driver is loaded
+    DMH_fcnIDs		lptr.FilePathID		; Chunk holding the FilePathID
+						;  structures for the driver
+						;  directory
+    DMH_errMsgs		lptr.DriverMapErrMsg	; Head of the list of custom
+						;  error messages for drivers
+    DMH_flags		DriverMapFlags
+    DMH_sysPath		label	char		; subdirectory under SP_SYSTEM
+						;  where drivers are located
+    
+DriverMapHeader	ends
+
+DriverMapEntry	struct
+    DME_token	dword			; 32-bit token for the driver
+    DME_attrs	word			; attributes that follow the token
+					;  in the DriverTable
+    DME_handle	hptr.GeodeHeader	; handle of loaded driver (0 if driver
+					;  not loaded)
+    DME_name	FileLongName		; name of the driver
+DriverMapEntry	ends
+
+DriverMapCallback struct
+    DMC_token	dword			; 32-bit token for driver whose loading
+					;  should trigger the callback
+    DMC_routine	word			; entry # of routine to call
+    DMC_cx	word			; cx to pass to callback
+    DMC_dx	word			; dx to pass to callback
+DriverMapCallback ends
+
+DriverMapErrMsg	struct
+    DMEM_next	lptr.DriverMapErrMsg
+    DMEM_entry	word			; entry # of driver
+    DMEM_msg	label	char		; null-terminated error message
+DriverMapErrMsg	ends

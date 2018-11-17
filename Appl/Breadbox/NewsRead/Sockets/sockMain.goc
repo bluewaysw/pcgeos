@@ -1,0 +1,911 @@
+/**********************************************************************
+ * FILE: SOCKETS.GOC - TCP Socket Code
+ * Project - News Reader
+ * Started 4/28/98
+ **********************************************************************/
+
+/**********************************************************************
+ * Includes                                                           *
+ **********************************************************************/
+
+@include <stdapp.goh>
+@include <socket.goh>
+
+@include "utils.goh"
+#include <ansi/string.h>
+#include <ansi/stdlib.h>
+#include <ansi/stdio.h>
+#include <sockmisc.h>
+
+@include "newsread.goh"
+@include "extern.goh"
+@include "Localize/strings.goh"
+@include "UIClass/statdiag.goh"
+@include "options.goh"
+#include "news.h"
+#include "newssock.h"
+@include "newsdata.goh"
+
+/**********************************************************************
+ * Globals                                                            *
+ **********************************************************************/
+
+Socket NewsSocket;
+//byte G_socketData[2048] ;
+MemHandle G_socketData = 0 ;
+#define NEWS_SOCKET_BUFFER_SIZE         2048
+word G_socketDataPos = 0 ;
+word G_socketDataLen = 0 ;
+
+char TCPDomain[] = "TCPIP";
+#define TCP_DOMAIN_LEN  5
+
+/* FR */
+#define SGETC_LONG_TIMEOUT  (60*60)
+#define QUICK_TIMEOUT       (10)
+
+word sgetc(void) ;
+
+ResolvedTCPAddress   G_hostaddr = {
+    {   {0, MANUFACTURER_ID_SOCKET_16BIT_PORT},
+        TCP_DOMAIN_LEN,
+        TCPDomain, 0}
+};
+
+extern Boolean G_onlineMode ;
+Boolean G_domainOpen = FALSE ;
+
+
+/**********************************************************************
+ * Internal Functions                                                 *
+ **********************************************************************/
+
+Boolean
+ICheckForAuthorizationRequest(TCHAR *buf) {
+    
+    if(buf)
+        if(strncmp(buf, "480", 3) == 0)
+            return(TRUE) ;
+
+    return(FALSE) ;
+}
+
+Boolean 
+ISendAuthorization(char *lineBuf) {
+    TCHAR *response ;
+    Boolean bAuthInfoRequested = FALSE;
+
+    /* get the user name and the password if not already entered */
+    while(!@call UserNameEntry::MSG_VIS_TEXT_GET_TEXT_SIZE()) {
+        word command ;
+        
+        /* get the login */
+        @send AuthorizationRequiredGlyph::
+                MSG_GEN_SET_USABLE(VUM_NOW) ;
+        @send PasswordRequiredGlyph::
+                MSG_GEN_SET_NOT_USABLE(VUM_NOW) ;
+        command = UserDoDialog(@LoginDialog) ;
+
+        if(command == IC_DISMISS) {
+
+            /* clear login and password */
+            @send UserNameEntry::MSG_VIS_TEXT_DELETE_ALL() ;
+            @send PasswordEntry::MSG_VIS_TEXT_DELETE_ALL() ;
+
+            return(TRUE) ;
+        }
+	bAuthInfoRequested = TRUE;
+    }
+
+    strcpy(lineBuf, "AUTHINFO USER ") ;
+
+    /* get the login */
+    @call UserNameEntry::MSG_VIS_TEXT_GET_ALL_PTR(&lineBuf[14]) ;
+
+    /* send the login */
+    strcat(lineBuf, "\r\n") ;
+    sputs(lineBuf) ;
+
+    /* get the response */
+    response = (TCHAR *) sgets(lineBuf) ;
+        
+    if(!response) 
+        return(TRUE) ;
+
+    /* if password requested */
+    if(strncmp(response, "381", 3) == 0) {
+
+        word command ;
+
+        /* enter password */
+        while(!@call PasswordEntry::MSG_VIS_TEXT_GET_TEXT_SIZE()) {
+        
+            /* enter the password */
+            @send AuthorizationRequiredGlyph::
+                    MSG_GEN_SET_NOT_USABLE(VUM_NOW) ;
+            @send PasswordRequiredGlyph::
+                    MSG_GEN_SET_USABLE(VUM_NOW) ;
+            command = UserDoDialog(@LoginDialog) ;
+
+            if(command == IC_DISMISS) {
+
+                @send PasswordEntry::MSG_VIS_TEXT_DELETE_ALL() ;
+                @send UserNameEntry::MSG_VIS_TEXT_DELETE_ALL() ;
+
+                return(TRUE);
+            }
+	    bAuthInfoRequested = TRUE;
+        }
+    
+        /* get the password */
+        strcpy(lineBuf, "AUTHINFO PASS ") ;
+        @call PasswordEntry::MSG_VIS_TEXT_GET_ALL_PTR(&lineBuf[14]) ;
+
+        /* send the login */
+        strcat(lineBuf, "\r\n") ;
+        sputs(lineBuf) ;
+
+        /* get the response */
+        response = (TCHAR *) sgets(lineBuf) ;
+        
+        if(!response) 
+            return(TRUE) ;
+
+    }
+    
+    if(strncmp(response, "281", 3) == 0) {
+
+        /* accepted */
+
+	/* Copy the authorization info into the Settings dialog if the Login
+	   dialog was raised at any point. */
+	if (bAuthInfoRequested)
+		@send process::MSG_NP_SETTINGS_TRANSFER_AUTHINFO(TRUE);
+
+        return(FALSE) ;
+    }
+
+    @send PasswordEntry::MSG_VIS_TEXT_DELETE_ALL() ;
+    @send UserNameEntry::MSG_VIS_TEXT_DELETE_ALL() ;
+
+    /* autorization failed dialog */
+    NotifyMessage(@AuthorizationFailedMsg) ;
+    
+    return(TRUE) ;
+}
+
+void
+CloseMedium(void) {
+
+#if 0	/* I'm disabling medium closes for now. The dialer handles this 
+		   process. -dhunter 2/22/2000 */
+
+    struct Caveat {
+        /* Used to force the order of the following two items */
+        SocketAddress sa;
+        TcpAccPntResolvedAddress xa; /* Must follow SocketAddress */
+    };
+    struct Caveat ca;
+//    word casize = sizeof(TcpAccPntResolvedAddress);
+    MediumAndUnit mau;
+    char tcpDomain[] = "TCPIP";
+
+    ca.sa.SA_port.SP_port = 80;
+    ca.sa.SA_port.SP_manuf = MANUFACTURER_ID_SOCKET_16BIT_PORT;
+    ca.sa.SA_domainSize = sizeof(tcpDomain)-1;
+    ca.sa.SA_domain = tcpDomain;
+    ca.sa.SA_addressSize = sizeof(TcpAccPntResolvedAddress);
+    ca.xa.TAPRA_linkSize = 3;
+    ca.xa.TAPRA_linkType = LT_ID;
+    ca.xa.TAPRA_accPntID = 1;
+
+    if (!SocketGetAddressMedium(&ca, &mau)) {
+
+		// close the medium
+        SocketCloseDomainMedium(tcpDomain,
+                                              &mau, FALSE);
+    }
+
+    G_domainOpen = FALSE ;
+#endif
+}
+
+void
+ForceCloseMedium(void) {
+
+    struct Caveat {
+        /* Used to force the order of the following two items */
+        SocketAddress sa;
+        TcpAccPntResolvedAddress xa; /* Must follow SocketAddress */
+    };
+    struct Caveat ca;
+//    word casize = sizeof(TcpAccPntResolvedAddress);
+    MediumAndUnit mau;
+    char tcpDomain[] = "TCPIP";
+
+    ca.sa.SA_port.SP_port = 80;
+    ca.sa.SA_port.SP_manuf = MANUFACTURER_ID_SOCKET_16BIT_PORT;
+    ca.sa.SA_domainSize = sizeof(tcpDomain)-1;
+    ca.sa.SA_domain = tcpDomain;
+    ca.sa.SA_addressSize = sizeof(TcpAccPntResolvedAddress);
+    ca.xa.TAPRA_linkSize = 3;
+    ca.xa.TAPRA_linkType = LT_ID;
+    ca.xa.TAPRA_accPntID = 1;
+
+    if (!SocketGetAddressMedium(&ca, &mau)) {
+
+		// close the medium
+        SocketCloseDomainMedium(tcpDomain,
+                                              &mau, TRUE);
+    }
+
+    G_domainOpen = FALSE ;
+}
+
+void
+OpenMedium(void) {
+
+    struct Caveat {
+        /* Used to force the order of the following two items */
+        SocketAddress sa;
+        TcpAccPntResolvedAddress xa; /* Must follow SocketAddress */
+    };
+    struct Caveat ca;
+//    word casize = sizeof(TcpAccPntResolvedAddress);
+    MediumAndUnit mau;
+    char tcpDomain[] = "TCPIP";
+
+    ca.sa.SA_port.SP_port = 80;
+    ca.sa.SA_port.SP_manuf = MANUFACTURER_ID_SOCKET_16BIT_PORT;
+    ca.sa.SA_domainSize = sizeof(tcpDomain)-1;
+    ca.sa.SA_domain = tcpDomain;
+    ca.sa.SA_addressSize = sizeof(TcpAccPntResolvedAddress);
+    ca.xa.TAPRA_linkSize = 3;
+    ca.xa.TAPRA_linkType = LT_ID;
+    ca.xa.TAPRA_accPntID = 1;
+
+    if (!SocketGetAddressMedium(&ca, &mau)) {
+
+		// close the medium
+		SocketOpenDomainMedium(&ca, SOCKET_NO_TIMEOUT);
+    }
+}
+
+/**********************************************************************
+ * Functions                                                          *
+ **********************************************************************/
+
+/*-------------------------------------------------------------------------
+ | Routine:  ConnectToServer
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Try to connect to the server and find out if posting is allowed.
+ |    Of course, there are plenty of reasons a connection is not made.
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE = error, else FALSE
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    EDG  ??/??/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+Boolean ConnectToServer()
+{
+    Boolean haveError = FALSE ;
+    UnresolvedTCPAddress hostname;
+    char *buffer, codebuf[4];
+    char lineBuf[1024] ;
+    word error, size, code;
+
+    /* Stop if we are already connected */
+    if (NewsSocket != 0) {
+        return(0);
+    }
+
+    /* Setup the server name */
+    @call NewsServerName::MSG_VIS_TEXT_GET_ALL_PTR(hostname.UTA_ip);
+
+@ifndef COMPILE_OPTION_NO_CONNECTING_DECONNECTING_STATUS
+    @call DownloadGroupsDialog::MSG_STATUS_DIALOG_SET_TITLE_OPTR(
+            @DownloadStatusConnecting) ;
+    @call DownloadGroupsDialog::MSG_STATUS_DIALOG_SET_TEXT_PTR("");
+    @send DownloadGroupsDialog::MSG_STATUS_DIALOG_OPEN(FALSE, TRUE, 
+                                                        hostname.UTA_ip, FALSE) ;
+@else
+    @send NewsApp::MSG_GEN_APPLICATION_MARK_BUSY() ;
+@endif
+
+    /* We are currently not connected */
+    NewsConnectionStatus = 0;
+  
+    if (hostname.UTA_ip[0] == '\0') {
+        
+        haveError = TRUE ;
+    
+    } else {
+
+        TCHAR *p_split ;
+        
+        /* TBD: currently, we hard code the use of access point #1. Must change. */
+        hostname.UTA_link.TAPEA_linkSize =
+                sizeof(hostname.UTA_link.TAPEA_linkType) +
+                sizeof(hostname.UTA_link.TAPEA_accPntID);
+        hostname.UTA_link.TAPEA_linkType = LT_ID;
+        hostname.UTA_link.TAPEA_accPntID = 1;
+
+        /* strip news port off */
+
+        G_hostaddr.RTA_sock.SA_port.SP_port = NEWS_SERVER_PORT;
+        p_split = strchr(hostname.UTA_ip, ':') ;
+        if(p_split) {
+
+            G_hostaddr.RTA_sock.SA_port.SP_port = atoi(p_split + 1) ;
+            (*p_split) = 0 ;
+        }
+
+      
+        /* Resolve the server address into its ip address */
+        G_hostaddr.RTA_sock.SA_addressSize = 
+                            SocketResolve(  
+                                TCPDomain, 
+                                &hostname,
+                                sizeof(hostname.UTA_link) + 
+                                    strlen(hostname.UTA_ip), 
+                                &G_hostaddr.RTA_addr,
+                                sizeof(G_hostaddr.RTA_addr));
+
+        /* Determine if there was an error */
+        if (G_hostaddr.RTA_sock.SA_addressSize == 0) {
+            
+            error = SE_BUFFER_TOO_SMALL;
+        
+            /* Act on the error, with fail cases */
+            switch(error) {
+            
+                case 0:
+                    break;
+      
+                case SE_BUFFER_TOO_SMALL:
+                case SE_DESTINATION_UNREACHABLE:
+                    ErrorMessage(@ServerUnreachable);
+                    haveError = TRUE ;
+                    break ;
+      
+                case SE_TEMPORARY_ERROR:
+                    ErrorMessage(@TemporaryError);
+                    haveError = TRUE;
+                    break ;
+            }
+        }
+
+        if (!haveError)  {
+
+            /* Create the socket now */
+            NewsSocket = SocketCreate(SDT_STREAM);
+
+		    /* connect to the requested address */
+
+            if(G_onlineMode) {
+		        error = SocketOpenDomainMedium(
+				    (SocketAddress *) &G_hostaddr, SOCKET_NO_TIMEOUT);
+
+                switch(error) {
+                
+                    case SE_NORMAL:
+                    case SE_NOT_IMPLEMENTED:
+                        G_domainOpen = TRUE ;
+                        break ;
+
+                    default:
+                        SocketClose(NewsSocket);
+                        NewsSocket = 0;
+                        ErrorMessage(@ConnectionRefused);
+                        haveError = TRUE ;
+                        break ;
+                }
+            }
+
+            /* from now we have to close the medium */
+            if (!haveError) {
+
+                /* Connect to the server, then report any errors. */
+                error = SocketConnect(NewsSocket, &G_hostaddr, SOCKET_NO_TIMEOUT);
+
+                switch (error) {
+                
+                    case SE_NORMAL:
+                        break;
+          
+                    case SE_CONNECTION_REFUSED:
+                        SocketClose(NewsSocket);
+                        CloseMedium();
+                        NewsSocket = 0;
+                        ErrorMessage(@ConnectionRefused);
+                        haveError = TRUE ;
+                        break ;
+          
+                    default:
+                        SocketClose(NewsSocket);
+                        CloseMedium();
+                        NewsSocket = 0;
+                        ErrorMessage(@ConnectionError);
+                        haveError = TRUE ;
+                        break ;
+                }
+            }
+
+            if(!haveError) {
+            
+                G_socketData = MemAlloc(NEWS_SOCKET_BUFFER_SIZE,
+                                            HF_SWAPABLE, 0) ;
+                G_socketDataPos = 0 ;
+                G_socketDataLen = 0 ;
+            
+                if(!G_socketData)
+                    haveError = TRUE ;
+            }
+
+            if (!haveError)  {
+              
+                /* Check for incoming data (looking for code) */
+                buffer = sgets(lineBuf);
+                if(buffer)
+                    size = strlen(buffer);
+                else
+                    size = 0;
+
+                /* If not enough data was received, report an error and abort */
+                if (size == 0 || size < 3) {
+
+		    if (NewsSocket != 0)	/* sgets may have disconnected */
+		    {
+			SocketClose(NewsSocket);
+			CloseMedium();
+			NewsSocket = 0;
+		    }
+					if (G_socketData)
+					{
+	                    MemFree(G_socketData) ;
+						G_socketData = 0 ;
+					}
+                    ErrorMessage(@ServerNotResponding);
+                    haveError = TRUE ;
+              
+                } else {
+                    
+                    /* Convert the code string into a number */
+                    strncpy(codebuf, buffer, 3);
+                    codebuf[3] = 0;
+                    code = atoi(codebuf);
+
+                    /* Keep reading any more data there is (header junk that a server may */
+                    /* spew out) */
+
+                    /* Show that we have some type of connection */
+                    if(code == 200) {
+                    
+                        /* We are connected and are allowed to post messages */
+                        NewsConnectionStatus = NCS_CONNECTED | NCS_POSTING_ALLOWED;
+                    
+                    } else if (code == 201) {
+                        
+                        /* We are connected, but not allowed to post messages */
+                        NewsConnectionStatus = NCS_CONNECTED;
+                    
+                    } else if (code == 502) {
+                        
+                        /* Sorry, not allowed here */
+                        SocketClose(NewsSocket);
+                        NewsSocket = 0;
+                        CloseMedium();
+						if (G_socketData)
+						{
+							MemFree(G_socketData) ;
+							G_socketData = 0 ;
+						}
+                        ErrorMessage(@ErrorPermissionDenied);
+                        haveError = TRUE ;
+                    
+                    } else {
+                        
+                        /* Got a strange error, just say something and abort */
+                        SocketClose(NewsSocket);
+                        NewsSocket = 0;
+                        CloseMedium();
+						if (G_socketData)
+						{
+							MemFree(G_socketData) ;
+							G_socketData = 0 ;
+						}
+                        ErrorMessage(@UnknownServerError);
+                        haveError = TRUE ;
+                    }
+                }
+            }
+        }
+    }
+
+    /* Got here, must be a valid connection */
+@ifndef COMPILE_OPTION_NO_CONNECTING_DECONNECTING_STATUS
+    @call DownloadGroupsDialog::MSG_STATUS_DIALOG_CLOSE() ;
+@else
+    @send NewsApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY() ;
+@endif
+ 
+    /* Be sure the socket is closed if we got an error */
+    if (haveError)  {
+        DisconnectFromServer(FALSE) ;
+    }
+
+    @send process::MSG_NP_ACTION_BAR_UPDATE_BUTTONS();
+
+    return(haveError);
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  DisconnectFromServer
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Done with the server.  Send a command to the news server and
+ |    disconnect.
+ |
+ | Inputs:
+ |    Boolean showDialog          -- TRUE if disconnect dialog desired.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    EDG  ??/??/98  Created
+ |    EDG  07/27/00  Removed SocketCloseSend & SocketReset
+ |
+ *-----------------------------------------------------------------------*/
+void DisconnectFromServer(Boolean showDialog)
+{
+//	NotifyMessage(@DebugBeforeSocketClose) ;
+
+
+    /* If we are connected, send a quit command */
+    if (NewsSocket != 0) {
+
+        TCHAR serverName[MAX_IP_ADDR_STRING_LENGTH +1] ;
+
+        /* Setup the server name */
+        @call NewsServerName::MSG_VIS_TEXT_GET_ALL_PTR(serverName);
+
+@ifndef COMPILE_OPTION_NO_CONNECTING_DECONNECTING_STATUS
+        if (showDialog)  {
+            @call DownloadGroupsDialog::MSG_STATUS_DIALOG_SET_TITLE_OPTR(
+                    @DownloadStatusDisconnecting) ;
+            @call DownloadGroupsDialog::MSG_STATUS_DIALOG_SET_TEXT_PTR("");
+            @send DownloadGroupsDialog::MSG_STATUS_DIALOG_OPEN(FALSE,TRUE, 
+                                                        serverName, FALSE) ;
+        }
+@else
+        @send NewsApp::MSG_GEN_APPLICATION_MARK_BUSY() ;
+@endif
+//      sputs("QUIT\r\n");
+
+
+//      SocketReset(NewsSocket);
+//      SocketCloseSend(NewsSocket);
+      SocketClose(NewsSocket);
+      if(G_domainOpen)
+        CloseMedium();
+      NewsSocket = 0;
+
+@ifndef COMPILE_OPTION_NO_CONNECTING_DECONNECTING_STATUS
+        if (showDialog) {
+            @call DownloadGroupsDialog::MSG_STATUS_DIALOG_CLOSE() ;
+        }
+@else
+        showDialog++ ;
+
+        @send NewsApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY() ;
+@endif
+    }
+
+    if(G_socketData) {
+        
+        MemFree(G_socketData) ;
+        G_socketData = 0 ;
+    }
+
+    /* Note that the disconnection has been done. */
+    NewsConnectionStatus = 0;
+
+
+    @send process::MSG_NP_ACTION_BAR_UPDATE_BUTTONS();
+	
+//	NotifyMessage(@DebugBeforeSocketClose) ;
+}
+
+
+
+/*-------------------------------------------------------------------------
+ | Routine:  HeaderLineCanBeAdded
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Checks to see if a header line of an article is worth being added
+ |    to the database.  It does this by searching for a prefix that we
+ |    want.
+ |
+ | Inputs:
+ |    char *buffer                -- Pointer to line about to be added
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE if a valid line
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/10/98  Created.
+ |
+ *-----------------------------------------------------------------------*/
+Boolean HeaderLineCanBeAdded(char *buffer)
+{
+    static char lines[7][20] = {
+        "Subject: ",
+        "From: ",
+        "Date: ",
+        "Message-ID: ",
+        "References: ",
+        "Content-",
+        "."
+    } ;
+    Boolean canAdd = FALSE ;
+    word i=0 ;
+
+    while (lines[i][0] != '.')  {
+        if (LocalCmpStringsNoCase(lines[i], buffer, strlen(lines[i]))==0)  {
+            canAdd = TRUE ;
+            break ;
+        }
+        i++ ;
+    }
+
+    return canAdd ;
+}
+
+
+#define SGET_GOT_NO_DATA   0xFFFF
+
+/*-------------------------------------------------------------------------
+ | Routine:  sgetc
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Read a single character from the socket.  This routine has been
+ |    enhanced to buffer up as much data in the socket as possible when
+ |    there is no data already in the buffer.  This gives a nice speed
+ |    increase to the system (and less call overhead).
+ |
+ | Outputs:
+ |    word                        -- SGET_GOT_NO_DATA if no data, or
+ |                                   the value in the lower 8 bits.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  11/03/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+word sgetc(void)
+{
+    word value ;
+
+    byte *p_socketData;
+
+    if(!G_socketData)
+        return(SGET_GOT_NO_DATA) ;
+
+    p_socketData = MemLock(G_socketData) ;
+
+    /* If empty, read in the data */
+    if (G_socketDataPos == G_socketDataLen)  {
+        /* Reset position back to the front */
+        G_socketDataPos = 0 ;
+
+        G_socketDataLen = SocketRecv(
+                   NewsSocket,
+                   p_socketData,
+                   NEWS_SOCKET_BUFFER_SIZE,
+                   QUICK_TIMEOUT,
+                   0,
+                   (SocketAddress *)0);
+    }
+
+    if (G_socketDataPos == G_socketDataLen)  {
+        value = SGET_GOT_NO_DATA ;
+    } else {
+        value = p_socketData[G_socketDataPos++] ;
+    }
+
+    MemUnlock(G_socketData) ;
+
+    return value ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  sgets
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Read from the standard port one line of text and return an allocated
+ |    block to the returned data.  If lost connection or error,
+ |    return nothing.
+ |
+ | Outputs:
+ |    char *
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    EDG  ??/??/98  Created
+ |    LES  11/03/98  Enhanced by making calls to sgetc for faster speed.
+ |
+ *-----------------------------------------------------------------------*/
+char *sgets(char *buffer)
+{
+    word count = 0, error;
+    word value ;
+	int numTimeouts = (SGETC_LONG_TIMEOUT / QUICK_TIMEOUT);
+
+    if(!G_socketData) {
+
+        DisconnectFromServer(FALSE);
+
+        return(0) ;
+    }
+
+    /* Get some memory */
+    while (count < 1023) {
+      
+        /* Get one character (and check for errors) */
+        while (1) {
+          
+            /* Read one character at a time */
+            buffer[count] = (char)(value = sgetc()) ;
+
+            /* Check for an error so we quit */
+            if (value == SGET_GOT_NO_DATA)  {
+                
+                error = ThreadGetError();
+                
+                if ((error != SE_NORMAL) &&
+					(error != SE_TIMED_OUT ||
+					(error == SE_TIMED_OUT && !(-- numTimeouts)))) {
+                  
+                    DisconnectFromServer(FALSE);
+                    return(0);
+                }
+          
+            } else {
+                
+                break;
+            }
+        }
+
+        if (buffer[count] == '\n')  {
+            buffer[count] = '\0' ;
+            buffer[count-1] = '\0' ;
+            break ;
+        }
+
+        count++;
+    }
+
+    /* Well, more data than we can handle.  Clip and return */
+    buffer[1023] = '\0';
+    
+    return(buffer);
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  sgetfield
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Read from the standard port until either a tab or CR/LF are 
+ |	  encountered.  If lost connection or error, return nothing.
+ |
+ | Outputs:
+ |    character which terminated the read, 0 if buffer end reached first
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    DEH  2/12/2000 Created
+ |
+ *-----------------------------------------------------------------------*/
+char *sgetfield(char *buffer, char *p_term)
+{
+    word count = 0, error;
+    word value ;
+	*p_term = '\0';
+
+    if(!G_socketData) {
+
+        DisconnectFromServer(FALSE);
+
+        return(0) ;
+    }
+
+    /* Get some memory */
+    while (count < 1023) {
+      
+        /* Get one character (and check for errors) */
+        while (1) {
+          
+            /* Read one character at a time */
+            buffer[count] = (char)(value = sgetc()) ;
+
+            /* Check for an error so we quit */
+            if (value == SGET_GOT_NO_DATA)  {
+                
+                error = ThreadGetError();
+                
+                if ((error != SE_NORMAL)  && (error != SE_TIMED_OUT)) {
+                  
+                    DisconnectFromServer(FALSE);
+                    return(0);
+                }
+          
+            } else {
+                
+                break;
+            }
+        }
+
+        if (buffer[count] == '\n')  {
+			*p_term = buffer[count];
+            buffer[count] = '\0' ;
+            buffer[count-1] = '\0' ;
+            break ;
+        }
+		else if (buffer[count] == '\t')
+		{
+			*p_term = buffer[count];
+			buffer[count] = '\0';
+			break;
+		}
+
+        count++;
+    }
+
+    /* Well, more data than we can handle.  Clip and return */
+    buffer[1023] = '\0';
+    
+    return(buffer);
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  sputs
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Output a string to the default socket.  Doesn't add \n to the end
+ |    like puts()
+ |
+ | Outputs:
+ |    char *                      -- Pointer to string to output to socket
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    EDG  ??/??/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+void sputs(char *line)
+{
+    SocketSend(NewsSocket, line, strlen(line), 0, (SocketAddress *)0);
+}
+
+/**********************************************************************
+ * END OF FILE: SOCKETS.GOC - TCP Socket Code
+ **********************************************************************/
+

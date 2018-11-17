@@ -1,0 +1,170 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		dosGeode.def
+
+AUTHOR:		Adam de Boor, Mar 10, 1992
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	3/10/92		Initial revision
+
+
+DESCRIPTION:
+	Most definitions, include files, etc. common to all DOS-based IFS 
+	drivers
+		
+	$Id: dosGeode.def,v 1.1 97/04/10 11:54:58 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;----------------------------------------------------------------------
+;	CONDITIONAL ASSEMBLY	
+;----------------------------------------------------------------------
+
+    _NIKE equ	FALSE
+
+
+
+;
+; Common include files
+;
+include	geos.def
+include	heap.def
+include geode.def
+
+ifdef FULL_EXECUTE_IN_PLACE
+include Internal/xip.def	; XIP specific stuff
+endif
+
+;------------------------------------------------------------------------------
+;  SJIS_SUPPORT : Support for Shift-JIS character mapping for Japanese
+;	Also includes JIS and EUC support by default.  This is available
+;	only in DBCS.
+;------------------------------------------------------------------------------
+if PZ_PCGEOS
+	SJIS_SUPPORT			equ	TRUE
+endif
+
+
+include	resource.def
+include	ec.def
+include lmem.def
+include system.def
+include drive.def
+include disk.def
+include driver.def
+include timedate.def
+include localize.def
+include sem.def
+include timer.def
+include initfile.def
+include gcnlist.def
+ifdef SJIS_SUPPORT
+include char.def
+include kanji.def
+endif
+
+include	Internal/semInt.def
+include	Internal/interrup.def
+include	Internal/dos.def
+include Internal/fileInt.def
+include	Internal/diskInt.def
+include Internal/driveInt.def
+include Internal/fsd.def
+include Internal/log.def
+include Internal/heapInt.def	; for ThreadPrivateData
+include Internal/geodeStr.def	; for GeodeFileHeader
+include Internal/fileStr.def	; for GeosFileHeader et al
+include Internal/localInt.def	; for LocalSetCodePage
+
+DefDriver Internal/fsDriver.def
+include Internal/dosFSDr.def
+
+; For making product-specific DOS drivers.  Currently only used for
+; NIKE (FLOPPY_BASED_DOCUMENTS) so that commits don't happen on every
+; disk unlock
+
+include Internal/prodFeatures.def
+include assert.def
+
+.ioenable
+
+;------------------------------------------------------------------------------
+;
+;	     CONDITIONAL COMPILATION CONSTANTS AND MACROS
+;
+;------------------------------------------------------------------------------
+
+	irp	c, <DRI, MS2, MS3, MS4, MS5, OS2, REDMS4, MSLF>
+ifndef _&c
+_&c	equ	FALSE
+endif
+	endm
+
+if _MS2 or _MS3 or _MS4 or _MS5 or _MSLF
+_MS	equ	TRUE
+else
+_MS	equ	FALSE
+endif
+
+MS	macro	code
+if _MS
+	code
+endif
+	endm
+
+MSLF	macro 	code
+if _MSLF
+	code
+endif
+	endm
+
+DRI	macro	code
+if _DRI
+	code
+endif
+	endm
+
+OS2	macro	code
+if _OS2
+	code
+endif
+	endm
+
+DRIEC	macro	code
+if _DRI and ERROR_CHECK
+	code
+endif
+	endm
+
+MSEC	macro	code
+if _MS and ERROR_CHECK
+	code
+endif
+	endm
+
+OS2EC	macro	code
+if _OS2 and ERROR_CHECK
+	code
+endif
+	endm
+
+PASS_ON_WEIRD_CRITICAL_ERRORS	equ	TRUE	; if set, then pass on
+						;  unrecognized/unhandled
+						;  critical errors to old
+						;  handler
+
+CATCH_MISSED_COM1_INTERRUPTS	equ	FALSE	; enables special code in
+						;  wait/post intercept to look
+						;  for interrupts on COM1 being
+						;  missed. unlikely to need
+						;  enabling...and you'll need
+						;  to do some work before you
+						;  do
+TEST_WAIT_POST			equ	FALSE	; enables logging of wait/post
+						;  activity

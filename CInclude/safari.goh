@@ -1,0 +1,339 @@
+/***********************************************************************
+ *
+ *	Copyright (c) NewDeal 1999 -- All Rights Reserved
+ *
+ * FILE:	safari.goh
+ * AUTHOR:	Gene Anderson
+ *
+ * DESCRIPTION:
+ *	This file defines structures and classes for GeoSafari and
+ *      the GeoSafari Builder
+ *
+ *	$Id$
+ *
+ ***********************************************************************/
+
+@include <ui.goh>
+@include <Objects/genC.goh>
+
+/* @deflib safari   jh this isn't a library header file so I don't
+                    think I want this line */
+
+#define SAFARI_DOCUMENT_PROTOCOL_MAJOR	2
+#define SAFARI_DOCUMENT_PROTOCOL_MINOR	0
+
+#define SAFARI_MAX_QUESTIONS 26
+
+#define SAFARI_MAX_DESCRIPTION_LENGTH 63
+
+typedef TCHAR SafariGameDesc[SAFARI_MAX_DESCRIPTION_LENGTH+1];
+
+typedef ByteEnum SafariFilterType;
+/* eliminmate NORMAL and renumber - also changed .def
+/*#define SFT_NORMAL          0        question # = answer */
+#define SFT_ALPHABETIC      0       /* answer = A-D, AA-DD */
+#define SFT_NUMERIC         1       /* answer = 0-9, ., /, ' ' */
+#define SFT_NO_KEYBOARD     2       /* no keyboard input */
+#define SFT_ANYTHING        3       /* allow anything */
+
+typedef WordFlags SafariFileOptions;
+#define SFO_NO_LEDS         0x0001
+#define SFO_QUESTION_SOUNDS 0x0002
+#define SFO_IMBED_GRAPHICS  0x0004
+#define SFO_FILTER          0x0700  /* SafariFilterType */
+
+#define SFO_FILTER_OFFSET   8
+
+#define LOGO_VIEWER_WIDTH   128
+#define LOGO_VIEWER_HEIGHT  128
+
+#define INDICATOR_WIDTH		20
+#define INDICATOR_HEIGHT	27  /* to match safari.def */
+#define INDICATOR_LED_WIDTH	16
+#define INDICATOR_LED_HEIGHT	11
+#define INDICATOR_LED_LEFT_MARGIN (INDICATOR_WIDTH-INDICATOR_LED_WIDTH)/2
+#define INDICATOR_LED_TOP_MARGIN  (INDICATOR_HEIGHT-INDICATOR_LED_HEIGHT)/2
+#define INDICATOR_FLASH_TIME    20
+
+/*
+ * chunk array header in map block
+ */
+typedef	struct {
+    LMemBlockHeader   SMB_meta;
+	 ChunkHandle       SMB_quiz;
+    word              SMB_number;
+    SafariGameDesc    SMB_desc;
+    SafariFileOptions SMB_flags;
+    FileLongName      SMB_logo;
+    FileLongName      SMB_16color;
+    FileLongName      SMB_256color;
+    FileLongName      SMB_nextQuiz;
+    word              SMB_iLogo;
+    word              SMB_i16Color;
+    word              SMB_i256color;
+    byte              SMB_extra[16];
+} SafariMapBlock;
+
+typedef struct {
+    sword             SQS_indicator;
+    Rectangle         SQS_bounds;
+} SafariQuestionStruct;
+
+#define SAFARI_QUESTION_MAX_LENGTH 255
+
+#define SAFARI_GAME_CARD_WIDTH    659 /* to match safari.def */
+#define SAFARI_GAME_CARD_HEIGHT   472 /* to match safari.def */
+
+typedef ByteFlags IndicatorState;
+#define IS_PRESSED   0x08
+#define IS_FLASHING  0x04
+#define IS_ON        0x02
+#define IS_DISABLED  0x01
+
+
+extern VMBlockHandle _pascal
+    SafariImportBitmap(TCHAR *filename, FileHandle fileHan);
+
+extern void _pascal
+    SafariFreeBitmap(VMBlockHandle vmbh, FileHandle fileHan);
+
+/*
+ * map block in logo file
+ */
+typedef	struct {
+    word              SLMB_i16Color;
+    word              SLMB_i256color;
+    byte              SLMB_extra[16];
+} SafariLogoMapBlock;
+
+
+/***************************************************************************
+ *			classes
+ ***************************************************************************/
+
+/*
+ * IndicatorClass: LEDs for game
+ */
+@class IndicatorClass, GenGadgetClass;
+
+@message void MSG_INDICATOR_SET_STATE(IndicatorState state=cx);
+
+@message void MSG_INDICATOR_FLASH();
+
+    @instance IndicatorState II_state;
+    @instance TimerHandle    II_timer;
+@endc
+
+/*
+ * PlayerIndicatorClass: player buttons
+ */
+@class PlayerIndicatorClass, IndicatorClass;
+    @instance optr           PII_destination;
+    @instance word           PII_message;
+    @instance ChunkHandle    PII_label;
+@endc
+
+/*
+ * IndicatorGroupClass: interaction to hold and link LEDs
+ */
+@class IndicatorGroupClass, GenInteractionClass;
+
+@message void MSG_INDICATOR_GROUP_INIT_FLASHING();
+
+@message void MSG_INDICATOR_GROUP_SET_ALL(IndicatorState istate=cx);
+
+@message optr MSG_INDICATOR_GROUP_GET_NTH(word num=cx)=cx:dx;
+
+    @instance word  IGI_startNum;
+    @instance optr  IGI_nextGroup;
+
+@endc
+
+/*
+ * SpacerClass: spacer for above indicators
+ */
+@class SpacerClass, GenGadgetClass;
+@endc
+
+/*
+ * GameCardClass: GeoSafari game engine
+ */
+@class GameCardClass, GenGadgetClass;
+
+typedef ByteEnum GameCardBitmapType;
+#define GCBT_NO_BITMAP        0
+#define GCBT_IMPORTED_BITMAP  1
+#define GCBT_IMBEDDED_BITMAP  2
+
+@message void MSG_GAME_CARD_SET_PATH(PathName *path=cx:dx, StandardPath stdPath=bp);
+
+@message void MSG_GAME_CARD_SET_BITMAP(FileLongName *bmap=cx:dx);
+
+@message void MSG_GAME_CARD_SET_IMPORTED_BITMAP(VMBlockHandle vmbh=cx, FileHandle fileHan=dx);
+
+@message void MSG_GAME_CARD_CLEAR_BITMAP();
+
+    @instance StandardPath GCI_stdPath;
+    @instance PathName     GCI_path;
+    @instance FileLongName GCI_bitmap;
+    @instance word         GCI_bitmapHan;
+    @instance GameCardBitmapType GCI_bitmapType;
+    @instance FileLongName GCI_filename;
+    @instance FileHandle   GCI_fileHan;
+@endc
+
+
+
+/***
+ *** SafariGlyphClass: gadget with on/off state and bitmaps
+ ***/
+
+@class SafariGlyphClass, GenGadgetClass;
+
+@message void MSG_SAFARI_GLYPH_SET_STATE(byte state=cl);
+/*
+ * Set the state
+ *
+ * Pass:
+ *	state - on=TRUE
+ * Return:
+ *	none
+ */
+
+@message void MSG_SAFARI_GLYPH_SET_ON_BITMAP(optr onBitmap=cx:dx);
+/*
+ * Set the "on" bitmap
+ *
+ * Pass:
+ *      onBitmap - optr of bitmap
+ * Return:
+ *      none
+ */
+
+@message void MSG_SAFARI_GLYPH_SET_OFF_BITMAP(optr offBitmap=cx:dx);
+/*
+ * Set the "off" bitmap
+ *
+ * Pass:
+ *      offBitmap - optr of bitmap
+ * Return:
+ *      none
+ */
+
+	@instance optr SGI_onBitmap;
+	@instance optr SGI_offBitmap;
+	@instance byte SGI_state;
+
+@endc
+
+/***
+ *** SafariButtonClass: a button with custom bitmaps and behavior
+ ***/
+
+@class SafariButtonClass, SafariGlyphClass;
+    @instance optr     SBI_destination;
+    @instance Message  SBI_message;
+@endc
+
+/***
+ *** SafariBackground: GenInteraction with a background bitmap
+ ***/
+
+@class SafariBackgroundClass, GenInteractionClass;
+    @instance optr     SBI_background;
+    @instance Color    SBI_color;
+@endc
+
+/***
+ *** SafariFeedbackClass: gadget to give interesting feedback
+ ***/
+
+#define SAFARI_FEEDBACK_WIDTH  224
+#define SAFARI_FEEDBACK_HEIGHT 16
+
+@class SafariFeedbackClass, GenGadgetClass;
+
+@message void MSG_SAFARI_FEEDBACK_START(byte red = dl, byte green = cl, byte blue = ch);
+/*
+ * Pass:   red, green, blue - starting RGB color
+ * Return: none
+ */
+
+@message void MSG_SAFARI_FEEDBACK_COUNTDOWN();
+/*
+ * Pass:   none
+ * Return: none
+ */
+
+@message void MSG_SAFARI_FEEDBACK_FLASH_ON();
+/*
+ * Pass:   none
+ * Return: none
+ */
+
+@message void MSG_SAFARI_FEEDBACK_FLASH_OFF();
+/*
+ * Pass:   none
+ * Return: none
+ */
+
+    @instance TimerHandle SFI_timer;
+    @instance word        SFI_curX1;
+    @instance word        SFI_curX2;
+    @instance sword       SFI_direction;
+    @instance ColorQuad   SFI_color;
+@endc
+
+/***
+ *** SafariTimebarClass: gadget to give interesting feedback
+ ***/
+
+#define SAFARI_TIMEBAR_WIDTH  10
+#define SAFARI_TIMEBAR_HEIGHT 192
+
+typedef ByteEnum SafariTimebarState;
+#define STBS_RUNNING        0
+#define STBS_PAUSED         1
+#define STBS_STOPPED        2
+
+@class SafariTimebarClass, GenGadgetClass;
+
+@message void MSG_SAFARI_TIMEBAR_SET_STATE(byte count=cl, byte maxCount=ch, byte state=dl);
+/*
+ * Set the current count and maximum (for %), and current state
+ * Pass:   count - time left
+ *         maxCount - maximum time
+ *         state - SafariTimebarState
+ * Return: none
+ */
+
+    @instance byte      STBI_count;
+    @instance byte      STBI_maxCount;
+    @instance SafariTimebarState STBI_state;
+@endc
+
+/***
+ *** SafariScoreClass: gadget to show the score
+ ***/
+
+#define SAFARI_SCORE_WIDTH    36
+#define SAFARI_SCORE_HEIGHT   42
+
+typedef ByteEnum SafariScoreSide;
+#define SSS_LEFT            0
+#define SSS_RIGHT           1
+
+@class SafariScoreClass, GenGadgetClass;
+
+@message void MSG_SAFARI_SCORE_SET_SCORE(byte score=cl);
+/*
+ * Set the score
+ * Pass:   score - score (-1 for blank)
+ * Return: none
+ */
+
+    @instance SafariScoreSide      SSI_side;
+    @instance byte                 SSI_score = -1;
+@endc
+
+/*@endlib  */

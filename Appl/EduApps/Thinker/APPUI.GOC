@@ -1,0 +1,1131 @@
+/**********************************************************************
+ * APPUI.GOC - User Interface Declaration                             *
+ * Project - Thinker Pro                                              *
+ **********************************************************************/
+
+/**********************************************************************
+ * Includes                                                           *
+ **********************************************************************/
+
+@include <stdapp.goh>
+@include <initfile.h>
+@include <Ansi\string.h>
+
+#include <token.h>
+
+@include "thinker.goh"
+@include "thnkicon.goh"
+@include "tnkdicon.goh"
+@include "password.goh"
+@include "bboxreg.goh"
+
+/* Timer used to update sound */
+TimerHandle G_soundTimer = NullHandle ;
+word G_soundTimerId ;
+
+T_simplePCSound G_sounds[16] ;
+T_soundState G_channelArray[MAX_SOUND_CHANNELS] ;
+Boolean G_soundIsOn = TRUE ;
+Boolean G_soundIsRunning = FALSE ;
+
+@classdecl ThinkerProcessClass, neverSaved;
+
+
+/*=======================================================================*/
+
+
+@start AppResource;
+    /*---------------------------------------------------------------------*/
+    @object GenApplicationClass ThinkerApp = {
+        GI_visMoniker = list {
+                            @ThinkerAppTextMoniker,
+                            @Moniker0,
+                            @Moniker1,
+                            @Moniker2,
+					   @Moniker3,
+					   @TinyColorMoniker } ;
+        GI_comp = @ThinkerPrimary;
+        gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) = @ThinkerPrimary;
+        gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST) =
+            @ThinkerDocumentControl;
+        gcnList(MANUFACTURER_ID_GEOWORKS, MGCNLT_APP_STARTUP) =
+            @ThinkerDocumentControl;
+        gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) =
+            @ThinkerDocumentControl;
+        HINT_APP_IS_EDUCATIONAL;
+        ATTR_GEN_HELP_FILE = "Thinker Pro Help" ;
+    }
+    /*---------------------------------------------------------------------*/
+    @visMoniker ThinkerAppTextMoniker = "Thinker Pro" ;
+    /*---------------------------------------------------------------------*/
+@end AppResource;
+
+
+/*=======================================================================*/
+
+
+@start Interface;
+    /*---------------------------------------------------------------------*/
+    @object GenPrimaryClass ThinkerPrimary = {
+      GI_comp = @ThinkerFileMenu, @ThinkerDisplayGroup, @SummaryDialog,
+                @Dialogs ;
+/*
+      HINT_INITIAL_SIZE = {SST_PIXELS | 350,
+                           SST_PIXELS | 200};
+*/
+      HINT_SIZE_WINDOW_AS_DESIRED ;
+        ATTR_GEN_HELP_FILE = "Thinker Pro Help" ;
+        ATTR_GEN_HELP_CONTEXT = "TOC" ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass Dialogs = {
+        GI_comp =
+            @PwdAskPasswordDialog,
+            @PwdChangePasswordDialog ;
+        GII_type = GIT_ORGANIZATIONAL ;
+        GII_visibility = GIV_DIALOG ;
+        GII_attrs = @default | GIA_NOT_USER_INITIATABLE ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass ThinkerFileMenu = {
+      GI_comp = @ThinkerDocumentControl,
+                @ThinkerGoToEdit,
+					 @ThinkerSoundOnOff/*,
+					 @AboutDBox */;
+      GI_attrs = @default | GA_KBD_SEARCH_PATH;
+      GII_visibility = GIV_POPUP;
+      ATTR_GEN_INTERACTION_GROUP_TYPE = GIGT_FILE_MENU;
+	 }
+
+/*---------------------------------------------------------------------*/
+@object GenInteractionClass AboutDBox = {
+    GI_visMoniker = 'b', "About";
+    GI_comp = @AppName, @Beta, @By, @BreadBoxLogo, @Visit,
+		    @Web, @Copyright;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_NOTIFICATION;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass AppName = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "Thinker Pro";
+	 ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @AppNameCharAttrs;
+}
+
+@chunk VisTextCharAttr AppNameCharAttrs =
+	CHAR_ATTR_FONT_SIZE_STYLE(
+		FID_DTC_URW_SANS, 24, TS_BOLD);
+
+@object GenGlyphClass Beta = {
+  GI_visMoniker = "An Educational Product";
+}
+
+@object GenGlyphClass By = {
+  GI_visMoniker = "from";
+}
+
+@object GenGlyphClass BreadBoxLogo = {
+  GI_visMoniker = list { @BreadboxLogoMoniker}
+}
+
+@object GenGlyphClass Copyright = {
+  GI_visMoniker = "Copyright 1994-2001 Breadbox Computer Company LLC";
+}
+
+@object GenGlyphClass Visit = {
+  GI_visMoniker = "Visit us at...";
+}
+
+@object GenGlyphClass Web = {
+  GI_visMoniker = "www.breadbox.com";
+}
+
+	 /*---------------------------------------------------------------------*/
+    @object GenTriggerClass ThinkerGoToEdit = {
+        GI_visMoniker = 'E', "Edit mode";
+/*        GTI_actionMsg = MSG_THINKER_DOCUMENT_STOP_QUIZ; */
+        GTI_actionMsg = MSG_THINKER_DOCUMENT_EDIT;
+        GTI_destination = (TO_APP_MODEL);
+        ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&GenDocumentClass};
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass ThinkerSoundOnOff = {
+        GI_visMoniker = 'o', "Sound is ON";
+        GTI_actionMsg = MSG_THINKER_PROCESS_TOGGLE_SOUND_ON_OFF;
+        GTI_destination = process;
+    }
+    /*---------------------------------------------------------------------*/
+    @visMoniker SoundOnMoniker = 'o', "Sound is ON" ;
+    @visMoniker SoundOffMoniker = 'o', "Sound is OFF" ;
+    /*---------------------------------------------------------------------*/
+	 @object ThinkerDocumentControlClass ThinkerDocumentControl = {
+      GI_attrs = @default | GA_KBD_SEARCH_PATH;
+      GDCI_noNameText = "No Document";
+      @localize {"Text displayed when no file has been opened yet"};
+      GDCI_documentGroup = ThinkerDocumentGroup;
+//      GDCI_attrs = @default;
+      GDCI_features = @default & ~(GDCF_SUPPORTS_USER_MAKING_SHARED_DOCUMENTS |
+                      GDCF_SUPPORTS_TEMPLATES |
+                      GDCF_SUPPORTS_USER_SETTABLE_EMPTY_DOCUMENT |
+							 GDCF_SUPPORTS_USER_MAKING_SHARED_DOCUMENTS);
+      GDCI_documentToken = {"TnkD", 16410};
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenDisplayGroupClass ThinkerDisplayGroup = {
+    }
+    /*---------------------------------------------------------------------*/
+@end Interface;
+
+
+/*=======================================================================*/
+
+
+@start QuizResultsResource;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass SummaryDialog = {
+        GI_visMoniker = "Summary";
+        GI_comp =
+            @ThisRoundGroup,
+            @TotalGroup,
+            @QuizContinueButton,
+/*            @QuizStopButton, */
+            @QuizRestartButton;
+        GII_attrs =
+            @default |
+            GIA_MODAL |
+            GIA_NOT_USER_INITIATABLE;
+        GII_visibility = GIV_DIALOG;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_DIVIDE_WIDTH_EQUALLY;
+        ATTR_GEN_HELP_CONTEXT = "Summary" ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass ThisRoundGroup = {
+        GI_visMoniker = "This Round";
+        GI_comp =
+            @ThisRoundAttemptedGroup,
+            @ThisRoundCorrectGroup,
+            @ThisRoundIncorrectGroup,
+            @ThisRoundPercentGroup;
+        HINT_DRAW_IN_BOX;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_MINIMUM_SIZE = {SST_PIXELS|150, 0} ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass ThisRoundAttemptedGroup = {
+        GI_comp = @ThisRoundAttemptedGlyph, @ThisRoundAttempted ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass ThisRoundAttemptedGlyph = {
+        GI_visMoniker = "Attempted";
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass ThisRoundAttempted = {
+        GI_attrs = @default | GA_READ_ONLY;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass ThisRoundCorrectGroup = {
+        GI_comp = @ThisRoundCorrectGlyph, @ThisRoundCorrect ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass ThisRoundCorrectGlyph = {
+        GI_visMoniker = "Correct";
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass ThisRoundCorrect = {
+        GI_attrs = @default | GA_READ_ONLY;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass ThisRoundIncorrectGroup = {
+        GI_comp = @ThisRoundIncorrectGlyph, @ThisRoundIncorrect ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass ThisRoundIncorrectGlyph = {
+        GI_visMoniker = "Incorrect";
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass ThisRoundIncorrect = {
+        GI_attrs = @default | GA_READ_ONLY;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass ThisRoundPercentGroup = {
+        GI_comp = @ThisRoundPercentGlyph, @ThisRoundPercent ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass ThisRoundPercentGlyph = {
+        GI_visMoniker = "Percent";
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass ThisRoundPercent = {
+        GI_attrs = @default | GA_READ_ONLY;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass TotalGroup = {
+        GI_visMoniker = "Total";
+        GI_comp =
+            @TotalAttemptedGroup,
+            @TotalCorrectGroup,
+            @TotalIncorrectGroup,
+            @TotalPercentGroup;
+        HINT_DRAW_IN_BOX;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_MINIMUM_SIZE = {SST_PIXELS|150, 0} ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass TotalAttemptedGroup = {
+        GI_comp = @TotalAttemptedGlyph, @TotalAttempted ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass TotalAttemptedGlyph = {
+        GI_visMoniker = "Attempted";
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass TotalAttempted = {
+        GI_attrs = @default | GA_READ_ONLY;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass TotalCorrectGroup = {
+        GI_comp = @TotalCorrectGlyph, @TotalCorrect ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass TotalCorrectGlyph = {
+        GI_visMoniker = "Correct";
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass TotalCorrect = {
+        GI_attrs = @default | GA_READ_ONLY;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass TotalIncorrectGroup = {
+        GI_comp = @TotalIncorrectGlyph, @TotalIncorrect ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass TotalIncorrectGlyph = {
+        GI_visMoniker = "Incorrect";
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass TotalIncorrect = {
+        GI_attrs = @default | GA_READ_ONLY;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass TotalPercentGroup = {
+        GI_comp = @TotalPercentGlyph, @TotalPercent ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass TotalPercentGlyph = {
+        GI_visMoniker = "Percent";
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass TotalPercent = {
+        GI_attrs = @default | GA_READ_ONLY;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass QuizContinueButton = {
+        GI_visMoniker = 'C', "Continue";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GTI_actionMsg = MSG_THINKER_DOCUMENT_CONTINUE_QUIZ;
+        GTI_destination = (TO_APP_MODEL);
+        ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&GenDocumentClass};
+        HINT_SEEK_REPLY_BAR;
+        HINT_GADGET_TEXT_COLOR = { C_GREEN, C_BLACK } ;
+        HINT_GADGET_BACKGROUND_COLORS = { C_BLACK, C_BLACK, C_LIGHT_GRAY, C_LIGHT_GRAY} ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass QuizStopButton = {
+        GI_visMoniker = 'S', "Stop Quiz";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GTI_actionMsg = MSG_THINKER_DOCUMENT_STOP_QUIZ;
+        GTI_destination = (TO_APP_MODEL);
+        ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&GenDocumentClass};
+        HINT_SEEK_REPLY_BAR;
+        HINT_GADGET_TEXT_COLOR = { C_YELLOW, C_BLACK } ;
+        HINT_GADGET_BACKGROUND_COLORS = { C_BLACK, C_BLACK, C_LIGHT_GRAY, C_LIGHT_GRAY} ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass QuizRestartButton = {
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GI_visMoniker = 'R', "Restart";
+        GTI_actionMsg = MSG_THINKER_DOCUMENT_START_QUIZ;
+        GTI_destination = (TO_APP_MODEL);
+        ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&GenDocumentClass};
+        HINT_SEEK_REPLY_BAR;
+        HINT_GADGET_TEXT_COLOR = { C_LIGHT_RED, C_BLACK } ;
+        HINT_GADGET_BACKGROUND_COLORS = { C_BLACK, C_BLACK, C_LIGHT_GRAY, C_LIGHT_GRAY} ;
+    }
+    /*---------------------------------------------------------------------*/
+@end QuizResultsResource;
+
+
+/*=======================================================================*/
+
+
+@start DocGroupResource;
+    /*---------------------------------------------------------------------*/
+    @object GenDocumentGroupClass ThinkerDocumentGroup = {
+        GDGI_attrs = @default;
+        GDGI_untitledName = "Thinker Pro Untitled";
+        @localize {"Name of new files"};
+        GDGI_documentClass = (ClassStruct *)&ThinkerDocumentClass;
+		  GDGI_documentControl = ThinkerDocumentControl;
+		  GDGI_genDisplayGroup = ThinkerDisplayGroup;
+		  GDGI_genDisplay = ThinkerDocDisplay;
+        GDGI_protocolMajor = DOCUMENT_PROTOCOL_MAJOR;
+        GDGI_protocolMinor = DOCUMENT_PROTOCOL_MINOR;
+    }
+    /*---------------------------------------------------------------------*/
+@end DocGroupResource;
+
+
+/*=======================================================================*/
+
+
+@start DocTemplateResource;
+    /*---------------------------------------------------------------------*/
+    @object GenDisplayClass ThinkerDocDisplay = {
+        GI_visMoniker = "Quiz";
+        GI_states = @default & ~GS_USABLE;
+        GI_comp = @DocumentTextBoxes;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass DocumentTopLine = {
+        GI_comp = @DocumentNonQuizTopLine, @DocumentQuizTopLine;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass DocumentNonQuizTopLine = {
+        GI_comp = @DocStatusLine;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass DocStatusLine = {
+        GI_visMoniker = " ";
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass DocButtonGroup = {
+        GI_comp =
+            @DocAddButton,
+            @DocDeleteButton,
+            @DocPrevButton,
+            @DocNextButton,
+            @DocQuizButton;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass DocAddButton = {
+        GI_visMoniker = 'A', "Add";
+        GTI_destination = (TO_APP_MODEL);
+        GTI_actionMsg = MSG_THINKER_DOCUMENT_ADD_ITEM;
+        ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&GenDocumentClass};
+        HINT_GADGET_TEXT_COLOR = { C_YELLOW, C_BLACK } ;
+        HINT_GADGET_BACKGROUND_COLORS = { C_BLACK, C_BLACK, C_LIGHT_GRAY, C_LIGHT_GRAY} ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass DocDeleteButton = {
+        GI_visMoniker = 'D', "Delete";
+        GTI_destination = (TO_APP_MODEL);
+        GTI_actionMsg = MSG_THINKER_DOCUMENT_DELETE_ITEM;
+        ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&GenDocumentClass};
+        HINT_GADGET_TEXT_COLOR = { C_LIGHT_RED, C_BLACK } ;
+        HINT_GADGET_BACKGROUND_COLORS = { C_BLACK, C_BLACK, C_LIGHT_GRAY, C_LIGHT_GRAY} ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass DocPrevButton = {
+        GI_visMoniker = 'P', "Prev";
+        GTI_destination = (TO_APP_MODEL);
+        GTI_actionMsg = MSG_THINKER_DOCUMENT_PREV_ITEM;
+        ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&GenDocumentClass};
+        HINT_GADGET_BACKGROUND_COLORS = { C_BLACK, C_BLACK, C_LIGHT_GRAY, C_LIGHT_GRAY} ;
+        HINT_GADGET_TEXT_COLOR = { C_GREEN, C_BLACK } ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass DocNextButton = {
+        GI_visMoniker = 'N', "Next";
+        GTI_destination = (TO_APP_MODEL);
+        GTI_actionMsg = MSG_THINKER_DOCUMENT_NEXT_ITEM;
+        ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&GenDocumentClass};
+        HINT_GADGET_BACKGROUND_COLORS = { C_BLACK, C_BLACK, C_LIGHT_GRAY, C_LIGHT_GRAY} ;
+        HINT_GADGET_TEXT_COLOR = { C_GREEN, C_BLACK } ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass DocQuizButton = {
+        GI_visMoniker = 'Q', "Quiz";
+        GTI_destination = (TO_APP_MODEL);
+        GTI_actionMsg = MSG_THINKER_DOCUMENT_START_QUIZ;
+        ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&GenDocumentClass};
+        HINT_GADGET_TEXT_COLOR = { C_LIGHT_BLUE, C_BLACK } ;
+        HINT_GADGET_BACKGROUND_COLORS = { C_BLACK, C_BLACK, C_LIGHT_GRAY, C_LIGHT_GRAY} ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass DocumentQuizTopLine = {
+        GI_comp = @DocQuestionsRemaining ;
+        GI_states = @default & ~GS_USABLE;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass DocQuestionsRemaining = {
+        GTXI_text = "99 questions left.";
+        GI_attrs = @default | GA_READ_ONLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_CENTER_MONIKER ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass DocStopQuizButton = {
+        GI_visMoniker = 'S', "Stop Quiz";
+        GTI_destination = (TO_APP_MODEL);
+        GTI_actionMsg = MSG_THINKER_DOCUMENT_QUIZ_TOTALS;
+        ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&GenDocumentClass};
+        HINT_GADGET_TEXT_COLOR = { C_YELLOW, C_BLACK } ;
+        HINT_GADGET_BACKGROUND_COLORS = { C_BLACK, C_BLACK, C_LIGHT_GRAY, C_LIGHT_GRAY} ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass DocumentTextBoxes = {
+        GI_comp =
+            @DocumentTopHalf,
+            @DocumentAnswerGroup;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+/*
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_DIVIDE_HEIGHT_EQUALLY;
+*/
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        HINT_DIVIDE_WIDTH_EQUALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass DocumentTopHalf = {
+        GI_comp =
+            @DocumentTopLine,
+				@DocumentQuestionBox,
+            @DocButtonGroup,
+				@DocStopQuizButton ;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+	 @object GenTextClass DocumentQuestionBox = {
+        GTXI_attrs = @default | GTA_INIT_SCROLLING;
+        GTXI_maxLength = 2000;
+        HINT_TEXT_WHITE_WASH_COLOR;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	 ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @QACharAttrs;
+}
+
+@chunk VisTextCharAttr QACharAttrs =
+	CHAR_ATTR_FONT_SIZE(FID_BERKELEY, 18);
+
+
+
+
+
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass DocumentAnswerGroup = {
+        GI_comp =
+            @DocumentAnswerGlyph,
+            @DocumentAnswerButton,
+            @DocumentAnswerStuff;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass DocumentAnswerGlyph = {
+        GI_visMoniker = "Answer:" ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_CENTER_MONIKER ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object AnswerTriggerClass DocumentAnswerButton = {
+        GI_states = @default & ~GS_USABLE;
+        GTI_actionMsg = MSG_THINKER_DOCUMENT_ANSWER_QUESTION;
+        GTI_destination = (TO_APP_MODEL);
+        ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&GenDocumentClass};
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+        HINT_DEFAULT_FOCUS ;
+        HINT_GADGET_TEXT_COLOR = { C_BLACK, C_BLACK } ;
+        HINT_GADGET_BACKGROUND_COLORS = { C_GREEN, C_GREEN, C_GREEN, C_GREEN } ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass DocumentAnswerStuff = {
+        GI_comp =
+            @DocumentAnswerBox,
+            @DocumentAnswerButtonBar;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+        HINT_DEFAULT_FOCUS ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass DocumentAnswerBox = {
+        GTXI_attrs = @default | GTA_INIT_SCROLLING;
+        GTXI_maxLength = 2000;
+        HINT_TEXT_WHITE_WASH_COLOR;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	 ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @QACharAttrs;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass DocumentAnswerButtonBar = {
+        GI_comp =
+            @DocumentAnswerCorrect,
+            @DocumentAnswerIncorrect;
+        GI_states = @default & ~GS_USABLE;
+/*        HINT_MAKE_REPLY_BAR; */
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY ;
+        HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass DocumentAnswerCorrect = {
+        GI_visMoniker = 'C', "Correct";
+        GTI_actionMsg = MSG_THINKER_DOCUMENT_QUIZ_QUESTION_RIGHT;
+        GTI_destination = (TO_APP_MODEL);
+        ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&GenDocumentClass};
+        HINT_GADGET_TEXT_COLOR = { C_GREEN, C_BLACK } ;
+        HINT_GADGET_BACKGROUND_COLORS = { C_BLACK, C_BLACK, C_LIGHT_GRAY, C_LIGHT_GRAY} ;
+/*         HINT_DEFAULT_DEFAULT_ACTION;      */
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass DocumentAnswerIncorrect = {
+        GI_visMoniker = 'I', "Incorrect";
+        GTI_actionMsg = MSG_THINKER_DOCUMENT_QUIZ_QUESTION_WRONG;
+        GTI_destination = (TO_APP_MODEL);
+        ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&GenDocumentClass};
+        HINT_GADGET_TEXT_COLOR = { C_LIGHT_RED, C_BLACK } ;
+        HINT_GADGET_BACKGROUND_COLORS = { C_BLACK, C_BLACK, C_LIGHT_GRAY, C_LIGHT_GRAY} ;
+    }
+    /*---------------------------------------------------------------------*/
+@end DocTemplateResource;
+
+
+/*=======================================================================*/
+
+
+@start StringsResource, data;
+
+@chunk char Strings[] = "str" ;
+@localize not;
+@chunk char ItemNumberString[] = "Question %u of %u";
+@localize "do not localize the %u";
+@chunk char AnswerButtonString[] = "Click here for answer" ;
+@chunk char AnswerButtonFiller[] = "?" ;
+@chunk char QuestionsLeftString[] = "%d questions left." ;
+@localize "do not localize the %d";
+@chunk char TPFolderTxt[] = "Thinker Pro Quizzes";
+@end StringsResource;
+
+
+/*=======================================================================*/
+
+@include "passwdui.goh"
+
+/**********************************************************************
+ * MSG_GEN_PROCESS_INSTALL_TOKEN                                      *
+ **********************************************************************/
+
+@method ThinkerProcessClass, MSG_THINKER_PROCESS_UPDATE_SOUND
+{
+    UpdateSound() ;
+    G_soundTimer = TimerStart(
+                   TIMER_EVENT_ONE_SHOT,
+                   ConstructOptr(GeodeGetCodeProcessHandle(), 0),
+                   1,
+                   MSG_THINKER_PROCESS_UPDATE_SOUND,
+                   1,
+						 &G_soundTimerId) ;
+}
+
+@method ThinkerProcessClass, MSG_GEN_PROCESS_INSTALL_TOKEN
+{
+  dword tokenChars;
+  TokenFlags tokenFlags;
+
+  @callsuper();
+  tokenChars = TOKEN_CHARS('T', 'n', (dword)'k', (dword)'D');
+
+  if (!TokenGetTokenInfo(tokenChars, 16410, &tokenFlags)) {
+    TokenDefineToken(tokenChars, 16410, @DocMonikerList, 0);
+  }
+}
+
+@method ThinkerProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+    Boolean isOn = TRUE ;
+
+    @callsuper() ;
+    @call ThinkerPrimary::MSG_GEN_SET_WIN_SIZE(
+                    VUM_NOW,
+					550,
+					350);
+    LoadSounds() ;
+    SoundStart() ;
+    InitFileReadBoolean("thinker", "soundOn", &isOn);
+    if (!isOn)
+        @call oself::MSG_THINKER_PROCESS_TOGGLE_SOUND_ON_OFF() ;
+}
+
+@method ThinkerProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+    SoundStop() ;
+    return @callsuper() ;
+}
+
+@method ThinkerProcessClass, MSG_THINKER_PROCESS_TOGGLE_SOUND_ON_OFF
+{
+    if (G_soundIsOn)  {
+        G_soundIsOn = FALSE ;
+        @call ThinkerSoundOnOff::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                  @SoundOffMoniker,
+                  VUM_DELAYED_VIA_UI_QUEUE) ;
+    } else {
+        G_soundIsOn = TRUE ;
+        @call ThinkerSoundOnOff::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                  @SoundOnMoniker,
+                  VUM_DELAYED_VIA_UI_QUEUE) ;
+    }
+    InitFileWriteBoolean("thinker", "soundOn", G_soundIsOn);
+}
+
+@classdecl AnswerTriggerClass ;
+
+@method AnswerTriggerClass, MSG_VIS_DRAW
+{
+    word len ;
+    GStateHandle gstate0 ;
+    Rectangle bounds ;
+    word x, y ;
+    word toggle = 0 ;
+    word width, height ;
+
+    @callsuper() ;
+    @call oself::MSG_VIS_GET_BOUNDS(&bounds);
+
+    MemLock(OptrToHandle(@AnswerButtonString)) ;
+
+    /* Calculate the length of the string for the font */
+    gstate0 = GrCreateState(0) ;
+    GrSetFont(gstate0, FID_DTC_URW_SANS, MakeWWFixed(12.0));
+    GrDrawText(gstate0, 0, 0, LMemDeref(@AnswerButtonString), 0) ;
+    len = 10+DWORD_X(GrGetCurPos(gstate0)) ;
+    GrDestroyState(gstate0) ;
+
+    GrSaveState(gstate) ;
+    GrSetFont(gstate, FID_DTC_URW_SANS, MakeWWFixed(24.0));
+    GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0) ;
+    GrSetAreaColor(gstate, CF_INDEX, C_WHITE, 0, 0) ;
+    for (y=bounds.R_top+8; y<=bounds.R_bottom-32; y+=24)  {
+        toggle = 0 ;
+        for (x=bounds.R_left+16; x<=bounds.R_right-32; x+=24)  {
+           GrDrawText(gstate, x, y+toggle, LMemDeref(@AnswerButtonFiller), 0) ;
+           toggle ^= 12 ;
+        }
+    }
+    width = bounds.R_right - bounds.R_left ;
+    height = bounds.R_bottom - bounds.R_top ;
+    x = bounds.R_left + ((width-len)>>1) ;
+    y = bounds.R_top + ((height-30)>>1) ;
+    GrFillRect(gstate, x, y, x+len, y+30) ;
+    GrDrawRect(gstate, x, y, x+len, y+30) ;
+    GrDrawRect(gstate, x-1, y-1, x+len+1, y+30+1) ;
+    GrSetFont(gstate, FID_DTC_URW_SANS, MakeWWFixed(12.0));
+    GrDrawText(gstate, x+5, y+7, LMemDeref(@AnswerButtonString), 0) ;
+    GrRestoreState(gstate) ;
+
+    MemUnlock(OptrToHandle(@AnswerButtonString)) ;
+}
+
+@classdecl ThinkerDocumentControlClass ;
+
+@method ThinkerDocumentControlClass,
+            MSG_GEN_DOCUMENT_CONTROL_CONFIGURE_FILE_SELECTOR
+/*   optr fileSelector = cx:dx, word flags = bp); */
+{
+/*    char buffer[100] ;
+    word size ;
+
+    @callsuper() ;
+
+	 if (InitFileReadStringBuffer("thinker", "docPath", buffer, sizeof(buffer)-1, &size)==FALSE)
+        @call fileSelector::MSG_GEN_PATH_SET(
+                  buffer,
+						0) ;
+*/
+ /* lets do it this way... jfh */
+ Boolean		notThere;
+
+
+	 @callsuper();
+
+    /* see if our default folder is in Document */
+	 MemLock (OptrToHandle(@TPFolderTxt));
+	 notThere = @call fileSelector::MSG_GEN_PATH_SET
+					 (LMemDeref(@TPFolderTxt),
+					 SP_DOCUMENT);
+	 MemUnlock (OptrToHandle(@TPFolderTxt));
+
+    /* if it was there we're all set - if not just go to Document */
+    if(notThere)  {
+		 @call fileSelector::MSG_GEN_PATH_SET(".", SP_DOCUMENT);
+		 }
+
+}
+
+/*=========================================================================*
+ *  ROUTINES:
+ *=========================================================================*/
+
+/*-------------------------------------------------------------------------
+ | Routine:  LoadSounds
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Load the sounds to be played later.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  04/01/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void LoadSounds(void)
+{
+    FileHandle file ;
+
+    ResetSound() ;
+    memset(G_sounds, 0, sizeof(G_sounds)) ;
+
+    FilePushDir() ;
+    FileSetCurrentPath(SP_PRIVATE_DATA, "thinker");
+    file = FileOpen("sounds.dat", FILE_DENY_NONE|FILE_ACCESS_R) ;
+    if (file)  {
+        FileRead(file, &G_sounds, sizeof(G_sounds), FALSE) ;
+        FileClose(file, FALSE) ;
+    }
+    FilePopDir() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  PlayFrequency
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Play a frequency on the PC Speaker (with logical checks)
+ |
+ | Inputs:
+ |    word freq                   -- Frequency to use (per GEOS sound.h)
+ |    word duration               -- Length of time in 1/60ths of a second
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  04/01/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void PlayFrequency(word freq, word duration)
+{
+    static word lastFreq = 0xFFFF ;
+
+    if (freq == lastFreq)
+        if (RandomNumber()&1)
+            freq-- ;
+        else
+            freq++ ;
+    lastFreq = freq ;
+    UserStandardSound(SST_CUSTOM_NOTE, freq, duration) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  PlaySimpleSound
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Plays a banked sound out the PC speaker.  Actually just sets up
+ |    the sound for playing.
+ |
+ | Inputs:
+ |    word soundId                -- Index into G_sounds
+ |    word priority               -- 0-65535 priority level if the given
+ |                                   sound doesn't have a priority already.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  04/01/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void PlaySimpleSound(word soundId, word priority)
+{
+    T_simplePCSound *p_sound ;
+    word i ;
+    word best = INDEX_NONE ;
+    word bestPriority = 0xFFFF ;
+    T_soundState *p_channel ;
+
+    if (G_soundIsOn)  {
+        p_sound = G_sounds + soundId ;
+        if (p_sound->priority)
+            priority = p_sound->priority ;
+
+        /* Find the best free channel or one with a lower priority */
+        for (i=0, p_channel=G_channelArray;
+             i<MAX_SOUND_CHANNELS;
+             i++, p_channel++)  {
+            /* Take emty channels immediately */
+            if (p_channel->soundNum == INDEX_NONE)  {
+                best = i ;
+                bestPriority = 0xFFFF ;
+                break ;
+            }
+
+            /* Otherwise, look for the lowest priority sound */
+            if (p_channel->priority <= bestPriority)  {
+                best = i ;
+                bestPriority = p_channel->priority ;
+            }
+        }
+
+        /* Only process the sound if we found a channel */
+        /* and the lowest priority sound is lower or equal to what we */
+        /* want to play */
+        if ((best != INDEX_NONE) &&
+            ((bestPriority <= priority) || (bestPriority==0xFFFF)))  {
+            p_channel = G_channelArray + best ;
+            p_channel->soundNum = soundId ;
+            p_channel->pos = 0 ;
+            p_channel->priority = priority ;
+        }
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  RandomNumber
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Generate a RandomNumber of value 0 to 65535.
+ |
+ | Outputs:
+ |    word                        -- 0 to 65535 number
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  03/31/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+word RandomNumber(void)
+{
+    static word rand1 = 0xf32d ;
+    static word rand2 = 0x0103 ;
+    static word rand3 = 0x4326 ;
+    static word rand4 = 0x4878 ;
+    word old ;
+
+    old = rand1 ;
+    rand1 = rand2 ;
+    rand2 = rand3 ;
+    rand3 = rand4 ;
+    rand4 ^= old^rand1^rand2^rand3 ;
+    rand3 += rand1+rand2+rand4 ;
+    rand4 >>= 1 ;
+    rand4 |= (old&0x8000) ;
+    rand4 += TimerGetCount() ;
+    rand2 ^= 0xFFFF ;
+    return old ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  ResetSound
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Reset the sound effects
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  04/01/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void ResetSound(void)
+{
+    word i ;
+
+    for (i=0; i<MAX_SOUND_CHANNELS; i++)  {
+        G_channelArray[i].soundNum = INDEX_NONE ;
+        G_channelArray[i].pos = 0 ;
+        G_channelArray[i].priority = 0 ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  SoundStart
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Start the sound system (mainly timer)
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  04/01/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void SoundStart(void)
+{
+    if (!G_soundIsRunning)  {
+        G_soundIsRunning = TRUE ;
+        if (!G_soundTimer)
+            G_soundTimer = TimerStart(
+                           TIMER_EVENT_ONE_SHOT,
+                           ConstructOptr(GeodeGetCodeProcessHandle(), 0),
+                           1,
+                           MSG_THINKER_PROCESS_UPDATE_SOUND,
+                           1,
+                           &G_soundTimerId) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  SoundStop
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Stops the sound system (mainly timer)
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  04/01/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void SoundStop(void)
+{
+    if (G_soundIsRunning)  {
+        G_soundIsRunning = FALSE ;
+        if (G_soundTimer)  {
+            TimerStop(G_soundTimer, G_soundTimerId) ;
+            G_soundTimer = NullHandle ;
+        }
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  SoundsWaitUntilDone
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Updates the sound effects until we are done.  Also stops the sound
+ |    system.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  04/01/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void SoundsWaitUntilDone(void)
+{
+    word i ;
+    Boolean isSoundPlaying ;
+
+    SoundStop() ;
+
+    do {
+        isSoundPlaying = FALSE ;
+        for (i=0; i<MAX_SOUND_CHANNELS; i++)  {
+            if (G_channelArray[i].soundNum != INDEX_NONE)  {
+                isSoundPlaying = TRUE ;
+                break ;
+            }
+        }
+
+        /* Stop if finally no sound is playing */
+        if (!isSoundPlaying)
+            break ;
+        UpdateSound() ;
+        TimerSleep(1) ;
+    } while (1) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  UpdateSound
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Update the sound effects using the current settings.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  04/01/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void UpdateSound(void)
+{
+    static word channel = 0 ;
+    T_soundState *p_state ;
+    T_simplePCSound *p_sound ;
+    word sample ;
+
+    p_state = G_channelArray + channel ;
+    if (p_state->soundNum != INDEX_NONE)  {
+        p_sound = G_sounds + p_state->soundNum ;
+        sample = p_sound->samples[p_state->pos] ;
+        if (sample > SOUND_FREQ_CUTOFF)  {
+            /* Play that frequency */
+            PlayFrequency(sample, 1) ;
+            p_state->pos++ ;
+        } else if (sample == 0)  {
+            /* Sound is done.  Stop here */
+            p_state->soundNum = INDEX_NONE ;
+            p_state->priority = 0 ;
+            p_state->pos = 0 ;
+        } else {
+            p_state->pos++ ;
+        }
+    }
+
+    /* Go to the next channel next time */
+    channel = ((channel+1)%MAX_SOUND_CHANNELS) ;
+}
+

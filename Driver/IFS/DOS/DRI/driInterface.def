@@ -1,0 +1,325 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		driInterface.def
+
+AUTHOR:		Adam de Boor, Oct 31, 1991
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	10/31/91	Initial revision
+
+
+DESCRIPTION:
+	Structures & constants that define the interface to DR DOS.
+		
+	$Id: driInterface.def,v 1.1 97/04/10 11:54:54 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+DRI_NUM_STD_HANDLES	equ	5		; number of standard file
+						;  handles in the JFT that
+						;  we shouldn't touch lest
+						;  any DOS app we run get
+						;  blown out of the water
+
+DRI_GET_DATA		equ (MSDOS_IOCTL shl 8) or 58h
+;
+;	Get private data table for DR-DOS.
+;	PASS:	ah	= MSDOS_IOCTL
+;		al	= 58h
+;		bx	= 0 so if running off a network (e.g. NetWare 3.11),
+;			  it doesn't think this weird IOCTL is intended for
+;			  it and return an ERROR_UNSUPPORTED_FUNCTION
+;	RETURN:	es:bx	= Private data table. es:[bx+2] holds segment of file
+;			  table.
+
+DRI_HANDLE_TABLE	equ	{nptr.nptr.FileHandle}[0xbe]
+;	Offset w/in file table segment at which base of handle table is stored.
+;	Each entry in the handle table points to a FileHandle structure in the
+;	same segment.
+
+DRI_6_0_HANDLE_TABLE equ	{nptr.nptr.FileHandle}[2]
+;	Offset w/in 6.0's file table segment at which base of handle table
+;	is stored.
+
+FHAccessMode	record
+    FHAM_NETWORK:1	; File/device accessed over network
+    FHAM_DEVICE:1	; Handle is for device, not file
+    FHAM_XTLOCK:1	; Extended lock structure, not file handle
+    FHAM_MSNET:1	; MSNET handle, not file handle
+    :3
+    FHAM_RO:1		; File was r/o when opened
+    FHAM_MPM1:1		; File appears read/only to others, locking
+			;  not permitted
+    FHAM_FCB:1		; File opened via FCB call
+    FHAM_PRIVATE:1	; Children don't inherit
+    FHAM_DENY_W:1	; Opened in deny-write mode
+    FHAM_DENY_R:1	; Opened in deny-read mode
+    FHAM_COMP:1		; Opened in compatibility mode
+    FHAM_WRITE:1	; Opened for writing
+    FHAM_READ:1		; Opened for reading
+FHAccessMode	end
+
+FHIoctlState	record	; Status bits for ioctl functions
+    FHIS_DEV:1		; Handle refers to device
+    FHIS_EOF:1		; "File written"
+    FHIS_BIN:1		; File in binary mode
+    :2			; RES and CLK -- reserved
+    FHIS_NUL:1		; Handle is to null device
+    FHIS_COUT:1		; Handle is to console output device
+    FHIS_CIN:1		; Handle is to console input device
+FHIoctlState	end
+
+;
+; One of these exists for each open handle.
+;
+FHFileInfo	struct
+    FHFI_block		word		; Last block accessed
+    FHFI_offset		word		; Offset w/in that block
+FHFileInfo	ends
+
+FHDevFileInfo	union
+    FHDFI_device	fptr.DeviceHeader
+    FHDFI_file		FHFileInfo
+FHDevFileInfo	end
+
+FileHandle	struct
+    FH_next		nptr.FileHandle	; Next free handle structure
+    FH_desc		nptr.FileDesc	; Offset of physical file
+					;  descriptor in same segment
+    FH_mode		FHAccessMode	; Access mode of the file
+    FH_pd		sptr		; Concurrent DOS cruft
+    FH_refCount		word
+    			byte		; (old-style) SFN for this handle
+    FH_ioctl		FHIoctlState	; Status bits
+
+    FH_info		FHDevFileInfo
+
+    FH_filePos		dword		; Current position w/in the file
+    FH_psp		sptr.ProgramSegmentPrefix
+    FH_sfn2		word		; ignore, if possible
+FileHandle	ends
+
+
+;
+; One of these exists for each open disk file. Many FileHandle structures
+; can point to a single FileDesc structure.
+; 
+FDState	record
+    :3,
+    FDS_DENY_W:1,	; Someone's opened deny-write to others
+    FDS_DENY_R:1,	; Someone's opened deny-read to others
+    FDS_COMP:1,		; Someone's opened in compatibility mode
+    FDS_XTLOCK:1,	; Someone's got an extended lock on this file
+    FDS_DIRTY:1,	; Someone's changed the file since the last directory
+			;  update.
+FDState	end
+
+FileDesc	struct
+    FD_next		nptr.FileDesc	; Next open file
+    FD_flags		FDState		; State flags, you know
+    FD_refCount		byte		; # handles open to it
+    FD_lock		word		; root of locks (?)
+    ; File ID:
+    FD_drive		byte		; Logical drive #
+    FD_loginSeq		byte		; Login sequence # of drive (checksum
+					;  of the FAT and root dirs so DRI
+					;  knows when the disk changes)
+    FD_dirLBN		word		; LBN of first block in
+					;  containing directory
+    FD_dirIndex		word		; Entry # in containing dir.
+    FD_time		FileTime	; Time of last write
+    FD_date		FileDate	; Date of last write
+    FD_initCluster	word		; First cluster in flie
+    FD_size		sdword		; File size
+FileDesc	ends
+
+;------------------------------------------------------------------------------
+;			   SFT DEFINITIONS
+; These are the DOS3 definitions, as that's what DR-DOS is compatible with.
+; They are used to figure the number of handles available to the system,
+; and for the Swat "sysfiles"/"geosfiles" commands.
+;------------------------------------------------------------------------------
+
+SFTMode		record
+	SFTM_FCB:1			;1 => FCB entry (not handle entry)
+	:8				;
+	SFTM_DENY FileExclude:3	;Access types denied for other openers
+	:2				;
+	SFTM_ACCESS FileAccess:2	;Access type for opener
+SFTMode		end
+
+; Flags for files:
+;
+SFTFFlags	record
+	SFTFF_SHARED:1		;1 if network-visible
+	SFTFF_DATESET:1		;1 if modification time up-to-date
+	SFTFF_ISDEV:1=0		;
+	SFTFF_WRITTEN:1		;1 if written (since last update?)
+	SFTFF_DRIVE:6		;drive mask (drives 0 -> 32)
+SFTFFlags	end
+;
+; Flags for devices:
+;
+SFTDFlags	record
+	SFTDF_SHARED:1		;1 if network-visible
+	SFTDF_IOCTL:1		;1 if supports IOCTL
+	SFTDF_ISDEV:1=1		;
+	SFTF_EOF:1		;1 if at end-of-file
+	SFTDF_BIN:1		;1 if in raw mode
+	SFTDF_SPECIAL:1		;1 if supports INT 29h
+	SFTDF_CLOCK:1		;1 if is clock device
+	SFTDF_NULL:1		;1 if is null device
+	SFTDF_STDOUT:1		;1 if is current stdout device
+	SFTDF_STDIN:1		;1 if is current stdin device
+SFTDFlags	end
+
+SFTEntry	struct
+    SFTE_refCount	word		; Reference count (# JFT entries
+					;  for all MSDOS apps referencing
+					;  this entry)
+    SFTE_mode		SFTMode		; Mode bits
+    SFTE_dirAttrib	FileAttrs	; Attributes from directory
+    SFTE_flags		SFTFFlags	; Flags for entry itself (assume file)
+    SFTE_DCB		fptr.DeviceControlBlock ; Pointer to DCB (file)
+					; or device header (device)
+
+    SFTE_initCluster	word		; Starting cluster
+    SFTE_time		FileTime
+    SFTE_date		FileDate
+    SFTE_size		dword		; Latest size of file
+
+    SFTE_position	dword		; Current seek position
+    SFTE_relCluster	word		; # clusters SFTE_position is from
+					;  start of file
+    SFTE_curCluster	word		; Cluster containing SFTE_position
+
+    SFTE_dirLBN		word		; Logical block number of start of
+					;  containing directory
+    SFTE_dirIndex	byte		; Index into containing directory
+					;  for file.
+
+    SFTE_name		char	11 dup(?)
+    SFTE_unknown	byte	4 dup(?)
+    SFTE_machine	word		; Id of owning machine
+    SFTE_owner		sptr		; PSP of owning process
+    SFTE_status		word		; Status last returned (?)
+SFTEntry	ends
+
+SFTBlockHeader	struct
+    SFTBH_next		fptr.SFTBlockHeader; Pointer to next block
+    SFTBH_numEntries	sword		; Number of entries in this block
+    SFTBH_entries	label SFTEntry
+SFTBlockHeader	ends
+
+
+;------------------------------------------------------------------------------
+;	 Device Control Block
+;------------------------------------------------------------------------------
+
+DeviceControlBlock	struct
+    DCB_drive		byte			;drive number
+    DCB_unit		byte			;unit number, from driver's
+						; perspective
+    DCB_sectorSize	word			;bytes per sector
+    DCB_clusterMask	byte			;(= cluster size - 1)
+				    		;used to find cluster boundaries
+    DCB_clusterShift	byte			;sector->cluster shift mask
+					    	;sector>>clusterShift = cluster
+    DCB_startFAT	word			;lbn of first FAT
+    DCB_numFATs		byte			;number of FATs
+    DCB_rootSize	word			;num blocks in root dir
+    DCB_startFilesArea	word			;lbn of first data cluster
+    DCB_endFilesArea	word			;# of last cluster in data area
+    DCB_FATSize		byte			;num blocks in FAT
+    DCB_startRoot	word			;lbn of root dir
+    DCB_deviceHeader	fptr.DeviceHeader
+    DCB_media		DosMediaType		;media type
+    DCB_mediaChanged	byte			;true if media changed
+    DCB_nextDCB		fptr.DeviceControlBlock	;next DCB
+    DCB_unknown		dword
+DeviceControlBlock	ends
+
+;------------------------------------------------------------------------------
+;	Current Directory Structure (3.X and up, only)
+;------------------------------------------------------------------------------
+CDStatus	record
+    CDS_NETWORK:1		; Set if accessed through network
+    CDS_LOCAL:1			; Set if device local (both NETWORK & LOCAL
+				;  can be set for some devices, if they
+				;  don't have a normal device driver...)
+    CDS_JOINED:1		; Set if drive is joined to a path on another
+    				;  device (using the path on the other device
+				;  actually refers to this drive's root).
+    CDS_SUBST:1			; Set if device is a substitute for a
+    				;  path on another device (using this drive
+				;  letter actually refers to the path on
+				;  the other device)
+    :4
+    CDS_DEVICE:1		; Character device (?), not block.
+    :7
+CDStatus	end
+
+CurrentDirectory	struct
+    CD_path		char	67 dup(0)	; Current directory
+    CD_status		CDStatus
+    CD_DCB		fptr.DeviceControlBlock
+    CD_curDir		word			; starting cluster of
+						;  current directory
+			word 	2 dup(?)
+    CD_rootOffset	word			; offset to backslash in
+						;  CD_path that represents
+						;  the root of the logical
+						;  drive. Something other
+						;  than 2 only for subst/join
+						;  drives.
+CurrentDirectory	ends
+
+DosListOfLists	struct		; > 3.0
+    DLOL_DCB		fptr.DeviceControlBlock
+    DLOL_SFT		fptr.SFTBlockHeader
+    DLOL_clock		fptr.DeviceHeader; Device header for CLOCK$
+    DLOL_console	fptr.DeviceHeader; Device header for CON
+    DLOL_maxSect	word		; Size of largest sector on any drive
+    DLOL_cache		fptr		; First cache block
+    DLOL_CWDs		fptr		; Current Working Directory info per
+					;  drive
+    DLOL_FCBs		fptr		; SFT for FCB access
+    DLOL_FCBsize	word		; Number of entries in FCB SFT
+    DLOL_numDrives	byte		; Number of drives in system
+    DLOL_lastDrive	byte		; Last real drive
+    DLOL_null		DeviceHeader	; Header for NUL device -- the head
+					;  of the driver chain.
+DosListOfLists	ends
+
+;--------------------------------------------------------------------------
+;			Locations in the DTA (MS-DOS Data transfer area)
+;--------------------------------------------------------------------------
+
+FileFindDTA	struct		; Format of DTA during FIND_FIRST/FIND_NEXT
+				;  sequence
+    ; undocumented fields from Schulman et al p. 515
+    FFD_drive		byte			; drive number (1-origin)
+    FFD_pattern		char	11 dup(?)	; search template
+    FFD_searchAttr	FileAttrs		; search attributes
+    FFD_dirIndex	word			; index w/in directory
+    FFD_dirLBN		word			; cluster for parent dir
+						;  (VARIES between DOS vers.)
+    FFD_reserved	byte	4 dup(?)	; misc
+    ; documented fields
+    FFD_attributes	FileAttrs	; file's attributes
+    FFD_modTime		FileTime	; file's modification time
+    FFD_modDate		FileDate	; file's modification date
+    FFD_fileSize	dword		; file's size in bytes
+				    ; file's name and extension in the form
+				    ; of a null terminated string
+    FFD_name		char	DOS_DOT_FILE_NAME_LENGTH_ZT dup(?)
+FileFindDTA	ends
+
+DTA_SIZE	=	64
+

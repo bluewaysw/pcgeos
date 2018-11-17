@@ -1,0 +1,412 @@
+/***********************************************************************
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	NTaker
+FILE:		ntakerGeode.def
+
+
+REVISION HISTORY:
+	
+	Name	Date		Description
+	----	----		-----------
+	atw	2/12/92		Initial revision
+   jfh   4/29/03		ported to GOC
+
+DESCRIPTION:
+	Contains standard include files for all modules.	
+		
+
+ ***********************************************************************/
+
+@include <stdapp.goh>
+#include <gstring.h>
+#include <ansi/string.h>
+#include <initfile.h>
+
+/*include geos.def
+include heap.def
+include geode.def
+include resource.def
+include ec.def
+include vm.def
+include dbase.def
+include	initfile.def
+
+include object.def
+include graphics.def
+include gstring.def
+
+include Objects/winC.def
+
+include	timedate.def
+include	system.def
+include hugearr.def
+*/
+/*------------------------------------------------------------------------------
+;			Libraries used
+;------------------------------------------------------------------------------
+UseLib ui.def
+UseLib pen.def
+*/
+@include <Objects/vTextC.goh>
+@include <pen.goh>
+
+#include <print.h>      /* These two for printing  */
+@include <spool.goh>
+@include <iacp.goh>     /* to launch calculator */
+#include <token.h>	/* for assigning doc token */
+@include <Objects/Text/tCtrlC.goh>  /* for controllers */
+@include <Objects/gPageCC.goh>
+
+/*include ntakerDocument.def
+include ntakerProcess.def
+include ntakerApplication.def
+include ntakerTitledButton.def
+include ntakerInk.def
+include ntakerText.def
+include ntakerDisplay.def
+include ntakerGlobal.def
+*/
+
+/*idata	segment
+	NTakerProcessClass	mask CLASSF_NEVER_SAVED
+	NTakerApplicationClass
+	NTakerDocumentClass
+	NTakerDisplayClass
+	NTakerInkClass		mask CLASSF_NEVER_SAVED
+	NTakerTextClass		mask CLASSF_NEVER_SAVED
+	TitledGenTriggerClass
+
+idata	ends
+
+udata	segment
+	features	NTakerFeatures
+udata	ends
+*/
+
+#define TEXT_MAX_LENGTH 10000		//max length of the text object
+
+/*-----------------------------------------------------------------------------
+			NTakerApplicationClass
+------------------------------------------------------------------------------*/
+@class NTakerApplicationClass GenApplicationClass;
+
+typedef WordFlags NTakerToolbarStates;
+#define NTS_SHOW_TOOLBAR	0x8000
+
+typedef WordFlags NTakerFeatures;
+#define NF_CARD_LIST			0x8000
+#define NF_KEYWORDS			0x4000
+#define NF_SEARCH				0x2000
+#define NF_MISC				0x1000
+#define NF_TOOLS				0x0800
+#define NF_CREATE_TOPICS	0x0400
+
+	@instance NTakerToolbarStates NAI_toolbarStates = NTS_SHOW_TOOLBAR;
+
+	@message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_NTAKER_APPLICATION_UPDATE_TOOLBARS;
+//	@message void MSG_NTAKER_APPLICATION_SET_TOOLBAR_STATE();
+//	@message void MSG_NTAKER_APPLICATION_TOOLBAR_VISIBILITY();
+//	@message void MSG_NTAKER_APPLICATION_QUERY_RESET_OPTIONS();
+
+@endc
+
+/*-----------------------------------------------------------------------------
+			NTakerDisplayClass
+------------------------------------------------------------------------------*/
+@class NTakerDisplayClass GenDisplayClass;
+
+	@message void MSG_NTAKER_DISPLAY_SET_HAS_TOPICS(FileHandle fileHan);
+	/* This informs the display whether or not the current file has
+	;	topics or not.
+	;	Pass: cx - file handle
+	;	Return: nothing  */
+
+	@message void MSG_NTAKER_DISPLAY_SET_NUM_SUB_TOPICS(word numTopics);
+	/* Informs the display how many sub topics the current topic has, so the
+	;	display can enable/disable the topic ui.
+	;	Pass: cx - num topics
+	;	Return: nothing  */
+
+	@message void MSG_NTAKER_DISPLAY_SET_VIEW_TYPE(word type);
+	/* Sets the current view to "List", "Card", or "Both"
+	;	Pass: cx - ViewType
+	;	Return: nothing  */
+
+	@message void MSG_NTAKER_DISPLAY_CHANGE_OPTIONS(word options);
+	/* Updates the UI after an option change
+	;	Pass: cx - NTakerOptions
+	;	Return: nothing  */
+
+	@message void MSG_NTAKER_DISPLAY_REDO_UI(NTakerOptions options);
+	/* Updates the UI after an option/ui level change
+	;	Pass: cx - NTakerOptions
+	;	Return: nothing  */
+
+	@message void MSG_NTAKER_DISPLAY_CHANGE_NOTE();    //FIX
+	/* Disables various UI gadgets depending upon whether or not a folder
+	;	is being displayed, before passing this on to the document
+	;	Pass: cx - identifier of selected item
+	;	Return: nothing */
+
+	@message void MSG_NTAKER_DISPLAY_CARD_LIST_DOUBLE_CLICK();  //FIX
+	/* Just passes this on to the document
+	;	Pass: cx - item double-clicked on
+	;	Return: nothing */
+
+	@message void MSG_NTAKER_DISPLAY_QUERY_FOR_NOTE_LIST_MONIKER();
+	/* Passed off to document.  */
+
+	@instance word NDISPI_hasTopics = 0;
+	@instance word NDISPI_numTopics = 0;
+
+@endc
+
+/*-----------------------------------------------------------------------------
+			TitledGenTriggerClass
+------------------------------------------------------------------------------*/
+@class TitledGenTriggerClass GenTriggerClass;
+				/* lptr.char ??? */
+	@instance char TGTI_title = 0;						//Title to display
+	@instance byte TGTI_pictureNumber = 0; 			// Moniker # to display
+
+@endc
+
+typedef ByteEnum PictureNumber;
+	#define PN_UP_ARROW		0x1
+	#define PN_DOWN_ARROW	0x2
+	#define PN_NEW_CARD     0x3
+
+/*-----------------------------------------------------------------------------
+			NTakerTextClass
+------------------------------------------------------------------------------*/
+@class NTakerTextClass VisTextClass;
+
+	/*Currently, no instance data or messages, as we just subclass it to do
+		geometry. */
+
+#define DEFAULT_TEXT_MIN_WIDTH 220	//Don't let it get narrower than this
+
+@endc
+
+/*-----------------------------------------------------------------------------
+			NTakerProcessClass
+------------------------------------------------------------------------------*/
+@class NTakerProcessClass GenProcessClass;
+
+typedef enum ViewType;
+	#define VT_CARD	0x1
+	#define VT_LIST	0x2
+	#define VT_BOTH	0x3
+
+	@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_NTAKER_SET_VIEW_TYPE;
+	/* Set the display mode to Card, List, or Both  */
+
+typedef WordFlags NTakerOptions;
+#define NTO_DISPLAY_DATES			0x8000
+
+	@message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_NTAKER_CHANGE_OPTIONS;
+	/*Set the date display options */
+
+@endc
+
+/*-----------------------------------------------------------------------------
+			NTakerDocumentClass
+------------------------------------------------------------------------------*/
+@class NTakerDocumentClass	GenDocumentClass;
+
+#define DOCUMENT_WIDTH		12*72
+#define DOCUMENT_HEIGHT		10*72
+
+
+	@message void MSG_NTAKER_DOC_INSERT_PAGE();
+	/* Create a new page here.
+	; Pass: nothing  */
+
+	@message void MSG_NTAKER_DOC_NEW_NOTE();
+	/* Create a new note.
+	; Pass: nothing  */
+
+	@message void MSG_NTAKER_DOC_CHANGE_NOTE();
+	/* Change notes (user selected a different note)
+	; Pass: cx - note number   */
+
+	@message void MSG_NTAKER_DOC_CREATE_FOLDER();
+	/* Create a new folder
+	; Pass: nothing
+	; Return: nothing */
+
+	@message void MSG_NTAKER_DOC_GET_PARENT_FOLDER();
+	/* Go to the parent folder
+	; Pass: nothing
+	; Return: nothing  */
+
+	@message void MSG_NTAKER_DOC_GET_PARENT_MOVE_FOLDER();
+	/* Go to the parent folder
+	; Pass: nothing
+	; Return: nothing  */
+
+/*MSG_NTAKER_DOC_CARD_LIST_DOUBLE_CLICK();
+;
+; Open a folder when the open-folder trigger button is pressed
+;
+; Pass: nothing
+; Return: nothing  */
+
+	@message void MSG_NTAKER_DOC_EDIT_SELECTED_CARD();
+	/* Switches to card mode.
+	;	Pass: nothing
+	;	Return: nothing  */
+
+	@message void MSG_NTAKER_DOC_MOVE_OPEN_FOLDER();
+	/* Open a folder when the open trigger button in the move dialog box
+	; is pressed
+	; Pass: nothing
+	; Return: nothing  */
+
+	@message void MSG_NTAKER_DOC_INIT_MOVE_BOX();
+	/* Initialize the MoveBox GenInteraction
+	; Pass: nothing
+	; Return: nothing  */
+
+	@message void MSG_NTAKER_DOC_MOVE();
+	/* Move the note a folder to another folder
+	; Pass: nothing
+	; Return: nothing  */
+
+	@message void MSG_NTAKER_DOC_DELETE();
+	/* Delete a note or a folder
+	; Pass: nothing
+	; Return: nothing  */
+
+	@message void MSG_NTAKER_DOC_SEARCH_BY_TITLE();
+	/* Search a note by title which is entered by the user
+	; Pass: nothing
+	; Return: nothing   */
+
+	@message void MSG_NTAKER_DOC_SEARCH_BY_KEYWORD();
+	/* Search a note by keyword which is entered by the user
+	; Pass: nothing
+	; Return: nothing   */
+
+	@message void MSG_NTAKER_DOC_DISPLAY_NOTE();
+	/* Display a note which is selected by the user from the search result
+	; dialog box
+	; Pass: nothing
+	; Return: nothing  */
+
+	@message void MSG_NTAKER_DOC_CLOSE_SEARCH_DIALOG();
+	/* Close the Search dialog box and free up the search
+	; result memory block
+	; Pass: nothing
+	; Return: nothing */
+
+	@message void MSG_NTAKER_DOC_BACKGROUND_SELECTED();
+	/*	New background has been selected by the user.
+	;	Pass: cx - InkBackgroundType
+	;	Return: nothing  */
+
+	@message void MSG_NTAKER_DOC_CUSTOM_BACKGROUND_PASTE();
+	/*	Get GStrings from the clipboard and paste it to the document
+	;	Pass: nothing
+	;	Return: nothing  */
+
+	@message (GEN_DYNAMIC_LIST_QUERY_MSG)
+								MSG_NTAKER_DOC_QUERY_FOR_NOTE_LIST_MONIKER;
+	@message (GEN_DYNAMIC_LIST_QUERY_MSG)
+								MSG_NTAKER_DOC_QUERY_FOR_MOVE_LIST_MONIKER;
+	@message (GEN_DYNAMIC_LIST_QUERY_MSG)
+								MSG_NTAKER_DOC_QUERY_FOR_SEARCH_LIST_MONIKER;
+
+	@message void MSG_NTAKER_DOC_NEXT_CARD();
+	@message void MSG_NTAKER_DOC_PREV_CARD();
+	/*	Display the next/prev cards
+	;	Pass: nothing
+	;	Return: nothing   */
+
+	@message void MSG_NTAKER_DOC_RESET_NOTE_LIST();
+	/*	Purges all monikers in the note list.
+	;	Pass: nothing
+	;	Return: nothing  */
+
+	@message void MSG_NTAKER_DOC_CHANGE_FEATURES();
+	/*	A message sent out when the features change.
+	;	Pass: nothing
+	;	Return: nothing  */
+
+	@message void MSG_NTAKER_DOC_DOWN_TOPIC();
+	/*	A message sent out when the user clicks on the "down topic" trigger
+	;	Pass: nothing
+	;	Return: nothing  */
+
+	@message void MSG_NTAKER_DOC_SET_VIEW_TYPE(word type);
+	/*	Message sent out when the user chooses a new view type.
+	;	Pass: cx - ViewType
+	;	Return: nothing  */
+
+	@message void MSG_NTAKER_DOC_BRINGUP_CREATE_TOPIC_BOX();
+	// Message sent out when the user wants to create a topic  
+
+
+	@instance dword NDOCI_curFolder = 0;
+	// Dword tag of the current folder
+
+	@instance dword NDOCI_curMoveFolder = 0;
+	// dword tag of the current folder in Move trigger
+
+	@instance dword NDOCI_curNote = 0;
+	// dword tag of the current note
+
+	@instance word NDOCI_curPage = 0;
+	// index of current page in page array
+
+//	@instance optr NDOCI_inkObj = 0;
+	// The optr of the ink object for this document
+
+	@instance optr NDOCI_textObj = 0;
+	// The optr of the text object for this document
+
+	@instance optr NDOCI_curObj = 0;
+	
+	@instance MemHandle NDOCI_searchBlock = 0;   //hptr.FindNoteHeader   FIX?
+//	@noreloc NDOCI_searchBlock;     FIX
+	// The block handle containing notes found via a search.
+
+@endc
+
+typedef enum PageRange;
+	#define PR_CUR_PAGE		0x1
+	#define PR_CUR_NOTE		0x2
+	#define PR_CUR_FOLDER	0x3
+	#define PR_ALL_NOTES		0x4
+
+typedef WordFlags PageInfo;
+#define PI_DATE			0x8000
+#define PI_TITLE			0x4000
+#define PI_KEYWORDS		0x2000
+
+typedef enum PageInfoPosition;
+	#define PIP_TOP				0x1
+	#define PIP_UPPER_LEFT		0x2
+	#define PIP_UPPER_RIGHT		0x3
+
+
+#define NTAKER_DOCUMENT_PRINT_BOX_LEFT_RIGHT_TEXT_MARGIN		5
+#define NTAKER_DOCUMENT_PRINT_BOX_SPACE_BETWEEN_LINES			4
+#define NTAKER_DOCUMENT_PRINT_BOX_LEFT_RIGHT_MARGIN			10
+#define NTAKER_DOCUMENT_PRINT_BOX_TOP_BOTTOM_MARGIN			10
+
+#define NTAKER_DOCUMENT_SPACE_BELOW_BOX_TO_PRINT_TEXT			5
+
+#define NTAKER_DOCUMENT_PRINT_FONT_SIZE				12
+#define NTAKER_DOCUMENT_PRINT_FONT_TYPE				FID_DTC_URW_MONO
+
+/* these aren't defined in the original?  */
+/*#define NT_INK 1
+#define NT_TEXT 2
+*/
+
+
+
+

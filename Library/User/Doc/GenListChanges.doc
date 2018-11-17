@@ -1,0 +1,268 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		User Interface
+FILE:		GenListChanges
+
+DESCRIPTION:
+
+	$Id: GenListChanges.doc,v 1.2.34.1 97/03/29 03:36:45 canavese Exp $
+
+------------------------------------------------------------------------------@
+
+Typical changes for your list
+-----------------------------
+	
+1.  Typical .ui file changes
+----------------------------
+
+    The following section shows specifically how to change GenLists (either
+    exclusive or non-exclusive) that have both "listMethod" and 
+    "listMethodIsData" set.   If your object is not using these, you'll need to
+    rework its function so that have something in the identifier field of each
+    item.  If you previously just had "listMethod" on, your handler will have
+    to look at an identifier, rather than an optr.  Usually this change is
+    not too hard to make.  If you previously used separate messages for each 
+    item, you'll have to have a single message that the list calls.  If you 
+    want, you can still keep messages as the identifiers for the items, and 
+    have the common handler immediately call itself with the message from the
+    identifier, although that is not a particularly efficient form of branching.
+
+    Exclusive list:
+    ---------------
+
+    From:
+	PlainTextList = GenList {
+		attributes = type exclusive, listMethod, listMethodIsData;
+		children = PlainTextEntry;
+		action = MSG_TSC_PLAIN_TEXT_CHANGE, "TO_OBJ_BLOCK_OUTPUT";
+	}	
+	PlainTextEntry = GenListEntry {
+		moniker = 'P', "Plain Text";
+		method = "0";
+	}
+
+    To:
+	PlainTextList = GenItemGroup {
+		children = PlainTextEntry;
+		applyMsg = MSG_TSC_PLAIN_TEXT_CHANGE;
+		destination = "TO_OBJ_BLOCK_OUTPUT";
+	}
+	PlainTextEntry = GenItem {
+		moniker = 'P', "Plain Text";
+		identifier = "0";
+	}
+    
+    Scrolling lists
+    ---------------
+    In addition to the above, change HINT_LIST_SCROLLING to HINT_ITEM_GROUP_-
+    SCROLLABLE (HINT_BOOLEAN_GROUP_SCROLLABLE if it's a non-exclusive list,
+    but none of you will have those yet).
+
+
+    Non-exclusive list:
+    -------------------
+
+    From:
+	TextStyleList = GenList {
+		genStates = default -usable;
+		attributes = type nonExclusive, listMethod, listMethodIsData;
+		children =
+			BoldEntry,
+			ItalicEntry,
+		action = MSG_TSC_STYLE_CHANGE, "TO_OBJ_BLOCK_OUTPUT";
+	}
+	BoldEntry = GenListEntry {
+		moniker = 'B', "Bold";
+		kbdAccelerator = control 'b';
+		method = "mask TS_BOLD";
+	}
+
+    To:
+	TextStyleList = GenBooleanGroup {
+		genStates = default -usable;
+		children =
+			BoldEntry,
+			ItalicEntry,
+		applyMsg = MSG_TSC_STYLE_CHANGE;
+		destination = "TO_OBJ_BLOCK_OUTPUT";
+	}
+	BoldEntry = GenBoolean {
+		moniker = 'B', "Bold";
+		identifier = "mask TS_BOLD";
+	}
+
+
+    Other miscellanious .ui changes
+    -------------------------------
+
+	* If you have an exclusive-none list, add the following line:
+
+		behaviorType = exclusiveNone;
+
+	  By default, GenItemGroups are exclusive.
+
+	* If you had any gadgetAttrs specified previously, nuke 'em.  Delayed 
+	  mode is now set at the window level.  One way to do this is to have
+	  "GII_type = GIV_PROPERTIES" in your windowed GenInteraction that 
+	  the item/boolean group is in. This may already be set correctly
+	  for your GenInteraction.  See GenInteraction docs for more details.
+
+        * If you have "gadgetAttrs = applCustom" in order to turn off anything
+	  happening on a double-press, change to:
+
+		ATTR_GEN_CUSTOM_DOUBLE_PRESS {
+			word	0
+		}
+
+	  If you actually had some custom behavior that occurs on a double
+	  press, you will want to break it out of your old output handler, 
+	  create a new message (say, MSG_FOO) and handler with the doublepress 
+	  handling code, and have the following in your .ui file:
+
+		ATTR_GEN_CUSTOM_DOUBLE_PRESS {
+			word	MSG_FOO
+		}
+
+	* If you had "gadgetAttrs = sendUserChanges" in your GenList before, 
+	  presumably you had some things you always needed to do on a user 
+	  change (like update a related gadget) even though your object is 
+	  running in delayed mode. You now get notification of any user 
+	  activity through a separate message (say MSG_STATUS) that you define:
+
+		ATTR_GEN_ITEM_GROUP_STATUS_MSG {
+			word	MSG_STATUS
+		}
+
+	  Use ATTR_GEN_BOOLEAN_GROUP_STATUS_MSG for GenBooleanGroups.
+	  Similar arguments are passed to this message as are passed to an
+	  apply message.
+
+	* If you had "gadgetAttrs = sendRedundantChanges" in your .ui file, you
+	  apparently wanted notification of changes even when there was no
+	  actual change in state of the object.  Redundant user changes are 
+	  already sent to status message of the new object, which should cover
+	  most cases of this.  However, if you want something sent to your 
+	  apply message regardless of whether the user has modified it, you can
+	  add the wonderfully concise ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_-
+	  NOT_MODIFIED.   
+
+	* If you had "gadgetAttrs = displayOnly", be the first on your block to
+	  set "genAttributes = readOnly" instead.
+
+
+Setting/getting messages
+------------------------
+
+	Exclusive lists
+	---------------
+
+	* MSG_GEN_LIST_SET_EXCL becomes MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+	  or MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED, depending on what you're 
+	  trying to do.  The only things passed are the identifier to set (in
+	  cx) and dx non-zero if the item group is indeterminate.  If you're
+	  worry about what indeterminate is, for most lists you don't need to
+	  bother with indeterminate state.  For more info, read the GenItem-
+	  Group docs.
+
+	* If you need an optr for the selected list entry, you can call 
+	  MSG_GEN_ITEM_GROUP_GET_ITEM_OD, passing the identifier in cx.
+
+	* MSG_GEN_LIST_GET_EXCL becomes MSG_GEN_ITEM_GROUP_GET_SELECTION.  The
+	  selection is returned in ax, not cx.  Nothing is passed to this.
+	  GIGS_NONE (-1) is returned, and the carry is set, if there's no 
+	  selection.  
+
+	* MSG_GEN_LIST_ENTRY_SET_MESSAGE becomes MSG_GEN_ITEM_SET_IDENTIFIER.
+	  
+	Non-exclusive lists
+	-------------------
+	
+	* MSG_GEN_LIST_SET_NON_EXCL_VIA_DATA becomes MSG_GEN_BOOLEAN_GROUP_SET_
+	  GROUP_STATE.    Selections to set TRUE are passed in cx; all others 
+	  are set FALSE.  Indeterminate selections are passed in dx.
+
+	* MSG_GEN_LIST_GET_NON_EXCL_VIA_DATA becomes MSG_GEN_BOOLEAN_GROUP_GET_-
+	  SELECTED_BOOLEANS.  The or'ed identifiers of the selected booleans
+	  are returned in ax (not cx).
+
+	  For those who still set and get the states of your items the hard way,
+	  consider switching to the simpler messages above, especially if your
+	  just building out a record anyway.  For those that don't, you can use
+	  the following:
+
+	* MSG_GEN_LIST_ENTRY_GET_STATE sent to the list entry becomes 
+	  MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED, sent to the boolean group. 
+	  The latter takes the identifier of the boolean to check in cx, and 
+	  returns the carry set if the boolean is selected.
+
+	* MSG_GEN_LIST_ENTRY_SET_STATE becomes MSG_GEN_BOOLEAN_GROUP_SET_-
+	  BOOLEAN_SELECTED_STATE.  This message takes an identifier in cx, 
+	  and dx zero to deselect, non-zero to select.
+
+
+Handlers for apply messages
+---------------------------
+
+	* No LUF_ flags are passed to the handler now, since double-presses,
+	  user changes, and applies are all handled in different messages now.
+	  Usually it is simple to break your current handler code up to deal
+	  with each of these situations.
+
+	* For item groups, the currently selected item identifier will be 
+	  passed in cx.  For boolean groups, the or'ed identifiers of the 
+	  currently selected booleans are passed in cx.  The or'ed identifiers
+	  of the booleans that have actually been modified by the user are
+	  passed in bp, which is often useful.
+
+	* Again, if your handler needs the optr of the selected item/boolean,
+	  it can send a MSG_GEN_ITEM_GROUP_GET_ITEM_OPTR to the item/boolean 
+	  group.
+
+
+Dynamic lists
+-------------
+	Lots of differences here:
+
+	* If desired, you can set the number of items in the .ui file by 
+	  setting GDLI_numItems.
+
+	* No query message for the number of items is ever sent out.  If nothing
+	  is set in the .ui file, the number of items defaults to zero.  When
+	  you know the number of items in the dynamic list, send a MSG_GEN_-
+	  DYNAMIC_LIST_SET_NUM_ITEMS (takes number of items in cx).  Nuke your
+	  MSG_META_GEN_LIST_GET_NUMBER_OF_ENTRIES handler.  Also, any of your
+	  calls to MSG_GEN_LIST_PURGE_MONIKERS should become MSG_GEN_LIST_-
+	  SET_NUM_ITEMS.   The new selection is no longer passed in dx.  You
+	  should do that yourself using MSG_GEN_ITEM_GROUP_SET_SELECTION
+	  beforehand, if you still desire that behavior.
+
+	* You will want to create a message to query for the item monikers
+	  and set it in GDLI_queryMsg.  There is no default meta message that
+	  is sent out.   Change your handler to handle the new message, rather
+	  than MSG_META_GEN_LIST_REQUEST_ENTRY_MONIKER.  Same stuff is passed.
+
+	* You will need to add a HINT_ITEM_GROUP_SCROLLABLE to your dynamic
+	  list if it isn't already there.  Otherwise you'll get a very, very
+	  long group of settings.
+
+	* MSG_GEN_LIST_SET_ENTRY_MONIKER can become a number of things.  If you
+	  are going to pass back as the moniker for the item:
+
+		* An fptr to null-terminated text -- Use MSG_GEN_DYNAMIC_LIST_-
+		 	REPLACE_ITEM_TEXT, which takes cx:dx as the pointer,
+	 		and bp as the item identifier (the position).  You
+			cannot have disabled items via this message.
+
+		* An optr to a VisMoniker -- Use MSG_GEN_DYNAMIC_LIST_REPLACE_-	
+			ITEM_MONIKER_OPTR, which takes ^lcx:dx as the optr, 
+			bp as the item identifier.  You cannot have disabled
+			items via this message.
+
+		* Anything else -- Use MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER
+			which takes similar parameters to the new MSG_GEN_-
+			REPLACE_VIS_MONIKER, except no update mode is passed,
+			and an item and itemFlags are passed.  See that message
+			for more details.

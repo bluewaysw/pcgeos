@@ -1,0 +1,250 @@
+#!/bin/sh
+##############################################################################
+#
+#	Copyright (C) GeoWorks 1995 -- All Rights Reserved
+#
+#	PROJECT:	PC/GEOS
+#	FILE:		makeRespGFS
+#
+#	REVISION HISTORY:
+#		Name	Date		Description
+#		----	----		-----------
+#		cbh	10/11/95	Initial version
+#
+#	$Id: respgfs,v 1.25 98/01/07 02:57:50 simon Exp $
+#
+# USAGE:
+#	makeRespGFS [-v] [-n] [-c] [gfsFile]
+#		-v	  VP and the apps which use it are in the gfs
+#		-n	  non-EC (default is EC)
+#		-c        make a compressed GFS also
+#		-b	  make a "big" GFS by leaving more geodes untruncated
+#		gfsFile	  optional path and filename to place gfs file.
+#
+# DESCRIPTION:
+#	Makes a Responder GFS.    Called by ship script to make the default
+#	GFS, and also used by our partners.
+#
+##############################################################################
+
+set -x
+
+vpInGFS=n
+ecChars=ec
+doComp=n
+bigfs=n
+
+# By default, use some bland filename in the current working directory.
+gfsFile=resp.gfs
+
+while [ $# -ne 0 ]; do
+    case $1 in
+	-v)\
+		vpInGFS=y;;
+	-n)\
+		ecChars="";;
+	-c)\
+		doComp=y;;
+	-b)\
+		bigfs=y;;
+	-*)\
+		gfsFlags="$gfsFlags $1";;
+	*)\
+		gfsFile=$1;;
+    esac
+    shift
+done
+
+
+    #
+    # Leave only stubs for those geodes that lie in the XIP image
+    #
+    # There are some geodes that we don't want in the XIP image (usually just
+    # apps that are too much trouble to XIP) so we put them in the GFS 
+    # instead, and exclude them below.
+    #
+    gfsApps=" \
+    	     geoplan${ecChars}.geo \
+	     geoplan.geo \
+	     geoplane.geo \
+    	     clog${ecChars}.geo \
+    	     cdbtest${ecChars}.geo \
+    	     cdbteste.geo \
+    	     cdbtest.geo \
+ 	     convrt.geo \
+	     convrtec.geo \
+	     cserv${ecChars}.geo \
+	     oserv${ecChars}.geo \
+	     obextd${ecChars}.geo \
+	     term${ecChars}.geo \
+	     imgtrans.geo \
+	     imgtrane.geo \
+	     gtelnet${ecChars}.geo \
+	     gtelnete.geo \
+	     gtelnet.geo \
+	     faxeci${ecChars}.geo \
+	     sockeci${ecChars}.geo \
+	     sockecie.geo \
+	     sockeci.geo \
+	     vidtst.geo \
+	     ini${ecChars}.geo \
+	     logfac${ecChars}.geo \
+	     g2test${ecChars}.geo \
+	     qastrtptest${ecChars}.geo \
+	     netgate${ecChars}.geo \
+	     ftknox${ecChars}.geo"
+
+
+    if [ "$vpInGFS" = "y" ]; then
+    	#
+	# If the VP is in the GFS, put the apps that use it in the GFS too
+	#
+    	gfsApps="$gfsApps \
+		datarm${ecChars}.geo \
+	        faxreceive${ecChars}.geo \
+	        datarec${ecChars}.geo \
+		secrty${ecChars}.geo"
+    fi
+
+    if [ "$bigfs" = "y" ]; then
+	#
+	#
+	gfsApps="$gfsApps \
+		fclock${ecChars}.geo \
+		about${ecChars}.geo \
+		transfr${ecChars}.geo "
+
+    fi
+
+    for i in $gfsApps; do
+    	findArgs="$findArgs -a ! -name $i";
+    done
+
+    elyom `find world -name \*.geo $findArgs -print` \
+          `find system/sysappl -name \*.geo $findArgs -print` \
+	  `find system/mbdata  -name \*.geo $findArgs -print` \
+	  `find system/mbtrans -name \*.geo $findArgs -print`
+
+    #
+    # Touch everything to make sure all the files have the same
+    # date, so we know when the image was made
+    #
+    find . \( -name \* \) -print | xargs touch
+
+    #
+    # gtouch the system app geodes so that they appear in the right
+    # order (this is for Nokia, who is using 8.3 filenames, because they
+    # get their geodes from the build).
+    #
+    geode=`dsfyArgs "world/sysapps/about${ecChars}.geo"`
+    gtouch -t 23:12 $geode
+    geode=`dsfyArgs "world/sysapps/imgtrans${ecChars}.geo"`
+    gtouch -t 23:11 $geode
+    geode=`dsfyArgs "world/sysapps/cserv${ecChars}.geo"`
+    gtouch -t 23:10 $geode
+    geode=`dsfyArgs "world/sysapps/disksp${ecChars}.geo"`
+    gtouch -t 23:09 $geode
+    geode=`dsfyArgs "world/sysapps/datarm${ecChars}.geo"`
+    gtouch -t 23:08 $geode
+    geode=`dsfyArgs "world/sysapps/calx${ecChars}.geo"`
+    gtouch -t 23:07 $geode
+    geode=`dsfyArgs "world/sysapps/contax${ecChars}.geo"`
+    gtouch -t 23:06 $geode
+    geode=`dsfyArgs "world/sysapps/backrst${ecChars}.geo"`
+    gtouch -t 23:05 $geode
+    geode=`dsfyArgs "world/sysapps/install${ecChars}.geo"`
+    gtouch -t 23:04 $geode
+    geode=`dsfyArgs "world/sysapps/transfr${ecChars}.geo"`
+    gtouch -t 23:03 $geode
+    geode=`dsfyArgs "world/sysapps/fmodem${ecChars}.geo"`
+    gtouch -t 23:02 $geode
+    geode=`dsfyArgs "world/sysapps/uinfo${ecChars}.geo"`
+    gtouch -t 23:01 $geode
+    geode=`dsfyArgs "world/sysapps/secrty${ecChars}.geo"`
+    gtouch -t 23:00 $geode
+
+    #
+    # gtouch the service app geodes so that they appear in the right
+    # order
+    #
+    geode=`dsfyArgs "world/svcapps/netgate${ecChars}.geo"`
+    gtouch -t 23:04 $geode
+    geode=`dsfyArgs "world/svcapps/term${ecChars}.geo"`
+    gtouch -t 23:03 $geode
+    geode=`dsfyArgs "world/svcapps/gtelnet${ecChars}.geo"`
+    gtouch -t 23:02 $geode
+    geode=`dsfyArgs "world/svcapps/www${ecChars}.geo"`
+    gtouch -t 23:01 $geode
+    geode=`dsfyArgs "world/svcapps/mlmn${ecChars}.geo"`
+    gtouch -t 23:00 $geode
+
+    #
+    # gtouch the extra app geodes so that they appear in the right
+    # order
+    #
+    geode=`dsfyArgs "world/extrapps/convrt${ecChars}.geo"`
+    gtouch -t 23:03 $geode
+    geode=`dsfyArgs "world/extrapps/comp${ecChars}.geo"`
+    gtouch -t 23:02 $geode
+    geode=`dsfyArgs "world/extrapps/fclock${ecChars}.geo"`
+    gtouch -t 23:01 $geode
+    geode=`dsfyArgs "world/extrapps/bigcalc${ecChars}.geo"`
+    gtouch -t 23:00 $geode
+
+    #
+    # gtouch the system app geodes so that they appear in the right
+    # order (this is for us, so we can use UNIX filenames)
+    #
+    gtouch -t 23:12 world/sysapps/about${ecChars}.geo
+    gtouch -t 23:11 world/sysapps/imgtrans${ecChars}.geo
+    gtouch -t 23:10 world/sysapps/cserv${ecChars}.geo
+    gtouch -t 23:09 world/sysapps/disksp${ecChars}.geo
+    gtouch -t 23:08 world/sysapps/datarm${ecChars}.geo
+    gtouch -t 23:07 world/sysapps/calx${ecChars}.geo
+    gtouch -t 23:06 world/sysapps/contax${ecChars}.geo
+    gtouch -t 23:05 world/sysapps/backrst${ecChars}.geo
+    gtouch -t 23:04 world/sysapps/install${ecChars}.geo
+    gtouch -t 23:03 world/sysapps/transfr${ecChars}.geo
+    gtouch -t 23:02 world/sysapps/fmodem${ecChars}.geo
+    gtouch -t 23:01 world/sysapps/uinfo${ecChars}.geo
+    gtouch -t 23:00 world/sysapps/secrty${ecChars}.geo
+ 
+    #
+    # gtouch the service app geodes so that they appear in the right
+    # order
+    #
+    gtouch -t 23:04 world/svcapps/netgate${ecChars}.geo
+    gtouch -t 23:03 world/svcapps/term${ecChars}.geo
+    gtouch -t 23:02 world/svcapps/gtelnet${ecChars}.geo
+    gtouch -t 23:01 world/svcapps/www${ecChars}.geo
+    gtouch -t 23:00 world/svcapps/mlmn${ecChars}.geo
+
+    #
+    # gtouch the extra app geodes so that they appear in the right
+    # order
+    #
+    gtouch -t 23:03 world/extrapps/convrt${ecChars}.geo
+    gtouch -t 23:02 world/extrapps/comp${ecChars}.geo
+    gtouch -t 23:01 world/extrapps/fclock${ecChars}.geo
+    gtouch -t 23:00 world/extrapps/bigcalc${ecChars}.geo
+	
+    #
+    # Combine everything into an image
+    #
+    gfs=${GFSTOOL-gfs}
+    $gfs create $gfsFlags -dResponder_System_Software -vSystem $gfsFile .
+
+    #
+    # Compress the image
+    #
+    if [ "$doComp" = y ]; then
+	prefix=`expr "$gfsFile" : '\(.*\)\.gfs$'`
+	if [ "$prefix" ]; then
+	    cgfsFile=${prefix}.cgfs
+	else
+	    cgfsFile=${gfsFile}.c
+	fi
+
+	cgfs=${CGFSTOOL-cgfs}
+	$cgfs $gfsFile $cgfsFile
+    fi

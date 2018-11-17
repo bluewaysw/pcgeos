@@ -1,0 +1,1058 @@
+/***********************************************************************
+ *
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+ * PROJECT:       HTMLView
+ * FILE:          wwwtools.goc
+ *
+ * AUTHOR:        Marcus Gr”ber
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *      Include files
+ ***************************************************************************
+ */
+@include <stdapp.goh>
+#include <initfile.h>
+#include <resource.h>
+#include <library.h>
+#include <geomisc.h>
+#include <localize.h>
+
+#include <ansi\string.h>
+#include <ansi\stdio.h>
+#include <ansi\stdlib.h>
+#include <ansi\ctype.h>
+
+#define EC_PurgeES() EC(_asm{ push cs; pop es })
+#define min(a,b) ((a)<(b)?(a):(b))
+
+@include <fixes.goh>
+@include <html4par.goh>
+@include <options.goh>
+
+#include "internal.h"
+
+/***************************************************************************
+ *      URL handling
+ ***************************************************************************/
+
+Boolean EXPORT ToolsParseURL(TCHAR *url, TCHAR *type, TCHAR *server, TCHAR *path)
+{
+    word i,j;
+
+    for(i=j=0; isalpha((unsigned char)url[i]); i++)
+      if(type && j < URL_MAX_TYPE-1)
+@ifdef DO_DBCS
+        type[j++] = toupper(url[i]);
+@else
+        type[j++] = toupper((unsigned char)url[i]);
+@endif
+                                        /* copy potential "type" to buffer */
+
+    if(url[i] == ':' && i > 1 && i <= URL_MAX_TYPE-1)
+    {                                   /* looks like a valid type? */
+      if(type)
+        type[j] = 0;                    /* terminate type string */
+      url += i+1;                       /* advance to position after ":" */
+    }
+    else if(type)
+      *type = 0;                        /* discard misread type info */
+
+    if(url[0] == '/' && url[1] == '/')  /* server name follows */
+    {
+      url += 2;                         /* skip over "//" */
+      for(i=j=0; url[i] && url[i] != '/' && url[i] != '?'; i++)
+        if(server && j < URL_MAX_SERVER-1)
+          server[j++] = url[i];         /* copy server name */
+
+      if(server)
+        server[j] = 0;                  /* terminate server name */
+      url += i;                         /* skip over server name */
+    }
+    else if(server)
+      *server = 0;
+
+    if(url[0])                          /* can only be a filename now... */
+    {
+      for(i=j=0; url[i]; i++)
+	  if(path && j < HTML_MAX_BUF-1) {
+	      if (i == 0 && url[i] == '?' && *server) {
+		  /* ensure we have root if we only have server and args */
+		  path[j++] = '/';
+		  path[j++] = '?';
+	      } else {
+		  path[j++] = (url[i]=='\\') ? '/' : url[i];
+	      }
+	  }
+                                        /* copy path normalizing slashes */
+      if(path)
+        path[j] = 0;                    /* terminate path name */
+      url += i;
+    }
+    else if(path)
+      *path = 0;
+
+    return TRUE;                        /* URL has been parsed */
+}
+
+TCHAR * EXPORT ToolsMakeURL(TCHAR *type,TCHAR *server,TCHAR *path,TCHAR *url)
+{
+    TCHAR *pp = path, *qq;
+    word len ;
+        *url=0;                         /* clear target buffer */
+
+    len = 5 ;
+    if (type)
+        len += strlen(type) ;
+    if (server)
+        len += strlen(server) ;
+    if (path) {
+        len += strlen(path) ;
+	/* replace spaces with %20 */
+	while (*pp) {
+	    if (*pp++ == ' ') {
+		len += 3-1;  /* %20 = 3, replaces ' ' = 1 */
+	    }
+	}
+    }
+
+    if(len >= HTML_MAX_BUF )
+       return NULL;                  /* abort if string would be too long */
+
+    if ((type) && (*type))                       /* service type specified? */
+       sprintf(url,_TEXT("%s:"),type);      /* prepend service type */
+
+    if (((type) && (*type)) || ((server) && (*server)))            /* must specifiy server name? */
+       sprintf(url+strlen(url),_TEXT("//%s/"),server);
+
+    if ((path) && (*path)) {                      /* add path if specified */
+	pp = path + (*path=='/' && (((type)&&(*type)) || ((server)&&(*server)))?1:0);
+	qq = url+strlen(url);
+	while (*pp) {
+	    if (*pp == ' ') {
+		strcpy(qq, _TEXT("%20"));
+		qq += 3;  /* length(%20) */
+		pp++;
+	    } else {
+		*qq++ = *pp++;
+	    }
+	}
+	*qq = 0;
+    }
+
+        return url;
+}
+
+/*
+ *  Update pathname in "cur" with pathname in "new", where "new" may be
+ *  either an absolute or a relative pathname. pathname in this context
+ *  means a "unix-ified" form always starting with a "/" (if absolute),
+ *  with a drive letter possibly following after that.
+ */
+
+/* remove leading spaces in argument (mapquest.com) */
+/* remove trailing spaces in full URL (redrocket.com banner) */
+void NukeVariousSpaces(TCHAR *buf)
+{
+    TCHAR *p, *q;
+    int len;
+
+    /* remove argument spaces */
+    p = strchr(buf, '?');
+    if (p) {
+	q = p+1;
+	while (*q == ' ') q++;
+	if (q > p+1)
+	    strcpy(p+1, q);
+    }
+    /* remove trailing spaces */
+    len = strlen(buf);
+    while (len > 1 && buf[len-1] == ' ') {
+	buf[len-1] = '\0';
+	len--;
+    }
+    /* remove leading spaces */
+    p = buf;
+    while (*p == ' ') p++;
+    if (p > buf)
+	strcpy(buf, p);
+}
+
+TCHAR * EXPORT ToolsResolvePathname(TCHAR *cur,TCHAR *new)
+{
+        TCHAR *p, *q;
+
+	/* special case, 'new' is just arguments */
+	if (new && *new == '?') {
+	    q = strchr(cur, '?');
+	    if (q) {
+		strcpy(q, new);         /* overwrite old arguments */
+		NukeVariousSpaces(cur);
+		return cur;
+	    } else {
+		strcat(cur, new);       /* append new args to plain path */
+		NukeVariousSpaces(cur);
+		return cur;
+	    }
+	}
+	/* special case, 'new' is null */
+	if (new && !(*new)) {
+	    NukeVariousSpaces(cur);
+	    return cur;
+	}
+
+    q=strchr(new,'?');              /* argument separator */
+        p=strchr(new,':');              /* drive letter in new path? */
+    if (q && p>q) p=0;
+        if(!p)                          /* also supports "x|" drive letters */
+          p = strchr(new,'|');
+    if (q && p>q) p=0;
+        if(p || *new=='/')              /* absolute path or path with drive? */
+        {
+          if(!p && cur[0]=='/' && cur[1] && (cur[2]==':' || cur[2]=='|'))
+            p=cur+3;                    /* cur path w/drive, new path without */
+          else
+            p=cur;                      /* full path: overwrite old */
+          strcpy(p,new);
+        }
+        else
+        {
+          if(*new!='\x23')              /* Simply append "#anchor" links */
+          {
+        q=strchr(cur,'?');
+        if(q) {
+          p=0;
+          while(q!=cur) {
+        q--;
+        if (*q=='/') {
+          p=q;
+          break;
+        }
+          }
+        } else {
+          p=strrchr(cur,'/');
+        }
+            while(new[0]=='.')          /* starts with relative directory? */
+            {
+              if(new[1]=='.')           /* more than one dot */
+              {
+                if(p && p!=cur && p[-1]!=':' && p[-1]!='|')
+                {                       /* never remove leftmost/root slash */
+                  p--;                  /* go one char back from last "/" */
+                  while(p!=cur && *p!='/')
+                    p--;                /* go back one element */
+                }
+                new++;                  /* remove one dot */
+              }
+              else if(new[1] == '/')    /* "./" means current directory */
+                new+=2;                 /* just skip ("null op") */
+              else if(new[1] == '\0')   /* "." means current directory */
+                new++;                  /* just skip ("null op") */
+          else if (isalnum(new[1]) || new[1] == '_')
+          break;                /* Unix name can start with . or _ */
+              else
+                new++;                  /* don't know what this is... */
+            }
+
+            if(p)                       /* cut off directory at position */
+              p[1]=0;
+          }
+          strcat(cur,new);              /* append new filename at end */
+        }
+
+	/* resolve . path elements */
+	while ((p = strstr(cur, _TEXT("/./")))) {
+	    strcpy(p, p+2);  /* remove "/." */
+	}
+
+	NukeVariousSpaces(cur);
+        return cur;                     /* return new pathname */
+}
+
+/*
+ * Convert a URL that may be relative or not into a URL which is absolute
+ * (i.e. which contains all the components necessary to uniquely identify
+ * the location without any further information), also taking into account
+ * the current URL passed.
+ */
+int EXPORT ToolsResolveRelativeURL(TCHAR *cur,TCHAR *url)
+{
+        MemHandle workBuf;
+	TCHAR *curType, *curServer, *curPath, *newPath;
+        TCHAR *server, *path, *p;
+	int maxPathLen = strlen(cur) + strlen(url) + 1;
+
+	workBuf = MemAlloc((URL_MAX_TYPE +
+			   URL_MAX_SERVER +
+			   maxPathLen +
+			   maxPathLen)*sizeof(TCHAR),
+			   HF_DYNAMIC, 0);
+	if (!workBuf) return 1;
+	curType = MemLock(workBuf);
+	if (!curType) {
+	    MemFree(workBuf);
+	    return 1;
+	}
+	curServer = curType+URL_MAX_TYPE;
+	curPath = curServer+URL_MAX_SERVER;
+	newPath = curPath+maxPathLen;
+	server = curServer;
+	path = curPath;
+        ToolsParseURL(url,curType,curServer,newPath);
+
+        *curPath=0;                     /* default: forget path on old server */
+        ToolsParseURL(cur,
+          *curType?                 NULL : curType,
+          (*curServer || *curType)? NULL : curServer,
+          (*curServer || *curType)? NULL : curPath);
+
+        ToolsResolvePathname(curPath,newPath);
+                                        /* update path */
+
+        if(!*curType && curPath[0] &&
+            (curPath[1]==':' || curPath[1]=='|' ||
+              (curPath[1] && (curPath[2]==':' || curPath[2]=='|'))))
+        {
+          strcpy(curType,_TEXT("FILE"));
+          *curServer=0;                 /* looks like local path */
+        }
+
+        if(!*curType)                   /* default service type is HTTP */
+        {
+          if(!*curServer)
+          {
+            server = curPath;           /* get server from first path element */
+            if(server[0]=='/')          /* skip over leading "/" */
+              server++;
+            p = strchr(server, '/');    /* path only starts after that */
+            if(p)                       /* found slash */
+            {
+              *p = 0;
+              path = p+1;               /* path follows */
+            }
+            else
+              path = curServer;         /* empty path (we know *curServer==0) */
+          }
+
+          /* default type for names starting with FTP is... suprise... */
+          if(LocalCmpStringsNoCase(server,_TEXT("FTP"),3)==0)
+            strcpy(curType, _TEXT("FTP"));
+          else
+            strcpy(curType, _TEXT("HTTP"));
+        }
+
+        ToolsMakeURL(curType, server, path, cur);
+                                        /* assemble new url */
+	MemFree(workBuf);
+        return 0;                       /* no error */
+}
+
+Boolean EXPORT ToolsMakeURLAbsolute(TCHAR *cur,TCHAR *url,TCHAR *urldst)
+{
+    MemHandle workBuf;
+    TCHAR *b;
+    Boolean ret;
+    int numSpaces = 0;
+
+    /* maximum possible size is this (spaces expand to %20) */
+    b = url; while (*b) if (*b++ == ' ') numSpaces++;  /* count spaces */
+    b = cur; while (*b) if (*b++ == ' ') numSpaces++;  /* count spaces */
+    workBuf = MemAlloc((strlen(url)+strlen(cur)+URL_MAX_TYPE+1+numSpaces*2)*sizeof(TCHAR), HF_DYNAMIC, 0);
+    if (!workBuf) return FALSE;
+    b = MemLock(workBuf);
+    if (!b) {
+	MemFree(workBuf);
+	return FALSE;
+    }
+    strcpy(b,cur);                      /* get current URL as base */
+    ToolsResolveRelativeURL(b,url);     /* make URL absolute */
+    ret = strcmp(b,cur);                /* effective URL changed? check now
+                                           because urldst may be equal to cur */
+    strcpy(urldst,b);                   /* update current URL */
+    MemFree(workBuf);
+    return ret;                         /* return changed or not */
+}
+
+void EXPORT ToolsNormalizeURL(TCHAR *url)
+{
+    MemHandle workBuf;
+    TCHAR *urlType, *urlServer, *urlPath;
+    TCHAR *atsign;
+    int maxPathLen = strlen(url)+1;
+
+    workBuf = MemAlloc((URL_MAX_TYPE + URL_MAX_SERVER + maxPathLen)*sizeof(TCHAR),
+		       HF_DYNAMIC, 0);
+    if (!workBuf) return;
+    urlType = MemLock(workBuf);
+    if (!urlType) {
+	MemFree(workBuf);
+	return;
+    }
+    urlServer = urlType + URL_MAX_TYPE;
+    urlPath = urlServer + URL_MAX_SERVER;
+    ToolsParseURL(url,urlType,urlServer,urlPath);
+    strupr(urlType);
+
+    /* If server name contains a "@", only normalize portion after that,
+       because the stuff before is a user name and password, which is most
+       likely case sensitive... */
+
+@ifdef DO_DBCS
+    atsign = strchr(urlServer, C_COMMERCIAL_AT);
+@else
+    atsign = strchr(urlServer, C_AT_SIGN);
+@endif
+    if(atsign)
+      strlwr(atsign);
+    else
+      strlwr(urlServer);
+
+    ToolsMakeURL(urlType,urlServer,urlPath,url);
+    MemFree(workBuf);
+}
+
+
+/***************************************************************************
+ *      Various utility functions
+ ***************************************************************************/
+
+word EXPORT ToolsStringSectionFindKey(char *sect, char *key,
+  TCHAR *subKey, TCHAR *value, word bufSize, Boolean mapLeftToRight)
+{
+    TCHAR *p, *val1, *val2;
+    word len1,len2,size;
+    MemHandle str;
+    word n,section;
+
+    size = 0;
+    if( InitFileReadStringBlock(sect, key, &str, IFCC_INTACT | IFRF_READ_ALL,
+          &size) || size==0)            /* attempt to load list */
+      return 0xFFFF;                    /* not found */
+
+    section = 0xFFFF;                   /* not found anything yet */
+    n = 0;                              /* section count */
+    p = MemLock(str);                   /* lock string block */
+    while(*p && section==0xFFFF)        /* while data left and no key found */
+    {
+      while(*p==' ' || *p=='\t') p++;   /* skip leading whites */
+      val1 = p;                         /* start of value 1 */
+      len1 = 0;                         /* found no data in first value yet */
+      while(*p!='=' && *p!='\r' && *p!='\n' && *p) p++,len1++;
+                                        /* skip over first value */
+      while(len1 && (val1[len1-1]==' ' || val1[len1-1]=='\t')) len1--;
+                                        /* remove trailing whites */
+
+      if(*p=='=') p++;                  /* skip over "=" */
+
+      while(*p==' ' || *p=='\t') p++;   /* skip leading whites */
+      val2 = p;                         /* start of value 2 */
+      len2 = 0;                         /* found no data in second value yet */
+      while((*p!='\r' && *p!='\n') && *p) p++,len2++;
+                                        /* skip over second value */
+      while(len2 && (val2[len2-1]==' ' || val2[len2-1]=='\t')) len2--;
+                                        /* remove trailing whites */
+      while(*p=='\r' || *p=='\n') p++;  /* skip over CR */
+
+      if(mapLeftToRight)                /* key on left or right side of "="? */
+      {
+        if(LocalCmpStringsNoCase(val1,subKey,len1)==0 && len1==strlen(subKey))
+        {
+          xstrncpy(value,val2,min(len2+1,bufSize/sizeof(TCHAR)));
+                                        /* return value, truncate if req'd */
+          section = n;                  /* success */
+        }
+      }
+      else
+      {
+        if(LocalCmpStringsNoCase(val2,subKey,len2)==0 && len2==strlen(subKey))
+        {
+          xstrncpy(value,val1,min(len1+1,bufSize/sizeof(TCHAR)));
+                                        /* return value, truncate if req'd */
+          section = n;                  /* success */
+        }
+      }
+      n++;                              /* count section */
+    }
+    MemUnlock(str);
+    MemFree(str);                       /* free memory with list */
+    return section;                     /* return success state */
+}
+
+optr EXPORT ToolsFormatMessage(optr msg,TCHAR *res)
+{
+    word size;
+    MemHandle mh;
+    char *dst;
+
+    MemLock(OptrToHandle(msg));         /* copy message to new data block */
+
+    size = strlen(LMemDeref(msg))+2;    /* basic size of HTML message */
+    if(res)                             /* insert error message? */
+      size += 2*strlen((char *)res);    /* leave room for two messages */
+
+    mh = MemAlloc(size*sizeof(TCHAR), HF_DYNAMIC, HAF_NO_ERR);
+    dst = MemLock(mh);
+    if(res)                             /* paste error message into block */
+    /* extra arguments to handle extended error messages */
+      sprintf(dst, LMemDeref(msg), (char *)res, (char *)res);
+    else
+      strcpy(dst, LMemDeref(msg));
+    MemUnlock(mh);
+
+    MemUnlock(OptrToHandle(msg));
+
+    return ConstructOptr(mh,0);         /* return optr to data block */
+}
+
+DiskHandle EXPORT ToolsParseDiskOrStandardPath(TCHAR **p)
+{
+    DiskHandle dh;
+    word c;
+
+@ifdef DO_DBCS
+    c = toupper(**p);    /* first letter of path */
+@else
+    c = toupper((unsigned char)**p);    /* first letter of path */
+@endif
+    dh = FileParseStandardPath(0,p);
+
+    if(dh==SP_NOT_STANDARD_PATH && c>='A' && c<='Z' && (*p)[1]==':')
+    {
+      dh = DiskRegisterDiskSilently(c-'A');
+                                        /* get disk handle */
+      (*p)+=2;                          /* skip over drive */
+    }
+
+    return dh;
+}
+
+/*
+ * Safe extraction of extensions, which is not confused by extensions in
+ * directory names...
+ */
+TCHAR * EXPORT ToolsFindExtension(TCHAR *p)
+{
+    TCHAR *q;
+
+    q = strrchr(p,'.');                 /* find last dot */
+    if(q==NULL) return NULL;            /* no dot: no extension */
+    q++;                                /* advance to point after dot */
+    if(strchr(q,'/') || strchr(q,'\\')) /* already in other component: no ext */
+      return NULL;
+                    /* if name starts with dot, no ext */
+    if ((q!=p) && (((*(q-2))=='/') || ((*(q-2))=='\\'))) return NULL;
+    return q;                           /* return pointer to extension */
+}
+
+/*
+ * "Safe" strcpy, making sure that the buffer is zero-terminated and that
+ * no more than bufsize bytes are transfered.
+ */
+TCHAR * EXPORT xstrncpy(TCHAR *dst, TCHAR *src, word bufsize)
+{
+    strncpy(dst,src,bufsize-1);
+    dst[bufsize-1] = 0;
+    return dst;
+}
+
+void EXPORT DebugDialogPrintf(TCHAR *fmt, ...)
+{
+     TCHAR buf[512];
+     va_list arg;
+
+     va_start(arg, fmt);
+     vsprintf(buf, fmt, arg);
+     va_end(arg);
+
+     UserStandardDialog(             /* notify user */
+        (TCHAR *)NULL, (TCHAR *)NULL, (TCHAR *)NULL, (TCHAR *)NULL, buf,
+        (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+        (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+}
+
+
+void VMChainifyLMemBlock(VMFileHandle vmf, VMChain vmc)
+{
+    MemHandle memHandle;
+    MemHandle *p;
+
+    p = VMLock(vmf, VMCHAIN_GET_VM_BLOCK(vmc), &memHandle);
+    *p = NullHandle;                    /* stuff VMChainLink into LMem header */
+    MemModifyFlags(memHandle, 0, HF_LMEM);
+    VMDirty(memHandle);                 /* make sure changes get saved */
+    VMUnlock(memHandle);
+}
+
+void * EXPORT VMLockChainifiedLMemBlock(VMFileHandle vmf,
+  VMBlockHandle vmb, MemHandle *mh)
+{
+    void *p;
+
+    p = VMLock(vmf, vmb, mh);
+    *(MemHandle *)p = *mh;
+    MemModifyFlags(*mh, HF_LMEM, 0);
+    return p;
+}
+
+void EXPORT VMUnlockChainifiedLMemBlock(MemHandle mh)
+{
+    *(MemHandle *)MemDeref(mh) = NullHandle;
+    MemModifyFlags(mh, 0, HF_LMEM);
+    VMUnlock(mh);
+}
+
+void EXPORT SysNotifyWithData(void *Ptr,word size,word notificationType,
+  word listType)
+{
+    MemHandle data;                     /* Extra data block sent along with the
+                                         * notification. */
+    void *dataPtr;                      /* The extra data block, locked */
+    EventHandle notifyEvent;            /* Recorded notification event for
+                                         * the GCN list */
+
+    data = MemAlloc(size, HF_DYNAMIC|HF_SHARABLE, HAF_NO_ERR);
+                                        /* allocate space for data item */
+
+    dataPtr = (void *)MemLock(data);
+    memcpy(dataPtr,Ptr,size);           /* transfer data into shared memory */
+    MemUnlock(data);
+
+    MemInitRefCount(data, 1);
+
+    notifyEvent = @record null::MSG_META_NOTIFY_WITH_DATA_BLOCK
+                        (MANUFACTURER_ID_GEOWORKS, notificationType, data);
+
+    @call application::MSG_META_GCN_LIST_SEND
+        (GCNLSF_SET_STATUS,
+         notifyEvent,
+         data,
+         listType,
+         MANUFACTURER_ID_GEOWORKS);
+}
+
+
+word LengthResolve(word total, HTMLmultiLength length)
+{
+    if(HTML_LEN_GET_UNIT(length) == HTML_LEN_PIXEL)
+    {
+      return HTML_LEN_GET_VALUE(length);
+    }
+    else if(HTML_LEN_GET_UNIT(length) == HTML_LEN_PERCENT)
+    {
+      return (word)((dword)total * HTML_LEN_GET_VALUE(length) / 100);
+    }
+    else if (HTML_LEN_GET_UNIT(length) == HTML_LEN_VARIABLE)
+    {
+      /* Variable?? Return all of it */
+      return total ;
+    }
+    return total;                       /* assume pixels */
+}
+
+
+/*
+ * Parse single-line lists of items delimited by either "," or ";". If
+ * the whiteDelim argument is TRUE, whitespaces also serve as delimiters.
+ *
+ * The routine returns a pointer to the n-th entry (zero-based), and stores
+ * the length of the entry (excluding trailing/leading whitespaces) in size,
+ * unless size is NULL.
+ *
+ * NULL is returned if there is no n-th entry in the list.
+ */
+TCHAR * EXPORT GetNthFromList(TCHAR *list, word n, Boolean whiteDel, word *size)
+{
+    register int j;
+
+    while(*list=='\t' || *list==' ')
+      list++;                           /* skip over whites at start */
+
+    while(n>0 && *list)                 /* advance to n-th entry */
+    {
+      if(whiteDel && (*list=='\t' || *list==' '))
+      {                                 /* whitespace may also end entry */
+        while(*list=='\t' || *list==' ')
+          list++;                       /* skip over whitespace */
+        if(*list != ',' && *list != ';')/* (whitespace before "," is ignored) */
+        {
+          n--;                          /* blanks only serve as delimiter */
+          list--;                       /* leave pointer on non-white */
+        }
+      }
+
+      if(*list == ',' || *list == ';')
+      {
+        n--;
+        do {                            /* skip over whites after delimiter */
+          list++;
+        } while(*list=='\t' || *list==' ');
+      }
+      else
+        list++;                         /* just advance by one character */
+    }
+
+    if(n>0)                             /* after end of list? */
+      return NULL;                      /* quit */
+
+    if(size)                            /* item size requested */
+    {
+      j = 0;
+      while(list[j] && list[j] != ',' && list[j] != ';' &&
+            (!whiteDel || (list[j] != ' ' && list[j] != '\t')))
+        j++;
+
+      while(j>0 && (list[j-1]==' ' || list[j-1]=='\t'))
+        j--;                            /* remove trailing whitespaces */
+
+      *size = j;                        /* return item size */
+    }
+
+    return list;                        /* got entry */
+}
+
+@ifdef DO_DBCS
+char * EXPORT GetNthFromListSBCS(char *list, word n, Boolean whiteDel, word *size)
+{
+    register int j;
+
+    while(*list=='\t' || *list==' ')
+      list++;                           /* skip over whites at start */
+
+    while(n>0 && *list)                 /* advance to n-th entry */
+    {
+      if(whiteDel && (*list=='\t' || *list==' '))
+      {                                 /* whitespace may also end entry */
+        while(*list=='\t' || *list==' ')
+          list++;                       /* skip over whitespace */
+        if(*list != ',' && *list != ';')/* (whitespace before "," is ignored) */
+        {
+          n--;                          /* blanks only serve as delimiter */
+          list--;                       /* leave pointer on non-white */
+        }
+      }
+
+      if(*list == ',' || *list == ';')
+      {
+        n--;
+        do {                            /* skip over whites after delimiter */
+          list++;
+        } while(*list=='\t' || *list==' ');
+      }
+      else
+        list++;                         /* just advance by one character */
+    }
+
+    if(n>0)                             /* after end of list? */
+      return NULL;                      /* quit */
+
+    if(size)                            /* item size requested */
+    {
+      j = 0;
+      while(list[j] && list[j] != ',' && list[j] != ';' &&
+            (!whiteDel || (list[j] != ' ' && list[j] != '\t')))
+        j++;
+
+      while(j>0 && (list[j-1]==' ' || list[j-1]=='\t'))
+        j--;                            /* remove trailing whitespaces */
+
+      *size = j;                        /* return item size */
+    }
+
+    return list;                        /* got entry */
+}
+@endif
+
+/*
+ * Duplicate a chunk within the same LMem heap (including its contents)
+ */
+optr EXPORT LMemDup(optr ch)
+{
+    optr dup;
+    word size;
+
+    size = LMemGetChunkSize(ch);
+    dup = ConstructOptr(OptrToHandle(ch), LMemAlloc(OptrToHandle(ch), size));
+    memcpy(LMemDeref(dup), LMemDeref(ch), size);
+
+    return dup;
+}
+
+/***************************************************************************
+ *      Support for chunk arrays making heavy use of NameTokens
+ ***************************************************************************/
+
+/*
+ * Copy the chunk array pointed to by ConstructOptr(srcMem, srcArray) into
+ * a chunk in a newly allocated block. In addition, transfer all name pool
+ * entries from the VM based pool at (vmf,vmc) into the specified memory
+ * based pool. The source block is assumed to be locked.
+ *
+ * Offsets of fields containing name pool entries in the chunk array structure
+ * are passed as additional word size arguments, terminated by the "magic
+ * number" 0xFFFF.
+ */
+
+optr EXPORT_CDECL CopyArrayWithTokens(MemHandle srcMem, ChunkHandle srcArray,
+  VMFileHandle vmf, VMChain vmc, optr pool, ...)
+{
+    optr array, newarr;
+    char *p;
+    word i, size, ofs;
+    va_list arg;
+    MemHandle newArrayMem;
+
+    if(srcArray)
+    {
+      array = ConstructOptr(srcMem, srcArray);
+      size = LMemGetChunkSize(array);
+
+      newArrayMem = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+      MemLock(newArrayMem);
+
+      newarr = ConstructOptr(newArrayMem, LMemAlloc(newArrayMem, size));
+      memcpy(LMemDeref(newarr), LMemDeref(array), size);
+
+      va_start(arg, pool);
+      do {
+        ofs = va_arg(arg, int);         /* get offset to be fixed up */
+        if(ofs != 0xFFFF)
+          for(i=ChunkArrayGetCount(newarr)-1; (int)i>=0; i--)
+          {                             /* reference tokens for images */
+            p = ChunkArrayElementToPtr(newarr, i, &size);
+
+            /* Transfer tokens from VM-based pool into text object's pool */
+            *(NameToken *)(p+ofs) = NamePoolTokenizeFromVM(pool, vmf, vmc,
+              *(NameToken *)(p+ofs), TRUE);
+          }
+      } while(ofs != 0xFFFF);
+      va_end(arg);
+
+      MemUnlock(newArrayMem);
+    }
+    else
+      newarr = 0;
+
+    return newarr;
+}
+
+/*
+ * Similar to the above, but assumes source tokens to be in a memory-based
+ * unsaved name pool. Also, the destination block has to be specified.
+ * In addition, the destination block is assumed, but not the source block.
+ */
+optr EXPORT_CDECL CopyArrayWithTokensFromPool(optr array, optr srcPool,
+  MemHandle dstMem, optr dstPool, ...)
+{
+    optr newarr;
+    char *p;
+    word i, size, ofs;
+    va_list arg;
+
+    if(array)
+    {
+      MemLock(OptrToHandle(array));
+
+      size = LMemGetChunkSize(array);
+
+      newarr = ConstructOptr(dstMem, LMemAlloc(dstMem, size));
+      memcpy(LMemDeref(newarr), LMemDeref(array), size);
+
+      va_start(arg, dstPool);
+      do {
+        ofs = va_arg(arg, int);         /* get offset to be fixed up */
+        if(ofs != 0xFFFF)
+          for(i=ChunkArrayGetCount(newarr)-1; (int)i>=0; i--)
+          {                             /* reference tokens for images */
+            p = ChunkArrayElementToPtr(newarr, i, &size);
+
+            /* Transfer tokens from VM-based pool into text object's pool */
+            *(NameToken *)(p+ofs) = NamePoolTokenizeFromPool(dstPool, srcPool,
+              *(NameToken *)(p+ofs), TRUE);
+          }
+      } while(ofs != 0xFFFF);
+      va_end(arg);
+
+      MemUnlock(OptrToHandle(array));
+    }
+    else
+      newarr = 0;
+
+    return newarr;
+}
+
+/*
+ * Prepare chunk array for being freed by releasing its name tokens in
+ * the passed name pool.
+ *
+ * Offsets of fields containing name pool entries in the chunk array structure
+ * are passed as additional word size arguments, terminated by the "magic
+ * number" 0xFFFF.
+ */
+void EXPORT_CDECL FreeArrayNameTokens(optr array, optr pool, ...)
+{
+    char *p;
+    word i, size, ofs;
+    va_list arg;
+
+    if(array)                           /* only if array exits */
+    {
+      ObjLockObjBlock(OptrToHandle(array)) ;
+      va_start(arg, pool);
+      do {
+        ofs = va_arg(arg, int);         /* get offset to be fixed up */
+        if(ofs != 0xFFFF)
+          for(i=ChunkArrayGetCount(array)-1; (int)i>=0; i--)
+          {                             /* release tokens for images */
+            p = ChunkArrayElementToPtr(array, i, &size);
+            if(*(NameToken *)(p+ofs) != NAME_POOL_NONE)
+              NamePoolReleaseToken(pool, *(NameToken *)(p+ofs));
+          }
+      } while(ofs != 0xFFFF);
+      va_end(arg);
+      MemUnlock(OptrToHandle(array)) ;
+    }
+}
+
+/***************************************************************************
+ *      Name Association support
+ ***************************************************************************/
+
+typedef struct {
+  ChunkArrayHeader  NAH_meta;
+  optr              NAH_pool;
+} NameAssocHeader;
+
+typedef struct {
+  NameToken NAD_tok1;
+  NameToken NAD_tok2;
+} NameAssocData;
+
+optr EXPORT NameAssocCreate(MemHandle mem, optr namePool)
+{
+    ChunkHandle ch;
+    NameAssocHeader *nah;
+
+    MemLock(mem);
+    ch = ChunkArrayCreate(mem,
+      sizeof(NameAssocData), sizeof(NameAssocHeader), 0);
+    nah = LMemDerefHandles(mem, ch);
+    nah->NAH_pool = namePool;           /* store related name pool */
+    MemUnlock(mem);
+
+    return ConstructOptr(mem, ch);
+}
+
+void EXPORT NameAssocFree(optr assoc)
+{
+    MemLock(OptrToHandle(assoc));
+    LMemFree(assoc);
+    MemUnlock(OptrToHandle(assoc));
+}
+
+void EXPORT NameAssocAssociate(optr assoc, TCHAR *str1, TCHAR *str2)
+{
+    NameAssocHeader *nah;
+    NameAssocData *nad;
+    NameToken tok1,tok2;
+    optr namePool;
+
+    MemLock(OptrToHandle(assoc));
+
+    nah = LMemDeref(assoc);
+    namePool = nah->NAH_pool;           /* get related name pool */
+
+    tok1 = NamePoolTokenize(namePool, str1, TRUE);
+    tok2 = NamePoolTokenize(namePool, str2, TRUE);
+                                        /* store association data */
+
+    nad = ChunkArrayAppend(assoc, 0);   /* append new element */
+    nad->NAD_tok1 = tok1;               /* store association pair */
+    nad->NAD_tok2 = tok2;
+
+    MemUnlock(OptrToHandle(assoc));
+}
+
+Boolean EXPORT NameAssocFindAssociation(optr assoc,
+  TCHAR *key, TCHAR *ret, word bufsize, Boolean firstToSecond, TCHAR **ptr)
+{
+    NameAssocHeader *nah;
+    NameAssocData *nad;
+    optr namePool;
+    word i;
+    Boolean res = FALSE;
+
+    /* if we are called after being freed... */
+    if (!assoc)
+	return FALSE;
+
+    MemLock(OptrToHandle(assoc));
+
+    nah = LMemDeref(assoc);
+    namePool = nah->NAH_pool;           /* get related name pool */
+
+    for(i=ChunkArrayGetCount(assoc)-1; (int)i>=0 && !res; i--)
+    {
+      nad = ChunkArrayElementToPtr(assoc, i, NULL);
+                                        /* find i-th element */
+      if(firstToSecond)
+      {
+        if(NamePoolTestEqualI(namePool, nad->NAD_tok1, key))
+        {
+          NamePoolCopy(namePool, ret, bufsize, nad->NAD_tok2, ptr);
+          res = TRUE;
+        }
+      }
+      else
+      {
+        if(NamePoolTestEqualI(namePool, nad->NAD_tok2, key))
+        {
+          NamePoolCopy(namePool, ret, bufsize, nad->NAD_tok1, ptr);
+          res = TRUE;
+        }
+      }
+    }
+
+    MemUnlock(OptrToHandle(assoc));
+
+    return res;                         /* return success or failure */
+}
+
+
+@ifdef DO_DBCS
+
+/* only need to check equality */
+sword strncmpisb(const char *str1, const char *str2, word strSize)
+{
+    int i;
+
+    if (!strSize) strSize = strlensbcs(str1);
+    for (i = 0; i < strSize; i++) {
+	if (toupper(str1[i]) != toupper(str2[i])) return -1;  /* no match */
+    }
+    return 0;  /* else match */
+}
+
+void _pascal struprsb(char *str)
+{
+    word size = strlensbcs(str);
+    int i;
+
+    for (i = 0; i < size; i++) {
+	if (str[i] == 0) break;
+	str[i] = toupper(str[i]);
+    }
+}
+
+@endif
+

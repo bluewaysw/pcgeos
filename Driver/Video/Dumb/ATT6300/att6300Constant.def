@@ -1,0 +1,105 @@
+COMMENT }%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1988 -- All Rights Reserved
+
+
+PROJECT:	PC GEOS
+MODULE:		Video drivers
+FILE:		att6300Constant.def
+
+AUTHOR:		Tony Requist
+
+REVISION HISTORY:
+	Name	Date	Description
+	----	----	-----------
+	Jim	7/90	initial version, mostly copied from HGC driver
+
+
+DESCRIPTION:
+	This file contains constants for the ATT6300 640x400 driver.
+
+	$Id: att6300Constant.def,v 1.1 97/04/18 11:42:38 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%}
+ifdef WIN32
+	NT_DRIVER = -1
+else
+	NT_DRIVER = 0
+endif
+
+;----------------------------------------------------------------------------
+;	Driver type constants
+;----------------------------------------------------------------------------
+
+IS_16			=	TRUE	;16 bit driver
+IS_MONO			=	TRUE	; monochrome driver
+if NT_DRIVER
+SAVE_UNDER_COUNT	=	0	;Number of save under areas
+DISPLAY_TYPE		= MEGA_DISPLAY_TYPE
+INVERSE_DRIVER		=	FALSE	; this driver can show inverse video
+else
+SAVE_UNDER_COUNT	=	4
+DISPLAY_TYPE		= HGC_DISPLAY_TYPE
+INVERSE_DRIVER		=	TRUE	; this driver can show inverse video
+endif
+
+
+
+;----------------------------------------------------------------------------
+;	Screen size constants
+;----------------------------------------------------------------------------
+
+PHYSICAL_SCREEN_WIDTH	=	10	; width in inches of typical display
+PHYSICAL_SCREEN_HEIGHT	=	7	; width in inches of typical display
+
+SCREEN_PIXEL_WIDTH	=	640	; width of screen, pixels
+SCREEN_BYTE_WIDTH	=	80	; width of screen, bytes
+if NT_DRIVER
+SCREEN_HEIGHT		=	480	; height of screen, scan lines
+else
+SCREEN_HEIGHT		=	400
+endif
+
+;----------------------------------------------------------------------------
+;	Video buffer constants
+;----------------------------------------------------------------------------
+if not NT_DRIVER
+SCREEN_BUFFER		=	0b800h	; ATT6300 video buffer segment addr
+SCREEN_BANK_OFFSET	=	2000h
+NUM_SCREEN_BANKS	=	4
+else
+SCREEN_BANK_OFFSET	=	0h
+NUM_SCREEN_BANKS	=	1
+endif
+
+
+BANK_SIZE	=	SCREEN_BYTE_WIDTH * SCREEN_HEIGHT / NUM_SCREEN_BANKS
+
+LAST_BANK	=	(NUM_SCREEN_BANKS-1)*SCREEN_BANK_OFFSET
+
+if NT_DRIVER
+ALT_SCREEN_BUFFER	= SCREEN_BUFFER + ((LAST_BANK + BANK_SIZE + 15) / 16)
+SAVE_AREA_SIZE		=	(0c000h - ALT_SCREEN_BUFFER) * 16
+
+else
+ALT_SCREEN_BUFFER	= c000h
+endif
+
+ATT6300_MODE		=	0x40
+TOSH3100_MODE		=	0x74
+
+;****************************************************************************
+;	ATT6300ProcessClass used to update window
+;****************************************************************************
+
+if NT_DRIVER
+
+ATT6300ProcessClass	class	ProcessClass
+MSG_ATT6300_PROCESS_UPDATE_WINDOW	message
+ATT6300ProcessClass	endc
+
+idata	segment
+ATT6300ProcessClass	mask CLASSF_NEVER_SAVED
+idata	ends
+
+endif ; NT_DRIVER

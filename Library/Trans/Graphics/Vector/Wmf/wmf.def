@@ -1,0 +1,276 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		wmf.def
+
+AUTHOR:		Maryann Simmons, Jul 13, 1992
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	MS	7/13/92		Initial revision
+
+
+DESCRIPTION:
+	
+		
+	$Id: wmf.def,v 1.1 97/04/07 11:24:57 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef 		__WMF
+
+StartLibrary	wmf
+
+;----------------------------------------------------------------------------
+;		Constants
+;----------------------------------------------------------------------------
+
+SIZE_OF_WMF_HEADER = 18
+SIZE_BUFF	   = 1024
+SIZE_ALDUS_HDR	   = 22
+VECTOR_EOF	   = -1
+
+SIZE_ALDUS_KEY = 4
+ALDUS_HDR_KEY1 = 0xcdd7
+ALDUS_HDR_KEY2 = 0x9ac6
+
+SIZE_MAX_FIXED_PARMS = 0x10
+DEFAULT_POINT_SIZE = 12
+
+OPAQUE	    = 2
+TRANSPARENT = 1
+
+;-------------------------------------------------------------------
+; BRUSH CONSTANTS( Enum these?)
+; Style
+BS_SOLID 	= 0
+BS_HOLLOW	= 1
+BS_HATCHED	= 2
+BS_PATTERN	= 3
+BS_DIBPATTERN	= 5
+
+; Color
+DIB_RGB_COLORS 	= 0
+DIB_PAL_COLORS	= 1
+
+;Hatch Style
+HS_HORIZONTAL	= 0
+HS_VERTICAL	= 1
+HS_FDIAGONAL	= 2
+HS_BDIAGONAL	= 3
+HS_CROSS	= 4
+HS_DIAGCROSS	= 5
+
+; Pen Styles
+PS_SOLID	= 0
+PS_DASH		= 1
+PS_DOT		= 2
+PS_DASHDOT	= 3
+PS_DASHDOTDOT	= 4
+PS_NULL		= 5
+PS_INSIDEFRAME	= 6
+
+;-------------------------------------------------------------------
+
+MFCOMMENT	= 0x000f	; printer escape for comment
+
+WHITE	    = 0x00ffffff
+
+INVALID_WMF_OPCODE = -1
+
+;----------------------------------------------------------------------------
+;		Structures
+;---------------------------------------------------------------------------
+
+WMFFileHeader	struct
+	WMF_type	word		; 1	Metafile is in memory
+					; 2	Metafile is on a disk	
+	WMF_headerSize  word		; Size in words of metafile Header
+	WMF_version	word		; Windows version number( 0x300)
+	WMF_size	dword		; Size in words of file
+	WMF_numObjects	word		; Maximum number of  objects that
+					; exist in the file at the same time
+	WMF_maxRecord	dword		; Size in words of the largest record
+	WMF_numParam	word		; Not used
+WMFFileHeader	ends
+
+WMFFileInfo	struct
+	WFI_ALDUS_key	byte  SIZE_ALDUS_KEY  dup (?)
+					; Keyword for Aldus Placeable Hdr
+	WFI_hdr		WMFFileHeader	; Header
+WMFFileInfo	ends
+
+MetafileInfo	struct
+	MI_outfile	hptr	;
+	MI_bkMode	word		; OPAQUE( = 2 ) or TRANSPARENT( = 1)
+	MI_bkColor	dword		;     explicit RGB:
+					;       0x00bbggrr 
+					; or:  index into logical palette:
+					;       0x010iiii (i being index)
+					; or:  palette relative RGB
+					;       0x02bbggrr maps to nearest
+					;       color in device context
+	MI_pointSize	word		; current text point size
+	MI_polyFillMode	byte		; RFR_ODD_EVEN( ALTERNATE ) or 
+					; RFR_WINDING ( WINDING   )
+					; marks beginning of parameter buffer
+	MI_objectList	hptr		; list of objects
+	MI_freeObjs	word		; num objects freed
+	MI_currObjs	word		; num objects currently allocated
+	MI_numObjects	word		; max num objects around at one time
+	MI_paramBuffer	byte SIZE_MAX_FIXED_PARMS dup (?)
+
+MetafileInfo	ends
+
+
+MetafileRecord	struct
+	MR_size		dword		; The size in words of the record
+	MR_function	word		; The vector function opcode
+MetafileRecord	ends
+
+;--------------------------------------------------------------------------
+;	Structures to support Object Creation
+;---------------------------------------------------------------------------
+
+MetaBrushObj	struct
+	MB_areaAttrs	AreaAttr
+MetaBrushObj	ends
+
+LogicalBrush	struct
+	LB_style	word
+	LB_colorRed	byte
+	LB_colorGreen	byte
+	LB_colorBlue	byte
+	LB_colorRes	byte
+	LB_hatch	word
+LogicalBrush	ends
+
+MetaRoutine	struct
+	MO_routine	fptr
+MetaRoutine	ends
+
+MetaPatternObj	struct
+	MPB_type	PatternType
+	MPB_pattern	SystemHatch
+MetaPatternObj	ends
+
+MetaPenObj	struct
+	MP_lineAttrs	LineAttr
+MetaPenObj	ends
+
+MetaPoint	struct
+	x	word
+	y	word
+MetaPoint	ends
+
+LogicalPen	struct
+	LP_style	word
+	LP_width	MetaPoint
+	LP_colorRed	byte
+	LP_colorGreen	byte
+	LP_colorBlue	byte
+	LP_colorRes	byte
+LogicalPen	ends
+;---------------------------------------------------------------------------
+;		Function Parameter Structures
+;---------------------------------------------------------------------------
+
+WMFEscapeParams		struct
+	WEP_escapeNum	word		; The escape function number to perform
+	WEP_count	word		; number of bytes of data following
+	WEP_data	label char	; information
+WMFEscapeParams		ends
+
+
+;-----------------------------------------------------------------------------
+;		Library routines
+;-----------------------------------------------------------------------------
+
+VectorRoutine			etype	word, 0, 1
+
+VECTOR_IMPORT			enum	VectorRoutine
+
+
+ImportCode	segment		resource
+global	ImportVectorConvertToTransferItem:far
+
+global	WmfEOF:near	
+global	WmfSaveDC:near	
+global	WmfRealizePalette:near	
+global	WmfSetPaletteEntries:near	
+global	WmfCreatePalette:near	
+global	WmfSetBkMode:near	
+global	WmfSetMapMode:near	
+global	WmfSetROP2:near	
+global	WmfSetRelAbs:near	
+global	WmfSetPolyFillMode:near	
+global	WmfSetStretchBltMode:near	
+global	WmfSetTextCharacterExtra:near	
+global	WmfRestoreDC:near	
+global	WmfSelectClipRegion:near	
+global	WmfSelectObject:near	
+global	WmfSetTextAlign:near	
+global	WmfResizePalette:near	
+global	WmfCreateDIBPatternBrush:near	
+global	WmfDeleteObject:near	
+global	WmfCreatePatternBrush20:near	
+global	WmfSetBkColor:near	
+global	WmfSetTextColor:near	
+global	WmfSetTextJustification:near	
+global	WmfSetWindowOrg:near	
+global	WmfSetWindowExt:near	
+global	WmfSetViewportOrg:near	
+global	WmfSetViewportExt:near	
+global	WmfOffsetWindowOrg:near	
+global	WmfOffsetViewportOrg:near	
+global	WmfLineTo:near	
+global	WmfMoveTo:near	
+global	WmfOffsetClipRegion:near	
+global	WmfSetMapperFlags:near	
+global	WmfSelectPalette:near	
+global	WmfCreatePenIndirect:near	
+global	WmfCreateFontIndirect:near	
+global	WmfCreateBrushIndirect:near	
+global	WmfPolygon:near	
+global	WmfPolyLine:near	
+global	WmfScaleWindowExt:near	
+global	WmfScaleViewportExt:near	
+global	WmfExcludeClipRect:near	
+global	WmfIntersectClipRect:near	
+global	WmfEllipse:near	
+global	WmfFloodFill:near	
+global	WmfRectangle:near	
+global	WmfSetPixel:near	
+global	WmfAnimatePalette:near	
+global	WmfExtTextOut:near	
+global	WmfPolyPolygon:near	
+global	WmfRoundRect:near	
+global	WmfPatBlt:near	
+global	WmfEscape:near	
+global	WmfDrawText:near	
+global	WmfCreateRegion:near	
+global	WmfArc:near	
+global	WmfPie:near	
+global	WmfChord:near	
+global	WmfBitBlt20:near	
+global	WmfBitBlt30:near	
+global	WmfSetDIBitsToDevice:near	
+global 	WmfStretchDiBits:near	
+global	WmfStretchBlt20:near
+global	WmfStretchBlt30:near
+
+
+
+
+
+
+
+
+ImportCode	ends
+
+EndLibrary	wmf
+

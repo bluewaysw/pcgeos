@@ -1,0 +1,947 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+ *
+ * PROJECT:	PC GEOS
+ * FILE:	genC.goh
+ * AUTHOR:	Tony Requist: February 12, 1991
+ *
+ * DECLARER:	UI
+ *
+ * DESCRIPTION:
+ *	This file defines GenClass
+ *
+ *	$Id: genC.goh,v 1.1 97/04/04 15:51:26 newdeal Exp $
+ *
+ ***********************************************************************/
+
+@optimize
+
+#include    <file.h>	/* XXX: until vardata can be exported */
+#include    <disk.h>	/* XXX: until vardata can be exported */
+#include    <object.h>  /* for MessageFlags */
+
+@deflib ui
+
+@include <Objects/visC.goh>
+
+@class	GenClass, VisClass, master, variant;
+
+/*
+ *	Methods
+ */
+
+@define genParent @parent word_offsetof(GenBase, Gen_offset), word_offsetof(GenInstance, GI_link)
+
+@define genChildren @children word_offsetof(GenBase, Gen_offset), word_offsetof(GenInstance, GI_comp), word_offsetof(GenInstance, GI_link)
+
+#define ObjDerefGen(obj) ObjDeref2(obj)
+
+@exportMessages	GenSpecMessages, @DEFAULT_EXPORTED_MESSAGES_3;
+@exportMessages	GenAppMessages,  @DEFAULT_EXPORTED_MESSAGES_5;
+
+/*** State query and setting ***/
+
+@message void MSG_GEN_SET_ENABLED(VisUpdateMode updateMode = dl);
+@message void MSG_GEN_SET_NOT_ENABLED(VisUpdateMode updateMode = dl);
+@message Boolean MSG_GEN_GET_ENABLED() = carry;
+@message void MSG_GEN_SET_USABLE(VisUpdateMode updateMode = dl);
+@message void MSG_GEN_SET_NOT_USABLE(VisUpdateMode updateMode = dl);
+@message Boolean MSG_GEN_GET_USABLE() = carry;
+@message Boolean MSG_GEN_CHECK_IF_FULLY_ENABLED() = carry;	/* XXX */
+@message Boolean MSG_GEN_CHECK_IF_FULLY_USABLE() = carry;	/* XXX */
+
+/*** Generic Attributes ***/
+
+@message void MSG_GEN_SET_ATTRS(GenAttrs attrsToSet = cl,
+				GenAttrs attrsToClear = ch); /* XXX */
+@message GenAttrs MSG_GEN_GET_ATTRIBUTES() = cl;	/* XXX */
+
+/*** Visual monikers ***/
+
+@message ChunkHandle MSG_GEN_GET_VIS_MONIKER() = ax;
+@message void MSG_GEN_USE_VIS_MONIKER(ChunkHandle moniker = cx,
+				VisUpdateMode updateMode = dl);
+
+@message ChunkHandle MSG_GEN_REPLACE_VIS_MONIKER(@stack
+				VisUpdateMode updateMode,
+				word height, word width, word length,
+				VisMonikerDataType dataType,
+				VisMonikerSourceType sourceType,
+				dword source) = ax;
+
+@message ChunkHandle MSG_GEN_REPLACE_VIS_MONIKER_OPTR(optr source = cx:dx,
+				VisUpdateMode updateMode = bp) = ax;
+@message ChunkHandle MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+				const char *source = cx:dx,
+				VisUpdateMode updateMode = bp) = ax;
+
+@message ChunkHandle MSG_GEN_CREATE_VIS_MONIKER(@stack
+				CreateVisMonikerFlags flags,
+				word height, word width, word length,
+				VisMonikerDataType dataType,
+				VisMonikerSourceType sourceType,
+				dword source) = ax;
+
+@message void MSG_GEN_DRAW_MONIKER(@stack DrawMonikerFlags monikerFlags,
+			word textHeight, GStateHandle gState, word yMaximum,
+			word xMaximum, word yInset, word xInset); /* XXX */
+
+/* Use DWORD_X and DWORD_Y to get x, y position */
+@message XYValueAsDWord MSG_GEN_GET_MONIKER_POS(
+    	    	    	@stack DrawMonikerFlags monikerFlags,
+			word textHeight, GStateHandle gState, word yMaximum,
+			word xMaximum, word yInset, word xInset) = bp.ax; 
+			/* XXX */
+
+/* Use DWORD_WIDTH and DWORD_HEIGHT to get width, height */
+@message SizeAsDWord MSG_GEN_GET_MONIKER_SIZE(word textHeight = dx,
+			GStateHandle gState = bp) = dx.cx; /* XXX */
+
+@message optr MSG_GEN_FIND_MONIKER(Boolean useAppMonikerList = dx,
+					VisMonikerSearchFlags searchFlags = bp,
+					MemHandle destBlock = cx) = cx:dx; /* XXX */
+@message void MSG_GEN_RELOC_MONIKER_LIST(optr monikerList = dx:cx,
+					Boolean relocFlag = bp);    /* XXX */
+
+/*** Keyboard accelerators ***/
+
+@message void MSG_GEN_SET_KBD_ACCELERATOR(KeyboardShortcut accelerator = cx,
+				VisUpdateMode updateMode = dl);	/* XXX */
+@message KeyboardShortcut MSG_GEN_GET_KBD_ACCELERATOR() = cx;	/* XXX */
+@message void MSG_GEN_CHANGE_ACCELERATOR(KeyboardShortcut bitsToClear = cx,
+					 KeyboardShortcut bitsToSet = dx);	/* XXX */
+
+/*** Help ***/
+
+@message void MSG_GEN_GET_HELP();	/* NEEDS PROTOTYPE */
+@message void MSG_GEN_SET_HELP();	/* NEEDS PROTOTYPE */
+
+/*** Hints ***/
+
+/*** Generic Composite Operations ***/
+
+@message void MSG_GEN_ADD_CHILD(optr child = cx:dx,
+				CompChildFlags flags = bp);
+@message void MSG_GEN_REMOVE_CHILD(optr child = cx:dx,
+				CompChildFlags flags = bp);	/* XXX */
+@message void MSG_GEN_ADD_CHILD_UPWARD_LINK_ONLY(optr child = cx:dx); /* XXX */
+@message void MSG_GEN_MOVE_CHILD(optr child = cx:dx,
+				CompChildFlags flags = bp);	/* XXX */
+@message word MSG_GEN_FIND_CHILD(optr child = cx:dx) = bp; /* XXX */
+@message optr MSG_GEN_FIND_CHILD_AT_POSITION(word position = cx) = cx:dx;
+@message optr MSG_GEN_FIND_PARENT() = cx:dx;	/* XXX */
+@message word MSG_GEN_COUNT_CHILDREN() = dx;
+
+/*** Generic Composite Communication ***/
+
+@message void MSG_GEN_CALL_PARENT(EventHandle event = cx); /* XXX */
+@message void MSG_GEN_SEND_TO_PARENT(EventHandle event = cx); /* XXX */
+@message void MSG_GEN_SEND_TO_CHILDREN(EventHandle event = cx); /* XXX */
+
+typedef enum /* word */ {
+    TO_GEN_PARENT=_FIRST_GenClass,
+    TO_FOCUS,
+    TO_TARGET,
+    TO_MODEL,
+    TO_APP_FOCUS,
+    TO_APP_TARGET,
+    TO_APP_MODEL,
+    TO_SYS_FOCUS,
+    TO_SYS_TARGET,
+    TO_SYS_MODEL
+} GenTravelOption;
+
+@message void MSG_GEN_GUP_CALL_OBJECT_OF_CLASS(EventHandle event = cx); /* XXX */
+@message void MSG_GEN_GUP_SEND_TO_OBJECT_OF_CLASS(EventHandle event = cx); /* XXX */
+@message Boolean MSG_GEN_GUP_TEST_FOR_OBJECT_OF_CLASS(
+				ClassStruct *class = cx:dx) = carry; /* XXX */
+@message optr MSG_GEN_GUP_FIND_OBJECT_OF_CLASS(
+				ClassStruct *class = cx:dx) = cx:dx; /* XXX */
+@message void MSG_GEN_CALL_APPLICATION(EventHandle event = cx); /* XXX */
+@message void MSG_GEN_SEND_TO_PROCESS(EventHandle event = cx); /* XXX */
+@message void MSG_GEN_CALL_SYSTEM(EventHandle event = cx); /* XXX */
+@message void MSG_GEN_OUTPUT_ACTION(EventHandle event = bp,
+						optr dest = cx:dx); /* XXX */
+
+/*** Generic Branch Construction/Destruction ***/
+
+@message optr MSG_GEN_COPY_TREE(MemHandle destBlock = cx,
+				ChunkHandle parentChunk = dx,
+				CompChildFlags flags = bp) = cx:dx;
+@message void MSG_GEN_DESTROY(VisUpdateMode updateMode = dl,
+    	    	    	    	CompChildFlags flags = bp); /* XXX */
+
+typedef enum /* word */ {
+    BRPT_OUTPUT_OPTR
+} BranchReplaceParamType;
+
+@message void MSG_GEN_BRANCH_REPLACE_PARAMS(@stack BranchReplaceParamType type,
+			dword replaceParam, dword searchParam); /* XXX */
+#define BRP_DUMMY_OPTR_START	1
+@message void MSG_GEN_BRANCH_REPLACE_OUTPUT_OPTR_CONSTANT(
+					optr replacementOptr = cx:dx,
+					word searchConstant = bp); /* XXX */
+
+/*** Display/Interaction Control Methods ***/
+
+@message void MSG_GEN_BRING_TO_TOP();
+@message void MSG_GEN_LOWER_TO_BOTTOM();
+
+/*** Other Focus/Target methods ***/
+
+/* MSG_META_GET_TARGET_AT_TARGET_LEVEL defined in Objectgs/metaC.goh */
+
+@message optr MSG_GEN_START_BROADCAST_FOR_DEFAULT_FOCUS() = cx:dx; /*INTERNAL*/
+    	    	    	    	    	    	    	    	     /* XXX */
+
+/*** Window Size and Position Methods ***/
+
+#define GET_MM_AND_TYPE(M,T) 	((M) | (((word) (T)) << 8))
+@message void MSG_GEN_SET_WIN_POSITION(WinPositionType modeAndType = dx,
+					SpecWinSizeSpec xPosSpec = cx,
+					SpecWinSizeSpec yPosSpec = bp);	/* XXX */
+@message void MSG_GEN_SET_WIN_SIZE(WinPositionType modeAndType = dx,
+					SpecWinSizeSpec xSizeSpec = cx,
+					SpecWinSizeSpec ySizeSpec = bp);	/* XXX */
+@message void MSG_GEN_RESET_TO_INITIAL_SIZE(VisUpdateMode updateMode = dl); /* XXX */
+@message void MSG_GEN_SET_WIN_CONSTRAIN(VisUpdateMode updateMode = dl,
+					WinConstrainType constrainType = dh); /* XXX */
+
+/*** Geometry Methods ***/
+
+typedef struct {
+    word		SSA_width;
+    word		SSA_height;
+    word		SSA_count;
+    VisUpdateMode	SSA_updateMode;
+} SetSizeArgs;
+
+typedef struct {
+    word	GSA_width;
+    word	GSA_height;
+    word	GSA_unused;
+    word	GSA_count;
+} GetSizeArgs;
+
+@message void MSG_GEN_SET_INITIAL_SIZE(@stack VisUpdateMode updateMode,
+			word count, SpecHeight height, SpecWidth width);	/* XXX */
+@message void MSG_GEN_SET_MINIMUM_SIZE(@stack VisUpdateMode updateMode,
+			word count, SpecHeight height, SpecWidth width);	/* XXX */
+@message void MSG_GEN_SET_MAXIMUM_SIZE(@stack byte updateMode,
+			word count, word height, word width);	/* XXX */
+@message void MSG_GEN_SET_FIXED_SIZE(@stack byte updateMode,
+			word count, word height, word width);	/* XXX */
+@message void MSG_GEN_GET_INITIAL_SIZE(GetSizeArgs *initSize = cxdxbpax);	/* XXX */
+@message void MSG_GEN_GET_MINIMUM_SIZE(GetSizeArgs *minSize = cxdxbpax);	/* XXX */
+@message void MSG_GEN_GET_MAXIMUM_SIZE(GetSizeArgs *maxSize = cxdxbpax);	/* XXX */
+@message void MSG_GEN_GET_FIXED_SIZE(GetSizeArgs *fixedSize = cxdxbpax);	/* XXX */
+
+/*** Generic Visual Update Method ***/
+
+@message void MSG_GEN_UPDATE_VISUAL(VisUpdateMode updateMode = dl); /* XXX */
+
+/*** Gagdet Apply/Reset/Activation Methods ***/
+
+@message void MSG_GEN_APPLY();	/* XXX */
+@message void MSG_GEN_RESET();	/* XXX */
+@message Boolean MSG_GEN_PRE_APPLY() = carry;
+@message void MSG_GEN_POST_APPLY();
+@message void MSG_GEN_MAKE_APPLYABLE();
+@message void MSG_GEN_MAKE_NOT_APPLYABLE();
+@message void MSG_GEN_ACTIVATE();	/* XXX */
+@message Boolean MSG_GEN_ACTIVATE_INTERACTION_DEFAULT() = carry; /* XXX */
+
+/*** Navigation Methods ***/
+
+@message void MSG_GEN_NAVIGATE_TO_NEXT_FIELD();	/* XXX */
+@message void MSG_GEN_NAVIGATE_TO_PREVIOUS_FIELD();	/* XXX */
+@message Boolean MSG_GEN_NAVIGATION_QUERY(
+		NavigationQueryParams *retValue = bpaxdxcx,
+		optr queryOrigin = cx:dx,
+		NavigationFlags navFlags = bp) = carry; /* XXX */
+
+typedef struct {
+    word	GRP_ax;
+    word	GRP_bp;
+    word	GRP_cx;
+    word	GRP_dx;
+} GenReturnParams;
+
+/*** Generic Upward Queries ***/
+
+typedef enum {
+    GUQT_UI_FOR_APPLICATION,
+    GUQT_UI_FOR_SCREEN,
+    GUQT_UI_FOR_FIELD,
+    GUQT_UI_FOR_MISC,
+    GUQT_FIELD,
+    GUQT_SCREEN,
+    GUQT_DELAYED_OPERATION
+} GenUpwardQueryType;
+
+@message Boolean MSG_GEN_GUP_QUERY(
+			GenReturnParams *retValue = axbpcxdx,
+			GenUpwardQueryType queryType = cx) = carry; /* XXX */
+
+typedef struct {
+    optr	GGFI_optr;
+    MemHandle	GGFI_window;
+    word	GGFI_unused;
+} GenGupFieldInfo;
+@alias (MSG_GEN_GUP_QUERY) Boolean MSG_GEN_GUP_QUERY_FOR_FIELD(
+				GenGupFieldInfo *retValue = cxdxbpax,
+				GenUpwardQueryType queryType = cx) = carry;
+typedef struct {
+    optr	GGSI_optr;
+    MemHandle	GGSI_window;
+    word	GGSI_unused;
+} GenGupScreenInfo;
+@alias (MSG_GEN_GUP_QUERY) Boolean MSG_GEN_GUP_QUERY_FOR_SCREEN(
+				GenGupScreenInfo *retValue = cxdxbpax,
+				GenUpwardQueryType queryType = cx) = carry;
+
+@message Boolean MSG_GEN_GUP_INTERACTION_COMMAND(InteractionCommand command = cx); /* XXX */
+
+/*** Keyboard shortcut search methods (Internal) ***/
+
+#define GET_CHAR_AND_SHIFT(C,S) 	((C) | (((word) (S)) << 8))
+@message Boolean MSG_GEN_FIND_KBD_ACCELERATOR(word charValue = cx,
+			word charFlagsAndShiftState = dx,
+			word toggleStateAndScanCode = bp) = carry; /* XXX */
+@message void MSG_GEN_SET_KBD_MKR_PATH();	/* XXX */
+
+/*** Enable notify methods (Internal) ***/
+
+typedef ByteFlags NotifyEnabledFlags;
+#define NEF_STATE_CHANGING	0x80
+
+@message Boolean MSG_GEN_NOTIFY_ENABLED(VisUpdateMode updateMode = dl,
+				byte flags = dh) = carry;	/* XXX */
+@message Boolean MSG_GEN_NOTIFY_NOT_ENABLED(VisUpdateMode updateMode = dl,
+				byte flags = dh) = carry;	/* XXX */
+
+/*** GenView Utility Methods (Internal) ***/
+
+typedef ByteEnum RequestedViewArea;
+#define RVA_NO_AREA_CHOICE 0
+#define RVA_X_SCROLLER_AREA 1
+#define RVA_Y_SCROLLER_AREA 2
+#define RVA_LEFT_AREA 3
+#define RVA_TOP_AREA 4
+#define RVA_RIGHT_AREA 5
+#define RVA_BOTTOM_AREA 6
+
+typedef struct {
+    byte	GFVRP_hViewArea;
+    byte	GFVRP_vViewArea;
+    ChunkHandle	GFVRP_hRange;
+    ChunkHandle	GFVRP_vRange;
+    word    	GFVRP_unused;
+} GenFindViewRangesParams;
+
+#define GET_VIEW_AREAS(H,V) 	((H) | (((word) (V)) << 8))
+@message void MSG_GEN_FIND_VIEW_RANGES(
+			GenFindViewRangesParams *retValue = cxdxbpax,
+			word viewAreas = cx,
+			ChunkHandle hRange = dx,
+			ChunkHandle vRange = bp); /* XXX */
+@message RequestedViewArea MSG_GEN_QUERY_VIEW_AREA(
+			RequestedViewArea viewArea = cl) = cl;	/* XXX */
+
+@message Boolean MSG_GEN_QUERY_NEED_TO_BE_ON_ACTIVE_LIST() = carry;
+
+typedef struct {
+    char    GOP_category[INI_CATEGORY_BUFFER_SIZE];
+    char    GOP_key[INI_CATEGORY_BUFFER_SIZE];
+} GenOptionsParams;
+
+@message void MSG_GEN_LOAD_OPTIONS(GenOptionsParams *params = ss:bp);
+
+@message void MSG_GEN_SAVE_OPTIONS(GenOptionsParams *params = ss:bp);
+
+@message void MSG_GEN_ADD_GEOMETRY_HINT(word hint = cx, word hintArgument = bp,
+					VisUpdateMode updateMode = dl);
+
+@message void MSG_GEN_REMOVE_GEOMETRY_HINT(word hint = cx, 
+					   VisUpdateMode updateMode = dl);
+
+/*
+ * Generic Directory Path Support
+ */
+typedef struct {
+    DiskHandle	GFP_disk;   	/* Handle of disk on which the path resides;
+				 * may be initialized to a StandardPath
+				 * constant */
+    PathName	GFP_path;   	/* Absolute path (relative if GFP_disk is
+				 * a StandardPath constant) to the directory */
+} GenFilePath;
+
+    @vardata GenFilePath	ATTR_GEN_PATH_DATA;
+    @vardata void		TEMP_GEN_PATH_SAVED_DISK_HANDLE;
+
+@message Boolean MSG_GEN_PATH_SET(char *path = cx:dx, DiskHandle disk = bp) = carry;
+@message Boolean MSG_GEN_PATH_GET(char *buffer = dx:bp, word bufSize = cx) = carry;
+	/* Pass buffer as NULL; returned handle of 0 => error */
+@alias (MSG_GEN_PATH_GET) MemHandle MSG_GEN_PATH_GET_BLOCK(char *buffer = dx:bp, word bufSize = cx) = dx;
+
+@message DiskHandle MSG_GEN_PATH_GET_DISK_HANDLE() = cx;
+
+@message optr MSG_GEN_FIND_OBJECT_WITH_TEXT_MONIKER(char *text = cx:dx,
+    	    	    	GenFindObjectWithMonikerFlags flags = bp) = cx:dx;  /*XXX*/
+
+typedef WordFlags GenFindObjectWithMonikerFlags;
+#define	GFTMF_EXACT_MATCH	0x8000
+#define GFTMF_SKIP_THIS_NODE	0x4000
+
+@message void MSG_GEN_GROW_PARENTS();	    	    /* INTERNAL */
+
+@message void MSG_GEN_GUP_ENSURE_UPDATE_WINDOW(	    /* INTERNAL */
+					UpdateWindowFlags updateFlags = cx,
+					VisUpdateMode updateMode = dl);
+@message void MSG_GEN_GUP_FINISH_QUIT(Boolean abortFlag = cx,
+					Boolean notifyParent = dx);
+
+@message void MSG_GEN_REMOVE(VisUpdateMode updateMode = dl,
+    	    	    	     CompChildFlags flags = bp);
+
+@message Boolean MSG_GEN_DESTROY_AND_FREE_BLOCK() = carry;
+
+typedef enum {
+    	KO_NO_KEYBOARD,
+	KO_KEYBOARD_REQUIRED,
+	KO_KEYBOARD_EMBEDDED
+} KeyboardOverride;
+
+@message void MSG_GEN_SET_KBD_OVERRIDE(KeyboardOverride override = cx);
+@message void MSG_GEN_SET_KBD_POSITION(sword xCoord = cx, sword yCoord = dx);
+
+@protominor NewForJediAndBeyond
+
+@message optr MSG_GEN_FIND_OBJECT_WITH_TEXT_MONIKER_C(char *text = cx:dx,
+    	    	    	GenFindObjectWithMonikerFlags flags = bp) = cx:dx;
+
+@protoreset
+
+@protominor NewForOmniGo200
+
+@message void MSG_GEN_ROTATE_DISPLAY();   /* Sent to primaries when screen
+					     rotates. */
+
+@protoreset
+
+
+@protominor UINewForFloatingKbd
+
+@message void MSG_GEN_TOGGLE_FLOATING_KBD();
+
+@protoreset
+
+/** End of Messages **/
+
+/*
+ *	Hints
+ */
+
+typedef struct {
+    ClassStruct *DCA_class;
+} DestinationClassArgs;
+
+    @vardata void HINT_DUMMY;
+    @vardata void HINT_FREQUENTLY_USED;
+    @vardata void HINT_INFREQUENTLY_USED;
+    @vardata void HINT_AN_ADVANCED_FEATURE;
+    @vardata void HINT_DEFAULT_DEFAULT_ACTION;
+    @vardata void HINT_ENSURE_TEMPORARY_DEFAULT;
+    @vardata void HINT_SAME_CATEGORY_AS_PARENT;
+    @vardata void HINT_SYS_MENU;
+    @vardata void HINT_USE_TEXT_MONIKER;
+    @vardata void HINT_USE_ICONIC_MONIKER;
+    @vardata void HINT_DEFAULT_FOCUS;
+    @vardata void HINT_DEFAULT_TARGET;
+    @vardata void HINT_DEFAULT_MODEL;
+    @vardata void HINT_PREVENT_DEFAULT_OVERRIDES;
+    @vardata void HINT_PRESERVE_FOCUS;
+    @vardata void HINT_DO_NOT_PRESERVE_FOCUS;
+    @vardata void HINT_GENERAL_CONSUMER_MODE;
+    @vardata void HINT_NEVER_ADOPT_MENUS;
+    @vardata void HINT_ALWAYS_ADOPT_MENUS;
+    @vardata void HINT_ALLOW_CHILDREN_TO_WRAP;
+    @vardata void HINT_BOTTOM_JUSTIFY_CHILDREN;
+    @vardata void HINT_CENTER_CHILDREN_HORIZONTALLY;
+    @vardata void HINT_CENTER_CHILDREN_ON_MONIKERS;
+    @vardata void HINT_CENTER_CHILDREN_VERTICALLY;
+    @vardata void HINT_CENTER_MONIKER;
+    @vardata SpecSizeSpec HINT_CUSTOM_CHILD_SPACING;
+    @vardata void HINT_DONT_ALLOW_CHILDREN_TO_WRAP;
+    @vardata void HINT_DONT_FULL_JUSTIFY_CHILDREN;
+    @vardata void HINT_DONT_INCLUDE_ENDS_IN_CHILD_SPACING;
+    @vardata void HINT_DO_NOT_USE_MONIKER;
+    @vardata void HINT_DRAW_IN_BOX;
+    @vardata void HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    @vardata void HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    @vardata CompSizeHintArgs HINT_FIXED_SIZE;
+    @vardata void HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    @vardata void HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY;
+    @vardata void HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+    @vardata CompSizeHintArgs HINT_INITIAL_SIZE;
+    @vardata void HINT_LEFT_JUSTIFY_CHILDREN;
+    @vardata void HINT_LEFT_JUSTIFY_MONIKERS;
+    @vardata void HINT_MAKE_REPLY_BAR;
+    @vardata CompSizeHintArgs HINT_MAXIMUM_SIZE;
+    @vardata CompSizeHintArgs HINT_MINIMUM_SIZE;
+    @vardata void HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+    @vardata void HINT_NO_WIDER_THAN_CHILDREN_REQUIRE;
+    @vardata void HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    @vardata void HINT_ORIENT_CHILDREN_VERTICALLY;
+    @vardata void HINT_PLACE_MONIKER_ABOVE;
+    @vardata void HINT_ALIGN_LEFT_MONIKER_EDGE_WITH_CHILD;
+    @vardata void HINT_PLACE_MONIKER_TO_LEFT;
+    @vardata void HINT_PLACE_MONIKER_TO_RIGHT;
+    @vardata void HINT_RIGHT_JUSTIFY_CHILDREN;
+    @vardata void HINT_TOP_JUSTIFY_CHILDREN;
+    @vardata word HINT_WRAP_AFTER_CHILD_COUNT;
+    @vardata void HINT_DIVIDE_WIDTH_EQUALLY;
+    @vardata void HINT_DIVIDE_HEIGHT_EQUALLY;
+    @vardata void HINT_NO_BORDERS_ON_MONIKERS;
+    @vardata TextColors HINT_GADGET_TEXT_COLOR;
+    @vardata void HINT_POPS_UP_TO_RIGHT;
+    @vardata void HINT_POPS_UP_BELOW;
+    @vardata void ATTR_GEN_PROPERTY;
+    @vardata void ATTR_GEN_NOT_PROPERTY;
+    @vardata void HINT_SEEK_MENU_BAR;
+    @vardata void HINT_AVOID_MENU_BAR;
+    @vardata void HINT_NAVIGATION_ID;
+    @vardata void HINT_NAVIGATION_NEXT_ID;
+    @vardata void HINT_DISMISS_WHEN_DISABLED;
+    @vardata void HINT_SEEK_X_SCROLLER_AREA;
+    @vardata void HINT_SEEK_Y_SCROLLER_AREA;
+    @vardata void HINT_SEEK_LEFT_OF_VIEW;
+    @vardata void HINT_SEEK_TOP_OF_VIEW;
+    @vardata void HINT_SEEK_RIGHT_OF_VIEW;
+    @vardata void HINT_SEEK_BOTTOM_OF_VIEW;
+    @vardata void HINT_GEN_UNUSED;      /* INTERNAL */
+    @vardata void HINT_USE_INITIAL_BOUNDS_WHEN_RESTORED;
+    @vardata void HINT_KEEP_INITIALLY_ONSCREEN;
+    @vardata void HINT_DONT_KEEP_INITIALLY_ONSCREEN;
+    @vardata void HINT_KEEP_PARTIALLY_ONSCREEN;
+    @vardata void HINT_KEEP_ENTIRELY_ONSCREEN;
+    @vardata void HINT_KEEP_ENTIRELY_ONSCREEN_WITH_MARGIN;
+    @vardata void HINT_DONT_KEEP_PARTIALLY_ONSCREEN;
+    @vardata SpecWinSizePair HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT;
+    @vardata void HINT_STAGGER_WINDOW;
+    @vardata void HINT_CENTER_WINDOW;
+    @vardata void HINT_TILE_WINDOW;
+    @vardata void HINT_POSITION_WINDOW_AT_MOUSE;
+    @vardata void HINT_EXTEND_WINDOW_TO_BOTTOM_RIGHT;
+    @vardata void HINT_EXTEND_WINDOW_NEAR_BOTTOM_RIGHT;
+    @vardata void HINT_SIZE_WINDOW_AS_DESIRED;
+    @vardata SpecWinSizePair HINT_SIZE_WINDOW_AS_RATIO_OF_PARENT;
+    @vardata SpecWinSizePair HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD;
+    @vardata SpecWinSizePair HINT_POSITION_ICON_AS_RATIO_OF_FIELD;
+    @vardata DestinationClassArgs ATTR_GEN_DESTINATION_CLASS;
+    @reloc ATTR_GEN_DESTINATION_CLASS, 0, optr;
+    @vardata void HINT_INITIATED;   	/* INTERNAL */
+    @vardata char[] ATTR_GEN_INIT_FILE_KEY;
+    @vardata char[] ATTR_GEN_INIT_FILE_CATEGORY;
+    @vardata void ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+    @vardata ChunkHandle ATTR_GEN_FEATURE_LINK;
+    @vardata void HINT_TOOLBOX;
+    @vardata void HINT_SAME_ORIENTATION_AS_PARENT;
+    @vardata void HINT_SEEK_REPLY_BAR;
+    @vardata MemHandle ATTR_GEN_WINDOW_CUSTOM_LAYER_ID;
+    @reloc ATTR_GEN_WINDOW_CUSTOM_LAYER_ID, 0, handle;
+    @vardata void HINT_SHOW_SHORTCUT;
+    @vardata void HINT_DRAW_SHORTCUT_BELOW;
+    @vardata void HINT_CAN_CLIP_MONIKER_WIDTH;
+    @vardata void HINT_CAN_CLIP_MONIKER_HEIGHT;
+    @vardata void HINT_SHOW_ENTIRE_MONIKER;
+    @vardata Point ATTR_GEN_POSITION;
+    @vardata sword ATTR_GEN_POSITION_X;
+    @vardata sword ATTR_GEN_POSITION_Y;
+    @vardata optr HINT_ALIGN_LEFT_EDGE_WITH_OBJECT;
+    @reloc HINT_ALIGN_LEFT_EDGE_WITH_OBJECT, 0, optr;
+    @vardata optr HINT_ALIGN_TOP_EDGE_WITH_OBJECT;
+    @reloc HINT_ALIGN_TOP_EDGE_WITH_OBJECT, 0, optr;
+    @vardata optr HINT_ALIGN_RIGHT_EDGE_WITH_OBJECT;
+    @reloc HINT_ALIGN_RIGHT_EDGE_WITH_OBJECT, 0, optr;
+    @vardata optr HINT_ALIGN_BOTTOM_EDGE_WITH_OBJECT;
+    @reloc HINT_ALIGN_BOTTOM_EDGE_WITH_OBJECT, 0, optr;
+    @vardata void HINT_DONT_SHOW_SHORTCUT;
+    @vardata void ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED;
+    @vardata void ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_ENABLED;
+    @vardata dword ATTR_GEN_VISIBILITY_DATA;
+    @vardata Message ATTR_GEN_VISIBILITY_MESSAGE;
+    @vardata optr ATTR_GEN_VISIBILITY_DESTINATION;
+    @reloc ATTR_GEN_VISIBILITY_DESTINATION, 0, optr;
+    @vardata void HINT_IS_POPUP_LIST;	    /* INTERNAL */
+    @vardata void HINT_MINIMIZE_CHILD_SPACING;
+
+typedef struct {
+    Color	BC_unselectedColor1;
+    Color	BC_unselectedColor2;
+    Color 	BC_selectedColor1;
+    Color 	BC_selectedColor2;
+} BackgroundColors;
+
+    @vardata BackgroundColors HINT_GADGET_BACKGROUND_COLORS;
+    @vardata WinPriority ATTR_GEN_WINDOW_CUSTOM_WINDOW_PRIORITY;
+    @vardata LayerPriority ATTR_GEN_WINDOW_CUSTOM_LAYER_PRIORITY;
+    @vardata MemHandle ATTR_GEN_WINDOW_CUSTOM_PARENT;
+    @vardata void TEMP_GEN_SAVE_WINDOW_INFO;	/* INTERNAL */
+    @vardata void TEMP_GEN_SAVE_ICON_INFO;	/* INTERNAL */
+    @vardata void ATTR_GEN_WINDOW_CUSTOM_WINDOW;
+    @vardata void HINT_ORIENT_CHILDREN_ALONG_LARGER_DIMENSION;
+    @vardata void HINT_PLACE_MONIKER_ALONG_LARGER_DIMENSION;
+    @vardata void HINT_WRAP_AFTER_CHILD_COUNT_IF_VERTICAL_SCREEN;
+    @vardata void HINT_NOT_MOVABLE;
+    @vardata void HINT_SEEK_TITLE_BAR_LEFT;
+    @vardata void HINT_SEEK_TITLE_BAR_RIGHT;
+
+typedef enum {
+    GDMT_LEVEL_0,
+    GDMT_LEVEL_1,
+    GDMT_LEVEL_2,
+    GDMT_LEVEL_3,
+    GDMT_HELP,
+    GDMT_HELP_PRIMARY
+} GenDefaultMonikerType;
+
+    @vardata GenDefaultMonikerType ATTR_GEN_DEFAULT_MONIKER;
+
+    @vardata char[] ATTR_GEN_HELP_FILE;
+    @vardata HelpType ATTR_GEN_HELP_TYPE;
+    @vardata void ATTR_GEN_HELP_FILE_FROM_INIT_FILE;
+    @vardata optr ATTR_GEN_FOCUS_HELP;
+	@reloc ATTR_GEN_FOCUS_HELP, 0, optr;
+    @vardata optr ATTR_GEN_FOCUS_HELP_LIB;
+        @reloc ATTR_GEN_FOCUS_HELP_LIB, 0, optr;
+
+    @vardata void HINT_UNUSED_G;
+
+    @vardata char[] ATTR_GEN_HELP_CONTEXT;
+    @vardata void HINT_WINDOW_NO_CONSTRAINTS;
+    @vardata optr ATTR_GEN_OUTPUT_TRAVEL_START;
+	@reloc ATTR_GEN_OUTPUT_TRAVEL_START, 0, optr;
+    @vardata SpecSizeSpec HINT_CUSTOM_CHILD_SPACING_IF_LIMITED_SPACE;
+    @vardata void HINT_WINDOW_NO_TITLE_BAR;
+    @vardata void HINT_WINDOW_NO_SYS_MENU;
+    @vardata void ATTR_GEN_USES_HIERARCHICAL_INIT_FILE_CATEGORY;
+    @vardata void ATTR_GEN_WINDOW_ACCEPT_INK_EVEN_IF_NOT_FOCUSED;
+
+typedef WordFlags SystemAttrs;
+#define SA_NOT			0x8000
+#define SA_TINY			0x4000
+#define SA_HORIZONTALLY_TINY	0x2000
+#define SA_VERTICALLY_TINY	0x1000
+#define SA_COLOR		0x0800
+#define SA_PEN_BASED		0x0400
+#define SA_KEYBOARD_ONLY	0x0200
+#define SA_NO_KEYBOARD		0x0100
+
+    @vardata SystemAttrs HINT_IF_SYSTEM_ATTRS;
+    @vardata void HINT_ENDIF;
+    @vardata void HINT_ELSE;
+
+    @vardata word TEMP_GEN_EMC_PANEL_ITEM_PRIORITY;
+    @vardata KeyboardOverride ATTR_GEN_WINDOW_KBD_OVERRIDE;
+    @vardata Point ATTR_GEN_WINDOW_KBD_POSITION;
+    @vardata void HINT_WINDOW_MINIMIZE_TITLE_BAR;
+    @vardata void HINT_WINDOW_ALWAYS_DRAW_WITH_FOCUS;
+
+
+@protoreset
+
+@protominor	UINewForResponder
+    @vardata void HINT_DRAW_SHADOW;
+    @vardata word HINT_SEEK_SLOT;
+    @vardata word HINT_INDENT_CHILDREN;
+@protoreset
+
+@protominor	PCVWindowHints
+    /*
+     * PCV Window hints.  Make sure that these hints are contiguous
+     * and remain in order, as Legos will map "looks" as offsets
+     * from the first of these hints, HINT_WINDOW_PCV_TOOL_DIALOG_LOOK
+     */
+    @vardata void HINT_WINDOW_PCV_TOOL_DIALOG_LOOK;
+    /* Draw in the style of a PCV tool dialog window.  This is similar to
+       the Stylus round thick dialog, but not quite so round or thick. */
+
+    @vardata void HINT_WINDOW_PCV_FIT_NOTE_PAD_LOOK;
+    /* Draw in the style of a PCV Fit Note pad window.  This has a corner
+       folded up on the bottom right and looks as if it is sittin on top
+       of a few other windows because of the border on the bottom right. */
+
+    @vardata void HINT_WINDOW_PCV_FIT_NOTE_LOOK;
+    /* Draw in the style of a PCV Fit Note window.  This has the bottom
+       right corner folded up. */
+
+    @vardata void HINT_WINDOW_PCV_ROLODEX_CARD_LOOK;
+    /*  Draw in the style of a PCV rolodex card window. */
+@protoreset
+
+@protominor UINewForResponder_4
+    @vardata SpecSizeSpec HINT_CUSTOM_CHILD_WRAP_SPACING;
+    @vardata void HINT_ALIGN_WITH_CENTERED_MONIKERS;
+    @vardata void HINT_DONT_INDENT_BOX;
+@protoreset
+
+@protominor PCVLooks_2
+    @vardata void HINT_BLANK_WINDOW_STYLE;
+    /* Draw the window as a blank white square, no UI. */
+
+    @vardata void HINT_BLANK_GREY_WINDOW_STYLE;
+    /* Draw the window as a blank grey square, no UI. */
+
+    @vardata void HINT_BLANK_BLACK_GROUP_STYLE;
+    /* Used with grouping objects.  Fill with black */
+
+    @vardata void HINT_BORDERED_GROUP_STYLE;
+    /* Draw with a rounded corner shadowed border (white filled) */
+@protoreset
+
+@protominor UINewForPenelope
+    @vardata    void    HINT_LEFT_JUSTIFY_Y_SCROLLER;
+    @vardata    void    HINT_TOP_JUSTIFY_X_SCROLLER;
+    @vardata 	void	HINT_DRAW_STYLE_3D_RAISED;
+    @vardata 	void	HINT_DRAW_STYLE_3D_LOWERED;
+    @vardata	void	HINT_DRAW_STYLE_FLAT;
+    /* Generic hints to specify three-dimensional look or not.
+       First used in the Odie Spui.			 */
+@protoreset
+
+
+@protominor PCVLooks_3
+    @vardata void HINT_USE_COMPRESSED_INSETS_FOR_MONIKER;
+    /* Use the alternate insets for computing the space between
+	the border and the moniker. */
+@protoreset
+
+    @vardata void HINT_SEEK_NOTEBOOK_LEFT;
+    @vardata void HINT_SEEK_NOTEBOOK_RIGHT;
+
+    @vardata Color HINT_WINDOW_WASH_COLOR;
+
+@protominor UINewForPenelope_2
+/* These aliases for HINT_GADGET_BACKGROUND_COLORS are used to 
+   specify the extra background colors for gadgets that
+   support independent background colors for multiple elements
+   of the gadget. Two colors can be chosen for both the unselected 
+   color and selected color -- they will be blended together.  
+   To get a solid color, set both colors the same. 
+
+   First used in Odie spui for GenItems and GenBooleans. */
+
+typedef struct {
+    BackgroundColors	TBC_backgroundColors1;
+    BackgroundColors	TBC_backgroundColors2;
+} TwoBackgroundColors;
+
+@vardataAlias (HINT_GADGET_BACKGROUND_COLORS)
+	TwoBackgroundColors HINT_GADGET_TWO_BACKGROUND_COLORS;
+
+typedef struct {
+    BackgroundColors	TBC_backgroundColors1;
+    BackgroundColors	TBC_backgroundColors2;
+    BackgroundColors	TBC_backgroundColors3;
+} ThreeBackgroundColors;
+
+@vardataAlias (HINT_GADGET_BACKGROUND_COLORS)
+	ThreeBackgroundColors HINT_GADGET_THREE_BACKGROUND_COLORS;
+
+@vardata Rectangle HINT_CUSTOM_EXTRA_MARGINS;
+
+@protoreset
+
+@protominor UINewForFloatingKbd
+
+typedef struct {
+    word    KTP_displayType;
+    word    KTP_disallowType;
+    word    KTP_entryMode;
+} KeyboardTypeParams;
+
+@vardata KeyboardTypeParams HINT_KEYBOARD_TYPE;
+
+@vardata KeyboardOverride HINT_PREVIOUS_KBD_OVERRIDE;
+
+@protoreset
+
+@protominor UINewForShortLongTouch
+
+/* Prototype for SLTP_{short/long}Message */
+@prototype void SHORT_LONG_TOUCH_MSG(optr sourceObj = cx:dx);
+
+typedef struct {
+    word SLTP_shortMessage;
+    optr SLTP_shortDestination;
+    word SLTP_longMessage;
+    optr SLTP_longDestination;
+} ShortLongTouchParams;
+
+@vardata ShortLongTouchParams HINT_SHORT_LONG_TOUCH;
+@reloc HINT_SHORT_LONG_TOUCH, 2, optr;
+@reloc HINT_SHORT_LONG_TOUCH, 6, optr;
+
+@protoreset
+
+@protominor UIFocusDisabledHelp
+@protoreset
+
+    @vardata optr ATTR_GEN_FOCUS_DISABLED_HELP;
+	@reloc ATTR_GEN_FOCUS_DISABLED_HELP, 0, optr;
+
+@protominor UIIconTextMoniker
+
+    typedef WordFlags IconTextMonikerFlags;
+    #define ITMF_POSITION_ICON_ABOVE_TEXT	0x8000
+    #define ITMF_SWAP_ICON_TEXT			0x1000
+
+    #define ITMF_POSITION_ICON_BELOW_TEXT	0x9000
+    #define ITMF_POSITION_ICON_RIGHT_OF_TEXT	0x1000
+
+    typedef struct {
+	IconTextMonikerFlags ITMP_flags;
+	word ITMP_spacing;
+    } IconTextMonikerParams;
+
+    @vardata IconTextMonikerParams HINT_USE_ICON_TEXT_COMBINATION_MONIKER;
+
+@protoreset
+
+@protominor     UINoHelpButton
+    @vardata void HINT_NO_HELP_BUTTON;
+@protoreset
+
+@protominor UIExtraKbdAccelerators
+@protoreset
+    @vardata KeyboardShortcut ATTR_GEN_EXTRA_KBD_ACCELERATORS;
+
+    @vardata void HINT_NO_TV_BORDER;
+
+typedef WordFlags GenRaisedFrameInfo;
+#define GRFI_TOP     0x8000
+#define GRFI_BOTTOM  0x4000
+#define GRFI_LEFT    0x2000
+#define GRFI_RIGHT   0x1000
+
+    @vardata GenRaisedFrameInfo HINT_RAISED_FRAME;
+
+@prototype void GEN_VISIBILITY_OUTPUT(optr obj = cx:dx, Boolean opening = bp);
+
+typedef ByteEnum GCMIcon;
+#define GCMI_NONE 0
+#define GCMI_EXIT 1
+#define GCMI_HELP 2
+
+typedef ByteFlags GeneralConsumerModeFlags;
+#define GCMF_LEFT_ICON	0x38
+#define GCMF_RIGHT_ICON 0x07
+
+typedef struct {
+    SpecWidth	CSHA_width;
+    SpecHeight	CSHA_height;
+    sword	CSHA_count;
+} CompSizeHintArgs;
+
+typedef struct {
+    SpecWidth	GSHA_width;
+    SpecHeight	GSHA_height;
+} GadgetSizeHintArgs;
+
+typedef struct {
+    word	HE_type;
+    word	HE_size;
+} HintEntry;
+
+typedef struct {
+    Color	TC_unselectedColor;
+    Color 	TC_selectedColor;
+} TextColors;
+
+/***/
+
+/*
+ *	Utility routines
+ */
+
+extern word
+    _pascal GenCopyChunk(MemHandle destBlock,
+				MemHandle blk, ChunkHandle chnk,
+				CompChildFlags flags); /* XXX */
+
+extern void
+    _pascal GenInsertChild(MemHandle mh, ChunkHandle chnk,
+				optr childToAdd,
+				optr referenceChild,
+				CompChildFlags flags); /* XXX */
+
+extern void
+    _pascal GenSetUpwardLink(MemHandle mh, ChunkHandle chnk,
+				optr parent); /* XXX */
+
+extern void
+    _pascal GenRemoveDownwardLink(MemHandle mh, ChunkHandle chnk,
+				CompChildFlags flags); /* XXX */
+
+extern void
+    _pascal GenSpecShrink(MemHandle mh, ChunkHandle chnk); /* XXX */
+
+extern void
+    _pascal GenProcessGenAttrsBeforeAction(
+				MemHandle mh, ChunkHandle chnk); /* XXX */
+
+extern void
+    _pascal GenProcessGenAttrsAfterAction(
+				MemHandle mh, ChunkHandle chnk); /* XXX */
+
+extern optr
+    _pascal GenFindObjectInTree(optr startObject,
+					dword childTable); /* XXX */
+
+#define GenFindParent(oself)	\
+    ObjLinkFindParent(oself, word_offsetof(GenBase, Gen_offset), \
+		      word_offsetof(GenInstance, GI_link))
+
+#ifdef __HIGHC__
+pragma Alias(GenCopyChunk, "GENCOPYCHUNK");
+pragma Alias(GenInsertChild, "GENINSERTCHILD");
+pragma Alias(GenSetUpwardLink, "GENSETUPWARDLINK");
+pragma Alias(GenRemoveDownwardLink, "GENREMOVEDOWNWARDLINK");
+pragma Alias(GenSpecShrink, "GENSPECSHRINK");
+pragma Alias(GenProcessGenAttrsBeforeAction, "GENPROCESSGENATTRSBEFOREACTION");
+pragma Alias(GenProcessGenAttrsAfterAction, "GENPROCESSGENATTRSAFTERACTION");
+pragma Alias(GenFindObjectInTree, "GENFINDOBJECTINTREE");
+#endif
+
+
+/*
+ *	Constants and Structures
+ */
+
+typedef ByteFlags GenAttrs;
+#define GA_SIGNAL_INTERACTION_COMPLETE	0x80
+#define GA_INITIATES_BUSY_STATE		0x40
+#define GA_INITIATES_INPUT_HOLD_UP		0x20
+#define GA_INITIATES_INPUT_IGNORE		0x10
+#define GA_READ_ONLY				0x08
+#define GA_KBD_SEARCH_PATH			0x04
+#define GA_TARGETABLE				0x02
+#define GA_NOTIFY_VISIBILITY			0x01
+
+typedef ByteFlags GenStates;
+#define GS_USABLE	0x80
+#define GS_ENABLED	0x40
+
+
+    @instance @link GI_link;
+    @instance @composite GI_comp = GI_link;
+    @instance @visMoniker GI_visMoniker;
+    @instance @kbdAccelerator GI_kbdAccelerator;
+    @instance GenAttrs GI_attrs = 0;
+    @instance GenStates GI_states = (GS_USABLE|GS_ENABLED);
+
+@endc
+
+@endlib

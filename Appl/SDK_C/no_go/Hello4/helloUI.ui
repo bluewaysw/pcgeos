@@ -1,0 +1,167 @@
+/*************************************************************************
+ *
+ *	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+ *
+ * PROJECT:	PC/GEOS 
+ * MODULE:	SDK_C/Hello4 (Sample Asm UI/C implemenation)
+ * FILE:	helloUI.ui
+ *
+ * AUTHOR:	John D. Mitchell
+ *
+ * REVISION HISTORY:
+ *	Date      Name	    Description
+ *	----      ----	    -----------
+ *	6/10/92   JDM	    Initial version.
+ *
+ * DESCRIPTION:
+ *	This file contains the User Interface description for the
+ *	multi-language "Hello" sample application.
+ *
+ *	This file will be compiled by UIC.
+ *
+ * 	$Id: helloUI.ui,v 1.1 97/04/04 16:38:09 newdeal Exp $
+ *
+ *************************************************************************/
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		UI Include Files
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#include "generic.uih"
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Application Object
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*
+ * The very top-level generic object of an application MUST be a GenApplication
+ * object. The hello.gp file contains "appobj" statement which indicates
+ * that this "HelloApp" object is in fact the top-level UI object.
+ *
+ * This object should be in its own resource, as it is all that need be in
+ * memory when the application is iconified. As such, its resource should be
+ * as small as possible.
+ */ 
+
+start	AppResource;
+
+HelloApp = GenApplication
+{
+    /*
+     * This GenApplication object has only one child: the main
+     * application window.
+     */
+    children = HelloPrimary;
+
+    /*
+     * The main window should appear on-screen when the application is
+     * launched, so place it on the GAGCNLT_WINDOWS GCN list. This causes
+     * the application object to bring it on-screen at the appropriate time.
+     */
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = HelloPrimary;
+
+    /*
+     * While the application object isn't shown on the screen, it has a list
+     * of VisMonikers for three purposes:
+     *	1) the GenPrimary (see below) inherits the moniker when it comes up
+     *	   on screen.
+     *	2) when GeoManager needs to display an icon for the application, and
+     *	   there's none for it in the Token Database, it launches the app and
+     *	   sends a message to the application object to install its list of
+     *	   monikers in the token database under the application's token.
+     *	3) when the GenPrimary is minimized, it uses the most appropriate
+     *	   graphical moniker from this list for the application's icon.
+     *	   if there's an abbreviated-text moniker in the list, that's used
+     *	   as the icon title. else any regular-text moniker is used.
+     */
+    moniker = list
+	    {
+	    HelloTextMoniker
+	    }
+}
+
+/*
+ * Actual definiton of the application's text moniker.  This is
+ * automatically placed in a ResEdit-able resource for easy localization.
+ */
+visMoniker HelloTextMoniker = "Hello Sample Application";
+
+end	AppResource;
+
+
+/*
+ * Every application has at least one GenPrimary object. This object serves
+ * as the main window of the application. Inside this window, various UI
+ * components, such as menus or lists, can be placed.
+ */
+
+start	Interface;		/* Miscellaneous UI object resource.	*/
+
+HelloPrimary = GenPrimary
+{
+    /*
+     * This GenPrimary (window) has only one child:  the application's
+     * view object.
+     */
+    children = HelloView;
+
+    /*
+     * At present, we are not supplying the icon image for this
+     * application, (just the text moniker given above), so we need to
+     * prevent the user from minimizing this window/application.
+     */
+    hints = {
+	    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE
+    }
+}
+
+end	Interface;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		View Object
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+start	Interface;
+
+/*
+ * This GenView object creates a window where the application can display
+ * portions of the document as necessary. As we want this window to be
+ * scrollable, the specific UI (Motif) will create scroll bars which the
+ * user can interact with. Whenever a portion of the window needs to be
+ * redrawn, the GenView object will invalidate a portion of the window,
+ * causing a MSG_META_EXPOSED to be sent to the application. The
+ * application will draw the document into the window as requested. The
+ * window keeps track of a mask, which is used to clip the application's
+ * drawing operations, so that only the invalid portion of the window is
+ * drawn to.
+ */ 
+
+HelloView = GenView
+{
+    /*
+     * Size of document, in points (72 points per inch). The GenView
+     * object will either adopt a default size, or will size itself to
+     * fit inside the main application (GenPrimary) window.
+     */
+    docRight = "14*72";		/* Width (in points).	*/
+    docBottom  = "11*72";	/* Height (in points).	*/
+
+    /*
+     * Make view scrollable both horizontally and vertically.  Also,
+     * keep the view from getting larger than the content.
+     */
+    horizAttributes = scrollable, noLargerThanContent;
+    vertAttributes  = scrollable, noLargerThanContent;
+
+    /*
+     * Send all messages for this object to the application's process
+     * class (HelloProcessClass).  For example, when the contents of this view
+     * (document) must be updated, the UI will send the MSG_META_EXPOSED to the
+     *  HelloProcessClass object.
+     */
+    output = process;
+}
+
+end	Interface;

@@ -1,0 +1,275 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1994 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		mailboxMain.def
+
+AUTHOR:		Adam de Boor, May 31, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	5/31/94		Initial revision
+
+
+DESCRIPTION:
+	Interface to the "Main" module...
+		
+	$Id: mailboxMain.def,v 1.1 97/04/05 01:20:02 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+MailboxProcessClass	class	GenProcessClass
+
+MSG_MP_NEW_TRANSPORT	message	
+; Take note that a new transport driver has been seen, finding all the media,
+; of those encountered so far, the driver can use.
+;
+; Context:	Queued by MediaNewTransport, so it can do stuff without
+;		running afoul of deadlocks.
+; Source:	MediaNewTransport
+;
+; Pass:
+;		cxdx	= MailboxTransport for new driver
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MP_MEDIUM_NOTIFY	message	
+; Cope with notification of a change in the status of some medium
+;
+; Context:	Sent by our SysSendNotification(SST_MEDIUM) hook so
+;		things don't happen deep in the bowels of other things,
+;		which usually causes problems
+; Source:	MainMediumNotify
+;
+; Pass:
+;		ss:bp	= MediumNotifyParams
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MediumNotifyParams	struct
+    MNP_notification	MediumSubsystemNotification
+    MNP_medium		MediumType	; (cxdx)
+    MNP_unit		word		; (bx)
+    MNP_unitType	MediumUnitType	; (al)
+    			even
+MediumNotifyParams	ends
+
+MSG_MP_MAILBOX_NOTIFY	message	
+; Cope with notification of a change in which we're interested
+;
+; Context:	Sent by our SysSendNotification(SST_MAILBOX) hook so
+;		things don't happen deep in the bowels of other things,
+;		which usually causes problems
+; Source:	MainMailboxNotify
+;
+; Pass:
+;		ss:bp	= MailboxNotifyParams
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MailboxNotifyParams	struct
+    MBNP_notification	MailboxSubsystemNotification
+    MBNP_dx		word
+    MBNP_cx		word
+    MBNP_bx		word
+    MBNP_ax		word
+MailboxNotifyParams	ends
+
+MSG_MP_SEND_MESSAGE_AVAILABLE_NOTIFICATION	message
+; Send MSG_META_MAILBOX_NOTIFY_MESSAGE_AVAILABLE to the destination app.  The
+; app is launched if it's not already running.
+;
+; Context:	Queued by IRSendMessageNotification, so we can call IACPConnect
+;		without running into deadlocks because of locked inbox queue.
+; Source:	IRSendMessageNotification
+;
+; Pass:
+;		ss:bp	= SendMsgAvailableNotifParams
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+SendMsgAvailableNotifParams	struct
+    SMANP_destApp	GeodeToken
+    SMANP_message	MailboxMessage
+    SMANP_ifLoaded	BooleanByte
+    			even
+SendMsgAvailableNotifParams	ends
+
+
+
+MailboxProcessClass	endc
+
+MainThreadType	etype	byte
+    MTT_TRANSMIT	enum MainThreadType
+    MTT_RECEIVE		enum MainThreadType
+
+MainThreadData	struct
+    MTD_thread		hptr		; thread doing the transmission
+    MTD_gen		word		; generation number for this data
+    MTD_transport	MailboxTransport; transport driver for messages
+    MTD_transOption	MailboxTransportOption
+if	MAILBOX_PERSISTENT_PROGRESS_BOXES
+    MTD_progress	optr.MailboxProgressBoxBase
+endif	; MAILBOX_PERSISTENT_PROGRESS_BOXES
+    MTD_cancelFlag	fptr.MailboxCancelAction
+    MTD_cancelAction	ActionDescriptor; message & object to notify in case
+					;  of cancelation
+    MTD_ackOD		optr		; place to send MSG_META_ACK when
+					;  thread is gone
+    MTD_ackID		word		; ID to pass it.
+    MTD_type		MainThreadType
+MainThreadData	ends
+
+MainThreadCode	segment	resource
+
+global	MainThreadLock:far
+;	Desc:	Lock down the block that holds the list of threads.
+;
+;	Pass:	nothing
+;	Return:	*ds:si	= chunk array of MainThreadData elements (actually,
+;			  elements are variable sized, but they are all at least
+;			  MainThreadData structures, whatever other cruft the
+;			  caller might have placed at the end)
+;
+
+global	MainThreadUnlock:far
+;	Desc:	Release the exclusive access to the list of threads that was
+;		granted during some previous call to MainThread*
+;
+;	Pass:	nothing
+;	Return:	nothing
+;	Destroy:nothing (flags preserved)
+;
+
+global	MainThreadCreate:far
+;	Desc:	Create an entry for a thread in the list of threads
+;
+;	Pass:	ds	= PLocked MainThreads block
+;		ax	= MainThreadType
+;		bx	= thread handle
+;		cx	= size of data for entry
+;	Return:	ds:di	= array entry, with MTD_thread, MTD_type, and
+;			  MTD_gen filled in; all else is 0
+;	Destroy:ax, cx
+;
+
+global	MainThreadDestroy:far
+;	Desc:	Delete the entry for a thread, returning the ack OD/ID
+;		registered for the thing.
+;
+;	Pass:	ds:di	= MainThreadData to nuke
+;	Return:	cx	= ack ID
+;		dx:bp	= ack OD
+;	Destroy:ds (thread block is released)
+;
+
+global	MainThreadEnum:far
+;	Desc:	Enumerate through the known transmit/receive threads
+;
+;	Pass:	bx:di	= callback routine (vfptr)
+;			Pass:
+;				ds:di	= MainThreadData
+;				*ds:si	= chunk array
+;				cx, dx, bp, es = callback data
+;			Return:
+;				carry set to stop enumerating:
+;					ax, cx, dx, bp, es = data to return
+;			   	carry clear to keep going:
+;			   		cx, dx, bp, es = data for next callback
+;		cx, dx, bp, es = data for callback routine
+;	Return:	carry set if callback returned carry set
+;			ax, cx, dx, bp, es = as returned by callback
+;	   	carry clear if callback never returned carry set
+;			ax, cx, dx, bp, es = as returned by callback
+;	   	ds 	= PLocked MainThreads block (must be unlocked by a call
+;			  to MainThreadUnlock
+;	Destroy:nothing
+;
+
+global	MainThreadMessageProgressBox:far
+;	Desc:	Send a message to the progress box for the current thread
+;
+;	Pass:	ax	= message to send
+;		cx, dx, bp = data to pass
+;		di	= MessageFlags
+;	Return:	whatever ObjMessage returns
+;	Destroy:whatever
+;
+
+global	MainThreadFindCurrentThread:far
+;	Desc:	Locate the MainThreadData for the current thread. It is death
+;		for the current thread not to be in the list.
+;
+;	Pass:	nothing
+;	Return:	ds:di	= MainThreadData (must call MainThreadUnlock when
+;			  done)
+;	Destroy:nothing
+;
+
+global	MainThreadFindByHandle:far
+;	Desc:	Locate the MainThreadData for the passed thread.
+;
+;	Pass:	ax	= thread handle
+;	Return:	carry set if not found:
+;			ds	= PLocked MainThreads block
+;			di	= destroyed
+;		carry clear if found:
+;			ds:di	= MainThreadData
+;		caller must call MainThreadUnlock when done, regardless of carry
+;	Destroy:bx
+;
+
+global	MainThreadCancel:far
+;	Desc:	Set the cancel flag for the thread, delivering any cancel
+;		message registered for the thread, and recording the passed
+;		ack OD/id, if the OD is non-zero
+;
+;	Pass:	ax	= MailboxCancelAction
+;		cx	= ack id
+;		dx:bp	= ack OD
+;		ds:di	= MainThreadData for thread to cancel
+;	Return:	nothing
+;
+
+global	MainThreadCheckForThreads:far
+;	Desc:	See if there are any registered threads.
+;
+;	Pass:	nothing
+;	Return:	carry set if there's any thread around
+;
+
+global	MailboxReportProgress:far
+global	MailboxRegisterReceiver:far
+global	MailboxUnregisterReceiver:far
+
+if ERROR_CHECK
+global 	ECMainThreadDSIsThreadData:far
+;	Desc:	Make sure that DS points to the PLocked MainThreads block that
+;		tracks our transmission and reception threads
+;
+;	Pass:	ds	= MainThreads
+;	Return:	nothing
+;	Destroy:death if DS not right, else nothing (flags preserved)
+;
+endif
+MainThreadCode	ends
+
+
+udata	segment
+	global	mainClientThreads:word
+udata	ends

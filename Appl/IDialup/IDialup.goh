@@ -1,0 +1,196 @@
+#ifndef __IDIALUP_GOH_
+#define __IDIALUP_GOH_
+
+@include <stdapp.goh>
+#include <input.h>
+#include <Ansi/stdio.h>
+#include <Ansi/string.h>
+#include <graphics.h>
+#include <internal/ppp.h>
+@include <accpnt.goh>
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+@class	IDialupProcessClass, GenProcessClass;
+@message void MSG_IDP_CONNECT();
+@message void MSG_IDP_DISCONNECT();
+@message void MSG_IDP_TIMER_HANDLE();
+@message void MSG_IDP_EDIT_CONNECTION();
+@message void MSG_IDP_CREATE_CONNECTION();
+@message void MSG_IDP_DELETE_CONNECTION();
+@message (GEN_APP_DO_STANDARD_DIALOG_MSG) MSG_IDP_DELETE_CONFIRM;
+@message void MSG_IDP_SAVE_PASSWORD();
+@message void MSG_IDP_PASSWORD_MODIFIED();
+@message void MSG_IDP_SET_DEFAULT_CONNECTION();
+@message void MSG_IDP_CONNECTION_SET_CURRENT();
+@message void MSG_IDP_INITIALIZE_CONNECTION();
+@message void MSG_IDP_EDIT_OK();
+@message void MSG_IDP_SELECT_ACCPNT();
+@message void MSG_IDP_SELECT_CONTINUE();
+@message void MSG_IDP_RESET_TIME();
+@message void MSG_IDP_STAY_CONNECTED();
+@message void MSG_IDP_IDLE_DISCONNECT();
+@message (GEN_APP_DO_STANDARD_DIALOG_MSG) MSG_IDP_FIELD_CHANGE_CONFIRM;
+@message void MSG_IDP_DIALING_OPTIONS();
+@message void MSG_IDP_DIALING_OPTIONS_CHANGE();
+@message void MSG_IDP_EDIT_CONNECTION_FINISH();
+@message (GEN_BOOLEAN_GROUP_APPLY_MSG) MSG_IDP_EDIT_DIALING_OPTIONS_CHANGED;
+//@message void MSG_IDP_NEW_NUMBERS();
+@message void MSG_IDP_EDIT_TYPE_MODIFIED() ;
+@message void MSG_IDP_EDIT_TYPE_UPDATE() ;
+@endc;
+
+@class	IDialupAppClass, GenApplicationClass;
+@message void MSG_IDA_VIEW_CONNECTION();
+@message void MSG_IDA_VIEW_INFO();
+@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_IDA_CONNECTION_LIST_MONIKER_QUERY;
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_IDA_CONNECTION_LIST_APPLY;
+@message void MSG_IDA_SAVE_CURRENT_PASSWORD();
+@message void MSG_IDA_DISCONNECT();
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_IDA_SHOW_DETAILS;
+@message (GEN_APP_DO_STANDARD_DIALOG_MSG) MSG_IDA_ERROR_DIALOG_DISMISSED;
+@endc;
+
+/* Objects of this class will maintain a global variable indicating when they
+   visually opened. */
+@class	IDialupInteractionClass, GenInteractionClass;
+@instance word IDII_dialogID;
+@define IDI_DIALOG_ID_IDLE_NOTIFY	0
+@define IDI_DIALOG_ID_LIA_NOTIFY	1
+@define IDI_DIALOG_ID_DIALUP_INFO	2
+@define IDI_DIALOG_ID_SUSPEND_NOTIFY	3
+@define IDI_NUM_DIALOG_IDS		4
+@endc;
+
+@class  IDialupInfoClass, IDialupInteractionClass;
+
+// used to draw the status 
+@message void MSG_IDI_RESET();
+@message void MSG_IDI_DRAW_STATUS();
+@message void MSG_IDI_DRAW_TIME();
+@message void MSG_IDI_DRAW_SPEED(word speed);
+@message void MSG_IDI_DRAW_RECEIVED();
+@message void MSG_IDI_DRAW_SENT();
+
+@instance PPPStatus IDI_status=0;
+@instance word IDI_color = 0;
+
+@instance sword IDI_text_height=16;
+@instance sword IDI_text_left=0;
+@instance sword IDI_text_width=0;
+
+@instance sword IDI_status_x=0;
+@instance sword IDI_status_y=0;
+
+@instance sword IDI_time_x=0;
+
+@instance word IDI_speed=0;
+@instance sword IDI_speed_x=0;
+@instance sword IDI_speed_y=0;
+
+@instance sword IDI_received_x=0;
+
+@instance sword IDI_sent_x=0;
+
+@instance Rectangle IDI_statusBoxBounds;
+@instance Rectangle IDI_dataBoxBounds;
+
+@endc;
+
+
+@class IDialupPrimaryClass, GenPrimaryClass;
+@instance byte IDPI_minimized = FALSE;
+@endc;
+
+/*
+ * Subclass the text class in order to make one that only allows
+ * valid IP addresses to be entered.  (Technically, it can be
+ * incomplete, but whatever is entered must be valid.)
+ */
+@class IDialupIPTextClass, GenTextClass;
+@endc;
+
+extern void
+    _pascal LoadPPPDriver(void);
+extern void
+    _pascal UnloadPPPDriver(void);
+extern unsigned long
+    _pascal CallPPPDriver(int func, word data);
+extern MemHandle 
+    _pascal GetPhoneStringWithOptions(MemHandle phoneHan,
+	        AccessPointLocalDialingOptions localDialOptions);
+
+#define TEXT_HEIGHT 16
+
+// 15 minutes
+#define DEFAULT_IDLE_TIME (60 * 15)
+// 1 minute
+#define DEFAULT_DELAY_TIME (60)  
+#define MAX_TEXT_LEN 50
+
+// update the connection status every 2 seconds
+#define UPDATE_TIME (60 * 2) 
+
+// init file category and keys
+#define IDIAL_CATEGORY "Idialup"
+#define IDLE_TIMEOUT_KEY "idletimeout"
+#define DELAY_TIMEOUT_KEY "delaytimeout"
+#define INET_APPLS_KEY "internetapplications"
+#define SHOW_DETAILS_KEY "showDetails"
+
+#define DEFAULT_KEY "default"
+#define SAVE_SECRET_KEY "saveSecret"
+
+#define IDEDO_AREA_CODE		0x0001
+#define IDEDO_ONE_FOR_LD	0x0002
+#define DEFAULT_DIAL_OPTIONS	(IDEDO_ONE_FOR_LD)
+
+#ifdef __HIGHC__
+pragma Alias(LoadPPPDriver, "LOADPPPDRIVER");
+pragma Alias(CallPPPDriver, "CALLPPPDRIVER");
+pragma Alias(GetPhoneStringWithOptions, "GETPHONESTRINGWITHOPTIONS");
+#endif /* __HIGHC__ */
+
+
+/* --------------------------------------------------------------------------
+ * 		MACROS
+ * --------------------------------------------------------------------------*/
+
+/*
+ * Macros to use Libary dgroup.
+ */
+#ifdef __HIGHC__
+
+#ifndef PUSHDS
+#define PUSHDS	_inline(0x1e)	/* push	ds */
+#endif
+
+#ifndef POPDS
+#define POPDS	_inline(0x1f)	/* pop	ds */
+#endif
+
+#endif
+
+#ifdef __BORLANDC__
+
+#ifndef PUSHDS
+#define PUSHDS  asm{push ds}
+#endif
+
+#ifndef POPDS
+#define POPDS   asm{pop  ds}
+#endif
+
+#endif
+
+#ifndef SET_DS_LIB_DGROUP
+#define SET_DS_LIB_DGROUP GeodeLoadDGroup (GeodeGetCodeProcessHandle())
+                                /* destroys ds! */
+#endif
+
+#endif
+

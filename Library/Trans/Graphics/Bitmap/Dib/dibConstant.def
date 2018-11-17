@@ -1,0 +1,160 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		dibConstant.def
+
+AUTHOR:		Maryann Simmons, Feb 25, 1992
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	MS	2/25/92		Initial revision
+
+
+DESCRIPTION:
+	$Id: dibConstant.def,v 1.1 97/04/07 11:29:18 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+;----------------------------------------------------------------------------
+;	CONSTANTS
+;----------------------------------------------------------------------------
+
+; this is the buffer size we are shooting for import in the callback for
+;	GrDrawBitmap
+
+DIB_IMPORT_BUFF_SIZE	=  	0x1400		; 5K
+DIB_EXPORT_BUFF_SIZE	=	0xc800		; 50K
+
+; DIB biBitCount Values
+DIB_MONO     = 1
+DIB_4BIT     = 4
+DIB_8BIT     = 8
+DIB_24BIT    = 24
+
+;compression constant
+NO_COMPRESS = 0			;file is not compressed
+
+
+;---------------------------------------------------------------------------
+;	ENUMERATED TYPES
+;--------------------------------------------------------------------------
+
+;---------------------------------------------------------------------------
+;	STRUCTURES
+;----------------------------------------------------------------------------
+;	The following structures are used to store the Bitmap File header and
+;	Bitmap Info structures read in from the DIB File
+;----------------------------------------------------------------------------
+DIBFileHeader struct
+	DBFH_type	BitmapType ;type of file -must be BM
+	DBFH_size	dword	;size of file in DWords
+	DBFH_reserved	dword	;dont use these
+	DBFH_offBit	dword	;offset to actual bitmap
+DIBFileHeader ends
+
+DIBBitmapInfo	struct
+	DBI_size	dword	;size in bytes of info header
+	DBI_width	dword	;pixel width of bitmap
+	DBI_height	dword	;pixel height of bitmap	
+	DBI_planes	word	;num bitplanes for target device( must be one)
+	DBI_bitCnt	word	;#bits/pixel
+	DBI_compress	dword	;type of compression
+	DBI_iSize	dword	;size in bytes of image
+	DBI_xRes	dword	;horiz. res in pixels/meter of target
+	DBI_yRes	dword	;vert res. in pixels/meter of target
+	DBI_colorUsed	dword	;number color indices actually used( 0 == max)
+	DBI_colorImp	dword	;num of important colors( 0 == all important)
+DIBBitmapInfo	ends
+
+DIBBitmapHeaders	struct
+	DBH_fileHeader		DIBFileHeader
+	DBH_info		DIBBitmapInfo
+	DBH_scanlineSize	word	;number of bytes/scanline
+	DBH_scanlineDiff	word	;difference between long and byte bound
+	DBH_numColors		word	;number of entries in color Table
+	DBH_stripSize		word	;num scanlines in each strip
+	DBH_initStripSize	word	;num scanlines in initial strip
+	DBH_rewind		word	;amount to seek back for next strip
+	DBH_initRewind		word	;initial amount to seek back from the
+					;end of the file to get first strip
+	DBH_buffHandle		hptr	;handle to buffer for import
+	DBH_invert		BooleanWord	;bitmap needs to be inverted
+DIBBitmapHeaders	ends
+
+DIBBitmapHeader		struct
+	DB_fileHeader	DIBFileHeader
+	DB_info		DIBBitmapInfo
+DIBBitmapHeader		ends
+
+; The DIB color table is an array of these quad strucutres 
+DIBRGBQuad	struct
+	DQ_rgbRed	byte
+	DQ_rgbGreen	byte
+	DQ_rgbBlue	byte
+	DQ_rgbUnused	byte
+DIBRGBQuad	ends
+
+;-----------------------------------------------------------------------------
+; The following structure will hold a Complex bitmap structure and some data
+; this is used by the callback routine ImportDIBCallBack
+;---------------------------------------------------------------------------
+BitmapHeaderAndData 	struct
+	BHD_CBM			CBitmap	;complex bitmap structure
+	BHD_DIBFile		hptr	;DIB File to import
+	BHD_scanlineSize	word	;size of scanline
+	BHD_scanlineDiff	word	;diff between long and byte bound
+	BHD_stripSize		word	;num scanlines per strip
+	BHD_initStripSize	word	;num scanlines in initial strip
+	BHD_rewind		word	;amount to seek back for next strip
+	BHD_initRewind		word	;initial amount to seek back from the
+					;end of the file to get first strip
+	BHD_buffHandle		hptr	;buffer to read strip from file into
+	BHD_invert		BooleanWord	;bitmap needs to be inverted
+;NOTE: the palette size must come last here: If any fields are added to this
+;	structure, they should come before the PALETTE!!
+	BHD_paletteSize		Palette ;palette struct
+BitmapHeaderAndData	ends
+
+
+;------------------------------------------------------------------------
+;This structure will hold the information about strip size and scanline
+;size. Strip size is determined by the number of scanlines that will fit in
+;a 100 K buffer. The Ytrans is the amount to translate the bitmap such that
+;only one strip's worth of data is generated at a time.
+
+ExportBitmapInfo	struc
+EBI_scanlineSize	word	?		;num bytes/scanline
+EBI_scanlineDiff	word	?		;num bytes diff between long
+						;and byte boundary
+EBI_stripSize		word	?		;number scanlines  in 100K
+EBI_numStrips		word	?		;number of strips in bitmap
+EBI_initStripSize	word	?		;initial strip size
+EBI_yTrans		word	?		;amount to translate bitmap
+ExportBitmapInfo	end
+;--------------------------------------------------------------------------
+
+;the following structure holds the ExportFrame information
+ExportDIBFrame	struc
+	EDF_VMFile		hptr	?	;VMFile containing GString
+	EDF_VMBlock		hptr	?	;VMBLock containing GString
+	EDF_DIBFile		hptr	?	;Open DIB File to export to
+	EDF_exportOptions	byte	?	;bit count format to export in
+ExportDIBFrame	end
+
+;----------------------------------------------------------------------------
+
+;-------------------------------------------------------------------------
+ExportInfo	struc
+	EBInfo		ExportBitmapInfo	;holds strip and scanline info
+	ETDFrame	ExportDIBFrame		;holds ExportFrame info
+	tempVMFilename	byte 36 dup(?)
+						;temp filename
+	scanBuff	dword			;to accnt for diff in long and
+						; byte allignment
+ExportInfo	end
+;-------------------------------------------------------------------------
+
+

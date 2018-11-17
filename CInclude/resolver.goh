@@ -1,0 +1,177 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	Socket project
+MODULE:		IP address resolver
+FILE:		resolver.goh
+
+AUTHOR:		Steve Jang, Feb 21, 1995
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SJ	2/21/95   	Initial version.
+
+DESCRIPTION:
+	Resolver C interface
+
+	$Id: resolver.goh,v 1.1 97/04/04 15:59:59 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@deflib resolver
+
+/* ==========================================================================
+ *
+ * User API
+ *
+ * ==========================================================================
+ */
+
+/* errors returned */
+typedef WordEnum ResolverError;
+#define RE_NO_ERROR                   0x00
+/*
+   Successful completion
+*/
+#define RE_TIMEOUT                    0x01
+/*
+   Request timed out
+*/
+#define RE_OUT_OF_RESOURCE            0x02
+/*
+   We ran out of resource to carry on the request
+*/
+#define RE_TEMPORARY                  0x03
+/*
+   We cannot provide answer temporarily
+*/
+#define RE_INFO_NOT_AVAILABLE         0x04
+/*
+   The information request does not exist
+*/
+#define RE_HOST_NOT_AVAILABLE         0x05
+/*
+   The domain name passed in does not exist
+*/
+#define RE_MEMORY_ERROR               0x06
+/*
+   We are most likely to have run out of memory
+*/
+#define RE_UNSUPPORTED_FUNCTION       0x07
+/*
+   Currently unsupported
+*/
+#define RE_INTERNAL_FAILURE           0x08
+/*
+   Implementation error( should never occur )
+*/
+#define RE_NO_NAME_SERVER             0x09
+/*
+   This happens in this case:  resolver didn't have name sever address
+   and it tried to use DHCP mechanism to get assigned one, but it could not
+   establish TCP/IP connection or the other end of the line doesn't support
+   DHCP.  Basically you should tell user to provide different access point or
+   set up name server information in access point application.
+*/
+#define RE_INTERRUPTED                0x0a
+/*
+   client interrupted the query by calling ResolverStopResolve
+*/
+#define RE_OPEN_DOMAIN_MEDIUM         0x0b
+/*
+   Error opening domain medium
+*/
+
+extern void _pascal ResolverRegister();
+/*
+   register with resolver; one must do this before calling any of resolver
+   routines
+*/
+
+extern void _pascal ResovlerUnregister();
+/*
+   register with resolver; one must do this before calling any of resolver
+   routines
+*/
+
+extern ResolverError
+    _pascal ResolverResolveAddress( byte *addr, int addrSize, long *result );
+/*
+   Resolve a domain name string to dword IP address value
+   Result is 4 byte IP address and is returned in a variable passed in.
+*/
+
+extern void _pascal ResolverDeleteCache();
+/*
+   Delete all resource record cache entries in resolver.
+   By doing this, one can clean up old information and start all over.
+
+   This does not mean that resolver will keep all cache entries forever.
+   Resolver will keep each cache entry for at most 7 days.  If time_to_live
+   value is less than 7 days, cache entry will be deleted according to the
+   time_to_live value associated with resource record entry.  This function
+   is provided only to make sure a way out of desperate situation.
+*/
+
+/* ==========================================================================
+ *
+ * More type defs
+ *
+ * ==========================================================================
+ */
+
+/* 
+  Resource Recorde Type
+*/
+typedef WordEnum ResourceRecordType;
+#define RRT_A         0x01
+#define RRT_NS        0x02
+#define RRT_CNAME     0x05
+#define RRT_SOA       0x06
+#define RRT_WKS       0x0b
+#define RRT_PTR       0x0c
+#define RRT_HINFO     0x0d
+#define RRT_MX        0x0f
+#define RRT_TXT       0x10
+
+typedef WordEnum ResourceQueryType;
+#define AXFR          0xfc
+#define RQT_ANY       0xff
+
+typedef WordEnum NetClass
+#define NC_IN         0x01
+#define NC_CH         0x03
+#define NC_HS         0x04
+#define NC_ANY        0xff
+
+typedef WordEnum ResponseErrorCode;
+#define REC_NO_ERROR           0x00
+#define REC_FORMAT_ERROR       0x01
+#define REC_SERVER_FAILURE     0x02
+#define REC_NAME_ERROR         0x03
+#define REC_NOT_IMPLEMENTED    0x04
+#define REC_REFUSED            0x05
+#define REC_INTERNAL_ERROR     0x07
+
+typedef struct {
+    ChunkArrayHeader   RAH_common
+    ResponseErrorCode  RAH_error
+    }
+
+typedef struct {
+    ResourceRecordType RAS_type
+    *byte              RAS_data
+    }
+
+#ifdef __HIGHC__
+pragma Alias(ResolverRegister, "RESOLVERREGISTER");
+pragma Alias(ResolverUnregister, "RESOLVERUNREGISTER");
+pragma Alias(ResolverResolveAddress, "RESOLVERRESOLVEADDRESS");
+pragma Alias(ResolverGetHostByName, "RESOLVERGETHOSTBYNAME");
+pragma Alias(ResolverGetHostInfo, "RESOLVERGETHOSTINFO");
+pragma Alias(ResolverDeleteCache, "RESOLVERDELETECACHE");
+#endif
+
+@endlib

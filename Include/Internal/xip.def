@@ -1,0 +1,96 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC/GEOS
+FILE:		xip.def
+
+
+REVISION HISTORY:
+	
+	Name	Date		Description
+	----	----		-----------
+	atw	3/ 4/94		Initial revision
+
+
+DESCRIPTION:
+	Contains structure definitions related to full XIP.
+		
+	$Id: xip.def,v 1.1 97/04/04 14:13:13 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+include geos.def
+include file.def
+
+SetDef	__XIP
+
+FullXIPHeader	struct
+	FXIPH_kdataSize		word
+	; The size of the kdata resource (in bytes) (this does not count
+	; the handle table or the kernel's udata resource)
+
+	FXIPH_dgroupSegment	sptr
+	; Segment in memory for the loader to put the kernel's dgroup resource
+	
+	FXIPH_handleTableStart	word
+	; The offset of the start of the handle table in kdata
+	; This is the handle of the kernel's coreblock
+	
+	FXIPH_bottomBlock	hptr
+	; The bottom most block on the heap (the kernel's dgroup resource)
+	
+	FXIPH_numHandles	word
+	; The total # handles
+	
+	FXIPH_firstFreeHandle	hptr
+	; The start of the handle free list (first handle in the free list)
+	
+	FXIPH_numFreeHandles	word
+	; The # handles on the free list
+	
+	align dword
+	FXIPH_romFSStart	dword
+	; The start of the GFS in ROM
+	
+	FXIPH_lastXIPResource	hptr
+	; The handle of the last resource that is in the XIP resource (used
+	; when determining how to load the resource in memory)
+	
+	FXIPH_handleAddresses	word
+	; Offset from start of the XIP header to the table that maps handles
+	; to offset in the ROM image for the various XIP resources
+
+	FXIPH_numGeodeNames	word
+	; The # geodes in the FXIPH_geodeNames table
+
+	FXIPH_geodeNames	nptr.GeodeNameTableEntry	
+	; Offset from start of the XIP header to the table that maps geode
+	; names with the handle of the associated coreblocks
+
+	FXIPH_mapPageAddr	sptr
+	; The segment address of the mapping page
+
+FullXIPHeader	ends
+
+GeodeNameTableEntry struct
+	GNTE_fname	char DOS_DOT_FILE_NAME_LENGTH_ZT dup (?)
+	; The filename of a geode in the XIP image, always SBCS.
+	
+	GNTE_longname	FileLongName
+	align word
+
+	GNTE_coreblock	hptr
+	; The coreblock of the geode whose filename is in the GNTE_fname field
+GeodeNameTableEntry ends
+
+;
+; Don't include this unless you are running on an XIP system
+;
+_FXIP		=	TRUE
+
+;
+; Track inter-resource call
+;
+ifndef	_TRACK_RESOURCE_CALLS
+_TRACK_RESOURCE_CALLS	equ	FALSE
+endif

@@ -1,0 +1,651 @@
+/****************************************************************************
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Calendar/UI
+FILE:		uiMain.ui
+
+AUTHOR:		Don Reeves, 7-6-89
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Don	7/89		Initial revision
+	Don	8/22/89		Began changes for new calendar
+	Don	2/23/91		Broke things into various UI files
+	Richard	3/15/95		Added Responder specific UI
+	Richard 4/15/95		Move My_Schedule out of DOCUMENT for Responder
+	Richard 5/31/95		ComplexExpandingMoniker changes
+	RR	6/20/95		Responder Memos
+	RR	7/19/95		code review changes
+
+DESCRIPTION:
+	Contains the main UI definitions for the GeoPlanner application
+		
+	$Id: uiMain.ui,v 1.3 98/04/28 11:25:57 joon Exp $
+
+*****************************************************************************/
+
+#include "product.uih"
+
+/*****************************************************************************
+ *                         Calendar's Primary Display                        *
+ *****************************************************************************/
+
+start AppResource;				/* Application resource */
+
+
+Calendar = CalendarApp vardataReloc {
+	documentState = "MSG_GEN_SET_NOT_ENABLED";
+	moniker = list {
+		GeoPlannerTextMoniker,
+		GeoPlannerShortTextMoniker,
+#if 0
+		GeoPlannerLCMoniker,
+		GeoPlannerLMMoniker,
+		GeoPlannerSCMoniker,
+		GeoPlannerSMMoniker,
+		GeoPlannerYCMoniker,
+		GeoPlannerYMMoniker,
+		GeoPlannerSCGAMoniker,
+		GeoPlannerTinyTCMoniker,
+		GeoPlannerTinyTMMoniker,
+		GeoPlannerTinyTCGAMoniker
+#else
+		GPCCalendarSCMoniker,
+		GPCCalendarTCMoniker
+#endif
+	}
+	children =
+		PlannerPrimary;
+	appFeatures = "DEFAULT_FEATURES";
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) =
+		PlannerPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) =
+		CalendarDocumentControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) =
+		CalendarDocumentControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_STARTUP_LOAD_OPTIONS) =
+		UserLevelList,
+		PreferencesBox,
+		DayPlanObject;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+		CalendarDocumentControl,
+		CalendarPrintControl,
+		EditControl,
+#if _USE_INK
+		EditInkControl,
+#endif
+		CalendarSearch,
+		CalendarPageSetup;
+	hints = {
+		ATTR_GEN_INIT_FILE_CATEGORY {
+			char	"calendar", 0
+		},
+/*#if _OPTIONS_MENU
+		ATTR_GEN_APPLICATION_SAVE_OPTIONS_TRIGGER {
+			UN_OPTR SaveOptionsTrigger
+		},
+		ATTR_GEN_APPLICATION_RESET_OPTIONS_TRIGGER {
+			UN_OPTR ResetOptionsTrigger
+		},   */
+/*#endif */
+		ATTR_GEN_APPLICATION_PRINT_CONTROL {
+			UN_OPTR CalendarPrintControl
+		},
+		ATTR_GEN_HELP_FILE {
+		    char "calendar", 0
+		}
+	}
+
+}
+
+
+visMoniker GeoPlannerTextMoniker =
+	"Calendar";
+
+visMoniker GeoPlannerShortTextMoniker = {
+	style = abbrevText;
+	"Calendar";
+}
+
+
+end	AppResource;
+
+#if 0
+start AppLCMonikerResource;
+visMoniker DatafileMonikerList = list {
+	GeoPlannerDocLCMoniker,
+	GeoPlannerDocLMMoniker,
+	GeoPlannerDocSCMoniker,
+	GeoPlannerDocSMMoniker,
+	GeoPlannerDocSCGAMoniker,
+	GeoPlannerDocYCMoniker,
+	GeoPlannerDocYMMoniker
+}
+end AppLCMonikerResource;
+#endif
+
+start AppSCMonikerResource;
+visMoniker DatafileMonikerList = list {
+	GPCCalendarDocSCMoniker,
+	GPCCalendarDocTCMoniker
+}
+end AppSCMonikerResource;
+
+
+/*****************************************************************************
+ *                The Calendar Display - always in memory                    *
+ *****************************************************************************/
+
+start	PrimaryInterface;
+
+
+PlannerPrimary = CalendarPrimary vardataReloc {
+	children =
+		FileMenu,
+		EditMenu,
+		ViewMenu,
+#if	_OPTIONS_MENU
+		OptionsMenu,
+#endif
+		QuickMenu,
+		UtilitiesMenu,
+		PrimaryDialogParent,
+		CalendarSizeControl;
+		
+	hints = {
+		HINT_DISPLAY_USE_APPLICATION_MONIKER_WHEN_MINIMIZED,
+		HINT_DISPLAY_USE_APPLICATION_MONIKER_WHEN_MENU_BAR_POPPED_OUT,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_SIZE_WINDOW_AS_DESIRED,
+		ATTR_GEN_HELP_CONTEXT {
+			char	"TOC", 0
+		},
+		ATTR_GEN_PRIMARY_DONE_ON_CLOSE {
+			lptr 0
+			UN_OPTR CalendarDocumentControl
+			optr 0
+			UN_OPTR CalendarPrintControl
+			lptr 0, 0
+			lptr 0, 0
+			lptr 0, offset PlannerDoneText, 0
+			lptr 0, 0
+		}
+	}
+}
+
+visMoniker PlannerDoneText = "Close the document and exit Calendar.";
+
+
+PrimaryDialogParent = GenInteraction {
+	type = organizational;
+	visibility = dialog;
+	attributes = notUserInitiatable;
+	children =
+		SetAlarmBox,
+		RepeatAddBox;
+}
+
+end	PrimaryInterface;
+
+
+
+/*****************************************************************************
+ *           Main Interface Declaration  - in memory when not iconified      *
+ *****************************************************************************/
+
+start	Interface;				/* Interface resource block */
+
+
+CalendarSizeControl = SizeControl {
+	children =
+		CalendarLeft,
+		CalendarRight;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT, 
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT
+	}
+}
+
+
+/*****************************************************************************
+ *                           The Left Calendar window                        *
+ *****************************************************************************/
+
+CalendarLeft = GenInteraction {
+	children =
+		YearHeader,
+		YearView;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT
+	}
+}
+
+
+/*****************************************************************************
+ *                    The Year GenGadget & the Time Field                    *
+ *****************************************************************************/
+
+YearHeader = GenInteraction {
+	children =
+#if _DISPLAY_TIME
+		CalendarTime1,
+#endif
+		MonthValueObject,
+		YearValue;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+#if _DISPLAY_TIME
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+#else
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+#endif
+		HINT_CENTER_CHILDREN_VERTICALLY
+	}
+}
+
+#if _DISPLAY_TIME
+CalendarTime1 = GenGlyph {
+	moniker = " ";
+}
+#endif
+
+MonthValueObject = MonthValue {
+	destination = YearObject;
+	applyMsg = MSG_YEAR_SWITCH_TO_MONTH;
+	hints = {
+		ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION,
+		HINT_VALUE_NOT_DIGITALLY_EDITABLE,
+		HINT_VALUE_FRAME,
+		HINT_VALUE_WRAP
+	}
+}
+
+YearValue = GenValue {
+	moniker = YearValueMonikerFake;
+	value = 2000;
+	minimum = LOW_YEAR;
+	maximum = HIGH_YEAR;
+	destination = YearObject;
+	hints = {
+		ATTR_GEN_VALUE_STATUS_MSG {
+			word	MSG_YEAR_CHANGE_YEAR
+		}
+	}
+}
+
+visMoniker YearValueMonikerFake = "";
+visMoniker YearValueMonikerReal = 'Y', "Year:";
+
+
+/*****************************************************************************
+ *                    The year "view" and month "children"                   *
+ *****************************************************************************/
+
+YearView = GenView {
+#ifdef VS150
+	moniker = "Calendar (Ctrl-L):";
+#endif
+	output = YearContent;
+	backColorFlags = MONTH_BG_COLOR_FLAGS;
+	backColorR = MONTH_BG_COLOR_RED;
+	backColorG = MONTH_BG_COLOR_GREEN;
+	backColorB = MONTH_BG_COLOR_BLUE;
+	viewAttributes =
+		genericContents,
+		trackScrolling,
+		dragScrolling,
+		sendAllKbdChars,
+		focusable;
+	horizAttributes =
+		scrollable,
+		dontDisplayScrollbar;
+	vertAttributes =
+		scrollable,
+		dontDisplayScrollbar;
+	genAttributes = default +targetable;
+	hints = {
+		HINT_MINIMUM_SIZE {
+			SpecWidth <SST_PIXELS, VIEW_WIDTH_MIN>
+			SpecHeight <SST_PIXELS, VIEW_HEIGHT_MIN>
+		},
+		HINT_INITIAL_SIZE {
+			SpecWidth <SST_PIXELS, VIEW_WIDTH_INITIAL>
+			SpecHeight <SST_PIXELS, VIEW_HEIGHT_INITIAL>
+		},
+		HINT_DEFAULT_TARGET,
+		HINT_DEFAULT_FOCUS,
+		HINT_PLACE_MONIKER_ABOVE
+	}
+}
+
+
+YearContent = GenContent {
+	children = YearObject;
+	genView = YearView;
+
+}
+
+YearObject = Year {
+	yearViewWidth = VIEW_WIDTH_INITIAL;
+	yearViewHeight = VIEW_HEIGHT_INITIAL;
+	Flags = default + ONE_MONTH_SIZE;
+	/* If default is changed to year view, then you'll need to adjust:
+	 * date & title font size, scrolling attributes on view, and
+	 * the default selection for the ViewDataList object */
+	titleFontSize = LG_TITLE_FONT_SIZE;
+	datesFontSize = LG_DATE_FONT_SIZE;
+	children =
+		MonthObject1,
+		MonthObject2,
+		MonthObject3,
+		MonthObject4,
+		MonthObject5,
+		MonthObject6,
+		MonthObject7,
+		MonthObject8,
+		MonthObject9,
+		MonthObject10,
+		MonthObject11,
+		MonthObject12;
+	genAttributes = default +targetable;
+}
+
+ MonthObject1 = Month {
+	 fontID	= "PLANNER_MONTH_FONT";
+ }
+ MonthObject2 = Month {
+	 fontID	= "PLANNER_MONTH_FONT";
+ }
+ MonthObject3 = Month {
+	 fontID	= "PLANNER_MONTH_FONT";
+ }
+ MonthObject4 = Month {
+	 fontID	= "PLANNER_MONTH_FONT";
+ }
+ MonthObject5 = Month {
+	 fontID	= "PLANNER_MONTH_FONT";
+ }
+ MonthObject6 = Month {
+	 fontID	= "PLANNER_MONTH_FONT";
+ }
+ MonthObject7 = Month {
+	 fontID	= "PLANNER_MONTH_FONT";
+ }
+ MonthObject8 = Month {
+	 fontID	= "PLANNER_MONTH_FONT";
+ }
+ MonthObject9 = Month {
+	 fontID	= "PLANNER_MONTH_FONT";
+ }
+ MonthObject10 = Month {
+	 fontID	= "PLANNER_MONTH_FONT";
+ }
+ MonthObject11 = Month {
+	 fontID	= "PLANNER_MONTH_FONT";
+ }
+ MonthObject12 = Month {
+	 fontID	= "PLANNER_MONTH_FONT";
+ }
+
+ MonthPrintObj = Month {
+	 flags	= default +PRINT;
+	 fontID	= "PLANNER_PRINT_MONTH_FONT";
+ }
+
+
+ /***************************************************************************
+  *                          The right calendar window                      *
+  ***************************************************************************/
+
+CalendarRight = GenInteraction {
+	children =
+		EventHeader,
+		EventView
+#if _USE_INK
+		, InkView
+#endif
+		;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT
+	}
+}
+
+
+/**************************************
+ * Top of DayPlan Window
+ **************************************/
+
+EventHeader = GenInteraction {
+	children = 
+#if _DISPLAY_TIME
+		CalendarTime2,
+#endif
+		DayRangeDisplay,
+		EventDateArrows;
+	hints = {
+#if _DISPLAY_TIME
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+#else
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+#endif
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+#if _DISPLAY_TIME
+CalendarTime2 = GenGlyph {
+	moniker = " ";
+	genStates = default -usable;
+}
+#endif
+
+DayRangeDisplay = GenText {
+	moniker = "View:";
+	genAttributes = readOnly;
+	text = "";
+	textDisplayAttributes =
+		noWordWrapping,
+		allowTextOffEnd,
+		dontScrollToChanges;
+	hints = {
+		HINT_TEXT_FRAME,
+		ATTR_GEN_TEXT_DEFAULT_PARA_ATTR {
+			word DEF_PARA_ATTR_CENTER
+		},
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+ 		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+EventDateArrows = DateArrows {
+	hints = {
+		HINT_VALUE_Y_SCROLLER
+	}
+}
+
+
+/**************************************
+ * Event View
+ **************************************/
+
+EventView = GenView {
+#ifdef VS150
+	moniker = "Events (Ctrl-E):";
+#endif
+	output = DayPlanObject;
+/*	backColorFlags = "mask CMM_ON_BLACK or CMT_CLOSEST"; */
+	backColorFlags = EVENT_BG_COLOR_FLAGS ;
+	backColorR = EVENT_BG_COLOR_RED;
+	backColorG = EVENT_BG_COLOR_GREEN;
+	backColorB = EVENT_BG_COLOR_BLUE;
+	hints = {
+		HINT_INITIAL_SIZE {
+			SpecWidth <SST_PIXELS, VIEW_WIDTH_INITIAL>
+			SpecHeight <SST_PIXELS, VIEW_HEIGHT_INITIAL>
+		 },
+		HINT_MINIMUM_SIZE {
+			SpecWidth <SST_PIXELS, VIEW_WIDTH_INITIAL>
+			SpecHeight <SST_PIXELS, VIEW_HEIGHT_MIN>
+		},
+		HINT_PLACE_MONIKER_ABOVE
+ 	}
+	viewAttributes = 
+		trackScrolling,
+		dragScrolling,
+		focusable;
+
+	vertAttributes = 
+		scrollable;
+	inkType = "GVIT_INK_WITH_STANDARD_OVERRIDE";
+}
+
+
+#if _USE_INK
+
+/**************************************
+ * Ink View
+ **************************************/
+
+InkView = GenView {
+/*	backColorFlags = "mask CMM_ON_BLACK or CMT_CLOSEST"; */
+	backColorFlags = EVENT_BG_COLOR_FALGS;
+	backColorR = EVENT_BG_COLOR_RED;
+	backColorG = EVENT_BG_COLOR_GREEN;
+	backColorB = EVENT_BG_COLOR_BLUE;
+	output = InkContent;
+	inkType = "GVIT_PRESSES_ARE_INK";
+	viewAttributes = 
+		default +dragScrolling;
+	vertAttributes = 
+		default +scrollable;
+	horizAttributes = 
+		default +scrollable;
+	hints = {
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_CENTER_MONIKER,
+		HINT_INITIAL_SIZE {
+			SpecWidth <SST_PIXELS, VIEW_WIDTH_INITIAL>
+			SpecHeight <SST_PIXELS, VIEW_HEIGHT_INITIAL>
+		},
+		HINT_MINIMUM_SIZE {
+			SpecWidth <SST_PIXELS, VIEW_WIDTH_MIN>
+			SpecHeight <SST_PIXELS, VIEW_HEIGHT_MIN>
+		}
+	}
+	genStates = default -usable;
+}	
+
+#endif	/* #if _USE_INK */
+
+end		Interface;
+
+
+
+/***************************************************************************
+ *                          The Day Plan object                            *
+ ***************************************************************************/
+
+start 	DPResource;
+
+ DayPlanObject = DayPlan {
+	 visCompGeoAttrs = customManageChildren;
+	 contentAttrs = sameWidthAsSubview;
+	 eventTable = EventTable;
+	 bufferTable = EmptyBT;
+	 myViewWidth	= VIEW_WIDTH_INITIAL;
+	 myViewHeight	= VIEW_HEIGHT_INITIAL;
+	 beginHour	= "DEFAULT_START_HOUR";
+	 beginMinute	= "DEFAULT_START_MINUTE";
+	 endHour	= "DEFAULT_END_HOUR";
+	 endMinute	= "DEFAULT_END_MINUTE";
+	 interval	= "DEFAULT_INTERVAL";
+	 prefFlags	= "DEFAULT_PREF_FLAGS";
+	 startup	= "DEFAULT_VIEW_INFO";
+ }
+
+ /* was here */
+
+ structure EventTableHeader = {
+	 ETH_Last	= wordComp : 0;
+	 ETH_ScreenFirst	= wordComp : 0;
+	 ETH_ScreenLast	= wordComp : 0;
+	 ETH_Temp	= wordComp : 0;
+ }
+
+ /**/
+
+ chunk EventTable = EventTableHeader {
+	 ETH_Last	= "size EventTableHeader";
+	 ETH_ScreenFirst	= "-1";			/* OFF_SCREEN_TOP */
+	 ETH_ScreenLast	= 0;			/* OFF_SCREEN_BOTTOM */
+ } 
+
+ chunk EmptyBT = EventTableHeader {		/* just create a chunk */
+ }
+
+ MySearchObject = MySearch {
+	 eventTable = SearchTable;
+ }
+
+ chunk SearchTable = EventTableHeader {
+	 ETH_Last	= "size EventTableHeader";
+	 ETH_ScreenFirst	= "-1";
+	 ETH_ScreenLast	= 0;
+ }	
+
+ chunk NoEventsString = "No Events";		/* Just a plain string */
+
+ #if _USE_INK
+
+ InkContent = VisContent {
+	 children = InkObject;
+ }
+
+ InkObject = Ink {
+	 flags = default
+		 +onlyChildOfContent,
+		 +controlled;
+	 color	= INK_COLOR;
+	 right	= 1000;
+	 bottom	= 1000;
+	 dirtyAD	= MSG_DP_INK_DIRTY, DayPlanObject;
+ }
+ #endif
+end	DPResource;
+
+
+
+/***************************************************************************
+ *                     Calendar Document Resource Block                    *
+ ***************************************************************************/
+
+start	DocumentBlock;
+
+CalendarDocumentGroup = GenDocumentGroup {
+#if DO_DBCS
+	defaultName = "New Schedule";
+#else
+	defaultName = "Untitled Schedule";
+#endif
+	output = process;
+	uiDC = CalendarDocumentControl;
+	protocolMajor = 1;
+	protocolMinor = 0;
+}
+end	DocumentBlock;
+
+/***************************************************************************
+ *                     Calendar Week View                                  *
+ ***************************************************************************/

@@ -1,0 +1,270 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1991 -- All Rights Reserved
+ *
+ * PROJECT:	GEOS
+ * MODULE:	ScaleToFit (Sample GEOS application)
+ * FILE:	ScaleToFit.goc
+ * AUTHOR:	Tony Requist: April 1, 1991
+ *
+ * DESCRIPTION:
+ *	This file source code for the ScaleToFit application. This code will
+ *	be compiled by GOC, and then linked by the GLUE linker to produce
+ *	a runnable .geo application file.
+ *
+ * RCS STAMP:
+ *	$Id: scaletofit.goc,v 1.1 97/04/04 16:36:13 newdeal Exp $
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+
+#define DOC_WIDTH     600
+#define DOC_HEIGHT    400         
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+/*
+ * Here we define "ScaleToFitProcessClass" as a subclass of the system provided
+ * "GenProcessClass". As this application is launched, an instance of this class
+ * will be created, and will handle all application-related events (messages).
+ * The application thread will be responsible for running this object,
+ * meaning that whenever this object handles a method, we will be executing
+ * in the application thread.
+ */
+
+@class	ScaleToFitProcessClass, GenProcessClass ;
+
+/* define methods for this class here. */
+
+@endc   /* end of class definition */
+
+/*
+ * This class definition must be stored in memory at runtime, so that
+ * the GEOS messaging system can examine it.
+ *
+ * The neverSaved flag is necessary because ProcessClass objects are
+ * hybrid objects.
+ */
+
+@classdecl	ScaleToFitProcessClass, neverSaved ;
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+/*
+ *		Application Object
+ *
+ * The very top-level generic object of an application MUST be a GenApplication
+ * object. The scaletofit.gp file contains "appobj" statement which indicates
+ * that this "ScaleToFitApp" object is in fact the top-level UI object.
+ * This object should be in its own resource so that GeoManager can load it
+ * quickly to grab the icon for this application. GeoManager will store this
+ * icon in its "Token Database", so that the icon image can be reused quickly.
+ */
+
+@start	AppResource ;
+
+@object GenApplicationClass ScaleToFitApp = {
+
+    /*
+     * The geoManager uses this token information to store this application's
+     * icon in a database.
+     *
+     * Four letters used as index to refer to this application in the token
+     * database.
+     */
+
+
+    GI_visMoniker = list { @ScaleToFitTextMoniker }
+
+    /*
+     * Manufacturer ID number. Also used for accessing database, to ensure
+     * uniqueness.
+     */
+
+
+    /*
+     * The GenApplication object only has one child: the main application
+     * window.
+     */
+
+    GI_comp = @ScaleToFitPrimary;
+
+    /*
+     * The main window should appear on-screen when the application is
+     * launched.
+     */
+
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @ScaleToFitPrimary;
+}
+
+@visMoniker ScaleToFitTextMoniker = "C ScaleToFit Sample Application";
+
+@end	AppResource
+
+/*
+ *		Primary window
+ *
+ * Every application has at least one GenPrimary object. This object serves
+ * as the main window of the application. Inside this window, various UI
+ * components, such as menus or lists, can be placed.
+ */
+
+@start	Interface		/* this resource is for misc UI objects */ ;
+
+@object GenPrimaryClass ScaleToFitPrimary  = {
+
+    GI_comp = @ScaleToFitView;		/* this window has one child: the
+					   GenView object (see below) */
+
+    ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+/*
+ *		GenView object
+ *
+ * This GenView object creates a window where the application can display
+ * portions of the document as necessary. As we want this window to be
+ * scrollable, the specific UI (Motif) will create scroll bars which the
+ * user can interact with. Whenever a portion of the window needs to be
+ * redrawn, the GenView object will invalidate a portion of the window,
+ * causing a MSG_META_EXPOSED to be sent to the application. The application
+ * will draw the document into the window as requested. The window keeps
+ * track of a mask, which is used to clip the application's drawing operations,
+ * so that only the invalid portion of the window is drawn to. Since
+ * the user will not be typing into this application's view, it takes
+ * ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT to prevent a default
+ * floating keyboard from appearing on pen-based systems.
+ */
+
+@object GenViewClass ScaleToFitView = {
+    GVI_horizAttrs = @default | GVDA_SCROLLABLE;
+    GVI_vertAttrs  = @default | GVDA_SCROLLABLE;
+
+    GVI_docBounds = {0, 0, DOC_WIDTH, DOC_HEIGHT};
+
+    GVI_content = process;
+    ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+}
+
+@end Interface
+
+/*
+ ***************************************************************************
+ *		Code for ScaleToFitProcessClass
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * MESSAGE:	ScaleToFitProcessExposed -- MSG_META_EXPOSED for ScaleToFitProcessClass
+ *
+ * DESCRIPTION:	This method is sent by the Windowing System when we must
+ *		redraw a portion of the document in the View area.
+ *
+ * PARAMTERS:
+ *	void (WindowHandle win)
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	4/91		Initial Revision
+ *
+ ***********************************************************************/
+@method ScaleToFitProcessClass, MSG_META_EXPOSED
+{
+    GStateHandle gstate;
+    /*
+     * Get a default graphics state that we can use while drawing.
+     */
+    gstate = GrCreateState(win);
+    /*
+     * Start a window update. This tells the windowing system that we are in
+     * the process of drawing to this window.
+     */
+    GrBeginUpdate(gstate);
+    /*
+     * Draw stuff here.
+     */
+
+    GrDrawRect(gstate, 20, 20, DOC_WIDTH-20, DOC_HEIGHT-20);
+
+    /*
+     * Now indicate that we are done drawing to the window and free the gstate.
+     */
+    GrEndUpdate(gstate);
+    GrDestroyState(gstate);
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_VIS_CONTENT_SUBVIEW_SIZE_CHANGED for ScaleToFitProcessClass
+ *
+ * DESCRIPTION:	Catches view size changes so we can scale our display to
+ *              fit the view.
+ *
+ * PARAMETERS:  void (word viewWidth, word viewHeight, WindowHandle viewWindow)
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	chris	10/14/91		Initial Revision
+ *
+ ***********************************************************************/
+@method ScaleToFitProcessClass, MSG_META_CONTENT_VIEW_SIZE_CHANGED {
+  Rectangle winBounds;
+  WWFixedAsDWord xScale, yScale;
+  
+  WinGetWinScreenBounds(viewWindow, &winBounds);
+
+  xScale = GrUDivWWFixed(MakeWWFixed(winBounds.R_right-winBounds.R_left+1), 
+			 MakeWWFixed(DOC_WIDTH));
+  yScale = GrUDivWWFixed(MakeWWFixed(winBounds.R_bottom-winBounds.R_top+1), 
+			 MakeWWFixed(DOC_HEIGHT));
+
+  @call ScaleToFitView::MSG_GEN_VIEW_SET_SCALE_FACTOR(
+			   0L, 0L, SVT_AROUND_UPPER_LEFT,
+			   yScale, xScale);
+}
+
+@method ScaleToFitProcessClass, MSG_META_CONTENT_VIEW_WIN_OPENED {
+  Rectangle winBounds;
+  WWFixedAsDWord xScale, yScale;
+  
+  WinGetWinScreenBounds(viewWindow, &winBounds);
+
+  xScale = GrUDivWWFixed(MakeWWFixed(winBounds.R_right-winBounds.R_left+1), 
+			 MakeWWFixed(DOC_WIDTH));
+  yScale = GrUDivWWFixed(MakeWWFixed(winBounds.R_bottom-winBounds.R_top+1), 
+			 MakeWWFixed(DOC_HEIGHT));
+
+  @call ScaleToFitView::MSG_GEN_VIEW_SET_SCALE_FACTOR(
+			   0L, 0L, SVT_AROUND_UPPER_LEFT,
+			   yScale, xScale);
+}
+
+

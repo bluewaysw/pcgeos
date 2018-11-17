@@ -1,0 +1,1516 @@
+/***************************************************************************
+ *                                                                         *
+ *  FOLLOW ME                                                              *
+ *                                                                         *
+ ***************************************************************************/
+
+
+/***************************************************************************
+ *		Include files
+ ***************************************************************************/
+
+@include <stdapp.goh>
+@include <Objects/gViewCC.goh>
+#include <gstring.h>
+@include <spool.goh>
+@include <Objects/clipbrd.goh>
+#include <sound.h>
+#include <Ansi/string.h>
+#include <initfile.h>
+@include <game.goh>
+@include "art/appicons.goh"
+@include "art/lose.goh"
+@include "art/foll1.goh"
+@include "art/foll2.goh"
+@include "art/foll3.goh"
+@include "art/foll4.goh"
+@include "art/foll5.goh"
+@include "art/foll6.goh"
+@include "art/foll7.goh"
+@include "art/foll8.goh"
+
+
+#define FOLLOW_START_LEVEL_0          0
+#define FOLLOW_START_LEVEL_1          1
+#define FOLLOW_START_LEVEL_3          3
+#define FOLLOW_START_LEVEL_5          5
+#define FOLLOW_START_LEVEL_10         10
+#define FOLLOW_START_LEVEL_20         20
+
+#define FOLLOW_REACTION_VERY_SLOW     1
+#define FOLLOW_REACTION_SLOW          2
+#define FOLLOW_REACTION_MEDIUM        3
+#define FOLLOW_REACTION_FAST          4
+#define FOLLOW_REACTION_VERY_FAST     5
+
+#define FOLLOW_SPEED_VERY_SLOW        20
+#define FOLLOW_SPEED_SLOW             15
+#define FOLLOW_SPEED_MEDIUM           10
+#define FOLLOW_SPEED_FAST             5
+#define FOLLOW_SPEED_VERY_FAST        2
+
+#define FOLLOW_SOUND_ON               0
+#define FOLLOW_SOUND_OFF              1
+#define FOLLOW_SOUND_SYS              2
+
+#define COUNTDOWN_TIME  60
+
+#define SHOW_ON_STARTUP   1
+
+word MyRandom(void) ;
+void mycopy(char *s, char *t, word size) ;
+void blip1(void) ;
+void blip2(void) ;
+void blip3(void) ;
+void blip4(void) ;
+void AppendNumToString(char *p_pos, optr string, word num) ;
+
+byte follow_field[1000] ;
+byte time                 = 0 ;
+word timer_id ;
+word timer_handle ;
+word timer2_id ;
+word timer2_handle ;
+word player_score         = 0 ;
+word sound_speed          = FOLLOW_SPEED_MEDIUM ;
+word player_index         = 0 ;
+word ready_phase          = 0 ;
+word play_position        = 0 ;
+word time_next            = 0 ;
+word game_mode            = 2 ;
+word start_level          = 1 ;
+word reaction_speed       = FOLLOW_REACTION_VERY_FAST ;
+word sound_off_on         = FOLLOW_SOUND_SYS ;
+
+Boolean timer_going       = FALSE ;
+Boolean timer2_going       = FALSE ;
+
+char follow_state_file[25] = "Follow Me State" ;
+
+char follow_path[20] = "Game" ;
+char follow_relativePath[] = "." ;
+word follow_drive = SP_USER_DATA ;
+
+#define DOC_WIDTH             135
+#define DOC_HEIGHT            135
+
+const word lose1SoundBuf[] = {
+	SSE_GENERAL,            GE_SET_PRIORITY, SP_GAME,
+	SSE_VOICE_ON,           0, LOW_C, DYNAMIC_F,
+	SSDTT_TICKS,            15,
+	SSE_VOICE_OFF,          0,
+	SSE_GENERAL,            GE_END_OF_SONG};
+
+const word lose2SoundBuf[] = {
+	SSE_GENERAL,            GE_SET_PRIORITY, SP_GAME,
+	SSE_VOICE_ON,           0, LOW_C, DYNAMIC_F,
+	SSDTT_TICKS,            60,
+	SSE_VOICE_OFF,          0,
+	SSE_GENERAL,            GE_END_OF_SONG};
+
+const word blip1SoundBuf[] = {
+	SSE_GENERAL,            GE_SET_PRIORITY, SP_GAME,
+	SSE_VOICE_ON,           0, MIDDLE_C, DYNAMIC_F,
+	SSDTT_TICKS,            10,
+	SSE_VOICE_OFF,          0,
+	SSE_GENERAL,            GE_END_OF_SONG};
+
+const word blip2SoundBuf[] = {
+	SSE_GENERAL,            GE_SET_PRIORITY, SP_GAME,
+	SSE_VOICE_ON,           0, MIDDLE_E, DYNAMIC_F,
+	SSDTT_TICKS,            10,
+	SSE_VOICE_OFF,          0,
+	SSE_GENERAL,            GE_END_OF_SONG};
+
+const word blip3SoundBuf[] = {
+	SSE_GENERAL,            GE_SET_PRIORITY, SP_GAME,
+	SSE_VOICE_ON,           0, MIDDLE_G, DYNAMIC_F,
+	SSDTT_TICKS,            10,
+	SSE_VOICE_OFF,          0,
+	SSE_GENERAL,            GE_END_OF_SONG};
+
+const word blip4SoundBuf[] = {
+	SSE_GENERAL,            GE_SET_PRIORITY, SP_GAME,
+	SSE_VOICE_ON,           0, HIGH_C, DYNAMIC_F,
+	SSDTT_TICKS,            10,
+	SSE_VOICE_OFF,          0,
+	SSE_GENERAL,            GE_END_OF_SONG};
+
+MemHandle   lose1Sound, lose2Sound, blip1Sound, blip2Sound,
+				blip3Sound, blip4Sound;
+
+/***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************/
+
+    /*---------------------------------------------------------------------*/
+    @class FollowProcessClass, GenProcessClass ;
+        @message void MSG_VIEW_FOLLOW_NEW() ;
+        @message void MSG_VIEW_FOLLOW_REAL_NEW() ;
+        @message void MSG_FOLLOW_BLIP(int num) ;
+        @message void MSG_FOLLOW_TIMER_UPDATE() ;
+        @message void MSG_FOLLOW_COMPLETED() ;
+        @message void MSG_FOLLOW_REDRAW_SQUARE(sword pos_x, sword pos_y) ;
+        @message void MSG_FOLLOW_UPDATE_SCORE() ;
+		  @message void MSG_FOLLOW_DID_NOT_WIN() ;
+        @message void MSG_FOLLOW_REAL_DID_NOT_WIN() ;
+        @message void MSG_FOLLOW_ROTATE_LEFT() ;
+        @message void MSG_FOLLOW_ROTATE_RIGHT() ;
+        @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_FOLLOW_SIZE_CHANGED;
+        @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_FOLLOW_SOUND_CHANGED;
+        @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_FOLLOW_START_LEVEL_CHANGED;
+        @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_FOLLOW_SPEED_CHANGED;
+        @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_FOLLOW_REACTION_CHANGED;
+	 @endc
+
+    @classdecl FollowProcessClass, neverSaved ;
+    /*---------------------------------------------------------------------*/
+
+	 /*---------------------------------------------------------------------*/
+    @class FollowViewClass, GenViewClass ;
+    @endc
+
+    @classdecl FollowViewClass;
+    /*---------------------------------------------------------------------*/
+
+	 /*---------------------------------------------------------------------*/
+    @class FollowContentClass, VisContentClass ;
+    @endc
+
+    @classdecl FollowContentClass ;
+    /*---------------------------------------------------------------------*/
+
+
+/***************************************************************************
+ *		UI Objects
+ ***************************************************************************/
+
+
+
+/*=========================================================================*/
+
+
+
+@start	AppResource ;
+    /*---------------------------------------------------------------------*/
+	 @object GenApplicationClass FollowApp = {
+        GI_visMoniker = list { @FollowTextMoniker,
+						 @Moniker0,
+                               @Moniker1,
+						 @Moniker2,
+						 @Moniker4 }
+		  GI_comp       = @FollowPrimary;
+        gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS)
+                      = @FollowPrimary;
+        gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST)
+							 = @HighScoreControl;
+	  }
+    /*---------------------------------------------------------------------*/
+    @visMoniker FollowTextMoniker =
+        "Follow Me" ;
+    /*---------------------------------------------------------------------*/
+@end	AppResource
+
+
+
+/*=========================================================================*/
+
+
+
+@start	Interface ;
+    /*---------------------------------------------------------------------*/
+    @object GenPrimaryClass FollowPrimary  = {
+		  GI_comp             = @FollowViewGroup,
+                              @FollowGameMenu,
+                              @FollowOptionsMenu,
+										@FollowDialogs,
+										@QTipsDialogBox ;
+		  ATTR_GEN_HELP_CONTEXT = "TOC";
+		  HINT_SIZE_WINDOW_AS_DESIRED ;
+        HINT_CENTER_WINDOW;
+        HINT_PRIMARY_NO_FILE_MENU ;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY ;
+		  HINT_CENTER_CHILDREN_VERTICALLY ;
+	 }
+    /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass FollowViewGroup = {
+		  GI_comp = @FollowScoreGroup,
+						@FollowGroup,
+                  @FollowStatus ;
+ //		  HINT_CENTER_CHILDREN_VERTICALLY ;
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+ //		  HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY ;
+	 }
+    /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass FollowScoreGroup = {
+        GI_comp = @FollowQuickNew,
+			   @FollowSpacer,
+			   @FollowScore ;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY ;
+	 //	  HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	//	  HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY ;
+	 //	  HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenTriggerClass FollowQuickNew = {
+		  GI_visMoniker   = 'N', "New" ;
+		  GTI_destination = process ;
+		  GTI_actionMsg   = MSG_VIEW_FOLLOW_NEW ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass FollowSpacer = {
+		  HINT_FIXED_SIZE = {SST_PIXELS | 100, 0,0};
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenGlyphClass FollowScore = {
+        GI_visMoniker    = "Level: 0" ;
+    }
+	 /*---------------------------------------------------------------------*/
+    @object GenInteractionClass FollowGroup = {
+        GI_comp = @FollowView, @FollowLostFocusGlyph ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+ //       HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+ //       HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+		  HINT_FIXED_SIZE = { SST_PIXELS | 150,
+                              SST_PIXELS | 150,
+                              0 } ;
+/*		  HINT_MINIMUM_SIZE = { SST_PIXELS | 150,
+                              SST_PIXELS | 150,
+                              0 } ;
+        HINT_INITIAL_SIZE = { SST_PIXELS | 220,
+                              SST_PIXELS | 220,
+                              0 } ;
+*/
+    }
+	 /*---------------------------------------------------------------------*/
+    @object FollowViewClass FollowView = {
+        GVI_attrs      = @default |
+                         GVA_CONTROLLED |
+                         GVA_SAME_COLOR_AS_PARENT_WIN |
+                         GVA_NO_WIN_FRAME;
+        GVI_horizAttrs   = @default |
+				//               GVDA_SCROLLABLE |
+									GVDA_NO_SMALLER_THAN_CONTENT |
+									GVDA_NO_LARGER_THAN_CONTENT ;
+        GVI_vertAttrs    = @default |
+           //                GVDA_SCROLLABLE |
+									GVDA_NO_SMALLER_THAN_CONTENT |
+									GVDA_NO_LARGER_THAN_CONTENT ;
+        GVI_content      = @FollowContent;
+        GVI_docBounds    = {0, 0, DOC_WIDTH, DOC_HEIGHT};
+        HINT_DEFAULT_TARGET;
+        HINT_DEFAULT_FOCUS;
+        HINT_VIEW_REMOVE_SCROLLERS_WHEN_NOT_SCROLLABLE ;
+    }
+	 /*---------------------------------------------------------------------*/
+	 @object FollowContentClass FollowContent = {
+		  VCNI_view         = FollowView ;
+
+		  VCNI_attrs        = @default |
+									 VCNA_SAME_WIDTH_AS_VIEW |
+									 VCNA_SAME_HEIGHT_AS_VIEW |
+									 VCNA_LARGE_DOCUMENT_MODEL |
+									 VCNA_ACTIVE_MOUSE_GRAB_REQUIRES_LARGE_EVENTS ;
+	 }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass FollowLostFocusGlyph = {
+        GI_comp = @FollowLostFocusGroup ;
+        GI_states = @default & (~GS_USABLE) ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass FollowLostFocusGroup = {
+        GI_comp = @FollowLostFocusGlyph1,
+                  @FollowLostFocusGlyph2 ;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass FollowLostFocusGlyph1 = {
+        GI_visMoniker = "Game" ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass FollowLostFocusGlyph2 = {
+        GI_visMoniker = "Paused" ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass FollowStatus = {
+        GI_visMoniker    = "I'm ready to play." ;
+    }
+
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass FollowGameMenu = {
+		  GI_comp = @FollowNewOption,
+						@FollowQTipsTrigger,
+						@HighScoreControl;
+		  GI_visMoniker = 'G', "Game" ;
+        GII_visibility = GIV_POPUP ;
+        ATTR_GEN_INTERACTION_GROUP_TYPE
+                       = (GIGT_FILE_MENU) ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenTriggerClass FollowNewOption = {
+		  GI_visMoniker   = 'N', "New Game" ;
+		  GTI_destination = process ;
+		  GTI_actionMsg   = MSG_VIEW_FOLLOW_NEW ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenTriggerClass FollowQTipsTrigger = {
+		  GI_visMoniker   = 'Q', "Quick Tips" ;
+		  GTI_destination = @QTipsDialogBox ;
+		  GTI_actionMsg   = MSG_GEN_INTERACTION_INITIATE ;
+		  HINT_TRIGGER_BRINGS_UP_WINDOW;
+    }
+	 /*---------------------------------------------------------------------*/
+	 @object HighScoreClass HighScoreControl = {
+		  HSI_fileName = "Follow Me High Scores";
+		  HSI_creator = {"FoMe", 16431};
+		  HSI_highScoreTitle = "Follow Me High Scores";
+	 }
+
+	 /*---------------------------------------------------------------------*/
+    @object GenInteractionClass FollowOptionsMenu = {
+        GI_comp = @FollowSound,
+                  @FollowSpeed,
+                  @FollowReaction,
+                  @FollowStartLevel ;
+        GII_visibility = GIV_POPUP ;
+        ATTR_GEN_INTERACTION_GROUP_TYPE
+                       = (GIGT_OPTIONS_MENU) ;
+    }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass FollowStartLevel = {
+		  GI_visMoniker   = 'L', "Start Level" ;
+		  GII_visibility  = GIV_POPUP ;
+		  GI_comp         = @FollowStartLevelGroup ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass FollowSpeed = {
+		  GI_visMoniker   = 'S', "Speed" ;
+		  GII_visibility  = GIV_POPUP ;
+		  GI_comp         = @FollowSpeedGroup ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass FollowReaction = {
+		  GI_visMoniker   = 'R', "Reaction Speed" ;
+		  GII_visibility  = GIV_POPUP ;
+		  GI_comp         = @FollowReactionGroup ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass FollowSound = {
+		  GI_visMoniker   = 'o', "Sound" ;
+		  GII_visibility  = GIV_POPUP ;
+		  GI_comp         = @FollowSoundGroup ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass FollowDialogs = {
+		  GI_comp = @FollowWrongCompletionBox;
+		  GII_type = GIT_ORGANIZATIONAL ;
+		  GII_visibility = GIV_DIALOG ;
+		  GII_attrs = @default | GIA_NOT_USER_INITIATABLE ;
+	 }
+	 /*---------------------------------------------------------------------*/
+@end Interface
+
+
+
+@start InterfaceStartLevel ;
+    /*---------------------------------------------------------------------*/
+    @object GenItemGroupClass FollowStartLevelGroup = {
+        GI_comp          = @FollowStart1,
+                           @FollowStart3,
+                           @FollowStart5,
+                           @FollowStart10,
+                           @FollowStart20 ;
+		  GIGI_selection   = FOLLOW_START_LEVEL_1 ;
+        GIGI_destination = process ;
+        GIGI_applyMsg = MSG_FOLLOW_START_LEVEL_CHANGED ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass FollowStart1 = {
+        GI_visMoniker = '1', "1" ;
+        GII_identifier = FOLLOW_START_LEVEL_1 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass FollowStart3 = {
+        GI_visMoniker = '3', "3" ;
+        GII_identifier = FOLLOW_START_LEVEL_3 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass FollowStart5 = {
+        GI_visMoniker = '5', "5" ;
+        GII_identifier = FOLLOW_START_LEVEL_5 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass FollowStart10 = {
+        GI_visMoniker = '0', "10" ;
+        GII_identifier = FOLLOW_START_LEVEL_10 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass FollowStart20 = {
+        GI_visMoniker = '2', "20" ;
+        GII_identifier = FOLLOW_START_LEVEL_20 ;
+    }
+	 /*---------------------------------------------------------------------*/
+@end InterfaceStartLevel
+
+
+
+@start InterfaceSound ;
+    /*---------------------------------------------------------------------*/
+    @object GenItemGroupClass FollowSoundGroup = {
+        GI_comp          = @FollowSoundOn,
+									@FollowSoundOff,
+									@FollowSoundSystem ;
+		  GIGI_selection   = FOLLOW_SOUND_SYS ;
+        GIGI_destination = process ;
+        GIGI_applyMsg = MSG_FOLLOW_SOUND_CHANGED ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass FollowSoundOn = {
+		  GI_visMoniker = 'S', "Sound On" ;
+        GII_identifier = FOLLOW_SOUND_ON ;
+    }
+	 /*---------------------------------------------------------------------*/
+	 @object GenItemClass FollowSoundOff = {
+		  GI_visMoniker = 'O', "Sound Off" ;
+		  GII_identifier = FOLLOW_SOUND_OFF ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenItemClass FollowSoundSystem = {
+		  GI_visMoniker = 'P', "Use System Preference" ;
+		  GII_identifier = FOLLOW_SOUND_SYS ;
+	 }
+	 /*---------------------------------------------------------------------*/
+@end InterfaceSound
+
+
+
+@start InterfaceSpeed ;
+    /*---------------------------------------------------------------------*/
+    @object GenItemGroupClass FollowSpeedGroup = {
+        GI_comp          = @FollowSpeedVerySlow,
+                           @FollowSpeedSlow,
+                           @FollowSpeedMedium,
+                           @FollowSpeedFast,
+                           @FollowSpeedVeryFast ;
+        GIGI_selection   = FOLLOW_SPEED_MEDIUM ;
+        GIGI_destination = process ;
+        GIGI_applyMsg = MSG_FOLLOW_SPEED_CHANGED ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass FollowSpeedVerySlow = {
+        GI_visMoniker = '1', "1. Very Slow" ;
+        GII_identifier = FOLLOW_SPEED_VERY_SLOW ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass FollowSpeedSlow = {
+        GI_visMoniker = '2', "2. Slow" ;
+        GII_identifier = FOLLOW_SPEED_SLOW ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass FollowSpeedMedium = {
+        GI_visMoniker = '3', "3. Medium" ;
+        GII_identifier = FOLLOW_SPEED_MEDIUM ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass FollowSpeedFast = {
+        GI_visMoniker = '4', "4. Fast" ;
+        GII_identifier = FOLLOW_SPEED_FAST ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass FollowSpeedVeryFast = {
+        GI_visMoniker = '5', "5. Very Fast" ;
+        GII_identifier = FOLLOW_SPEED_VERY_FAST ;
+    }
+    /*---------------------------------------------------------------------*/
+@end InterfaceSpeed
+
+
+
+@start InterfaceReaction ;
+    /*---------------------------------------------------------------------*/
+    @object GenItemGroupClass FollowReactionGroup = {
+        GI_comp          = @FollowReactionVerySlow,
+                           @FollowReactionSlow,
+                           @FollowReactionMedium,
+                           @FollowReactionFast,
+                           @FollowReactionVeryFast ;
+        GIGI_selection   = FOLLOW_REACTION_VERY_SLOW ;
+        GIGI_destination = process ;
+        GIGI_applyMsg = MSG_FOLLOW_REACTION_CHANGED ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass FollowReactionVerySlow = {
+        GI_visMoniker = '1', "1. Very Slow" ;
+        GII_identifier = FOLLOW_REACTION_VERY_SLOW ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass FollowReactionSlow = {
+        GI_visMoniker = '2', "2. Slow" ;
+        GII_identifier = FOLLOW_REACTION_SLOW ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass FollowReactionMedium = {
+        GI_visMoniker = '3', "3. Medium" ;
+        GII_identifier = FOLLOW_REACTION_MEDIUM ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass FollowReactionFast = {
+        GI_visMoniker = '4', "4. Fast" ;
+        GII_identifier = FOLLOW_REACTION_FAST ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass FollowReactionVeryFast = {
+        GI_visMoniker = '5', "5. Very Fast" ;
+        GII_identifier = FOLLOW_REACTION_VERY_FAST ;
+    }
+    /*---------------------------------------------------------------------*/
+@end InterfaceReaction
+
+
+
+@start InterfaceDone ;
+	 /*---------------------------------------------------------------------*/
+    @object GenInteractionClass FollowWrongCompletionBox = {
+        GI_visMoniker   = "Oooops!" ;
+        GII_visibility  = GIV_DIALOG ;
+        GII_type        = GIT_NOTIFICATION ;
+        GII_attrs       = @default                         |
+                          GIA_INITIATED_VIA_USER_DO_DIALOG |
+                          GIA_MODAL                        |
+                          GIA_NOT_USER_INITIATABLE         ;
+        GI_comp         = @LoserGlyph ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass LoserGlyph = {
+        GI_comp = @LoserLoseGlyph,
+                  @LoserGlyph2 ;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass LoserLoseGlyph = {
+        GI_visMoniker = list { @LoseMoniker } ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass LoserGlyph2 = {
+        GI_visMoniker = "Sorry, try again" ;
+    }
+    /*---------------------------------------------------------------------*/
+@end InterfaceDone
+
+
+
+/*=========================================================================*/
+
+
+@start QTipsResource;
+@include "art/QTip1.goh"
+
+	 @object GenInteractionClass QTipsDialogBox = {
+		  GI_visMoniker = "Follow Me Quick Tips";
+		  GI_comp = @GoalText,
+						@QuickTipsGroup,
+						@ShowOnStartupGroup,
+						@OKTipsButton;
+		  GII_visibility = GIV_DIALOG ;
+		  GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY ;
+		  ATTR_GEN_HELP_CONTEXT = "TOC";
+	 }
+
+
+	 @object GenTextClass GoalText = {
+		  GI_attrs = @default | GA_READ_ONLY;
+		  GTXI_text = "The goal of the game is to repeat the longest possible pattern of colors that is presented to you.";
+		  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	 }
+
+	 @object GenBooleanGroupClass ShowOnStartupGroup = {
+		  GI_comp = @ShowOnStartupBoolean;
+	 }
+
+	 @object GenBooleanClass ShowOnStartupBoolean = {
+		  GI_visMoniker = 'S', "Show this Dialog box when Follow Me starts";
+		  GBI_identifier = SHOW_ON_STARTUP;
+	 }
+
+	 @object GenTriggerClass OKTipsButton = {
+		  GI_visMoniker   = 'O', "OK";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+		  HINT_SEEK_REPLY_BAR;
+		  HINT_DEFAULT_DEFAULT_ACTION;
+	 }
+
+
+	 @object GenInteractionClass QuickTipsGroup = {
+		  GI_comp = @QTip1;
+	 }
+
+	 @object GenInteractionClass QTip1 = {
+		  GI_comp = @QTip1GlyphHolder, @QTip1Text ;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+		  HINT_CENTER_CHILDREN_VERTICALLY;
+	 }
+
+	 @object GenInteractionClass QTip1GlyphHolder = {
+		  GI_comp = @QTip1Glyph;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY;
+		  HINT_CENTER_CHILDREN_VERTICALLY;
+		  HINT_FIXED_SIZE = {SST_PIXELS | 60, 0,0};
+        /* ^^^ is based on the width of the widest icon */
+	 }
+
+	 @object GenGlyphClass QTip1Glyph = {
+		  GI_visMoniker = list { @QTip1Moniker };
+	 }
+
+	 @object GenTextClass QTip1Text = {
+		  GI_attrs = @default | GA_READ_ONLY;
+		  GTXI_text = "Click on the buttons that the computer flashes to repeat the pattern.";
+		  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+		  HINT_MINIMUM_SIZE = {SST_PIXELS | 325, 0, 0};
+	 }
+
+
+@end QTipsResource
+
+
+/*=========================================================================*/
+
+
+@start StringsResource;
+	/*---------------------------------------------------------------------*/
+	 @chunk char StringScorePrefix[] = "Level: " ;
+		  @localize { "Prefix for 'Level: ###'" 0-20 } ;
+    @chunk char StringFinalScorePrefix[] = "Final Score: " ;
+        @localize { "Prefix for 'Final Score: ###'" 0-20 } ;
+@end StringsResource ;
+@start Interface ;
+	 /*---------------------------------------------------------------------*/
+	 @visMoniker MonikerReadyToPlay = "Ready to play" ;
+    @visMoniker MonikerGameOver = "Game Over" ;
+	  /*---------------------------------------------------------------------*/
+    @visMoniker StringComment1 = "Let me start simple ..." ;
+        @localize { "The StringComments are comments that appear at the bottom while playing." } ;
+    @visMoniker StringComment2 = "My turn!" ;
+    @visMoniker StringComment3 = "My turn again!" ;
+	 @visMoniker StringComment4 = "Here we go!" ;
+    @visMoniker StringComment5 = "This isn't so hard, is it?" ;
+    @visMoniker StringComment6 = "Doing better!" ;
+    @visMoniker StringComment7 = "OK, how about this ..." ;
+    @visMoniker StringComment8 = "Gee, you're pretty good!" ;
+    @visMoniker StringComment9 = "Wow!" ;
+    @visMoniker StringComment10 = "This is pretty amazing!" ;
+    @visMoniker StringComment11 = "I hope you're not cheating!" ;
+    @visMoniker StringComment12 = "Photographic memory?" ;
+    @visMoniker StringComment13 = "You know I'm not going to stop!" ;
+    @visMoniker StringComment14 = "Whew!  Your arm must be getting tired!" ;
+    @visMoniker StringComment15 = "You're amazing!" ;
+    @visMoniker StringComment16 = "How do you do it?" ;
+    @visMoniker StringComment17 = "I think we have a winner!!!" ;
+    /*---------------------------------------------------------------------*/
+    @visMoniker StringCountdown6 = "<< GO! >>" ;
+         @localize { "Messages showing the remaining time." } ;
+    @visMoniker StringCountdown5 = "Countdown ... 5" ;
+    @visMoniker StringCountdown4 = "Countdown ... 4" ;
+    @visMoniker StringCountdown3 = "Countdown ... 3" ;
+    @visMoniker StringCountdown2 = "Countdown ... 2" ;
+    @visMoniker StringCountdown1 = "Countdown ... 1" ;
+    @visMoniker StringCountdown0 = "Too slow!" ;
+    /*---------------------------------------------------------------------*/
+@end Interface ;
+
+
+/*=========================================================================*/
+
+
+word MyRandom()
+{
+    static word rand1 = 0xf32d ;
+    static word rand2 = 0x0103 ;
+    static word rand3 = 0x4326 ;
+    static word rand4 = 0x4878 ;
+	 word old ;
+
+	 old = rand1 ;
+    rand1 = rand2 ;
+    rand2 = rand3 ;
+    rand3 = rand4 ;
+
+    rand4 ^= old^rand1^rand2^rand3 ;
+    rand3 += rand1+rand2+rand4 ;
+    rand4 += TimerGetCount() ;
+    return old ;
+}
+
+
+/*-------------------------------------------------------------------------*/
+void FollowDraw(GStateHandle gstate)
+{
+    Bitmap *ptr ;
+
+    MemLock(OptrToHandle(@foll1)) ;
+    ptr = (Bitmap *)LMemDeref(@foll1) ;
+    GrDrawBitmap(gstate,
+                 67,
+                 1,
+                 (Bitmap*)ptr,
+                 NULL) ;
+    MemUnlock(OptrToHandle(@foll1)) ;
+
+    MemLock(OptrToHandle(@foll2)) ;
+    ptr = (Bitmap *)LMemDeref(@foll2) ;
+    GrDrawBitmap(gstate,
+                 1,
+                 1,
+                 (Bitmap*)ptr,
+                 NULL) ;
+    MemUnlock(OptrToHandle(@foll2)) ;
+
+    MemLock(OptrToHandle(@foll3)) ;
+    ptr = (Bitmap *)LMemDeref(@foll3) ;
+    GrDrawBitmap(gstate,
+                 1,
+                 67,
+                 (Bitmap*)ptr,
+                 NULL) ;
+    MemUnlock(OptrToHandle(@foll3)) ;
+
+    MemLock(OptrToHandle(@foll4)) ;
+    ptr = (Bitmap *)LMemDeref(@foll4) ;
+    GrDrawBitmap(gstate,
+                 67,
+                 67,
+                 (Bitmap*)ptr,
+                 NULL) ;
+    MemUnlock(OptrToHandle(@foll4)) ;
+}
+
+/*-------------------------------------------------------------------------*/
+void FollowPlaySound(MemHandle soundHandle)
+{
+ word 		tempo = 8;
+
+
+	 if (sound_off_on == FOLLOW_SOUND_SYS)
+		 /* this routine abides by syst sound setting */
+		 UserStandardSound(SST_CUSTOM_SOUND, soundHandle, 1);
+	 else if (sound_off_on == FOLLOW_SOUND_OFF)  return;
+	 else {
+		 /* this routine doesn't check syst sound setting -
+		  * but we need to supply the tempo */
+		 SoundPlayMusic(soundHandle, SP_GAME, tempo, EOSF_UNLOCK);
+		 }
+}
+
+/*-------------------------------------------------------------------------*/
+@method FollowProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+ FileHandle fhandle ;
+ Boolean		initError, tips;
+
+
+	 @callsuper() ;
+
+    @call FollowApp::MSG_GEN_APPLICATION_INSTALL_TOKEN();
+
+	 SoundAllocMusic(lose1SoundBuf, 1, &lose1Sound);
+	 SoundAllocMusic(lose2SoundBuf, 1, &lose2Sound);
+	 SoundAllocMusic(blip1SoundBuf, 1, &blip1Sound);
+	 SoundAllocMusic(blip2SoundBuf, 1, &blip2Sound);
+	 SoundAllocMusic(blip3SoundBuf, 1, &blip3Sound);
+	 SoundAllocMusic(blip4SoundBuf, 1, &blip4Sound);
+
+	 /* check for quick tips */
+	 initError = InitFileReadBoolean("Follow", "showTips", &tips);
+	 if (initError) tips = TRUE;
+	 if (tips) {
+		 @send ShowOnStartupGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+														 SHOW_ON_STARTUP,
+														 TRUE);
+		 @send QTipsDialogBox::MSG_GEN_INTERACTION_INITIATE();
+		 }
+	 else
+		 @send ShowOnStartupGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+														 SHOW_ON_STARTUP,
+														 FALSE);
+
+	 FilePushDir() ;
+    FileSetCurrentPath(follow_drive, follow_relativePath) ;
+    FileCreateDir(follow_path) ;
+    FileSetCurrentPath(follow_drive, follow_path) ;
+
+    fhandle = FileOpen(follow_state_file, FILE_ACCESS_R|FILE_DENY_W) ;
+
+    if (fhandle!=NullHandle)  {
+        FilePos(fhandle, 0, FILE_POS_START) ;
+        FileRead(fhandle, &game_mode, sizeof(byte), FALSE) ;
+        FileRead(fhandle, &player_score, sizeof(word), FALSE) ;
+		  FileRead(fhandle, &ready_phase, sizeof(word), FALSE) ;
+        FileRead(fhandle, &sound_speed, sizeof(word), FALSE) ;
+        FileRead(fhandle, &reaction_speed, sizeof(word), FALSE) ;
+        FileRead(fhandle, &start_level, sizeof(word), FALSE) ;
+		  FileRead(fhandle, &sound_off_on, sizeof(word), FALSE) ;
+        FileClose(fhandle, FALSE) ;
+		  @call FollowSoundGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(sound_off_on, FALSE) ;
+        @call FollowStartLevelGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(start_level, FALSE) ;
+        @call FollowReactionGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(reaction_speed, FALSE) ;
+        @call FollowSpeedGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(sound_speed, FALSE) ;
+    } else  {
+     //   @send process::MSG_VIEW_FOLLOW_NEW() ;
+    }
+	 FilePopDir() ;
+	 @call FollowStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+		  @MonikerReadyToPlay,
+        VUM_DELAYED_VIA_APP_QUEUE) ;
+}
+/*-------------------------------------------------------------------------*/
+@method FollowProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+ FileHandle fhandle ;
+ Boolean		tips;
+
+
+	 SoundStopMusic(lose1Sound);
+	 SoundFreeMusic(lose1Sound);
+	 SoundStopMusic(lose2Sound);
+	 SoundFreeMusic(lose2Sound);
+	 SoundStopMusic(blip1Sound);
+	 SoundFreeMusic(blip1Sound);
+	 SoundStopMusic(blip2Sound);
+	 SoundFreeMusic(blip2Sound);
+	 SoundStopMusic(blip3Sound);
+	 SoundFreeMusic(blip3Sound);
+	 SoundStopMusic(blip4Sound);
+	 SoundFreeMusic(blip4Sound);
+
+	 FilePushDir() ;
+    FileSetCurrentPath(follow_drive, follow_relativePath) ;
+    FileCreateDir(follow_path) ;
+    FileSetCurrentPath(follow_drive, follow_path) ;
+    FileDelete(follow_state_file) ;
+    fhandle = FileCreate(follow_state_file,
+              FILE_CREATE_TRUNCATE |
+              FILE_ACCESS_RW |
+              FILE_DENY_NONE,
+              FILE_ATTR_NORMAL) ;
+
+    if (fhandle!=NullHandle)  {
+        FilePos(fhandle, 0, FILE_POS_START) ;
+        FileWrite(fhandle, &game_mode, sizeof(byte), FALSE) ;
+        FileWrite(fhandle, &player_score, sizeof(word), FALSE) ;
+		  FileWrite(fhandle, &ready_phase, sizeof(word), FALSE) ;
+        FileWrite(fhandle, &sound_speed, sizeof(word), FALSE) ;
+        FileWrite(fhandle, &reaction_speed, sizeof(word), FALSE) ;
+        FileWrite(fhandle, &start_level, sizeof(word), FALSE) ;
+        FileWrite(fhandle, &sound_off_on, sizeof(word), FALSE) ;
+        FileClose(fhandle, FALSE) ;
+		  @call FollowSoundGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(sound_off_on, FALSE) ;
+        @call FollowStartLevelGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(start_level, FALSE) ;
+        @call FollowReactionGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(reaction_speed, FALSE) ;
+        @call FollowSpeedGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(sound_speed, FALSE) ;
+    }
+    FilePopDir() ;
+
+    if (timer_going)  {
+        TimerStop(timer_handle, timer_handle) ;
+        timer_going = FALSE ;
+    }
+    if (timer2_going)  {
+        TimerStop(timer2_handle, timer2_id) ;
+        timer2_going = FALSE ;
+    }
+
+	 /* set the quick tips if not default */
+	 tips = @call ShowOnStartupGroup::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(
+																	 SHOW_ON_STARTUP);
+	 InitFileWriteBoolean("Follow", "showTips", tips);
+
+	 return (@callsuper()) ;
+}
+/*-------------------------------------------------------------------------*/
+@method FollowContentClass, MSG_META_EXPOSED
+{
+    GStateHandle gstate;
+
+    gstate = GrCreateState(win);
+    GrBeginUpdate(gstate);
+
+    FollowDraw(gstate);
+
+    GrEndUpdate(gstate);
+    GrDestroyState(gstate);
+}
+/*-------------------------------------------------------------------------*/
+char *convert_word_to_str(char *buffer, word value)
+{
+    word power = 10000 ;
+    byte flag = 0 ;
+    word digit = 0 ;
+
+    while (power)  {
+        digit = '0' + (value/power) ;
+        if ((digit!='0')||(power==1))
+            flag |= 1 ;
+
+        if (flag)  {
+            *(buffer++) = digit ;
+            value %= power ;
+        }
+        power /= 10 ;
+    }
+    *buffer = '\0' ;
+
+    return buffer ;
+}
+/*-------------------------------------------------------------------------*/
+@method FollowProcessClass, MSG_FOLLOW_UPDATE_SCORE
+{
+    char buffer[30] ;
+
+    AppendNumToString(buffer, @StringScorePrefix, player_score) ;
+    @call FollowScore::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(buffer, VUM_NOW) ;
+}
+/*-------------------------------------------------------------------------*/
+void mycopy(char *s, char *t, word size)
+{
+    for (; size; size--)
+        *(s++) = *(t++) ;
+}
+/*-------------------------------------------------------------------------*/
+@method FollowProcessClass, MSG_FOLLOW_BLIP
+{
+    switch(num)  {
+        case 0:
+            blip1() ;
+            break ;
+        case 1:
+            blip2() ;
+            break ;
+        case 2:
+            blip3() ;
+            break ;
+        case 3:
+            blip4() ;
+            break ;
+    }
+}
+/*-------------------------------------------------------------------------*/
+@method FollowProcessClass, MSG_FOLLOW_DID_NOT_WIN
+{
+    if (timer2_going)  {
+        TimerStop(timer2_handle, timer2_id) ;
+        timer2_going = FALSE ;
+    }
+
+	 FollowPlaySound(lose2Sound);
+
+    timer_handle = TimerStart(TIMER_EVENT_ONE_SHOT,
+                          oself,
+                          10,
+                          MSG_FOLLOW_REAL_DID_NOT_WIN,
+                          0,
+                          &timer_id) ;
+    timer_going = TRUE ;
+}
+/*-------------------------------------------------------------------------*/
+@method FollowProcessClass, MSG_FOLLOW_REAL_DID_NOT_WIN
+{
+    char str[30] ;
+    word final_score = 0 ;
+
+    ready_phase = 9 ;
+    timer_going = FALSE ;
+    if (timer2_going)  {
+        TimerStop(timer2_handle, timer2_id) ;
+        timer2_going = FALSE ;
+    }
+
+    @call FollowStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+        @MonikerGameOver,
+		  VUM_NOW) ;
+    if (player_score >= start_level)  {
+        final_score = player_score+2*start_level ;
+        switch (sound_speed)  {
+            case FOLLOW_SPEED_SLOW:
+                final_score *= 2 ;
+                break ;
+            case FOLLOW_SPEED_MEDIUM:
+                final_score *= 3 ;
+                break ;
+            case FOLLOW_SPEED_FAST:
+                final_score *= 4 ;
+                break ;
+            case FOLLOW_SPEED_VERY_FAST:
+                final_score *= 5 ;
+                break ;
+        }
+        final_score *= reaction_speed ;
+    }
+    player_score = final_score ;
+
+	 AppendNumToString(str, @StringFinalScorePrefix, final_score) ;
+    @call FollowScore::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(str, VUM_NOW) ;
+
+    UserDoDialog(@FollowWrongCompletionBox) ;
+
+	 if (player_score)
+	    @send HighScoreControl::MSG_HIGH_SCORE_ADD_SCORE(
+												  (dword) player_score, 0);
+
+}
+/*-------------------------------------------------------------------------*/
+void blip1()
+{
+    WindowHandle win ;
+    GStateHandle gstate ;
+    Bitmap *ptr ;
+
+    win = @call FollowView::MSG_GEN_VIEW_GET_WINDOW() ;
+
+    gstate = GrCreateState(win) ;
+    MemLock(OptrToHandle(@foll5)) ;
+    ptr = (Bitmap *)LMemDeref(@foll5) ;
+    GrDrawBitmap(gstate,
+                 67,
+                 1,
+                 (Bitmap*)ptr,
+                 NULL) ;
+    MemUnlock(OptrToHandle(@foll5)) ;
+    GrDestroyState(gstate) ;
+
+	 FollowPlaySound(blip1Sound);
+	 TimerSleep(sound_speed+2) ;
+
+    gstate = GrCreateState(win) ;
+    MemLock(OptrToHandle(@foll1)) ;
+    ptr = (Bitmap *)LMemDeref(@foll1) ;
+    GrDrawBitmap(gstate,
+                 67,
+                 1,
+                 (Bitmap*)ptr,
+                 NULL) ;
+    MemUnlock(OptrToHandle(@foll1)) ;
+    GrDestroyState(gstate) ;
+}
+/*-------------------------------------------------------------------------*/
+void blip2()
+{
+    WindowHandle win ;
+    GStateHandle gstate ;
+    Bitmap *ptr ;
+
+    win = @call FollowView::MSG_GEN_VIEW_GET_WINDOW() ;
+
+    gstate = GrCreateState(win) ;
+    MemLock(OptrToHandle(@foll6)) ;
+    ptr = (Bitmap *)LMemDeref(@foll6) ;
+    GrDrawBitmap(gstate,
+                 1,
+                 1,
+                 (Bitmap*)ptr,
+                 NULL) ;
+    MemUnlock(OptrToHandle(@foll6)) ;
+    GrDestroyState(gstate) ;
+
+	 FollowPlaySound(blip2Sound);
+	 TimerSleep(sound_speed+2) ;
+
+    gstate = GrCreateState(win) ;
+    MemLock(OptrToHandle(@foll2)) ;
+    ptr = (Bitmap *)LMemDeref(@foll2) ;
+    GrDrawBitmap(gstate,
+                 1,
+                 1,
+                 (Bitmap*)ptr,
+                 NULL) ;
+    MemUnlock(OptrToHandle(@foll2)) ;
+    GrDestroyState(gstate) ;
+}
+/*-------------------------------------------------------------------------*/
+void blip3()
+{
+    WindowHandle win ;
+    GStateHandle gstate ;
+    Bitmap *ptr ;
+
+    win = @call FollowView::MSG_GEN_VIEW_GET_WINDOW() ;
+
+    gstate = GrCreateState(win) ;
+    MemLock(OptrToHandle(@foll7)) ;
+    ptr = (Bitmap *)LMemDeref(@foll7) ;
+    GrDrawBitmap(gstate,
+                 1,
+                 67,
+                 (Bitmap*)ptr,
+                 NULL) ;
+    MemUnlock(OptrToHandle(@foll7)) ;
+    GrDestroyState(gstate) ;
+
+	 FollowPlaySound(blip3Sound);
+	 TimerSleep(sound_speed+2) ;
+
+    gstate = GrCreateState(win) ;
+    MemLock(OptrToHandle(@foll3)) ;
+    ptr = (Bitmap *)LMemDeref(@foll3) ;
+    GrDrawBitmap(gstate,
+                 1,
+                 67,
+                 (Bitmap*)ptr,
+                 NULL) ;
+    MemUnlock(OptrToHandle(@foll3)) ;
+    GrDestroyState(gstate) ;
+}
+/*-------------------------------------------------------------------------*/
+void blip4()
+{
+    WindowHandle win ;
+    GStateHandle gstate ;
+    Bitmap *ptr ;
+
+    win = @call FollowView::MSG_GEN_VIEW_GET_WINDOW() ;
+
+    gstate = GrCreateState(win) ;
+    MemLock(OptrToHandle(@foll8)) ;
+    ptr = (Bitmap *)LMemDeref(@foll8) ;
+    GrDrawBitmap(gstate,
+                 67,
+                 67,
+                 (Bitmap*)ptr,
+                 NULL) ;
+    MemUnlock(OptrToHandle(@foll8)) ;
+    GrDestroyState(gstate) ;
+
+	 FollowPlaySound(blip4Sound);
+	 TimerSleep(sound_speed+2) ;
+
+    gstate = GrCreateState(win) ;
+    MemLock(OptrToHandle(@foll4)) ;
+    ptr = (Bitmap *)LMemDeref(@foll4) ;
+    GrDrawBitmap(gstate,
+                 67,
+                 67,
+                 (Bitmap*)ptr,
+                 NULL) ;
+    MemUnlock(OptrToHandle(@foll4)) ;
+    GrDestroyState(gstate) ;
+}
+/*-------------------------------------------------------------------------*/
+@method FollowProcessClass, MSG_FOLLOW_TIMER_UPDATE
+{
+    if (timer2_going == TRUE)  {
+        timer2_going = FALSE ;
+        time_next = 0 ;
+
+        switch(ready_phase)  {
+            case 0:
+                if (player_score == 0)  {
+                    @send FollowStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                              @StringComment1,
+                              VUM_NOW) ;
+                } else if (player_score < 3) {
+                    @send FollowStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                              @StringComment2,
+                              VUM_NOW) ;
+                } else if (player_score < 5) {
+                    @send FollowStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                              @StringComment3,
+                              VUM_NOW) ;
+                } else if (player_score < 7) {
+                    @send FollowStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                              @StringComment4,
+                              VUM_NOW) ;
+                } else if (player_score < 10) {
+                    @send FollowStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                              @StringComment5,
+                              VUM_NOW) ;
+                } else if (player_score < 13)  {
+                    @send FollowStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                              @StringComment6,
+                              VUM_NOW) ;
+                } else if (player_score < 16)  {
+                    @send FollowStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                              @StringComment7,
+                              VUM_NOW) ;
+                } else if (player_score < 20)  {
+                    @send FollowStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                              @StringComment8,
+                              VUM_NOW) ;
+                } else if (player_score < 25)  {
+                    @send FollowStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                              @StringComment9,
+                              VUM_NOW) ;
+                } else if (player_score < 30)  {
+                    @send FollowStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                              @StringComment10,
+                              VUM_NOW) ;
+                } else if (player_score < 35)  {
+                    @send FollowStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                              @StringComment11,
+                              VUM_NOW) ;
+                } else if (player_score < 40)  {
+                    @send FollowStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                              @StringComment12,
+                              VUM_NOW) ;
+                } else if (player_score < 45)  {
+                    @send FollowStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                              @StringComment13,
+                              VUM_NOW) ;
+                } else if (player_score < 50)  {
+                    @send FollowStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                              @StringComment14,
+                              VUM_NOW) ;
+                } else if (player_score < 75)  {
+                    @send FollowStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                              @StringComment15,
+                              VUM_NOW) ;
+                } else if (player_score < 100)  {
+                    @send FollowStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                              @StringComment16,
+                              VUM_NOW) ;
+                } else  {
+                    @send FollowStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                              @StringComment17,
+                              VUM_NOW) ;
+                }
+                ready_phase++ ;
+                time_next = 90 ;
+                break ;
+            case 1:
+                if (play_position > player_score)  {
+                    play_position = 0 ;
+                    time_next = sound_speed ;
+                    ready_phase = 2 ;
+                } else {
+                    time_next = sound_speed+2 ;
+                    @send process::MSG_FOLLOW_BLIP(follow_field[play_position++]) ;
+                }
+                break ;
+            case 2:
+                @send FollowStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                              @StringCountdown6,
+                              VUM_NOW) ;
+                ready_phase = (reaction_speed+3) ;
+                time_next = COUNTDOWN_TIME ;
+                break ;
+            case 3:
+                @send FollowStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                              @StringCountdown5,
+                              VUM_NOW) ;
+                ready_phase = 4 ;
+                time_next = COUNTDOWN_TIME ;
+                break ;
+            case 4:
+                @send FollowStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                              @StringCountdown4,
+                              VUM_NOW) ;
+                ready_phase = 5 ;
+                time_next = COUNTDOWN_TIME ;
+                break ;
+            case 5:
+                @send FollowStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                              @StringCountdown3,
+                              VUM_NOW) ;
+                ready_phase = 6 ;
+                time_next = COUNTDOWN_TIME ;
+                break ;
+            case 6:
+                @send FollowStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                              @StringCountdown2,
+                              VUM_NOW) ;
+                ready_phase = 7 ;
+                time_next = COUNTDOWN_TIME ;
+                break ;
+            case 7:
+                @send FollowStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                              @StringCountdown1,
+                              VUM_NOW) ;
+                ready_phase = 8 ;
+                time_next = COUNTDOWN_TIME ;
+                break ;
+            case 8:
+                @call FollowStatus::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                              @StringCountdown0,
+                              VUM_NOW) ;
+                ready_phase = 9 ;
+                time_next = 0 ;
+
+					 FollowPlaySound(lose1Sound);
+					 TimerSleep(20) ;
+					 FollowPlaySound(lose1Sound);
+					 TimerSleep(20) ;
+					 FollowPlaySound(lose1Sound);
+					 TimerSleep(20) ;
+
+					 ready_phase = 9 ;
+                game_mode = 2 ;
+                @send process::MSG_FOLLOW_DID_NOT_WIN() ;
+                break ;
+        }
+
+        if (time_next != 0)  {
+            timer2_handle = TimerStart(TIMER_EVENT_ONE_SHOT,
+                                  oself,
+                                  time_next,
+                                  MSG_FOLLOW_TIMER_UPDATE,
+                                  0,
+                                  &timer2_id) ;
+            timer2_going = TRUE ;
+        }
+    } else {
+        ready_phase = 0 ;
+    }
+}
+/*-------------------------------------------------------------------------*/
+@method FollowContentClass, MSG_META_START_SELECT
+{
+    int num ;
+    int nums[4] = {2, 1, 3, 4} ;
+
+    if (!((ready_phase < 3)||(ready_phase > 8)))  {
+        if (game_mode < 2)  {
+            ready_phase = (reaction_speed+2) ;
+
+            if (game_mode == 0)  {
+                game_mode = 1 ;
+            }
+
+            xPosition /= 67 ;
+            yPosition /= 67 ;
+            num = nums[xPosition + (yPosition << 1)] ;
+            if (num == (1+follow_field[player_index]))  {
+                switch(num)  {
+                    case 1:
+                        blip1() ;
+                        break ;
+                    case 2:
+                        blip2() ;
+                        break ;
+                    case 3:
+                        blip3() ;
+                        break ;
+                    case 4:
+                        blip4() ;
+                        break ;
+                }
+
+                if (player_index == player_score)  {
+                    player_index = 0 ;
+                    ready_phase = 0 ;
+                    follow_field[++player_score] = (MyRandom()>>1)&3 ;
+                    @send process::MSG_FOLLOW_UPDATE_SCORE() ;
+                } else {
+                    player_index++ ;
+                }
+            } else {
+                TimerStop(timer2_handle, timer2_id) ;
+                ready_phase = 0 ;
+                game_mode = 2 ;
+                @send process::MSG_FOLLOW_DID_NOT_WIN() ;
+            }
+        }
+    }
+    retVal->flags = MRF_PROCESSED ;
+}
+/*-------------------------------------------------------------------------*/
+@method FollowProcessClass, MSG_VIEW_FOLLOW_NEW
+{
+    ready_phase = 0 ;
+
+    if (timer2_going)  {
+        timer2_going = FALSE ;
+        TimerStop(timer2_handle, timer2_id) ;
+    }
+
+    ready_phase = 0 ;
+    game_mode = 3 ;
+    timer_handle = TimerStart(TIMER_EVENT_ONE_SHOT,
+                          oself,
+                          10,
+                          MSG_VIEW_FOLLOW_REAL_NEW,
+                          0,
+                          &timer_id) ;
+    timer_going = TRUE ;
+}
+/*-------------------------------------------------------------------------*/
+@method FollowProcessClass, MSG_VIEW_FOLLOW_REAL_NEW
+{
+    int i ;
+
+    game_mode = 0 ;
+
+    for (i=0; i<start_level; i++)
+        follow_field[i] = (MyRandom()>>1)&3 ;
+
+    player_score = (start_level-1) ;
+    player_index = 0 ;
+
+    @call process::MSG_FOLLOW_UPDATE_SCORE() ;
+
+    ready_phase = 0 ;
+    timer2_handle = TimerStart(TIMER_EVENT_ONE_SHOT,
+                          oself,
+                          30,
+                          MSG_FOLLOW_TIMER_UPDATE,
+                          0,
+                          &timer2_id) ;
+    timer2_going = TRUE ;
+}
+/*-------------------------------------------------------------------------*/
+@method FollowProcessClass, MSG_FOLLOW_START_LEVEL_CHANGED
+{
+    start_level = selection ;
+
+    if (start_level == 0)
+        start_level = 1 ;  /* Custom */
+
+    if (game_mode < 2)
+        @call oself::MSG_VIEW_FOLLOW_NEW() ;
+}
+/*-------------------------------------------------------------------------*/
+@method FollowProcessClass, MSG_FOLLOW_REACTION_CHANGED
+{
+    reaction_speed = selection ;
+
+    if (game_mode < 2)
+        @call oself::MSG_VIEW_FOLLOW_NEW() ;
+}
+/*-------------------------------------------------------------------------*/
+@method FollowProcessClass, MSG_FOLLOW_SPEED_CHANGED
+{
+    sound_speed = selection ;
+
+    if (game_mode < 2)
+        @call oself::MSG_VIEW_FOLLOW_NEW() ;
+}
+/*-------------------------------------------------------------------------*/
+@method FollowProcessClass, MSG_FOLLOW_SOUND_CHANGED
+{
+    sound_off_on = selection ;
+}
+/*-------------------------------------------------------------------------*/
+void AppendNumToString(char *p_pos, optr string, word num)
+{
+    char *p_src ;
+    word len ;
+
+    MemLock(OptrToHandle(string)) ;
+    p_src = LMemDeref(string) ;
+    strcpy(p_pos, p_src) ;
+    MemUnlock(OptrToHandle(string)) ;
+    len = strlen(p_pos) ;
+    convert_word_to_str(p_pos+len, num) ;
+}
+/*-------------------------------------------------------------------------*/
+
+

@@ -1,0 +1,79 @@
+#!/bin/sh
+
+###############################################################################
+# 	Copyright (c) Geoworks 1999 -- All Rights Reserved
+#
+# PROJECT:	PC GEOS
+# FILE: 	macptobit
+# AUTHOR: 	Gene
+# DESCRIPTION:
+#	Shell script to convert MacPaint files to PC/GEOS background bitmaps
+#
+# USAGE:
+#	macptobit [-c b|w] [-w #] [-h #] <file.macp> <file.bit> <longname>
+#
+#	-c b - crop black edges
+#	-c w - crop white edges
+#
+#	-w # - clip width to #
+#	-h # - clip height to #
+#
+#	$Id: macptobit,v 1.3 90/09/22 16:03:09 gene Exp $
+#
+###############################################################################
+
+#
+# Process arguments
+#
+crop=
+cwidth=
+cheight=
+while [ $# -gt 3 ]; do
+    case $1 in
+	-c*)	shift
+		crop=`expr substr $1 1 1`
+		shift;;
+	-w*)	shift
+		cwidth=$1
+		shift;;
+	-h*)	shift
+		cheight=$1
+		shift;;
+	*)	;;
+    esac
+done
+file=`basename $1 .mac`
+
+#
+# Convert from MacPaint to PBM and XBM formats
+#
+if [ "$crop" ]; then
+    macptopbm < $1 | pnmcrop -$crop > /tmp/$file.pbm
+else
+    macptopbm < $1 > /tmp/$file.pbm
+fi
+pbmtoxbm < /tmp/$file.pbm > /tmp/$file.xbm
+
+#
+# Set the width to the next lowest multiple of a byte, because
+# convBM pads to byte boundaries.
+#
+width=`xbmwidth < /tmp/$file.xbm`
+if [ "$cwidth" ]; then
+    if [ $cwidth -le $width ]; then
+	width=$cwidth;
+    fi
+fi
+width=`expr \( $width - 1 \) / 8 \* 8`
+#
+# Set the height to the minimum of the actual height and
+# the (optional) passed clip height.
+#
+height=`xbmheight < /tmp/$file.xbm`
+if [ "$cheight" ]; then
+    if [ $cheight -le $height ]; then
+	height=$cheight;
+    fi
+fi
+height=`expr $height - 1`
+pnmcut 1 1 $width $height < /tmp/$file.pbm | pbmtoxbm | convBM $2 -o "$3"

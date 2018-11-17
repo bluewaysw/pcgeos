@@ -1,0 +1,542 @@
+/*
+ *	(c) Copyright GeoWorks 1991-1995.  All Rights Reserved.
+ *	GEOWORKS CONFIDENTIAL
+ *
+ * Project:	GEOS
+ * Module:	Pyramid
+ * File:	pyramid.ui
+ *
+ * Author:	Jon Witort, Jan  7, 1991
+ *
+ * Revision History:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jon	1/ 7/91		Initial revision
+ *
+ * Description:
+ *
+ *	UI for the Pyramid app.
+ *
+ *	$Id: pyramid.ui,v 1.1 97/04/04 15:15:06 newdeal Exp $
+ */
+
+#include "generic.uih"
+#include "cards.uih"
+
+#define	_JEDI	0
+
+/*#include "Art/mkrPyramid.ui"
+*/
+#include "Art/mkpyr.ui"
+
+class	Pyramid = Game {
+	chosenOne = optrComp : null;
+	chosenRank = wordComp : 0;
+	sumTo = wordComp : 0;
+	nNukes = byteComp : 0;
+	undoInfo = typeComp "PyramidUndoInfo": "0,0,0";
+}
+
+class PyramidDeck = Deck {
+	leftParent = optrComp : null;
+	rightParent = optrComp : null;
+	leftChild = optrComp : null;
+	rightChild = optrComp : null;
+	deckFlags = bitFieldComp byte {
+		unused : 3,
+		alwaysDetectable,
+		isDiscard,
+		notInTree,
+		leftSonIsDead,
+		rightSonIsDead
+	} : {};
+}
+
+/* ----------------------------------------------------------------------------
+	Application Object
+-----------------------------------------------------------------------------*/
+start	AppResource;
+
+PyramidApp = GenApplication vardataReloc {
+	moniker = list {
+	  /*	PyramidLCMoniker,
+		PyramidLMMoniker, 
+		PyramidSCMoniker,
+		PyramidSMMoniker, 
+		PyramidSCGAMoniker,
+		PyramidYCMoniker,
+		PyramidYMMoniker,
+		PyramidTMMoniker,
+		PyramidTCGAMoniker,
+       */
+		PyramidAppMoniker,
+		PyramidTinyMoniker,
+		"Pyramid";
+	}
+	children = PyramidPrimary;	/* only one child for now */
+	hints = {
+	  /*	ATTR_GEN_APPLICATION_SAVE_OPTIONS_TRIGGER {
+			UN_OPTR SaveOptionsTrigger
+		}, */
+		ATTR_GEN_HELP_FILE { char "pyramid", 0 }
+	}
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) =
+			PyramidPrimary;
+	gcnList (MANUFACTURER_ID_GEOWORKS,GAGCNLT_SELF_LOAD_OPTIONS) =
+			PyramidCardBackSelector;
+}
+
+end	AppResource;
+
+/* ----------------------------------------------------------------------------
+	 Primary window.
+-----------------------------------------------------------------------------*/
+
+start	Interface;		/* this resource is for misc UI objects */
+
+PyramidPrimary = GenPrimary {
+	children = GameMenu, OptionsMenu, PyramidView, StatusBar;
+
+	hints = {
+    /*		HINT_PRIMARY_FULL_SCREEN,   */
+	 	HINT_SIZE_WINDOW_AS_DESIRED, 
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY,
+		HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY,
+		HINT_INCLUDE_ENDS_IN_CHILD_SPACING,
+		HINT_PRIMARY_NO_FILE_MENU,
+		/*
+		 * Motif will automatically add a help trigger and
+		 * place it in the title bar if ATTR_GEN_HELP_CONTEXT is
+		 * placed on the GenPrimary.
+		 */
+		ATTR_GEN_HELP_CONTEXT {
+			char "TOC", 0
+		},
+		ATTR_GEN_WINDOW_KBD_OVERRIDE {
+			word	KO_NO_KEYBOARD
+		},
+		HINT_DISPLAY_MENU_BAR_HIDDEN_ON_STARTUP,
+		ATTR_GEN_DISPLAY_MENU_BAR_POPPED_OUT,
+		HINT_CENTER_WINDOW
+	}
+}
+
+end Interface;
+
+
+/*-----------------------------------------------------------------------------
+	UI Objects within Primary window
+-----------------------------------------------------------------------------*/
+
+/******************************************************************************
+				Deck
+******************************************************************************/
+
+start	Interface;
+
+GameMenu = GenInteraction {
+	moniker = 'G', "Game";
+	visibility = popup;
+	children = RedealTrigger, UndoTrigger;
+	hints =	{
+		ATTR_GEN_INTERACTION_GROUP_TYPE {
+			GenInteractionGroupType GIGT_FILE_MENU
+		}
+	}
+}
+
+RedealTrigger = GenTrigger {
+	moniker = 'R', "Re-Deal";
+	kbdAccelerator = ctrl 'R';
+	genAttributes = default +initiatesInputIgnore;
+
+	action = MSG_PYRAMID_NEW_GAME, MyPlayingTable;
+}
+
+/*
+ShowHighScoresTrigger = GenTrigger {
+	moniker = 'F', "Hall Of Fame";
+	action = MSG_PYRAMID_SHOW_HIGH_SCORES, process;
+	hints = {HINT_TRIGGER_BRINGS_UP_WINDOW}
+}
+
+ExitTrigger = GenTrigger {
+	EXIT_TRIGGER_VALUES
+	action = MSG_META_QUIT, PyramidApp;
+}
+*/
+
+OptionsMenu = GenInteraction {
+	moniker = 'O', "Options";
+	children = PyramidCardBackSelector, 
+			SumToInteraction, 
+			HideInteraction,
+			SaveOptionsTrigger;
+	visibility = popup;
+}
+
+PyramidCardBackSelector = CardBackSelector {
+	moniker = "Card Backs";
+	type = properties;
+	visibility = dialog;
+	hints = {
+		HINT_INITIAL_SIZE {
+			SpecWidth <SST_PIXELS, 0>
+			SpecHeight <SST_PIXELS, 0>
+		}
+	}
+}
+
+UndoTrigger = GenTrigger {
+	moniker = 'U', "Undo";
+	genStates = default -enabled;
+	action = MSG_PYRAMID_UNDO_MOVE, MyPlayingTable;
+}
+
+SumToInteraction = GenInteraction {
+	children = SumToList;
+	visibility = subGroup;
+}
+
+SumToList = GenItemGroup {
+	children =	SumToThirteenEntry,
+			SumToFourteenEntry;
+	applyMsg = MSG_PYRAMID_SET_SUM_TO;
+	destination = MyPlayingTable;
+	selection = 13;
+	numSelections = 1;
+	hints = {
+	    HINT_ORIENT_CHILDREN_VERTICALLY
+
+	}
+}
+
+SumToThirteenEntry = GenItem {
+	moniker = '3', "Sum Cards to 13";
+	identifier = 13;
+}
+
+SumToFourteenEntry = GenItem {
+	moniker = '4', "Sum Cards to 14";
+	identifier = 14;
+}
+
+HideInteraction = GenInteraction {
+	children = GameOptions;
+	visibility = subGroup;
+}
+
+GameOptions = GenBooleanGroup {
+	children = HideEntry, CycleEntry;
+	applyMsg = MSG_PYRAMID_SET_GAME_OPTIONS;
+	destination = MyPlayingTable;
+	selectedBooleans = "mask PGO_CYCLE_THROUGH_DECK";
+}
+
+HideEntry = GenBoolean {
+	moniker = 'H', "Hide Covered Cards";
+	identifier = "mask PGO_HIDE_CARDS";
+}
+
+CycleEntry = GenBoolean {
+	moniker = 'C', "Cycle Through Deck";
+	identifier = "mask PGO_CYCLE_THROUGH_DECK";
+}
+
+SaveOptionsTrigger = GenTrigger {
+	moniker = 'O', "Save Options";
+	action = MSG_META_SAVE_OPTIONS, process;
+}
+
+PyramidView = GenView {
+	output = MyPlayingTable;
+	horizAttributes = default +noLargerThanContent;
+	vertAttributes = default +noLargerThanContent;
+	hints = {
+		HINT_INITIAL_SIZE {
+			SpecWidth <SST_PIXELS, 580>
+			SpecHeight<SST_PIXELS, 360>
+		},
+		HINT_DEFAULT_TARGET
+	}
+}
+
+StatusBar = GenInteraction {
+	children = NewGameTrigger;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_HORIZONTALLY
+	}
+	genStates = default -usable;
+}
+
+NewGameTrigger = GenTrigger {
+	moniker = 'N', "New Game";
+	genAttributes = default +initiatesInputIgnore;
+	action = MSG_PYRAMID_NEW_GAME, MyPlayingTable;
+}
+
+end Interface;
+
+start StuffResource;
+
+MyPlayingTable = Pyramid {
+	view = PyramidView;
+	children = MyHand, TopOfMyHand, MyTalon, MyDiscard,
+
+				DeckA1,
+
+			    DeckB1, DeckB2,
+
+		         DeckC1, DeckC2, DeckC3,
+
+		     DeckD1, DeckD2, DeckD3, DeckD4,
+
+		 DeckE1, DeckE2, DeckE3, DeckE4, DeckE5,
+
+	      DeckF1, DeckF2, DeckF3, DeckF4, DeckF5, DeckF6,
+
+	  DeckG1, DeckG2, DeckG3, DeckG4, DeckG5, DeckG6, DeckG7;
+
+	sumTo = 13;
+	hand = MyHand;
+	left = 0;
+	top = 0;
+	right = 580;
+	bottom = 360;
+
+	visCompGeoAttrs = default +customManageChildren;
+
+	whichBack = 1;		/* default to egyptian back */
+}
+
+MyHand = Hand {
+}
+
+TopOfMyHand = PyramidDeck {
+	deckFlags = notInTree, alwaysDetectable;
+}
+
+MyTalon = PyramidDeck {
+	deckFlags = notInTree, alwaysDetectable;
+	offsetFromUpCardX = 0;
+	offsetFromUpCardY = 0;
+}
+
+MyDiscard = PyramidDeck {
+	deckFlags = isDiscard, notInTree;
+	offsetFromUpCardX = 0;
+	offsetFromUpCardY = 0;
+	attr = default -detectable;
+}
+
+DeckA1 = PyramidDeck {
+	leftChild = DeckB1;
+	rightChild = DeckB2;
+	attr = default -detectable;
+}
+
+DeckB1 = PyramidDeck {
+	rightParent = DeckA1;
+	leftChild = DeckC1;
+	rightChild = DeckC2;
+	attr = default -detectable;
+}
+
+DeckB2 = PyramidDeck {
+	leftParent = DeckA1;
+	leftChild = DeckC2;
+	rightChild = DeckC3;
+	attr = default -detectable;
+}
+
+DeckC1 = PyramidDeck {
+	rightParent = DeckB1;
+	leftChild = DeckD1;
+	rightChild = DeckD2;
+	attr = default -detectable;
+}
+
+DeckC2 = PyramidDeck {
+	leftParent = DeckB1;
+	rightParent = DeckB2;
+	leftChild = DeckD2;
+	rightChild = DeckD3;
+	attr = default -detectable;
+}
+
+DeckC3 = PyramidDeck {
+	leftParent = DeckB2;
+	leftChild = DeckD3;
+	rightChild = DeckD4;
+	attr = default -detectable;
+}
+
+DeckD1 = PyramidDeck {
+	rightParent = DeckC1;
+	leftChild = DeckE1;
+	rightChild = DeckE2;
+	attr = default -detectable;
+}
+
+DeckD2 = PyramidDeck {
+	leftParent = DeckC1;
+	rightParent = DeckC2;
+	leftChild = DeckE2;
+	rightChild = DeckE3;
+	attr = default -detectable;
+}
+
+DeckD3 = PyramidDeck {
+	leftParent = DeckC2;
+	rightParent = DeckC3;
+	leftChild = DeckE3;
+	rightChild = DeckE4;
+	attr = default -detectable;
+}
+
+DeckD4 = PyramidDeck {
+	leftParent = DeckC3;
+	leftChild = DeckE4;
+	rightChild = DeckE5;
+	attr = default -detectable;
+}
+
+DeckE1 = PyramidDeck {
+	rightParent = DeckD1;
+	leftChild = DeckF1;
+	rightChild = DeckF2;
+	attr = default -detectable;
+}
+
+DeckE2 = PyramidDeck {
+	leftParent = DeckD1;
+	rightParent = DeckD2;
+	leftChild = DeckF2;
+	rightChild = DeckF3;
+	attr = default -detectable;
+}
+
+DeckE3 = PyramidDeck {
+	leftParent = DeckD2;
+	rightParent = DeckD3;
+	leftChild = DeckF3;
+	rightChild = DeckF4;
+	attr = default -detectable;
+}
+
+DeckE4 = PyramidDeck {
+	leftParent = DeckD3;
+	rightParent = DeckD4;
+	leftChild = DeckF4;
+	rightChild = DeckF5;
+	attr = default -detectable;
+}
+
+DeckE5 = PyramidDeck {
+	leftParent = DeckD4;
+	leftChild = DeckF5;
+	rightChild = DeckF6;
+	attr = default -detectable;
+}
+
+DeckF1 = PyramidDeck {
+	rightParent = DeckE1;
+	leftChild = DeckG1;
+	rightChild = DeckG2;
+	attr = default -detectable;
+}
+
+DeckF2= PyramidDeck {
+	leftParent = DeckE1;
+	rightParent = DeckE2;
+	leftChild = DeckG2;
+	rightChild = DeckG3;
+	attr = default -detectable;
+}
+
+DeckF3 = PyramidDeck {
+	leftParent = DeckE2;
+	rightParent = DeckE3;
+	leftChild = DeckG3;
+	rightChild = DeckG4;
+	attr = default -detectable;
+}
+
+DeckF4 = PyramidDeck {
+	leftParent = DeckE3;
+	rightParent = DeckE4;
+	leftChild = DeckG4;
+	rightChild = DeckG5;
+	attr = default -detectable;
+}
+
+DeckF5 = PyramidDeck {
+	leftParent = DeckE4;
+	rightParent = DeckE5;
+	leftChild = DeckG5;
+	rightChild = DeckG6;
+	attr = default -detectable;
+}
+
+DeckF6 = PyramidDeck {
+	leftParent = DeckE5;
+	leftChild = DeckG6;
+	rightChild = DeckG7;
+	attr = default -detectable;
+}
+
+DeckG1 = PyramidDeck {
+	deckFlags = alwaysDetectable;
+	rightParent = DeckF1;
+}
+
+DeckG2 = PyramidDeck {
+	deckFlags = alwaysDetectable;
+	leftParent = DeckF1;
+	rightParent = DeckF2;
+}
+
+DeckG3 = PyramidDeck {
+	deckFlags = alwaysDetectable;
+	leftParent = DeckF2;
+	rightParent = DeckF3;
+}
+
+DeckG4 = PyramidDeck {
+	deckFlags = alwaysDetectable;
+	leftParent = DeckF3;
+	rightParent = DeckF4;
+}
+
+DeckG5 = PyramidDeck {
+	deckFlags = alwaysDetectable;
+	leftParent = DeckF4;
+	rightParent = DeckF5;
+}
+
+DeckG6 = PyramidDeck {
+	deckFlags = alwaysDetectable;
+	leftParent = DeckF5;
+	rightParent = DeckF6;
+}
+
+DeckG7 = PyramidDeck {
+	deckFlags = alwaysDetectable;
+	leftParent = DeckF6;
+}
+
+end StuffResource;
+
+
+start	StringBlock, data;
+
+/***********************************************************************
+ * 		Solitaire Strings
+ ***********************************************************************/
+
+chunk	WinningString		= "Congratulations, you've won!";
+
+end	StringBlock;

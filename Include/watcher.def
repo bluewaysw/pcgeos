@@ -1,0 +1,130 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		watcher.def
+
+AUTHOR:		Jennifer Wu, Mar 10, 1993
+
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jwu	3/10/93		Initial revision
+
+
+DESCRIPTION:
+	Definitions for watcher applications.
+		
+	$Id: watcher.def,v 1.1 97/04/04 14:24:07 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+;------------------------------------------------------------------------------
+;		FATAL ERRORS
+;------------------------------------------------------------------------------
+
+READ_BOO_BOO						enum FatalErrors
+	; Bytes read from stream were less than desired.
+
+WRITE_BOO_BOO						enum FatalErrors
+	; Bytes written to stream were less than desired.
+
+CANNOT_CREATE_STREAM					enum FatalErrors
+	; Either we tried to create a stream with a buffer that was
+	; too big or we just plain don't have enough memory to 
+	; allocate a stream.
+
+STREAM_NOTIFIED_ERROR					enum FatalErrors
+	; Error in the strea.  Check the registers to see the error 
+	; code.  I don't know which register holds what values at this 
+	; point.
+
+STREAM_DRIVER_LIED_TO_US_ABOUT_AMOUNT_OF_DATA_IN_STREAM	enum FatalErrors
+	; Read notification was sent with a different number of bytes of
+	; data in the stream than there really is.
+
+DIRECTORY_DOES_NOT_EXIST				enum FatalErrors
+	; No such directory has been created yet or the path is wrong.
+
+DIRECTORY_DOES_NOT_WANT_TO_EXIST			enum FatalErrors
+	; Error creating the directory.  Check the pathname and the
+	; error code in ax if you have an enquiring mind.
+
+ERROR_LOADING_DRIVER					enum FatalErrors
+	; Check ax for GeodeLoadError value to find out what went wrong.
+
+FAILED_READ_BYTE_WHEN_THERE_IS_OBVIOUSLY_A_BYTE		enum FatalErrors
+	; We checked the stream ahead of time to make sure that there
+	; were bytes of data in there, but for some reason, the stream
+	; says there aren't any bytes to be read now.  Pourquoi?
+
+CANNOT_CLOSE_MESSAGE_FILE				enum FatalErrors
+	; For some strange reason, we can't close the file. 
+	; This shouldn't even be happening.  You must be having a nightmare.
+
+;----------------------------------------------------------------------------
+;		CONSTANTS 
+;----------------------------------------------------------------------------
+
+WATCHER_STREAM_SIZE		equ	1000
+
+DEVICE_BUSY			equ	-1
+DEVICE_IDLE			equ	0
+
+POLL				equ	-1
+NO_POLL				equ	0
+
+MAX_ATTEMPTS			equ	10
+
+;---------------------------------------------------------------------------
+;		STRUCTURES
+;---------------------------------------------------------------------------
+WatcherData	struct
+	WD_driverData	word		; Start of driver data in stream block
+					; asciiz string name of the device 
+	WD_device	byte	GEODE_MAX_DEVICE_NAME_SIZE	dup (0)
+	WD_destination	GeodeToken	; Token of destination application
+	WD_port		word		; Port device is installed in.
+					; Either a ParallelPortNum or
+					; a SerialPortNum for now.
+					; Also used to refer to connection to
+					; the port.
+	WD_driverHandle	word		; handle of driver for the device
+	WD_driverStrategy	fptr	; Fptr to driver's strategy routine
+	WD_poll		byte		; nonzero if device requires polling
+	WD_busy		byte		; nonzero if currently processing a msg
+					; set by watcher, cleared by driver
+	WD_msgCount	word		; number of unprocessed messages 
+					; received
+	WD_fileHandle	word		; handle of file for current message
+	WD_fileName	DosDotFileName	; name of file for current message
+WatcherData	ends
+
+;----------------------------------------------------------------------------
+;		ERROR CODES FOR THE STREAM
+;----------------------------------------------------------------------------
+
+;
+;  Values for these errors continue from PagerDriverErrors which continue
+;  from StreamErrors.  The reason is that no two of these errors can have
+;  the same value since they will all be stored in the same place in the
+;  streams and we want to be able to tell them apart.
+;
+WatcherStreamError	etype	word, PagerDriverError
+WSE_CANNOT_CREATE_FILE			enum	WatcherStreamError
+WSE_ERROR_PROCESSING_MSG		enum 	WatcherStreamError
+WSE_INVALID_TOKEN			enum	WatcherStreamError
+
+;------------------------------------------------------------------------
+;		MESSAGE TOKENS
+;------------------------------------------------------------------------
+
+MessageToken		etype	byte, 13, 3	
+				; strange values for easy spotting of errors
+MT_START_OF_MESSAGE 			enum	MessageToken
+MT_CONTINUE_MESSAGE			enum 	MessageToken
+MT_END_OF_MESSAGE			enum 	MessageToken
+
+

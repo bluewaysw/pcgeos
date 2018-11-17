@@ -1,0 +1,159 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Include/
+FILE:		stylesh.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	12/91		Initial version
+
+DESCRIPTION:
+	This file defines the several common structures from the style
+	sheet library.
+
+	$Id: stylesh.def,v 1.1 97/04/04 14:24:20 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef __STYLESH
+
+StartLibrary	styles
+
+include chunkarr.def
+
+;------------------------------------------------------------------------------
+;	Constants and structures
+;------------------------------------------------------------------------------
+
+STYLE_SHEET_MAX_ELEMENT_SIZE	=	500
+
+; This is the header for attribute elements
+
+StyleSheetElementHeader	struct
+    SSEH_meta		RefElementHeader
+    SSEH_style		word			;token of style
+StyleSheetElementHeader	ends
+
+; Element header for a style in the style array
+
+StyleElementFlags	record
+    SEF_DISPLAY_IN_TOOLBOX:1
+    SEF_PROTECTED:1			;Style cannot be deleted
+    :14
+StyleElementFlags	end
+
+StyleElementHeader	struct
+    SEH_meta		NameArrayElement
+    SEH_baseStyle	word
+    SEH_flags		StyleElementFlags
+    SEH_reserved	byte 6 dup (?)
+    SEH_privateData	dword
+    SEH_attrTokens	label	word
+StyleElementHeader	ends
+
+; This structure describes the location of an array that can either be in a
+; VM block or in a mem block
+
+StyleChunkDesc	struct
+    SCD_vmFile			word		;VM file handle or 0
+    SCD_vmBlockOrMemHandle	word
+    SCD_chunk			word
+StyleChunkDesc	ends
+
+; If the low bit is set in SCD_chunk, this indicates that the block is not
+; an object block
+
+STYLE_CHUNK_NOT_IN_OBJ_BLOCK	= 1
+
+
+MAX_STYLE_SHEET_ATTRS		equ	4
+
+;---
+
+; This is the parameter block that is passed to the various style sheet
+; routines.  Note that not all parameters need to be passed to all routines.
+
+StyleSheetParams	struct
+    SSP_descriptionCallbacks	fptr		MAX_STYLE_SHEET_ATTRS dup (?)
+    SSP_specialDescriptionCallback	fptr
+	; callback routines to describe (in text) a style
+	; needed for: DescribeStyle
+
+    SSP_mergeCallbacks		fptr		MAX_STYLE_SHEET_ATTRS dup (?)
+	; callback routines to merge the diffs between two styles into a
+	; third style
+	; needed for: DeleteStyle, RedefineStyle, PasteStyle
+    SSP_substitutionCallbacks	fptr		MAX_STYLE_SHEET_ATTRS dup (?)
+	; callback routines to substitute one attr token with another
+	; needed for: DeleteStyle, RedefineStyle, PasteStyle
+
+SSP_copyStart	label	byte
+    SSP_styleArray		StyleChunkDesc
+	; pointer to the style array
+	; needed for: all
+    SSP_attrArrays		StyleChunkDesc	MAX_STYLE_SHEET_ATTRS dup (<>)
+	; pointers to attribute arrays
+	; needed for: all but RenameStyle
+SSP_copyEnd	label	byte
+
+    SSP_attrTokens		word		MAX_STYLE_SHEET_ATTRS dup (?)
+	; tokens for each attribute type
+	; needed by: AddStyle, ApplyStyle, RedefineStyle, CopyElement,
+	;            PasteElement
+    SSP_xferStyleArray		StyleChunkDesc
+	; pointer to the transfer item style array
+	; needed for: CopyElement, PasteElement
+    SSP_xferAttrArrays		StyleChunkDesc	MAX_STYLE_SHEET_ATTRS dup (<>)
+	; pointers to transfer item attribute arrays
+	; needed for: CopyElement, PasteElement
+StyleSheetParams	ends
+
+;	Description callback:
+;	Pass:
+;		es:di - buffer
+;		cx - bufer size left
+;		ds:si - derived attribute structure
+;		ds:dx - base attribute structure (dx = 0 for none)
+;		bp - number of characters already in buffer
+;		on stack: 
+;			optr of extra UI to update (special callback only)
+;			private data for style
+;	Return:
+;		es:di - updated
+;		cx - updated
+;	Destroyed:
+;		ax, bx, dx, si, bp, ds
+
+;	Merge callback:
+;		target <= new + (target - old)
+;	Pass:
+;		ds:si - attribute structure to modify ("target")
+;		es:di - result attribute structure (copy of "new")
+;		ds:cx - old attribute structure ("old")
+;		ss:bp - pointer to private data from style structure
+;		dx - current element size
+;	Return:
+;		structure updated
+;		dx - new element size
+;	Destroyed:
+;		ax, bx, cx, dx, si, di, bp, ds
+
+;	Substitute callback:
+;		Substitute old token with new token
+;	Pass:
+;		si, ds - values passed to StyleSheet routine
+;		cx - old element token
+;		dx - new element token
+;		di - non-zero to update reference counts (decrement the
+;		     reference count for the old token and increment the
+;		     reference count for the new token)
+;	Return:
+;		ax - non-zero if recalculation needed
+;	Destroyed:
+;		ax, bx, cx, dx, si, di, bp, ds
+
+EndLibrary	styles

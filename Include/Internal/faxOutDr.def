@@ -1,0 +1,736 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	(c) Copyright Geoworks 1994.  All rights reserved.
+			GEOWORKS CONFIDENTIAL
+
+PROJECT:	
+MODULE:		
+FILE:		faxOutNPDr.def
+
+AUTHOR:		Steve Kertes, Oct 28, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SK	10/28/94   	Initial revision
+
+
+DESCRIPTION:
+
+	the fax send, not pasta, driver
+		
+	$Id: faxOutDr.def,v 1.1 97/04/04 14:14:26 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SetDef __FAXOUTDR
+
+include driver.def
+include Internal/faxDriver.def
+
+; This PASTA variable exists in order to get the Geos 2.0 PASTA fax
+; solution to compile under 3.0
+ifndef	PASTA
+	PASTA	equ	0
+endif
+
+;------------------------------------------------------------------------------
+;		       Fax Output Driver Function Calls
+;------------------------------------------------------------------------------
+
+;StartDriver faxout
+;
+; Protocol number for this interface.  Adjust the final numbers, below,
+; if the interface is changed.
+;
+FAXOUT_PROTO_MAJOR equ DRIVER_EXT_PROTO_MAJOR+0
+FAXOUT_PROTO_MINOR equ DRIVER_EXT_PROTO_MINOR+0
+
+if not PASTA
+FaxOutFunction		etype	word, DriverExtendedFunction, 2
+;
+; Remember that the first 6 functions to be supported are:
+;
+; DR_INIT		0
+; DR_EXIT		2
+; DR_SUSPEND		4
+; DR_UNSUSPEND		6
+; DRE_TEST_DEVICE	8
+; DRE_SET_DEVICE	10
+;
+DR_FAXOUT_REGISTER			enum FaxOutFunction
+; Register with the driver, this tells it what messages to send for events
+; and who to send them to
+;
+;Pass:
+;	ax = timer message (handler calls DR_FAXIN_HANDLE_TIMER)
+;	bx = notify message (handler calls DR_FAXIN stuff)
+;	bp = data message (handler calls DR_FAXIN_HANDLE_DATA_NOTIFICATION)
+;
+; Return:
+;	carry set if register failed (someone else is registerd)
+;
+
+DR_FAXOUT_UNREGISTER			enum FaxOutFunction
+; Clears the registration stuff.  It is possible to unregister someone else,
+; don't do it!!
+;
+; Pass:
+;	nothing
+;
+; Return
+;	nothing
+
+DR_FAXOUT_SET_PORT			enum FaxOutFunction
+; sets the serial port to be using, this will close the last port opened, if
+; it was opened by this driver
+;
+; Pass:
+;	bx = SerialPortNum (active version)
+; Return:
+;	nothing
+;
+
+DR_FAXOUT_SET_T30			enum FaxOutFunction
+; Set the maximum values that the user of the driver can use.  This does not
+; work correctly for baud rates.
+;
+; Pass:
+;	cx:dx	= T30Response values to use
+;	bl	= T30ResponseFlags (what entries are being set)
+; Return:
+;	writes settings to .ini
+;
+
+DR_FAXOUT_SET_STATION_ID		enum FaxOutFunction
+; Sets the station id to send to the fax machine we call
+;
+; Pass:
+;	bx:dx	= pointer to station id string to use (null terminated)
+; Return:
+;	writes id to .ini
+;
+
+DR_FAXOUT_HANDLE_DATA_NOTIFICATION	enum FaxOutFunction
+; Data is ready from the serial port.
+; Must be called by the handler of the data message that was registered.
+;
+; Pass:
+;	whatever was passed when data msg was called (currently nothing)
+; Return:
+;	nothing
+;
+
+DR_FAXOUT_HANDLE_TIMER			enum FaxOutFunction
+; A timer event has occured.
+; Must be called by the handler of the timer message that was registered.
+;
+; Pass:
+;	whatever was passed when timer msg was called (currently nothing)
+; Return:
+;	nothing
+;
+
+DR_FAXOUT_HANDLE_TIMEOUT		enum FaxOutFunction
+; Must be called by the handler of the FSFN_TIMEOUT notification.
+; This will cause the driver to timeout and abort whatever it was doing.
+; This will result in a FSFN_SENDER_STOPPED notificaion with FSDEC_TIMEOUT.
+;
+; Pass:
+;	nothing
+; Return:
+;	nothing
+;
+
+DR_FAXOUT_INIT_DEVICE			enum FaxOutFunction
+; This starts things off by initing the modem for fax sending.
+; Do not do anything until a FSFN_READY_TO_PLACE_CALL notification has
+; been sent.
+;
+; Pass:
+;	nothing
+; Return:
+;	carry set if could not open serial port
+;
+
+DR_FAXOUT_ESTABLISH_CONNECTION		enum FaxOutFunction
+; Call this, after FSFN_READY_TO_PLACE_CALL has been received, to try
+; to make a connection.
+;
+; Pass:
+;	cx:dx	= phone number to dial
+;	bx	= max timeout value in secs (modem may give up early)
+;	ah	= FaxoutDialFlags
+;	al	= length of number to dial
+; Return:
+;	carry set if not ready to make call (NEC only, EC dies)
+;
+
+DR_FAXOUT_GET_T30			enum FaxOutFunction
+; The handler of FSFN_GET_T30 should call this to get a copy of the current
+; session paramaters.
+;
+; Pass:
+;	bx:dx = T30Response to put T30 stuff into
+; Return:
+;	bx:dx filled in
+;
+
+DR_FAXOUT_GET_CALLED_ID			enum FaxOutFunction
+; The handler of FSFN_GET_CALLED_ID can call this to get a copy of the
+; current called station id.
+;
+; Pass:
+;	bx:dx is ptr to buffer to put callers id (must be at least
+;	FAXFILE_MAX_FAX_ID_FIELD_LENGTH)
+; Return:
+;
+
+DR_FAXOUT_SEND_DOCUMENT			enum FaxOutFunction
+; Must be called by the handler of FSFN_READY_TO_SEND_DOCUMENT.  Next a
+; FSFN_READY_TO_SEND_PAGE will be sent.
+;
+; Pass:
+;	cx = number of pages in document
+; Return:
+;	nothing
+;
+
+DR_FAXOUT_SEND_PAGE			enum FaxOutFunction
+; Must be called by the handler of FSFN_READY_TO_SEND_PAGE.
+;
+; Pass:
+;	cx = page to be sent (0 based), must match page requested
+; Return:
+;	nothing
+;
+
+DR_FAXOUT_SEND_IMAGE_DATA		enum FaxOutFunction
+; This sends a line of data, filtering it so that all DLE characters are
+; doubled.  Use this to send the page image.  After the entire image has
+; been sent call DR_FAXOUT_END_PAGE.
+;
+; Pass:
+;	bx:dx	= buffer to send
+;	cx	= length of buffer
+; Return:
+;	nothing
+;
+
+DR_FAXOUT_END_PAGE			enum FaxOutFunction
+; Ends the current page.
+;
+; Pass:
+;	nothing
+; Return:
+;	nothing
+;
+
+DR_FAXOUT_ACK_DOCUMENT_COMPLETE		enum FaxOutFunction
+; Must be called by the handler of FSFN_DOCUMENT_COMPLETE to tell the
+; driver if more documents need to be sent.
+;
+; Pass:
+;	cx = BooleanWord, BW_TRUE if another doc is to be sent
+;	dl = FaxVerticalRes
+; Return:
+;	nothing
+;
+
+DR_FAXOUT_USER_STOP			enum FaxOutFunction
+; Stops transmission and kills the current session.
+; This will result in a FSFN_SENDER_STOPPED notificaion with FSDEC_USER_STOP.
+;
+; Pass:
+;	nothing, how depressing.
+; Return:
+;	nothing
+
+DR_FAXOUT_CHECK_FOR_MODEM		enum FaxOutFunction
+;
+; PASS:		ax	- SerialPortNum of port to check
+; RETURN:	carry	- clear if a viable faxmodem is there
+;			- set if no modem/not a faxmodem
+; DESTROYED:	nothing
+;
+; This is to be used before DR_FAXOUT_REGISTER to determine if a viable
+; faxmodem of the appropriate class is attached to the passed serial port
+; number.
+;
+else ; now if PASTA is true
+FaxOutFunction		etype	word, DriverExtendedFunction, 2
+
+;
+; Remember that the first 6 functions to be supported are:
+;
+; DR_INIT		0
+; DR_EXIT		2
+; DR_SUSPEND		4
+; DR_UNSUSPEND		6
+; DRE_TEST_DEVICE	8
+; DRE_SET_DEVICE	10
+;
+
+DR_FAXOUT_REGISTER			enum FaxOutFunction
+;	PASS:		ax	= data notification message #
+;			bx	= job done message #
+;			bp	= timeout notification message #
+;			cx:dx	= OD of object that will receive messages
+;	RETURN:		nothing
+;	DESTROYS:	nothing
+;
+;	This function is intended to be called by the spooler, so
+;	as to provide some messages and an OD that the driver may have
+;	the Serial Driver send notifications to, have timeout
+;	messages sent to, and have success/failure messages sent to.
+;
+;	The method correspoding to the message passed in ax must call
+;	DR_FAXOUT_HANDLE_DATA_NOTIFICATION, and the method for bp
+;	must call DR_FAXOUT_HANDLE_TIMEOUT.
+;
+;	The data notification and timeout methods will be passed nothing
+;	they can use themselves, and they should call the required driver
+;	routines before destroying any registers.
+;
+;	The "job finished" method will be passed with ss:bp pointing
+;	to a FaxErrorInfo structure, from which it can determine
+;	if the job was a success or failure, etc.
+;
+
+DR_FAXOUT_HANDLE_DATA_NOTIFICATION	enum FaxOutFunction
+;	PASS:		nothing
+;	RETURN:		nothing
+;	DESTROYS:	nothing
+;
+;	This routine must be called by the method that handles the
+;	message passed in ax to DR_FAXOUT_REGISTER.
+;
+
+DR_FAXOUT_HANDLE_TIMEOUT		enum FaxOutFunction
+;	PASS:		nothing
+;	RETURN:		nothing
+;	DESTROYS:	nothing
+;
+;	This routine must be called by the method that handles the
+;	message passed in bp to DR_FAXOUT_REGISTER.
+;
+
+DR_FAXOUT_SEND				enum FaxOutFunction
+;	PASS:		bx	= VM file handle of faxfile to send
+;	RETURN:		carry set on error (e.g. couldn't open serial port)
+;	DESTROYS:	nothing
+;
+;	This routine must be called by the method that handles the
+;	message passed to DR_FAXOUT_REGISTER.
+;
+
+DR_FAXOUT_USER_STOP			enum FaxOutFunction
+;	PASS:		nothing
+;	RETURN:		nothing
+;	DESTROYS:	nothing
+;
+;	This routine must be called by the method that handles the
+;	message passed to DR_FAXOUT_REGISTER.
+;
+
+DR_FAXOUT_FORCE_STOP			enum FaxOutFunction
+;	PASS:		ax	= FaxErrorType
+;	RETURN:		nothing
+;	DESTROYS:	nothing
+;
+;	This routine must be called by the method that handles the message
+;	passed to DR_FAXOUT_REGISTER.
+;
+
+DR_FAXOUT_RESET_DEVICE			enum	FaxOutFunction
+;	PASS:		nothing
+;	RETURN:		nothing
+;	DESTROYS:	nothing
+;
+; 	This routine will reset the fax modem so that it won't be left
+;	in the faxing state after transmission.
+;
+endif ; PASTA
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;
+; Notification messages are sent to the optr that was registered for them.
+; The FaxSendFaxNotification is passed in cx, and other data is passed in
+; dx and bp if necessary.  (FSFN_READY_TO_SEND_PAGE passes the page number
+; to send in dx.)
+;
+FaxSendFaxNotification		etype	word, 0, 2
+
+FSFN_READY_TO_PLACE_CALL		enum	FaxSendFaxNotification
+;
+; The modem is ready to send a fax, all we need now is for a
+; DR_FAXOUT_ESTABLISH_CONNECTION to be sent.  This notification is sent
+; after the series of events set off by calling DR_FAXOUT_INIT_DEVICE has
+; sucessfuly completed.  No extra data is passed.
+;
+FSFN_READY_TO_SEND_DOCUMENT		enum	FaxSendFaxNotification
+;
+; We are ready to send a document now, the caller needs to call us with
+; DR_FAXOUT_SEND_DOCUMENT to get us to continue (passing total number of pages)
+; No extra data is passed
+;
+FSFN_READY_TO_SEND_PAGE			enum	FaxSendFaxNotification
+;
+; We are ready to send a page now, the caller needs to call us with
+; DR_FAXOUT_SEND_PAGE to get us to continue. The page we are waiting to send
+; is passed in dx.  (starting with page 0)
+;
+FSFN_BEGIN_SENDING_IMAGE_DATA		enum	FaxSendFaxNotification
+;
+; It is time to send image data!  The caller calls DR_FAXOUT_SEND_IMAGE_DATA
+; until all the data is sent, then they call DR_FAXOUT_END_PAGE.  The page
+; to begin sending is passed in dx, starting with page 0.
+;
+FSFN_DOCUMENT_COMPLETE			enum	FaxSendFaxNotification
+;
+; We have sent the last page of a document, and we need to be told if there
+; are more documents to be sent.  The current document should not be closed
+; yet, since the receiver may request a retransmit of the last page.
+; Reply with DR_FAXOUT_ACK_DOCUMENT_COMPLETE.
+;
+FSFN_PAGE_IS_GOOD			enum	FaxSendFaxNotification
+FSFN_PAGE_IS_BAD			enum	FaxSendFaxNotification
+;
+; A page has been finished, and we have received the post page message.
+; The page number is passed in dx.  If the page was bad then we will be
+; retransmitting it, unless too many attempts have been made.  If it was
+; good then the next page will be transmitted.  This message will be sent
+; AFTER the FSFN_DOCUMENT_COMPLETE.  No reply is needed, since the next
+; message will be a done, or a ready to send page or document.
+;
+
+FSFN_GET_T30				enum	FaxSendFaxNotification
+;
+; we have parsed a DCS or DIS response, if you want the subparamater values
+; call DR_FAXOUT_GET_T30.  A FaxoutT30ParamaterType is passed in dx so the
+; caller knows if which (DCS or DIS) caused this to happen.
+;
+FSFN_GET_CALLED_ID			enum	FaxSendFaxNotification
+;
+; this notification is sent after we have parsed a +FCSI response.  call
+; DR_FAXOUT_GET_CALLED_ID to get the called station id.
+;
+
+FSFN_TIMEOUT				enum	FaxSendFaxNotification
+;
+; a timeout has occured, the caller must call DR_FAXOUT_HANDLE_TIMEOUT
+;
+
+FSFN_SENDER_STOPPED			enum	FaxSendFaxNotification
+;
+; the send machine is stopped.  dx is the FaxSendDoneErrorCode that caused
+; the stop.  no reply is needed.
+;
+
+FSFN_CONNECTING				enum	FaxSendFaxNotification
+;
+; the modem has connected to the remote machine.  no reply is neeed.
+; (this is just a status message)
+;
+
+FSFN_FAX_SUCCESSFULY_SENT		enum	FaxSendFaxNotification
+;
+; the current fax has been successfuly sent, but wait until a STOPPED
+; notification is sent before quitting!  no reply is needed. (this is just
+; a status message)
+;
+
+FSFN_HANGING_UP_PHONE			enum	FaxSendFaxNotification
+;
+; the fax driver is about to hang up the phone.  this is needed in responder
+; so we can tell the difference between the driver hanging up the phone and
+; when the user does it.
+;
+
+FaxoutT30ParamaterType			etype	word, 0, 1
+FTPT_DCS				enum	FaxoutT30ParamaterType
+;
+; a +FDCS response reports the current session paramaters that to be used
+; to send the page image.  this type is sent with at FSFN_GET_T30 notification.
+;
+FTPT_DIS				enum	FaxoutT30ParamaterType
+;
+; a +FDIS response reports the receiver capabilities, and may be of no use at
+; all to the caller.  this type is sent with at FSFN_GET_T30 notification.
+;
+
+
+;
+; a FaxSendDoneErrorCode is passed in dx with a FSFN_SENDER_STOPPED
+; notification
+;
+FaxSendDoneErrorCode		etype	word, 0, 2
+FSDEC_NONE				enum	FaxSendDoneErrorCode
+;
+;	No error occurred -- successful reception.
+;
+FSDEC_UNABLE_TO_OPEN_COM_PORT		enum	FaxSendDoneErrorCode
+;
+;	Failed to open com port, can't go far without it.
+;
+FSDEC_INCOMPATIBLE_MODEM		enum	FaxSendDoneErrorCode
+;
+;	We discover that the modem that we are supposed to use for
+;	sending is not in fact compatible with us.  For example, if the
+;	user tries to use a Class 1-only modem with the Class 2 driver,
+;	they should get this message back.
+;
+FSDEC_RECEIVED_BUSY			enum	FaxSendDoneErrorCode
+;
+;	Tried to call, but got busy signal
+;
+FSDEC_RECEIVED_NOCARRIER		enum	FaxSendDoneErrorCode
+;
+;	Tried to call, but no carrier detected
+;
+FSDEC_RECEIVED_NODIALTONE		enum	FaxSendDoneErrorCode
+;
+;	Tried to call, but no dialtone detected
+;
+FSDEC_REMOTE_NOT_FAX_DEVICE		enum	FaxSendDoneErrorCode
+;
+;	The thing that we called doesn't appear to be a fax device.
+;	This also can happen if the remote does not answer the phone.
+;
+FSDEC_RECEIVED_ERROR_RESPONSE		enum	FaxSendDoneErrorCode
+;
+;	The driver got some kind of known error response from the device,
+;	during transmission.
+;
+FSDEC_RECEIVED_FHNG			enum	FaxSendDoneErrorCode
+;
+;	We got some random FHNG that we don't understand.
+;
+FSDEC_RECEIVED_UNEXPECTED_RESPONSE	enum	FaxSendDoneErrorCode
+;
+;	The driver got some kind of unexpected response during transmission.
+;
+FSDEC_TIMEOUT				enum	FaxSendDoneErrorCode
+;
+;	The driver got some kind of timeout when dealing with its fax device.
+;
+FSDEC_USER_STOP				enum	FaxSendDoneErrorCode
+;
+;	The user stopped the receiving process explicitly.
+;
+FSDEC_CALL_CANCLED			enum	FaxSendDoneErrorCode
+;
+;	AT+FK or <CAN> cancled the call (could also be a user stop)
+;
+FSDEC_TOO_MANY_ATTEMPTS_TO_SEND_PAGE	enum	FaxSendDoneErrorCode
+;
+;	We only try 3 times to send a page, after that we give up.
+;
+
+FSDEC_INVALID				enum	FaxSendDoneErrorCode, 0xfff0
+;
+; This is simply a marker to indicate a bogus error.  It's never sent by the
+; fax driver system.
+;
+
+
+;
+; FaxoutDialFlags are passed with DR_FAXOUT_ESTABLISH_CONNECTION
+; New and improved: FDF_SEND_UNIFORM_PAGES was added to indicate that entire fax
+; pages -- even blank ones -- should be generated.  If this flag is not set,
+; then the fax pages will be just as large as they need to be, but no larger.
+;
+; FDF_SEND_UNIFORM_PAGES is used in the FaxPrint print driver and nowhere
+; else.
+;
+FaxoutDialFlags		record
+	:5
+	FDF_SEND_UNIFORM_PAGES:1
+	FDF_USE_TONE_DIAL:1
+	FDF_USE_PULSE_DIAL:1
+FaxoutDialFlags		end
+
+FAXOUT_DEFAULT_TIMEOUT		equ	60		; 60 seconds to timeout
+FAXOUT_DEFAULT_DIAL_FLAGS	equ	(mask FDF_USE_TONE_DIAL)
+
+;EndDriver faxout
+
+;--------------------------------
+;	FaxErrorType
+;--------------------------------
+
+;
+; NOTE:	the spooler's errorStrings table relies on the order and
+;	content of this	enumerated type, so you must change
+;	errorStrings if you modify this.
+;
+; FaxErrorType contains 3 major types of errors:
+;
+; 1) Minor Error Messages
+;
+;	FET_BUSY, FET_NO_ANSWER, FET_REMOTE_NOT_FAX_DEVICE, 
+;	FET_RECEIVED_ERROR_RESPONSE, FET_RECEIVED_UPEXPECTED_RESPONSE,
+;	FET_COULD_NOT_SEND_PAGE
+;
+; 	This category is for errors related to individual fax jobs.
+;	For example: wrong phone number, line busy, etc. 
+;
+; 2) Serious Error Messages
+;
+;	FET_TIMEOUT, FET_USER_STOP, FET_COULDNT_OPEN_DEVICE
+;
+;	This categoriy is for errors that make the whole sending process 
+;	abort.  That is, if the user has tried to send more than one job
+;	by using the Transmit All button, the system will not attempt to
+;	send the remaining jobs.  These errors are triggered by things such
+;	as modem timeouts and user interupts.
+;
+; 3) Other Messages
+;
+;	FET_NEW_PAGE, FET_NONE, FET_OPENING_PORT, FET_OPENING_PORT,
+;	FET_INITIALIZING_MODEM,	FET_DIALING, FET_NEGOTIATING_PARAMS,
+;	FET_SENDING_START_PAGE
+;
+;	These messages exist merely to inform the spooler about what
+;	the driver is currently up to (so that it can relay that
+;	to the user.)
+;
+
+FaxErrorType		etype	word, 0, 2
+FET_BUSY				enum	FaxErrorType
+;
+;	We got a busy signal when we called the specified phone number.
+;
+FET_NO_ANSWER				enum	FaxErrorType
+;
+;	We got no answer when we called the specified phone number.
+;
+FET_REMOTE_NOT_FAX_DEVICE		enum	FaxErrorType
+;
+;	The thing we called doesn't appear to be a fax device.
+;
+FET_RECEIVED_ERROR_RESPONSE		enum	FaxErrorType
+;
+;	The driver got some kind of known error response from the device,
+;	during transmission.
+;
+FET_RECEIVED_UNEXPECTED_RESPONSE	enum	FaxErrorType
+;
+;	The driver got some kind of unexpected response during transmission.
+;
+FET_TIMEOUT				enum	FaxErrorType
+;
+;	The driver got some kind of timeout when dealing with its fax device.
+;
+FET_USER_STOP				enum	FaxErrorType
+;
+;	The user stopped the sending process explicitly.
+;
+FET_COULDNT_OPEN_DEVICE			enum	FaxErrorType
+;
+;	Tried to open the device (in the case of Class 2, using the Serial
+;	Driver), but failed.
+;
+FET_INCOMPATIBLE_MODEM			enum	FaxErrorType
+;
+;	We discover that the modem that we are supposed to use for
+;	sending is not in fact compatible with us.  For exaple, if the
+;	user tries to use a Class 1-only modem with the Class 2 driver,
+;	they should get this message back.
+;
+FET_COULD_NOT_SEND_PAGE			enum	FaxErrorType
+;
+;	Got a bad post page response 3 times when sending a page.
+;
+FET_NEW_PAGE				enum	FaxErrorType
+;
+;	Informs the spooler that we are about to send a new page.
+;
+FET_INITIALIZED				enum	FaxErrorType
+;
+;	This value is only used in manual dialing, after intialization of the 
+;	modem is done, the driver have to inform the spooler to tell the user
+;	to dial the fax number and press the "connect" button.
+;
+FET_NOT_DIAL				enum	FaxErrorType
+;
+;	This value is only when the user cancels manual dialing.
+;
+FET_NONE				enum	FaxErrorType
+;
+;	No error occurred -- successful transmission.
+;
+FET_OPENING_PORT			enum 	FaxErrorType
+;
+; 	Opening the serial port.
+;
+FET_INITIALIZING_MODEM			enum	FaxErrorType
+;
+;	Initializing the modem.
+;
+FET_DIALING				enum	FaxErrorType
+;
+; 	Dialing the phone number.
+;
+FET_NEGOTIATING_PARAMS			enum	FaxErrorType
+;
+;	Negotiating parameters with remote fax machine.
+;
+FET_SENDING_START_PAGE			enum	FaxErrorType
+;
+;	Sending start page command to fax modem to begin data
+;	transmission phase.
+;
+
+;--------------------------------
+;	FaxSendType
+;--------------------------------
+
+;
+; Types of method that are used to send the fax.  I think this
+; is a hold-over from manual-dialing days.  It should be removed, I
+; don't think anyone uses it.
+;
+FaxSendType	etype	byte,0,2
+FST_AUTO	enum	FaxSendType
+FST_MANUAL	enum	FaxSendType
+
+;--------------------------------
+;	FaxErrorInfo
+;--------------------------------
+
+;
+; This structure contains everything the FDA can know about an error
+; that occurs in the driver.
+;
+FaxErrorInfo		struct
+FEI_type	FaxErrorType	FET_NONE
+;
+;	General type of error that occurred.
+;
+FEI_state	word
+;
+;	State we were in when the error occured.  This may not mean anything
+;	for some drivers, if they don't use the state machine approach.
+;
+FEI_pagesSent	word	0
+;
+;	Number of pages successfully sent before the error occurred.
+;
+FEI_sourceCodeLine	word	0xffff
+;
+;	Line number of source code file where the error was reported.
+;	Admittedly, this number may be hard to interpret, but it
+;	still could come in handy at some point.
+;
+FEI_code	word
+;
+;	This field is intended to allow drivers to convey some kind of
+;	driver-specific error code.
+;
+FaxErrorInfo		end

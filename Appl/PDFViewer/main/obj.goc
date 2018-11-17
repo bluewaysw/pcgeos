@@ -1,0 +1,393 @@
+//========================================================================
+//
+// Object.cc
+//
+// Copyright 1996 Derek B. Noonburg
+//
+//========================================================================
+
+#ifdef __GNUC__
+#pragma implementation
+#endif
+
+@include "pdfvu.goh"
+@include "obj.goh"
+@include "array.goh"
+@include "diction.goh"
+@include "xref.goh"
+@include "stream.goh"
+
+
+//------------------------------------------------------------------------
+// Object
+//------------------------------------------------------------------------
+
+/*
+char *objTypeNames[numObjTypes] = {
+  "boolean",
+  "integer",
+  "real",
+  "string",
+  "name",
+  "null",
+  "array",
+  "dictionary",
+  "stream",
+  "ref",
+  "cmd",
+  "error",
+  "eof",
+  "none"
+};
+*/
+
+#ifdef DEBUG_MEM
+long Object::numAlloc[numObjTypes] =
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+#endif
+
+#ifdef DEBUG_MEM
+#define initObj(t) ++numAlloc[obj->type = t]
+#else
+#define initObj(t) obj->type = t
+#endif
+
+
+void initArray(Obj *obj) {
+  initObj(objArray);
+  obj->u.array = gmalloc( sizeof (Array) );
+  ArrayInit(obj->u.array);
+}
+
+void initDict(Obj *obj) {
+  initObj(objDict);
+  obj->u.dict = gmalloc( sizeof (Dict) );
+  DictInit(obj->u.dict);
+}
+
+void initStream(Obj *obj, Stream *stream1) {
+  initObj(objStream);
+  obj->u.stream = stream1;
+}
+
+
+  // Copy an object.  (obj <- obj2)
+void ObjCopy(Obj *obj, Obj *obj2) {
+
+    memcpy(obj, obj2, sizeof (Obj));
+/*  obj->type = obj2->type; */
+  switch (obj->type) {
+  case objString:
+//    obj->u.string = gmalloc(sizeof (GooString));
+    GStrInitGS(&obj->u.string, &obj2->u.string);
+    break;
+  case objName:
+    obj->u.name = copyString(obj2->u.name);
+    break;
+  case objArray:
+    ArrayIncRef(obj->u.array);
+    break;
+  case objDict:
+    DictIncRef(obj->u.dict);
+    break;
+  case objStream:
+    StreamIncRef(obj->u.stream);
+    break;
+  case objCmd:
+    obj->u.cmd = copyString(obj2->u.cmd);
+    break;
+  default:
+    break;
+  }
+#ifdef DEBUG_MEM
+  ++numAlloc[type];
+#endif
+}
+
+/* fetch an object (dest <- src obj) */
+
+void ObjFetch(Obj *dest, Obj *obj, XRef *xref) {
+  (obj->type == objRef && xref) ?
+         XRefFetch(xref, obj->u.ref.num, obj->u.ref.gen, dest) : ObjCopy(dest, obj);
+}
+
+  // Free object contents.
+void ObjFree(Obj *obj) {
+  switch (obj->type) {
+  case objString:
+    GStrFree(&obj->u.string);
+    break;
+  case objName:
+    gfree(obj->u.name);
+    break;
+  case objArray:
+      if (!ArrayDecRef(obj->u.array)) {
+	  ArrayFree(obj->u.array);
+	  gfree(obj->u.array);
+      }
+    break;
+  case objDict:
+      if (!DictDecRef(obj->u.dict)) {
+	  DictFree(obj->u.dict);
+	  gfree(obj->u.dict);
+      }
+    break;
+  case objStream:
+      if (!StreamDecRef(obj->u.stream)) {
+	  StreamFree(obj->u.stream);
+	  gfree(obj->u.stream);
+      }
+    break;
+  case objCmd:
+    gfree(obj->u.cmd);
+    break;
+  default:
+    break;
+  }
+#ifdef DEBUG_MEM
+  --numAlloc[type];
+#endif
+  obj->type = objNone;
+}
+
+#if 0
+char *Object::getTypeName() {
+  return objTypeNames[type];
+}
+
+void Object::print(FILE *f) {
+  Object obj;
+  int i;
+
+  switch (type) {
+  case objBool:
+    fprintf(f, "%s", booln ? "true" : "false");
+    break;
+  case objInt:
+    fprintf(f, "%d", intg);
+    break;
+  case objReal:
+    fprintf(f, "%g", real);
+    break;
+  case objString:
+    fprintf(f, "(%s)", string->getCString());
+    break;
+  case objName:
+    fprintf(f, "/%s", name);
+    break;
+  case objNull:
+    fprintf(f, "null");
+    break;
+  case objArray:
+    fprintf(f, "[");
+    for (i = 0; i < arrayGetLength(); ++i) {
+      if (i > 0)
+	fprintf(f, " ");
+      arrayGetNF(i, &obj);
+      obj.print(f);
+      obj.free();
+    }
+    fprintf(f, "]");
+    break;
+  case objDict:
+    fprintf(f, "<<");
+    for (i = 0; i < dictGetLength(); ++i) {
+      fprintf(f, " /%s ", dictGetKey(i));
+      dictGetValNF(i, &obj);
+      obj.print(f);
+      obj.free();
+    }
+    fprintf(f, " >>");
+    break;
+  case objStream:
+    fprintf(f, "<stream>");
+    break;
+  case objRef:
+    fprintf(f, "%d %d R", ref.num, ref.gen);
+    break;
+  case objCmd:
+    fprintf(f, "%s", cmd);
+    break;
+  case objError:
+    fprintf(f, "<error>");
+    break;
+  case objEOF:
+    fprintf(f, "<EOF>");
+    break;
+  case objNone:
+    fprintf(f, "<none>");
+    break;
+  }
+}
+
+void Object::memCheck(FILE *f) {
+#ifdef DEBUG_MEM
+  long i;
+  long t;
+
+  t = 0;
+  for (i = 0; i < numObjTypes; ++i)
+    t += numAlloc[i];
+  if (t > 0) {
+    fprintf(f, "Allocated objects:\n");
+    for (i = 0; i < numObjTypes; ++i) {
+      if (numAlloc[i] > 0)
+	fprintf(f, "  %-20s: %6d\n", objTypeNames[i], numAlloc[i]);
+    }
+  }
+#endif
+}
+
+#endif  /* 0 */
+
+  // Initialize an object.
+  void initBool(Obj *obj, GBool booln1)
+    { initObj(objBool); obj->u.booln = booln1; }
+  void initInt(Obj *obj, long intg1)
+    { initObj(objInt); obj->u.intg = intg1; }
+  void initReal(Obj *obj, gdouble real1)
+    { initObj(objReal); obj->u.real = real1; }
+  void initString(Obj *obj, GooString *string1)
+    { initObj(objString); GStrInitGS(&obj->u.string, string1); }
+  void initName(Obj *obj, char *name1)
+    { initObj(objName); obj->u.name = copyString(name1); }
+  void initNull(Obj *obj)
+    { initObj(objNull); }
+  void initDictData(Obj *obj, Dict *dict1)
+    { initObj(objDict); obj->u.dict = dict1; }
+  void initRef(Obj *obj, long num1, long gen1)
+    { initObj(objRef); obj->u.ref.num = num1; obj->u.ref.gen = gen1; }
+  void initCmd(Obj *obj, char *cmd1)
+    { initObj(objCmd); obj->u.cmd = copyString(cmd1); }
+  void initError(Obj *obj)
+    { initObj(objError); }
+  void initEOF(Obj *obj)
+    { initObj(objEOF); }
+
+  // Type checking.
+  GBool isBool(Obj *obj) { return obj->type == objBool; }
+  GBool isInt(Obj *obj) { return obj->type == objInt; }
+  GBool isReal(Obj *obj) { return obj->type == objReal; }
+  GBool isNum(Obj *obj) { return obj->type == objInt || obj->type == objReal; }
+  GBool isString(Obj *obj) { return obj->type == objString; }
+  GBool isName(Obj *obj) { return obj->type == objName; }
+  GBool isNull(Obj *obj) { return obj->type == objNull; }
+  GBool isArray(Obj *obj) { return obj->type == objArray; }
+  GBool isDict(Obj *obj) { return obj->type == objDict; }
+  GBool isStream(Obj *obj) { return obj->type == objStream; }
+  GBool isRef(Obj *obj) { return obj->type == objRef; }
+  GBool isCmd(Obj *obj) { return obj->type == objCmd; }
+  GBool isError(Obj *obj) { return obj->type == objError; }
+  GBool isEOF(Obj *obj) { return obj->type == objEOF; }
+  GBool isNone(Obj *obj) { return obj->type == objNone; }
+
+  // Special type checking.
+  GBool isNameSame(Obj *obj, char *name1)
+    { return obj->type == objName && !strcmp(obj->u.name, name1); }
+  GBool isCmdSame(Obj *obj, char *cmd1)
+    { return obj->type == objCmd && !strcmp(obj->u.cmd, cmd1); }
+
+//  GBool isDict(char *dictType);
+//  GBool isStream(char *dictType);
+
+
+
+  // Accessors.  NB: these assume object is of correct type.
+  GBool getBool(Obj *obj) { return obj->u.booln; }
+  long getInt(Obj *obj) { return obj->u.intg; }
+  gdouble getReal(Obj *obj) { return obj->u.real; }
+  gdouble getNum(Obj *obj) { return obj->type == objInt ? 
+				 IntToGdouble(obj->u.intg) : obj->u.real; }
+  GooString *getString(Obj *obj) { return &obj->u.string; }
+  char *getName(Obj *obj) { return obj->u.name; }
+  Array *getArray(Obj *obj) { return obj->u.array; }
+  Dict *getDict(Obj *obj) { return obj->u.dict; }
+  Stream *getStream(Obj *obj) { return obj->u.stream; }
+  Ref getRef(Obj *obj) { return obj->u.ref; }
+  long getRefNum(Obj *obj) { return obj->u.ref.num; }
+  long getRefGen(Obj *obj) { return obj->u.ref.gen; }
+
+
+//------------------------------------------------------------------------
+// Array accessors.
+//------------------------------------------------------------------------
+
+
+ long ObjArrayGetLength(Obj *obj)
+  { return ArrayGetLength(obj->u.array); }
+
+ void ObjArrayAdd(Obj *obj, Obj *elem)
+  { ArrayAdd(obj->u.array, elem); }
+
+ void ObjArrayGet(Obj *obj, long i, Obj *obj2, XRef *xref)
+  { ArrayGet(obj->u.array, i, obj2, xref); }
+
+ void ObjArrayGetNF(Obj *obj, long i, Obj *obj2)
+  { ArrayGetNF(obj->u.array, i, obj2); }
+
+//------------------------------------------------------------------------
+// Dict accessors.
+//------------------------------------------------------------------------
+
+
+ long ObjDictGetLength(Obj *obj)
+  { return DictGetLength(obj->u.dict); }
+
+ void ObjDictAdd(Obj *obj, char *key, Obj *val)
+  { DictAdd(obj->u.dict, key, val); }
+
+ GBool ObjDictIsSame(Obj *obj, char *dictType)
+  { return DictIs(obj->u.dict, dictType); }
+
+ GBool ObjIsDictSame(Obj *obj, char *dictType)
+  { return obj->type == objDict && DictIs(obj->u.dict, dictType); }
+
+ void ObjDictLookup(Obj *obj, char *key, Obj *obj2, XRef *xref)
+  { DictLookup(obj->u.dict, key, obj2, xref); }
+
+ void ObjDictLookupNF(Obj *obj, char *key, Obj *obj2)
+  { DictLookupNF(obj->u.dict, key, obj2); }
+
+ char *ObjDictGetKey(Obj *obj, long i)
+  { return DictGetKey(obj->u.dict, i); }
+
+ void ObjDictGetVal(Obj *obj, long i, Obj *obj2, XRef *xref)
+  { DictGetVal(obj->u.dict, i, obj2, xref); }
+
+ void ObjDictGetValNF(Obj *obj, long i, Obj *obj2)
+  { DictGetValNF(obj->u.dict, i, obj2); }
+
+//------------------------------------------------------------------------
+// Stream accessors.
+//------------------------------------------------------------------------
+
+ GBool ObjStreamIs(Obj *obj, char *dictType)
+  { return DictIs(StreamGetDict(obj->u.stream), dictType); }
+
+ GBool ObjIsStream(Obj *obj, char *dictType)
+  { return obj->type == objStream && ObjStreamIs(obj, dictType); }
+
+ void ObjStreamReset(Obj *obj)
+  { StreamReset(obj->u.stream); }
+
+ int ObjStreamGetChar(Obj *obj)
+  { return StreamGetChar(obj->u.stream); }
+
+ int ObjStreamLookChar(Obj *obj)
+  { return StreamLookChar(obj->u.stream); }
+
+ void ObjStreamGetLine(Obj *obj, char *buf, int size)
+  { StreamGetLine(obj->u.stream, buf, size); }
+
+ long ObjStreamGetPos(Obj *obj)
+  { return StreamGetPos(obj->u.stream); }
+
+ void ObjStreamSetPos(Obj *obj, long pos)
+  { StreamSetPos(obj->u.stream, pos); }
+
+ FileHandle ObjStreamGetFile(Obj *obj)
+  { return StreamGetFile(obj->u.stream); }
+
+ Dict *ObjStreamGetDict(Obj *obj)
+  { return StreamGetDict(obj->u.stream); }
+

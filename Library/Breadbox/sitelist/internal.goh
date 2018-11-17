@@ -1,0 +1,118 @@
+/*
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+ */
+
+/***************************************************************************
+ *  FILE:  INTERNAL.GOH
+ ***************************************************************************/
+
+/* -- Site List Definition: ------------------------------------------- */
+
+/* All site list are LMemBlocks holding the open session and more information */
+/* about the currently locked entries */
+/* This is the memory block used to track the information */
+typedef struct {
+    /* Header to the LMem block like normal */
+    LMemBlockHeader SLB_meta ;
+
+    /* Name of this file (used for debugging) */
+    FileLongName SLB_filename ;
+
+    /* Handle to the current file */
+    VMFileHandle SLB_file ;
+
+    /* Entries copied from the map block when opened */
+    VMBlockHandle SLB_array ;
+    VMBlockHandle SLB_sortArray ;
+    VMBlockHandle SLB_freeList ;
+
+    /* Keep track of the number of locks */
+    /* (errors in EC if closed and still locked) */
+    word SLB_numLocks ;
+} T_siteListBlock ;
+
+/* The map block points to the huge array of data entries as well as a */
+/* sort array.  Free items are also put on another list. */
+typedef struct {
+    VMBlockHandle SLMB_array ;
+    VMBlockHandle SLMB_sortArray ;
+    VMBlockHandle SLMB_freeList ;
+} T_siteListMapBlock ;
+
+/* -- Site Entry Definition: ------------------------------------------- */
+
+/* Each entry of the database is stored as a chunk array */
+/* The values of T_siteField represent a chunk array index to a variable */
+/* sized element */
+/* To track if a chunk is dirty, we use a flag */
+typedef struct {
+    ChunkArrayHeader SEH_meta ;
+    Boolean SEH_isDirty ;
+    T_siteEntryID SEH_id ;
+    Boolean SEH_needsResort ;
+} T_siteEntryHeader ;
+
+/* -- Site Field Definition: ------------------------------------------- */
+
+/* Each field of the entry is as follows: */
+/*    SITE_FIELD_NAME          STRING  */
+/*    SITE_FIELD_SITE          STRING  */
+/*    SITE_FIELD_PORT          WORD    */
+/*    SITE_FIELD_ENTRY_TYPE    WORD    */
+/*    SITE_FIELD_USERNAME      STRING  */
+/*    SITE_FIELD_PASSWORD      STRING  */
+/*    SITE_FIELD_VMCHAIN       VMCHAIN */
+
+/* -- Site Sort List Definition: -------------------------------------- */
+
+/* All items added to the database are sorted by SITE_FIELD_NAME. */
+/* These are organized in another HugeArray of T_siteEntryID elements. */
+
+/* -- Site Free List Definition: -------------------------------------- */
+
+/* No records are truly deleted out of the SLB_array.  They are just */
+/* resized to zero and their index put on the free list. */
+/* This means that there will be some growth, but will be limited to */
+/* the maximum number of entries at any time. */
+
+
+typedef enum {
+    /* Illegal handle for a site list */
+    SITE_LIST_BAD_SITE_LIST_HANDLE = 0xCE00,
+
+    /* There are an unequal number of SiteEntryLock and Unlocks. */
+    SITE_LIST_STILL_HAS_LOCKED_ENTRIES,
+
+    /* Trying to access a sort position that is out of bounds. */
+    SITE_LIST_BAD_SORT_INDEX,
+
+    /* Field is a number that we don't know about */
+    SITE_LIST_ERROR_UNKNOWN_FIELD,
+
+    /* Cannot open a database twice. */
+    SITE_LIST_ERROR_DATABASE_ALREADY_OPENED,
+
+    /* Cannot close a database twice. */
+    SITE_LIST_ERROR_DATABASE_ALREADY_CLOSED,
+
+    /* Trying to update the UI for a non existing site */
+    SITE_LIST_ERROR_CANT_UPDATE_UI_WITHOUT_SELECTED_SITE,
+} FatalErrors;
+
+/* -- UI Related definitions: -------------------------------------- */
+
+#define SITE_LIST_PASSWORD_ON_BIT 1
+
+/***************************************************************************
+ *  END OF FILE:  INTERNAL.GOH
+ ***************************************************************************/
+

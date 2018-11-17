@@ -1,0 +1,131 @@
+/*
+ *	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+ *
+ * Project:	PC GEOS
+ * Module:	
+ * File:	chart.ui
+ *
+ * Author:	John Wedgwood, Oct  8, 1991
+ *
+ * Revision History:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	John	10/ 8/91	Initial revision
+ *
+ * Description:
+ *	UI definitions for the chart library.
+ *
+ *	$Id: uiTemplate.ui,v 1.1 97/04/04 17:47:28 newdeal Exp $
+ *
+ */
+
+
+/**************************************************************************
+ *	CLASS DEFINITIONS
+ **************************************************************************/ 
+class ChartObject = meta {
+	link 	= linkComp;
+    	geoFlags	= bitFieldComp byte {
+			forceRecalc,
+			expandToFit,
+			centerHorizontally,
+			centerVertically
+		  } : {};
+ 	
+	selection = wordComp : 0;
+	position = typeComp "Point" : "0,0" ;
+	size	= typeComp "Point" : "0,0" ;
+	grobj	= optrComp : null;
+	state	= byteComp : 0;
+}
+
+class ChartComp = ChartObject {
+	children = compositeComp link;
+	compType = byteComp : 0;
+	compFlags = byteComp : 0;
+	margin = typeComp "Rectangle" : "0,0,0,0";
+}
+
+
+class ChartGroup = ChartComp {
+	docPosition	= typeComp "PointDWord" : "0,0";
+	
+	dataBlock	= wordComp : 0;
+
+	type		= byteComp : -1;
+	variation	= byteComp : -1;
+
+	flags		= wordComp : 0;	
+	dataAttrs	= typeComp "ChartDataAttributes" : "0";
+	groupFlags	= byteComp : "mask CGF_LEGEND_VERTICAL";
+	gridFlags	= typeComp "GridFlags" : "0";
+	legend		= wordComp : 0;
+	buildChangeFlags = wordComp : 0;
+}
+
+class PlotArea = ChartComp {
+
+	xAxis = wordComp :0;
+	yAxis = wordComp :0;
+
+}
+
+class SeriesGroup = ChartComp {
+	gridLines = optrComp : null;
+	dropLines = nptrComp : null;
+}
+
+/**************************************************************************
+ *	TEMPLATE RESOURCE.  The main object is the ChartGroup, which
+ 	is a vertical composite.  Its first child is the HorizComp,
+ 	which initially just contains the VertComp, but may also later
+ 	contain the Y-axis title and the (vertical) legend, if any.
+	The VertComp contains the PlotArea and the x-axis title, if
+ 	any.  The PlotArea is an overlapping composite -- it contains
+ 	the axes and the SeriesGroup, which contains the series objects.
+ **************************************************************************/ 
+start ChartUI, notDetachable;
+
+
+TemplateChartGroup = ChartGroup {
+	children = TemplateHorizComp;
+	compType = "CCT_VERTICAL";
+	margin = "4,4,4,4";
+}
+
+	
+/**************************************************************************
+ *	HorizComp contains all objects that go side-by-side in the chart.
+ **************************************************************************/ 
+
+TemplateHorizComp = ChartComp {
+	compType = "CCT_HORIZONTAL";
+	children = TemplateVertComp;
+	geoFlags = default +expandToFit;
+}
+
+
+TemplateVertComp = ChartComp {
+	children = TemplatePlotArea;
+	compType = "CCT_VERTICAL";
+	geoFlags = default +expandToFit;
+}
+
+TemplatePlotArea = PlotArea {
+	compType = "CCT_OVERLAP";
+	geoFlags = default +expandToFit;
+	children = TemplateSeriesGroup;
+	
+}
+
+TemplateSeriesGroup = SeriesGroup {
+	compType = "CCT_OVERLAP";
+}
+
+end	ChartUI;
+
+
+
+
+
+

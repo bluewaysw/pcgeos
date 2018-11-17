@@ -1,0 +1,250 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+ *
+ * PROJECT:	  PCGEOS
+ * MODULE:	  CommonDesktop/CUI
+ * FILE:	  cuiZoomer.ui
+ *
+ * AUTHOR:  	  Don Reeves, Nov 29, 1992
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	11/29/92  Don	    Initial version
+ *
+ * DESCRIPTION:
+ *	User interface description for Zoomer File Manager
+ *
+ * 	$Id: cuiZoomer.ui,v 1.1 97/04/04 15:01:27 newdeal Exp $
+ *
+ ***********************************************************************/
+
+/***********************************************************************
+ * 		Top-level menu structure
+ ***********************************************************************/
+
+start	PrimaryInterface;
+
+FileMenu = GenInteraction {
+	children =
+		FileMenuOpen,
+		FileMenuMove,
+		FileMenuCopy,
+		FileMenuRename,
+		FileMenuDelete;
+	visibility = popup;
+	hints = {
+		ATTR_GEN_INTERACTION_GROUP_TYPE {
+			GenInteractionGroupType GIGT_FILE_MENU
+		}
+	}
+}
+
+ViewMenu = GenInteraction {
+	children =
+		DisplayViewModes;
+	visibility = popup;
+	hints = {
+		ATTR_GEN_INTERACTION_GROUP_TYPE {
+			GenInteractionGroupType GIGT_VIEW_MENU
+		}
+	}
+}
+
+UtilMenu = GenInteraction {
+	moniker = 'U', "Utilities";
+	children =
+		FileMenuGetInfo,
+		FileMenuCreateFolder,
+		DiskFormatButton,
+		UtilMenuDiskRename,
+#if INSTALLABLE_TOOLS
+		UtilMenuRescan,
+		ToolGroup;
+#else
+		UtilMenuRescan;
+#endif
+	visibility = popup;
+}
+
+end	PrimaryInterface;
+
+
+
+start	Interface;
+
+/***********************************************************************
+ * 		File Menu
+ ***********************************************************************/
+
+FileMenuOpen = GenTrigger {
+	moniker = 'O', "Open";
+	/*kbdAccelerator = specificUI ENTER;*/
+	action = MSG_OPEN_SELECT_LIST, process;
+	genStates = default -enabled;
+	genAttributes = default +initiatesInputHoldUp;
+}
+
+FileMenuMove = GenTrigger {
+	moniker = 'M', "Move";
+	action = MSG_FM_START_MOVE, process;
+	genStates = default -enabled;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+FileMenuCopy = GenTrigger {
+	moniker = 'C', "Copy";
+	action = MSG_FM_START_COPY, process;
+	genStates = default -enabled;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+FileMenuRename = GenTrigger {
+	moniker = 'R', "Rename";
+	action = MSG_FM_START_RENAME, process;
+	genStates = default -enabled;
+	genAttributes = default +initiatesInputHoldUp;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+FileMenuDelete = GenTrigger {
+	moniker = 'D', "Delete";
+	action = MSG_FM_START_DELETE, process;
+	genStates = default -enabled;
+	genAttributes = default +initiatesInputHoldUp;
+}
+
+
+/***********************************************************************
+ * 		View Menu
+ ***********************************************************************/
+
+DisplayViewModes = GenItemGroup ignoreDirty {
+	numSelections  = 1;
+	selection = "mask FIDM_LICON";
+	children =
+		ViewModesNamesOnly,
+#if SEPARATE_NAMES_AND_DETAILS
+		ViewModesNamesAndDates,
+		ViewModesNamesAndSizes,
+#else
+		ViewModesFullFileDetails,
+#endif
+		ViewModesLargeIcons;
+	applyMsg = MSG_SET_VIEW_MODE;
+	destination = process;
+	genStates = default -enabled;
+	genAttributes = default +initiatesBusyState;
+	hints = {
+		ATTR_GEN_INIT_FILE_KEY {char "viewMode", 0}
+	}
+}
+
+ViewModesNamesOnly = GenItem ignoreDirty {
+	moniker = 'N', "Names Only";
+	identifier = "mask FIDM_SHORT";
+}
+
+#if SEPARATE_NAMES_AND_DETAILS
+
+ViewModesNamesAndDates = GenItem ignoreDirty {
+	moniker = 'D', "Names and Dates";
+	identifier = "mask FIDM_FULL or mask FIDM_FULL_DATES";
+}
+
+ViewModesNamesAndSizes = GenItem ignoreDirty {
+	moniker = 'S', "Names and Sizes";
+	identifier = "mask FIDM_FULL";
+}
+
+#else
+
+ViewModesFullFileDetails = GenItem ignoreDirty {
+	moniker = 'a', "Names and Details";
+	identifier = "mask FIDM_FULL";
+}
+
+#endif
+
+ViewModesLargeIcons = GenItem ignoreDirty {
+	moniker = 'I', "Icons";
+	identifier = "mask FIDM_LICON";
+}
+
+
+/***********************************************************************
+ * 		Utils Menu
+ ***********************************************************************/
+
+FileMenuGetInfo = GenTrigger {
+	moniker = 'I', "Get File Information";
+	action = MSG_FM_GET_INFO, process;
+	genStates = default -enabled;
+	genAttributes = default +initiatesInputHoldUp;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+FileMenuCreateFolder = GenTrigger {
+	moniker = 'C', "Create Folder";
+	action = MSG_FM_START_CREATE_DIR, process;
+	genStates = default -enabled;
+	genAttributes = default +initiatesInputHoldUp;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+DiskFormatButton = GenTrigger {
+#if	_PMGR	/* no Format Card for PManager */
+	genStates = default -usable;
+#endif
+	moniker = 'F', "Format Card";
+	action = MSG_META_START_DISK_FORMAT_BOX, process;
+	genAttributes = default +initiatesInputHoldUp;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+UtilMenuDiskRename = GenTrigger {
+#if	_PMGR	/* no Rename Card for PManager */
+	genStates = default -usable;
+#endif
+	moniker = 'R', "Rename Card";
+	action = MSG_META_START_DISK_RENAME_BOX, process;
+	genAttributes = default +initiatesInputHoldUp;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+UtilMenuRescan = GenTrigger {
+	moniker = 'e', "Rescan Drives";
+	action = MSG_WINDOWS_REFRESH_ALL, process;
+	genAttributes = default +initiatesBusyState;
+}
+
+end	Interface;
+
+start	ToolUI;
+
+#if INSTALLABLE_TOOLS
+
+ToolGroup = ToolManager ignoreDirty {
+	tools = ignoreDirty data {
+		ChunkArrayHeader <0,size ToolLibrary, 0, size ChunkArrayHeader>
+	}
+}
+
+#endif		/* if INSTALLABLE_TOOLS */
+
+end	ToolUI;

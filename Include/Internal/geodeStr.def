@@ -1,0 +1,395 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+FILE:		geodeStr.def
+
+DECLARER:	Kernel
+
+DESCRIPTION:
+	This file defines standard file structures.
+
+	$Id: geodeStr.def,v 1.1 97/04/04 14:15:07 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__GEODE_STR
+
+include geode.def
+
+StartKernel
+
+global GeodeForEach:far
+;
+;	Definitions for standard files
+;
+NUMBER_OF_STANDARD_FILES	=	4
+
+;	Geode file types (correspond to location in PCGEOS source tree)
+
+GeodeType 		etype word, 1
+
+GEODE_TYPE_APPLICATION 	enum GeodeType
+GEODE_TYPE_LIBRARY 	enum GeodeType
+GEODE_TYPE_DRIVER 	enum GeodeType
+
+;
+; Define the actual state variable structure
+;
+GeodeHeader	struct
+
+	;*** Standard position for handle to segment
+
+    GH_geodeHandle	hptr.GeodeHeader		;handle to this segment
+
+	;*** Variables from core data information (loaded from file)
+
+				;*** Generic information ***
+    GH_geodeAttr	GeodeAttrs	<>
+    GH_geodeFileType	GeodeType	;GEODE file type, see GEODE spec
+    GH_geodeRelease	ReleaseNumber	<> ;release #
+    GH_geodeProtocol	ProtocolNumber	<> ;protocol #
+    GH_geodeSerial	word		;time stamp (SWAT uniqueness)
+    GH_geodeName	char	GEODE_NAME_SIZE dup(?)  ;(permanent name
+							    ;of GEODE)
+    GH_geodeNameExt	char	GEODE_NAME_EXT_SIZE dup(?) ; name extension
+    GH_geodeToken	GeodeToken	<>
+    GH_geodeRefCount	sword		;reference count for GEODE
+
+				;*** Driver variables
+    GH_driverTab	fptr.DriverInfoStruct
+GH_driverTabOff		equ <GH_driverTab.offset>
+GH_driverTabSegment 	equ <GH_driverTab.segment>
+
+				;*** Exported library information
+    GH_libEntry		fptr.far	;Library entry routine for kernel
+					; to call
+    GH_libEntryOff 	equ <GH_libEntry.offset>
+    GH_libEntrySegment	equ <GH_libEntry.segment>
+
+    GH_exportLibTabOff 	nptr.fptr	;Offset of entry point table
+    GH_exportEntryCount	sword		;number of exported entry points
+
+				;*** Imported library information ***
+    GH_libCount		sword		;number of imported library table
+					;entries
+    GH_libOffset	nptr.hptr	;offset (in memory) of imported
+					;library table
+
+				;*** Resource information ***
+    GH_resCount		sword		;number of resources
+    GH_resHandleOff 	nptr.hptr	;offset (in memory) to resource handle
+					;table
+    GH_resPosOff	nptr.dword	;offset (in memory) to resource
+					;position table
+    GH_resRelocOff 	nptr.word	;offset (in memory) to resource
+					;relocation size table
+
+	; NOTE: if you change anything above this label in GeodeHeader then 
+	; be sure to to update the tools header file in
+	;  /staff/pcgeos/include/geode.h or things like swat will be
+	; unhappy - jimmy 6/94
+
+    GH_endOfVariablesFromFile	label	byte
+	;*** END of variables loaded from file
+
+	;*** GEODE generic variables
+
+    GH_geoHandle	hptr			;handle to GEODE's .geo file
+    GH_parentProcess	hptr.GeodeHeader	;handle of parent process
+    GH_nextGeode	hptr.GeodeHeader	;handle of next GEODE on list
+    GH_privData		hptr			;If this is not the kernel
+						; geode, then it contains data
+						; to be accessed via the
+						; GeodePrivXXXX routines.
+						;If this *is* the kernel geode,
+						; then this contains a map of
+						; the allocated privData
+						; offsets.
+    GH_extraLibOffset	nptr.hptr		;Pointer to table of extra
+						; libraries (those imported
+						; by the libraries this geode
+						; imports, but not imported
+						; directly by this geode)
+    GH_extraLibCount	word			;Number of entries in the
+						; extraLib table.
+    GH_generalPatchData	hptr			;Handle of memory
+						; block containing
+						; general patch data
+    GH_languagePatchData hptr			;Handle of memory
+						; block containing
+						; language patch data
+
+	;*** The remaining state variables are only present if the GEODE is
+	;*** a process
+
+GeodeHeader	ends
+
+ProcessHeader	struct
+    PH_geodePart	GeodeHeader <>
+
+				;*** User interface information
+    PH_appObject	optr		;Application object
+    PH_vmHandle		hptr		;Handle of state file
+    PH_savedBlockPtr	hptr		;First handle on "saved" chain
+    PH_uiData		word		;One word of data for UI
+    PH_uiThread		hptr		;Second, "UI" thread for process, if
+					;any.  Runs all "ui-object" blocks
+
+				;*** File system variables
+    PH_stdFileHandles	hptr	NUMBER_OF_STANDARD_FILES dup (?)
+ProcessHeader	ends
+
+
+GeodeRelocationSource etype byte
+
+	; Relocation to a kernel entry point.
+	;	GRE_extra - unused
+	;	word at relocation - kernel entry point number
+GRS_KERNEL	enum GeodeRelocationSource
+
+	; Relocation to a library entry point.
+	;	GRE_extra - imported library number
+	;	word at relocation - library entry point number
+GRS_LIBRARY	enum GeodeRelocationSource
+
+	; Relocation to a resource of the geode.  This is never used with
+	; GRT_OFFSET or GRT_FAR_PTR since the linker eliminates GRT_OFFSET and
+	; convert GRT_FAR_PTR to GRT_SEGMENT.
+	;	GRE_extra - unused
+	;	word at relocation - resource number
+	;	for GRT_CALL - word at relocation+2 - offset of call
+GRS_RESOURCE	enum GeodeRelocationSource	;geode's resource
+
+
+GeodeRelocationType etype byte
+
+	; Relocation to a far pointer to an entry point (4 bytes).  If the
+	; target is movable then the segment is replaced by the handle>>4.  The
+	; second word of data at the target is not used.
+GRT_FAR_PTR	enum GeodeRelocationType
+
+	; Relocation to the offset of an entry point (2 bytes).
+GRT_OFFSET	enum GeodeRelocationType
+
+	; Relocation to the segment of an entry point (2 bytes).  If the
+	; target is movable then the segment is replace by the handle>>4.
+GRT_SEGMENT	enum GeodeRelocationType
+
+	; Relocation to the handle of an entry point (2 bytes).
+GRT_HANDLE	enum GeodeRelocationType
+
+	; Relocation to a call to a possibly movable routine (5 bytes).  The
+	; offset stored points to the byte AFTER the call opcode.  If the
+	; target is fixed, behavior is the same as GRT_FAR_PTR.  If the
+	; target is movable, the call opcode is replaced with a software
+	; interrupt and the other three bytes are replaced with data that
+	; defines the call:
+	;	Sixteen Software interrupts are used for geode resource and
+	;	library calls with the low four bits of the interrupt number
+	;	being the low byte of the handle to call (when shifted left
+	;	four bits).
+	;	bytes 0 and 1:INT RESOURCE_CALL_INT..RESOURCE_CALL_INT+15
+	;	byte 2: high byte of handle
+	;	byte 3 and 4: offset of call
+GRT_CALL	enum GeodeRelocationType
+
+	; Relocation to the last handle in an XIP resource.
+GRT_LAST_XIP_RESOURCE	enum	GeodeRelocationType
+
+
+GeodeRelocationInfo	record
+	GRI_SOURCE GeodeRelocationSource:4
+	GRI_TYPE GeodeRelocationType:4
+GeodeRelocationInfo	end
+
+
+GeodeRelocationEntry	struct
+    GRE_info	GeodeRelocationInfo
+    GRE_extra	byte			;extra data depending on source
+    GRE_offset	word			;offset of relocation
+GeodeRelocationEntry	ends
+
+;------------------------------------------------------------------------------
+;		Method parameter definition for C
+;------------------------------------------------------------------------------
+
+;	Return parameter...
+
+MethodReturnType	etype	byte
+MRT_VOID		enum	MethodReturnType
+MRT_BYTE_OR_WORD	enum	MethodReturnType
+MRT_DWORD		enum	MethodReturnType
+MRT_MULTIPLE		enum	MethodReturnType
+
+MethodReturnByteWordType	etype	byte
+MRBWT_AL		enum	MethodReturnByteWordType
+MRBWT_AH		enum	MethodReturnByteWordType
+MRBWT_CL		enum	MethodReturnByteWordType
+MRBWT_CH		enum	MethodReturnByteWordType
+MRBWT_DL		enum	MethodReturnByteWordType
+MRBWT_DH		enum	MethodReturnByteWordType
+MRBWT_BPL		enum	MethodReturnByteWordType
+MRBWT_BPH		enum	MethodReturnByteWordType
+MRBWT_AX		enum	MethodReturnByteWordType
+MRBWT_CX		enum	MethodReturnByteWordType
+MRBWT_DX		enum	MethodReturnByteWordType
+MRBWT_BP		enum	MethodReturnByteWordType
+
+MethodReturnDWordReg	etype	byte
+MRDWR_AX		enum	MethodReturnDWordReg
+MRDWR_CX		enum	MethodReturnDWordReg
+MRDWR_DX		enum	MethodReturnDWordReg
+MRDWR_BP		enum	MethodReturnDWordReg
+
+MethodReturnMultipleType	etype	byte
+MRMT_AXBPCXDX		enum	MethodReturnMultipleType
+MRMT_AXCXDXBP		enum	MethodReturnMultipleType
+MRMT_CXDXBPAX		enum	MethodReturnMultipleType
+MRMT_DXCX		enum	MethodReturnMultipleType
+MRMT_BPAXDXCX		enum	MethodReturnMultipleType
+MRMT_MULTIPLEAX		enum	MethodReturnMultipleType
+
+MethodReturnDWordInfo	record
+    MTDI_HIGH_REG	MethodReturnDWordReg:2
+    MTDI_LOW_REG	MethodReturnDWordReg:2
+MethodReturnDWordInfo	end
+
+MethodReturnInfo	union				;MPD_RETURN_TYPE =
+    MRI_byteWord	MethodReturnByteWordType	;    MRT_BYTE_OR_WORD
+    MRI_dword		MethodReturnDWordInfo		;    MRT_DWORD
+    MRI_multiple	MethodReturnMultipleType	;    MRT_MULTIPLE
+MethodReturnInfo	end
+
+;	Passed parameters...
+
+MethodStackInfo		record
+    MSI_STRUCT_AT_SS_BP:1		;if 1: Single C parameter is a far
+					;      pointer to a structure which
+					;      must be copied onto the stack,
+					;      passed in ss:bp and copied back
+					;if 0: Multiple paramters passed on
+					;      the stack because they don't
+					;      fit in regs.  Pass ss:bp
+					;      pointing to the parameters
+    MSI_PARAM_SIZE:7
+MethodStackInfo		end
+
+MethodMemoryInfo	union			;MPM_C_PARAMS =
+    MMI_C_PARAM_SIZE	byte			;	1
+    MMI_STACK_INFO	MethodStackInfo		;	0
+MethodMemoryInfo	end
+
+MethodPassMemory	record
+    MPM_C_PARAMS:1
+    MPM_MEMORY_INFO	MethodMemoryInfo:8
+MethodPassMemory	end
+
+MethodPassReg	etype	byte
+MPR_NONE	enum	MethodPassReg
+MPR_CL		enum	MethodPassReg
+MPR_CH		enum	MethodPassReg
+MPR_DL		enum	MethodPassReg
+MPR_DH		enum	MethodPassReg
+MPR_CX		enum	MethodPassReg
+MPR_DX		enum	MethodPassReg
+MPR_BP		enum	MethodPassReg
+
+MethodPassRegisters	record
+    MPR_PARAM3		MethodPassReg:3	;Reg to put 3rd parameter in
+    MPR_PARAM2		MethodPassReg:3	;Reg to put 2nd parameter in
+    MPR_PARAM1		MethodPassReg:3	;Reg to put 1st parameter in
+MethodPassRegisters	end
+
+MethodPassInfo	union				;MPD_REGISTER_PARAMS =
+    MPI_REGISTERS	MethodPassRegisters	;    1
+    MPI_MEMORY		MethodPassMemory	;    0
+MethodPassInfo	end
+
+;	The full thing...
+
+MethodParameterDef	record
+
+	; Bits used to encode return type
+
+    MPD_RETURN_TYPE	MethodReturnType:2
+    MPD_RETURN_INFO	MethodReturnInfo:4
+
+	; Bits used to encode passed parameters
+
+    MPD_REGISTER_PARAMS:1		;Set if params passed in registers
+    MPD_PASS_INFO	MethodPassInfo:9
+
+MethodParameterDef	end
+
+;---------------
+
+HandlerModel	etype	byte
+HM_FAR		enum	HandlerModel
+HM_NEAR		enum	HandlerModel
+HM_BASED	enum	HandlerModel
+
+HandlerTypeDef	record
+    HTD_MODEL	HandlerModel:2
+    HTD_PROCESS_CLASS:1
+    :5
+HandlerTypeDef	end
+
+;------------------------------------------------------------------------------
+;		Relocation information
+;------------------------------------------------------------------------------
+
+RESOURCE_CALL_INT_BASE	=	080h			;INT 80h thru 8fh
+
+RESOURCE_CALL_VECTOR_BASE =	RESOURCE_CALL_INT_BASE * fptr ;INT 80h vector
+
+INT_OPCODE		=	0cdh			;opcode for INT XX
+
+
+;--------------------------------------------------------------------------
+;			Executable file header
+;--------------------------------------------------------------------------
+
+ExecutableFileHeader	struct
+    EFH_attributes		GeodeAttrs
+    EFH_fileType		word
+    EFH_heapSpace		word
+    ;
+    ; Heap space requirement -- used for applications only.  Amout of space
+    ; that will come out of the operating space of the heap if this application
+    ; is launched.  Is a somewhat magical value, roughly equivalent to the #
+    ; of paragraphs of non-Discardable memory req'd, used to determine whether
+    ; the app may safely be loaded into the heap or not.  The exact value
+    ; will be determined by running the "heapspace" TCL script on the
+    ; application, the result of which will then be stored by the programmer
+    ; in the .gp file.  glue will then store that value here.	-- Doug 3/2/93
+
+    EFH_unused			word	;used to be 2nd word of kernel protocol
+    EFH_resourceCount		word
+    EFH_importLibraryCount	word
+    EFH_exportEntryCount	word
+    EFH_udataSize		word
+    EFH_classPtr		dword
+    EFH_appObj			optr
+ExecutableFileHeader	ends
+
+;	Imported library entry
+
+ImportedLibraryEntry	struct
+    ILE_name		char	GEODE_NAME_SIZE dup(?)
+    ILE_attrs		word
+    ILE_protocol	ProtocolNumber <>
+ImportedLibraryEntry	ends
+
+;--------------------------------------------------------------------------
+;			Geode file header
+;--------------------------------------------------------------------------
+
+GeodeFileHeader struct
+	GFH_execHeader	ExecutableFileHeader
+	GFH_coreBlock	GeodeHeader
+GeodeFileHeader ends
+
+
+EndKernel

@@ -1,0 +1,174 @@
+/***********************************************************************
+
+       Copyright (c) Gerd Boerrigter 1998 -- All Rights Reserved
+
+  PROJECT:      FROTZ for GEOS - an interpreter for all Infocom games.
+  MODULE:       sound support
+  FILE:         gSample.goc
+
+  AUTHOR:       Gerd Boerrigter
+
+  RCS STAMP:
+    $Id: $
+
+  DESCRIPTION:
+    This file contains the GEOS front end, sound support.
+
+  REVISION HISTORY:
+    Date      Name      Description
+    --------  --------  -----------
+    98-06-06  GerdB     Initial Version.
+
+***********************************************************************/
+
+@include <stdapp.goh>
+#include "frotz.h"
+
+// @include <Geos/frotz.goh>
+
+
+extern void end_of_sound (void);
+
+static struct {
+    word prefix;
+    byte repeats;
+    byte base_note;
+    word frequency;
+    word unused;
+    word length;
+} sheader;
+
+static current_sample = 0;
+
+static play_part = 0;
+static play_count = 0;
+
+static word sound_adr = 0;
+static word sound_irq = 0;
+static word sound_dma = 0;
+static word sound_int = 0;
+static word sound_ver = 0;
+
+static byte far *sample_data = NULL;
+
+static long sample_adr1 = 0;
+static long sample_adr2 = 0;
+static word sample_len1 = 0;
+static word sample_len2 = 0;
+
+
+/*
+ * os_beep
+ *
+ * Play a beep sound. Ideally, the sound should be high- (number == 1)
+ * or low-pitched (number == 2).
+ *
+ */
+
+void os_beep (int number)
+{
+
+}/* os_beep */
+
+/*
+ * os_prepare_sample
+ *
+ * Load the sample from the disk.
+ *
+ */
+
+void os_prepare_sample (int number)
+{
+
+    os_stop_sample ();
+
+    /* Exit if the sound board isn't set up properly */
+
+    if (sample_data == NULL)
+    return;
+    if (sound_adr == 0)
+    return;
+
+    /* Continue only if the desired sample is not already present */
+
+    if (current_sample != number) {
+
+    }
+
+}/* os_prepare_sample */
+
+/*
+ * os_start_sample
+ *
+ * Play the given sample at the given volume (ranging from 1 to 8 and
+ * 255 meaning a default volume). The sound is played once or several
+ * times in the background (255 meaning forever). The end_of_sound
+ * function is called as soon as the sound finishes.
+ *
+ */
+
+void os_start_sample (int number, int volume, int repeats)
+{
+
+    os_stop_sample ();
+
+    /* Exit if the sound board isn't set up properly */
+
+    if (sample_data == NULL)
+    return;
+    if (sound_adr == 0)
+    return;
+
+    /* Load new sample */
+
+    os_prepare_sample (number);
+
+    /* Continue only if the sample's in memory now */
+
+    if (current_sample == number) {
+
+    play_count = repeats;
+
+
+    play_part = 1;
+//    start_of_dma (sample_adr1, sample_len1);
+
+    }
+
+}/* os_start_sample */
+
+/*
+ * os_stop_sample
+ *
+ * Turn off the current sample.
+ *
+ */
+
+void os_stop_sample (void)
+{
+
+    play_part = 0;
+
+    /* Exit if the sound board isn't set up properly */
+
+    if (sample_data == NULL)
+    return;
+    if (sound_adr == 0)
+    return;
+
+
+}/* os_stop_sample */
+
+/*
+ * os_finish_with_sample
+ *
+ * Remove the current sample from memory (if any).
+ *
+ */
+
+void os_finish_with_sample (void)
+{
+
+    os_stop_sample ();      /* we keep 64KB allocated all the time */
+
+}/* os_finish_with_sample */

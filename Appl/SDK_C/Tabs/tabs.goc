@@ -1,0 +1,202 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) NewDeal 2001.  All rights reserved.
+	NEWDEAL CONFIDENTIAL
+
+PROJECT:	GEOS
+MODULE:		Tabs (Tabbed Dialog Sample Application)
+FILE:		tabs.goc
+
+AUTHOR:		Edward Di Geronimo Jr., Feb 11, 2001
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ed	2/11/01   	Initial version.
+
+DESCRIPTION:
+	Demonstrates how to use tabbed dialogs in Motif and NewUI.
+	Pick one of the directional defines below to change how the
+	tab dialog gets layed out.
+
+
+	$Id$
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+
+/* Define either TABS_TOP, TABS_BOTTOM, TABS_LEFT, or TABS_RIGHT */
+@define TABS_TOP
+
+/* If nothing defined, default to TABS_TOP */
+@ifndef TABS_TOP
+@ifndef TABS_BOTTOM
+@ifndef TABS_LEFT
+@ifndef TABS_RIGHT
+@define TABS_TOP
+@endif
+@endif
+@endif
+@endif
+
+@class TabsProcessClass, GenProcessClass;
+@message (GEN_ITEM_GROUP_APPLY_MSG)MSG_TABS_SELECTION_CHANGED;
+@endc
+@classdecl TabsProcessClass;
+
+/* Tabs Horizontal means the ItemGroup and the GenInteraction are layed out
+   horizontally. */
+@if defined(TABS_TOP) || defined(TABS_BOTTOM)
+@define TABS_VERTICAL
+@else
+@define TABS_HORIZONTAL
+@endif
+
+word OldSelection;
+
+@start AppResource;
+
+@object GenApplicationClass TabsApp = {
+    GI_visMoniker = "Tabs Sample App";
+    GI_comp = @TabsPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @TabsPrimary;
+}
+
+@end AppResource;
+
+@start Interface;
+
+@object GenPrimaryClass TabsPrimary = {
+    GI_comp = @Spacer, @TabHolder;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+/* Force some space between the menu and the tab stuff, to make things more
+   visible */
+@object GenGlyphClass Spacer = {
+    HINT_FIXED_SIZE = {SST_PIXELS | 10, SST_PIXELS | 10};
+}
+
+@object GenInteractionClass TabHolder = {
+@if defined(TABS_TOP) || defined(TABS_LEFT)
+    GI_comp = @TabItemGroup, @TabGroup;
+@else
+    GI_comp = @TabGroup, @TabItemGroup;
+@endif
+    HINT_MINIMIZE_CHILD_SPACING;
+    HINT_MINIMUM_SIZE = { SST_PIXELS | 200, SST_PIXELS | 200 };
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+@ifdef TABS_HORIZONTAL
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+@endif
+}
+
+@object GenItemGroupClass TabItemGroup = {
+    GI_comp = @Tab1, @Tab2, @Tab3, @Tab4;
+    GIGI_selection = 0;
+    GIGI_destination = process;
+    GIGI_applyMsg = MSG_TABS_SELECTION_CHANGED;
+    HINT_ITEM_GROUP_TAB_STYLE;
+@ifdef TABS_VERTICAL
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+@else
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+@endif
+    /* Sticking on centering hints, along with a hint not to center children
+       if using tabs. This makes things look better in older GEOS versions
+       which don't support tabs. */
+    HINT_ITEM_GROUP_DONT_CENTER_TABBED_CHILDREN;
+@ifdef TABS_HORIZONTAL
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+@ifdef TABS_RIGHT
+    HINT_RIGHT_JUSTIFY_CHILDREN;
+@endif
+@else
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+@ifdef TABS_BOTTOM
+    HINT_BOTTOM_JUSTIFY_CHILDREN;
+@endif
+@endif
+}
+
+@object GenItemClass Tab1 = {
+    GI_visMoniker = "Tab 1";
+    GII_identifier = 0;
+}
+
+@object GenItemClass Tab2 = {
+    GI_visMoniker = "Tab 2";
+    GII_identifier = 1;
+}
+
+@object GenItemClass Tab3 = {
+    GI_visMoniker = "Tab 3";
+    GII_identifier = 2;
+}
+
+@object GenItemClass Tab4 = {
+    GI_visMoniker = "Tab 4";
+    GII_identifier = 3;
+}
+
+@object GenInteractionClass TabGroup = {
+    GI_comp = @Glyph1, @Glyph2, @Glyph3, @Glyph4;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+@ifdef TABS_TOP
+    HINT_RAISED_FRAME = { GRFI_LEFT | GRFI_RIGHT | GRFI_BOTTOM };
+@endif
+@ifdef TABS_BOTTOM
+    HINT_RAISED_FRAME = { GRFI_LEFT | GRFI_RIGHT | GRFI_TOP };
+@endif
+@ifdef TABS_LEFT
+    HINT_RAISED_FRAME = { GRFI_TOP | GRFI_RIGHT | GRFI_BOTTOM };
+@endif
+@ifdef TABS_RIGHT
+    HINT_RAISED_FRAME = { GRFI_LEFT | GRFI_TOP | GRFI_BOTTOM };
+@endif
+    /* HINT_DRAW_IN_BOX is ignored if HINT_RAISED_FRAME is supported. However,
+       we're going to stick it on so the app looks more like what we want in
+       older versions of GEOS which don't support tabbed dialogs. */
+    HINT_DRAW_IN_BOX;
+}
+
+@object GenGlyphClass Glyph1 = {
+    GI_visMoniker = "One";
+}
+
+@object GenGlyphClass Glyph2 = {
+    GI_visMoniker = "Two";
+    GI_states = @default & ~GS_USABLE;
+}
+
+@object GenGlyphClass Glyph3 = {
+    GI_visMoniker = "Three";
+    GI_states = @default & ~GS_USABLE;
+}
+
+@object GenGlyphClass Glyph4 = {
+    GI_visMoniker = "Four";
+    GI_states = @default & ~GS_USABLE;
+}
+
+@end Interface;
+
+@method TabsProcessClass, MSG_TABS_SELECTION_CHANGED
+{
+    optr tabItems[4] = {@Glyph1, @Glyph2, @Glyph3, @Glyph4};
+
+    @call tabItems[OldSelection]::MSG_GEN_SET_NOT_USABLE(\
+        VUM_DELAYED_VIA_APP_QUEUE);
+    OldSelection = selection;
+    @call tabItems[selection]::MSG_GEN_SET_USABLE(VUM_NOW);
+}

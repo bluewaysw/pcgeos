@@ -1,0 +1,1255 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GlobalPC 1998 -- All Rights Reserved
+ *
+ * PROJECT:	Internet Dial-up & Configure  Applications
+ * MODULE:	
+ * FILE:	
+ *
+ * AUTHOR:	mzhu: Nov 23, 1998
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      mzhu    11/23/98        Initial version
+ *
+ * DESCRIPTION:
+ *
+ *	$Id: $
+ *
+ ***********************************************************************/
+@include <stdapp.goh>
+@include <system.h>
+@include <gcnlist.goh>
+#include <geoworks.h>
+@include <geoMisc.h>
+@include <socket.goh>
+#include <sockmisc.h>
+@include "IDialup.goh"
+@include "IDialUI.goh"
+#include "IDialppp.h"
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>
+#include <Ansi/stdio.h>
+#include <Internal/ppp.h>
+#include <Internal/socketDr.h>
+#include <sockmisc.h>
+@include <accpnt.goh>
+#include <font.h>
+#include <win.h>
+
+@classdecl	IDialupInteractionClass;
+@classdecl	IDialupInfoClass;
+extern TimerHandle timerHandle ;
+extern word timerId ;
+extern dword startTime;
+extern PPPStatus pppStatus;
+extern Boolean iAppRunning;
+extern word defaultAccpnt;
+extern Boolean connectSent;
+extern Boolean disconnectRequested;
+extern Boolean bStealthLIAFlag;
+extern Boolean bErrorDialogFlag;
+
+unsigned long bytesSent = 0, bytesReceived = 0;
+unsigned long bytesS = 0, bytesR = 0;
+unsigned int seconds=0, minutes=0, hours=0;
+extern unsigned int idleTime, idleTimeout, delayTimeout;
+static int windowDownDelay;
+Boolean sendFieldChangeConfirm = FALSE;
+extern word connectionNum;
+Boolean bConnectionWasFullyOpen = FALSE;
+Boolean bDialogOpenFlags[@IDI_NUM_DIALOG_IDS] = { FALSE /*, FALSE, ... */ };
+
+word GetBaudRate(void);
+Boolean IAppRunning(void);
+void IDialupNotifyIdle(dword total);
+
+#pragma codeseg IDINFO_TIMER_TEXT
+
+/***********************************************************************
+ *	MSG_IDP_TIMER_HANDLE for IDialupProcessClass
+ ***********************************************************************
+ * SYNOPSIS:     Timer handler
+ *
+ * PARAMETERS:  
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *	Get the number of bytes sent and received via PPP.
+ *	If either byte count has changed...
+ *	  Store new byte counts.
+ *	  If the idle notify dialog is visible, dismiss it.
+ *	  If the info display is visible, update the byte counts.
+ *	else...
+ *	  If either idle notify or LIA notify dialogs are visible
+ *	  or bStealthLIAFlag, and delayTimeout occurred,
+ *	    Dismiss both, minimize, and start disconnect.
+ *	  If idleTimeout occurred...
+ *	    If LIA notify dialog is visible, dismiss it.
+ *	    Setup and raise idle notify dialog.
+ *	Store new connection time values.
+ *	If the info display is visible, update the connection time.
+ *	Restart timer.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/23/98	Initial Revision
+ *	dhunter	08/31/00	Made small and fast as possible
+ *
+ ***********************************************************************/
+@extern method IDialupProcessClass, MSG_IDP_TIMER_HANDLE
+{
+  dword total;
+    
+  if(!windowDownDelay) {
+    @send IDialupPrimary::MSG_GEN_DISPLAY_SET_MINIMIZED();
+    windowDownDelay = -1;
+  } else if(windowDownDelay != -1) {
+    windowDownDelay --;
+  }
+
+  /* get the bytes sent and received from ppp, and display them */
+  bytesS = CallPPPDriver(PPP_ID_GET_BYTES_SENT, 0);
+  bytesR = CallPPPDriver(PPP_ID_GET_BYTES_RECEIVED, 0);
+
+  total = TimerGetCount() - startTime; //total ticks
+
+  if(bytesS > bytesSent || bytesR > bytesReceived)
+    {  
+      idleTime = total/60;
+      // This is now taken care of by MSG_NOTIFY_APP_STARTED & _APP_EXITED
+      //     iAppRunning = TRUE;
+
+      if(bytesS != bytesSent)
+	{
+	  bytesSent = bytesS;
+	  if(bDialogOpenFlags[@IDI_DIALOG_ID_DIALUP_INFO])
+	    {
+	      @call IDInfoGroup::MSG_IDI_DRAW_SENT();
+	    }
+	}
+
+      if(bytesR != bytesReceived)
+	{
+	  bytesReceived = bytesR;
+	  if(bDialogOpenFlags[@IDI_DIALOG_ID_DIALUP_INFO])
+	    {
+	      @call IDInfoGroup::MSG_IDI_DRAW_RECEIVED();
+	    }
+	}
+      if(bDialogOpenFlags[@IDI_DIALOG_ID_IDLE_NOTIFY])
+	{
+	  @send IDIdleNotifyDialog::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+	  @send IDIdleNotifyDialog::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	  @send IDialupPrimary::MSG_GEN_DISPLAY_SET_MINIMIZED();
+	}
+#if 0   // This gets done properly in MSG_NOTIFY_EXITED_APP. -Dave 1/14/2000
+      if((@call IDLIANotifyDialog::MSG_VIS_GET_ATTRS()) & VA_REALIZED )
+	{
+	  @send IDLIANotifyDialog::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+	  @send IDialupPrimary::MSG_GEN_DISPLAY_SET_MINIMIZED();
+	}
+#endif
+    }
+  else
+    {
+      // This is now taken care of by MSG_NOTIFY_APP_STARTED & _APP_EXITED
+      // iAppRunning = IAppRunning();
+
+      // send icmp echo request to keep the connectin alive
+      // LoadTCPIPDriver();
+      // SendEchoReq();
+
+      if ((bDialogOpenFlags[@IDI_DIALOG_ID_IDLE_NOTIFY]
+        || bDialogOpenFlags[@IDI_DIALOG_ID_LIA_NOTIFY]
+	|| bStealthLIAFlag) && total/60 - idleTime >= delayTimeout)
+	{
+	  @send IDIdleNotifyDialog::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+	  @send IDIdleNotifyDialog::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	  @send IDLIANotifyDialog::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+	  @send IDialupPrimary::MSG_GEN_DISPLAY_SET_MINIMIZED();
+	  @send self::MSG_IDP_DISCONNECT();
+	}
+      else if(total/60 - idleTime >= idleTimeout)
+	{
+	  IDialupNotifyIdle(total);
+	}
+    }
+  
+// caculate the time passed
+  total = total / 60;             //total seconds
+  seconds = total % 60;
+  total = total / 60;        //total minutes
+  minutes = total % 60;
+  hours = total / 60;             //total hours
+
+  if(bDialogOpenFlags[@IDI_DIALOG_ID_DIALUP_INFO])
+    {
+      @call IDInfoGroup::MSG_IDI_DRAW_TIME();
+    }
+
+  // start the timer again
+  if(timerHandle && pppStatus == PPP_STATUS_OPEN)
+    {
+      timerHandle = TimerStart(TIMER_EVENT_ONE_SHOT, 
+			       oself,
+			       UPDATE_TIME,
+			       MSG_IDP_TIMER_HANDLE,
+			       0, 
+			       &timerId) ;
+    } 
+  else 
+    {
+      timerHandle = 0;
+      timerId = 0;
+    }
+}
+
+#pragma codeseg
+
+
+/***********************************************************************
+ *		IDialupNotifyIdle
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Setup and raise idle notify dialog.
+ * CALLED BY:	MSG_IDP_TIMER_HANDLE
+ * RETURN:	nothing
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:	You'll see...
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dhunter	8/31/00   	Initial Revision
+ *
+ ***********************************************************************/
+void
+IDialupNotifyIdle (dword total)
+{
+    TCHAR str[MAX_TEXT_LEN];
+
+    if(bDialogOpenFlags[@IDI_DIALOG_ID_LIA_NOTIFY]) {
+	@send IDLIANotifyDialog::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+	@send IDialupPrimary::MSG_GEN_DISPLAY_SET_MINIMIZED();
+    }
+
+    idleTime = total/60;
+    MemLock(OptrToHandle(@idleStr1));
+    @call IDINText1::MSG_VIS_TEXT_REPLACE_ALL_PTR(LMemDeref(@idleStr1), 0);
+    if(idleTimeout > 3600) {
+	sprintf(str, _TEXT("%u%s%u%s"), idleTimeout/3600, LMemDeref(@hourStr), 
+		(idleTimeout%3600)/60, LMemDeref(@idleStr2));
+    } else {
+	sprintf(str, _TEXT("%u%s"), idleTimeout/60, LMemDeref(@idleStr2));
+    }
+    @call IDINText1::MSG_VIS_TEXT_APPEND_PTR(str, 0);
+
+    @call IDINText2::MSG_VIS_TEXT_REPLACE_ALL_PTR(LMemDeref(@idleStr3), 0);
+    sprintf(str, _TEXT("%u"), delayTimeout/60);
+    @call IDINText2::MSG_VIS_TEXT_APPEND_PTR(str, 0);
+    @call IDINText2::MSG_VIS_TEXT_APPEND_PTR(LMemDeref(@idleStr4), 0);
+
+    @call IDialupApp::MSG_GEN_BRING_TO_TOP();
+    @call IDIdleNotifyDialog::MSG_GEN_SET_USABLE(VUM_NOW);
+    @call IDIdleNotifyDialog::MSG_GEN_INTERACTION_INITIATE();
+    @call IDIdleNotifyDialog::MSG_GEN_BRING_TO_TOP();
+    @call IDialupApp::MSG_GEN_BRING_TO_TOP();
+    MemUnlock(OptrToHandle(@idleStr1));
+}	/* End of IDialupNotifyIdle.	*/
+
+#ifdef PRODUCT_LOGGING
+void ABLog(char *fmt, ...)
+{
+@ifdef DO_DBCS
+    static TCHAR buf[512];  /* not thread-safe, but saves stack usage */
+    int i;
+@else
+    static TCHAR buf[1024];  /* not thread-safe, but saves stack usage */
+@endif
+    va_list arg;
+    TimerDateAndTime tdat;
+    static FileHandle abLog = NullHandle;
+    
+    if (!abLog) {
+	FilePushDir();
+	FileSetStandardPath(SP_TOP);
+	abLog = FileCreate(_TEXT("idialup.log"),
+			   FILE_CREATE_NO_TRUNCATE | FCF_NATIVE |
+			   FILE_ACCESS_W | FILE_DENY_RW, 0 );
+	FilePopDir();
+	if (abLog) {
+	    FilePos(abLog, 0, FILE_POS_END);
+	}
+    }
+    if (abLog) {
+	buf[0] = '(';
+      	TimerGetDateAndTime(&tdat);
+	LocalFormatDateTime(buf+1, DTF_ZERO_PADDED_SHORT, &tdat);
+	strcat(buf, _TEXT(" "));
+	LocalFormatDateTime(buf+strlen(buf), DTF_HMS_24HOUR, &tdat);
+	strcat(buf, _TEXT(") "));
+	FileWrite(abLog, buf, strlen(buf), FALSE);
+	va_start(arg, fmt);
+	vsprintf(buf, fmt, arg);
+	va_end(arg);
+@ifdef DO_DBCS
+        for (i = 0; i < strlen(buf); i++) {
+	    (char *)buf[i] = buf[i];
+        }
+	FileWrite(abLog, buf, strlensbcs(buf), FALSE);
+@else
+	FileWrite(abLog, buf, strlen(buf), FALSE);
+@endif
+	FileCommit(abLog, TRUE);
+    }
+}
+#endif
+
+/***********************************************************************
+ *	MSG_META_NOTIFY for IDialupAppClass
+ ***********************************************************************
+ * SYNOPSIS:     PPP notification handle
+ *
+ * PARAMETERS:  ManufacturerID manufID = cx,
+ *		word notificationType = dx,
+ *		word data = bp
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/23/98	Initial Revision
+ *
+ ***********************************************************************/
+@extern method IDialupAppClass, MSG_META_NOTIFY
+{
+  unsigned int r = 0;
+  SocketDrError sdErr;
+  SpecSocketDrError ssdErr;
+  TCHAR *ptr, *argPtr = NULL;
+  static Boolean accpntErr = FALSE;
+  PPPStatus prevStatus = pppStatus;
+  Boolean oldDisconnectRequested = disconnectRequested;
+
+  if(manufID == MANUFACTURER_ID_GEOWORKS &&
+     notificationType == GWNT_PPP_STATUS_NOTIFICATION) 
+    {
+      // Don't record hacked message to AUI to flash icon!
+      // Just get the heck out of here!
+      if ( data == 0xfeed )
+	  return;
+
+      PUSHDS;
+      SET_DS_LIB_DGROUP;
+
+      pppStatus = data & PPPStatusBits;
+
+      // This will catch the initial event we get when we're added to the
+      // GCN list.
+      if (pppStatus == prevStatus)
+      {
+	  POPDS;
+	  return;
+      }
+
+      sdErr = data & 0x00ff; // low bytes
+      ssdErr = (data & PPPErrorBits) & 0xff00; // high bytes
+
+      switch(pppStatus)
+	{
+	case PPP_STATUS_OPENING:
+	  {
+	    // Now that are status is OPENING, we can clean this flag up.
+	    connectSent = FALSE;
+	    bConnectionWasFullyOpen = FALSE;
+
+	    if(AccessPointGetActivePoint(APT_INTERNET) == 0)
+	      {
+		@call IDialupPrimary::MSG_GEN_DISPLAY_SET_MINIMIZED();
+		@send process::MSG_IDP_DISCONNECT();
+		accpntErr = TRUE;
+	      }
+	    else
+	      {
+		accpntErr = FALSE;
+		/* open window, we'll close after connecting */
+		@call IDialupApp::MSG_GEN_BRING_TO_TOP();
+		@call IDialupPrimary::MSG_GEN_DISPLAY_SET_NOT_MINIMIZED();
+		@call IDInfoGroup::MSG_IDI_RESET();
+		@call self::MSG_IDA_VIEW_INFO();
+		@call IDDisconnectButton::MSG_GEN_SET_ENABLED(VUM_NOW);
+		@call IDConnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+		@call IDInfoGroup::MSG_IDI_DRAW_STATUS();
+	      }
+	    break;
+	  }
+	case PPP_STATUS_CONNECTING:
+	  {
+	    @call IDInfoGroup::MSG_IDI_DRAW_STATUS();
+	    break;
+	  }
+	case PPP_STATUS_DIALING:
+	  {
+	    @call IDInfoGroup::MSG_IDI_DRAW_STATUS();
+	    break;
+	  }
+	case PPP_STATUS_OPEN:
+	  {
+	    @call IDConnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+	    if ( disconnectRequested )
+		@call IDDisconnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	    else
+		@call IDDisconnectButton::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+	    @call IDInfoGroup::MSG_IDI_DRAW_STATUS();
+
+	    // get the baud rate 
+	    r = GetBaudRate();
+#ifdef PRODUCT_LOGGING
+	    ABLog(_TEXT("connect speed: %d\r\n"), r);
+#endif
+	    @call IDInfoGroup::MSG_IDI_DRAW_SPEED(r);
+
+	    // start the timer 
+	    timerHandle = TimerStart(TIMER_EVENT_ONE_SHOT, 
+				     ConstructOptr(GeodeGetProcessHandle(), 0),
+				     UPDATE_TIME,
+				     MSG_IDP_TIMER_HANDLE,
+				     0, 
+				     &timerId) ;
+
+	    // remember the starting time
+	    startTime = TimerGetCount();
+	    idleTime = 0;
+	    bStealthLIAFlag = FALSE;
+
+	    // clear the bytes read/write
+	    bytesSent = bytesReceived = 0;
+
+	    // check and remember if there is an internet application running
+	    iAppRunning = IAppRunning();
+
+	    windowDownDelay = 1;
+
+	    // note that the connection is fully open.
+	    bConnectionWasFullyOpen = TRUE;
+
+	    break;
+	  } 
+	case PPP_STATUS_CLOSING:
+	  {
+	    @call IDInfoGroup::MSG_IDI_DRAW_STATUS();
+	    break;
+	  }
+	case PPP_STATUS_ACCPNT:
+	  {
+	    accpntErr = TRUE;
+	    break;
+	  }
+ 	case PPP_STATUS_CLOSED:
+	  {
+	    /* The idle and last-internet-app dialogs can go away now. */
+	    @send IDIdleNotifyDialog::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+	    @send IDIdleNotifyDialog::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	    @send IDLIANotifyDialog::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+
+	    AccessPointSetActivePoint(defaultAccpnt, APT_INTERNET);
+
+	    idleTime = 0;
+	    bytesSent = bytesReceived = 0;
+
+	    MemLock(OptrToHandle(@busyStr));
+
+	    // If we requested a disconnect, skip all error messages.
+	    //
+	    if( (sdErr || ssdErr) && !disconnectRequested )
+	      {
+		ptr = NULL;
+
+		// close caused by error
+
+		switch(ssdErr)
+		  {
+		  case SSDE_LINE_BUSY:    // modem got a busy signal
+		    ptr = LMemDeref(@busyStr);
+		    break;
+		  case SSDE_NO_CARRIER:
+		    if ( sdErr != SDE_CONNECTION_RESET )
+			ptr = LMemDeref(@noCarrierStr);
+		    else if ( prevStatus < PPP_STATUS_OPEN )
+			ptr = LMemDeref(@dialIntStr);
+		    else if ( prevStatus == PPP_STATUS_OPEN )
+			ptr = LMemDeref(@connectionIntStr);
+		    // Other cases (closing, closed), we shouldn't
+		    // put up any message because the loss of carrier
+		    // is expected.
+		    break;
+		  case SSDE_NO_DIALTONE:
+		    ptr = LMemDeref(@noDialtoneStr);
+		    break;
+		  case SSDE_NO_ANSWER:
+		    ptr = LMemDeref(@noAnswerStr);
+		    break;
+		  case SSDE_AUTH_REFUSED:
+		  case SSDE_AUTH_FAILED:
+		    ptr = LMemDeref(@authFailedStr);
+		    break;
+		  case SSDE_DEVICE_BUSY:  // serial port or modem driver already in use
+		    ptr = LMemDeref(@deviceBusyStr);
+		    break;
+		  case SSDE_DEVICE_ERROR:
+		    ptr = LMemDeref(@deviceErrorStr);
+		    break;
+		  case SSDE_DIAL_ERROR:
+		    ptr = LMemDeref(@dialErrorStr);
+		    break;
+		  case SSDE_CALL_FAILED:  // couldn't dial for some reason
+		    ptr = LMemDeref(@callFailedStr);
+		    break;
+		  case SSDE_NEG_FAILED:
+		    ptr = LMemDeref(@negFailedStr);
+		    break;
+		  case SSDE_IDLE_TIMEOUT:
+		  case SSDE_DEVICE_TIMEOUT:
+		    ptr = LMemDeref(@timeoutStr);
+		    break;
+
+		  case SSDE_LQM_FAILURE:
+		      ptr = LMemDeref( @ConnectionLostStr );
+		      break;
+
+		    /* These cases below were unhandled errors that are
+		     * considered to be INTERNAL errors.  We need to display
+		     * some information, at least to be helpful in
+		     * customer support, if nothing else.
+		     */
+		  case SSDE_BLACKLISTED:  // used in GSM network
+		      argPtr = LMemDeref( @err_ssde_blacklisted );
+		      break;
+		  case SSDE_DELAYED:      // used in GSM network
+		      argPtr = LMemDeref( @err_ssde_delayed );
+		      break;
+		  case SSDE_LOOPED_BACK:
+		      argPtr = LMemDeref( @err_ssde_looped_back );
+		      break;
+		  case SSDE_DEVICE_NOT_FOUND:// unable to load device driver
+		      argPtr = LMemDeref( @err_ssde_device_not_found );
+		      break;
+		  case SSDE_NO_USERNAME:    // no username and password, prompting used
+		      argPtr = LMemDeref( @err_ssde_no_username );
+		      break;
+		  case SSDE_CANCEL:         // user cancelled 
+		      argPtr = LMemDeref( @err_ssde_cancel );
+		      break;
+		  case SSDE_INVALID_ACCPNT: // invalid access point
+		      argPtr = LMemDeref( @err_ssde_invalid_accpnt );
+		      break;
+		  case SSDE_LOGIN_FAILED:
+		      argPtr = LMemDeref( @err_ssde_login_failed );
+		      break;
+		  case SSDE_LOGIN_FAILED_NO_NOTIFY:
+		      argPtr = LMemDeref( @err_ssde_login_failed_no_notify );
+		      break;
+		  case SSDE_DIAL_ABORTED:
+		      break;		  // do nothing here.
+
+		  case 0:	// This case, we need to check less
+		  default:	// specific sdErr.. better then nothing!
+		      switch(sdErr)
+		      {
+		      case SDE_CONNECTION_TIMEOUT:   //generic failure
+			  switch ( prevStatus )
+			  {
+			  case PPP_STATUS_CONNECTING:
+			      ptr = LMemDeref(@timeoutStr);
+			      break;
+
+			  case PPP_STATUS_OPEN:
+			      ptr = LMemDeref(@timeoutOpenStr);
+			      break;
+
+			      // This is a problem with modem hangup
+			      // Ignore it since we were closing anyway.
+			  case PPP_STATUS_CLOSING:
+			      break;
+
+			  default:
+			      argPtr = LMemDeref( @err_sde_timeout );
+			      break;
+			  }
+			  break;
+
+		      case SDE_CONNECTION_REFUSED:   //remote refuse to connect
+			  argPtr = LMemDeref( @err_sde_connection_refused );
+			  break;
+		      case SDE_MEDIUM_BUSY:          //active connection outside
+			  argPtr = LMemDeref( @err_sde_medium_busy );
+			  break;
+		      case SDE_INSUFFICIENT_MEMORY:  
+			  argPtr = LMemDeref( @err_sde_insufficient_memory );
+			  break;
+		      case SDE_NOT_REGISTERED:	 //client has not reg with dr
+			  argPtr = LMemDeref( @err_sde_not_registered );
+			  break;
+		      case SDE_ALREADY_REGISTERED:   //same client registering 2x 
+			  argPtr = LMemDeref( @err_sde_already_registered );
+			  break;
+		      case SDE_CONNECTION_EXISTS:	 //opening duplicate conn.
+			  argPtr = LMemDeref( @err_sde_connection_exists );
+			  break;
+		      case SDE_LINK_OPEN_FAILED:	 //couldn't open any links
+			  argPtr = LMemDeref( @err_sde_link_open_failed );
+			  break;
+		      case SDE_DRIVER_NOT_FOUND: 
+			  argPtr = LMemDeref( @err_sde_driver_not_found );
+			  break;
+		      case SDE_DESTINATION_UNREACHABLE:
+			  argPtr = LMemDeref( @err_sde_destination_unreach );
+			  break;
+		      case SDE_CONNECTION_RESET_BY_PEER://remote initiated reset
+			  if ( prevStatus < PPP_STATUS_OPEN )
+			      ptr = LMemDeref(@dialIntStr);
+			  else if ( prevStatus == PPP_STATUS_OPEN )
+			      ptr = LMemDeref(@connectionIntStr);
+			  break;
+		      case SDE_CONNECTION_RESET:     //we initiated reset
+			  argPtr = LMemDeref( @err_sde_connection_reset );
+			  break;
+		      case SDE_UNSUPPORTED_FUNCTION:
+			  argPtr = LMemDeref( @err_sde_unsupported_function );
+			  break;
+		      case SDE_INVALID_CONNECTION_HANDLE:
+			  argPtr = LMemDeref( @err_sde_invalid_conn_handle );
+			  break;
+		      case SDE_INVALID_ADDR_FOR_LINK: //loopback illegal for link
+			  argPtr = LMemDeref( @err_sde_invalid_addr_link );
+			  break;
+		      case SDE_INVALID_ADDR:	  //bad address entered
+			  argPtr = LMemDeref( @err_sde_invalid_addr );
+			  break;
+		      case SDE_TEMPORARY_ERROR:
+			  argPtr = LMemDeref( @err_sde_temporary_error );
+			  break;
+		      case SDE_INTERRUPTED:
+			  argPtr = LMemDeref( @err_sde_interrupted );
+			  break;
+
+		      default:
+			  argPtr = LMemDeref( @err_ppp_unknown );
+			  break;
+		      }
+		  }
+
+		if(accpntErr)
+		{
+		    if ( connectionNum == 0 )
+			ptr = LMemDeref( @noConnectionStr );
+		    else
+			ptr = LMemDeref(@setDefaultConnectionStr);
+		    accpntErr = FALSE;
+		}
+
+		// Don't use funky error message if there is an
+		// accpnt error.
+		else if ( argPtr )
+		{
+		    switch ( prevStatus )
+		    {
+		    case PPP_STATUS_OPENING:
+		    case PPP_STATUS_DIALING:
+		    case PPP_STATUS_CONNECTING:
+			ptr = LMemDeref(@unknownPPPErrorFailedStr);
+			break;
+
+		    default:
+			ptr = LMemDeref(@unknownPPPErrorClosedStr);
+			break;
+		    }
+		}
+
+#ifdef PRODUCT_LOGGING
+		if(ptr) ABLog(_TEXT("%s\r\n"), ptr);
+#endif
+
+		if(ptr && !bErrorDialogFlag)
+		  {
+		    @call IDialupPrimary::MSG_GEN_DISPLAY_SET_NOT_MINIMIZED();
+		    @call IDialupApp::MSG_GEN_BRING_TO_TOP();
+
+		    @call self::MSG_GEN_APPLICATION_DO_STANDARD_DIALOG
+		       (MSG_IDA_ERROR_DIALOG_DISMISSED, oself, 0, 
+			(char *)0, (char *)0, argPtr,
+			ptr,
+			(CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+			(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) |
+			CDBF_SYSTEM_MODAL);
+		    bErrorDialogFlag = TRUE;
+		  }
+	      }
+	      else
+	      {
+	        // The PPP connection has closed as per the user's disconnect
+	        // request.  Reset the user disconnect request flag.
+	        disconnectRequested = FALSE;
+	      }
+	    MemUnlock(OptrToHandle(@busyStr));
+
+	    if ( sendFieldChangeConfirm )
+	    {
+		// We were told to change fields when done closing,
+		// so do it now.
+		sendFieldChangeConfirm = FALSE;
+		UserConfirmFieldChange( CFCT_CONFIRM_COMPLETE, (word)TRUE );
+	    }
+
+	    // If the primary is minimized, and the connection is closed, then
+	    // we might as well quit to free up valuable system resources.
+	    // Also quit if the user requested the disconnect and the
+	    // connection was fully open prior to closure.
+
+	    // Otherwise, if we're not quitting, go back to the ISP view.
+
+	    if ((oldDisconnectRequested && bConnectionWasFullyOpen) || 
+		@call IDialupPrimary::MSG_GEN_DISPLAY_GET_MINIMIZED())
+		    @send, forceQueue application::MSG_META_QUIT();
+	    else
+	    {
+		@call IDConnectButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+		@call IDDisconnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		
+		@call self::MSG_IDA_VIEW_CONNECTION();
+	    }
+
+	    break;
+	  }
+	}
+
+      POPDS;
+    }
+    else if ( manufID == MANUFACTURER_ID_GEOWORKS &&
+	      notificationType == GWNT_CONFIRM_FIELD_CHANGE ) 
+    {
+	PUSHDS;
+	SET_DS_LIB_DGROUP;
+
+	sendFieldChangeConfirm = FALSE;
+
+	if ( !UserConfirmFieldChange( CFCT_CONFIRM_START ) )
+	{
+	    // If we are closed, go ahead and confirm the field change.
+	    // (connectSent is a hack to catch the time between the
+	    //  Connect button being pressed and the status being set
+	    //  to OPENING by the PPP driver/GCN notify mechanism.)
+	    //
+	    if ( pppStatus == PPP_STATUS_CLOSED && !connectSent )
+		UserConfirmFieldChange( CFCT_CONFIRM_COMPLETE, (word)TRUE );
+
+	    else
+	    {
+		MemLock(OptrToHandle(@dontChangeFieldNowStr));
+
+		// We are closing anyway.. send confirmation when
+		// closing is complete.
+		if ( pppStatus == PPP_STATUS_CLOSING )
+		{
+		    sendFieldChangeConfirm = TRUE;
+		    ptr = LMemDeref( @fieldChangeAlreadyClosingStr );
+		    @call self::MSG_GEN_APPLICATION_DO_STANDARD_DIALOG
+			 (0, 0, 0, 
+			  (char *)0, (char *)0, (char *)0,
+			  ptr,
+			  (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+			  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) |
+			  CDBF_SYSTEM_MODAL);
+		}
+
+		// We have an open connection.. we need to prompt the
+		// user for what to do.
+		else if ( pppStatus == PPP_STATUS_OPEN )
+		{
+		    word customTriggerTable[7];
+		    customTriggerTable[0] = 2;	// numTriggers
+		    customTriggerTable[1] = OptrToChunk(
+			@fieldChangeCloseConnYesVisMoniker );
+		    customTriggerTable[2] = OptrToHandle(
+			@fieldChangeCloseConnYesVisMoniker );
+		    customTriggerTable[3] = IC_YES;
+		    customTriggerTable[4] = OptrToChunk(
+			@fieldChangeCloseConnNoVisMoniker );
+		    customTriggerTable[5] = OptrToHandle(
+			@fieldChangeCloseConnNoVisMoniker );
+		    customTriggerTable[6] = IC_NO;
+
+		    ptr = LMemDeref( @fieldChangeCloseConnStr );
+		    @call self::MSG_GEN_APPLICATION_DO_STANDARD_DIALOG
+			 (MSG_IDP_FIELD_CHANGE_CONFIRM, 
+			  HandleToOptr(GeodeGetProcessHandle()), 0, 
+			  (char *)customTriggerTable, (char *)0, (char *)0,
+			  ptr,
+			  (CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
+		      (GIT_MULTIPLE_RESPONSE << CDBF_INTERACTION_TYPE_OFFSET) |
+			  CDBF_SYSTEM_MODAL);
+		}
+
+		// Connection is being established.  Best bet here is
+		// to tell the user to not do this now.
+		else
+		{
+		    ptr = LMemDeref( @dontChangeFieldNowStr );
+		    @call self::MSG_GEN_APPLICATION_DO_STANDARD_DIALOG
+			 (0, 0, 0, 
+			  (char *)0, (char *)0, (char *)0,
+			  ptr,
+			  (CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+			  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET) |
+			  CDBF_SYSTEM_MODAL);
+		    UserConfirmFieldChange( CFCT_CONFIRM_COMPLETE,
+					    (word)FALSE );
+		}
+
+		MemUnlock(OptrToHandle(@dontChangeFieldNowStr));
+	    }
+	}
+
+	POPDS;
+    }
+    else if (manufID == MANUFACTURER_ID_GEOWORKS &&
+	     notificationType == GWNT_INSTANT_SUSPEND_RESUME_NOTIFICATION) 
+    {
+	if (data == ISRT_SUSPEND_REFUSED && pppStatus != PPP_STATUS_CLOSED) {
+	    @call IDSuspendNotifyDialog::MSG_GEN_INTERACTION_INITIATE();
+	    @call IDSuspendNotifyDialog::MSG_GEN_BRING_TO_TOP();
+	    @call IDialupApp::MSG_GEN_BRING_TO_TOP();
+	}
+    }
+
+    else
+    {
+	@callsuper();
+    }
+}
+
+
+/***********************************************************************
+ *	MSG_VIS_DRAW for IDialupInfoClass
+ ***********************************************************************
+ * SYNOPSIS:     Save the gstat
+ *
+ * PARAMETERS:   
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	2/17/98	 Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupInfoClass, MSG_IDI_RESET
+{
+  @self->IDI_speed=0;
+  bytesSent = bytesS = bytesReceived = bytesR = 0;
+  hours = minutes = seconds = 0;
+}
+
+/***********************************************************************
+ *	MSG_VIS_DRAW for IDialupInfoClass
+ ***********************************************************************
+ * SYNOPSIS:     Save the gstat
+ *
+ * PARAMETERS:   
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	2/17/98	 Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupInfoClass, MSG_VIS_DRAW
+{
+  Rectangle rect;
+  Rectangle statusBoxBounds, dataBoxBounds;
+
+  @callsuper();
+
+  @call IDInfoStatusBox::MSG_VIS_GET_BOUNDS(&statusBoxBounds);
+  @call IDInfoDataBox::MSG_VIS_GET_BOUNDS(&dataBoxBounds);
+  if (memcmp(&statusBoxBounds, &pself->IDI_statusBoxBounds, sizeof(Rectangle))
+     || memcmp(&dataBoxBounds, &pself->IDI_dataBoxBounds, sizeof(Rectangle))) {
+    TCHAR *str;
+    struct {
+      byte WCI_red;
+      byte WCI_flags;
+      byte WCI_green;
+      byte WCI_blue;
+    } colorInfo;
+    WindowHandle win;
+    dword height;
+
+    win = @call self::MSG_VIS_QUERY_WINDOW();
+    if(win) {
+      WinGetInfo(win, WIT_COLOR, &colorInfo);
+      @self->IDI_color = colorInfo.WCI_red;
+    }
+
+    height = GrFontMetrics(gstate, GFMI_HEIGHT);
+    @self->IDI_text_height = (word)(height>>16) + 2;
+
+    if (@call IDInfoStatusBox::MSG_VIS_GET_ATTRS() & VA_REALIZED)
+    {
+	rect = statusBoxBounds;
+
+	@self->IDI_text_left = (rect.R_right*3 + rect.R_left)/5;
+	@self->IDI_text_width = rect.R_right - @self->IDI_text_left - 10;
+	
+	str = LMemDeref(@statusStr);
+	@self->IDI_status_x = (rect.R_right*3 + rect.R_left)/5 - GrTextWidth(gstate, str, strlen(str));
+	@self->IDI_status_y = rect.R_top + @self->IDI_text_height/2;
+	
+	str = LMemDeref(@timeStr);
+	@self->IDI_time_x = (rect.R_right*3 + rect.R_left)/5 - GrTextWidth(gstate, str, strlen(str));
+    }
+    else
+	@self->IDI_status_x = @self->IDI_time_x = 0;
+
+    if (@call IDInfoDataBox::MSG_VIS_GET_ATTRS() & VA_REALIZED)
+    {
+	rect = dataBoxBounds;
+
+	str = LMemDeref(@speedStr);
+	@self->IDI_speed_x = (rect.R_right*2 + rect.R_left)/3 - GrTextWidth(gstate, str, strlen(str));
+	@self->IDI_speed_y = rect.R_top + @self->IDI_text_height;
+	
+	str = LMemDeref(@sentStr);
+	@self->IDI_sent_x = (rect.R_right*2 + rect.R_left)/3 - GrTextWidth(gstate, str, strlen(str));
+
+	str = LMemDeref(@receivedStr);
+	@self->IDI_received_x = (rect.R_right*2 + rect.R_left)/3 - GrTextWidth(gstate, str, strlen(str));
+    }
+    else
+	@self->IDI_speed_x = @self->IDI_sent_x = @self->IDI_received_x = 0;
+  }
+
+  // draw the saved data 
+  @call self::MSG_IDI_DRAW_STATUS();
+  @call self::MSG_IDI_DRAW_TIME();
+  @call self::MSG_IDI_DRAW_SPEED(-1);
+  @call self::MSG_IDI_DRAW_SENT();
+  @call self::MSG_IDI_DRAW_RECEIVED();
+}
+
+/***********************************************************************
+ *	MSG_IDI_DRAW_STATUS for IDialupInfoClass
+ ***********************************************************************
+ * SYNOPSIS:     draw the status
+ *
+ * PARAMETERS:   
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	 we save the status and draw the text
+ *              
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	2/17/98	 Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupInfoClass, MSG_IDI_DRAW_STATUS
+{
+  TCHAR *str=0;
+  GStateHandle gstate;
+
+  if (@self->IDI_status_x == 0)
+      return;
+
+  gstate = @call self::MSG_VIS_VUP_CREATE_GSTATE();
+  GrSetAreaColor(gstate, CF_INDEX, @self->IDI_color, 0, 0);
+
+  // firstly, let's clean up the mess
+  GrFillRect(gstate, @self->IDI_text_left, @self->IDI_status_y,
+             @self->IDI_text_left + @self->IDI_text_width, 
+             @self->IDI_status_y + @self->IDI_text_height);
+
+  str = LMemDeref(@statusStr);
+  GrDrawText(gstate, @self->IDI_status_x, @self->IDI_status_y, str, strlen(str));
+
+  switch(pppStatus) {
+  case PPP_STATUS_OPENING:
+    str = LMemDeref(@openingStr);
+    break;
+  case PPP_STATUS_CONNECTING:
+    str = LMemDeref(@connectingStr);
+    break;
+  case PPP_STATUS_DIALING:
+    str = LMemDeref(@dialingStr);
+    break;
+  case PPP_STATUS_OPEN:
+    str = LMemDeref(@connectedStr);
+    break;
+  case PPP_STATUS_CLOSING:
+    str = LMemDeref(@closingStr);
+    break;
+  case PPP_STATUS_CLOSED:
+    str = LMemDeref(@disconnectedStr);
+    break;
+  default:
+    return;
+  }
+    
+  GrDrawTextAtCP(gstate, str, strlen(str));
+
+  GrDestroyState(gstate);
+}
+
+/***********************************************************************
+ *	MSG_IDI_DRAW_TIME for IDialupInfoClass
+ ***********************************************************************
+ * SYNOPSIS:     draw the connection time
+ *
+ * PARAMETERS:   
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	 we save and draw the time
+ *              
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	2/17/98	 Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupInfoClass, MSG_IDI_DRAW_TIME
+{
+  TCHAR *str;
+  GStateHandle gstate;
+
+  if (@self->IDI_time_x == 0)
+      return;
+
+  gstate = @call self::MSG_VIS_VUP_CREATE_GSTATE();
+  GrSetAreaColor(gstate, CF_INDEX, @self->IDI_color, 0, 0);
+
+  // firstly, let's clean up the mess
+  GrFillRect(gstate, @self->IDI_text_left, @self->IDI_status_y + @self->IDI_text_height + 3,
+             @self->IDI_text_left + @self->IDI_text_width, 
+             @self->IDI_status_y + @self->IDI_text_height * 2 + 3);
+
+  str = LMemDeref(@timeStr);
+  GrDrawText(gstate, @self->IDI_time_x, @self->IDI_status_y + @self->IDI_text_height + 3, 
+	     str, strlen(str));
+  GrDrawCharAtCP(gstate, hours/10+'0');
+  GrDrawCharAtCP(gstate, hours%10+'0');
+  GrDrawCharAtCP(gstate, ':');
+  GrDrawCharAtCP(gstate, minutes/10+'0');
+  GrDrawCharAtCP(gstate, minutes%10+'0');
+  GrDrawCharAtCP(gstate, ':');
+  GrDrawCharAtCP(gstate, seconds/10+'0');
+  GrDrawCharAtCP(gstate, seconds%10+'0');
+
+  GrDestroyState(gstate);
+}
+
+/***********************************************************************
+ *	MSG_IDI_DRAW_SPEED for IDialupInfoClass
+ ***********************************************************************
+ * SYNOPSIS:     draw the connection speed
+ *
+ * PARAMETERS:   word speed
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	 we save and draw the speed
+ *              
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	2/17/98	 Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupInfoClass, MSG_IDI_DRAW_SPEED
+{
+  GStateHandle gstate;
+  TCHAR *str, text[10];
+
+  if(speed != (word)-1) {
+    @self->IDI_speed = speed;
+  }
+
+  if (@self->IDI_speed_x == 0)
+      return;
+
+  gstate = @call self::MSG_VIS_VUP_CREATE_GSTATE();
+  GrSetAreaColor(gstate, CF_INDEX, @self->IDI_color, 0, 0);
+
+  // firstly, let's clean up the mess
+  GrFillRect(gstate, @self->IDI_text_left, @self->IDI_speed_y,
+             @self->IDI_text_left + @self->IDI_text_width, 
+             @self->IDI_speed_y + @self->IDI_text_height);
+
+  str = LMemDeref(@speedStr);
+  GrDrawText(gstate, @self->IDI_speed_x, @self->IDI_speed_y,
+	     str, strlen(str));
+
+  memset(text, 0, sizeof(TCHAR)*10);
+  sprintf(text,_TEXT("%u"), @self->IDI_speed);
+  GrDrawTextAtCP(gstate, text, strlen(text));
+
+  GrDestroyState(gstate);
+}
+
+/***********************************************************************
+ *	MSG_IDI_DRAW_SENT for IDialupInfoClass
+ ***********************************************************************
+ * SYNOPSIS:     draw the bytes sent
+ *
+ * PARAMETERS:   
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	 we save and draw the bytes
+ *              
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	2/17/98	 Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupInfoClass, MSG_IDI_DRAW_SENT
+{
+  GStateHandle gstate;
+  TCHAR *str, text[10];
+
+  if (@self->IDI_sent_x == 0)
+      return;
+
+  gstate = @call self::MSG_VIS_VUP_CREATE_GSTATE();
+  GrSetAreaColor(gstate, CF_INDEX, @self->IDI_color, 0, 0);
+
+  // firstly, let's clean up the mess
+  GrFillRect(gstate, @self->IDI_text_left, @self->IDI_speed_y + @self->IDI_text_height,
+             @self->IDI_text_left + @self->IDI_text_width, 
+             @self->IDI_speed_y + @self->IDI_text_height * 2);
+
+  str = LMemDeref(@sentStr);
+  GrDrawText(gstate, @self->IDI_sent_x, @self->IDI_speed_y + @self->IDI_text_height,
+	     str, strlen(str));
+
+  memset(text, 0, sizeof(TCHAR)*10);
+  sprintf(text,_TEXT("%lu"), bytesSent);
+  GrDrawTextAtCP(gstate, text, strlen(text));
+
+  GrDestroyState(gstate);
+}
+
+/***********************************************************************
+ *	MSG_IDI_DRAW_RECEIVED for IDialupInfoClass
+ ***********************************************************************
+ * SYNOPSIS:     draw the bytes received
+ *
+ * PARAMETERS:   
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	 we save and draw the bytes
+ *              
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	2/17/98	 Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupInfoClass, MSG_IDI_DRAW_RECEIVED
+{
+  GStateHandle gstate;
+  TCHAR *str, text[10];
+
+  if (@self->IDI_received_x == 0)
+      return;
+
+  gstate = @call self::MSG_VIS_VUP_CREATE_GSTATE();
+  GrSetAreaColor(gstate, CF_INDEX, @self->IDI_color, 0, 0);
+
+  // firstly, let's clean up the mess
+  GrFillRect(gstate, @self->IDI_text_left, @self->IDI_speed_y + @self->IDI_text_height * 2,
+             @self->IDI_text_left + @self->IDI_text_width, 
+             @self->IDI_speed_y + @self->IDI_text_height * 3);
+
+  str = LMemDeref(@receivedStr);
+  GrDrawText(gstate, @self->IDI_received_x, @self->IDI_speed_y + @self->IDI_text_height * 2, 
+	     str, strlen(str));
+  
+  memset(text, 0, sizeof(TCHAR)*10);
+  sprintf(text,_TEXT("%lu"), bytesReceived);
+  GrDrawTextAtCP(gstate, text, strlen(text));
+
+  GrDestroyState(gstate);
+}
+
+
+/***********************************************************************
+ *	         MSG_VIS_OPEN for IDialupInteractionClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Intercept visual open and set a global flag.
+ * PARAMETERS:	    various
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dhunter	8/31/00   	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupInteractionClass, MSG_VIS_OPEN
+{
+    bDialogOpenFlags[((IDialupInteractionInstance *)ObjDerefGen(oself))
+		    ->IDII_dialogID] = TRUE;
+    @callsuper();
+}	/* End of MSG_VIS_OPEN.	*/
+
+
+
+/***********************************************************************
+ *	         MSG_VIS_CLOSE for IDialupInteractionClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Intercept visual close and set a global flag.
+ * PARAMETERS:	    various
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dhunter	8/31/00   	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupInteractionClass, MSG_VIS_CLOSE
+{
+    bDialogOpenFlags[((IDialupInteractionInstance *)ObjDerefGen(oself))
+		    ->IDII_dialogID] = FALSE;
+    @callsuper();
+}	/* End of MSG_VIS_CLOSE.	*/

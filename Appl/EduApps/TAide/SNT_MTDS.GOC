@@ -1,0 +1,612 @@
+/***************************************************************************
+ *  FILE:			snt_mtds.goc
+ *  PROJECT:		Breadbox Teacher's Aide
+ *  DESCRIPTION:	This file has methods for student notes manipulation
+ *			
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include "taide.goh"
+@include "externs.goh"
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+
+/*
+ ***************************************************************************
+ *		Code for student notes database Manipulation
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * FUNCTION:	StuNotesCallBack
+ *
+ * CALLED BY:
+ *
+ *
+ * STRATEGY:
+ *
+ *
+ ***********************************************************************/
+sword _pascal StuNotesCallback (MemHandle m1,
+						  MemHandle m2,
+						  word valueForCallback )
+{
+void			*e1, *e2;
+BasicDBFieldID	fieldID;
+word			size1, size2;
+char *		string1, string2;
+void			*d1, *d2;
+TimerDateAndTime*	date1;
+TimerDateAndTime*	date2;
+
+
+    e1 = MemDeref(m1);
+    e2 = MemDeref(m2);
+
+    if (valueForCallback == VFC_DATE)  {
+
+	  fieldID = BasicDBGetFieldIDPtr(e1, BDBFHE_CATEGORY, STU_NOTE_DATE, 1);
+	  BasicDBGetPtrToFieldData(e1, fieldID, &d1);
+
+	  fieldID = BasicDBGetFieldIDPtr(e2, BDBFHE_CATEGORY, STU_NOTE_DATE, 1);
+	  BasicDBGetPtrToFieldData(e2, fieldID, &d2);
+
+	  date1 = d1;
+	  date2 = d2;
+
+	  if (date1->TDAT_year < date2->TDAT_year) return (-1);
+	  else if (date1->TDAT_year > date2->TDAT_year) return (1);
+	  else if (date1->TDAT_month < date2->TDAT_month) return (-1);
+	  else if (date1->TDAT_month > date2->TDAT_month) return (1);
+	  else if (date1->TDAT_day < date2->TDAT_day) return (-1);
+	  else if (date1->TDAT_day > date2->TDAT_day) return (1);
+	  else return (0);
+	  } /* end of date callback if */
+
+    else  {
+
+	  fieldID = BasicDBGetFieldIDPtr(e1, BDBFHE_CATEGORY, STU_NOTE_SUBJ, 1);
+	  size1 = BasicDBGetPtrToFieldData(e1, fieldID, &string1);
+
+	  fieldID = BasicDBGetFieldIDPtr(e2, BDBFHE_CATEGORY, STU_NOTE_SUBJ, 1);
+	  size2 = BasicDBGetPtrToFieldData(e2, fieldID, &string2);
+
+	  return LocalCmpStringsNoSpaceCase( &string1, &string2,
+				( size1 < size2) ? size1 : size2 );
+
+	  } /* end of subject callback else */
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_NEW_STUDENT_NOTE for TADocumentClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@extern method TADocumentClass, MSG_NEW_STUDENT_NOTE
+{
+ TimerDateAndTime	date;
+ char			dateString[DATE_TIME_BUFFER_SIZE + 1];
+
+
+    TimerGetDateAndTime(&date);
+    LocalFormatDateTime(dateString, DTF_SHORT, &date);
+    @call MSDBNoteDate::MSG_VIS_TEXT_REPLACE_ALL_PTR(dateString, 0);
+    @call MSDBNoteSubj::MSG_VIS_TEXT_DELETE_ALL();
+    @call MSDBNote::MSG_VIS_TEXT_DELETE_ALL();
+    @call MSDBNoteList::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+    pself->TADI_isNewNote = TRUE;
+
+    /* disable the new & del buttons */
+    @call MSDBNewNoteButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    @call MSDBDeleteNoteButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SAVE_STUDENT_NOTE for TADocumentClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@extern method TADocumentClass, MSG_SAVE_STUDENT_NOTE
+{
+ BasicDBError		error;
+ dword			length, newNotePos, begin, end, i;
+ BasicDBFieldID	dateFieldID, textFieldID, numNFieldID, dbHanFieldID;
+ BasicDBFieldID	subjFieldID, dIndexHanFieldID, sIndexHanFieldID;
+ BasicDBRecordID	recordID;
+ VMBlockHandle		notesDBHan, notesDIndexHan, notesSIndexHan;
+ MemHandle		mh, noteHan;
+ char*			note;
+ char			subjString[NAME_SIZE];
+ TimerDateAndTime	date;
+ char			dateString[DATE_TIME_BUFFER_SIZE + 1];
+ dword			curStuNote;
+
+
+    /* first check the date */
+    @call MSDBNoteDate::MSG_VIS_TEXT_GET_ALL_PTR(dateString);
+    if (!DateCheck(dateString)) {
+	  @call MSDBNoteDate::MSG_VIS_TEXT_SELECT_ALL();
+	  @call MSDBNoteDate::MSG_META_GRAB_FOCUS_EXCL();
+	  return;
+	  }
+    /* get any selection */
+    curStuNote = @call MSDBNoteList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    /* get the current student's notes db and indices */
+    dbHanFieldID = BasicDBGetFieldID(pself->TADI_openStuRecMH,
+							BDBFHE_CATEGORY,
+							STU_NOTES_DB,
+							1);
+    dIndexHanFieldID = BasicDBGetFieldID(pself->TADI_openStuRecMH,
+							BDBFHE_CATEGORY,
+							STU_NOTES_D_INDX,
+							1);
+    sIndexHanFieldID = BasicDBGetFieldID(pself->TADI_openStuRecMH,
+							BDBFHE_CATEGORY,
+							STU_NOTES_S_INDX,
+							1);
+
+    BasicDBGetFieldData(pself->TADI_openStuRecMH,
+						    dbHanFieldID,
+						    &notesDBHan,
+						    sizeof(VMBlockHandle));
+    BasicDBGetFieldData(pself->TADI_openStuRecMH,
+						    dIndexHanFieldID,
+						    &notesDIndexHan,
+						    sizeof(VMBlockHandle));
+    BasicDBGetFieldData(pself->TADI_openStuRecMH,
+						    sIndexHanFieldID,
+						    &notesSIndexHan,
+						    sizeof(VMBlockHandle));
+
+    if (pself->TADI_isNewNote)  {
+	  /* create the record */
+	  mh = BasicDBCreateRecord();
+	  /* and its fields */
+	  error = BasicDBAddField(pself->GDI_fileHandle,
+					   notesDBHan,
+					   mh,
+					   STU_NOTE_DATE,
+					   0,
+					   0,
+					   &dateFieldID);
+	  error = BasicDBAddField(pself->GDI_fileHandle,
+					   notesDBHan,
+					   mh,
+					   STU_NOTE_SUBJ,
+					   0,
+					   0,
+					   &subjFieldID);
+	  error = BasicDBAddField(pself->GDI_fileHandle,
+					   notesDBHan,
+					   mh,
+					   STU_NOTE_TEXT,
+					   0,
+					   0,
+					   &textFieldID);
+	  } /* end of new note if */
+    else {
+       /* get teh record that is on screen */
+	  if (pself->TADI_curStuNoteSortPref == VFC_DATE)
+		error = BasicDBGetRecordByIndex(pself->GDI_fileHandle,
+					   notesDBHan,
+					   notesDIndexHan,
+					   curStuNote,
+					   &mh);
+	  else
+		error = BasicDBGetRecordByIndex(pself->GDI_fileHandle,
+					   notesDBHan,
+					   notesSIndexHan,
+					   curStuNote,
+					   &mh);
+	  if (error) NotifyDBox(0, @BDBGetByIndexError);
+	  dateFieldID = BasicDBGetFieldID(mh,
+							BDBFHE_CATEGORY,
+							STU_NOTE_DATE,
+							1);
+	  subjFieldID = BasicDBGetFieldID(mh,
+							BDBFHE_CATEGORY,
+							STU_NOTE_SUBJ,
+							1);
+	  textFieldID = BasicDBGetFieldID(mh,
+							BDBFHE_CATEGORY,
+							STU_NOTE_TEXT,
+							1);
+	  }
+
+    /* stash the date, subj and text */
+    LocalParseDateTime(dateString, DTF_SHORT, &date);
+    error = BasicDBSetFieldData(mh,
+							dateFieldID,
+							&date,
+							sizeof(TimerDateAndTime));
+    length = @call MSDBNoteSubj::MSG_VIS_TEXT_GET_ALL_PTR(subjString);
+    error = BasicDBSetFieldData(mh,
+							subjFieldID,
+							subjString,
+							length);
+    noteHan = @call MSDBNote::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+    length = @call MSDBNote::MSG_VIS_TEXT_GET_TEXT_SIZE();
+    note = MemLock(noteHan);
+    error = BasicDBSetFieldData(mh,
+							textFieldID,
+							note,
+							(word) length);
+    MemUnlock(noteHan);
+    MemFree(noteHan);
+    /* and store the record */
+    error = BasicDBSaveRecord(pself->GDI_fileHandle,
+					   notesDBHan,
+					   mh,
+					   StuNotesCallback,
+					   &recordID);
+    if (error) NotifyDBox(0, @ErrMsgCouldntSaveRec);
+
+    /* get the note pos in the index */
+    if (pself->TADI_curStuNoteSortPref == VFC_DATE)
+	  error = BasicDBIndexElementFind (pself->GDI_fileHandle,
+					   notesDBHan,
+					   recordID,
+					   notesDIndexHan,
+					   VFC_DATE,
+					   StuNotesCallback,
+					   &newNotePos);
+    else
+	  error = BasicDBIndexElementFind (pself->GDI_fileHandle,
+					   notesDBHan,
+					   recordID,
+					   notesSIndexHan,
+					   VFC_SUBJ,
+					   StuNotesCallback,
+					   &newNotePos);
+    if (error) NotifyDBox(0, @BDBIndexElemFindError);
+
+    if (pself->TADI_isNewNote) {
+	  /* now save the updated notes info in stu db */
+	  pself->TADI_curStuNumNotes++;
+	  numNFieldID = BasicDBGetFieldID(pself->TADI_openStuRecMH,
+							BDBFHE_CATEGORY,
+							STU_NUM_NOTES,
+							1);
+	  error = BasicDBSetFieldData(pself->TADI_openStuRecMH,
+						    numNFieldID,
+						    &pself->TADI_curStuNumNotes,
+						    sizeof(dword));
+
+	  /* show the new date/subj in the dlist */
+	  @call MSDBNoteList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(pself->TADI_curStuNumNotes);
+    /*	  curStuNote = newNotePos; */
+	  @call MSDBNoteList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+						   /*curStuNote*/ newNotePos, FALSE);
+	  pself->TADI_isNewNote = FALSE;
+	  } /* end of new note if */
+    else { /* existing note changed */
+	  if (curStuNote != newNotePos) {
+		if (curStuNote < newNotePos) {
+		   begin = curStuNote;
+		   end = newNotePos;
+		   }
+		else {
+		   begin = newNotePos;
+		   end = curStuNote;
+		   }
+		for (i = begin; i <= end; i++) {
+		   /* redraw the affected dlist monikers */
+		   @call self::MSG_NOTE_DLIST_MONIKER_QUERY(@MSDBNoteList, i);
+		   }
+	   /*	curStuNote = newNotePos; */
+		@call MSDBNoteList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+						   /*curStuNote*/newNotePos, FALSE);
+		} /* end of new position if */
+
+	  } /* end of existing note else */
+
+    /* enable the new & del buttons */
+    @call MSDBNewNoteButton::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @call MSDBDeleteNoteButton::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+    /* and save the stu record so that the user doesn't have to
+	* click save on the reply bar too. */
+    @call self::MSG_SAVE_STUDENT_INFO();
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_DELETE_STUDENT_NOTE for TADocumentClass
+ *              
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@extern method TADocumentClass, MSG_DELETE_STUDENT_NOTE
+{
+ BasicDBFieldID	fieldID;
+ BasicDBRecordID	recordID;
+ VMBlockHandle		notesDBHan, notesDIndexHan, notesSIndexHan;
+ MemHandle		mh;
+ word			error, curStuNote;
+
+
+    /* show confirmation dialog box */
+    if (AckDBox(0, 0, @ConfMsgDeleteStuNote) == ACK_NO) return;
+
+    /* get the selection */
+    curStuNote = @call MSDBNoteList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+    /* get the current student's notes db */
+    fieldID = BasicDBGetFieldID(pself->TADI_openStuRecMH,
+							BDBFHE_CATEGORY,
+							STU_NOTES_DB,
+							1);
+    BasicDBGetFieldData(pself->TADI_openStuRecMH,
+						    fieldID,
+						    &notesDBHan,
+						    sizeof(VMBlockHandle));
+    fieldID = BasicDBGetFieldID(pself->TADI_openStuRecMH,
+							BDBFHE_CATEGORY,
+							STU_NOTES_D_INDX,
+							1);
+    BasicDBGetFieldData(pself->TADI_openStuRecMH,
+						    fieldID,
+						    &notesDIndexHan,
+						    sizeof(VMBlockHandle));
+    fieldID = BasicDBGetFieldID(pself->TADI_openStuRecMH,
+							BDBFHE_CATEGORY,
+							STU_NOTES_S_INDX,
+							1);
+    BasicDBGetFieldData(pself->TADI_openStuRecMH,
+						    fieldID,
+						    &notesSIndexHan,
+						    sizeof(VMBlockHandle));
+    /* and the note */
+    if (pself->TADI_curStuNoteSortPref == VFC_DATE)
+	  error = BasicDBGetRecordByIndex(pself->GDI_fileHandle,
+					   notesDBHan,
+					   notesDIndexHan,
+					   curStuNote,
+					   &mh);
+    else
+	  error = BasicDBGetRecordByIndex(pself->GDI_fileHandle,
+					   notesDBHan,
+					   notesSIndexHan,
+					   curStuNote,
+					   &mh);
+    if (error) NotifyDBox(0, @BDBGetByIndexError);
+    /* now delete the note */
+    recordID = BasicDBGetRecordID(mh);
+    BasicDBDeleteRecord(pself->GDI_fileHandle,
+					   notesDBHan,
+					   mh,
+					   StuNotesCallback);
+
+    /* and save the new number of notes */
+    fieldID = BasicDBGetFieldID(pself->TADI_openStuRecMH,
+							BDBFHE_CATEGORY,
+							STU_NUM_NOTES,
+							1);
+    pself->TADI_curStuNumNotes--;
+    error = BasicDBSetFieldData(pself->TADI_openStuRecMH,
+						    fieldID,
+						    &pself->TADI_curStuNumNotes,
+						    sizeof(dword));
+
+    /* now tell the dlist and reset the current note showing */
+    @call MSDBNoteList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(curStuNote, 1);
+    if(pself->TADI_curStuNumNotes) {
+	  if(pself->TADI_curStuNumNotes == curStuNote) curStuNote--;
+	  @call MSDBNoteList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+						   curStuNote, FALSE);
+	  @call self::MSG_NOTE_DLIST_APPLY(curStuNote, 1, 0);
+	  }
+    else {
+	  @call self::MSG_NEW_STUDENT_NOTE();
+	  }
+
+    @call self::MSG_SAVE_STUDENT_INFO();
+
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_NOTE_DLIST_APPLY for TADocumentClass
+ *
+ * PARAMETERS:  void (word selection, numSelections, flags)
+ *
+ * DESCRIPTION:	Handles an apply of user selection in the notes list.
+ *                  Shows the date, subj and note text
+ *
+ *
+ ***********************************************************************/
+@extern method TADocumentClass, MSG_NOTE_DLIST_APPLY
+{
+ BasicDBError		error;
+ word			size;
+ BasicDBFieldID	fieldID;
+ VMBlockHandle		notesDBHan, notesIndexHan;
+ MemHandle		mh;
+ char*			text;
+ BasicDBRecordHeader *	recordPtr;
+ char			subjString[NAME_SIZE];
+ TimerDateAndTime	date;
+ char			dateString[DATE_TIME_BUFFER_SIZE + 1];
+
+
+    /* get the current student's notes db */
+    fieldID = BasicDBGetFieldID(pself->TADI_openStuRecMH,
+							BDBFHE_CATEGORY,
+							STU_NOTES_DB,
+							1);
+    BasicDBGetFieldData(pself->TADI_openStuRecMH,
+						    fieldID,
+						    &notesDBHan,
+						    sizeof(VMBlockHandle));
+    if (pself->TADI_curStuNoteSortPref == VFC_DATE)
+	  fieldID = BasicDBGetFieldID(pself->TADI_openStuRecMH,
+							BDBFHE_CATEGORY,
+							STU_NOTES_D_INDX,
+							1);
+    else
+	  fieldID = BasicDBGetFieldID(pself->TADI_openStuRecMH,
+							BDBFHE_CATEGORY,
+							STU_NOTES_S_INDX,
+							1);
+    BasicDBGetFieldData(pself->TADI_openStuRecMH,
+						    fieldID,
+						    &notesIndexHan,
+						    sizeof(VMBlockHandle));
+    /* now get the selected record */
+    error = BasicDBGetRecordByIndex(pself->GDI_fileHandle,
+					   notesDBHan,
+					   notesIndexHan,
+					   selection,
+					   &mh);
+    if (error) NotifyDBox(0, @BDBGetByIndexError);
+    /* get the subj field of that record */
+    fieldID = BasicDBGetFieldID(mh,
+							BDBFHE_CATEGORY,
+							STU_NOTE_SUBJ,
+							1);
+    size = BasicDBGetFieldData(mh,
+						    fieldID,
+						    subjString,
+						    NAME_SIZE);
+    if (size) @call MSDBNoteSubj::MSG_VIS_TEXT_REPLACE_ALL_PTR(subjString, size);
+    else @call MSDBNoteSubj::MSG_VIS_TEXT_DELETE_ALL();
+    /* and the date field of that record */
+    fieldID = BasicDBGetFieldID(mh,
+							BDBFHE_CATEGORY,
+							STU_NOTE_DATE,
+							1);
+    BasicDBGetFieldData(mh,
+						    fieldID,
+						    &date,
+						    sizeof(TimerDateAndTime));
+    LocalFormatDateTime(dateString, DTF_SHORT, &date);
+    @call MSDBNoteDate::MSG_VIS_TEXT_REPLACE_ALL_PTR(dateString, 0);
+
+    /* and the text field of that record */
+    fieldID = BasicDBGetFieldID(mh,
+							BDBFHE_CATEGORY,
+							STU_NOTE_TEXT,
+							1);
+    recordPtr = MemLock(mh);
+    size = BasicDBGetPtrToFieldData(recordPtr,
+						    fieldID,
+						    (byte*) &text);
+    @call MSDBNote::MSG_VIS_TEXT_REPLACE_ALL_PTR(text, size);
+    MemUnlock(mh);
+
+    /* got the data - free the record */
+    BasicDBDiscardRecord(mh);
+
+    /*curStuNote = selection; */
+    pself->TADI_isNewNote = FALSE;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_NOTE_DLIST_MONIKER_QUERY for TADocumentClass
+ *
+ * DESCRIPTION:	Queries for monikers for notes list.
+ *
+ * PARAMETERS:  void (optr list, word item)
+ *
+ *  
+ *
+ ***********************************************************************/
+@extern method TADocumentClass, MSG_NOTE_DLIST_MONIKER_QUERY
+{
+ BasicDBError		error;
+ word			size;
+ BasicDBFieldID	fieldID;
+ VMBlockHandle		notesDBHan, notesIndexHan;
+ MemHandle		mh;
+ char			subjString[NAME_SIZE];
+ TimerDateAndTime	date;
+ char			dateString[DATE_TIME_BUFFER_SIZE + 1 + 	NAME_SIZE];
+
+
+    /* get the current student's notes db */
+    fieldID = BasicDBGetFieldID(pself->TADI_openStuRecMH,
+							BDBFHE_CATEGORY,
+							STU_NOTES_DB,
+							1);
+    BasicDBGetFieldData(pself->TADI_openStuRecMH,
+						    fieldID,
+						    &notesDBHan,
+						    sizeof(VMBlockHandle));
+    if (pself->TADI_curStuNoteSortPref == VFC_DATE)
+	  fieldID = BasicDBGetFieldID(pself->TADI_openStuRecMH,
+							BDBFHE_CATEGORY,
+							STU_NOTES_D_INDX,
+							1);
+    else
+	  fieldID = BasicDBGetFieldID(pself->TADI_openStuRecMH,
+							BDBFHE_CATEGORY,
+							STU_NOTES_S_INDX,
+							1);
+    BasicDBGetFieldData(pself->TADI_openStuRecMH,
+						    fieldID,
+						    &notesIndexHan,
+						    sizeof(VMBlockHandle));
+    /* now get the selected record */
+    error = BasicDBGetRecordByIndex(pself->GDI_fileHandle,
+					   notesDBHan,
+					   notesIndexHan,
+					   item,
+					   &mh);
+    if (error) NotifyDBox(0, @BDBGetByIndexError);
+    /* and the date field of that record */
+    fieldID = BasicDBGetFieldID(mh,
+							BDBFHE_CATEGORY,
+							STU_NOTE_DATE,
+							1);
+    BasicDBGetFieldData(mh,
+						    fieldID,
+						    &date,
+						    sizeof(TimerDateAndTime));
+
+    /* and the subj field of that record */
+    fieldID = BasicDBGetFieldID(mh,
+							BDBFHE_CATEGORY,
+							STU_NOTE_SUBJ,
+							1);
+    size = BasicDBGetFieldData(mh,
+						    fieldID,
+						    subjString,
+						    NAME_SIZE);
+    /* got the data - free the record */
+    BasicDBDiscardRecord(mh);
+    LocalFormatDateTime(dateString, DTF_SHORT, &date);
+    strcat(dateString, " ");
+    subjString[size] = 0;
+    strcat(dateString, subjString);
+    @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, dateString);
+
+
+}
+

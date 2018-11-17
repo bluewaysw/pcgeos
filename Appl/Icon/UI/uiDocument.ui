@@ -1,0 +1,343 @@
+/*
+ *	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+ *
+ * Project:	PC GEOS
+ * Module:	
+ * File:	uiDocument.ui
+ *
+ * Author:	Steve Yegge, Feb 11, 1993
+ *
+ * Revision History:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	stevey	2/11/93	Initial revision
+ *
+ * Description:
+ *	
+ *
+ *	$Id: uiDocument.ui,v 1.1 97/04/04 16:06:29 newdeal Exp $
+ *
+ */
+
+#define VIEWER_VIEW_DEFAULT_WIDTH	280
+#define VIEWER_VIEW_DEFAULT_HEIGHT	150
+#define VIEWER_VIEW_MINIMUM_WIDTH	100
+#define VIEWER_VIEW_MINIMUM_HEIGHT	60
+
+start	FileMenuUI;
+
+/*-----------------------------------------------------------------------------
+		DisplayGroup and Control
+-----------------------------------------------------------------------------*/
+
+IconDisplayControl = GenDisplayControl {
+	visibility = popup;
+	hints = {
+		ATTR_GEN_INTERACTION_GROUP_TYPE {
+			GenInteractionGroupType GIGT_WINDOW_MENU
+		}
+	}
+}
+
+IconDisplayGroup = GenDisplayGroup {
+	hints = {
+		HINT_DEFAULT_FOCUS, HINT_DEFAULT_TARGET,
+	}
+}
+
+/*----------------------------------------------------------------------------
+			IconDocumentControl
+-----------------------------------------------------------------------------*/
+
+IconDocumentControl = GenDocumentControl {
+	documentTokenChars = "'I', 'D', 'O', 'C'";
+	/*
+	 * Special attributes:  allow multiple open files, and don't
+	 * display name on primary (this is handled by display control)
+	 */
+	dcAttributes = default +multipleOpenFiles;
+	features = default -displayNameOnPrimary;
+	noNameText = "No Database";
+	/*
+	 *  Pointer to GenDocumentGroup;
+	 */
+	appDC = IconDocumentGroup;
+	dialogTemplateText = "Template:\\\rUse a pre-designed template to create a\\\rnew icon database.";
+	dialogNewText = "New:\\\rCreate a blank, empty icon database.";
+	dialogOpenText = "Open:\\\rOpen an existing icon database.";
+}
+
+end FileMenuUI;
+
+/*
+ *  The GenDocumentGroup should be put in a resource of its own, run
+ *  by the application thread.
+ */
+
+start DocUI;
+
+IconDocumentGroup = GenDocumentGroup {
+	defaultName = "Untitled Icon Database";
+	attributes = default -dontManageChildren;
+	/*
+	 * Document object to duplicate
+	 */
+	genDocument = IconDBViewerTemplate;
+	uiDC = IconDocumentControl;
+	genDisplayGroup = IconDisplayGroup;
+	genDisplay = IconDBDisplay;
+	genView = IconDBView;
+	protocolMajor = DOCUMENT_PROTOCOL_MAJOR;
+	protocolMinor = DOCUMENT_PROTOCOL_MINOR;
+}
+
+end DocUI;
+
+/*-----------------------------------------------------------------------------
+		Block to duplicate when creating a Display.
+-----------------------------------------------------------------------------*/
+
+start DisplayTempUI;
+
+/*
+ *  IconDBDisplay -- this is the root object in the ui tree that's
+ *  duplicated for each document, and must be set not-usable.
+ */
+
+IconDBDisplay = GenDisplay {
+	genStates = default -usable;
+	children = Menus,
+		   NotMenus;
+	hints = {
+		HINT_NEVER_ADOPT_MENUS,		/* has its own menu bar */
+	}
+}
+
+/*
+ *  Menus that will be included in each GenDisplay object.  The actual
+ *  icon & format menus are defined in uiIconMenu.ui and uiFormatMenu.ui
+ */
+
+Menus = GenInteraction {
+	type = organizational;
+	children = IconMenu,
+		   FormatMenu;
+}
+
+/*-----------------------------------------------------------------------------
+		TopGroup (fatbits & database viewer)
+-----------------------------------------------------------------------------*/
+NotMenus = GenInteraction {
+	type = organizational;
+	children = IconDBView,
+		   RightGroup;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+	}
+}
+
+IconDBView = GenView {
+	genAttributes = default +targetable;
+	docLeft = 0;
+	docTop = 0;
+	docRight = VIEWER_VIEW_DEFAULT_WIDTH;
+	docBottom = VIEWER_VIEW_DEFAULT_HEIGHT;
+	backColorR = C_WHITE;
+	viewAttributes = default +dragScrolling, +focusable;
+	horizAttributes = default +scrollable;
+	vertAttributes  = default +scrollable; 
+	hints = {
+		HINT_VIEW_REMOVE_SCROLLERS_WHEN_NOT_SCROLLABLE,
+		HINT_MINIMUM_SIZE {
+			SpecWidth <SST_PIXELS, 80>
+			SpecHeight <SST_PIXELS, 50>
+		}
+	}
+}
+
+FatbitsView = GenView {
+	genStates = default -enabled;
+	genAttributes = default -targetable;
+	docLeft = 0;
+	docTop = 0;
+	docRight = 384;
+	docBottom = 240;
+	viewAttributes = default +dragScrolling;
+	horizAttributes = default +noLargerThanContent, +scrollable;
+	vertAttributes = default +noLargerThanContent, +scrollable;
+	hints = {
+		HINT_INITIAL_SIZE {
+			SpecWidth <SST_PIXELS, 400>
+			SpecHeight <SST_PIXELS, 250>
+		},
+		HINT_VIEW_REMOVE_SCROLLERS_WHEN_NOT_SCROLLABLE,
+	}
+}
+
+RightGroup = GenInteraction {
+	type = organizational;
+	children = FatbitsView,
+		   BottomInteraction;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY,
+	}
+}
+
+BottomInteraction = GenInteraction {
+	type = organizational;
+	children = BMOInteraction,
+		   FormatViewGroup;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+	}
+}
+
+BMOInteraction = GenInteraction {
+	type = organizational;
+	visibility = popout;
+	children = BMOView;
+	hints = {
+		ATTR_GEN_INTERACTION_POPOUT_NOT_CLOSABLE,
+	}
+}
+
+BMOView = GenView {
+	genStates = default - enabled;
+	viewAttributes = default +dragScrolling;
+	horizAttributes = default +noLargerThanContent, +scrollable;
+	vertAttributes = default +noLargerThanContent, +scrollable;
+	docLeft = 0;
+	docTop = 0;
+	docRight = 48;
+	docBottom = 30;
+	hints = {
+		HINT_VIEW_REMOVE_SCROLLERS_WHEN_NOT_SCROLLABLE,
+		HINT_INITIAL_SIZE {
+			SpecWidth <SST_PIXELS, 48>
+			SpecHeight <SST_PIXELS, 30>
+		},
+		HINT_DEFAULT_TARGET, HINT_DEFAULT_FOCUS,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+	}
+}
+
+/*-----------------------------------------------------------------------------
+ *  FormatViewGroup...this is necessary to make the format view
+ *  be small while it's attached to the display, and to allow the view
+ *  to expand-width & height to fit when the interaction's popped out.
+ -----------------------------------------------------------------------------*/
+
+FormatViewGroup = FormatViewInteraction {
+	type = organizational;
+	visibility = popout;
+	children = FormatView;
+	hints = {
+		ATTR_GEN_INTERACTION_POPOUT_NOT_CLOSABLE,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+	}
+}
+
+FormatView = GenView {
+	genStates = default +enabled;
+	genAttributes = default -targetable;
+	viewAttributes = default +sameColorAsParentWin;	
+	horizAttributes = default +scrollable; 
+	vertAttributes  = default +scrollable;
+	hints = {
+		HINT_VIEW_REMOVE_SCROLLERS_WHEN_NOT_SCROLLABLE,
+		HINT_MINIMUM_SIZE {
+			SpecWidth <>
+			SpecHeight <SST_PIXELS, 52>
+			word 0
+		},
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+	}
+}
+
+end DisplayTempUI;
+
+
+/*-----------------------------------------------------------------------------
+		Block to duplicate when creating a document
+-----------------------------------------------------------------------------*/
+
+start	DocumentTempUI;
+
+IconDBViewerTemplate = DBViewer {
+}
+
+MyFatbitsContent = BMOVisContent {
+	left = 0;
+	top = 0;
+	right = 383;
+	bottom = 239;
+	children = MyFatbits;
+}
+
+MyFatbits = IconFatbits {
+	left = 0;
+	top = 0;
+	right = 383;
+	bottom = 239;
+	visBitmap = BMO;
+}
+
+BMOContent = BMOVisContent {
+	left = 0;
+	top = 0;
+	right = 48;
+	bottom = 30;
+	children = BMO;
+}
+
+BMO = IconBitmap {
+	left = 0;
+	top = 0;
+	right = 48;
+	bottom = 30;
+	fatbits = MyFatbits;
+	lineWidth = 4;
+	undoFlags = default +transparent, +undoable, +usesBackupBitmap;
+	hints = {
+		ATTR_BITMAP_DO_NOT_COMPACT_BITMAP,
+	}
+}
+
+FormatViewer = FormatContent {
+	contentAttrs = default + sameWidthAsSubview, + sameHeightAsSubview;
+	justFlags = heightJustification centerVertically;
+	visCompGeoAttrs = default +allowChildrenToWrap;
+}
+
+/*-----------------------------------------------------------------------------
+		Transform-format stuff.
+-----------------------------------------------------------------------------*/
+
+TFSourceDisplayContent = VisContent {
+	children = TFSourceDisplayObject;
+	contentAttrs = default + sameWidthAsSubview, + sameHeightAsSubview;
+}
+
+TFSourceDisplayObject = TransformDisplay {
+	secretIdentity = TDT_SOURCE_FORMAT;
+}
+
+TFDestDisplayContent = VisContent {
+	children = TFDestDisplayObject;
+	contentAttrs = default + sameWidthAsSubview, + sameHeightAsSubview;
+}
+
+TFDestDisplayObject = TransformDisplay {
+	secretIdentity = TDT_DEST_FORMAT;
+}
+
+end	DocumentTempUI;

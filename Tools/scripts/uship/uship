@@ -1,0 +1,419 @@
+#!/usr/public/perl
+# -*- perl -*-
+##############################################################################
+#
+# 	Copyright (c) Geoworks 1995 -- All Rights Reserved
+#       GEOWORKS CONFIDENTIAL
+#
+# PROJECT:	Tools
+# MODULE:	ubership
+# FILE: 	uship
+# AUTHOR: 	Jacob A. Gabrielson, Sep 30, 1995
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	JAG	9/30/95   	Initial Revision
+#
+# DESCRIPTION:
+#	Replacement for ship, send & pcs.
+#
+#	Chances are that if you're making a new product, you want to
+#	create a new list of geodes/files in geodeList (and possibly
+#	some new entries in geode.db), and then add in a new
+#	clause to the section marked "MAIN SECTION" below.
+#
+# USAGE:
+#
+#	uship {flags}* CAPITALIZED_IMAGE_NAME[_EC]
+#
+#	flags can be:
+#
+#		-test		Just print out the command uship would
+#				execute, but don't do them for real.
+#
+#		-manifest	Just print out a list of full paths to
+#				the files that go into the build.  Don't
+#				execute or print out any commands.
+#
+#
+#	$Id: uship,v 1.14 96/05/07 16:51:56 todd Exp $
+#
+###############################################################################
+
+###############################################################################
+###############################################################################
+####
+####
+#### SETUP MISC. STUFF 
+####
+####
+###############################################################################
+###############################################################################
+
+## Get username.
+$g_user = getlogin || (getpwuid($<))[0]  || "Somebody";
+
+#
+# Our directory & source files.  Maintained as separate variables so
+# you can change individual ones for testing purposes; otherwise you'd
+# have to lock out every file to test any of them.
+#
+
+$ushipDir = "/staff/pcgeos/Tools/scripts/uship";
+$dbLocation = "/staff/pcgeos/Tools/scripts/uship/geode.db";
+$listLocation = "/staff/pcgeos/Tools/scripts/uship/geodeList";
+
+#$ushipDir = "/staff/pcgeos/$g_user/Tools/scripts/uship";
+#$dbLocation = "/staff/pcgeos/$g_user/Tools/scripts/uship/geode.db";
+#$listLocation = "/staff/pcgeos/$g_user/Tools/scripts/uship/geodeList";
+
+#
+# Include files.
+#
+push(@INC, $ushipDir);
+require 'geode.pl';
+require 'glist.pl';
+
+#
+# Make sure PWD environment variable is set correctly.
+#
+chop($ENV{'PWD'} = `pwd`);
+
+#
+# Set up some standard variables.
+#
+
+#
+# Get prefix of local sparc dir.  E.g. mine is /n/pr, since my home
+# machine is praseodymium and thus my home directory is /n/pr/jacob.
+#
+chdir "/staff/$g_user/..";
+chop($g_sparcDir = `pwd`);
+chdir $ENV{'PWD'} || die;
+
+#
+# This is useful for emulating the functionality of the DOS .bat file
+# MAKEDEMO.BAT.
+#
+if ($g_userNovellHome = $ENV{'PCSDIR'}) {
+    #
+    # For example, converts /n/users/jacob/jedidemo.ec -> /n/users/jacob
+    #
+    $g_userNovellHome =~ s,/[^/]+$,,;
+} else {
+    #
+    # If PCSDIR isn't set, choose a default that at least works in Seattle.
+    #
+    $g_userNovellHome = "/n/users/$g_user";
+}
+
+&geode_Init($dbLocation);
+&glist_Init($listLocation);
+
+###############################################################################
+###############################################################################
+####
+####
+#### MAIN SECTION: DOWNLOAD THE DESIRED THING
+####
+####
+###############################################################################
+###############################################################################
+
+for (@ARGV) {
+    $ec = /_EC$/;
+
+    if (/-test/) {
+	$g_testOnly = 1;
+    }
+
+    #
+    # Print out the list of files that go into the build, but don't
+    # do anything else.
+    #
+    if (/-manifest/) {
+	$g_manifest = 1;
+	$g_testOnly = 1;
+    }
+
+    #################################
+    #
+    # Download the network demo version of ObiWan (2nd-generation jedi).
+    # This is the global version shared by everyone via Novell.
+    #
+    elsif (/^OBI_DEMO_TOSERVER/) {
+	$d_target = '/n/geos/obidemo' . ($ec ? '.ec' : '');
+
+	## Remove old directory.
+	&system("rm -rf $d_target");
+
+	&send($ENV{'PWD'},
+	      $d_target,
+	      'obiDemoProduct' . ($ec ? ' ecOn' : ''),
+	      &glist_Expand('obiCommonGeodes obiDemoGeodes obiCommonFiles obiDemoMisc '));
+    }
+
+    #################################
+    #
+    # Download the ObiWan stub intended for personal use.  This is 
+    # equivalent to running MAKEDEMO.BAT.  We send the documents to
+    # the local directories because global ones get locked, can't
+    # be deleted for testing, etc.
+    #
+    elsif (/^OBI_DEMO_STUB/) {
+	## Note: don't remove any files in this case as MAKEDEMO.BAT doesn't.
+
+	&send($ENV{'PWD'},
+	      "$g_userNovellHome/obidemo" . ($ec ? '.ec' : '.net'),
+	      'obiDemoProduct' . ($ec ? ' ecOn' : ''),
+	      &glist_Expand('obiDemoStub obiDemoDocuments'));
+    }
+
+    #################################
+    #
+    # Download the network demo version of Jedi.  This is the global version
+    # shared by everyone via Novell.  This is mainly used to test this
+    # script, as the old ship script already does this.
+    #
+    elsif (/^JEDI_DEMO_TOSERVER/) {
+	$d_target = '/n/products/jedi/jacob/jedidemo' . ($ec ? '.ec' : '');
+
+	&system("rm -rf $d_target");
+
+	&send($ENV{'PWD'},
+	      $d_target,
+	      'jediDemoProduct' . ($ec ? ' ecOn' : ''),
+	      &glist_Expand('jediDemoGeodes jediDemoMisc jediDemoDocuments'));
+    }
+
+    #################################
+    #
+    # Download the files that go into the OminGo's GFS.  This is mainly used
+    # to test this script, as the old ship script already does this.
+    #
+    elsif (/^JEDI_GFS/) {
+	$d_target = "$g_sparcDir/jedi" . ($ec ? '.ec' : '');
+
+	## For the GFS, don't nuke the dest dir, as it may be a link.
+	&system("rm -rf $d_target/*");
+
+	&send($ENV{'PWD'},
+	      $d_target,
+	      'jediGFSProduct' . ($ec ? ' ecOn' : ''),
+	      &glist_Expand('jediGFSGeodes'));
+    }
+
+    #################################
+    #
+    # Download the Jedi stub intended for personal use.  This is 
+    # equivalent to running MAKEDEMO.BAT.  This is mainly used
+    # to test this script, as the old MAKEDEMO.BAT script already does
+    # this.
+    #
+    elsif (/^JEDI_DEMO_STUB/) {
+	## Don't remove any files in this case (since MAKEDEMO.BAT doesn't).
+	&send($ENV{'PWD'},
+	      "$g_userNovellHome/jedidemo" . ($ec ? '.ec' : '.net'),
+	      $ec ? 'ecOn' : '',
+	      &glist_Expand('jediDemoStub jediDemoDocuments'));
+    }
+}
+
+&geode_Exit();
+&glist_Exit();
+
+#
+# Print out all the accumulated errors at the end, so it's easy to see
+# them all.
+#
+if ($errors) {
+    print STDERR <<EOM;
+ERRORS OCCURRED:
+
+$errors
+EOM
+    exit -1;
+}
+
+exit 0;
+
+###############################################################################
+###############################################################################
+####
+####
+#### SUBROUTINES: MODIFY WITH CARE...
+####
+####
+###############################################################################
+###############################################################################
+
+##############################################################################
+#	system
+##############################################################################
+#
+# SYNOPSIS:	Execute a Unix command.  Add to error log if it fails. 
+# PASS:		cmd	= string to execute as command (i.e. "mv foo bar")
+# CALLED BY:	(GLOBAL)
+# RETURN:	nothing
+# SIDE EFFECTS:	none
+#
+# STRATEGY:
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#       JAG 	1/17/96   	Initial Revision
+#
+##############################################################################
+sub system {
+    local($cmd) = @_;
+
+    return if $g_manifest;
+
+    print $cmd, "\n\n";
+    if (!$g_testOnly) {
+	system($cmd) && &error("'$cmd' failed");
+    }
+}
+
+##############################################################################
+#	error
+##############################################################################
+#
+# SYNOPSIS:	Add a line to the error log.
+# PASS:		msg	= line to add
+# CALLED BY:	(GLOBAL)
+# RETURN:	nothing
+# SIDE EFFECTS:	none
+#
+# STRATEGY:
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#       JAG 	1/17/96   	Initial Revision
+#
+##############################################################################
+sub error {
+    local($msg) = @_;
+    $errors . = $msg . "\n";
+    print STDERR $msg . "\n";
+}
+
+##############################################################################
+#	pcsend
+##############################################################################
+#
+# SYNOPSIS:	Copies the file down to wherever (essentially 
+#		replaces pcs).  Uses "pcsend".
+# PASS:		flags	= command-line arguments to pcsend
+#		destdir = root directory to copy to (like -d to pcs)
+#		srcdir  = directory to copy from
+#		files   = usually just the name of the file, but can be
+#			  a space separated LIST of files to send, i.e.
+#			  'geos.geo geos.vm'
+# CALLED BY:	(GLOBAL)
+# RETURN:	nothing
+# SIDE EFFECTS:	none
+#
+# STRATEGY:
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#       JAG 	1/17/96   	Initial Revision
+#
+##############################################################################
+sub pcsend {
+    local($flags, $destdir, $srcdir, $files) = @_;
+    local($file, $srcfile);
+
+    #$destdir =~ s,/jedi/,/,ogi if ($destdir =~ m,/jedi/,oi);
+
+    #
+    # Send all the files ($files is a space-separated list of files to 
+    # send).
+    #
+    foreach $file (split(' ', $files)) {
+	$srcfile = "$srcdir/$file";
+
+	## Make sure the source file exists, then send the thing.
+	if (-f $srcfile) {
+	    &system("pcsend $flags -d$destdir $srcfile"); #'
+	} else {
+	    &error("error:  file '$srcfile' does not exist."); #'
+	}
+    }
+}
+
+##############################################################################
+#	send
+##############################################################################
+#
+# SYNOPSIS:	Send down all the files.
+# PASS:		srcdirPrefix	= where the files come from, something like 
+#                                   '/staff/pcgeos/ReleaseJedi/Installed'
+#               destdirPrefix   = where to ship them to, something like
+#                                   '/n/geos/jedidemo.ec'
+#               prod            = space-separated string of product shme
+#                                   that should be true for this list
+#                                   of stuff, e.g. 'ecOn jediDemoProduct'
+#               files           = space-separated string of files to send,
+#                                 e.g. "kernel ui phonebook" etc.
+#            
+# CALLED BY:	(GLOBAL)
+# RETURN:	nothing
+# SIDE EFFECTS:	
+#
+# STRATEGY:
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#       JAG 	12/ 6/95   	Initial Revision
+#
+##############################################################################
+sub send {
+    ## Set namespace to geode.pl's so we can see the variables it sets.
+    package geode;		
+    local($srcdirPrefix, $destdirPrefix, $prod, $files) = @_;
+    local($file);
+    local($srcdir);
+    local($destdir);
+
+    foreach $file (split(' ', $files)) {
+
+	## Load all the data for this key.
+	&main'geode_LoadInfo($prod, $file); #'
+
+	#
+	# Construct full path of the file.  If it begins with a "/", then
+	# we assume it's already a correct full path.  Otherwise we append
+	# $srcdirPrefix (usually "/staff/pcgeos/<branch>/Installed").
+	#
+	$srcdir = "$basePath/$productPath";
+	$srcdir =~ s,/$,,o;	# remove trailing slash
+	$srcdir = "$srcdirPrefix/$srcdir" if ($basePath !~ m,^/,o);
+
+	if ($main'g_manifest) { #'
+	    local(@files) = split(' ', $name);
+	    local($file);
+	    foreach $file (@files) {
+		print "$srcdir/$file\n";
+	    }
+	    next;		# don't send anything
+	}
+
+	#
+	# Create destination path.
+	#
+	$destdir = "$destdirPrefix/$destPath";
+	if (! -d $destdir) {
+	    &main'system("mkdir -p $destdir"); #'
+	}
+
+	&main'pcsend('-n', $destdir, $srcdir, $name); #'
+    }
+}
+

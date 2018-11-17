@@ -1,0 +1,71 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	Text library
+MODULE:		TextUndo
+FILE:		tuConstant.def
+
+
+REVISION HISTORY:
+	
+	Name	Date		Description
+	----	----		-----------
+	atw	6/16/92		Initial revision
+
+
+DESCRIPTION:
+	Contains constants/structure defs for TextUndo module
+		
+	$Id: tuConstant.def,v 1.1 97/04/07 11:22:41 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+TextUndoType	etype	word
+	TUT_SMALL_REPLACEMENT_CHARS		enum	TextUndoType
+	TUT_LARGE_REPLACEMENT_CHARS		enum	TextUndoType
+	TUT_DELETE_RUNS_IN_RANGE		enum	TextUndoType
+	TUT_SAVED_RUNS				enum	TextUndoType
+
+CommonReplacementData	struct
+	CRD_meta	VMChainLink
+	; This is 0 for small replacement actions, and the handle of the
+	; HugeArray containing the text to replace for large replacement
+	; actions.
+
+	CRD_charsToDelete	dword
+	; The # chars that were in the replacement text - we delete these 
+	; chars when undoing
+
+	CRD_insertionPoint	dword
+	; The offset into the object where we need to do the replacements.
+
+	CRD_charsToInsert	dword
+	; The # of chars that were in the range before the replace occurred.
+	; It is also the # chars in the CRD_chars array/huge array.
+
+	CRD_chars		label	char
+	; This is where the deleted characters are stored in small replacement
+	; actions.
+	
+CommonReplacementData	ends
+
+RunHAD	struct
+	RHAD_meta	HugeArrayDirectory <>
+	RHAD_runOffset	word
+RunHAD	ends
+
+DeleteRunsData	struct
+	DRD_meta	VMChainLink <>	
+	DRD_runOffset	word
+	DRD_range	VisTextRange <>
+DeleteRunsData	ends
+
+MAX_CHARS_PER_TYPING_UNDO_ACTION	equ	(16*6) - (size CommonReplacementData)
+; The max # chars that will be stored in a single undo action as the user
+; backspaces one char at a time
+
+
+SBCS <MAX_CHARS_IN_SMALL_STRUCT	equ	(16*62) - (size CommonReplacementData)>
+DBCS <MAX_CHARS_IN_SMALL_STRUCT	equ	(((16*62) - (size CommonReplacementData))/2)>
+; The max # chars that will be stored in a small "ReplacementData" undo action

@@ -1,0 +1,2185 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1994 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		System Inbox/Outbox
+FILE:		mailbox.def
+
+AUTHOR:		Adam de Boor, Mar 21, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	3/21/94		Initial revision
+
+
+DESCRIPTION:
+	Interface definition for system Mailbox library, which controls the
+	System Inbox / Outbox.
+		
+	$Id: mailbox.def,v 1.1 97/04/04 14:25:55 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__MAILBOX
+
+StartLibrary	mailbox
+
+include	medium.def
+
+MailboxMessage	type	dword	; The token for a mailbox message.
+
+MAILBOX_TOKEN_CHARS_0_1		equ	<'M' or ('B' shl 8)>
+MAILBOX_TOKEN_CHARS_2_3		equ	<'O' or ('X' shl 8)>
+MAILBOX_TOKEN_ID		equ	MANUFACTURER_ID_GEOWORKS
+
+;------------------------------------------------------------------------------
+;
+;			  MailboxError Codes
+;
+;------------------------------------------------------------------------------
+
+ME_UNRECOVERABLE	equ	0x8000
+; If this is set in a MailboxError, it means the message can never be sent.
+; If it's clear, it means the transmission should be retried. (For example, if
+; the error indicates a resource shortage, it is considered recoverable;
+; if it indicates the message body cannot be found, it's not.)
+
+MailboxError	etype	word, 0
+ME_SUCCESS				enum MailboxError
+ME_NOT_ENOUGH_MEMORY			enum MailboxError
+ME_CANNOT_LOAD_DATA_DRIVER		enum MailboxError
+ME_CANNOT_LOAD_TRANSPORT_DRIVER		enum MailboxError
+ME_UNABLE_TO_CREATE_TRANSMIT_THREAD	enum MailboxError
+ME_CANNOT_ENQUEUE_MESSAGE		enum MailboxError
+ME_USER_CANCELED			enum MailboxError
+ME_LOST_CONNECTION			enum MailboxError
+ME_CANNOT_CREATE_MESSAGE_FILE		enum MailboxError
+ME_CANNOT_RESIZE_MBOX_REF		enum MailboxError
+ME_CANNOT_SAVE_MESSAGE_FILE		enum MailboxError
+ME_CANCELED_BY_RECEIVER			enum MailboxError
+ME_MESSAGE_BLOCKS_ARE_MISMATCHED	enum MailboxError
+
+ME_DATA_DRIVER_CANNOT_STORE_MESSAGE_BODY	enum MailboxError
+; The data driver could not store away its copy of the message body.
+; Perhaps the MMF_BODY_DATA_VOLATILE flag was passed, indicating that
+; the driver should copy the body to its storage area but the data could
+; not be copied for some reason.  Another possibility is that the data 
+; driver could not store an incoming message during a DR_MBDD_WRITE_*
+; call.
+
+ME_INSUFFICIENT_DISK_SPACE		enum MailboxError
+; Not enough disk space to store the message.
+
+ME_CANNOT_CONNECT			enum MailboxError
+; Temporary failure to connect.
+
+;-------------------- Start of Unrecoverable Error Codes
+
+ME_ADDRESS_INVALID			enum MailboxError, ME_UNRECOVERABLE
+
+ME_DATA_DRIVER_CANNOT_ACCESS_MESSAGE_BODY	enum MailboxError
+; The data driver could not retrieve the message body.  Perhaps the file
+; in which the body was stored got deleted somehow.
+
+ME_UNSUPPORTED_BODY_FORMAT		enum MailboxError
+
+ME_MESSAGE_BODY_INVALID			enum MailboxError
+; The message body has been corrupted
+
+ME_INVALID_MESSAGE			enum MailboxError
+; The passed MailboxMessage is invalid
+
+ME_REPLY_ADDRESS_NOT_AVAILABLE		enum MailboxError
+; The address of the message being replied to is not available.  The message
+; probably came from a transport/option that doesn't pass source address.
+
+ME_DESTINATION_APPLICATION_UNKNOWN	enum MailboxError
+; The destination application specified for a message bound for the inbox
+; is not available on this machine, and the Mailbox library is unwilling to
+; wait for it to become available.
+
+ME_UNKNOWN_DISK_ERROR			enum MailboxError
+; Encountered some unexpected error when committing changes to the administra-
+; tive file.
+
+ME_APP_REF_BUF_TOO_SMALL		enum MailboxError
+ME_CANNOT_OPEN_MESSAGE_FILE		enum MailboxError
+ME_CANNOT_READ_MESSAGE_FILE		enum MailboxError
+
+ME_CAN_NEVER_CONNECT			enum MailboxError
+; Permanent sort of general connection error.
+
+;------------------------------------------------------------------------------
+;
+;			 MESSAGE BODY STORAGE
+;
+;------------------------------------------------------------------------------
+    ;
+    ; Geoworks-defined storage types.
+    ; 
+GeoworksMailboxStorageID	etype	word, 0
+    GMSID_FILE		enum	GeoworksMailboxStorageID
+    GMSID_VM_TREE	enum	GeoworksMailboxStorageID
+    GMSID_HUGE_ARRAY	equ	GMSID_VM_TREE
+
+MailboxStorage	struct
+    MS_id	word
+    MS_manuf	ManufacturerID
+MailboxStorage	ends
+
+
+
+;------------------------------------------------------------------------------
+;
+;			 MESSAGE BODY FORMAT
+;
+;------------------------------------------------------------------------------
+
+GeoworksMailboxDataFormatID	etype 	word, 0
+    GMDFID_INVALID		enum	GeoworksMailboxDataFormatID	; none
+    GMDFID_END_OF_LIST		equ	GMDFID_INVALID
+
+    GMDFID_STREAM_GSTRING	enum	GeoworksMailboxDataFormatID	; FILE
+    GMDFID_VM_GSTRING		enum	GeoworksMailboxDataFormatID	; VMT
+    GMDFID_TRANSFER_ITEM	enum	GeoworksMailboxDataFormatID	; VMT
+    GMDFID_TEXT_CHAIN		enum	GeoworksMailboxDataFormatID	; VMT
+    GMDFID_TEXT_FILE		enum	GeoworksMailboxDataFormatID	; FILE
+    GMDFID_DOCUMENT		enum	GeoworksMailboxDataFormatID	; FILE
+    GMDFID_ADDRESS_CARD		enum	GeoworksMailboxDataFormatID	; VMT
+    GMDFID_APPOINTMENT		enum	GeoworksMailboxDataFormatID	; VMT
+    GMDFID_INK			enum	GeoworksMailboxDataFormatID	; VMT
+    GMDFID_VM_COMPOSITE		enum	GeoworksMailboxDataFormatID	; VMT
+    GMDFID_FAX_FILE		enum	GeoworksMailboxDataFormatID	; FILE
+    GMDFID_SHORT_MESSAGE	enum	GeoworksMailboxDataFormatID	; VMT
+    GMDFID_FOAM_FILE		enum	GeoworksMailboxDataFormatID	; FILE
+    GMDFID_TEXT_ARRAY		enum	GeoworksMailboxDataFormatID	; VMT
+
+MailboxDataFormat	struct
+    MDF_id		word
+    MDF_manuf		ManufacturerID
+MailboxDataFormat	ends
+
+
+
+;------------------------------------------------------------------------------
+;
+;			 TRANSPORT MECHANISMS
+;
+;------------------------------------------------------------------------------
+GeoworksMailboxTransportID	etype	word, 0
+    GMTID_LOCAL			enum 	GeoworksMailboxTransportID
+    ; Message goes in the inbox. Transport address may be a null pointer.
+
+    GMTID_NET_LIBRARY		enum	GeoworksMailboxTransportID
+    GMTID_PRINT_SPOOLER		enum	GeoworksMailboxTransportID
+    GMTID_FAX_SEND		enum	GeoworksMailboxTransportID
+    GMTID_ZOOMER		enum	GeoworksMailboxTransportID
+    GMTID_SM			enum	GeoworksMailboxTransportID
+    GMTID_SKELETON		enum	GeoworksMailboxTransportID
+    GMTID_SMTP			enum	GeoworksMailboxTransportID
+
+MailboxTransport	struct
+    MT_id		word
+    MT_manuf		ManufacturerID
+MailboxTransport	ends
+
+MailboxTransportOption	type	word
+
+MailboxTransportAndOption struct
+	MTAO_transport		MailboxTransport
+	MTAO_transOption	MailboxTransportOption
+MailboxTransportAndOption ends
+
+MAILBOX_ANY_TRANSPORT_OPTION 	equ	-1
+
+MailboxMessagePriority	etype	byte
+    MMP_EMERGENCY	enum	MailboxMessagePriority
+    ; User should be notified immediately and not allowed to do anything but
+    ; receive the message.
+    
+    MMP_URGENT		enum	MailboxMessagePriority
+    ; User should be notified immediately, but does not need to read the
+    ; message right away. The notification will mention the message's urgency,
+    ;  however.
+    
+    MMP_FIRST_CLASS	enum	MailboxMessagePriority
+    ; User should be notified on next periodic check of the inbox. No 
+    ; constraints on when the user should read the message (other than the
+    ; ending time-bound of the message itself).
+    
+    MMP_THIRD_CLASS	enum	MailboxMessagePriority
+    ; User should not be notified of the message's arrival, except as required
+    ; by the receiving application.
+
+MailboxDeliveryVerb	etype	byte
+    MDV_DELIVER		enum	MailboxDeliveryVerb
+    ; Default, vanilla verb
+    
+    MDV_VIEW		enum	MailboxDeliveryVerb
+    ; Message contains some sort of image that can be viewed. For example, a
+    ; received fax.
+    
+    MDV_PLAY		enum	MailboxDeliveryVerb
+    ; Message contains some sort of continuous something that has a definite
+    ; starting point and a stopping point. Examples of this would be a voice
+    ; recording or MPEG movie.
+    
+    MDV_ACCEPT		enum	MailboxDeliveryVerb
+    ; Another generic verb
+    
+    MDV_READ		enum	MailboxDeliveryVerb
+    ; Closely related to MDV_VIEW, but useful for email and other things that
+    ; are more textual (faxes can be graphical, you know...)
+    
+    MDV_FILE		enum	MailboxDeliveryVerb
+    ; Message contains some unit that can be stored inside a document that
+    ; holds multiple such units. For example, an address card or a notebook
+    ; page.
+
+MailboxMessageFlags	record
+    :8
+    ; Bits used internally to the Mailbox library.
+
+    MMF_BODY_DATA_VOLATILE:1
+    ; Set if the body data will be deleted by the registering geode once the
+    ; message has been registered. The data driver must copy the message body
+    ; to preserve it.
+    ;
+    ; NOTE: IF THE MailboxStorage is MANUFACTURER_ID_GEOWORKS/GMSID_VM_TREE AND
+    ; THE VM FILE USED IN THE BODY REFERENCE IS *NOT* A VM FILE RETURNED BY
+    ; MailboxGetVMFile, YOU *MUST* PASS MMF_BODY_DATA_VOLATILE SET.
+    
+    MMF_SEND_WITHOUT_QUERY:1
+    ; Set if the message should be sent whenever possible, without asking the
+    ; user about it. This means if a connection is available or could be
+    ; created, it will be used (or created, if the medium is available, and
+    ; then used).
+    
+    MMF_PRIORITY MailboxMessagePriority:2
+    ; The priority at which the message should travel.
+    
+    MMF_VERB MailboxDeliveryVerb:3
+    ; How the user will think of what happens when the message gets delivered
+
+    MMF_DELETE_BODY_AFTER_TRANSMISSION:1
+    ; Set if the data driver should delete the message body after
+    ; transmitting.  Note that if MMF_BODY_DATA_VOLATILE is set, then
+    ; the data driver will always delete the copy of the body it made
+    ; at the time the message was registered, and leave the body of the
+    ; original app-ref alone, regardless of how MMF_DELETE_BODY_AFTER_
+    ; TRANSMISSION is set. 
+    ; 
+
+MailboxMessageFlags	end
+
+	; ensure not too many verbs defined...
+	.assert	MailboxDeliveryVerb le (1 shl width MMF_VERB)
+
+	; ensure not too many priorities defined...
+	.assert	MailboxMessagePriority le (1 shl width MMF_PRIORITY)
+
+MailboxTransAddr	struct
+    MTA_transAddr	fptr		; Data known to the transport driver
+					;  indicating the destination
+    MTA_transAddrLen	word		; Number of bytes in that addres
+    MTA_userTransAddr	fptr.TCHAR	; User-readable form of the address.
+					;  If 0:0, empty string is assumed.
+MailboxTransAddr	ends
+
+;------------------------------------------------------------------------------
+;
+;			  EXPORTED ROUTINES
+;
+;------------------------------------------------------------------------------
+
+global	MailboxRegisterMessage:far
+;	Desc:	Registers a message with the system. The body data are copied,
+;		if necessary, or simply taken-possession-of.
+;
+;	Pass:	cx:dx	= MailboxRegisterMessageArgs
+;	Return:	carry set on error:
+;			ax	= MailboxError
+;			dx	= destroyed
+;		carry clear on success:
+;			dxax	= MailboxMessage
+;	Destroyed:	nothing
+;
+MailboxRegisterMessageArgs	struct
+    MRA_bodyStorage	MailboxStorage		; In what underlying format the
+						;  body data are stored.
+    MRA_bodyFormat	MailboxDataFormat	; The format imposed on the
+						;  underlying storage.
+    MRA_bodyRef		fptr			; Pointer to the address of the
+						;  message-body data. The format
+						;  of the address is specific to
+						;  the storage driver used.
+    MRA_bodyRefLen	word			; Number of bytes in the body's
+						;  address
+    MRA_transport	MailboxTransport	; The means by which the 
+						;  message will be sent. If 
+						;   this is
+						;  MANUFACTURER_ID_GEOWORKS/
+						;  GMTID_LOCAL, the message will
+						;  go in the inbox, else it will
+						;  go in the outbox.
+    MRA_transOption	MailboxTransportOption	; Transport option within the
+						;  selected transport driver.
+    MRA_transAddrs	fptr.MailboxTransAddr	; Pointer to the addresses of
+						;  the machines/peripherals/
+						;  whatevers that will receive
+						;  the message
+    MRA_numTransAddrs	word			; Number of entries in
+						;  MRA_transAddrs
+    MRA_transData	dword			; 32-bit opaque data for the
+						;  transport driver
+    MRA_flags		MailboxMessageFlags	; Control flags
+    MRA_summary		fptr.TCHAR		; Description of the message, so
+						;  the sending & receiving
+						;  users know what it contains.
+
+MAILBOX_MAX_SUBJECT	equ	1024		; longest MRA_summary string
+						;  allowed
+
+    MRA_destApp		GeodeToken		; The "application" that is to
+						;  receive the message on the
+						;  remote machine.
+    MRA_startBound	FileDateAndTime		; Time after which it's ok to
+						;  send the message.
+    MRA_endBound	FileDateAndTime		; Timer before which the message
+						;  must be sent.
+MAILBOX_ETERNITY	equ	-1	; value to pass for MRA_endBound and
+					;  MRTMA_endBound to have no deadline.
+MAILBOX_NOW		equ	0	; value to pass for MRA_startBound and
+					;  MRTMA_startBound to have message
+					;  available for sending now
+MailboxRegisterMessageArgs	ends
+
+global	MailboxRegisterSavedMessage:far
+;	Desc:	Registers a message with the system, using data saved by a
+;		previous call to MSG_MAILBOX_SEND_CONTROL_SAVE_TRANSACTION.
+;
+;	Pass:	cx:dx	= MailboxRegisterSavedMessageArgs
+;	Return:	carry set on error:
+;			ax	= MailboxError
+;			dx	= destroyed
+;		carry clear on success:
+;			dxax	= success
+
+MailboxRegisterSavedMessageArgs	struct
+    MRSMA_bodyStorage	MailboxStorage		; In what underlying format the
+						;  body data are stored.
+    MRSMA_bodyFormat	MailboxDataFormat	; The format imposed on the
+						;  underlying storage.
+    MRSMA_bodyRef	fptr			; Pointer to the address of the
+						;  message-body data. The format
+						;  of the address is specific to
+						;  the storage driver used.
+    MRSMA_bodyRefLen	word			; Number of bytes in the body's
+						;  address
+    MRSMA_savedMsgFile	hptr			; VM file containing saved
+						;  message data
+    MRSMA_savedMsgData	word			; VM block returned by Mailbox-
+						;  SendControl
+			byte	12 dup(?)	; Padding to hold stuff
+						;  extracted from saved data
+						;  when MailboxRegisterMessage
+						;  is called
+
+    MRSMA_flags		MailboxMessageFlags	; Control flags
+    MRSMA_summary	fptr.TCHAR		; Description of the message, so
+						;  the sending & receiving
+						;  users know what it contains.
+
+    MRSMA_destApp	GeodeToken		; The "application" that is to
+						;  receive the message on the
+						;  remote machine.
+    MRSMA_startBound	FileDateAndTime		; Time after which it's ok to
+						;  send the message.
+    MRSMA_endBound	FileDateAndTime		; Timer before which the message
+						;  must be sent.
+MailboxRegisterSavedMessageArgs	ends
+
+	.assert MRSMA_flags eq MRA_flags
+	.assert MRSMA_summary eq MRA_summary
+	.assert MRSMA_destApp eq MRA_destApp
+	.assert MRSMA_startBound eq MRA_startBound
+	.assert MRSMA_endBound eq MRA_endBound
+
+global	MailboxDeleteSavedMessage:far
+;	Desc:	Delete the data stored for a saved transaction.
+;
+;	Pass:	cx	= VM file in which data were stored
+;		dx	= block handle returned by MailboxSendControl
+;	Return:	nothing
+;
+
+global	MailboxCheckStorageTypeSupported:far
+;	Desc:	Ensures the indicated data storage driver is present in the
+;		system.
+;
+;	Pass:	cxdx	= MailboxStorage
+;	Return:	carry set if driver is available
+;		carry clear if driver could not be found
+;
+
+global	MailboxCreateStreamGString:far
+;	Desc:	Creates a stream-based graphics string, returning the file
+;		name (within the Mailbox library's spool directory) and the
+;		handle of a GState for drawing into the string.
+;
+;	Pass:	cx:dx	= buffer in which to place the FileLongName of the
+;			  created file.
+;	Return:	carry set if gstring couldn't be created:
+;			ax	= FileError
+;		carry clear if gstring created & ready:
+;			di	= GState for drawing to it
+;			si	= GString handle
+;			cx:dx	= filled in
+;
+
+global	MailboxGetAdminFile:far
+;	Desc:	Retrieves the handle of the main administrative VM file that is
+;		maintained by the Mailbox library.
+;
+;		This file should *NOT* be used for general storage of data.
+;		This call is intended to allow applications that wish to
+;		register a message without the aid of a MailboxSendControl to
+;		create the transData argument required by the transport driver
+;		they've chosen, should the driver expect something to be
+;		allocated within the admin file.
+;
+;	Pass:	nothing
+;	Return:	bx	= handle of the Mailbox library's administrative file
+;
+
+global	MailboxGetVMFile:far
+;	Desc:	Obtain the handle of a writable VM file in which data can be
+;		stored. The file is managed by the Mailbox library, meaning that
+;		data stored in it can be passed off to the library without
+;		being marked as MMF_BODY_DATA_VOLATILE.
+;
+;		The data-size estimates allow the library to more rationally
+;		apportion data among various VM files without getting block
+;		sizes within one file so large that the system is in danger of
+;		running out of conventional memory. Mis-estimating will
+;		usually not be fatal, as the library is rather cautious when
+;		deciding whether to start a new file, but you should do your
+;		best to come up with accurate information on your needs.
+;
+;	Pass:	bx	= expected number of VM blocks to be added to the
+;			  file. If passed as 0, a system-specified default
+;			  value will be assumed.
+;	Return:	carry set on error:
+;			ax	= VMStatus
+;			bx	= destroyed
+;		carry clear if ok:
+;			bx	= VMFileHandle
+;			ax	= destroyed
+;
+
+global	MailboxOpenVMFile:far
+;	Desc:	Reopen a VM file that was previously returned by
+;		MailboxGetVMFile, and whose name was gotten through
+;		MailboxGetVMFileName.
+;
+;		The call must be matched by a call to MailboxDoneWithVMFile.
+;
+;	Pass:	cx:dx	= name of the file to open
+;	Return:	carry set on error:
+;			ax	= VMStatus
+;			bx	= destroyed
+;		carry clear if ok
+;			ax	= VMStatus
+;			bx	= file handle
+;
+
+global	MailboxGetVMFileName:far
+;	Desc:	Get the name of a VM file opened by the Mailbox library. This
+;		is used primarily by data storage drivers to obtain a
+;		persistent reference to the body of a message (file handles
+;		aren't preserved across shutdowns or file closes...)
+;
+;	Pass:	cx:dx	= buffer in which to place the file's FileLongName
+;		bx	= file handle whose name is required.
+;	Return:	cx:dx	= buffer filled with null-terminated name. File
+;			  resides in Mailbox library's spool directory.
+;
+
+global	MailboxDoneWithVMFile:far
+;	Desc:	Lets the Mailbox library know you're done using the given
+;		file, which was returned from MailboxGetVMFile. The Mailbox
+;		library is free to close the file, if it desires.
+;
+;	Pass:	bx	= file handle
+;	Return:	nothing
+;
+
+global	MailboxCheckMediumAvailable:far
+;	Desc:	Sees if the Mailbox library has been told a transmission
+;		medium exists. The medium is not guaranteed to exist once
+;		this call returns, as the Mailbox library has no control over
+;		the comings and goings of media. All this tells you is that
+;		while the call was in-progress, the medium existed.
+;
+;		Library takes posession of the passed memory block if 
+;		al is MUT_MEM_BLOCK
+;
+;	Pass:	cxdx	= MediumType
+;		bx	= unit number (ignored if MUT_NONE)
+;		al	= MediumUnitType
+;	Return:	carry set if medium exists.
+;		carry clear if medium is absent.
+;
+
+global	MailboxCheckMediumConnected:far
+;	Desc:	Sees if the Mailbox library has been told a connection over a
+;		transmission medium exists. The medium is not guaranteed to
+;		remain connected once this call returns, as the Mailbox library
+;		has no control over connections, usually. All this tells you is
+;		that while the call was in-progress, the medium was connected.
+;
+;		Library takes posession of the passed memory block if 
+;		al is MUT_MEM_BLOCK
+;
+;	Pass:	cxdx	= MediumType
+;		bx	= unit number (ignored if MUT_NONE)
+;		al	= MediumUnitType
+;	Return:	carry set if medium is connected.
+;		carry clear if medium is not connected.
+;
+
+global	MailboxGetFirstMediumUnit:far
+;	Desc:	Returns the first available unit of the indicated medium. For
+;		use when a transport driver just wants to use a particular
+;		medium but doesn't care which one.
+;
+;		NOTE: Do not call this for a medium that doesn't use unit
+;		      numbers. You will generate a fatal-error in the error-
+;		      checking version, and won't get any additional information
+;		      in the non-error-checking version (since the return will
+;		      be MUT_NONE whether there's an available unit or not).
+;		      Use MailboxCheckMediumAvailable instead.
+;
+;	Pass:	cxdx	= MediumType
+;	Return:	ax	= MediumUnitType (MUT_NONE if none available)
+;		bx	= unit number (caller must, of course, free the
+;			  memory block if MUT_MEM_BLOCK)
+;
+
+global	MailboxGetNumTransAddrs:far
+;	Desc:	Retrieves the number of transport addresses bound to a message
+;
+;	Pass:	cxdx	= MailboxMessage
+;	Return:	carry set if couldn't get the number of addresses:
+;			ax	= MailboxError
+;		carry ciear if successfully fetched the number of addresses:
+;			ax	= number of addresses
+;				= 0 if message is in the inbox
+;		
+
+global	MailboxGetTransAddr:far
+;	Desc:	Retrieve a transport address from a message.
+;
+;	Pass:	cxdx	= MailboxMessage
+;		es:di	= buffer in which to store the address
+;		ax	= number of bytes in the buffer
+;		bx	= address number to fetch
+;	Return:	carry set if copy couldn't be completed:
+;			ax	= 0 if message or address # is invalid (index
+;				  too large)
+;				= # bytes required if buffer was too small
+;		carry clear if copy successful:
+;			ax	= # bytes copied out
+;
+
+global	MailboxSetTransAddr:far
+;	Desc:	Sets the opaque transport address for a message, replacing the
+;		existing one.
+;
+;		NOTE: the new address may not differ from the old address in its
+;		      significant address bytes. This is not intended to allow
+;		      arbitrary redirection of a message, but simply for trans-
+;		      port drivers to record their progress for a particular
+;		      address in the insignificant portion of the address.
+;
+;	Pass:	cxdx	= MailboxMessage
+;		es:di	= buffer containing the new address
+;		bx	= address number to set
+;		ax	= number of bytes in the buffer.
+;	Return:	carry set if copy couldn't be completed:
+;			ax	= MailboxError (message is invalid or
+;				  not enough memory available)
+;		carry clear if address successfully changed
+;
+
+global	MailboxGetUserTransAddrLMem:far
+;	Desc:	Retrieve a user-readable transport address from a message.
+;
+;	Pass:	cxdx	= MailboxMessage
+;		ax	= address number desired
+;		bx	= handle of lmem block in which to place the string
+;	Return:	carry set if copy couldn't be completed:
+;			ax	= MailboxError (index too large, invalid
+;				  message, not enough memory)
+;		carry clear if copy completed:
+;			^lbx:ax	= null-terminated string
+;
+
+global	MailboxGetTransData:far
+;	Desc:	Retrieve the 32-bit transData registered with a message.
+;
+;	Pass:	cxdx	= MailboxMessage
+;	Return:	carry set on error:
+;			ax	= MailboxError (message is invalid)
+;		carry clear if ok:
+;			bxax	= transData
+;
+
+global	MailboxSetTransData:far
+;	Desc:	Set the 32-bit transData registered with a message. The caller
+;		is responsible for freeing any resources referred to by the
+;		previous transData dword, since the Mailbox library places
+;		absolutely no interpretation on the transData, and thus cannot
+;		know what needs to be freed when one transData dword replaces
+;		another.
+;
+;	Pass:	cxdx	= MailboxMessage
+;		bxax	= new transData
+;	Return:	carry set on error:
+;			ax	= MailboxError
+;		carry clear if ok:
+;			ax	= ME_SUCCESS
+;
+
+global	MailboxGetStorageType:far
+;	Desc:	Fetches the MailboxStorage token for the message.
+;
+;	Pass:	cxdx	= MailboxMessage
+;	Return:	carry set if error:
+;			ax	= MailboxError (message is invalid)
+;		carry clear if ok:
+;			bxax	= MailboxStorage
+;
+
+global	MailboxGetTransport:far
+;	Desc:	Fetches the MailboxTransport token for the message.
+;
+;	Pass:	cxdx	= MailboxMessage
+;	Return:	carry set if error:
+;			ax	= MailboxError (message is invalid)
+;		carry clear if ok:
+;			bxax	= MailboxTransport
+;
+
+global	MailboxGetTransOption:far
+;	Desc:	Fetches the MailboxTransportOption for the message.
+;
+;	Pass:	cxdx	= MailboxMessage
+;	Return:	carry set if error:
+;			ax	= MailboxError (message is invalid)
+;		carry clear if ok:
+;			ax	= MailboxTransportOption
+;
+
+global 	MailboxGetBodyMboxRefBlock:far
+;	Desc:	Fetches the opaque mailbox reference to the message body.
+;	Pass	cxdx	= MailboxMessage
+;	Return:	carry clear if okay:
+;			^hbx	= mbox-ref
+;			ax destroyed
+;		carry set on error:
+;			ax	= MailboxError
+;					ME_NOT_ENOUGH_MEMORY
+;					ME_INVALID_MESSAGE
+;
+
+global	MailboxGetDestApp:far
+;	Desc:	Fetch the GeodeToken for the destination app of the
+;		message.
+;	Pass:	cxdx	= MailboxMessage
+;		es:di	= GeodeToken buffer
+;	Return:	carry set on error:
+;			ax	= MailboxError (message is invalid)
+;		carry clear if ok:
+;			es:di filled in
+;
+
+global	MailboxGetStartBound:far
+;	Desc:	Fetch the start bound of a message.
+;	Pass:	cxdx	= MailboxMessage
+;	Return:	carry set on error:
+;			ax	= MailboxError (message is invalid)
+;		carry clear if ok:
+;			axbx	= FileDateAndTime
+;
+
+global	MailboxGetEndBound:far
+;	Desc:	Fetch the end bound of a message.
+;	Pass:	cxdx	= MailboxMessage
+;	Return:	carry set on error:
+;			ax	= MailboxError (message is invalid)
+;		carry clear if ok:
+;			axbx	= FileDateAndTime
+;
+
+global	MailboxAcknowledgeMessageReceipt:far
+;	Desc:	Tells the Mailbox library that the application has taken
+;		control of the indicated message. The message is removed
+;		(visually) from the system inbox only when this function
+;		is called.
+;
+;		If this function is *not* called following receipt of a
+;		MSG_META_MAILBOX_NOTIFY_MESSAGE_AVAILABLE and the application
+;		exits and restarts, the application will again be notified of
+;		the message's availability.
+;
+;	Pass:	cxdx	= MailboxMessage
+;	Return:	nothing
+;
+
+global	MailboxDeleteMessage:far
+;	Desc:	To be called only after MailboxAcknowledgeMessageReceipt,
+;		this indicates the application has finished handling the
+;		message and the Mailbox library is free to delete the message
+;		when it sees fit.
+;
+;	Pass:	cxdx	= MailboxMessage
+;	Return:	nothing
+;		cx, dx - destroyed
+;
+
+global	MailboxGetSubjectLMem:far
+;	Desc:	Retrieve the subject/summary of a message into an lmem
+;		block
+;
+;	Pass:	cxdx	= MailboxMessage
+;		bx	= handle of lmem block into which to copy the
+;			  subject.
+;	Return:	carry set on error:
+;			ax	= MailboxError (invalid message, insufficient
+;				  memory)
+;		carry clear if ok:
+;			^lbx:ax	= null-terminated subject
+;
+
+global	MailboxGetSubjectBlock:far
+;	Desc:	Retrieve the subject/summary of a message into a global
+;		memory block.
+;
+;	Pass:	cxdx	= MailboxMessage
+;	Return:	carry set on error:
+;			ax	= MailboxError (invalid message, insufficient
+;				  memory)
+;		carry clear if ok:
+;			^hbx	= null-terminated subject
+;
+
+global	MailboxGetMessageFlags:far
+;	Desc:	Retrieve the MailboxMessageFlags for the message.
+;
+;	Pass:	cxdx	= MailboxMessage
+;	Return:	carry set on error:
+;			ax	= MailboxError (invalid message)
+;		carry clear if ok:
+;			ax	= MailboxMessageFlags
+;
+
+global	MailboxGetBodyFormat:far
+;	Desc:	Fetches the MailboxDataFormat token for the message.
+;
+;	Pass:	cxdx	= MailboxMessage
+;	Return:	carry set if error:
+;			ax	= MailboxError (message is invalid)
+;		carry clear if ok:
+;			bxax	= MailboxDataFormat
+;
+
+global	MailboxGetBodyRef:far
+;	Desc:	Retrieves the app-reference to the body of a message (i.e.
+;		the address of the message body in the format understood and
+;		used by applications registering a message with the Mailbox
+;		library).
+;
+;		Each call must be matched by a call to MailboxDoneWithBody.
+;
+;	Pass:	cxdx	= MailboxMessage
+;		es:di	= place to store app-reference to body
+;		ax	= # bytes pointed to by es:di
+;	Return:	carry set on error:
+;			ax	= MailboxError (invalid message, unable to load
+;				  driver, insufficient memory, app-ref buffer
+;				  too small, no message body available)
+;		carry clear if ok:
+;			es:di	= filled
+;			ax	= # bytes used in app-ref buffer
+;
+
+global	MailboxChangeBodyFormat:far
+;	Desc:	Stores a new body for a message.
+;
+;	Pass:	cxdx	= MailboxMessage
+;		es:di	= MailboxChangeBodyFormatArgs
+;	Return:	carry set on error:
+;			ax	= MailboxError (invalid message, body currently
+;				  in-use)
+;		carry clear if successful:
+;			ax	= destroyed
+;
+
+MailboxChangeBodyFormatArgs	struct
+    MCBFA_bodyStorage	MailboxStorage		; In what underlying format the
+						;  body data are stored.
+    MCBFA_bodyFormat	MailboxDataFormat	; The format imposed on the
+						;  underlying storage.
+    MCBFA_bodyRef	fptr			; Pointer to the address of the
+						;  message-body data. The format
+						;  of the address is specific to
+						;  the storage driver used.
+    MCBFA_bodyRefLen	word			; Number of bytes in the body's
+						;  address
+    MCBFA_newBodyFlags	MailboxMessageFlags	; new flags for the new message
+						;  body.  Only MMF_BODY_DATA
+						;  _VOLATILE and MMF_DELETE
+						;  _BODY_AFTER_TRANSMISSION
+						;  can be passed and are used.
+						;  Does no affect old body.
+MailboxChangeBodyFormatArgs	ends
+
+global	MailboxBodyReformatted:far
+;	Desc:	Changes the format indication for the message body without
+;		touching the body itself. Use this if you reformat the body
+;		of the message in-place. If you create a copy in a new
+;		format, use MailboxChangeBodyFormat instead.
+;
+;	Pass:	cxdx	= MailboxMessage
+;		axbx	= MailboxDataFormat
+;		bp	= MailboxMessageFlags for new message body (Only
+;			  MMF_BODY_DATA_VOLATILE and MMF_DELETE_BODY_AFTER
+;			  _TRANSMISSION can be passed and are used.)  Does not
+;			  affect old body.
+;	Return:	carry set on error:
+;			ax	= MailboxError (invalid message)
+;		carry clear if successful:
+;			ax	= preserved
+;
+
+global	MailboxStealBody:far
+;	Desc:	Allows a caller to take possession of the body of a
+;		message. The caller is then responsible for destroying the
+;		data. If the message body is within a VM file, the caller is
+;		responsible for calling MailboxDoneWithVMFile after freeing the
+;		data that make up the body.
+;
+;	Pass:	cxdx	= MailboxMessage
+;		es:di	= place to store app-reference to body
+;		ax	= # bytes pointed to by es:di
+;	Return:	carry set on error:
+;			ax	= MailboxError (invalid message, unable to load
+;				  driver, insufficient memory, app-ref buffer
+;				  too small, body in-use by someone else, no
+;				  message body available)
+;		carry clear if ok:
+;			es:di	= filled
+;			ax	= # bytes used in app-ref buffer
+;
+
+global	MailboxDoneWithBody:far
+;	Desc:	Indicates the body reference returned by an earlier call to
+;		MailboxGetBodyRef will no longer be used. The data driver is
+;		free to close the file, etc. No further use of the body via
+;		this reference may be made.
+;
+;	Pass:	cxdx	= MailboxMessage
+;		es:di	= app-reference to body
+;		ax	= # bytes in app-reference
+;	Return:	carry set if passed MailboxMessage is invalid
+;
+
+global	MailboxLoadDataDriver:far
+;	Desc:	Load the data storage driver indicated by the given
+;		MailboxStorage token. Driver should be unloaded using
+;		MailboxFreeDriver
+;
+;	Pass:	cxdx	= MailboxStorage
+;	Return:	carry set if couldn't load:
+;			ax	= GeodeLoadError
+;		carry clear if driver loaded:
+;			bx	= handle of driver
+;	
+
+global	MailboxLoadDataDriverWithError:far
+;	Desc:	Load the data storage driver indicated by the given
+;		MailboxStorage token. Driver should be unloaded using
+;		MailboxFreeDriver.
+;
+;		If the data driver cannot be loaded, because it cannot be
+;		found, the passed error string will be used to prompt the
+;		user to make the driver available, with the option to retry
+;		the load. If ax is 0, this is the same as MailboxLoadDataDriver
+;
+;	Pass:	cxdx	= MailboxStorage
+;		*ds:ax	= error string to use
+;	Return:	carry set if couldn't load:
+;			ax	= GeodeLoadError
+;		carry clear if driver loaded:
+;			bx	= handle of driver
+;	
+
+global	MailboxLoadTransportDriver:far
+;	Desc:	Load the transport driver indicated by the given
+;		MailboxTransport token. Driver should be unloaded using
+;		MailboxFreeDriver.
+;
+;	Pass:	cxdx	= MailboxTransport
+;	Return:	carry set if couldn't load:
+;			ax	= GeodeLoadError
+;		carry clear if driver loaded:
+;			bx	= handle of driver
+;	
+
+global	MailboxFreeDriver:far
+;	Desc:	Unloads a driver loaded by the Mailbox library.
+;
+;	Pass:	bx	= handle of driver
+;	Return:	nothing
+;	Destroyed:	bx
+;
+
+global	MAILBOXPUSHTOMAILBOXDIR:far
+;	Desc:	Perform a FilePushDir followed by a MailboxChangeToMailboxDir
+;
+;	Pass:	nothing
+;	Return:	nothing
+;
+
+global	MAILBOXCHANGETOMAILBOXDIR:far
+;	Desc:	Change to the directory where the Mailbox library holds its
+;		message bodies and administrative files. This is primarily
+;		intended for use by data and transport drivers.
+;
+;	Pass:	nothing
+;	Return:	nothing
+;
+
+
+
+global	MailboxRetrieveMessages:far
+;	Desc:	Ask a transport driver to get any new messages it's capable
+;		of getting. If the driver is already loaded and fetching
+;		messages for this medium + transport option, the call will
+;		do nothing.
+;
+;	Pass:	axbx	= MailboxTransport
+;		cxdx	= MediumType
+;		si	= MailboxTransportOption
+;	Return:	nothing
+;
+
+global	MailboxReplyToMessage:far
+;	Desc:	Register a message as a reply to a messge in the mailbox.  The
+;		body data are copied, if necessary, or simply
+;		taken-possession-of.
+;
+;	Pass:	cx:dx	= MailboxReplyToMessageArgs
+;	Return:	carry set on error:
+;			ax	= MailboxError
+;			dx	= destroyed
+;		carry clear on success:
+;			dxax	= MailboxMessage
+;	Destroyed:	nothing
+;
+
+MailboxReplyToMessageArgs	struct
+    MRTMA_message	MailboxMessage		; message to reply to
+    MRTMA_bodyStorage	MailboxStorage		; In what underlying format the
+						;  body data are stored.
+    MRTMA_bodyFormat	MailboxDataFormat	; The format imposed on the
+						;  underlying storage.
+    MRTMA_bodyRef	fptr			; Pointer to the address of the
+						;  message-body data. The format
+						;  of the address is specific to
+						;  the storage driver used.
+    MRTMA_bodyRefLen	word			; Number of bytes in the body's
+						;  address
+    MRTMA_transData	dword			; 32-bit opaque data for the
+						;  transport driver
+    MRTMA_flags		MailboxMessageFlags	; Control flags
+    MRTMA_summary	fptr.TCHAR		; Description of the message, so
+						;  the sending & receiving
+						;  users know what it contains.
+    MRTMA_destApp	GeodeToken		; The "application" that is to
+						;  receive the message on the
+						;  remote machine.
+    MRTMA_startBound	FileDateAndTime		; Time after which it's ok to
+						;  send the message.
+    MRTMA_endBound	FileDateAndTime		; Timer before which the message
+						;  must be sent.
+MailboxReplyToMessageArgs	ends
+
+global MailboxGetRemainingMessages:far
+;	Desc:	Returns the number of messages remaining to be sent using
+;		the current connection. If called from DR_MBTD_TRANSMIT_MESSAGE,
+;		the count will include the message currently being transmitted.
+;
+;		NOTE: This routine may only be called from the PREPARE_FOR_-
+;		TRANSPORT, CONNECT, TRANSMIT_MESSAGE, or END_CONNECT functions
+;		of a transport driver. Any other use will generate a fatal
+;		error.
+;
+;	Pass:	nothing
+;
+;	Return:	cx	= number of messages remaining
+;
+;	Destroyed:	nothing
+;
+
+global MailboxGetRemainingDestinations:far
+;	Desc:	Returns the number of destinations to which the passed message
+;		still needs to be sent. If called from DR_MBTD_TRANSMIT_MESSAGE,
+;		the count will include the destination currently being sent to.
+;
+;		NOTE: This routine may only be called from the PREPARE_FOR_-
+;		TRANSPORT, CONNECT, TRANSMIT_MESSAGE, or END_CONNECT functions
+;		of a transport driver. Any other use will generate a fatal
+;		error.
+;
+;	Pass:	dxax	= MailboxMessage
+;
+;	Return:	cx	= number of destinations queued for transmission (i.e.
+;			  that will be sent to "soon", barring errors)
+;		ax	= total number of destinations yet to be sent to,
+;			  queued or not.
+;	Destroyed:	nothing
+;
+
+global MAILBOXGETADMINFILE:far
+global MAILBOXGETVMFILE:far
+global MAILBOXOPENVMFILE:far
+global MAILBOXGETVMFILENAME:far
+global MAILBOXDONEWITHVMFILE:far
+
+global MAILBOXREGISTERMESSAGE:far
+global MAILBOXCHANGEBODYFORMAT:far
+global MAILBOXGETBODYFORMAT:far
+global MAILBOXGETBODYREF:far
+global MAILBOXDONEWITHBODY:far
+global MAILBOXSTEALBODY:far
+global MAILBOXGETMESSAGEFLAGS:far
+global MAILBOXGETSUBJECTLMEM:far
+global MAILBOXGETSUBJECTBLOCK:far
+global MAILBOXACKNOWLEDGEMESSAGERECEIPT:far
+global MAILBOXGETDESTAPP:far
+global MAILBOXGETSTORAGETYPE:far
+global MAILBOXSETTRANSADDR:far
+global MAILBOXGETTRANSADDR:far
+global MAILBOXGETUSERTRANSADDRLMEM:far
+global MAILBOXGETNUMTRANSADDRS:far
+global MAILBOXSETTRANSDATA:far
+global MAILBOXGETTRANSDATA:far
+global MAILBOXGETBODYMBOXREFBLOCK:far
+global MAILBOXGETSTARTBOUND:far
+global MAILBOXGETENDBOUND:far
+global MAILBOXDELETEMESSAGE:far
+
+global	MAILBOXCHECKMEDIUMAVAILABLE:far
+global	MAILBOXCHECKMEDIUMCONNECTED:far
+global	MAILBOXGETFIRSTMEDIUMUNIT:far
+
+global	MAILBOXSETCANCELACTION:far
+
+global	MAILBOXLOADTRANSPORTDRIVER:far
+global	MAILBOXLOADDATADRIVER:far
+global	MAILBOXLOADDATADRIVERWITHERROR:far
+global	MAILBOXFREEDRIVER:far
+
+MailboxPushToMailboxDir		equ	MAILBOXPUSHTOMAILBOXDIR
+MailboxChangeToMailboxDir	equ	MAILBOXCHANGETOMAILBOXDIR
+
+global	MAILBOXCONVERTTOMAILBOXTRANSFERITEM:far
+global	MAILBOXCONVERTTOCLIPBOARDTRANSFERITEM:far
+global	MAILBOXREPLYTOMESSAGE:far
+global	MAILBOXBODYREFORMATTED:far
+
+;------------------------------------------------------------------------------
+;
+;		    SST_MAILBOX Notification Types
+;
+;------------------------------------------------------------------------------
+MailboxSubsystemNotification	etype	word, 0
+
+MSN_APP_LOADED			enum	MailboxSubsystemNotification
+;	Desc:	Notifies the Mailbox library that a user-interactible
+;		application has completed loading and is ready to receive
+;		whatever messages are appropriate.
+;
+;	Pass:	bxcxdx	= GeodeToken (bx = GT_chars[0..1], cx = GT_chars[2..3],
+;			  dx = GT_manufID)
+;		ah	= IACPServerFlags
+;		al	= IACPServerMode
+;
+
+MSN_APP_NOT_LOADED		enum	MailboxSubsystemNotification
+;	Desc:	Notifies the Mailbox library that an app has either exited
+;		or is no longer user-interactible. In any case, it's no longer
+;		able to receive messages.
+;
+;	Pass:	bxcxdx	= GeodeToken (bx = GT_chars[0..1], cx = GT_chars[2..3],
+;			  dx = GT_manufID)
+;
+
+MSN_NEW_FOCUS_APP		enum	MailboxSubsystemNotification
+;	Desc:	Notifies the Mailbox library that a new app is the focus
+;		(i.e. foreground) application.
+;
+;	Pass:	bxcxdx	= GeodeToken (bx = GT_chars[0..1], cx = GT_chars[2..3],
+;			  dx = GT_manufID)
+;
+
+MSN_NEW_IACP_BINDING		enum	MailboxSubsystemNotification
+;	Desc:	Notifies the Mailbox library of a new binding for a generic
+;		token, possibly allowing it to resolve a token whose name
+;		has been hitherto unknown.
+;
+;	Pass:	bxcxdx	= GeodeToken (bx = GT_chars[0..1], cx = GT_chars[2..3],
+;			  dx = GT_manufID)
+;
+
+MSN_REMOVE_IACP_BINDING		enum	MailboxSubsystemNotification
+;	Desc:	Notifies the Mailbox library that a binding for a generic
+;		token has been removed.  The token is left unbound.
+;
+;	Pass:	bxcxdx	= GeodeToken (bx = GT_chars[0..1], cx = GT_chars[2..3],
+;			  dx = GT_manufID)
+;
+
+;------------------------------------------------------------------------------
+;
+;		       EXPORTED OBJECT CLASSES
+;
+;------------------------------------------------------------------------------
+
+
+
+MailboxSendControlClass	class	GenControlClass
+;
+; Messages sent out:
+; 	MSG_META_MAILBOX_CREATE_MESSAGE
+;
+; GenApplication GCN lists to be placed on (will add itself to these when
+; it's interactible):
+; 	GAGCNLT_SELF_LOAD_OPTIONS/MANUFACTURER_ID_GEOWORKS
+;	GAGCNLT_MAILBOX_SEND_CONTROL/MANUFACTURER_ID_GEOWORKS
+;	GAGCNLT_APP_TARGET_NOTIFY_PAGE_STATE_CHANGE/MANUFACTURER_ID_GEOWORKS
+;
+; Notification types responded to:
+; 	GWNT_PAGE_STATE_CHANGE/MANUFACTURER_ID_GEOWORKS, if sendable object
+;		is MOT_PAGE_RANGE
+;	GWNT_MAILBOX_SEND_CONTEXT/MANUFACTURER_ID_GEOWORKS
+;
+
+;
+; Constants
+;
+
+MSCFeatures		record
+    :14
+    MSCF_POOF_LIST:1
+    MSCF_TRANSPORT_LIST:1
+MSCFeatures		end
+
+MSC_DEFAULT_FEATURES		equ	mask MSCFeatures
+
+MSCToolboxFeatures	record
+    :15
+    MSCTF_SEND_DIALOG:1
+MSCToolboxFeatures	end
+
+MSC_DEFAULT_TOOLBOX_FEATURES	equ	mask MSCToolboxFeatures
+
+
+;
+; Other object types can be defined by a subclass of MailboxSendControl by
+; saying:
+; 	MailboxObjectType	equ	first <subclass_name>Messages
+; 	MOT_RANDOM_OBJECT	enum	MailboxObjectType
+; 	MOT_ANOTHER_OBJECT	enum	MailboxObjectType
+; etc.
+;
+; If you do not subclass MailboxSendControl, but still wish to add new data
+; types your application is capable of sending, then use "MOT_FIRST_APP_TYPE"
+; instead.
+; 
+MailboxObjectType	etype	word, first MailboxSendControlMessages
+
+    MOT_DOCUMENT	enum	MailboxObjectType
+    MOT_PAGE_RANGE	enum	MailboxObjectType
+    MOT_CURRENT_PAGE	enum	MailboxObjectType
+    MOT_SELECTION	enum	MailboxObjectType
+    MOT_CLIPBOARD	enum	MailboxObjectType
+    MOT_FILE		enum	MailboxObjectType
+    MOT_QUICK_MESSAGE	enum	MailboxObjectType
+    
+MOT_FIRST_APP_TYPE	equ	(first MailboxObjectType+DEFAULT_CLASS_MESSAGES)
+;
+; Structure at the beginning of the notification block for
+; GWNT_MAILBOX_SEND_CONTEXT, if MSG_META_NOTIFY_WITH_DATA_BLOCK used instead
+; of MSG_META_NOTIFY.
+; 
+MailboxSendContextNotification struct
+    MSCN_objectType	MailboxObjectType
+    MSCN_formats	nptr.MailboxDataFormat	; Formats in which data can
+						;  be presented. 0 if don't want
+						;  to say what the formats are.
+    MSCN_data		label byte	; additional data specific to the
+					;  object type. None of the
+					;  Geoworks-defined data types expects
+					;  additional data, but data types
+					;  you define might want it.
+MailboxSendContextNotification ends
+
+MSG_MAILBOX_SEND_CONTROL_OBJECT_TYPE_SELECTED	message	
+; Bring up the message-send dialog assuming the indicated data object is
+; going to be sent. If the dialog is already up, do nothing.
+;
+; Context:	Delivered when the user has clicked on a tool or trigger
+;		for sending a particular data object via the outbox
+; Source:	GenTrigger built by controller
+; Destination:  MailboxSendControl
+; Interception: May be intercepted by subclass to set a UI tree, based on the
+;		passed MailboxObjectType, usable. The tree should be made
+;		usable by means of MSG_MAILBOX_SEND_CONTROL_ENABLE_DATA_-
+;		OBJECT_UI after the objects in the tree have had their
+;		bounding parameters set to be appropriate to the document
+;		that's open.
+;
+;		The subclass must call the superclass once this has been done.
+;
+; Pass:
+;		cx	= MailboxObjectType selected
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MAILBOX_SEND_CONTROL_ENABLE_DATA_OBJECT_UI	message	private
+; "Turn on" (i.e. set usable) a UI tree to allow the user to select one or more
+; of the objects of the type that s/he has already indicated s/he wishes to
+; send.
+;
+; When the selected body type changes, any UI previously turned on by this
+; message is turned off (set not-usable & removed from the tree).
+;
+; Multiple object trees can be turned on at once using this message.
+;
+; Context:	Sent from a subclass of MSG_MAILBOX_SEND_CONTROL_OBJECT_-
+;		TYPE_SELECTED, or from the MailboxSendControl's own handler
+;		for that message if one of the MailboxObjectTypes understood
+;		by MailboxSendControl itself has been selected.
+; Source:	MailboxSendControlClass or subclass thereof
+; Destination:  MailboxSendControlClass
+; Interception: Not useful. Use a different MailboxObjectType token for a
+;		particular data object if you don't like the UI that's used
+;		by your superclass.
+;
+; Pass:
+;		^lcx:dx	= root of tree to set usable (VUM_NOW)
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MAILBOX_SEND_CONTROL_GET_PAGE_RANGE		message	
+; If the selected MailboxObjectType is MOT_PAGE_RANGE, this returns the range
+; of pages selected by the user.
+;
+; Context:	Called by the controller's output when attempting to create
+;		the message body, to determine what page(s) should be sent.
+; Source:	controller output
+; Destination:  MailboxSendControlClass
+; Interception: Not useful.
+;
+; Pass:
+;		bp	= transaction handle passed by MSG_META_MAILBOX_CREATE_-
+;			  MESSAGE
+; Return:
+;		cx	= first page
+;		dx	= last page (inclusive)
+;		bp - unchanged
+;		ax - destroyed
+;
+
+MSG_MAILBOX_SEND_CONTROL_CHOOSE_FORMAT		message	
+; Consult the selected transport driver to determine in what data format the
+; data object being sent should be written. The transport driver will choose 
+; the format it wishes the application to use. If none of the formats is
+; acceptable, the MailboxSendControl will notify the user of the problem
+; and the transaction will be canceled.
+;
+; Context:	Called by the controller's output when attempting to create
+;		the message body. 
+; Source:	controller output
+; Destination:  MailboxSendControlClass
+; Interception: Not useful
+;
+; Pass:
+;		cx:dx	= pointer to array of MailboxDataFormat descriptors
+;			  for the formats in which the application is
+;			  prepared to represent the selected data object(s).
+;			  Indiscriminate transport drivers will select the
+;			  first entry in the array, so you should order the
+;			  formats from best to worst choice. Array is
+;			  terminated by entry with MANUFACTURER_ID_GEOWORKS/
+;			  GMDFID_INVALID
+;		bp	= transaction handle passed by MSG_META_MAILBOX_CREATE
+;			  _MESSAGE
+; Return:
+;		If format selected:
+;			cxdx	= MailboxDataFormat to use.
+;		If no format acceptable:
+;			cx, dx	= 0
+;			transaction will be canceled.
+;		bp - unchanged
+;		ax - destroyed
+;
+
+MSG_MAILBOX_SEND_CONTROL_CANCEL_MESSAGE		message	
+; If the controller's output (the recipient of the MSG_META_MAILBOX_CREATE_-
+; MESSAGE) is unable to create the message, for whatever reason, it must invoke
+; this on the controller to clean up after the send attempt.
+;
+; If the controller has received MSG_META_DETACH and this is the last
+; transaction in the list of pending transactions, the META_ACK will be
+; sent to the controller during the method.
+;
+; Context:	Invoked by controller's output when it doesn't wish to finish
+;		sending a message.
+; Source:	controller output
+; Destination:  MailboxSendControlClass
+; Interception: Intercept if subclass has other state that needs to be cleaned
+;		up at the end of a transaction. Must eventually call the super-
+;		class at the end of any processing the subclass needs to
+;		perform.
+;
+; Pass:
+;		dx	= zero if user should be notified, -1 if not
+;		bp	= transaction handle passed by MSG_META_MAILBOX_CREATE_-
+;			  MESSAGE
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+
+MSG_MAILBOX_SEND_CONTROL_CREATE_TRANSACTION	message
+; Record the relevant preliminary information about the message in preparation
+; for bringing up the create-message dialog box. The transaction chunk will
+; live (pointed to by MSCI_transactions) until the user asks to send the
+; message or cancels the whole thing.
+;
+; Context:	Called by MailboxSendDialog before coming on-screen
+; Source:	MailboxSendDialog
+; Destination:	MailboxSendControl and subclass
+; Interception:	Not a whole lot of point. If you plan to store stuff in your
+;		MSG_MAILBOX_SEND_CONTROL_CREATE_BODY method, you can enlarge
+;		the transaction chunk now, but it doesn't seem worthwhile.
+;
+; Pass:
+; 		nothing
+; Return:
+;		*ds:ax	= MSCTransaction chunk
+;
+MSCPageRangeData	struct
+    MSCPRD_start	word
+    MSCPRD_end		word
+MSCPageRangeData	ends
+
+MSCObjectData	union
+    MSCOD_pageRange	MSCPageRangeData
+MSCObjectData	end
+
+MSCTFlags	record
+    :12
+    MSCTF_DIALOG_COMPLETE:1		; set if creation dialog has been
+					;  completed.
+    MSCTF_CREATION_PENDING:1		; set if application has been asked
+					;  to create the message body and
+					;  we're awaiting the REGISTER_MESSAGE
+					;  call.
+    MSCTF_NOTIFY_AFTER_REGISTER:1	; set if output needs to be notified
+					;  (via META_MAILBOX_MESSAGE_REGISTERED)
+					;  once message is actually registered
+					;  or if message couldn't be registered.
+    MSCTF_NON_REENTRANT:1		; set if transport driver + option
+					;  may not be used to create another
+					;  transaction until this one is
+					;  complete
+MSCTFlags	end
+
+MSCTransaction	struct
+    MSCT_next		lptr.MSCTransaction	; next one in the list
+    MSCT_size		word			; number of bytes in chunk
+						;  used by data stored by
+						;  MailboxSendControl. Subclass
+						;  should add this to the base
+						;  of the chunk to get to any
+						;  data it stores in the
+						;  transaction chunk, rather
+						;  than relying on this
+						;  structure remaining constant
+						;  between versions of the
+						;  system.
+    MSCT_transport	MailboxTransport	; transport driver chosen
+    MSCT_transOption	MailboxTransportOption
+    MSCT_dataBlock	hptr			; handle of block holding the
+						;  data for the transaction
+    MSCT_addresses	word			; addresses for the message
+						;  (chunk array in dialog block)
+    MSCT_addrControl	word			; address controller for the
+						;  message (in dialog block)
+    MSCT_feedback	optr			; optr of the dialog
+						;  that tells the user the
+						;  thing is being sent
+						;  (RESPONDER only)
+    MSCT_flags		MSCTFlags
+    MSCT_transData	dword			; transport-specific data
+    MSCT_objType	MailboxObjectType	; data object type selected
+    MSCT_objData	MSCObjectData		; any additional data about the
+						;  data object that we maintain
+    ; Following extracted from MSCRegisterMessageArgs
+    MSCT_bodyStorage	MailboxStorage
+    MSCT_bodyFormat	MailboxDataFormat
+    MSCT_messageFlags	MailboxMessageFlags
+    MSCT_destApp	GeodeToken
+    MSCT_startBound	FileDateAndTime
+    MSCT_endBound	FileDateAndTime
+    MSCT_bodyRef	lptr.byte
+    MSCT_summary	lptr.TCHAR
+MSCTransaction	ends
+
+MSG_MAILBOX_SEND_CONTROL_TWEAK_PARAMS		message
+; This allows a subclass to alter the MailboxRegisterMessageArgs that the
+; controller is about to pass to MailboxRegisterMessage, should it have
+; additional information unavailable to the superclass.
+;
+; Context:	Called by MailboxSendControl immediately before calling
+;		MailboxRegisterMessage
+; Source:	MailboxSendControl
+; Destination:  MailboxSendControl subclass
+; Interception: must be intercepted to do anything special. Superclass has
+;		no method for this message.
+;
+; Pass:
+;		cx:dx	= MailboxRegisterMessageArgs, fully initialized
+;		bp	= transaction chunk handle returned by
+;			  MSG_MAILBOX_SEND_CONTROL_CREATE_TRANSACTION
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+
+MSG_MAILBOX_SEND_CONTROL_TRANSACTION_FINISHED	message
+; Signals the end of a message-creation transaction. Subclass (and MSC itself)
+; should free any resources it allocated to handle the transaction.
+;
+; If the controller has received MSG_META_DETACH and this is the last
+; transaction in the list of pending transactions, the META_ACK will be
+; sent to the controller during the method.
+;
+; Context:	Called by MailboxSendControl once a message has been registered
+;		or canceled.
+; Source:	MailboxSendControl
+; Destination:  MailboxSendControl and subclass
+; Interception: should be intercepted by a subclass that allocated additional
+;		resources in MSG_MAILBOX_SEND_CONTROL_CREATE_TRANSACTION
+;		(or anywhere else, for that matter).
+;
+;		Subclass should call the superclass as the final act of its
+;		method, as the transaction chunk will be freed by the method
+;		in MailboxSendControl
+;
+; Pass:
+;		bp	= transaction chunk handle returned by
+;			  MSG_MAILBOX_SEND_CONTROL_CREATE_TRANSACTION
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+
+MSG_META_MAILBOX_CREATE_MESSAGE			message	MetaMailboxMessages
+; Informs the output of the MailboxSendControl that it should now create the
+; body of the message and call the controller back when that is accomplished.
+;
+; Creating the body will involve calling MSG_MAILBOX_SEND_CONTROL_CHOOSE_FORMAT
+; to determine in what format the body should be represented, followed by
+; MSG_MAILBOX_SEND_CONTROL_REGISTER_MESSAGE. If necessary, call other methods
+; (e.g. MSG_MAILBOX_SEND_CONTROL_GET_PAGE_RANGE) to determine exactly of what
+; the message body should consist.
+;
+; If the message body cannot be created, the recipient must invoke
+; MSG_MAILBOX_SEND_CONTROL_CANCEL_MESSAGE on the controller to clean up after
+; the transaction.
+;
+; Context:	Sent by the MailboxSendControl once all the parameters of
+;		the message have been set by the user.
+; Source:	MailboxSendControl
+; Destination:  controller output
+; Interception: must be intercepted by the controller output to create the
+;		message body. The MailboxSendControl (and thus the application)
+;		will not detach unless this message is handled and the
+;		transaction completed or canceled.
+;
+; Pass:
+;		^lcx:dx	= MailboxSendControl to talk to
+;		bp	= transaction handle to identify this message.
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSCRegisterMessageArgs	struct
+    MSCRMA_bodyStorage	MailboxStorage		; In what underlying format the
+						;  body data are stored.
+    MSCRMA_bodyFormat	MailboxDataFormat	; The format imposed on the
+						;  underlying storage.
+    MSCRMA_bodyRef	fptr			; Pointer to the address of the
+						;  message-body data. The format
+						;  of the address is specific to
+						;  the storage driver used.
+    MSCRMA_bodyRefLen	word			; Number of bytes in the body's
+						;  address
+    MSCRMA_flags	MailboxMessageFlags	; Control flags
+    MSCRMA_summary	fptr.TCHAR		; Description of the message, so
+						;  the sending & receiving
+						;  users know what it contains.
+    MSCRMA_destApp	GeodeToken		; The "application" that is to
+						;  receive the message on the
+						;  remote machine.
+    MSCRMA_startBound	FileDateAndTime		; Time after which it's ok to
+						;  send the message.
+    MSCRMA_endBound	FileDateAndTime		; Timer before which the message
+						;  must be sent.
+MSCRegisterMessageArgs	ends
+
+MSG_MAILBOX_SEND_CONTROL_REGISTER_MESSAGE	message	
+; Record the control information and body reference for registering the message.
+; The message will not be registered until the addresses have been fetched
+; by a call to MSG_MAILBOX_SEND_CONTROL_GET_ADDRESSES.
+;
+; Context:	Called by controller output once it has created the body, etc.
+; Source:	controller output
+; Destination:  MailboxSendControl
+; Interception: don't. If you want to mess with the parameters, intercept
+;		MSG_MAILBOX_SEND_CONTROL_TWEAK_PARAMS instead.
+;
+; Pass:
+;		cx:dx	= MSCRegisterMessageArgs
+;		bp	= transaction handle to identify the message
+; Return:
+;		nothing
+;		bp - unchanged
+;		ax, cx, dx - destroyed
+;
+
+MSCMessageRegisteredArgs	struct
+    MSCMRA_error	MailboxError	; ME_SUCCESS if registered ok
+    MSCMRA_message	MailboxMessage	; message token, if registered ok
+    MSCMRA_bodyStorage	MailboxStorage
+    MSCMRA_bodyFormat	MailboxDataFormat
+    MSCMRA_bodyRefLen	word
+    MSCMRA_bodyRef	label	byte	; start of body reference.
+MSCMessageRegisteredArgs	ends
+
+MSG_META_MAILBOX_MESSAGE_REGISTERED	message	MetaMailboxMessages
+; Sent once the MailboxSendControl has attempted to register the message. The
+; controller output can use this to call MailboxDoneWithVMFile or whatever
+; other cleanup it needs to perform, based on whether the message was
+; successfully registered.
+;
+; Context:	Sent by MailboxSendControl after calling MailboxRegisterMessage
+; Source:	MailboxSendControl
+; Destination:  controller output
+; Interception: should be intercepted to clean up the body in case the
+;		message couldn't be registered. No need to call superclass.
+;
+; Pass:
+;		^hcx	= MSCMessageRegisteredArgs. Will be freed by a
+;			  subsequent MSG_META_DEC_BLOCK_REF_COUNT delivered
+;			  to the controller output.
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+
+MSG_MAILBOX_SEND_CONTROL_REPLY_TO_MESSAGE	message
+
+; Brings up the message-creation dialog based on the transport, transport
+; option and addresses bound to the indicated message (which must currently
+; be or have been in the inbox).  The user is allowed to change the body
+; type and everything of that natyure.  If the transport driver allows it,
+; the user may modify the addresses.
+;
+; Context:	Starting to compose a reply message.
+; Source:	Unrestricted
+;
+; Pass:
+;		cxdx	= MailboxMessage
+; Return:
+;		carry set on error
+;			ax	= MailboxError
+;		carry clear if no error
+;			ax - destroyed
+;
+;		cx, dx, bp - destroyed
+;
+
+MSCSetAddressesArgs	struct
+    MSCSAA_transAddrs	fptr.MailboxTransAddr	; Pointer to the addresses of
+						;  the machines/peripherals/
+						;  whatevers that will receive
+						;  the message
+    MSCSAA_numTransAddrs	word		; Number of entries in
+						;  MSCSAA_transAddrs
+    MSCSAA_transportAndOption	MailboxTransportAndOption
+						; Transport and transport
+						;  option for which the
+						;  addresses are destined
+MSCSetAddressesArgs	ends
+
+MSG_MAILBOX_SEND_CONTROL_SET_ADDRESSES	message
+; This message is usually used for replying to messages stored by the
+; application itself intead of in the system mailbox.  The application can
+; send this message to the send control to tell it which addresses to use
+; for the reply message.
+;
+; If the MailboxSendDialogClass object is on-screen and is using the same
+; transport + option, the send control will forward the addresses to the
+; send dialog.  Otherwise, the addresses will be stored in
+; TEMP_MAILBOX_SEND_CONTROL_ADDRESSES_AND_TRANSPORT, replacing any existing
+; addresses in this vardata.
+;
+; Context:	Starting to compose a reply message.
+; Source:	Unrestricted
+;
+; Pass:
+;		cx:dx	= MSCSetAddressesArgs
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MAILBOX_SEND_CONTROL_SET_AVAILABLE_FORMATS	message	
+; Specify the formats in which the selected body types can be presented. The
+; format list remains in force until it is changed again. This is a one
+; way street: there's no way to remove the format list.
+;
+; Context:	Called by subclass when MSG_MAILBOX_SEND_CONTROL_OBJECT_TYPE_-
+;		SELECTED called, and by MailboxSendControl when handling
+;		a context notification that includes formats.
+; Source:	usually MailboxSendControl subclass
+; Destination:  MailboxSendControl
+; Interception: not useful
+;
+; Pass:
+;		cx:dx	= array of MailboxDataFormat descriptors ending with
+;			  one that is MANUFACTURER_ID_GEOWORKS/GMDFID_INVALID
+; Return:
+;		nothing
+;		bp - unchanged
+;		ax, cx, dx - destroyed
+;
+
+MSG_MAILBOX_SEND_CONTROL_GET_OBJECT_TYPE	message	
+; Fetches the type of object to be included in the body of a message.
+;
+; Context:	Called by recipient of MSG_META_MAILBOX_CREATE_MESSAGE if
+;		it needs to know what to put in the message.
+; Source:	anyone
+; Destination:  MailboxSendControl
+; Interception: not useful
+;
+; Pass:
+;		bp	= transaction handle received in MSG_META_MAILBOX_-
+;			  CREATE_MESSAGE
+; Return:
+;		ax	= MailboxObjectType for the transaction
+;		cx, dx, bp - unchanged
+;
+
+
+MSG_MAILBOX_SEND_CONTROL_CREATE_BODY	message	
+; Ask the address control or controller output to create the body of the
+; message. This
+;
+; Context:	Called when the message body needs to be created, usually from
+;		MSG_MAILBOX_SEND_CONTROL_GET_ADDRESSES, but sometimes
+;		by the MailboxSendDialog before it comes on screen, if the
+;		transport driver has the MBTC_NEED_MESSAGE_BODY flag set.
+; Source:	internal
+; Destination:  MailboxSendControl
+; Interception: If the subclass has additional UI (like settings from data-
+;		object UI or other funky things, like Mail Merge) whose settings
+;		need to be saved in order for the application to create the
+;		message body, it should save its data in the passed transaction
+;		chunk. The subclass can resize the chunk as it sees fit. It
+;		should use what's in the MSCT_size field as the offset into
+;		the chunk to start storing its information (LMemInsertAt is
+;		your friend when it comes to enlarging the chunk...).
+;
+;		It should do this before calling the superclass, as the output
+;		may ask for the information from the transaction before the
+;		superclass returns, if it's run by the same thread as the
+;		MailboxSendControl.
+;
+; Pass:
+;		*ds:bp	= MSCTransaction
+; Return:
+;		nothing
+;		bp - unchanged
+;		ax, cx, dx - destroyed
+;
+
+
+MSG_MAILBOX_SEND_CONTROL_SET_DATA_OBJECT_VALID	message	
+; Note whether the object selected by the previously-enabled data object UI
+; is valid. If it's not valid, the user will not be able to send the message.
+;
+; By default, it is assumed valid when the data-object ui are enabled (this
+; is for backwards-compatibility). Subclasses may want to call this immediately
+; after calling ENABLE_DATA_OBJECT_UI to start the state out at invalid.
+;
+; Context:	Called by subclass or the data object selection ui itself
+; Source:	see above
+; Destination:  MailboxSendControl
+; Interception: not usually
+;
+; Pass:
+;		cx	= TRUE if selected object is valid
+;			= FALSE if selected object is invalid (i.e. no
+;			  selection)
+; Return:
+;		nothing
+;		dx, bp - unchanged
+;		ax, cx - destroyed
+;
+
+MSG_MAILBOX_SEND_CONTROL_SAVE_TRANSACTION	message	
+; Save all the data for the passed transaction (except the body information)
+; in the passed VM file. If the application doesn't actually want to register
+; a message at this time, it can call MSG_MAILBOX_SEND_CONTROL_CANCEL_MESSAGE
+; after calling this method.
+;
+; Context:	Called by subclass or application immediately before the
+;		transaction is registered with the outbox.
+; Source:	application
+; Destination:  MailboxSendControl
+; Interception: not usually
+;
+; Pass:
+;		cx	= VM file in which to save the data
+;		bp	= transaction handle
+; Return:
+;		carry set if transaction couldn't be saved:
+;			ax	= MailboxError
+;		carry clear if successful:
+;			ax	= VM block to pass to
+;				  MailboxRegisterSavedMessage
+;		cx, bp - unchanged
+;		ax, dx - destroyed
+;
+
+
+MSG_MAILBOX_SEND_CONTROL_COMPLETE_TRANSACTION	message	
+; Now have all the information needed to register a message. Please do so.
+;
+; Context:	Called by MailboxSendControl on itself once it has both the
+;		body information and all the addresses for the transaction.
+; Source:	MailboxSendControl
+; Destination:  MailboxSendControl or subclass
+; Interception: may be intercepted by those subclasses that don't actually
+;		want to register a message (i.e. those that have ATTR_MAIL-
+;		BOX_SEND_CONTROL_SAVES_TRANSACTIONS), but instead want to
+;		save the transaction away for future use. In such a case,
+;		the subclass should not call the superclass, which will
+;		register the message, but should call MSG_MAILBOX_SEND_CON-
+;		TROL_CANCEL_MESSAGE once they've saved the transaction away.
+;
+;		While a subclass can tweak the transaction information here,
+;		it's better if it does so in MSG_MAILBOX_SEND_CONTROL_TWEAK_-
+;		PARAMS instead.
+;
+; Pass:
+;		bp	= transaction handle
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+;
+; Room for expansion of public API
+; 
+MailboxSendControlMessages	= MailboxSendControlMessages + 28
+
+;
+; Private Messages
+;
+
+MSG_MAILBOX_SEND_CONTROL_GET_ADDRESSES			message	private
+; Store the addresses into the transaction, as the user wants to send the
+; message. If the body hasn't been created yet, start that process going.
+;
+; Context:	Sent by the "Send" trigger in the dialog when the user thinks
+;		the addresses are complete.
+; Source:	"Send" trigger
+; Destination:  MailboxSendControl
+; Interception: don't
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+
+MSG_MAILBOX_SEND_CONTROL_TRANSPORT_SELECTED		message	private
+; Initiate a dialog based on the user having selected the indicated transport.
+; Controller must call the OutboxTransportMenu back to obtain the
+; MailboxMediaTransport structure to use in the MSG_MSD_SET_TRANSPORT call
+; before initiating the dialog box.
+;
+; Context:	Sent as the output of the OutboxTransportMenu object in our
+;		child block when one of its triggers has been activated.
+; Source:	OutboxTransportMenuClass
+; Destination:	MailboxSendControlClass
+; Interception:	Not useful (superclass must be called to initiate the
+;		dialog, though)
+;
+; Pass:
+; 		cx	= transport index #
+; Return:
+; 		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MailboxMediaTransport		struct
+    MMT_medium		MediumType
+    MMT_transport	MailboxTransport
+    MMT_transOption	MailboxTransportOption
+MailboxMediaTransport		ends
+
+MSG_MAILBOX_SEND_CONTROL_INITIATE_DIALOG_WITH_TRANSPORT	message
+; Bring up the send control dialog with the address control for this
+; medium + transport.
+;
+; Source:	MailboxSendControlClass object itself
+; Destination:	itself
+; Interception:	Not useful
+;
+; Pass:
+;		ss:bp	= MailboxMediaTransport to be displayed
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destoryed
+
+MSG_MAILBOX_SEND_CONTROL_GET_CONTENTS_MONIKER		message private
+; Retrieve the moniker for the given element of the body-contents list
+;
+; Context:	Sent by contents list in dialog
+; Source:	GenDynamicList
+; Destination:	MailboxSendControl
+; Interception:	Not useful
+;
+; Pass:
+; 		^lcx:dx	= list requesting the moniker
+;		bp	= position of the item requested
+; Return:	
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MAILBOX_SEND_CONTROL_GET_CONTENTS_STRING	message
+; Retrieve the string for the given element of the body-contents list
+;
+; Context:	Called by the send dialog when we tell it what contents
+;		are to be sent.
+; Source:	MailboxSendDialog
+; Destination:  MailboxSendControl
+; Interception: Not useful, unless you've failed to provide a text moniker
+;		for the content index in your array
+;
+; Pass:
+;		cx	= index into MSCI_dataTypes array
+;		^hdx	= lmem block in which to place the result
+; Return:
+;		^ldx:ax	= null-terminated string
+;		bp - unchanged
+;		- destroyed
+;
+
+
+MSG_MAILBOX_SEND_CONTROL_SET_CONTENTS			message	 private
+; Choose something else to put in the body of the message.
+;
+; Context:	This is the output of the Contents dynamic list in the
+;		send dialog box.
+; Source:	GenDynamicList
+; Destination:  MailboxSendControl
+; Interception: don't. Subclass MSG_MAILBOX_SEND_CONTROL_OBJECT_TYPE_SELECTED
+;		instead.
+;
+; Pass:
+;		cx	= index into MSCI_dataTypes array
+;		bp	= number of selections
+;		dl	= GenItemGroupStateFlags
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MAILBOX_SEND_CONTROL_POOF_SELECTED	message	
+; Indicates the user has elected to send a Poof message. Bring up the right
+; dialog box to do so.
+;
+; Context:	Sent by the OutboxPoofMenu in the duplicated UI when an entry
+;		is selected
+; Source:	OutboxPoofMenu
+; Interception: Not useful
+;
+; Pass:
+;		dx	= MailboxDialogType to initiate
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;; Place only messages private to the MailboxSendControl
+;;;;;;;;;;;;;;;;;; here. Place public messages up before the "Room for
+;;;;;;;;;;;;;;;;;; expansion of public API" comment earlier in the file.
+;;;;;;;;;;;;;;;;;; 
+
+HINT_MAILBOX_SEND_CONTROL_INCORPORATE_ADDRESS_CONTROL	vardata
+; Asks that the transport driver's address controller be displayed within
+; the MailboxSendControl dialog, if screen real-estate permits this. As with
+; all hints, the MailboxSendControl is free to ignore the hint if it chooses.
+
+HINT_MAILBOX_SEND_CONTROL_SEPARATE_ADDRESS_CONTROL	vardata
+; Asks that the transport driver's address controller be displayed as a
+; separate dialog box, with a Choose Address trigger (or something similar)
+; left in the MailboxSendControl's dialog.
+
+MailboxDialogType	etype	word
+    MDT_APPLICATION	enum	MailboxDialogType	; app-created message
+    MDT_FILE		enum	MailboxDialogType	; system message w/file
+    MDT_CLIPBOARD	enum	MailboxDialogType	; system message
+							;  w/clipboard
+    MDT_QUICK_MESSAGE	enum	MailboxDialogType	; system message w/text
+							;  and/or ink
+
+TempMailboxDialogData	struct
+    TMDD_block		hptr		; duplicated block
+    TMDD_type		MailboxDialogType
+TempMailboxDialogData	ends
+
+TEMP_MAILBOX_SEND_CONTROL_CURRENT_DIALOG	vardata TempMailboxDialogData
+; The duplicated block that holds the current dialog box.
+
+TEMP_MAILBOX_SEND_CONTROL_DESTROY_DIALOG_PENDING	vardata
+; Exists when the current dialog should be destroyed once all transactions
+; are complete.
+
+ATTR_MAILBOX_SEND_CONTROL_SEND_PAGES			vardata
+; Tells the controller to augment the array of MailboxSendObjectTypes for
+; the controller with entries appropriate for an application that deals
+; with pages and can send them. The controller output should expect
+; MOT_PAGE_RANGE or MOT_CURRENT_PAGE data types. The entries' presentation
+; will not be controlled by a feature bit.
+
+ATTR_MAILBOX_SEND_CONTROL_SEND_DOCUMENT			vardata
+; Tells the controller to augment the array of MailboxSendObjectTypes for
+; the controller with entries appropriate for sending the current document.
+; The controller output should expect the MOT_DOCUMENT data type. The entry's
+; presentation will not be controlled by a feature bit.
+  
+ATTR_MAILBOX_SEND_CONTROL_SEND_SELECTION		vardata
+; Tells the controller to augment the array of MailboxSendObjectTypes for
+; the controller with entries appropriate for sending the currently-selected
+; object(s), of whatever type. The controller output should expect the
+; MOT_SELECTION data type. The entry's presentation will not be controlled by
+; a feature bit.
+
+ATTR_MAILBOX_SEND_CONTROL_TRANSPORT_HINT      vardata MailboxTransportAndOption
+; A hint that contains transport-specific data set by the programmer to be
+; given to the transport driver's address control when the transport is
+; selected.
+;
+; The data stored with the hint begins with the MailboxTransport and the
+; transport option to which it pertains. After that comes data known only to
+; the transport driver's address controller. You must refer to the .def file
+; for the appropriate transport driver to find what goes here.
+;
+; More than one of these may be placed on a MailboxSendControl object, one for
+; each transport driver that requires/requests the information.
+;
+
+ATTR_MAILBOX_SEND_CONTROL_SINGLE_TRANSPORT	vardata	MailboxMediaTransport
+; Tells the send control it should only allow the user to create messages
+; for a particular transport.  The attribute is accompanied by a
+; MailboxMediaTransport structure that gives the MailboxTransport,
+; MailboxTransportOption, and MediumType tokens that uniquely identify the
+; type of transport to use.
+
+MSCAddressesAndTransport	struct
+    MSCAAT_addresses	lptr.ChunkArayHeader	; array of MBACAddress entries
+    MSCAAT_transport	MailboxTransportAndOption
+						; transport and options for
+						;  addresses.
+MSCAddressesAndTransport	ends
+
+TEMP_MAILBOX_SEND_CONTROL_ADDRESSES_AND_TRANSPORT	vardata	\
+						MSCAddressesAndTransport
+;
+; Used by MSG_MAILBOX_SEND_CONTROL_SET_ADDRESSES handler to store addresses
+; which have not yet been passed to the send dialog.
+;
+
+ATTR_MAILBOX_SEND_CONTROL_AVAILABLE_FORMATS	vardata	MailboxDataFormat
+; The available formats, as provided by MSG_MAILBOX_SEND_CONTROL_SET_AVAIL-
+; ABLE_FORMATS
+
+ATTR_MAILBOX_SEND_CONTROL_SAVES_TRANSACTIONS	vardata
+; Tells the send control that the application uses it to create saved
+; transactions for later use. The list of transports from which the user
+; chooses will be restricted to those that are able to save and restore
+; transactions.
+
+MailboxSendObjectType	struct
+    MSOT_id		MailboxObjectType
+    ; Token that means something to the controller's output, indicating what
+    ; type of data should make up the message body. If one of the
+    ; MailboxObjectType values defined above is used, the controller will
+    ; provide additional UI, as appropriate, to allow the user to specify
+    ; exactly which data objects, from the range of those possible, are to be
+    ; sent.
+
+    MSOT_feature	word		0
+    ; The feature bit that controls whether the user can see this data type as
+    ; something to send. 0 if should always be presented.
+
+    MSOT_desc		lptr.VisMoniker
+    ; Moniker (or moniker list) describing the type of data being sent. Two
+    ; types of monikers are looked for, either pointed to by this field or
+    ; within a moniker list pointed to by this field: a VMS_TOOL moniker
+    ; will cause the controller to build a tool for sending the specified
+    ; type of data. Any other type of moniker will be used to build a non-tool
+    ; UI object below the controller itself.
+MailboxSendObjectType	ends
+
+    MSCI_dataTypes	lptr.ChunkArrayHeader	0
+    ; Array of MailboxSendObjectType records defining the types of data the
+    ; application is capable of sending in the body of a message.
+
+    MSCI_transactions	lptr.MSCTransaction	0
+    ; The list of pending transactions.
+    
+    MSCI_defBodyType	MailboxObjectType	?
+    ; The current default body type, as set via GWNT_MAILBOX_SEND_CONTEXT
+    
+    MSCI_curBodyType	MailboxObjectType		?
+    ; The body type selected by the user. Reinitialized at each
+    ; TRANSPORT_SELECTED call
+    
+MailboxSendControlClass	endc
+
+
+MSG_META_MAILBOX_NOTIFY_MESSAGE_AVAILABLE	method	MetaMailboxMessages
+; Informs the receiving application that there is a message waiting for it in
+; the system inbox.
+;
+; Context:	Delivered to an application's process object via IACP
+;		when a message is waiting for it in the inbox. The message will
+;		be sent when the user indicates the message should be delivered.
+; Source:	Mailbox library
+; Destination:  process object
+; Interception: Must be intercepted by applications capable of receiving
+;		Inbox messages. There is no default method for this message.
+;		If it is not handled, the message will remain in the inbox
+;		until the user deletes it, if that's possible.
+;
+; Pass:
+;		cxdx	= MailboxMessage
+; Return:
+;		carry set if handled
+;		ax, cx, dx, bp - destroyed
+
+
+MailboxOutboxControlClass	class	GenControlClass
+;
+; Messages sent out:
+; 	none
+;
+; GenApplication GCN lists to be placed on (will add itself to these when
+; it's interactible):
+; 	none (adds itself to MGCNLT_OUTBOX_CHANGE on the Mailbox library's
+;	      application object, but you don't need to worry about that)
+;
+; Notification types responded to:
+; 	none
+;
+
+;
+; Constants
+;
+
+MOCFeatures		record
+    :13
+    MOCF_DELETE_MESSAGE:1
+    MOCF_STOP_SENDING:1
+    MOCF_START_SENDING:1
+MOCFeatures		end
+
+MOC_DEFAULT_FEATURES		equ	mask MOCF_DELETE_MESSAGE
+
+MOCToolboxFeatures	record
+    :16
+MOCToolboxFeatures	end
+
+MOC_DEFAULT_TOOLBOX_FEATURES	equ	0
+
+;
+;	Messages sent by the controller's UI gadgetry. Not to be sent by
+;	anything else...
+;
+
+MSG_MAILBOX_OUTBOX_CONTROL_ENABLE_FEATURES		message
+; Enables only those features currently defined whose feature flags are
+; passed. Any feature defined for the controller whose flag is not set in
+; the passed register is set not-enabled.
+;
+; Context:	Sent by message list as different items are selected.
+; Source:	message list
+; Destination:	MailboxOutboxControl
+; Interception:	no point
+;
+; Pass:
+; 		cx	= MOCFeatures to be enabled
+; 		dx	= MOCToolboxFeatures to be enabled
+; Return:
+; 		nothing
+; 		ax, cx, dx - destroyed
+; 		bp - unchanged
+;
+
+MailboxOutboxControlClass	endc
+
+EndLibrary	mailbox
+

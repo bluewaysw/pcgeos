@@ -1,0 +1,351 @@
+/***********************************************************************
+ *
+ *	Copyright (c) NewDeal 1999 -- All Rights Reserved
+ *
+ * PROJECT:	  GeoSafari Builder
+ *
+ * AUTHOR:  	  Gene Anderson
+ *
+ *	$Id$
+ *
+ ***********************************************************************/
+
+@include "safbuild.goh"
+@include "global.goh"
+@include <wav.goh>
+@include <token.h>
+
+@classdecl	SafBuildProcessClass, neverSaved ;
+@classdecl      SafBuildAppClass;
+
+
+
+/***********************************************************************
+ *		MSG_SAFBUILD_PROCESS_PLAY_SOUND
+ ***********************************************************************
+ *
+ * SYNOPSIS:      Play a sound
+ * PARAMETERS:	  filename - name of WAV file
+ *                path - path to WAV file
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	  Date		Description
+ *	----	  ----		-----------
+ *	gene      6/24/99   	Initial Revision
+ *
+ ***********************************************************************/
+@method SafBuildProcessClass, MSG_SAFBUILD_PROCESS_PLAY_SOUND
+{
+    WavPlayFile(SP_DOCUMENT, path, filename);
+}
+
+
+/***********************************************************************
+ *		MSG_PROCESS_CREATE_UI_THREAD for SafBuildProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:  Increase the size of the ui thread stack.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	  Date		Description
+ *	----	  ----		-----------
+ *	gene      4/6/99   	Initial Revision
+ *
+ ***********************************************************************/
+@method SafBuildProcessClass, MSG_PROCESS_CREATE_UI_THREAD
+{
+    stackSize = 4048;
+    return @callsuper();
+}
+
+
+/***********************************************************************
+ *		MSG_GEN_PROCESS_CLOSE_APPLICATION
+ ***********************************************************************
+ * SYNOPSIS:	    close the application
+ * PASS:            
+ * RETURN:          none
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	7/1/99		Initial Revision
+ *
+ ***********************************************************************/
+@method SafBuildProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+    /*
+     * close the game file and/or any bitmap file
+     */
+    @call TheGameCard::MSG_SB_GAME_CARD_CLOSE_FILE();
+    /*
+     * call the superclass to do the work
+     */
+    return @callsuper();
+}
+
+/***********************************************************************
+ *		MSG_GEN_PROCESS_INSTALL_TOKEN
+ ***********************************************************************
+ *
+ * SYNOPSIS:  install a document token
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	  Date		Description
+ *	----	  ----		-----------
+ *	gene      10/11/99   	Initial Revision
+ *
+ ***********************************************************************/
+/*@method SafBuildProcessClass, MSG_GEN_PROCESS_INSTALL_TOKEN
+{
+    dword tChars;
+    TokenFlags tFlags;
+
+    @callsuper();
+	 tChars = TOKEN_CHARS('G','E',(dword)'D', (dword) 'O');
+	 if (!TokenGetTokenInfo(tChars, 16431, &tFlags)) {
+	TokenDefineToken(tChars, 16431, @GBDocIconMonikerList, 0);
+    }
+}
+
+/***********************************************************************
+ *		MSG_SAFBUILD_APP_UPDATE_FONT_TRIGGERS
+ ***********************************************************************
+ *
+ * SYNOPSIS:        Update the add/remove font triggers
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	  Date		Description
+ *	----	  ----		-----------
+ *	gene      4/22/99   	Initial Revision
+ *
+ ***********************************************************************/
+
+static const char drawCat[] = "geodraw";
+static const char fontKey[] = "fontmenu";
+
+@method SafBuildAppClass, MSG_SAFBUILD_APP_UPDATE_FONT_TRIGGERS
+{
+    word eSize;
+    MemHandle mh;
+    Boolean keyExists = FALSE;
+
+    if (!InitFileReadStringBlock(&drawCat, &fontKey, &mh,
+				 IFRF_FIRST_ONLY, &eSize)) {
+	MemFree(mh);
+	keyExists = eSize;
+    }
+
+ /*   if (keyExists) {
+	/*
+	 * if the key exists, disable add and enable remove
+	 */
+/*	@call AddFontTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@call RemoveFontTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+    } else {
+	@call AddFontTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@call RemoveFontTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    }  */
+}
+
+
+/***********************************************************************
+ *		MSG_SAFBUILD_APP_ADD_FONT
+ ***********************************************************************
+ *
+ * SYNOPSIS:        Add the fonts to Artist
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	  Date		Description
+ *	----	  ----		-----------
+ *	gene      4/22/99   	Initial Revision
+ *
+ ***********************************************************************/
+
+static const TCHAR fontStr[] = "020202011200";
+
+@method SafBuildAppClass, MSG_SAFBUILD_APP_ADD_FONT
+{
+    /*
+     * put up an explanatory dialog
+     */
+    MemLock(OptrToHandle(@fontExplainStr));
+
+    @call oself::MSG_GEN_APPLICATION_DO_STANDARD_DIALOG(
+	0,       /* dialogMethod */
+	0,       /* dialogOD */
+	NULL,    /* helpContext */
+	NULL,    /* customTriggers */
+	NULL,    /* arg2 */
+	NULL,    /* arg1 */
+	LMemDeref(@fontExplainStr), /* string */
+	(CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+	/* interaction type */
+	(GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)
+	);
+    MemUnlock(OptrToHandle(@fontExplainStr));
+    
+    /*
+     * add the fonts
+     */
+    InitFileWriteString(&drawCat, &fontKey, &fontStr);
+    /*
+     * update the UI
+     */
+    @call oself::MSG_SAFBUILD_APP_UPDATE_FONT_TRIGGERS();
+}
+
+
+
+/***********************************************************************
+ *		MSG_SAFBUILD_APP_REMOVE_FONT
+ ***********************************************************************
+ *
+ * SYNOPSIS:        Remove fonts from Artist
+ * PARAMETERS:	    none
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	  Date		Description
+ *	----	  ----		-----------
+ *	gene      4/22/99   	Initial Revision
+ *
+ ***********************************************************************/
+
+@method SafBuildAppClass, MSG_SAFBUILD_APP_REMOVE_FONT
+{
+    InitFileDeleteEntry(&drawCat, &fontKey);
+
+    @call oself::MSG_SAFBUILD_APP_UPDATE_FONT_TRIGGERS();
+}
+
+
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_META_ATTACH_OBJECT
+* PASS:            none
+* RETURN:          none
+* DESCRIPTION:     Handle some initialization
+*
+* REVISION HISTORY:
+*         Name      Date        Description
+*         ----      ----        -----------
+*         gene      12/7/98     Initial Revision
+***************************************************************/
+
+@method SafBuildAppClass, MSG_META_ATTACH_OBJECT
+{
+    Boolean genLogo = FALSE;
+
+    @callsuper();
+    @call VerifyText::MSG_VIS_TEXT_CREATE_STORAGE(VTSF_MULTIPLE_CHAR_ATTRS, FALSE);
+    InitFileReadBoolean("safari", "genlogo", &genLogo);
+    if (genLogo) {
+	@call GenerateLogoFileTrigger::MSG_GEN_SET_USABLE(VUM_DLYD);
+    } else {
+	@call GenerateLogoFileTrigger::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+    }
+
+ /*   @call oself::MSG_SAFBUILD_APP_UPDATE_FONT_TRIGGERS();  */
+}
+
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_SAFBUILD_APP_UPDATE_FILE_SELECTORS
+* PASS:            filePath - GenFilePath
+* RETURN:          none
+* DESCRIPTION:     update the directory for the file selectors
+*
+* REVISION HISTORY:
+*         Name      Date        Description
+*         ----      ----        -----------
+*         gene      6/30/99     Initial Revision
+***************************************************************/
+
+@method SafBuildAppClass, MSG_SAFBUILD_APP_UPDATE_FILE_SELECTORS
+{
+    GenFilePath *gfpd;
+
+    ObjLockObjBlock(OptrToHandle(@FileChooseSelector));
+    gfpd = ObjVarAddData(@FileChooseSelector, ATTR_GEN_PATH_DATA, sizeof(GenFilePath));
+    memcpy(gfpd, filePath, sizeof(GenFilePath));
+    MemUnlock(OptrToHandle(@FileChooseSelector));
+}
+
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_SAFBUILD_APP_GENERATE_LOGO_FILE
+* PASS:            none
+* RETURN:          none
+* DESCRIPTION:     generate the logo file
+*
+* REVISION HISTORY:
+*         Name      Date        Description
+*         ----      ----        -----------
+*         gene      7/1/99     Initial Revision
+***************************************************************/
+
+@method SafBuildAppClass, MSG_SAFBUILD_APP_GENERATE_LOGO_FILE
+{
+    VMBlockHandle blk;
+    VMBlockHandle mapBlock;
+    SafariLogoMapBlock *mapPtr;
+    FileHandle fh;
+    MemHandle mem;
+
+    FilePushDir();
+    /*
+     * create a file in USERDATA\Safari
+     */
+	 FileSetCurrentPath(SP_USER_DATA, "GeoExplorer");
+    fh = VMOpen("Logo", VMAF_FORCE_READ_WRITE, VMO_CREATE_TRUNCATE, TRUE);
+    /* 
+	  * create the map block
+     */
+    mapBlock = VMAlloc(fh, sizeof(SafariMapBlock), 0);
+    VMSetMapBlock(fh, mapBlock);
+    mapPtr = VMLock(fh, mapBlock, &mem);
+    /*
+     * import the bitmaps
+     */
+	/* FileSetCurrentPath(SP_DOCUMENT, "GeoSafari"); */
+	/* blk = SafariImportBitmap("LOGO16.GIF", fh);
+	 mapPtr->SLMB_i16Color = blk; */
+    blk = SafariImportBitmap("ge_splsh.jpg", fh);
+    mapPtr->SLMB_i256color = blk;
+    VMDirty(mem);
+    /*
+     * done with the file
+     */
+    VMUnlock(mem);
+    VMClose(fh, FALSE);
+
+    FilePopDir();
+}

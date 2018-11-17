@@ -1,0 +1,126 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		User Interface
+FILE:		GenRangeChanges
+
+DESCRIPTION:
+
+	$Id: GenRangeChanges,v 1.1.34.1 97/03/29 03:37:21 canavese Exp $
+
+------------------------------------------------------------------------------@
+
+
+The new GenValue functions similarly the GenItemGroup.  For instance:
+
+	* There is no user value.  The GenValue object keeps a GVSF_MODIFIED
+	  flag to see whether the user has modified the value or not.
+
+	* Apply messages are generally only sent out after the user has modified
+	  the value.  To force an apply message after setting the GenValue to
+	  something, send a MSG_GEN_VALUE_SET_MODIFIED_STATE(TRUE) followed by
+	  a MSG_GEN_APPLY.
+
+	* Delayed mode is determined by the dialog box the GenValue is in. To 
+	  get a message sent out on user changes in a delayed mode dialog box,
+	  set the vardata HINT_GEN_VALUE_STATUS_MSG with the appropriate 
+	  message.
+
+	* Indeterminate state is kept as a flag passed to MSG_VALUE_SET_VALUE,
+	  and can also be set/retrieved with the usual messages.
+
+
+A typical .ui change:
+
+	MyRange = GenRange {
+		gadgetAttrs = delayed;
+		value = 10;
+		minimum = 0;
+		maximum = 100;
+		increment = 1;
+		action = MSG_FOO, process
+	}
+
+	changes to:
+
+	MyRange = GenValue {
+		value = 10;
+		minimum = 0;
+		maximum = 100;
+		increment = 1;
+		applyMsg = MSG_FOO;
+		destination = process;
+	}
+
+
+	
+Various changes to make:
+
+MSG_GEN_RANGE_SET_VALUE -> MSG_GEN_VALUE_SET_VALUE
+MSG_GEN_RANGE_GET_VALUE -> MSG_GEN_VALUE_GET_VALUE
+	Instead of a word in cx, the integer portion of the WWFixed value is
+	in dx.    For SET_VALUE, bp is the indeterminate flag and is usually 
+	set to zero.  No other flags are passed in MSG_GEN_VALUE_SET_VALUE.
+
+MSG_GEN_RANGE_SET_MINIMUM -> MSG_GEN_VALUE_SET_MINIMUM
+MSG_GEN_RANGE_SET_MAXIMUM -> MSG_GEN_VALUE_SET_MAXIMUM
+MSG_GEN_RANGE_SET_INCREMENT -> MSG_GEN_VALUE_SET_INCREMENT
+MSG_GEN_RANGE_GET_MINIMUM -> MSG_GEN_VALUE_GET_MINIMUM
+MSG_GEN_RANGE_GET_MAXIMUM -> MSG_GEN_VALUE_GET_MAXIMUM
+MSG_GEN_RANGE_GET_INCREMENT -> MSG_GEN_VALUE_GET_INCREMENT
+	Instead of a word in cx, the integer portion of the WWFixed value is
+	in dx.    
+
+GRV_INDETERMINATE ->
+	Instead of passing GRV_INDETERMINATE in cx to make things
+	indeterminate, bp should be set non-zero when calling MSG_GEN_RANGE_-
+	SET_VALUE.
+	
+gadgetAttrs = sendUserChanges ->
+	ATTR_GEN_VALUE_STATUS_MSG {
+		word MSG_FOO
+	}
+
+gadgetAttrs = defaultAction nextField ->
+	ATTR_GEN_VALUE_NAVIGATE_TO_NEXT_FIELD_ON_RETURN_PRESS
+
+gadgetAttrs = defaultAction applCustom ->
+	ATTR_GEN_VALUE_CUSTOM_RETURN_PRESS {
+		word MSG_FOO (or 0 for no action)
+	}
+	
+gadgetAttrs = sendRedundantChanges ->
+	ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED
+
+distanceFlags = displayUnits bbfixed ->
+	displayFormat = decimal;
+
+distanceFlags = displayUnits points ->
+	displayFormat = points;
+
+	Value is now stored as a WWFixed number of points (generally passed in
+	 dx.cx) rather than a word of points*8 as in the GenRange.  A little
+	 work may need to be done to shift things around when converting
+	 distance ranges over.  
+
+	 MSG_GEN_RANGE_SET_DISTANCE_FLAGS -> MSG_GEN_VALUE_SET_DISPLAY_FORMAT
+	 MSG_GEN_RANGE_GET_DISTANCE_FLAGS -> MSG_GEN_VALUE_GET_DISPLAY_FORMAT
+
+action = MSG_FOO, process ->
+	applyMsg = MSG_FOO;
+	destination = process;
+
+	MSG_GEN_RANGE_GET_ACTION -> MSG_GEN_VALUE_GET_APPLY_MSG
+				    MSG_GEN_VALUE_GET_DESTINATION
+	MSG_GEN_RANGE_SET_ACTION -> MSG_GEN_VALUE_SET_APPLY_MSG
+				    MSG_GEN_VALUE_SET_DESTINATION
+	MSG_GEN_RANGE_SET_ACTION_OD -> MSG_GEN_VALUE_SET_DESTINATION
+	MSG_GEN_RANGE_SET_ACTION_MESSAGE -> MSG_GEN_VALUE_SET_APPLY_MSG
+
+		Register passing will have changed on these.  Consult the
+		appropriate message header.
+
+
+

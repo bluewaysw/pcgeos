@@ -1,0 +1,227 @@
+/***************************************************************************
+ *  FILE:			lay_mtds.goc
+ *  PROJECT:		Breadbox Teacher's Aide
+ *  DESCRIPTION:	This file has methods for layout saving/loading for
+ *                  seating
+ *
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include "taide.goh"
+@include "seating.goh"
+@include "externs.goh"
+
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+@extern method TADocumentClass, MSG_TADOC_SAVE_LAYOUT_SELECTION
+{
+    FileLongName currentFile;
+    if ((GFS_GET_ENTRY_TYPE(entryFlags)==GFSET_FILE) &&
+        (!(entryFlags & GFSEF_NO_ENTRIES)))  {
+        @call SaveLayoutList::MSG_GEN_FILE_SELECTOR_GET_SELECTION(currentFile);
+        @call SaveLayoutText::MSG_VIS_TEXT_REPLACE_ALL_PTR(currentFile, 0) ;
+     }
+}
+
+@extern method TADocumentClass, MSG_TADOC_SAVE_LAYOUT_TRIGGER
+{
+    static GeodeToken fileToken = {{TA_LAYOUT_ICON_TOKEN}, TA_LAYOUT_ICON_MFID};
+    static FileExtAttrDesc multipleChanges[] =
+      {{ FEA_TOKEN, &fileToken, sizeof(GeodeToken), NULL },
+       { FEA_END_OF_LIST, 0, 0, NULL }};
+    FileLongName currentFile;
+    VMFileHandle file ;
+    VMBlockHandle block ;
+    MemHandle mem ;
+    SeatingDeskLayout *p_layout ;
+    optr seating ;
+    word i ;
+
+
+    seating = ConstructOptr(pself->GDI_display, OptrToChunk(@MCSeating)) ;
+
+    @call SaveLayoutText::MSG_VIS_TEXT_GET_ALL_PTR(currentFile) ;
+
+    FilePushDir();
+    FileSetCurrentPath(TA_LAYOUT_SP, TA_LAYOUT_DIR);
+    file = VMOpen(currentFile, VMAF_FORCE_READ_WRITE, VMO_CREATE_ONLY, 0);
+    if (file == NullHandle)  {
+        if (UserStandardDialogOptr(
+                NullHandle,
+				NullHandle,
+				NullHandle,
+				NullHandle,
+				@SeatingTextQuestionOverwriteLayout,
+		        ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			     (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET)))==IC_YES)
+            file = VMOpen(currentFile, VMAF_FORCE_READ_WRITE, VMO_CREATE_TRUNCATE, 0);
+    }
+    if (file)  {
+        block = VMAlloc(file, sizeof(*p_layout), 0) ;
+        p_layout = VMLock(file, block, &mem) ;
+        @call seating::MSG_SEATING_SAVE_LAYOUT(p_layout) ;
+
+        /* Don't store any student labels */
+        for (i=0; i<p_layout->SDL_numDesks; i++)
+            p_layout->SDL_deskArray[i].SDP_label = STUDENT_LABEL_NONE ;
+
+        VMDirty(mem) ;
+        VMUnlock(mem) ;
+        VMSetMapBlock(file, block) ;
+        VMClose(file, FALSE) ;
+
+        FileSetPathExtAttributes(currentFile, FEA_MULTIPLE, multipleChanges, 1) ;
+    }
+
+    FilePopDir();
+
+}
+
+@extern method TADocumentClass, MSG_TADOC_LOAD_LAYOUT_SELECTION
+{
+    if ((GFS_GET_ENTRY_TYPE(entryFlags)==GFSET_FILE) &&
+        (!(entryFlags & GFSEF_NO_ENTRIES)))
+        @call LoadLayoutTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+    else
+        @call LoadLayoutTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+}
+
+@extern method TADocumentClass, MSG_TADOC_LOAD_LAYOUT_TRIGGER
+{
+    FileLongName currentFile;
+    optr seating ;
+    VMFileHandle file ;
+    VMBlockHandle block ;
+    MemHandle mem ;
+    SeatingDeskLayout *p_layout ;
+    word numDesks ;
+
+
+    seating = ConstructOptr(pself->GDI_display, OptrToChunk(@MCSeating)) ;
+    numDesks = @call seating::MSG_SEATING_GET_NUM_DESKS() ;
+
+    @call LoadLayoutList::MSG_GEN_FILE_SELECTOR_GET_SELECTION(&currentFile);
+
+    if ((numDesks == 0) || (UserStandardDialogOptr(
+            NullHandle,
+			NullHandle,
+			NullHandle,
+			NullHandle,
+			@SeatingTextQuestionLoadLayout,
+		    ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			 (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET)))==IC_YES))  {
+        FilePushDir();
+	   FileSetCurrentPath(TA_LAYOUT_SP, TA_LAYOUT_DIR);
+        file = VMOpen(currentFile, VMAF_FORCE_READ_ONLY, VMO_OPEN, 0);
+        if (file)  {
+            block = VMGetMapBlock(file) ;
+            p_layout = VMLock(file, block, &mem) ;
+            if (mem)  {
+                @call seating::MSG_SEATING_LOAD_LAYOUT(p_layout) ;
+                VMUnlock(mem) ;
+            }
+            VMClose(file, FALSE) ;
+        }
+        FilePopDir();
+    }
+}
+
+
+@extern method TADocumentClass, MSG_TADOC_AUTO_LAYOUT_ORDERED
+{
+    word i, num ;
+    dword count ;
+    optr seating ;
+    BasicDBRecordID recordID ;
+    word desks[SEATING_MAX_DESKS] ;
+
+    seating = ConstructOptr(pself->GDI_display, OptrToChunk(@MCSeating)) ;
+    num = @call seating::MSG_SEATING_GET_SORTED_DESK_LIST(desks, SEATING_MAX_DESKS) ;
+
+    count = 0 ;
+    BasicDBIndexGetCount(pself->GDI_fileHandle,
+					pself->TADI_stuDBHan,
+					pself->TADI_curStuIndex,
+					&count) ;
+    if (num > count)
+        num = count ;
+    for (i=0; i<num; i++)  {
+        recordID = 0 ;
+	   BasicDBGetRecordIDByIndex(pself->GDI_fileHandle,
+						    pself->TADI_curStuIndex,
+						    i,
+						    &recordID) ;
+        @call seating::MSG_SEATING_LABEL_DESK(desks[i], recordID) ;
+    }
+}
+
+word MyRandom(void)
+{
+    static word rand1 = 0xf32d ;
+    static word rand2 = 0x0103 ;
+    static word rand3 = 0x4326 ;
+    static word rand4 = 0x4878 ;
+    word old ;
+
+    old = rand1 ;
+    rand1 = rand2 ;
+    rand2 = rand3 ;
+    rand3 = rand4 ;
+    rand4 ^= old^rand1^rand2^rand3 ;
+    rand3 += rand1+rand2+rand4 ;
+    rand4 += TimerGetCount() ;
+
+    return old ;
+}
+
+@extern method TADocumentClass, MSG_TADOC_AUTO_LAYOUT_RANDOM
+{
+    word i, num ;
+    dword count ;
+    optr seating ;
+    BasicDBRecordID recordID ;
+    word desks[SEATING_MAX_DESKS] ;
+    word p, v ;
+
+    seating = ConstructOptr(pself->GDI_display, OptrToChunk(@MCSeating)) ;
+    num = @call seating::MSG_SEATING_GET_NUM_DESKS() ;
+
+    count = 0 ;
+    BasicDBIndexGetCount(pself->GDI_fileHandle,
+					pself->TADI_stuDBHan,
+					pself->TADI_curStuIndex,
+					&count) ;
+
+    /* Now randomly swap around to randomly order them */
+    for (i=0; i<num; i++)
+        desks[i] = i ;
+
+    for (i=0; i<num; i++)  {
+        p = MyRandom()%num ;
+        v = desks[i] ;
+        desks[i] = desks[p] ;
+        desks[p] = v ;
+    }
+
+    if (num > count)
+        num = count ;
+
+    for (i=0; i<num; i++)  {
+        recordID = 0 ;
+	   BasicDBGetRecordIDByIndex(pself->GDI_fileHandle,
+						    pself->TADI_curStuIndex,
+						    i,
+						    &recordID) ;
+        @call seating::MSG_SEATING_LABEL_DESK(desks[i], recordID) ;
+    }
+}

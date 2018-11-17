@@ -1,0 +1,1482 @@
+/*----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1990 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		TEdit
+FILE:		tedit.goc
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	tony	7/91		Initial version
+
+TESCRIPTION:
+	This file source code for the TEdit application. This code will
+	be assembled by ESP, and then linked by the GLUE linker to produce
+	a runnable .geo application file.
+
+IMPORTANT NOTE:
+	This sample application is primarily intended to demonstrate a
+	model for handling documents.  Basic parts of a PC/GEOS application
+	are not documented heavily here.  See the "Hello" sample application
+	for more detailed documentation on the standard parts of a PC/GEOS
+	application.
+
+
+-----------------------------------------------------------------------------*/
+
+/*-----------------------------------------------------------------------------
+;			Include files
+;----------------------------------------------------------------------------*/
+
+@include "ctedit.goh"
+
+/* ----------------------------------------------------------------------------
+	Class Declarations
+-----------------------------------------------------------------------------*/
+
+@classdecl  TEProcessClass, neverSaved;
+@classdecl  TELargeTextClass;
+@classdecl  TEDocumentClass;
+
+/* ----------------------------------------------------------------------------
+	Globals
+-----------------------------------------------------------------------------*/
+
+word g_defaultPointSize = 0;
+
+@extern object TEView;
+@extern object TEContent;
+@extern object TETextEdit;
+
+@extern chunk FileReadErrorString;
+@extern chunk FileTooBigString;
+@extern chunk CharactersFilteredString;
+@extern chunk FileWriteErrorString;
+@extern chunk nonDosCharsString;
+
+/*-----------------------------------------------------------------------------
+;		Code for TEProcessClass
+;----------------------------------------------------------------------------
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GEN_PROCESS_OPEN_APPLICATION
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Open the TextEdit application
+
+PASS:		AppAttachFlags		attachFlags
+			MemHandle		launchBlock
+			MemHandle 		extraState
+
+RETURN:		Nothing
+
+REVISION HISTORY:
+	Name	Date			Description
+	----	----			-----------
+	Don	1/5/90		Initial version
+	jfh	10/13/04		port to GOC
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@method TEProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+ GeodeHandle	gh;
+ Boolean			initError;
+
+
+	/* Call our superclass */
+	@callsuper();
+
+	/* Add process to point-size notification */
+	gh = GeodeGetProcessHandle();
+	@call GeodeGetAppObject(0)::MSG_META_GCN_LIST_ADD (HandleToOptr(gh),
+					GAGCNLT_APP_TARGET_NOTIFY_TEXT_CHAR_ATTR_CHANGE,
+					MANUFACTURER_ID_GEOWORKS);
+
+	/* XXX Set the default point size, unless we are restoring from state
+	;
+	pop	cx
+	;
+	; even if restoring from state, set point size if none set yet.
+	; GWNT_TEXT_CHAR_ATTR_CHANGE will come in and overwrite our value,
+	; if it wants - brianc 5/3/94
+	; 
+	tst	ds:[defaultPointSize]
+	jz	setPointSize
+	test	cx, mask AAF_RESTORING_FROM_STATE
+	jnz	exit
+setPointSize:
+	call	UserGetDefaultMonikerFont	; default point size => DX
+	mov	ax, 9
+	cmp	dx, 10
+	jle	storePointSize
+	mov	ax, 12
+	cmp	dx, 13
+	jle	storePointSize
+	mov	ax, 14
+storePointSize:
+	mov	ds:[defaultPointSize], ax
+exit:
+	.leave
+	ret */
+
+	if (!g_defaultPointSize) {
+		initError = InitFileReadInteger("ui", "fontsize", &g_defaultPointSize);
+		if (initError) g_defaultPointSize = 12;
+		}
+
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GEN_PROCESS_CLOSE_APPLICATION
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Close the TextEdit application
+
+PASS:		Nothing
+
+RETURN:		Handle of extra block to save to state
+
+REVISION HISTORY:
+	Name	Date			Description
+	----	----			-----------
+	Don	1/5/90		Initial version
+	jfh	10/13/04		port to GOC
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@method TEProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+ GeodeHandle	gh;
+
+
+	/* Remove process from point-size notification */
+	gh = GeodeGetProcessHandle();
+	@call GeodeGetAppObject(0)::MSG_META_GCN_LIST_REMOVE (HandleToOptr(gh),
+					GAGCNLT_APP_TARGET_NOTIFY_TEXT_CHAR_ATTR_CHANGE,
+					MANUFACTURER_ID_GEOWORKS);
+
+	return(0);
+
+}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_META_NOTIFY_WITH_DATA_BLOCK
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Notify the process that some change has occurred on a GCN list.
+
+PASS:		ManufacturerID manufID,
+		  word	notificationType
+		  MemHandle data
+
+RETURN:		Nothing
+
+REVISION HISTORY:
+	Name	Date			Description
+	----	----			-----------
+	Don	11/ 1/92		Initial version
+	jfh	10/13/04		port to GOC
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@method TEProcessClass, MSG_META_NOTIFY_WITH_DATA_BLOCK
+{
+ VisTextNotifyCharAttrChange	*attrs;
+
+
+	/* See if this is one we are interested in */
+	if (data &&
+			manufID == MANUFACTURER_ID_GEOWORKS &&
+			notificationType == GWNT_TEXT_CHAR_ATTR_CHANGE) {
+
+		/* Grab the passed point size, and store it */
+		attrs = MemLock(data);
+		g_defaultPointSize = attrs->VTNCAC_charAttr.VTCA_pointSize.WBF_int;
+		MemUnlock(data);
+		}
+
+	@callsuper();
+
+}
+
+/*----------------------------------------------------------------------
+
+MESSAGE:	MSG_META_TEXT_USER_MODIFIED for TEProcessClass
+
+DESCRIPTION:	Notification that the user has modified the text
+
+PASS:
+		obj = text object modified
+
+RETURN:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	9/10/92		Initial version
+	jfh	10/20/04		port to GOC
+
+----------------------------------------------------------------------------*/
+@method TEProcessClass, MSG_META_TEXT_USER_MODIFIED
+{
+ EventHandle	event;
+
+	/* sending a MSG_GEN_DOCUMENT_MARK_DIRTY to the MODEL does not
+		always work since the MODEL might not be updated yet.  Instead,
+		we want to send to the document associated with this text
+		object  */
+	event = @record GenDocumentClass::MSG_GEN_DOCUMENT_MARK_DIRTY();
+
+	/* Dispatch the classed event. */
+	@send obj::MSG_META_SEND_CLASSED_EVENT(event, TO_OBJ_BLOCK_OUTPUT);
+
+
+}
+
+/*-----------------------------------------------------------------------------
+;		Code for TEDocumentClass
+;----------------------------------------------------------------------------
+
+/*----------------------------------------------------------------------
+
+MESSAGE:	MSG_META_ATTACH for TEDocumentClass
+
+DESCRIPTION:	...
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	1/27/93		Initial version
+	jfh	10/13/04		port to GOC
+
+-----------------------------------------------------------------------------*/
+/*@method TEDocumentClass, MSG_META_ATTACH
+{
+ VMFileHandle	vmfh;
+
+	/* Set up the VM file (so that we always have it) */
+/*	vmfh = ClipboardGetClipboardFile();
+	@send GeodeGetOptrNS(@TETextEdit)::MSG_VIS_TEXT_SET_VM_FILE(vmfh);
+
+   @callsuper();
+
+}
+
+/*----------------------------------------------------------------------
+MESSAGE:	MSG_GEN_DOCUMENT_CREATE_UI_FOR_DOCUMENT for TEDocumentClass
+
+DESCRIPTION:	Create the UI used to display the document (the text object)
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	9/ 8/92		Initial version
+	jfh	10/19/04		port to GOC
+
+-----------------------------------------------------------------------------*/
+@method TEDocumentClass, MSG_GEN_DOCUMENT_CREATE_UI_FOR_DOCUMENT
+{
+ VMFileHandle	vmfh;
+ optr				textObj;
+
+
+	@callsuper();
+
+	/* get the optr of the text object */
+	textObj = ConstructOptr(pself->GDI_display, OptrToChunk(@TETextEdit));
+
+	/* We need a VM file -- use the clipboard  */
+	vmfh = ClipboardGetClipboardFile();
+
+	/* Make the text object large */
+	@send textObj::MSG_VIS_TEXT_SET_VM_FILE(vmfh);
+	@send textObj::MSG_VIS_LARGE_TEXT_CREATE_DATA_STRUCTURES();
+	@send textObj::MSG_VIS_NOTIFY_GEOMETRY_VALID();
+	/* try this from banker */
+/*	@call textObj::MSG_VIS_TEXT_CREATE_STORAGE(
+		   VTSF_MULTIPLE_CHAR_ATTRS | VTSF_MULTIPLE_PARA_ATTRS,
+			    FALSE);
+
+	/* and read in the file */
+	ReadDataFromFile(pself->GDI_fileHandle, pself->GDI_fileName, textObj);
+
+
+}
+
+/*----------------------------------------------------------------------
+MESSAGE:	MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT for TEDocumentClass
+
+DESCRIPTION:	Attach the UI used to display the document (the text object)
+		into the visual tree
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	9/ 8/92		Initial version
+	jfh	10/19/04		port to GOC
+
+-----------------------------------------------------------------------------*/
+@method TEDocumentClass, MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT
+{
+// VMFileHandle	vmfh;
+ optr				textObj;
+
+
+	@callsuper();
+
+	/* get the optr of the text object */
+	textObj = ConstructOptr(pself->GDI_display, OptrToChunk(@TETextEdit));
+
+   /* XXX this doesn't help with kbd shortcuts or font size */
+	@send oself::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	@send oself::MSG_GEN_SET_ATTRS(GA_TARGETABLE | GA_KBD_SEARCH_PATH, 0);
+	@send oself::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+
+	/* add the object as a child */
+	@send oself::MSG_VIS_ADD_CHILD(textObj, 0);
+
+	/* We need a VM file -- use the clipboard  */
+//	vmfh = ClipboardGetClipboardFile();
+//	@send textObj::MSG_VIS_TEXT_SET_VM_FILE(vmfh);
+
+	@send textObj::MSG_META_GRAB_TARGET_EXCL();
+	@send textObj::MSG_META_GRAB_FOCUS_EXCL();
+
+}
+
+/*----------------------------------------------------------------------
+MESSAGE:	MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT for TEDocumentClass
+
+DESCRIPTION:	Detach the UI for the document from the visual world
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	9/ 3/92		Initial version
+	jfh	10/19/04		port to GOC
+
+-----------------------------------------------------------------------------*/
+@method TEDocumentClass, MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT
+{
+ optr		textObj;
+
+
+	/* get the optr of the text object */
+	textObj = ConstructOptr(pself->GDI_display, OptrToChunk(@TETextEdit));
+
+	/* remove it as a child */
+	@send textObj::MSG_VIS_REMOVE(VUM_NOW);
+
+	@callsuper();
+
+}
+
+/*----------------------------------------------------------------------
+MESSAGE:	MSG_GEN_DOCUMENT_DESTROY_UI_FOR_DOCUMENT for TEDocumentClass
+
+DESCRIPTION:	Destroy the UI for the document
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	9/ 3/92		Initial version
+	jfh	10/19/04		port to GOC
+
+-----------------------------------------------------------------------------*/
+@method TEDocumentClass, MSG_GEN_DOCUMENT_DESTROY_UI_FOR_DOCUMENT
+{
+ optr		textObj;
+
+
+	/* get the optr of the text object */
+	textObj = ConstructOptr(pself->GDI_display, OptrToChunk(@TETextEdit));
+
+	@send textObj::MSG_VIS_TEXT_FREE_ALL_STORAGE(TRUE);
+
+	@callsuper();
+
+}
+
+/*----------------------------------------------------------------------
+MESSAGE:	MSG_GEN_DOCUMENT_FILE_CHANGED_REINITIALIZE_CREATED_UI
+						for TEDocumentClass
+
+DESCRIPTION:	Revert
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	12/ 9/92		Initial version
+	jfh	10/19/04		port to GOC
+
+-----------------------------------------------------------------------------*/
+@method TEDocumentClass, MSG_GEN_DOCUMENT_FILE_CHANGED_REINITIALIZE_CREATED_UI
+{
+ optr		textObj;
+
+
+	/* get the optr of the text object */
+	textObj = ConstructOptr(pself->GDI_display, OptrToChunk(@TETextEdit));
+
+	/* Read in the file */
+	ReadDataFromFile(pself->GDI_fileHandle, pself->GDI_fileName, textObj);
+
+}
+
+/*----------------------------------------------------------------------
+
+MESSAGE:	MSG_GEN_DOCUMENT_PHYSICAL_SAVE for TEDocumentClass
+
+DESCRIPTION:	...
+
+PASS:
+   word *	error);
+
+RETURN:
+	true - if error occurs
+	word *	error); 		- Error code from FileError type
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	7/30/92		Initial version
+	jfh	10/20/04		port to GOC
+
+----------------------------------------------------------------------------*/
+@method TEDocumentClass, MSG_GEN_DOCUMENT_PHYSICAL_SAVE
+{
+ word				errCode;
+ Boolean			writeErr;
+ optr				textObj;
+
+
+	/* this method is called on creating a new doc so we'll check
+		for this and not try to write to file if so. */
+	if (pself->GDI_operation == GDO_NEW)  return(FALSE);
+
+	/* get the optr of the text object */
+	textObj = ConstructOptr(pself->GDI_display, OptrToChunk(@TETextEdit));
+
+	/* Save the data in the file */
+	writeErr = WriteDataToFile (pself->GDI_fileHandle, pself->GDI_fileName,
+								&errCode, textObj);
+
+	/* return the error code */
+	*error = errCode;
+	return(writeErr);
+
+}
+
+/*----------------------------------------------------------------------
+
+MESSAGE:	MSG_GEN_DOCUMENT_PHYSICAL_SAVE_AS_FILE_HANDLE
+						for TEDocumentClass
+
+TESCRIPTION:	Write the document data to a new file handle
+
+PASS:
+			word *		error,
+			FileHandle		file);
+RETURN:
+		true - if error occurs
+		word *	error); 		- Error code from FileError type
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	8/25/92		Initial version
+	jfh	10/20/04		port to GOC
+
+----------------------------------------------------------------------------*/
+@method TEDocumentClass, MSG_GEN_DOCUMENT_PHYSICAL_SAVE_AS_FILE_HANDLE
+{
+ word				errCode;
+ Boolean			writeErr;
+ optr				textObj;
+
+
+	/* get the optr of the text object */
+	textObj = ConstructOptr(pself->GDI_display, OptrToChunk(@TETextEdit));
+
+	/* Save the data in the new file */
+	writeErr = WriteDataToFile (file, pself->GDI_fileName, &errCode, textObj);
+
+	/* return the error code */
+	*error = errCode;
+	return(writeErr);
+
+}
+
+/*----------------------------------------------------------------------
+
+FUNCTION:	WriteDataToFile
+
+TESCRIPTION:	Write the data to the document file
+
+CALLED BY:	INTERNAL
+
+PASS:
+	FileHandle fileHandle, FileLongName fileName,
+							  word *errCode, optr textObj
+
+RETURN:
+	True if error
+	word *errCode - error code
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	8/25/92		Initial version
+	dloft	4/25/93		added bufferHandle checks
+	jfh	10/21/04		port to GOC
+----------------------------------------------------------------------------*/
+Boolean WriteDataToFile (FileHandle fileHandle, FileLongName fileName,
+							  word *errCode, optr textObj)
+{
+ word				fileErr, charsPulled, written;
+ Boolean			retVal = FALSE;
+ VisTextRange  range;
+ MemHandle		textMH;
+ char				*buffer;
+ Boolean			keepWriting = TRUE;
+ TextReference reference;
+ dword			getStart, getEnd, charsLeft;
+ Boolean			lastBlock = FALSE;
+
+
+	/* zero out the existing file before we write back to it */
+	fileErr = FileTruncate(fileHandle, 0, FALSE);
+	if (fileErr) {
+		NotifyDBox (fileName, @FileWriteErrorString);
+		*errCode = fileErr;
+		return(TRUE);
+		}
+
+	/* get text size (need to initialize range as below) */
+	range.VTR_start = 0;
+	range.VTR_end = TEXT_ADDRESS_PAST_END;
+	@call textObj::MSG_VIS_TEXT_GET_RANGE(&range, 0);
+
+	/* allocate a buffer to read into */
+	textMH = MemAlloc(READ_WRITE_BLOCK_SIZE, HF_SWAPABLE, 0);
+	buffer = MemLock(textMH);
+
+	while (keepWriting) {
+		/* get a chunk of text - if there is any left */
+		if (range.VTR_end == range.VTR_start) {
+			/* we're done */
+			keepWriting = FALSE;
+			break;
+         }
+
+		/* set the start and end to read from the text obj.  Use 1/2
+			block size to allow for CR-LF expansion */
+		getStart = range.VTR_start;
+		charsLeft = range.VTR_end - range.VTR_start;
+		if (charsLeft > READ_WRITE_BLOCK_SIZE/2)
+			charsLeft = READ_WRITE_BLOCK_SIZE/2;
+		else  lastBlock = TRUE;
+		getEnd = getStart + charsLeft;
+		range.VTR_start = getEnd;
+
+		/* init the TextReference to point to our buffer */
+		reference.TR_type = TRT_POINTER;
+		reference.TR_ref.TRU_pointer.TRP_pointer = buffer;
+		/* and get the next chunk of text */
+		charsPulled = @call textObj::MSG_VIS_TEXT_GET_TEXT_RANGE(0, reference,
+						getEnd, getStart);
+
+		ConvertBufferToDos(buffer, &charsPulled, lastBlock);
+
+		written = FileWrite(fileHandle, buffer, charsPulled, FALSE);
+		/* write error check */
+		if (written != charsPulled) {
+			*errCode = ThreadGetError();
+			NotifyDBox (fileName, @FileWriteErrorString);
+			retVal = TRUE;
+			keepWriting = FALSE;
+			break;
+			}
+
+	} /* end of keepWriting while loop */
+
+	/* and clean up */
+	@send textObj::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+	if (textMH)  MemFree(textMH);
+	FileCommit(fileHandle, FALSE);
+
+	return(retVal);
+
+}
+
+/*----------------------------------------------------------------------
+
+FUNCTION:	ConvertBufferToDos
+
+DESCRIPTION:	Convert a buffer from GEOS to DOS
+
+PASS:
+	char *buf, word *size, Boolean lastBlock
+
+RETURN:
+	word *size - new size
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	9/ 8/92		Initial version
+	jfh	10/21/04		port to GOC
+
+----------------------------------------------------------------------------*/
+void ConvertBufferToDos(char *buf, word *size, Boolean lastBlock)
+{
+ word		numChars, i, j;
+
+
+	numChars = *size;
+
+	/* convert to the DOS character set, replacing all unknown characters
+		with '_' (this should never happen) */
+	LocalGeosToDos(buf, numChars, '_');
+
+	/* move the data to the end of the block */
+	j = READ_WRITE_BLOCK_SIZE/2;
+	for (i = 0; i < numChars; i++) {
+		buf[j] = buf[i];
+		j++;
+		}
+
+	/* now copy the chars back to the front expanding LFs to CRs */
+	j = 0;
+	for (i = READ_WRITE_BLOCK_SIZE/2; i < READ_WRITE_BLOCK_SIZE/2 + numChars; i++) {
+		buf[j] = buf[i];
+		if (buf[i] == C_CR) {
+			j++;
+			buf[j] = C_LF;
+			}
+      j++;
+		}
+
+	/* if this is the last block make sure that it ends in a CR-LF  */
+	if (lastBlock) {
+		if (buf[j-1] != C_LF) {
+			buf[j] = C_CR;
+			j++;
+			buf[j] = C_LF;
+			j++;
+         }
+		}
+
+	/* return new size  */
+	*size = j;
+
+}
+
+/*----------------------------------------------------------------------
+
+FUNCTION:	ReadDataFromFile
+
+DESCRIPTION:	Read the data from the document file
+
+CALLED BY:	INTERNAL
+
+PASS:  
+	FileHandle fileHandle, FileLongName fileName, optr textObj
+
+RETURN:
+	none
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	9/ 8/92		Initial version
+	jfh	10/19/04		port to GOC
+
+----------------------------------------------------------------------------*/
+void ReadDataFromFile (FileHandle fileHandle, FileLongName fileName, optr textObj)
+{
+ MemHandle		textMH;
+ char				*buffer;
+ word				charsRead, charsConv;
+ Boolean			textChanged = FALSE;
+ Boolean			keepReading = TRUE;
+ dword			readSize = 0;
+ dword			textSize;
+ WWFixed			pSize;
+
+
+	/* get the file and position at the beginning of it  */
+	FilePos(fileHandle, 0, FILE_POS_START);
+
+	/* do some housekeeping */
+	@send process::MSG_GEN_PROCESS_UNDO_IGNORE_ACTIONS(TRUE);
+	@send textObj::MSG_META_SUSPEND();
+	@send textObj::MSG_VIS_TEXT_DELETE_ALL();
+
+	/* allocate a buffer to read into */
+	textMH = MemAlloc(READ_WRITE_BLOCK_SIZE, HF_SWAPABLE, 0);
+	buffer = MemLock(textMH);
+
+	/* Read in the data from the document.  If FileRead returns -1 there was
+		an error.  If it returns less than READ_WRITE_BLOCK_SIZE then we're
+		done reading. */
+	while (keepReading) {
+		charsRead = FileRead(fileHandle, buffer, READ_WRITE_BLOCK_SIZE, FALSE);
+		if (charsRead == 0xffff) {
+			keepReading = FALSE;
+			NotifyDBox (fileName, @FileReadErrorString);
+			break;
+			}
+		else if (charsRead == 0) {
+			/* nothing to read - maybe a new file? */
+			keepReading = FALSE;
+			break;
+			}
+		else {
+			/* convert the DOS text to GEOS */
+			charsConv = charsRead;
+			textChanged = ConvertBufferToGeos(buffer, &charsConv);
+
+			readSize += charsConv;
+
+			/* append the data to the text object */
+			if (charsConv)
+				/* we can't send this with charsConv = 0 since that
+            	signifies a null term'd string - and we don't want that */
+				@send textObj::MSG_VIS_TEXT_APPEND_BLOCK(textMH, charsConv);
+
+			/* see if the text obj took all our text */
+			textSize = @call textObj::MSG_VIS_TEXT_GET_TEXT_SIZE();
+			if (readSize != textSize)  {
+				NotifyDBox (fileName, @FileTooBigString);
+				keepReading = FALSE;
+				break;
+				}
+
+			/* are we done reading? */
+			if (charsRead < READ_WRITE_BLOCK_SIZE) keepReading = FALSE;
+         }  /* end of good read if */
+
+		}  /* end of keepReading while */
+
+	if (textChanged)
+		/* tell the user we changed the text */
+		NotifyDBox (fileName, @CharactersFilteredString);
+
+	MemFree(textMH);
+	@send textObj::MSG_VIS_TEXT_SELECT_START();
+
+	/* Change to the default point size  */
+	@send textObj::MSG_VIS_TEXT_SET_USER_MODIFIED();
+	pSize.WWF_frac = 0;
+	pSize.WWF_int = g_defaultPointSize;
+	@send textObj::MSG_VIS_TEXT_SET_POINT_SIZE(pSize, TEXT_ADDRESS_PAST_END, 0);
+	/* clear modified bit, so actual changes later will enable SAVE trigger */
+	@send textObj::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+
+	/* houskeeping */
+	@send textObj::MSG_META_UNSUSPEND();
+	@send process::MSG_GEN_PROCESS_UNDO_ACCEPT_ACTIONS();
+
+}
+
+/*----------------------------------------------------------------------
+
+FUNCTION:	ConvertBufferToGeos
+
+DESCRIPTION:	Convert a buffer from DOS to GEOS
+
+CALLED BY:	INTERNAL
+
+PASS:
+	char *buf, word size
+
+RETURN:
+	word size -- the new size
+	TRUE if buffer was changed (control characters removed)
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	9/ 8/92		Initial version
+	jfh	10/19/04		port to GOC
+
+----------------------------------------------------------------------------*/
+Boolean ConvertBufferToGeos(char *buf, word *size)
+{
+ Boolean		changed = FALSE;
+ word			i, j, numChars;
+
+
+	numChars = *size;
+
+	/* convert to the GEOS character set, replacing all unknown characters
+		with C_CTRL_A (which we'll blow out in the next step  */
+	LocalDosToGeos(buf, numChars, C_CTRL_A);
+
+	/* now we'll exclude all but a few of the control characters (< ' ').
+		If we do encounter one that we blow out we'll set the return
+		to TRUE.  */
+	j = 0;
+   for (i = 0; i < numChars; i++) {
+		/* check for the EOF marker special case */
+		if (buf[i] == C_CTRL_Z && i == numChars - 1)
+			break;
+		/* check for ctrl chars we'll keep */
+		else if (buf[i] == /*C_PAGE_BREAK*/C_CTRL_L ||
+					buf[i] == C_TAB ||
+					buf[i] == C_CR) {
+			buf[j] = buf[i];
+			j++;
+			}
+		/* check for ctrl chars we ignore without telling the user */
+		else if (buf[i] == C_LF) {
+			/* don't increment j */
+			}
+		/* the ctrl chars we skip and tell user */
+		else if (buf[i] < ' ') {
+			changed = TRUE;
+			}
+		/* everything else */
+		else {
+			buf[j] = buf[i];
+			j++;
+			}
+		}  /* end of ctrl char check for loop */
+
+	/* return new size  */
+	*size = j;
+
+	return(changed);
+
+}
+
+/*----------------------------------------------------------------------
+
+MESSAGE:	MSG_VIS_TEXT_SET_POINT_SIZE for TEDocumentClass
+
+DESCRIPTION:	Set the point size
+
+PASS:
+	WWFixed 		pointSize,
+        dword 		rangeEnd,
+		  dword 		rangeStart)
+
+RETURN:
+
+REVISION HISTORY:
+	Name	Date			Description
+	----	----			-----------
+	Tony	12/18/92		Initial version
+	jfh	10/22/04    port to GOC
+----------------------------------------------------------------------------*/
+@method TEDocumentClass, MSG_VIS_TEXT_SET_POINT_SIZE
+{
+ optr			textObj;
+ Boolean		modState;
+
+
+	/* get the optr of the text object */
+	textObj = ConstructOptr(pself->GDI_display, OptrToChunk(@TETextEdit));
+
+	/* get the user modified state of text object, then mark it as user
+		modified so that we don't bogusly mark the document as dirty  */
+
+/*	mov	ax, MSG_VIS_TEXT_GET_USER_MODIFIED_STATE
+	call	callTextObject			;cx = user modified state
+	push	cx
+	mov	ax, MSG_VIS_TEXT_SET_USER_MODIFIED
+	call	callTextObject  */
+	modState = @call textObj::MSG_VIS_TEXT_GET_USER_MODIFIED_STATE();
+	@call textObj::MSG_VIS_TEXT_SET_USER_MODIFIED();
+
+/*	mov	ax, MSG_VIS_TEXT_SET_POINT_SIZE
+	mov	dx, size VisTextSetPointSizeParams
+	call	callTextObject  */
+	@call textObj::MSG_VIS_TEXT_SET_POINT_SIZE(pointSize, TEXT_ADDRESS_PAST_END, 0);
+
+/*	pop	cx
+	tst	cx
+	jnz	afterUserModified
+	mov	ax, MSG_VIS_TEXT_SET_NOT_USER_MODIFIED
+	call	callTextObject
+afterUserModified:
+
+	ret */
+	if (!modState)
+		@send textObj::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+
+}
+
+/*@method TELargeTextClass, MSG_VIS_TEXT_SET_POINT_SIZE
+{
+ char		buf[25];
+
+
+	/* just to see what's passed in */
+/*	UtilHex32ToAscii(buf, rangeStart, UHTAF_NULL_TERMINATE);
+	UserStandardDialog(0, 0, 0, buf,
+			  "rangeStart is: \001",
+			  ((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+			  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+
+	UtilHex32ToAscii(buf, rangeEnd, UHTAF_NULL_TERMINATE);
+	UserStandardDialog(0, 0, 0, buf,
+			  "rangeEnd is: \001",
+			  ((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+			  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+
+	UtilHex32ToAscii(buf, (dword)(pointSize.WWF_int), UHTAF_NULL_TERMINATE);
+	UserStandardDialog(0, 0, 0, buf,
+			  "point size is: \001",
+			  ((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+			  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+
+
+	@callsuper();
+
+}
+
+/*----------------------------------------------------------------------
+
+MESSAGE:	 MSG_PRINT_START_PRINTING for TEDocumentClass
+
+DESCRIPTION:	Start printing
+
+PASS:
+	*ds:si - instance data
+	es - segment of TEDocumentClass
+
+	ax - The message
+
+	cx:dx - spool print control
+	bp - gstate
+
+	optr					printCtrlOD,
+	GStateHandle		gstate
+RETURN:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	9/10/92		Initial version
+	JDM	93.02.15	push-/pob-wbf modifications.
+	jfh	10/29/04    port to GOC
+
+----------------------------------------------------------------------------*/
+@method TEDocumentClass, MSG_PRINT_START_PRINTING
+{
+ PCMarginParams		margins;
+ PaperDimensions		pageSize;
+ word                horizMargins, vertMargins;
+ optr						textObj;
+ Boolean					modState;
+ VisTextCharAttrDiffs	diffs;
+ VisTextCharAttr			attrs;
+ FontID	    	    	fontID;
+ WBFixed	    	    	pointSize;
+ TextStyle				textStyles;
+ XYValueAsDWord		oldSize;
+ word						newWidth, newHeight;
+ word						counter, regionNum;
+ VisLargeTextGetRegionPosReturnStruct	regPos;
+
+	/* get the optr of the text object */
+	textObj = ConstructOptr(pself->GDI_display, OptrToChunk(@TETextEdit));
+
+	/*push	ax, cx, dx, bp
+	mov	ax, MSG_GEN_APPLICATION_MARK_BUSY
+	call	UserCallApplication
+	pop	ax, cx, dx, bp */
+	@call GeodeGetAppObject(0)::MSG_GEN_APPLICATION_MARK_BUSY();
+
+	/* Get the margins the printer is using */
+	/*push	bp
+	mov	ax, MSG_PRINT_CONTROL_GET_PRINTER_MARGINS
+	mov	dx, TRUE			; set the margins too
+	call	callSpoolPrintControl		; margins => AX, CX, DX, BP
+	mov	di, bp
+	pop	bp
+	mov	leftMargin, ax
+	mov	topMargin, cx
+	add	dx, ax
+	add	di, cx
+	mov	horizMargins, dx
+	mov	vertMargins, di */
+	@call printCtrlOD::MSG_PRINT_CONTROL_GET_PRINTER_MARGINS(&margins, TRUE);
+	horizMargins = margins.PCMP_left + margins.PCMP_right;
+	vertMargins = margins.PCMP_top + margins.PCMP_bottom;
+
+	/* Get and set the paper size the user has selected */
+	/*push	bp
+	mov	ax, MSG_PRINT_CONTROL_GET_PAPER_SIZE
+	call	callSpoolPrintControl		; paper dimmensions => CX, DX
+	push	cx, dx
+	mov	ax, MSG_PRINT_CONTROL_SET_DOC_SIZE
+	call	callSpoolPrintControl
+	pop	cx, dx
+	pop	bp
+	sub	cx, horizMargins
+	sub	dx, vertMargins
+	mov	newSize.XYS_width, cx
+	mov	newSize.XYS_height, dx */
+	@call printCtrlOD::MSG_PRINT_CONTROL_GET_PAPER_SIZE(&pageSize);
+	@call printCtrlOD::MSG_PRINT_CONTROL_SET_DOC_SIZE(pageSize.PD_widthLow,
+							  (word)pageSize.PD_height);
+	newWidth = pageSize.PD_widthLow - horizMargins;
+	newHeight = (word)pageSize.PD_height - vertMargins;
+
+	/* get the user modified state of text object, then mark it as user
+		modified so that we don't bogusly mark the document as dirty */
+	/*mov	ax, MSG_VIS_TEXT_GET_USER_MODIFIED_STATE
+	call	callTextObject			;cx = user modified state
+	mov	userModified, cx
+	mov	ax, MSG_VIS_TEXT_SET_USER_MODIFIED
+	call	callTextObject  */
+	modState = @call textObj::MSG_VIS_TEXT_GET_USER_MODIFIED_STATE();
+	@call textObj::MSG_VIS_TEXT_SET_USER_MODIFIED();
+
+	/* change the font and point size to MONO 12  */
+	/*mov	ax, MSG_META_SUSPEND
+	call	callTextObject */
+	@send textObj::MSG_META_SUSPEND();
+
+	/*lea	ax, charAttr
+	movdw	getParams.VTGAP_attr, ssax
+	lea	ax, diffs
+	movdw	getParams.VTGAP_return, ssax
+	clr	getParams.VTGAP_flags
+	mov	ax, MSG_VIS_TEXT_GET_CHAR_ATTR
+	lea	bx, getParams
+	mov	dx, size getParams
+	call	callTextObject */
+	@call textObj::MSG_VIS_TEXT_GET_CHAR_ATTR(0, &diffs, &attrs,
+												TEXT_ADDRESS_PAST_END, 0);
+
+	/*push	charAttr.VTCA_fontID
+	mov	al, charAttr.VTCA_textStyles
+	push	ax				; save text styles
+	pushwbf	charAttr.VTCA_pointSize, ax */
+	fontID = attrs.VTCA_fontID;
+	textStyles = attrs.VTCA_textStyles;
+	pointSize = attrs.VTCA_pointSize;
+
+	/*mov	charAttr.VTCA_fontID, FID_DTC_URW_MONO
+	mov	charAttr.VTCA_pointSize.WBF_int, 12
+	mov	charAttr.VTCA_pointSize.WBF_frac, 0
+
+	lea	ax, charAttr
+	movdw	setParams.VTSCAP_charAttr, ssax
+	mov	ax, MSG_VIS_TEXT_SET_CHAR_ATTR
+	lea	bx, setParams
+	mov	dx, size setParams
+	call	callTextObject */
+	attrs.VTCA_fontID = FID_DTC_URW_MONO;
+	attrs.VTCA_pointSize.WBF_int = 12;
+	attrs.VTCA_pointSize.WBF_frac = 0;
+	@call textObj::MSG_VIS_TEXT_SET_CHAR_ATTR(&attrs, TEXT_ADDRESS_PAST_END, 0);
+
+
+	/*popwbf	charAttr.VTCA_pointSize, ax
+	pop	ax				; al <- styles
+	mov	charAttr.VTCA_textStyles, al
+	pop	charAttr.VTCA_fontID
+
+	/* change the page size of the text object */
+	/*mov	ax, MSG_VIS_LARGE_TEXT_GET_DRAFT_REGION_SIZE
+	call	callTextObject
+	mov	oldSize.XYS_width, cx
+	mov	oldSize.XYS_height, dx */
+	oldSize = @call textObj::MSG_VIS_LARGE_TEXT_GET_DRAFT_REGION_SIZE(0);
+
+	/*mov	cx, newSize.XYS_width
+	mov	dx, newSize.XYS_height
+	mov	ax, MSG_VIS_LARGE_TEXT_SET_DRAFT_REGION_SIZE
+	call	callTextObject */
+	@call textObj::MSG_VIS_LARGE_TEXT_SET_DRAFT_REGION_SIZE(newWidth, newHeight);
+
+	/*mov	ax, MSG_META_UNSUSPEND
+	call	callTextObject  */
+	@send textObj::MSG_META_UNSUSPEND();
+
+	/* now loop through printing the regions
+
+	mov	ax, MSG_VIS_LARGE_TEXT_GET_REGION_COUNT
+	call	callTextObject			;cx = count
+	mov	counter, cx
+	clr	regionNum */
+	counter = @call textObj::MSG_VIS_LARGE_TEXT_GET_REGION_COUNT();
+	regionNum = 0;
+
+	/* tell the PrintControl how many pages we have to print
+
+	push	bp
+	mov	dx, cx
+	mov	cx, 1
+	mov	ax, MSG_PRINT_CONTROL_SET_TOTAL_PAGE_RANGE
+	call	callSpoolPrintControl
+	pop	bp  */
+	@call printCtrlOD::MSG_PRINT_CONTROL_SET_TOTAL_PAGE_RANGE(1, counter);
+
+	/* We use the default translation matrix as the text object
+		applies additional transformations to it. Each loop:
+			1) Assume the default transform is correct
+			2) Return to the top of the page
+			3) Re-position for the next page
+			4) Re-initialize the default transformation
+			5) Account for margins
+
+printLoop: */
+	for (regionNum = 0; regionNum < counter; regionNum++) {
+		/*mov	di, gstate
+		call	GrSaveState  */
+		GrSaveState(gstate);
+
+		/* Get this page's position
+
+		mov	ax, MSG_VIS_LARGE_TEXT_GET_REGION_POS
+		mov	cx, regionNum
+		call	callTextObject			;dxax = pos, cx = height
+		pushdw	dxax				;save y pos */
+		@call textObj::MSG_VIS_LARGE_TEXT_GET_REGION_POS(&regPos, regionNum);
+
+		/* Set a clip rectangle so that all of the text in the
+			document will not be drawn into the spool file (for this page)
+
+		mov	dx, cx				;dx = height
+		mov	ax, leftMargin
+		mov	bx, topMargin
+		mov	cx, newSize.XYS_width
+		add	cx, ax
+		add	dx, bx
+		;
+		; adjust bottom of clip rect to fix problem where top pixel of next
+		; line (on next page) appears on this page
+		;
+		mov	si, PCT_REPLACE
+		call	GrSetClipRect */
+		GrSetClipRect(gstate, PCT_REPLACE,
+						  margins.PCMP_left, margins.PCMP_top,
+						  newWidth + margins.PCMP_left,
+						  regPos.VLTGRPRS_height+ margins.PCMP_top);
+
+		/* Translate to the location of the page (including the margins)
+
+		popdw	bxax				;bxax = y pos
+		negdw	bxax
+		add	ax, topMargin
+		adc	bx, 0
+		clr	dx
+		mov	cx, leftMargin			;dxcx = x pos
+		call	GrApplyTranslationDWord
+		call	GrInitDefaultTransform  */
+		GrApplyTranslationDWord(gstate, margins.PCMP_left,
+		               -regPos.VLTGRPRS_yPosition + margins.PCMP_top);
+		GrInitDefaultTransform(gstate);
+
+
+		/* Now actually print
+
+		mov	ax, MSG_VIS_DRAW
+		mov	cl, mask DF_EXPOSED or mask DF_PRINT
+		mov	bx, di				;bx = GState (passed in BP)
+		call	callTextObject */
+		@send textObj::MSG_VIS_DRAW((DF_EXPOSED |DF_PRINT), gstate);
+
+
+		/* Must be present at the end of each page
+
+		mov	di, gstate
+		call	GrRestoreState
+		mov	al, PEC_FORM_FEED
+		call	GrNewPage */
+		GrRestoreState(gstate);
+		GrNewPage(gstate, PEC_FORM_FEED);
+
+		/*inc	regionNum
+		dec	counter
+		LONG jnz printLoop */
+		} /* end of printloop for */
+
+	/* Tell the PrintControl object that we're done
+
+	push	bp
+	mov	ax, MSG_PRINT_CONTROL_PRINTING_COMPLETED
+	call	callSpoolPrintControl
+	pop	bp  */
+	@call printCtrlOD::MSG_PRINT_CONTROL_PRINTING_COMPLETED();
+
+	/*mov	ax, MSG_META_SUSPEND
+	call	callTextObject */
+	@call textObj::MSG_META_SUSPEND();
+
+	/*lea	ax, charAttr
+	movdw	setParams.VTSCAP_charAttr, ssax
+	mov	ax, MSG_VIS_TEXT_SET_CHAR_ATTR
+	lea	bx, setParams
+	mov	dx, size setParams
+	call	callTextObject */
+	attrs.VTCA_fontID = fontID;
+	attrs.VTCA_pointSize = pointSize;
+	@call textObj::MSG_VIS_TEXT_SET_CHAR_ATTR(&attrs, TEXT_ADDRESS_PAST_END, 0);
+
+	/*mov	cx, oldSize.XYS_width
+	mov	dx, oldSize.XYS_height
+	mov	ax, MSG_VIS_LARGE_TEXT_SET_DRAFT_REGION_SIZE
+	call	callTextObject */
+	@call textObj::MSG_VIS_LARGE_TEXT_SET_DRAFT_REGION_SIZE(DWORD_X(oldSize),
+									  DWORD_Y(oldSize));
+
+	/*mov	ax, MSG_META_UNSUSPEND
+	call	callTextObject */
+	@call textObj::MSG_META_UNSUSPEND();
+
+	/*tst	userModified
+	jnz	afterUserModified
+	mov	ax, MSG_VIS_TEXT_SET_NOT_USER_MODIFIED
+	call	callTextObject */
+	if (!modState) @send textObj::MSG_VIS_TEXT_SET_NOT_USER_MODIFIED();
+
+
+/*afterUserModified:
+
+	clr	bx
+	call	GeodeGetAppObject
+	mov	di, mask MF_FORCE_QUEUE
+	mov	ax, MSG_GEN_APPLICATION_MARK_NOT_BUSY
+	call	ObjMessage  */
+	@call GeodeGetAppObject(0)::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+
+
+	/*.leave
+	ret  */
+
+
+}
+
+
+
+/*-----------------------------------------------------------------------------
+;		Code for TELargeTextClass
+;----------------------------------------------------------------------------
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_VIS_TEXT_REPLACE_WITH_TEXT_TRANSFER_FORMAT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Message sent when the text object is pasted to.  This will
+		essentially clean up the incoming text, making sure that all
+		characters are legal dos characters.
+
+PASS:	block - VMBlockHandle
+		file - VMFileHandle
+		pasteFrame - ptr to frame if quick paste, 0 otherwise (word)
+		end, start - range to replace (dwords)
+
+RETURN:	nothing
+
+PSEUDO CODE/STRATEGY:
+	The text from the clipboard come in as a huge array.  Thus, for each
+	block, we lock it down, copy it into a temporary memory block,
+	clean up that block, and have the text object insert that block into
+	itself.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JimG	7/14/94   	Initial version
+	PT	5/26/95		Functions with QuickMove now
+	jfh	10/27/04    port to GOC
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@method TELargeTextClass, MSG_VIS_TEXT_REPLACE_WITH_TEXT_TRANSFER_FORMAT
+{
+ Boolean			replacedChars = FALSE;
+ VisTextReplaceParameters	replace;
+ MemHandle		mh;
+ TextTransferBlockHeader	*tbHeaderPtr;
+ VMBlockHandle		arrayDirectoryBlock;
+ dword				elementsRemaining, arrayIndex, count;
+ word					size, blockSize, i;
+ char					*text, *buffer;
+
+
+	/* Suspend the text object so that the possibly multiple updates
+		will be seen as one update. */
+	@send oself::MSG_META_SUSPEND();
+
+	/* Do common prep work for subclasses of VisText that want to specially
+		handle MSG_VIS_TEXT_REPLACE_WITH_TEXT_TRANSFER_FORMAT do do interesting
+		things when pasting */
+	if (@call oself::MSG_VIS_TEXT_PREP_FOR_QUICK_TRANSFER(block, file,
+						pasteFrame, end, start)) return;
+
+	/* Initialize the replacement parameters.  The first time we do this,
+		we replace the range given in the transfer params.  After that, we
+		set the start to the end. */
+	replace.VTRP_range.VTR_start = start;
+	replace.VTRP_range.VTR_end = end;
+	replace.VTRP_flags = VTRF_USER_MODIFICATION;
+	replace.VTRP_textReference.TR_type = TRT_POINTER;
+
+	/* Lock down the block containing the TextTransferBlockHeader struct */
+	tbHeaderPtr = VMLock(file, block, &mh);
+
+	/* Get VMblock of Huge Array directory block for text data. */
+	arrayDirectoryBlock = (tbHeaderPtr->TTBH_text >> 16);
+	
+	/* Unlock this block.. don't need it anymore.  We don't care about
+		the attribute runs for this application. */
+	VMUnlock(mh);
+	
+	elementsRemaining = HugeArrayGetCount(file, arrayDirectoryBlock);
+
+	/* if there are 0 or 1 elements then just skip the loop.
+		the 1 element would just be a zero byte anyway. */
+	if(elementsRemaining > 1) {
+		elementsRemaining--;
+		arrayIndex = 0;
+
+		while (elementsRemaining) {
+			count = HugeArrayLock(file, arrayDirectoryBlock,
+												 arrayIndex, &text, &size);
+			/* Take minimum of the count after in this array block and of the
+				elements remaining as the number of bytes to copy.  This basically
+				ensures that we don't copy the zero byte at the end of the string
+				since elementsRemaining has been decremented to take care of the
+				zero byte.  */
+			if ((word)count < (word)elementsRemaining)
+				blockSize = (word)count;
+			else blockSize = elementsRemaining;
+
+			/* Allocate and LOCK temporary buffer  */
+			mh = MemAlloc(blockSize, HF_SWAPABLE, 0);
+			buffer = MemLock(mh);
+
+			/* Copy data from the VMblock into our new buffer. */
+			for (i = 0; i < blockSize; i++) {
+            buffer[i] = text[i];
+				}
+
+			HugeArrayUnlock(text);
+
+			replacedChars = TECleanUpNonDosChars(buffer, blockSize);
+
+			/* Load up the replace parameters and do the replace! */
+			replace.VTRP_textReference.TR_ref.TRU_pointer.TRP_pointer = buffer;
+			replace.VTRP_insCount = blockSize;
+			@call oself::MSG_VIS_TEXT_REPLACE_TEXT(&replace);
+	   
+			MemFree(mh);
+		
+			/* Retrieve size of this last replacement. */
+			elementsRemaining -= blockSize;
+			if (elementsRemaining) {
+				arrayIndex += blockSize;
+				/* make start and end the same for next replacements
+					since they both come back pointing to the start of the last
+					replacement, add in the length of the replacement to get the
+					position for the next call. */
+				replace.VTRP_range.VTR_start += blockSize;
+				replace.VTRP_range.VTR_end += blockSize;
+            }
+
+			}  /* end of elementsRemaining while loop */
+
+   	}  /* end of >1 elements if */
+
+	@send oself::MSG_META_UNSUSPEND();
+
+	/* Okay, give the user a notification that they pasted non dos
+		characters into the TFE:  */
+	if (replacedChars)
+		NotifyDBox (0, @nonDosCharsString);
+	
+}
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		TECleanUpNonDosChars
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Makes all characters in buffer DOS compatible characters.
+		Converts some GEOS characters (e.g., smart quotes) to DOS
+		characters, but if other GEOS characters are encountered,
+		they are replaced by an underscore.
+
+CALLED BY:	TELargeTextReplaceWithTextTransferFromat
+PASS:		char *buffer, word size
+
+RETURN:	return 0 if all chars ok
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JimG	7/15/94    	Initial version
+	jfh	10/28/04    port to GOC
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+Boolean TECleanUpNonDosChars(char *buffer, word size)
+{
+ Boolean		replaced = FALSE;
+ word			testChar, i;
+
+
+	for (i = 0; i < size; i++) {
+		testChar = (word)buffer[i];
+      testChar &= 0xff;
+		if (!LocalIsDosChar(testChar)) {
+			/* replace any smart quotes with regular quotes */
+			if (testChar == C_QUOTEDBLLEFT || testChar == C_QUOTEDBLRIGHT)
+				buffer[i] = C_QUOTE;
+			else if (testChar == C_QUOTESNGLEFT || testChar == C_QUOTESNGRIGHT)
+				buffer[i] = C_SNG_QUOTE;
+			else {
+				buffer[i] = C_UNDERSCORE;
+				replaced = TRUE;
+				}
+			} /* end of not a DOS character */
+		else {
+			/* a valid DOS char, but we want to tweak a bit */
+			if (testChar == C_GRAPHIC ||
+					testChar == /*C_SECTION_BREAK*/C_CTRL_K ||
+					testChar == /*C_PAGE_BREAK*/C_CTRL_L) {
+				/* we don't want these in TFE */
+				buffer[i] = C_UNDERSCORE;
+				replaced = TRUE;
+				}
+			}
+		} /* end of character for loop */
+
+	return(replaced);
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	NotifyDBox  (char* string1, optr notifyMsg)
+ *
+ * CALLED BY:
+ *
+ *
+ * STRATEGY:    Puts up selected notification box
+ *
+ *
+ ***********************************************************************/
+void NotifyDBox (char* string1, optr notifyMsg)
+{
+
+	 /* put up a notification box */
+	 MemLock (OptrToHandle(notifyMsg));
+	 UserStandardDialog(0, 0, 0, string1,
+			  LMemDeref(notifyMsg),
+			  ((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+			  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+	 MemUnlock (OptrToHandle(notifyMsg));
+
+}
+

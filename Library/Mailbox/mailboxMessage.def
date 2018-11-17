@@ -1,0 +1,1176 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1994 -- All Rights Reserved
+
+PROJECT:	Clavin
+MODULE:		Message Transmission/Reception
+FILE:		mailboxMessage.def
+
+AUTHOR:		Adam de Boor, Apr 11, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	4/11/94		Initial revision
+
+
+DESCRIPTION:
+	Interface to the Message module.
+		
+GLOBAL FUNCTIONS:
+	MailboxRegisterMessage
+	MailboxChangeBodyFormat
+	
+	MailboxGetBodyFormat
+	MailboxGetBodyRef
+	MailboxDoneWithBody
+	MailboxStealBody
+	MailboxGetMessageFlags
+	MailboxGetSubjectLMem
+	MailboxGetSubjectBlock
+	MailboxAcknowledgeMessageReceipt
+	
+	MailboxGetDestApp
+	MailboxGetStorageType
+	MailboxSetTransAddr
+	MailboxGetTransAddr
+	MailboxGetNumTransAddrs
+	
+	MailboxReportPercentage
+	MailboxGetCancelFlag
+
+	MailboxGetTransData
+
+	$Id: mailboxMessage.def,v 1.1 97/04/05 01:20:03 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+MessageCode	segment	resource
+
+global	MessageCleanup:far
+;	Desc:	Cleanup entry-point routine for DBQs that hold
+;		MailboxMessageDesc structures.
+;
+;	Pass:	bx	= VM file
+;		dxax	= DBGroupAndItem
+;	Return:	nothing
+;
+
+global	MessageCreateQueue:far
+;	Desc:	Allocate a DBQ in the admin file to track messages.
+;
+;	Pass:	dx	= entry-point number of routine to call when a
+;			  new item is added to the queue (DBQ_NO_ADD_ROUTINE
+;			  if none)
+;	Return:	carry set if couldn't allocate
+;		carry clear if queue allocated:
+;			ax	= queue handle
+;
+
+global	MessageCreateMoniker:far
+;	Desc:	Create a moniker for a message and one or more of its addresses
+;		within an lmem block.
+;
+;	Pass:	ds	= locked lmem/object block
+;		dxax	= MailboxMessage
+;		cx	= TalID of addresses to include (ignored if message
+;			  is in the inbox or MMF_PREPARING is set)
+;		bx	= MessageMonikerFlags
+;	Return:	*ds:ax	= gstring moniker
+;
+
+MessageMonikerFlags	record
+    MMF_ALL_VIEW:1		; Set if message needs to indicate its
+				;  transport mechanism, for an outbox message,
+				;  or its destination application, for an
+				;  inbox message. Passed when a control panel
+				;  is displaying all messages in the inbox or
+				;  outbox.
+    MMF_INCLUDE_DUPS:1		; If TID_ADDR_INDEX set in the talID, include
+				;  the address's duplicates as well.
+    MMF_CONNECTING:1		; Set if moniker should indicate we're
+				;  connecting to the indicated address. The
+				;  subject & timestamp of the message are
+				;  irrelevant. MMF_ALL_VIEW, MMF_INCLUDE_DUPS,
+				;  MMF_PREPARING may not be set.
+    MMF_PREPARING:1		; Set if moniker should indicate the message
+				;  is being prepared. The TalID is ignored.
+				;  MMF_ALL_VIEW, MMF_INCLUDE_DUPS, MMF_LOST_-
+				;  CONNECTION, MMF_CONNECTING may not be set.
+    MMF_LOST_CONNECTION:1	; Set if moniker should indicate connection
+				;  was lost to the indicated address. The
+				;  subject & timestamp of the message are
+				;  irrelevant. MMF_ALL_VIEW, MMF_INCLUDE_DUPS,
+				;  MMF_PREPARING, MMF_CONNECTING may not be set.
+    :11
+MessageMonikerFlags	end
+
+global	MessageEnsureSizes:far
+;	Desc:	Make sure the various sizes needed by MessageCreateMoniker
+;		have been determined and return the multiples that routine
+;		will be using for moniker lines, so objects can set their
+;		hints appropriately at startup, rather than resizing as
+;		the moniker is set.
+;
+;	Pass:	nothing
+;	Return:	ax	= line width
+;		bx	= line height
+;
+
+global	MessageAddrEnum:far
+;	Desc:	Enumerate the addresses for a message. Note that nothing
+;		particularly strenuous should be done this way (e.g. no
+;		calling the transport driver in the callback routine), as
+;		we're trying not to do a whole heck of a lot with a message
+;		locked, to avoid synchronization headaches.
+;
+;	Pass:	dxax	= message whose addresses are to be enumerated
+;		bx:di	= vfptr of callback routine:
+;			  Pass:
+;			  	ds:di	= MailboxInternalTransAddr
+;				*ds:si	= address array
+;			  	*ds:bx 	= MailboxMessageDesc
+;				cx, bp, es = callback data
+;			  Return:
+;				carry set if enum should stop:
+;					bx, cx, bp, di, es = return values
+;				carry clear to keep going:
+;					cx, bp, es = data for next callback
+;				callback should call UtilVMDirtyDS if it
+;					dirties the block, as OUAddrEnum will
+;					not do so on its behalf before unlocking
+;					the message
+;		cx, bp, es	= callback data
+;	Return:	carry set if callback returned carry set:
+;			bx, cx, bp, di, es = as returned from callback
+;		carry clear if callback never returned carry set:
+;			bx, cx, bp, di, es = as returned from callback, or as
+;					 passed in if message had no addresses
+;					 (!?)
+;
+
+global	MessageStoreAddress:far
+;	Desc:	Store a single MailboxTransAddr in the MMD_transAddrs array
+;		for a message.
+;
+;	Pass:	*ds:di	= MailboxMessageDesc
+;		es:si	= MailboxTransAddr to add
+;		ax	= value to store in MITA_medium
+;	Return:	carry set on error
+;	Destroyed:	nothing
+;
+
+global	MessageLoadDataDriver:far
+;	Desc:	Attempt to load the storage driver & return its handle +
+;		strategy
+;
+;	Pass:	cxcx	= MailboxMessage
+;	Return:	carry set on error:
+;			ax	= MailboxError
+;		carry clear if ok:
+;			bx	= driver handle
+;			cx	= base mbox-ref size
+;			si	= base app-ref size
+;			dxax	= strategy routine
+;
+
+global	MailboxGetMessageFlags:far
+;
+;	See mailbox.def
+;
+
+global	MailboxDeleteMessage:far
+;
+;	See mailbox.def
+;
+
+global	MailboxRegisterMessage:far
+;
+;	See mailbox.def
+;
+
+global	MailboxGetDestApp:far
+;
+; 	See mailbox.def
+;
+
+global	MailboxGetBodyFormat:far
+global	MailboxGetBodyRef:far
+global	MailboxDoneWithBody:far
+global	MailboxStealBody:far
+global	MailboxGetSubjectBlock:far
+global	MailboxGetSubjectLMem:far
+global	MailboxGetTransData:far
+
+
+global	MessageCheckBodyIntegrity:far
+;	Desc:	Checkthe integrity of the message body.
+;
+;	Pass:	dxax	= MailboxMessage (assumed valid)
+;	Return:	carry set if message body invalid
+;
+
+MessageCode	ends
+
+Resident	segment	resource
+
+global	MessageLock:far
+;	Desc:	Lock down the MailboxMessage passed
+;
+;	Pass:	dxax	= MailboxMessage (DBGroupAndItem)
+;	Return:	*ds:di	= MailboxMessageDesc
+;
+
+global	MessageLockCXDX:far
+;	Desc:	Lock down the MailboxMessage passed
+;
+;	Pass:	cxdx	= MailboxMessage (DBGroupAndItem)
+;	Return:	*ds:di	= MailboxMessageDesc
+;
+
+Resident	ends
+
+C_Mailbox	segment	resource
+
+if	not MAILBOX_PERSISTENT_PROGRESS_BOXES
+global	MAILBOXREPORTPROGRESS:far
+; This is a dummy declaration to shadow the one in mailbox.def.
+;
+endif	; not MAILBOX_PERSISTENT_PROGRESS_BOXES
+
+C_Mailbox	ends
+
+if	_RESPONDER_OUTBOX_CONTROL
+udata	segment
+
+global	mmAddrStateRightBorder:word
+global	mmSubjectRightBorder:word
+global	mmDestinationRightBorder:word
+global	mmTransMediumAbbrevRightBorder:word
+
+udata	ends
+
+endif	; _RESPONDER_OUTBOX_CONTROL
+;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+;
+;		       MessageControlPanelClass
+;
+
+;
+; Superclass of the InboxControlPanel and OutboxControlPanel classes. It
+; exists to allow painless interaction between the application and the
+; multitude of control panels that might be present at one time.
+;
+
+if	_CONTROL_PANELS
+MessageControlPanelClass class	GenInteractionClass
+
+MCP_IS_SPECIFIC		equ	-1	; Panel is for a specific transport or
+					;  application. Panel will use its
+					;  MCPI_specificMoniker, set the
+					;  MCPI_specificRoot usable and the
+					;  MCPI_nonSpecificRoot not-usable
+MCP_IS_SYSTEM		equ	0	; Panel is the system panel for its
+					;  queue. Panel will use its
+					;  GI_visMoniker and leave its
+					;  specific & non-specific trees
+					;  alone (not-usable and usable,
+					;  respectively)
+
+MSG_MCP_SET_SPECIFIC	message	
+; Record whether the panel is for a specific transport/application or is
+; the system panel.
+;
+; If MCP_IS_SPECIFIC is passed, the moniker for the panel will be replaced with
+; MCPI_specificMoniker, while MCPI_specificMoniker will be zeroed. It is up
+; to the subclass, however, to actually mangle the moniker appropriately once
+; it learns, in MSG_MCP_SET_CRITERIA, for what specific purpose the panel
+; exists.
+;
+; Context:	Sent by MailboxApplication immediately after duplicating the
+;		resource.
+; Interception: Must be intercepted to add the panel to the appropriate
+;		message-queue-change GCN list on the mailbox application
+;		(MGCNLT_OUTBOX_CHANGE or MGCNLT_INBOX_CHANGE). Use the
+;		utility routine UtilAddToMailboxGCNList to accomplish this
+;		task.
+;
+;		Any other things that need to be done to initialize the specific
+;		or non-specific object trees can be done at this time.
+;
+;		The superclass should be called when everything else the
+;		subclass needs to do is done.
+;
+; Pass:
+;		cx	= MCP_IS_SPECIFIC or MCP_IS_SYSTEM
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+;MSG_META_BLOCK_FREE
+;
+; The MessageControlPanel intercepts this to notify the details box and message
+; list objects to release any references they have to messages. Any subclass
+; must also intercept this to remove the control panel from the GCN list to
+; which it was added in MSG_MCP_SET_SPECIFIC.
+;
+
+;MSG_MB_NOTIFY_BOX_CHANGE
+;
+; MessageControlPanel intercepts this and generates the appropriate
+; MSG_ML_UPDATE_LIST message for the panel's message list.
+; 
+
+MSG_MCP_SET_CRITERIA	message	
+; Sets the filtering criteria for the control panel's message list. The
+; appropriate message is sent on to the panel's message list and the criteria
+; are stored for later consultation.
+;
+; If displaying stuff for a specific transport or application (MCPI_specific-
+; Moniker is 0), the subclass should update the moniker based on the criteria.
+;
+; Context:	Sent by the MailboxApplication object when the panel is
+;		first created. May also be sent by the subclass to itself
+;		when the user selects a differet transport/application to
+;		view.
+; Source:	MailboxApplication or self
+; Destination:  guess
+; Interception: superclass should likely be called at the beginning, to copy
+;		the criteria into the instance data.
+;
+;		Subclass is expected to intercept this message to mangle the
+;		moniker when the panel is displaying messages for a specific
+;		transport or application.
+;
+; Pass:
+;		cx	= MailboxDisplayPanelType
+;		^hdx	= MailboxDisplayPanelCriteria
+;			= 0 if should display all messages from the source
+;			  queue.
+;		if MDPT_BY_TRANSPORT:
+;			^hbp	= MailboxDisplayPanelCriteria for
+;				  MDPT_BY_MEDIUM
+; Return:
+;		memory block(s) freed
+;		carry set if no messages fit the criteria. it's then the
+;			caller's decision whether to bring the box up
+;			on-screen
+;		bp - unchanged
+;		ax, cx, dx - destroyed
+;
+
+
+MSG_MCP_MESSAGE_SELECTED	message	
+; The user has selected a message in the message list. The message # will be
+; mapped to a MailboxMessage + address # and MSG_MCP_DISPLAY_DETAILS will be
+; called.
+;
+; Context:	Sent when the user has selected a message from the control
+;		panel's message list.
+; Source:	MessageList object
+; Destination:  MessageControlPanel
+; Interception: Not usually intercepted. Default handler calls the list object
+;		back to map the number to a MailboxMessage + address # before
+;		sending a MSG_MCP_DISPLAY_DETAILS to itself. That's the
+;		message you need to subclass.
+;
+; Pass:
+;		cx	= message # (must call the list back to get the
+;			  actual message & address #)
+;		dl	= GenItemGroupStateFlags
+;		bp	= number of selections (0 or 1)
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MCP_DISPLAY_DETAILS	message	
+; The user has selected a message in the message list. The control panel should
+; now put up the appropriate detail box. The default handler sends a
+; MSG_MD_SET_MESSAGE to the object pointed to by MCPI_detailsBox
+;
+; Context:	Sent when the user has selected a message from the control
+;		panel's message list.
+; Source:	MessageList object
+; Destination:  MessageControlPanel *subclass*
+; Interception: Unlikely, as all the functionality I could think of needing
+;		is defined in the MessageDetails class.
+;
+; Pass:
+;		cxdx	= MailboxMessage (no extra reference added)
+;		bp	= address # (meaningful only if message is in the
+;			  outbox)
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MCP_GET_DELIVERY_VERB	message	
+; Called by MessageControlPanelClass to obtain a string from the subclass with
+; which to abuse the deliverAll trigger's moniker.
+;
+; Context:	Called by MessageControlPanelClass when its criteria are changed
+;		in order to decide (a) whether the deliverAll trigger should
+;		be usable, and (b) what string should be merged into the
+;		trigger's moniker
+; Source:	MessageControlPanel::MCP_SET_CRITERIA
+; Destination:  MessageControlPanel subclass
+; Interception: must be intercepted to be useful. No need to call superclass
+;
+; Pass:
+;		nothing
+; Return:
+;		carry set if deliverAll trigger should not be usable
+;		carry clear if it should be:
+;			*ds:ax	= string with which to abuse the
+;				  deliverAllMoniker
+;		bp - unchanged
+;		cx, dx - destroyed
+;
+
+MSG_MCP_GET_TITLE_STRING	message	
+; Fetch the string to insert into the MCPI_specificMoniker.
+;
+; Context:	Called by MessageControlPanel when its criteria are changed
+;		for the first time if the panel is a non-system panel
+; Source:	MessageControlPanel::MCP_SET_CRITERIA
+; Destination:  MessageControlPanel subclass
+; Interception: must be intercepted
+;
+; Pass:
+;		nothing
+; Return:
+;		*ds:ax	= string to insert into the moniker
+;		bp - unchanged
+;		cx, dx - destroyed
+;
+
+MSG_MCP_INITIALIZE_SELECTION_LIST	message	
+; The control panel is a system one, the criteria have been set, and now it's
+; time to tell the selection list, by means of which the user alters what the
+; panel is displaying, what should be selected.
+;
+; Context:	Called by MessageControlPanel when its criteria are changed
+;		for the first time if the panel is a system panel
+; Source:	MessageControlPanel::MCP_SET_CRITERIA
+; Destination:  MessageControlPanel subclass
+; Interception: must be intercepted to be useful. no need to call superclass
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		bp - unchanged
+;		ax, cx, dx - destroyed
+;
+
+    MCPState	record
+        MCPS_IS_SYSTEM:1
+	; Set if panel is the system inbox or outbox panel
+	
+	:7
+    MCPState	end
+
+    MCPI_state			MCPState	0
+    
+    MessageControlPanelCriteria	struct
+        MCPC_type	MailboxDisplayPanelType	?
+	MCPC_data	MailboxDisplayPanelCriteria	<>
+    MessageControlPanelCriteria ends
+
+    MCPI_messageList		lptr
+    ; The MessageList object for the panel.
+
+    MCPI_primaryCriteria	lptr.MessageControlPanelCriteria
+    ; The main search criteria for selecting messages
+    
+    MCPI_secondaryCriteria	lptr.MessageControlPanelCriteria
+    ; The secondary search criteria, used only if MDPT_BY_TRANSPORT
+
+    MCPI_detailsBox		lptr
+    ; The MessageDetails object for the panel.
+    
+    MCPI_specificMoniker	lptr.VisMoniker
+
+jIfSys	macro	mcpi, dest
+	test	mcpi.MCPI_state, mask MCPS_IS_SYSTEM
+	jnz	dest
+	endm
+
+jIfSpec	macro	mcpi, dest
+	test	mcpi.MCPI_state, mask MCPS_IS_SYSTEM
+	jz	dest
+	endm
+
+    MCPI_specificRoot		lptr
+    ; Non-usable object that gets set usable when told the panel is for
+    ; something specific. It's up to the subclass to mangle the text in
+    ; the object, if necessary.
+    
+    MCPI_nonSpecificRoot	lptr
+    ; Usable object, that gets set not-usable when told the panel is for
+    ; something specific.
+    
+    MCPI_deliveryTrigger	lptr
+    ; Trigger to set usable/not usable and whose moniker should be abused
+    ; based on what the criteria are.
+    
+    MCPI_deliveryMoniker	lptr.VisMoniker
+    ; Template moniker to use for the delivery trigger.
+    
+MessageControlPanelClass endc
+endif	; _CONTROL_PANELS
+
+;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+;
+;			MessageListClass
+;
+
+
+MessageListClass	class	GenDynamicListClass
+
+if	_CONTROL_PANELS
+MSG_ML_SET_CRITERIA	message	
+; Sets the filtering criteria for the message list. 
+;
+; Context:	Sent by MessageControlPanel in response to a 
+;		MSG_MCP_SET_CRITERIA message.
+; Source:	MessageControlPanelClass
+; Destination:  guess
+; Interception: not usually
+;
+; Pass:
+;		*ds:dx	= primary MessageControlPanelCriteria
+;		*ds:bp	= secondary MessageControlPanelCriteria (if primary
+;			  is MDPT_BY_TRANSPORT)
+; Return:
+;		carry set if list is empty
+;		ax, cx, dx, bp - destroyed
+;
+endif	; _CONTROL_PANELS
+
+MSG_ML_GET_SCAN_ROUTINES	message	
+; Fetches the virtual far pointers of routines to use when selecting and sorting
+; messages for display.
+;
+; Context:	Called by MessageListClass when it is regenerating the
+;		display list or adding a new message to it.
+; Source:	MessageListClass
+; Destination:  subclass of MessageListClass
+; Interception: must be intercepted. DO NOT CALL SUPERCLASS: default handler
+;		will FatalError
+;
+; Pass:
+;		cx:dx	= pointer to MLScanRoutines structure to fill in
+; Return:
+;		routines filled in
+;		bp - unchanged
+;		ax, cx, dx - destroyed
+;
+    MLScanRoutines	struct
+	MLSR_select		vfptr.far
+	;	Pass:	dxax	= MailboxMessage
+	;		bx	= admin file
+	;		*ds:si	= MessageList object
+	;	Return:	*ds:si	= still the MessageList object (ds fixed up)
+	;	Destroy:nothing
+	;
+
+	MLSR_compare	vfptr.far	; can be fptr if callback is fixed
+	;	Pass:	ds:si	= first MLMessage
+	;		es:di	= second MLMessage (ds = es)
+	;	Return:	flags set so caller can jl, je, or jg according as
+	;		ds:si is less than, equal to, or greater than es:di
+	;	Destroy:ax, bx, cx, dx, di, si
+	;
+    MLScanRoutines	ends
+
+MessageList	segment	resource
+    global	MessageListAddMessage:far
+    ;	Desc:	Add a message to the end of the list of messages displayed
+    ;		by a message list. This is called by the selection routine
+    ;		in a subclass when it decides one of the addresses is
+    ;		acceptable.
+    ;
+    ;	Pass:	*ds:si	= MessageList object
+    ;		bx	= admin file
+    ;		ss:bp	= MLMessage (only those fields that are used in
+    ;				comparison by subclass need to be valid, except
+    ;				MLM_message and MLM_address which have to be
+    ;				valid)
+    ;	Return:	*ds:si	= still the MessageList object (ds fixed up)
+    ;
+MessageList	ends
+
+MSG_ML_RESCAN	message
+; Forces the list of displayed messages to be completely rebuilt.
+;
+; Context:	Sent by the list to itself in response to a ML_SET_CRITERIA
+; Source:	self
+; Destination:  self
+; Interception: probably not
+;
+; Pass:
+;		new criteria in instance data
+; Return:
+;		carry set if list is empty
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_ML_GET_MESSAGE	message	
+; Map a message number to a MailboxMessage and address number.
+;
+; Context:	Called by the control panel when it's been notified a message
+;		has been selected.
+; Interception: not necessary -- default method just indexes into the message
+;		array to get the MailboxMessage and address #
+;
+; Pass:
+;		cx	= message number (must be in-range, else fatal-error)
+; Return:
+;		cxdx	= MailboxMessage
+;		bp	= address # (meaningful only if message is in the
+;			  outbox)
+;		ax - destroyed
+;
+
+MSG_ML_UPDATE_LIST	message	
+; Take note that a new message has been added to or removed from the queue this
+; list is displaying.
+;
+; MessageListClass will use the subclass's scan routines to add the message
+; to the list, if necessary, and resort the list, if the message was added.
+;
+; Context:	Sent by MessageControlPanel when it receives MSG_MCP_UPDATE_LIST
+; Source:	MessageControlPanel
+; Interception: not
+;
+; Pass:
+;		cxdx	= MailboxMessage (reference should be added if the
+;			  panel wishes to display the message)
+;			  Bit 0 of dx set if the list can skip sorting (used
+;			  as an optimization if the caller is going to send
+;			  another MSG_ML_UPDATE_LIST in a short while.)
+;		bp	= MABoxChange
+; Return:
+;		carry set if list is newly empty
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_ML_RELEASE_MESSAGES	message	
+; Clear out the message array, removing all references to the messages in
+; question.
+;
+; Context:	Called by MessageControlPanel when it receives a
+;		MSG_META_BLOCK_FREE before it sends the message to its
+;		superclass.
+; Source:	MessageControlPanel
+; Interception: not, unless the subclass has additional references...
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		cx, dx, bp - unchanged
+;		ax - destroyed
+;
+
+if	_CONTROL_PANELS
+MSG_ML_DELIVER_ALL	message	
+; Deliver all the messages in the list by whatever means are appropriate.
+;
+; Context:	Sent by the deliver-all trigger in the control panel
+; Source:	anything
+; Destination:  MessageList subclass
+; Interception: Must be subclassed to do anything. MessageList defines no
+;		method for this message.
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+endif	; _CONTROL_PANELS
+
+MSG_ML_GENERATE_MONIKER	message	
+; Generate the moniker for the passed message and address.
+;
+; Context:	Called by the method for GEN_DYNAMIC_LIST_QUERY_ITEM_MONIKER
+; Source:	MessageList
+; Destination:  MessageList subclass
+; Interception: May be intercepted to override default behaviour of using
+;		MessageCreateMoniker
+;
+; Pass:
+;		cxdx	= MailboxMessage for which to create moniker
+;		bp	= address # for which to create moniker
+; Return:
+;		*ds:ax	= gstring moniker
+;		cx, dx, bp - destroyed
+;
+
+MSG_ML_GET_INITIAL_MINIMUM_SIZE	message	
+; Place an initial HINT_MINIMUM_SIZE on the object corresponding to the typical
+; width and height of an item in this list
+;
+; Context:	Called by MessageList during SPEC_BUILD handling and when
+;		ML_SET_CRITERIA called.
+; Source:	MessageList::SPEC_BUILD, MessageList::ML_SET_CRITERIA
+; Destination:  MessageList or subclass
+; Interception: may be subclassed to specify different size than default (which
+;		is based on a single-line moniker produced by
+;		MessageCreateMoniker)
+;
+; Pass:
+;		nothing
+; Return:
+;		cx	= minimum width (may be 0)
+;		dx	= minimum height (may be 0)
+;		bp - unchanged
+;		ax - destroyed
+;
+
+MSG_ML_CHECK_BEFORE_REMOVAL	message	
+; Called to see if a message should be removed from the list.
+;
+; Context:	Called by MB_NOTIFY_BOX_CHANGE if MLA_CHECK_BEFORE_REMOVAL is
+;		set and the change type is anything other than MBCT_EXISTS
+; Source:	MessageList
+; Destination:  MessageList subclass
+; Interception: may be intercepted to take care of things like looking for
+;		duplicate addresses that haven't been sent to, etc. Superclass
+;		need not be called (default behaviour is to remove the message)
+;
+; Pass:
+;		cxdx	= MailboxMessage
+;		bp	= MABoxChange holding address # affected
+; Return:
+;		carry set to keep message:
+;			bp	= address number to display for entry
+;		carry clear to remove message:
+;			bp	= destroyed
+;		ax - destroyed
+;		cx, dx - unchanged
+;
+
+    ;
+    ; Attributes that control our behaviour. Set in the .ui file, please.
+    ; 
+    MLSourceQueue	etype	byte, 0
+	MLSQ_INBOX		enum	MLSourceQueue
+	MLSQ_OUTBOX		enum	MLSourceQueue
+
+    MLAttrs	record
+	MLA_SOURCE_QUEUE MLSourceQueue:1		;
+	MLA_MODIFIED:1				; set during processing of
+						;  MB_NOTIFY_BOX_CHANGE to
+						;  indicate that the list
+						;  contents have changed
+	MLA_CHECK_BEFORE_REMOVAL:1		; set if should call the
+						;  subclass before removing
+						;  a message from the list
+	:5
+    MLAttrs	end
+
+    MLI_attrs		MLAttrs	<>
+    
+if	_CONTROL_PANELS
+    ;
+    ; Selection criteria, as maintained by the MessageControlPanel object and
+    ; passed to us in MSG_ML_SET_CRITERIA.
+    ; 
+    MLI_primaryCriteria	lptr.MessageControlPanelCriteria
+    MLI_secondaryCriteria lptr.MessageControlPanelCriteria
+endif	; _CONTROL_PANELS
+
+    ;
+    ; Chunk array of messages and addresses that are currently being displayed.
+    ; Can't use a HugeArray, as you might expect (given that DBQs are
+    ; HugeArrays) as there's no facility for sorting them...
+    ;
+    ; Note that if an address has duplicates, they will be automatically
+    ; displayed with the original address, so they should not be added to the
+    ; array. (adding an address with MTF_DUP set will generate an error,
+    ; in fact.)
+    ; 
+    MLMessage	struct
+	MLM_message		MailboxMessage	<>
+	MLM_address		word
+	MLM_transport		MailboxTransport
+	MLM_medium		word
+if	_AUTO_RETRY_AFTER_TEMP_FAILURE
+	MLM_autoRetryTime	FileDateAndTime
+endif	; _AUTO_RETRY_AFTER_TEMP_FAILURE
+	MLM_registered		FileDateAndTime
+	MLM_state		MailboxAddressState
+	MLM_priority		MailboxMessagePriority
+    MLMessage	ends
+
+    MLI_messages	lptr.ChunkArrayHeader
+    
+MessageListClass	endc
+
+;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+;
+;			MessageGlyphClass
+;
+
+MessageGlyphClass	class	GenGlyphClass
+
+MSG_MG_SET_MESSAGE	message	
+; Set the message whose description the glyph should display.
+;
+; Context:	Usually sent before the box that contains the glyph is
+;		brought on-screen.
+; Source:	?
+;
+; Pass:
+;		cxdx	= MailboxMessage w/extra reference
+;		bp	= TalID
+; Return:
+;		reference on message removed
+;		nothing
+;		cx, dx, bp - unchanged
+;		ax - destroyed
+;
+
+MSG_MG_SET_MESSAGE_NO_DUPS	message	
+; Set the message whose description the glyph should display. Does not
+; display the duplicates of any marked address.
+;
+; Context:	Usually sent before the box that contains the glyph is
+;		brought on-screen.
+; Source:	?
+;
+; Pass:
+;		cxdx	= MailboxMessage w/extra reference
+;		bp	= TalID
+; Return:
+;		reference on message removed
+;		nothing
+;		cx, dx, bp - unchanged
+;		ax - destroyed
+;
+
+MSG_MG_SET_MESSAGE_ALL_VIEW	message	
+; Set the message whose description the glyph should display, using the
+; MMF_ALL_VIEW flag when creating the moniker.
+;
+; Context:	Usually sent before the box that contains the glyph is
+;		brought on-screen.
+; Source:	?
+;
+; Pass:
+;		cxdx	= MailboxMessage w/extra reference
+;		bp	= TalID
+; Return:
+;		reference on message removed
+;		nothing
+;		cx, dx, bp - unchanged
+;		ax - destroyed
+;
+
+MSG_MG_SET_MESSAGE_PREPARING	message	
+; Set the message whose description the glyph should display, using the
+; MMF_PREPARING flag when creating the moniker.
+;
+; Context:	?
+; Source:	?
+;
+; Pass:
+;		cxdx	= MailboxMessage w/extra reference
+;		bp	= TalID (ignored)
+; Return:
+;		reference on message removed
+;		nothing
+;		cx, dx, bp - unchanged
+;		ax - destroyed
+;
+
+MSG_MG_SET_MESSAGE_CONNECTING	message	
+; Set the message whose description the glyph should display, using the
+; MMF_CONNECTING flag when creating the moniker.
+;
+; Context:	?
+; Source:	?
+;
+; Pass:
+;		cxdx	= MailboxMessage w/extra reference
+;		bp	= TalID
+; Return:
+;		reference on message removed
+;		nothing
+;		cx, dx, bp - unchanged
+;		ax - destroyed
+;
+
+MSG_MG_SET_MESSAGE_LOST_CONNECTION	message	
+; Set the message whose description the glyph should display, using the
+; MMF_LOST_CONNECTION flag when creating the moniker.
+;
+; Context:	?
+; Source:	?
+;
+; Pass:
+;		cxdx	= MailboxMessage w/extra reference
+;		bp	= TalID
+; Return:
+;		reference on message removed
+;		nothing
+;		cx, dx, bp - unchanged
+;		ax - destroyed
+;
+
+MessageGlyphClass	endc
+
+
+;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+;
+;			MessageDetailsClass
+;
+
+if	_CONTROL_PANELS
+MessageDetailsClass	class	GenInteractionClass
+
+MSG_MD_SET_MESSAGE	message	
+; Set the message to display in the box and bring it up on-screen
+;
+; Context:	Sent by MessageControlPanel when the user has clicked
+; 		on a message in the MessageList
+; Interception: should be subclassed to fill in the additional fields of the
+;		detail box that are different between the inbox and the
+;		outbox. Subclass should also add the box to the appropriate
+;		GCN list so we know if the message gets deleted.
+;
+;		The default handler defined at MessageDetails will do:
+;		    - set the subject as the text for the MDI_subjectText
+;		      object
+;		    - store the longhand version of the message's
+;		      registration date in the MDI_dateText object.
+;		    - set the moniker back to MDI_titleMoniker, freeing any
+;		      existing one, and mangling it according to the
+;		      string returned by MSG_MD_GET_TITLE_STRING
+;		    - replace the moniker of the MDI_actionTrigger object
+;		      with the MDI_deliveryMoniker and then mangle a copy
+;		      of that moniker according to the string returned
+;		      by MSG_MD_GET_DELIVERY_VERB
+;		    - invoke the MSG_GEN_INTERACTION_INITIATE method
+;
+; Pass:
+;		cxdx	= MailboxMessage
+;		bp	= address # (+ dups) to display, if message is
+;			  in the outbox
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MD_GET_TITLE_STRING	message	
+; Get the string to replace the \1 in MDI_titleMoniker in the title bar of
+; this here dialog.
+;
+; Context:	Called by MessageDetails::MD_SET_MESSAGE before the box
+;		is brought on-screen.
+; Source:	see above
+; Destination:  MessageDetails *subclass*
+; Interception: must be intercepted. default handler fatal-errors
+;
+; Pass:
+;		MDI_message, MDI_address
+; Return:
+;		*ds:ax	= chunk with string to use
+;		cx, dx, bp - destroyed
+;
+
+MSG_MD_GET_DELIVERY_VERB	message	
+; Get the string to replace the \1 in MDI_deliveryMoniker in the action trigger
+; of this here dialog.
+;
+; Context:	Called by MessageDetails::MD_SET_MESSAGE before the box
+;		is brought on-screen.
+; Source:	see above
+; Destination:  MessageDetails *subclass*
+; Interception: must be intercepted. default handler fatal-errors
+;
+; Pass:
+;		MDI_message, MDI_address
+; Return:
+;		*ds:ax	= chunk with string to use
+;		cx, dx, bp - destroyed
+;
+
+MSG_MD_RELEASE_MESSAGE	message	
+; Release the reference to the message we're displaying.
+;
+; Context:	Called by MessageDetails::VIS_CLOSE
+; Source:	MessageDetails
+; Destination:  MessageDetails & subclass
+; Interception: should be intercepted by subclass to remove the object from
+;		the GCN list to which it added the object in MD_SET_MESSAGE
+;
+;		subclass must call superclass at some point. default method
+;		will zero MDI_message and call DBQDelRef on the message.
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		cx, dx, bp - unchanged
+;		ax - destroyed
+;
+
+;MSG_MB_NOTIFY_MESSAGE_REMOVED
+;
+; If the message that was removed is the message being displayed, the box will
+; be forcibly dismissed, causing the reference to the message to be released.
+;
+
+    MDI_message		MailboxMessage	<>
+    MDI_address		word		?
+    MDI_titleMoniker	lptr.VisMoniker
+    MDI_deliveryMoniker	lptr.VisMoniker
+    MDI_boundMoniker	lptr.VisMoniker
+    MDI_subjectText	lptr
+    ; Text object that is to receive the complete subject of the message
+    
+    MDI_dateText	lptr
+    ; Text object that is to receive the longhand form of the message's
+    ; registration time
+    
+    MDI_actionTrigger	lptr
+    ; GenTrigger whose moniker is to be abused with the message's delivery /
+    ; transmission verb. (template pointed to by MDI_deliveryMoniker)
+    
+    MDI_boundText	lptr
+    ; Text object whose moniker is to be abused with the message's delivery /
+    ; transmission verb. (template pointed to by MDI_boundMoniker)
+
+MessageDetailsClass	endc
+endif	; _CONTROL_PANELS
+
+;- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
+;
+;		MessageSendableNotifyDialogClass
+;
+; Superclass of OutboxSendableConfirmationClass and InboxTransWinCloseClass.
+;
+; (OutboxSendableConfirmationClass is used in OutConfirmSendableUI,
+; OutWinOpenUI and OutWinCloseUI templates.  However, We only have
+; InWinCloseUI template, but no InConfirmSendableUI or InWinOpenUI templates.
+; Thus we create InboxTransWinCloseClass directly instead of a more general
+; (and parallel) InboxSendableDialogClass.   --- AY 1/11/95)
+;
+MessageSendableNotifyDialogClass	class	GenInteractionClass
+
+MSG_MSND_SET_MESSAGE	message
+; Sets the message & addresses to display in the dialog box.
+;
+; Context:	Sent before a sendable dialog is initiated.  (A message is
+;		sendable if the medium exists (in case of an outbox message)
+;		and the current time falls within the message's transmission
+;		 window.)
+; Source:	MailboxApplication
+; Interception:	Unlikely.  Subclasses should intercept MSG_MSND_GET_VERB
+;		to provide the verb to this class instead.
+;
+; Pass:
+;		cxdx	= MailboxMessage w/one extra reference
+;		bp	= talID (if applicable)
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MSND_GET_VERB	message
+; Returns the verb of the message displayed.
+;
+; Context:	Sent to itself when the dialog receives MSG_MSND_SET_MESSAGE
+; Source:	MessageSendableNotifyDialogClass
+; Interception:	Subclasses MUST intercept this message to provide the verb.
+;		Do not call superclass.
+;
+; Pass:
+;		MSNDI_message and MSNDI_talID already set
+; Return:
+;		ax	= lptr to verb in object block
+;		cx, dx, bp - unchanged
+;
+
+MSG_MSND_SEND_MESSAGE_NOW	message	
+; Submit the message being displayed to be sent to the addresses being
+; displayed. The box is then taken down and destroyed.
+;
+; Context:	The user decided to send the message now.
+; Source:	Sent from the <Verb> Now trigger
+; Interception:	Subclasses MUST intercept this message to do the sending, and
+;		then call superclass.  Default behavior is to remove one ref
+;		from the message and then destroy the dialog block.
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MSND_SEND_MESSAGE_LATER	message
+; Bring down the dialog box and nuke it.
+;
+; Context:	The user decided not to send the message for now.
+; Source:	Usually from the <Verb> Later trigger.
+; Interception: Unlikely.  Default behavior is to delay the deadline (if
+;		MSNDI_dealyHour and MSNDI_minute are non-null), remove one
+;		ref from the message and then destroy the dialog block.
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_MSND_DELETE_MESSAGE		message
+; Delete the message from the inbox/outbox.
+;
+; Context:	The user wants to delete the message.
+; Source:	Sent from the Delete trigger
+; Interception:	Subclasses MUST intercept this message to delete the message,
+;		and then call superclass.  Default behavior is to remove one
+;		ref from the message and then destroy the dialog block.
+;
+; Pass:
+;		nothing
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+    MSNDI_message	MailboxMessage
+    MSNDI_talID		TalID
+    MSNDI_msgGlyph	lptr.MessageGlyphBase
+
+    MSNDI_notifyText	lptr.GenTextBase
+    ; text obj that has \1 marker to hold verb of messge.  Ignored if null.
+
+    MSNDI_textHasTwoMarkers	BooleanByte
+    ; BB_TRUE if MSDI_notifyText has two \1 makers.
+
+    MSNDI_nowTrigger	lptr.GenBase
+    ; GenTrigger or GenInteraction whose moniker has \1 marker to hold verb.
+
+    MSNDI_laterTrigger	lptr.GenBase
+    ; ditto
+
+    MSNDI_delayHour	lptr.GenValueBase
+    MSNDI_delayMinute	lptr.GenValueBase
+    ; GenValue's that let the user set the amount of time to delay the end
+    ; bound of the transmit window.  No delay if null.
+
+MessageSendableNotifyDialogClass	endc

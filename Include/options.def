@@ -1,0 +1,225 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Libraries
+FILE:		options.def
+
+AUTHOR:		Adam de Boor, Sep  2, 1991
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	9/ 2/91		Initial revision
+
+
+DESCRIPTION:
+	This file defines the interface to the Options library, a set of
+	user-interface objects to provide the automatic saving and restoring
+	of options to and from the .ini file.
+	
+	To use the library, you must use the subclasses of the generic objects
+	where you would use the original generic classes, place them inside
+	OptInteraction objects and specify the category for the whole group
+	in the OptInteraction, and the key for the option in the gadget.
+	
+	You must also use an OptAdmin object whose optList instance
+	variable contains a list of all OptInteraction objects that are
+	themselves not immediate children of an OptInteraction object.
+	
+	To save all currently set options, you simply send a
+	METHOD_OPT_SAVE_OPTION message to your OptAdmin object and it
+	will take care of the rest.
+
+	All the objects but OptInteraction and OptAdmin will fetch their
+	initial value from the .ini file when they are sent a
+	METHOD_OPT_RESTORE_OPTION message by the OptApplication object when
+	the application object is attached.
+
+	FOR FURTHER INFORMATION:
+	see /staff/pcgeos/Release12X/Library/Options/README
+	
+
+	$Id: options.def,v 1.1 97/04/04 14:24:36 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__OPTIONS
+
+StartLibrary	options
+
+;==============================================================================
+;
+;			    OptRangeClass
+;
+; Functions just as a regular GenRange object. No special requirements must
+; be met by the programmer.
+;==============================================================================
+OptRangeClass	class	GenRangeClass
+    ORI_key	lptr.char	0	; String holding the key under which
+					;  the range value is stored.
+OptRangeClass	endc
+
+;==============================================================================
+;
+;			     OptListClass
+;
+; For an OptList object to work, the list must have LA_LIST_MESSAGE and
+; LA_LIST_METHOD_IS_DATA set, meaning the OptList object holds the message
+; sent to the list's output when the list is acted upon, and the individual
+; list entries hold unique values in their GLEI_method instance variable.
+;
+; For an exclusive list, the GLEI_method values can simply be unique integers.
+;
+; For a non-exclusive list, however, the GLEI_method values must be unique
+; *bitmasks*. The list's value is saved by or'ing the values of all set
+; entries together, while its value is restored by setting all entries whose
+; values have a non-zero intersection with the integer stored in the .ini file.
+;==============================================================================
+ 
+OptListClass	class	GenListClass
+    OLI_key	lptr.char	0	; String holding the key under which
+					;  the exclusive's method is stored.
+OptListClass	endc
+
+;==============================================================================
+;			
+;			   OptBooleanListClass
+;
+; An OptBooleanListClass MUST be an exclusive list, or FATAL ERRORS
+; will ensue.  
+; If the object has 2 children (GenListEntries), and its children have their
+; GLEI_method variables set to "TRUE" and "FALSE" (as defined in
+; geos.def), then everything will work JUST fine.  Otherwise, behavior
+; of this beast is undefined.
+
+OptBooleanListClass	class	OptListClass	; now new instance data.
+OptBooleanListClass	endc
+
+;==============================================================================
+;
+;			   OptTextEditClass
+;
+; Functions as a regular GenText object, with all that implies. No
+; restrictions are made on the values of instance variables beyond those
+; set down by the GenText class itself.
+;
+; When the value is stored, the entire text stored in the object is stored
+; as a single string. Similarly, when the value is restored, any text already
+; in the object is replaced by the text stored for the key in the .ini file.
+;==============================================================================
+OptTextEditClass	class	GenTextEditClass
+    OTEI_key	lptr.char	0	; String holding the key under which
+					;  the object's text is stored.
+OptTextEditClass	endc
+
+;==============================================================================
+;
+;			 OptInteractionClass
+;
+; The OptInteraction object contains the category in which the keys of its
+; generic descendents are to be found. If you have a sub-interaction with
+; Opt objects within an OptInteraction group, the sub-interaction should
+; also be an OptInteraction object, though it need not have a category string,
+; unless it wishes to override the category of its parent.
+;==============================================================================
+OptInteractionClass class GenInteractionClass
+    OII_category lptr.char	0	; Ini file category for all options
+
+GUQT_CATEGORY	enum GenUpwardQueryType, 6000
+;	Query type to pass to METHOD_GUP_QUERY when requesting the
+;	category under which options are to be stored.
+;
+;	Pass:	dx	= handle of block in which the querying object
+;			  resides.
+;	Return:	carry set if query answered:
+;			*ds:dx	= category string to use
+;			cx	= non-zero if string should be freed when
+;				  done.
+;
+
+OptInteractionClass endc
+
+;==============================================================================
+;
+;			 OptSummonsClass
+;
+; The OptSummons object contains the category in which the keys of its
+; generic descendents are to be found.
+; It is identical to OptInteractionClass, except it is sub-classed off
+; of GenSummons instead of GenInteraction.
+;==============================================================================
+OptSummonsClass class GenSummonsClass
+    OSI_category lptr.char	0	; Ini file category for all options
+OptSummonsClass endc
+
+;==============================================================================
+;
+;			 OptAdminClass
+;
+; The main administrator object of the library. This is not a visual object,
+; though it is generic (to take advantage of the GenActiveList class). For
+; the library to function correctly on your behalf, you must have a single
+; OptAdmin object that is on your application object's active list, or to
+; which you send a METHOD_ATTACH when your interface has been completely
+; built up (e.g. font lists generated, etc.) and options are ready to be
+; restored.
+;
+; If you have only one OptInteraction object, the effect of this object can
+; be achieved by sending METHOD_OPT_RESTORE_OPTION when the object is first
+; attached, and METHOD_OPT_SAVE_OPTION when you wish to have its options
+; written to the .ini file.
+;==============================================================================
+
+OptAdminClass class MetaClass
+
+METHOD_OPT_SAVE_OPTION message MetaOptionsMessages
+;	Method sent down the generic tree (with a depth-first traversal) to
+;	cause the value currently set to be saved to the .ini file.
+;
+;	Pass:	nothing
+;	Return:	nothing
+
+
+METHOD_OPT_RESTORE_OPTION message MetaOptionsMessages
+;	Method sent down the generic tree to cause an object to fetch its
+;	value from the .ini file.
+;
+;	Pass:	nothing
+;	Return:	nothing
+
+METHOD_OA_ADD_GROUP			message
+;	Add an OptInteraction tree to the list of objects to be notified
+;	when METHOD_ATTACH, METHOD_OPT_SAVE_OPTION or METHOD_OPT_RESTORE_OPTION
+;	is received.
+;
+;	If the object is already in the list, nothing happens.
+;
+;	The object will receive a METHOD_OPT_RESTORE_OPTION when it has been
+;	added to the list (but only if it wasn't in the list before).
+;
+;	Pass:	^lcx:dx	= optr of object to add to the list
+;	Return:	nothing
+;
+
+METHOD_OA_REMOVE_GROUP			message
+;	Remove an OptInteraction tree from the list of objects to be notified
+;	when METHOD_ATTACH, METHOD_OPT_SAVE_OPTION or METHOD_OPT_RESTORE_OPTION
+;	is received.
+;
+;	If the object isn't in the list, nothing happens.
+;
+;	Pass:	^lcx:dx	= optr of object to remove from the list.
+;	Return:	nothing
+;
+
+    OAI_optList	lptr.optr	0
+    ; Array of OptInteraction objects that are not contained within another
+    ; OptInteraction object. The elements of the array should be declared
+    ; with the UN_OPTR macro, like so:
+    ; 	UN_OPTR	obj1, obj2, ..., objn
+
+OptAdminClass endc
+
+EndLibrary	options

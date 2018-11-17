@@ -1,0 +1,144 @@
+#!/bin/sh -
+#
+# This script copies all files to the CD-Rom image directory.
+#
+# $Id: makeCDRomImage,v 1.6 94/02/07 18:27:30 jon Exp $
+#
+# Ok, this is how I've been shipping stuff to /n/intl_disks.
+# 
+# You should ship the target stuff first since the ship script does an 'rm -rf'
+# on the target directory nuking anything put there by the other scripts.
+# 
+#   > cd /staff/pcgeos/Release20X/Installed
+#   > ship ZOOMER_SDK		# ships to /n/intl_disks/target/geos/geosnc
+#   > ship ZOOMER_SDK_EC	# ships to /n/intl_disks/target/geos/geosec
+# 
+#   > cd /staff/pcgeos/Zoomer816B/Installed
+#   > /staff/pcgeos/Installed/ship REAL_ZOOMER_SDK	# target/zoom/zoomnc
+#   > /staff/pcgeos/Installed/ship REAL_ZOOMER_SDK_EC	# target/zoom/zoomec
+# 
+# Now you can ship the SDK files.
+# 
+#   > /staff/pcgeos/Tools/script/sdk/makeCDRomImage Release20X /n/intl_disks
+# 
+# After you ship, you will need to fix up a few things.
+# 
+# 1. target/geos
+# 
+#    a. The geos(ec).ini files need to be fixed up.  The "ini = INI\SDK.INI"
+#       should appear under the "[paths]" category instead of "[system]".
+#    b. You need to move manager(ec).geo from system/sysappl to world so
+#       it'll appear in the express menu.
+# 
+# 2. target/zoom
+# 
+#    The zoomer stuff includes a bunch of files which we don't want to appear
+#    on the sdk.  So you need to...
+# 
+#   > /staff/pcgeos/Tools/script/sdk/removeZoomerFile /n/intl_disks
+# 
+# 
+# The last thing is to create the profiling kernels.  You need to check out
+# kernelConstant.def and turn on each of the 5 profiling options one at a time
+# and recompile.  You should rename the kernel files using GeoManager and give
+# them file notes.  The text for the file notes are in
+# /s/p/IN/Pr/SDKTarget/kernel.notes.
+# 
+# That should be it.  Hopefully everything will work.
+
+MAKETOOLPATH=/staff/pcgeos/Tools/scripts/sdk
+export MAKETOOLPATH
+
+if [ "$1" = "" ] || [ "$2" = "" ]; then
+	echo "Usage: makeCDRomImage <branch> <CD-Rom dir>"
+	echo "Ex.: makeCDRomImage Release20X /n/intl_disks"
+	exit 1
+fi
+
+
+if ( cd /staff/pcgeos/$1/Installed ); then
+	cd /staff/pcgeos/$1/Installed
+	echo ""
+	echo "makeCDRomImage Started On `hostname` At `date` running as $USER"
+else
+	echo "$1 is not a PC/GEOS development tree. (e.g., . or Release20X)"
+	exit 1
+fi
+
+echo ""
+echo "========================================================================"
+echo "Shipping target software..."
+echo "========================================================================"
+
+/staff/pcgeos/Installed/ship sdktarget hwr diskset nonec desktop minimalApplications minimalFonts other_zoomer_sdk_stuff noDictionary other_sdk_stuff $2/target/geos/geosnc | tee /staff/$USER/makeCDRomImage.out
+
+/staff/pcgeos/Installed/ship sdktarget hwr diskset ec desktop minimalApplications minimalFonts other_zoomer_sdk_stuff noDictionary other_sdk_stuff $2/target/geos/geosec | tee -a /staff/$USER/makeCDRomImage.out
+
+echo ""
+echo "========================================================================"
+echo "Shipping Zoomer target software..."
+echo "========================================================================"
+
+if ( cd /staff/pcgeos/Zoomer816B/Installed ); then
+	cd /staff/pcgeos/Zoomer816B/Installed
+
+	/staff/pcgeos/Installed/ship zoomerpc penOnly minimalFonts debugTools $2/target/zoom/zoomnc | tee -a /staff/$USER/makeCDRomImage.out
+
+	/staff/pcgeos/Installed/ship zoomerpc penOnly minimalFonts debugTools ec $2/target/zoom/zoomec | tee -a /staff/$USER/makeCDRomImage.out
+
+else
+	echo "Couldn't locate Zoomer816B/Installed directory."
+fi
+
+echo ""
+echo "========================================================================"
+echo "Shipping Bullet target software..."
+echo "========================================================================"
+
+if ( cd /staff/pcgeos/Bullet/Installed ); then
+	cd /staff/pcgeos/Bullet/Installed
+
+	/staff/pcgeos/Installed/ship bulletpc penOnly minimalFonts debugTools $2/target/bull/bullnc | tee -a /staff/$USER/makeCDRomImage.out
+
+	/staff/pcgeos/Installed/ship bulletpc penOnly minimalFonts debugTools ec $2/target/bull/bullec | tee -a /staff/$USER/makeCDRomImage.out
+
+else
+	echo "Couldn't locate Bullet/Installed directory."
+fi
+
+cd /staff/pcgeos/$1/Installed
+
+echo ""
+echo "========================================================================"
+echo "Shipping files for SDK CD-Rom..."
+echo "========================================================================"
+
+$MAKETOOLPATH/copySymFiles    $1 $2 | tee -a /staff/$USER/makeCDRomImage.out
+$MAKETOOLPATH/copySrcFiles    $1 $2 | tee -a /staff/$USER/makeCDRomImage.out
+$MAKETOOLPATH/copyToolFiles   $1 $2 | tee -a /staff/$USER/makeCDRomImage.out
+$MAKETOOLPATH/copyDrivers -u  $1 $2 | tee -a /staff/$USER/makeCDRomImage.out
+$MAKETOOLPATH/copyMiscFiles   $1 $2 | tee -a /staff/$USER/makeCDRomImage.out
+$MAKETOOLPATH/copyTargetFiles $1 $2 | tee -a /staff/$USER/makeCDRomImage.out
+$MAKETOOLPATH/copyDocFiles    $1 $2 | tee -a /staff/$USER/makeCDRomImage.out
+
+$MAKETOOLPATH/removeZoomerFiles $2 | tee -a /staff/$USER/makeCDRomImage.out
+
+echo ""
+echo "========================================================================"
+echo "Chmoding all files to be read/write"
+echo "========================================================================"
+chmod a+rw `find $2 -print`
+
+#
+# Now let's do some error checking
+#
+
+echo "========================================================================"
+echo "Checking /staff/$USER/makeCDRomImage.out for errors"
+echo "========================================================================"
+fgrep error /staff/$USER/makeCDRomImage.out
+
+$MAKETOOLPATH/checkFileSizeAndPermission $2
+
+echo ""
+echo makeCDRomImage Ended At `date`

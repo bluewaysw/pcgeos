@@ -1,0 +1,203 @@
+/**********************************************************************
+ *
+ *	Copyright (c) Designs in Light 2002 -- All Rights Reserved
+ *
+ * PROJECT:        Mail	
+ * MODULE:	   Mail
+ * FILE:	   mailqp.goc
+ * 
+ * DESCRIPTION:
+ *      Common code for quoted printable encoding
+ * 
+ ****************************************************************************/
+
+@include <stdapp.goh>
+@include <bbxmlib.goh>
+@include <socket.goh>
+#include <chunkarr.h>
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>
+
+static char qpEncodeTable[] = "0123456789ABCDEF";
+
+#define QPDECODE_BEGIN  0
+#define SAW_EQUAL       1
+#define SAW_FIRST_HEX   2
+
+
+
+/***********************************************************************
+ *		HTQPENCODEPTR
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Quoted-printable encode nbytes of bytes in bufToCode 
+ *              into bufCoded as per RFC1521.
+ *              Size of bufCoded must be (3 * nbytes) + 1.
+ * CALLED BY:	Client
+ * RETURN:	bufCoded, the null-terminated bufToCode as Q coded.
+ *              Return the number of bytes in bufCoded.
+ *	
+ * STRATEGY:    Quoted-printable encode non-USASCII characters.
+ *
+ *              Rule 1. Any octet can be encoded with =XX, where
+ *                  XX is the octet hex value (in uppercase).
+ *                 
+ *              Rule 2. (octets >= 33 && octets <= 60) ||
+ *                      (octets >= 62 && octets <= 126) need not
+ *                  be encoded.
+ *
+ *              Rule 3. Any TAB of SPACE must be followed by a 
+ *                  printable character. Therefore if TAB or SPACE
+ *                  appears at the end of an encoded line, it must
+ *                  be encoded according to Rule 1.
+ *     
+ *              Rule 4. Line breaks must be encoded with "=OD=OA".
+ *
+ *              Rule 5. The encoded line must not be longer than
+ *                  76 characters. This does not include the CRLF
+ *                  ending the encoded line. If necessary, 'soft'
+ *                  line breaks can be used. An '=' sign as the 
+ *                  last character on an encoded line indicates 
+ *                  such a 'soft' break.
+ * 
+ *              Rule 6. Unsafe characters ! " # $ @ [ \ ] ^ ` { | } ~
+ *                  should be encoded according to Rule 1.
+ *    
+ *              HOWEVER, we only implement Rule 1, 2, 4, and 6. Caller
+ *                  must implement Rules 3 and 5; basically breaking up
+ *                  lines to < 76 chars, and if necessary, adding 'soft'
+ *                  breaks '='.
+ * 
+ *              IMPORTANT:
+ *
+ *              The characaters that we DO not encode are as follows:
+ *               'a'-'z', 'A'-'Z', '0'-'9', and the followin 11 chars
+ *                   39, 40, 41, 43, 44, 45, 46, 47, 58, 61, 63.
+ *              I add to the list 32 and 9 and remove 61 ('=').
+ *              See Appendix B of RFC1521. The rest are known to be 
+ *              unsafe.
+ *
+ *              alternatively:
+ *                   '0'-'9', 'A'-'Z', 'a'-'z', and '()+,-./:=?
+ *                   but not !"#$@[\]^`{|}~ and =, SPC, and TAB
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/13/97   	Initial Revision
+ *	
+ ***********************************************************************/
+int _far _pascal
+MailQPEncodePtr (const byte *bufToCode, int nbytes, byte *bufCoded)
+{
+    char c;
+    int i, len = 0;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;         /* To use local string "%2X" */
+    for (i=0; i<nbytes; i++) {
+	c = *bufToCode;
+@ifdef DO_DBCS
+	if ((c >= C_APOSTROPHE_QUOTE) && (c <= ')') ||  /*  '()  */
+@else
+	if ((c >= C_SNG_QUOTE) && (c <= ')') ||  /*  '()  */
+@endif
+	    (c >= '+') && (c <= ':') ||          /*  +,-./0123456789:  */
+	    (c >= 'A') && (c <= 'Z') ||          /*  A-Z  */
+@ifdef DO_DBCS
+	    (c == C_CARRIAGE_RETURN) || (c == C_LINE_FEED) ||        /* Rule 4 is not right */
+@else
+	    (c == C_CR) || (c == C_LF) ||        /* Rule 4 is not right */
+@endif
+	    (c >= 'a') && (c <= 'z')) {          /*  a-z  */
+	    /* Safe NOT to encode */
+	    *bufCoded++ = c;
+	    len++;
+
+	} else {
+	    *bufCoded++ = '=';
+	    *bufCoded++ = qpEncodeTable[(byte)((c & 0xF0) >> 4)];
+	    *bufCoded++ = qpEncodeTable[(byte)(c & 0x0F)];
+	    len += 3;
+	}
+
+	bufToCode++;
+    }
+
+    POPDS;
+
+    *bufCoded = 0;  /* null-terminate for safety */
+    return len;
+}	
+
+/***********************************************************************
+ *		HTQPDECODEPTR
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Decode a quoted-printable coded bufferCoded into 
+ *              bufferPlain as per RFC1521. It is ok to pass the same
+ *              encoded buffer to bufferCode and bufferPlain if you
+ *              do not care about ovewriting the encoded buffer. 
+ *              nbytes is the number of bytes to decode in bufferCoded.
+ *              Pass nbytes=0 if bufferCoded is NULL-terminated.
+ *              bufferPlain must be the same size of bufferCoded.
+ * CALLED BY:	Client
+ * RETURN:	bufferPlain, contains Q decoded data.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	kkee    	5/13/97   	Initial Revision
+ *	
+ ***********************************************************************/
+int _far _pascal
+MailQPDecodePtr (const byte *bufferCoded, int nbytes, byte *bufferPlain)
+{
+    int state = QPDECODE_BEGIN;
+    byte *end = bufferPlain;
+    Boolean nullTerm = (nbytes == 0) ? TRUE : FALSE;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;         /* To use local string "%2X" */
+
+    while (*bufferCoded) {
+	if (state == SAW_EQUAL) {
+	    if (*bufferCoded == CR && *(bufferCoded+1)== LF) {
+		++bufferCoded;
+		--nbytes;
+		state = QPDECODE_BEGIN;
+	    } else if (ISDIGIT(*bufferCoded)) {
+		*end = (*bufferCoded - '0') << 4;
+		state = SAW_FIRST_HEX;
+	    } else if ((*bufferCoded >= 'a' && *bufferCoded <= 'f') ||
+		     (*bufferCoded >= 'A' && *bufferCoded <= 'F')) {
+		*end = (TOUPPER(*bufferCoded) - 'A' + 10) << 4;
+		state = SAW_FIRST_HEX;
+	    } else {
+		*end++ = '=';
+		*end++ = *bufferCoded;
+		state = QPDECODE_BEGIN;
+	    }
+
+	} else if (state == SAW_FIRST_HEX) {
+	    if (ISDIGIT(*bufferCoded)) 
+		*end++ = *end | (*bufferCoded - '0');
+	    else 
+		*end++ = *end | (TOUPPER(*bufferCoded) - 'A' + 10);
+		state = QPDECODE_BEGIN;
+	} else if (*bufferCoded == '=') {
+	    state = SAW_EQUAL;
+	} else {
+	    *end++ = *bufferCoded;
+	}
+	bufferCoded++;
+	if (!nullTerm && --nbytes == 0) break;
+    }
+
+    POPDS;
+
+    return (end-bufferPlain);
+}
+

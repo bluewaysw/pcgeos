@@ -1,0 +1,278 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1994 -- All Rights Reserved
+ *
+ * PROJECT:	  Clavin
+ * MODULE:	  UI Specification
+ * FILE:	  uiOutPanel.ui
+ *
+ * AUTHOR:  	  Adam de Boor: May 25, 1994
+ *
+ * REVISION HISTORY:
+ *	Name	  Date	    Description
+ *	----	  ----	    -----------
+ *	ardeb	  5/25/94	    Initial version
+ *
+ * DESCRIPTION:
+ *	
+ *
+ *
+ * 	$Id: uiOutPanel.ui,v 1.1 97/04/05 01:19:10 newdeal Exp $
+ *
+ ***********************************************************************/
+
+#if	_CONTROL_PANELS
+
+start OutboxPanelUI, notDetachable;
+
+OutboxPanelRoot = OutboxControlPanel {
+	genStates = default -usable;
+	attributes = default +notUserInitiatable;
+	moniker = "Outbox";
+	specificMoniker = "\\1 Messages";
+		localize "Moniker placed in the title bar of an outbox control panel that shows up when a group of messages becomes sendable. @1 is replaced by the verb from a typical Send menu, such as Fax or Beam or Print.";
+
+	children = OutboxPanelTransportsGroup, OutboxPanelHelpText,
+		OutboxPanelMessages,
+		OutboxPanelReplyBar,
+		OutboxPanelDetails;
+	msgList = OutboxPanelMessages;
+	detailsBox = OutboxPanelDetails;
+	specificRoot = OutboxPanelHelpText;
+	nonSpecificRoot = OutboxPanelTransportsGroup;
+	deliveryTrigger = OutboxPanelDeliverAll;
+	deliveryMoniker = 'A', "\\1 All";
+		localize "Moniker used for the deliver-all trigger in an outbox control panel when the panel is showing a list of messages for a particular transport. @1 is replaced with the delivery verb, like Fax or Mail or Print";
+
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		ATTR_GEN_WINDOW_CUSTOM_PARENT {
+			hptr	0	; use screen as parent
+		},
+		ATTR_GEN_WINDOW_CUSTOM_LAYER_PRIORITY {
+			; keep on top. dont set win prio, though, as we want
+			; it to not interfere with control panels, etc.
+			LayerPriority	LAYER_PRIO_ON_TOP
+		}
+	}
+}
+
+	/* goofy interaction needed b/c MINIMIZE_SIZE + 
+	 * DISPLAY_CURRENT_SELECTION is interpreted as "don't display a moniker"
+	 */
+OutboxPanelTransportsGroup = GenInteraction {
+	children = OutboxPanelTransportGlyph, OutboxPanelTransports;
+	hints = { 
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY
+	}
+}
+
+OutboxPanelTransportGlyph = GenGlyph {
+	moniker = "Show:";
+}
+
+OutboxPanelTransports = OutboxTransportList {
+	destination = OutboxPanelRoot;
+	applyMsg = MSG_OCP_SET_TRANSPORT;
+	monikerSource = OutboxPanelTransportMonikers;
+	hints = {
+		HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION,
+		HINT_ITEM_GROUP_MINIMIZE_SIZE
+	}
+}
+
+OutboxPanelTransportMonikers = OutboxTransportMonikerSource {
+	type = panel;
+}
+
+OutboxPanelHelpText = GenGlyph {
+	moniker = "The following can all now be sent:";
+	genStates = default -usable;
+}
+
+OutboxPanelMessages = OutboxMessageList {
+	attrs = sourceQueue outbox;
+	applyMsg = MSG_MCP_MESSAGE_SELECTED;
+	destination = OutboxPanelRoot;
+	hints = {
+		HINT_ITEM_GROUP_SCROLLABLE,
+		ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION,
+		HINT_MAXIMUM_SIZE {
+			SpecWidth <>
+			SpecHeight <SST_PCT_OF_FIELD_HEIGHT, PCT_45>
+			word 1
+		}
+	}
+}
+
+/* Need this to get the Poof menu into the reply bar... */
+OutboxPanelReplyBar = GenInteraction {
+	children = 
+#if 	_POOF_MESSAGE_CREATION
+		OutboxPanelPoof,
+#endif	/* _POOF_MESSAGE_CREATION */
+		OutboxPanelDeliverAll,
+		OutboxPanelDone;
+	hints = { HINT_MAKE_REPLY_BAR }
+}
+
+#if 	_POOF_MESSAGE_CREATION
+OutboxPanelPoof = MailboxSendControl {
+	moniker = 'P', "Poof!";
+	visibility = popup;
+	defBodyType = "MOT_QUICK_MESSAGE";
+	hints = {
+		HINT_AVOID_MENU_BAR,
+		ATTR_GEN_CONTROL_PROHIBIT_UI {
+			word mask MSCF_TRANSPORT_LIST
+		}
+	}
+}
+#endif	/* _POOF_MESSAGE_CREATION */
+
+OutboxPanelDeliverAll = GenTrigger {
+	/* moniker set by MCP */
+	action = MSG_ML_DELIVER_ALL, OutboxPanelMessages;
+	genStates = default -usable;
+}
+
+OutboxPanelDone = GenTrigger {
+	moniker = 'D', "Done";
+	action = MSG_MA_DESTROY_DIALOG, MailboxApp;
+}
+
+OutboxPanelDetails = OutboxDetails {
+	titleMoniker = "\\1 Message";
+	deliveryMoniker = 'N', "\\1 Now";
+	boundMoniker = "\\1 Between:";
+	subjectText = OutboxPanelDetailsSubject;
+	dateText = OutboxPanelDetailsDate;
+	actionTrigger = OutboxPanelDetailsSend;
+	boundText = OutboxPanelDetailsBounds;
+
+	attributes = default +notUserInitiatable;
+
+	children = OutboxPanelDetailsSubject,
+		OutboxPanelDetailsDate,
+		OutboxPanelDetailsDestination,
+		OutboxPanelDetailsNumFailures,
+		OutboxPanelDetailsReason,
+		OutboxPanelDetailsBounds,
+		OutboxPanelDetailsListAllGroup,
+		OutboxPanelDetailsSend,
+		OutboxPanelDetailsDelete,
+		OutboxPanelDetailsClose;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_MAXIMUM_SIZE {
+			SpecWidth <SST_PCT_OF_FIELD_WIDTH, PCT_100>
+			SpecHeight 0
+			word 0
+		}
+	}
+}
+
+OutboxPanelDetailsSubject = GenText {
+	genAttributes = default +readOnly;
+	moniker = "Subject:";
+	text = "";
+	hints = {
+		HINT_MAXIMUM_SIZE {
+			SpecWidth <>
+			SpecHeight <SST_LINES_OF_TEXT, 3>
+		},
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+OutboxPanelDetailsDate = GenText {
+	genAttributes = default +readOnly;
+	moniker = "Date:";
+	text = "";
+	textDisplayAttributes = singleLineText, noWordWrapping;
+	hints = { HINT_EXPAND_WIDTH_TO_FIT_PARENT }
+}
+
+OutboxPanelDetailsDestination = GenText {
+	genAttributes = default +readOnly;
+	moniker = "To:";
+	text = "";
+	hints = {
+		HINT_MAXIMUM_SIZE {
+			SpecWidth <>
+			SpecHeight <SST_LINES_OF_TEXT, 4>
+		},
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+OutboxPanelDetailsNumFailures = GenText {
+	genAttributes = default +readOnly;
+	moniker = "Number of Failures:";
+	text = "";
+	textDisplayAttributes = singleLineText, noWordWrapping;
+	hints = { HINT_EXPAND_WIDTH_TO_FIT_PARENT }
+}
+
+OutboxPanelDetailsReason = GenText {
+	genAttributes = default +readOnly;
+	moniker = "Reason for Last Failure:";
+	text = "";
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+OutboxPanelDetailsBounds = GenText {
+	genAttributes = default +readOnly;
+	text = "";
+	textDisplayAttributes = singleLineText, noWordWrapping;
+	hints = { HINT_EXPAND_WIDTH_TO_FIT_PARENT }
+}
+
+OutboxPanelDetailsListAllGroup = GenBooleanGroup {
+	children = OutboxPanelDetailsListAllAddresses;
+	destination = OutboxPanelDetails;
+	applyMsg = MSG_OD_LIST_ALL_ADDRESSES;
+}
+
+OutboxPanelDetailsListAllAddresses = GenBoolean {
+	moniker = 'A', "List All Addresses";
+	identifier = ODLS_LIST_ALL;
+}
+
+OutboxPanelDetailsSend = GenTrigger {
+	/* moniker set by box */
+	action = MSG_OD_SEND_MESSAGE, OutboxPanelDetails;
+	hints = {
+		HINT_DEFAULT_DEFAULT_ACTION,
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+OutboxPanelDetailsDelete = GenTrigger {
+	moniker = 'D', "Delete";
+	action = MSG_OD_DELETE_MESSAGE, OutboxPanelDetails;
+	hints = {
+		HINT_TRIGGER_DESTRUCTIVE_ACTION,
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+OutboxPanelDetailsClose = GenTrigger {
+	moniker = 'C', "Close";
+	hints = {
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {
+			word IC_DISMISS
+		},
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+end OutboxPanelUI;
+
+#endif	/* _CONTROL_PANELS */

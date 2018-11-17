@@ -1,0 +1,2873 @@
+/***************************************************************************
+ *  FILE:  PVault.GOC                                                      *
+ ***************************************************************************/
+
+/*-------------------------------------------------------------------------
+ | Program:  Pocket Vault
+ *-------------------------------------------------------------------------
+ |
+ | Objective:
+ |    Program used to store a group of data in a personal holding area
+ |    where security is a MUST.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/16/99  Created
+ |    jfh	 09/04/99	 fixed pword check in N version
+ |                   & changed help file name
+ |    jfh  09/20/99  OK- this time changed help file name
+ |                   AND - messed around trying to get the password dboxes
+ |                   help to open in the right context in the N version -
+ |                   doesn't seem to work with dboxes started with UserDo...
+ |    jfh  09/21/99  added Nokia tiny icon
+ |                   compiled release N version
+ |		jfh  04/26/01  started v1.1
+ |                   changed loc of data file on N9k
+ |                   	added check for data file in v1.0 loc
+ |                   grey out open & del when no items
+ |                   requires each item to have a title
+ |                   Added title sorting -
+ |                   	done by creating index on app opening and deleting
+ |                      it on app close so that existing dbs don't get hosed
+ |                   ...to be continued...
+ |		jfh  04/27/01  removed ENABLED from UITurnOn & Off (caused crashing
+ |                      when making DList not USABLE after I started
+ |								implementing sorting
+ |							continued sort stuff
+ |    jfh  05/01/01  Finished sort stuff
+ |		jfh  05/06/01  ARRGGHHHH - the new data file location still won't do.
+ |							it needs to be in a subfolder of Documents to get backed-
+ |							up, restored, etc.
+ |    jfh  08/23/01  built desktop version
+ |                   commented out ntiny.goh
+ |                   enabled change password button
+ |                   ---  There are weird random bugs in desktop build!!! ---
+ |         08/24/01	Frank says N9000 is cool
+ |    jfh  09/03/01  beefed up sort file creation
+ |                   save sort file on each action
+ |
+ |
+ *-----------------------------------------------------------------------*/
+
+/***************************************************************************
+ *		Include files
+ ***************************************************************************/
+
+@include <stdapp.goh>
+@include <Objects/vltextc.goh>
+#include <Ansi/string.h>
+#include <Ansi/stdio.h>
+@include "options.goh"
+
+@ifdef NSAFE_BUILD
+@include <foam.goh>
+@endif
+
+@ifdef NSAFE_BUILD
+#define PVAULT_DB_STANDARD_PATH   SP_DOCUMENT
+#define PVAULT_DB_V10_STANDARD_PATH   SP_PUBLIC_DATA
+#define PVAULT_DB_RELATIVE_PATH   "PktVault"
+#define PVAULT_DB_V10_RELATIVE_PATH   "."
+#define PVAULT_DB_REL_PATH_AND_NAME   "\\PktVault\\PvData"
+@endif
+@ifdef DESKTOP_BUILD
+#define PVAULT_DB_STANDARD_PATH   SP_PUBLIC_DATA
+#define PVAULT_DB_RELATIVE_PATH   "."
+@endif
+#define PVAULT_DB_NAME            "PvData"
+#define PVAULT_SORT_NAME			 "SortData"
+
+#define PASSWORD_MIN_LENGTH       6
+#define PASSWORD_MAX_LENGTH       12
+#define PASSWORD_HINT_LENGTH      40
+
+#define PVAULT_DATA_MAX_LENGTH    1023
+#define PVAULT_TITLE_MAX_LENGTH   80
+
+#define DEFAULT_PASSWORD_ID       0x5076
+#define DEFAULT_PASSWORD_ID2      16310
+#define DEFAULT_PASSWORD_ID3      0x775E
+
+typedef struct {
+    TCHAR P_password[PASSWORD_MAX_LENGTH+1] ;
+    TCHAR P_hint[PASSWORD_HINT_LENGTH+1] ;
+} T_password ;
+
+typedef struct {
+    HugeArrayDirectory PVH_directory ;
+    T_password PVH_password ;
+} T_pvHeader ;
+
+typedef struct {
+     /* NOTE:  The order of elements in this structure is VERY important */
+    word PVIH_id ;
+    word PVIH_length ;          /* Data limit of 1K */
+	 TCHAR PVIH_title[PVAULT_TITLE_MAX_LENGTH+1] ;
+	 T_password PVIH_password ;
+} T_pvItemHeader ;
+
+typedef struct {
+    T_pvItemHeader PVCI_header ;
+    TCHAR PVCI_data[PVAULT_DATA_MAX_LENGTH+1] ;
+    Boolean PVCI_isDirty ;
+    Boolean PVCI_decodeAll ;
+    word PVCI_index ;
+} T_pvCompleteItem ;
+
+typedef struct {
+	 word		SE_index;
+	 TCHAR		SE_title[PVAULT_TITLE_MAX_LENGTH+1];
+} SortElement;
+
+
+/* Personal Vault Database Routines */
+Boolean PVDBOpen(void) ;
+Boolean PVDBIsOpen(void) ;
+void PVDBClose(void) ;
+void PVDBSave(void) ;
+void PVDBGetMainPassword(T_password *p_password) ;
+void PVDBSetMainPassword(T_password *p_password) ;
+T_pvItemHeader *PVDBLock(word index, word *p_size) ;
+void PVDBDirty(T_pvItemHeader *p_item) ;
+void PVDBUnlock(T_pvItemHeader *p_item, word size) ;
+word PVDBGetNumberItems(void) ;
+word PVDBAllocItem(void) ;
+word PVDBResizeData(word index, word newLength) ;
+T_pvCompleteItem *PVDBGrab(word index, Boolean decodeAll) ;
+void PVDBRelease(T_pvCompleteItem *p_item) ;
+void PVDBDelete(word index) ;
+
+Boolean PVComparePasswords(T_password *p_entered, T_password *p_stored) ;
+
+typedef word AskPasswordResult ;
+#define ASK_PASSWORD_RESULT_CANCEL    0
+#define ASK_PASSWORD_RESULT_OK        1
+#define ASK_PASSWORD_RESULT_CHANGE    2
+AskPasswordResult PVAskPassword(T_password *p_password, Boolean askChange) ;
+Boolean PVChangePassword(T_password *p_password, Boolean changeHint) ;
+
+#define MAX_ENCODE_PASSWORD_LENGTH  10
+void PVGenerateRealPassword(
+         T_password *p_password,
+         word index,
+         byte rpass[MAX_ENCODE_PASSWORD_LENGTH]) ;
+void PVEncode(T_password *p_password, word index, void *p_data, word len) ;
+void PVDecode(T_password *p_password, word index, void *p_data, word len) ;
+
+void PVGenerateIDBasedPassword(word id, T_password *p_password) ;
+
+/* Utilitiy routines */
+void UITurnOff(optr object) ;
+void UITurnOn(optr object) ;
+InteractionCommand GEOSMessageBox(
+                       optr string,
+                       CustomDialogType type,
+                       GenInteractionType itype) ;
+
+/* Sort index routines */
+void CreateSortFile(void);
+void DeleteSortFile(void);
+void InitSortArray(void);
+word AddToSortArray(TCHAR *title, word item);
+void DelFromSortArray(word item);
+
+/***************************************************************************
+ *		Global variables:
+ ***************************************************************************/
+                                                        
+VMFileHandle G_dbFile = NullHandle ;
+VMBlockHandle G_dbArray = NullHandle ;
+word G_pvdbLockCount = 0 ;
+word G_pvdbGrabCount = 0 ;
+T_pvCompleteItem G_pvdbItem ;
+byte passwordString[] = "Yh\340,\341\\;aU4*!" ;
+Boolean G_isNewItem = FALSE ;
+VMFileHandle g_sortFile = NullHandle;
+VMBlockHandle g_sortVMBH = NullHandle ;
+ChunkHandle g_sortChunkArrayHan = NullHandle;
+
+/***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************/
+
+    /*---------------------------------------------------------------------*/
+	 @class PVaultProcessClass, GenProcessClass ;
+			@message void MSG_POCKET_VAULT_OPEN_VAULT() ;   /* sort OK */
+			@message void MSG_POCKET_VAULT_CLOSE_VAULT() ;  /* sort NA */
+			@message void MSG_POCKET_VAULT_OPEN_ITEM() ;    /* sort OK */
+         @message void MSG_POCKET_VAULT_NEW_ITEM() ;
+         @message void MSG_POCKET_VAULT_DELETE_ITEM() ;
+         @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_POCKET_VAULT_QUERY_ITEM ;
+	 @endc                                                         /* sort OK */
+
+    @classdecl PVaultProcessClass, neverSaved ;
+    /*---------------------------------------------------------------------*/
+
+    /*---------------------------------------------------------------------*/
+    @class PVaultEditItemDialogClass, GenInteractionClass ;
+			@instance T_pvCompleteItem *EID_item = NULL ;               /* sort NA */
+			@message void MSG_EDIT_ITEM_DIALOG_OPEN(T_pvCompleteItem *p_item) ;
+         @message void MSG_EDIT_ITEM_DIALOG_CLOSE() ;
+         @message void MSG_EDIT_ITEM_DIALOG_CHANGE_PASSWORD() ;
+    @endc
+    /*---------------------------------------------------------------------*/
+
+@ifdef NSAFE_BUILD
+    /*---------------------------------------------------------------------*/
+	 @class NSafeGenTextClass, UnderlinedGenTextClass ;
+        @instance optr NGI_next = NullHandle ;
+    @endc
+
+    @classdecl NSafeGenTextClass ;
+    /*---------------------------------------------------------------------*/
+@endif
+
+/***************************************************************************
+ *		UI Objects
+ ***************************************************************************/
+
+
+
+/*=========================================================================*/
+
+
+
+@start	AppResource ;
+    /*---------------------------------------------------------------------*/
+@ifdef DESKTOP_BUILD
+	 @object GenApplicationClass PVaultApp = {
+@endif
+@ifdef NSAFE_BUILD
+	 @object FoamSubApplicationClass PVaultApp = {
+@endif
+		GI_visMoniker = list { @PVaultTextMoniker,
+						 @AppIcon1,
+						 @AppIcon2,
+						 @TinyIcon };
+		GI_comp       = @PVaultPrimary
+@ifdef COMPILE_OPTION_EXPIRE_ON
+                        , @ExpireDialog
+@endif
+                        ;
+        gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS)
+                      = @PVaultPrimary;
+@ifdef DESKTOP_BUILD
+		  ATTR_GEN_HELP_FILE = "VaultHelp" ;
+@endif
+@ifdef NSAFE_BUILD
+		  ATTR_GEN_HELP_FILE = "PVHelp" ;
+@endif
+	 }
+
+	 /*---------------------------------------------------------------------*/
+@ifdef DESKTOP_BUILD
+	 @visMoniker PVaultTextMoniker =
+		  "The Vault" ;
+@endif
+@ifdef NSAFE_BUILD
+	 @visMoniker PVaultTextMoniker =
+		  "Pocket\rVault" ;
+@endif
+
+	 /*---------------------------------------------------------------------*/
+    @include "art\icon1.goh"
+	 @include "art\icon2.goh"
+/*@ifdef DESKTOP_BUILD   */
+	 @include "art\pvtiny.goh"
+/*@endif */
+/*@ifdef NSAFE_BUILD
+	 @include "art\ntiny.goh" */
+/*@endif   */
+@end	AppResource
+
+
+/*=========================================================================*/
+
+@ifdef COMPILE_OPTION_EXPIRE_ON
+@include "iexpire.goh"
+@include "expireui.goh"
+@include "cexpire.goh"
+@endif
+
+/*=========================================================================*/
+
+
+
+@start	Interface		/* this resource is for misc UI objects */ ; ;
+    /*---------------------------------------------------------------------*/
+	 @object GenPrimaryClass PVaultPrimary  = {
+@ifdef NSAFE_BUILD
+        GI_comp = @PVaultPrimaryBorder, @Dialogs ; /* jfh added Dialogs here */
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+@endif
+@ifdef DESKTOP_BUILD
+        GI_comp =
+				@PVMainArea,
+            @PVMenuBar,
+            @Dialogs ;
+        HINT_SIZE_WINDOW_AS_DESIRED ;
+@endif
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        ATTR_GEN_HELP_CONTEXT = "TOC";
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass Dialogs = {
+        GI_comp =
+            @PVEditItemDialog,
+            @PVAskPasswordDialog,
+            @PVChangePasswordDialog ;
+        GII_type = GIT_ORGANIZATIONAL ;
+        GII_visibility = GIV_DIALOG ;
+        GII_attrs = @default | GIA_NOT_USER_INITIATABLE ;
+    }
+    /*---------------------------------------------------------------------*/
+@ifdef NSAFE_BUILD
+	 @object ComplexMonikerClass PVaultPrimaryBorder =  {
+	   ComplexMoniker = GenInteractionClass;
+        GI_comp =
+            @PVMainArea,
+            @PVMenuBar ;
+	    GI_attrs = @default | GA_KBD_SEARCH_PATH ;
+        HINT_DRAW_IN_BOX;
+        HINT_DRAW_SHADOW ;
+        HINT_PLACE_MONIKER_ABOVE;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_COMPLEX_MONIKER_DRAW_SEPARATOR;
+        ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+        ATTR_COMPLEX_MONIKER_PLACE_BITMAP_AT_LEFT;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+    }
+@endif
+    /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass PVMainArea = {
+        GI_comp = @PVClosedVault, @PVOpenedVault ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+@ifdef DESKTOP_BUILD
+		  HINT_DRAW_IN_BOX ;
+        HINT_MINIMUM_SIZE = { SST_PIXELS | 400, SST_PIXELS | 200 } ;
+@endif
+	 }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass PVClosedVault = {
+        GI_comp = @PVClosedTitle ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass PVClosedTitle = {
+@ifdef DESKTOP_BUILD
+		  GI_visMoniker = "The Vault is Closed." ;
+@endif
+@ifdef NSAFE_BUILD
+		  GI_visMoniker = "Pocket Vault is Closed." ;
+@endif
+	 }
+    /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass PVMenuBar = {
+        GI_comp =
+            @PVOpenVaultTrigger,
+            @PVOpenItemTrigger,
+            @PVNewItemTrigger,
+            @PVDeleteItemTrigger,
+            @PVCloseVaultTrigger
+@ifdef NSAFE_BUILD
+            ,
+            @PVExitTrigger
+@endif
+            ;
+        HINT_FIXED_SIZE = { SST_PIXELS|100, 0 } ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_ORIENT_CHILDREN_VERTICALLY ;
+        HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY ;
+        HINT_INCLUDE_ENDS_IN_CHILD_SPACING ;
+    }
+    /*---------------------------------------------------------------------*/
+@ifdef NSAFE_BUILD
+    @object GenTriggerClass PVExitTrigger = {
+        GI_visMoniker = "Exit" ;
+        GTI_destination = PVaultApp ;
+        GTI_actionMsg = MSG_META_QUIT ;
+		  HINT_SEEK_SLOT = 3;
+	 }
+@endif
+    /*---------------------------------------------------------------------*/
+	 @object GenTriggerClass PVOpenVaultTrigger = {
+        GI_visMoniker = 'O', "Open Vault" ;
+        GTI_destination = process ;
+        GTI_actionMsg = MSG_POCKET_VAULT_OPEN_VAULT ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+@ifdef NSAFE_BUILD
+        HINT_SEEK_SLOT = 0;
+@endif
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass PVOpenedVault = {
+		  GI_states = @default & (~GS_USABLE) ;
+@ifdef NSAFE_BUILD
+        GI_comp = @PVListBorderAndTitle ;
+@endif
+@ifdef DESKTOP_BUILD
+        GI_comp = @PVList ;
+@endif
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+@ifdef NSAFE_BUILD
+    @chunk TCHAR PVListBorderAndTextTitle[] = "Vault Items:";
+    @object ComplexMonikerClass PVListBorderAndTitle =  {
+        ComplexMoniker = GenInteractionClass;
+        CMI_topText = @PVListBorderAndTextTitle;
+        CMI_fontSize = FOAM_LARGE_FONT_SIZE;
+        GI_comp = @PVList;
+        CMI_iconBitmap = CMB_SERVICES_DEFINE;
+        HINT_PLACE_MONIKER_ABOVE;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_COMPLEX_MONIKER_DRAW_SEPARATOR;
+        ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+        HINT_INDENT_CHILDREN = FOAM_HEADER_ICON_WIDTH ;
+        ATTR_COMPLEX_MONIKER_PLACE_BITMAP_AT_LEFT;
+    }
+@endif
+    /*---------------------------------------------------------------------*/
+    @object GenDynamicListClass PVList = {
+        GDLI_queryMsg = MSG_POCKET_VAULT_QUERY_ITEM ;
+		  GIGI_destination = process ;
+		  ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS = MSG_POCKET_VAULT_OPEN_ITEM;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_ITEM_GROUP_SCROLLABLE;
+    }
+    /*---------------------------------------------------------------------*/
+	 @object GenTriggerClass PVOpenItemTrigger = {
+		  GI_states = @default & (~GS_USABLE) ;
+@ifdef NSAFE_BUILD
+		  GI_visMoniker = 'O', "Open" ;;
+@endif
+@ifdef DESKTOP_BUILD
+		  GI_visMoniker = 'O', "Open Item" ;;
+@endif
+		  GTI_destination = process ;
+		  GTI_actionMsg = MSG_POCKET_VAULT_OPEN_ITEM ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+@ifdef NSAFE_BUILD
+        HINT_SEEK_SLOT = 0;
+@endif
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass PVNewItemTrigger = {
+		  GI_states = @default & (~GS_USABLE) ;
+@ifdef NSAFE_BUILD
+		  GI_visMoniker = 'N', "New" ;
+@endif
+@ifdef DESKTOP_BUILD
+		  GI_visMoniker = 'N', "New Item" ;;
+@endif
+		  GTI_destination = process ;
+        GTI_actionMsg = MSG_POCKET_VAULT_NEW_ITEM ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+@ifdef NSAFE_BUILD
+        HINT_SEEK_SLOT = 1;
+@endif
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass PVDeleteItemTrigger = {
+		  GI_states = @default & (~GS_USABLE) ;
+@ifdef NSAFE_BUILD
+		  GI_visMoniker = 'D', "Delete" ;
+@endif
+@ifdef DESKTOP_BUILD
+		  GI_visMoniker = 'D', "Delete Item" ;;
+@endif
+		  GTI_destination = process ;
+		  GTI_actionMsg = MSG_POCKET_VAULT_DELETE_ITEM ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+@ifdef NSAFE_BUILD
+        HINT_SEEK_SLOT = 2;
+@endif
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass PVCloseVaultTrigger = {
+		  GI_states = @default & (~GS_USABLE) ;
+@ifdef NSAFE_BUILD
+		  GI_visMoniker = 'C', "Close" ;
+@endif
+@ifdef DESKTOP_BUILD
+		  GI_visMoniker = 'C', "Close Vault" ;;
+@endif
+		  GTI_destination = process ;
+        GTI_actionMsg = MSG_POCKET_VAULT_CLOSE_VAULT ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+@ifdef NSAFE_BUILD
+        HINT_SEEK_SLOT = 3;
+@endif
+    }
+    /*---------------------------------------------------------------------*/
+	 @object PVaultEditItemDialogClass PVEditItemDialog = {
+        GI_visMoniker = "Edit Item" ;
+@ifdef NSAFE_BUILD
+        GI_comp = @PVEditItemBorder ;
+@endif
+@ifdef DESKTOP_BUILD
+		  GI_comp = @PVEditItemContents ;
+@endif
+        GII_visibility = GIV_DIALOG ;
+        GII_attrs = @default |
+                    GIA_MODAL |
+                    GIA_NOT_USER_INITIATABLE ;
+        HINT_CENTER_CHILDREN_ON_MONIKERS ;
+        ATTR_GEN_HELP_CONTEXT = "Edit Item";
+    }
+    /*---------------------------------------------------------------------*/
+@ifdef NSAFE_BUILD
+    @chunk TCHAR PVEditItemBorderTitle[] = "Edit Item";
+    @object ComplexMonikerClass PVEditItemBorder =  {
+        ComplexMoniker = GenInteractionClass;
+        CMI_topText = @PVEditItemBorderTitle;
+		  CMI_fontSize = FOAM_NORMAL_FONT_SIZE;
+        GI_comp = @PVEditItemContents ;
+        CMI_iconBitmap = CMB_SERVICES_DEFINE;
+        HINT_DRAW_IN_BOX;
+        HINT_DRAW_SHADOW;
+        HINT_PLACE_MONIKER_ABOVE;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_COMPLEX_MONIKER_DRAW_SEPARATOR;
+        ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+        HINT_INDENT_CHILDREN = FOAM_HEADER_ICON_WIDTH ;
+        ATTR_COMPLEX_MONIKER_PLACE_BITMAP_AT_LEFT;
+/*
+        HINT_MAXIMUM_SIZE = { SST_PIXELS | 300, SST_PIXELS | 180, 0 } ;
+*/
+    }
+@endif
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass PVEditItemContents = {
+        GI_comp = @PVEditItemTitle,
+                  @PVEditItemData,
+                  @PVEditItemOKTrigger,
+                  @PVEditItemChangePasswordTrigger,
+                  @PVEditItemCancelTrigger ;
+        HINT_CENTER_CHILDREN_ON_MONIKERS ;
+        ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_MINIMUM_SIZE = {SST_PIXELS | 320, 0} ;
+    }
+    /*---------------------------------------------------------------------*/
+@ifdef NSAFE_BUILD
+    @object NSafeGenTextClass PVEditItemTitle = {
+@endif
+@ifdef DESKTOP_BUILD
+    @object GenTextClass PVEditItemTitle = {
+@endif
+        GI_visMoniker = 'T', "Title:" ;
+        GTXI_attrs = @default |
+                     GTA_SINGLE_LINE_TEXT |
+                     GTA_USE_TAB_FOR_NAVIGATION ;
+        GTXI_maxLength = PVAULT_TITLE_MAX_LENGTH ;
+        GTXI_text = "" ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_DEFAULT_FOCUS ;
+        HINT_DEFAULT_TARGET ;
+@ifdef NSAFE_BUILD
+        HINT_MINIMUM_SIZE = {SST_PIXELS | 260, 0} ;
+@endif
+@ifdef DESKTOP_BUILD
+        HINT_MINIMUM_SIZE = {SST_PIXELS | 300, 0} ;
+@endif
+    }
+    /*---------------------------------------------------------------------*/
+@ifdef NSAFE_BUILD
+    @object NSafeGenTextClass PVEditItemData = {
+@endif
+@ifdef DESKTOP_BUILD
+    @object GenTextClass PVEditItemData = {
+@endif
+        GI_visMoniker = 'D', "Data:" ;
+        GTXI_maxLength = PVAULT_DATA_MAX_LENGTH ;
+        GTXI_text = "" ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	    GTXI_attrs = @default
+                     | GTA_INIT_SCROLLING
+                     | GTA_USE_TAB_FOR_NAVIGATION ;
+@ifdef NSAFE_BUILD
+        NGI_next = @PVEditItemTitle ;
+@endif
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass PVEditItemOKTrigger = {
+        GTI_destination = @PVEditItemDialog ;
+        GTI_actionMsg = MSG_EDIT_ITEM_DIALOG_CLOSE ;
+        HINT_SEEK_REPLY_BAR ;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_OK};
+@ifdef NSAFE_BUILD
+        HINT_SEEK_SLOT = 0;
+@endif
+    }
+    /*---------------------------------------------------------------------*/
+@ifdef NSAFE_BUILD
+    @chunk TCHAR EditItemChangePasswordMoniker[] = "Change\rPassword" ;
+    @object ComplexMonikerClass PVEditItemChangePasswordTrigger = {
+        ComplexMoniker = GenTriggerClass ;
+        CMI_topText = @EditItemChangePasswordMoniker ;
+        GTI_actionMsg = MSG_EDIT_ITEM_DIALOG_CHANGE_PASSWORD ;
+        GTI_destination = @PVEditItemDialog ;
+        HINT_SEEK_MENU_BAR ;
+        HINT_SEEK_SLOT = 1;
+    }
+@endif
+@ifdef DESKTOP_BUILD
+    @object GenTriggerClass PVEditItemChangePasswordTrigger = {
+		  GI_visMoniker = 'C', "Change password" ;
+        GTI_actionMsg = MSG_EDIT_ITEM_DIALOG_CHANGE_PASSWORD ;
+        GTI_destination = @PVEditItemDialog ;
+        HINT_SEEK_REPLY_BAR ;
+    }
+@endif
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass PVEditItemCancelTrigger = {
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        HINT_SEEK_REPLY_BAR ;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {IC_DISMISS};
+@ifdef NSAFE_BUILD
+        HINT_SEEK_SLOT = 3;
+@endif
+    }
+    /*---------------------------------------------------------------------*/
+@end Interface ;
+
+@start PasswordWithHintResource ;
+    /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass PVAskPasswordDialog = {
+        GI_visMoniker = "Password Check" ;
+@ifdef DESKTOP_BUILD
+	   GI_comp = @PVAskPasswordContents ;
+	   GII_visibility = GIV_DIALOG ;
+@endif
+@ifdef NSAFE_BUILD
+        GI_comp = @PVAskPasswordBorder ;
+	   GII_visibility = GIV_POPUP ;
+@endif
+	   GII_type = GIT_COMMAND ;
+	   GII_attrs = @default |
+				GIA_MODAL |
+				GIA_NOT_USER_INITIATABLE |
+				GIA_INITIATED_VIA_USER_DO_DIALOG ;
+	   HINT_ORIENT_CHILDREN_VERTICALLY ;
+	   HINT_CENTER_CHILDREN_ON_MONIKERS ;
+@ifdef NSAFE_BUILD
+        HINT_DRAW_IN_BOX ;
+        HINT_DRAW_SHADOW ;
+	   HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+@endif
+        ATTR_GEN_HELP_CONTEXT = "Password Check";
+    }
+    /*---------------------------------------------------------------------*/
+@ifdef NSAFE_BUILD
+	 @chunk TCHAR PVAskPasswordBorderTitle[] = "Password Check";
+    @object ComplexMonikerClass PVAskPasswordBorder =  {
+        ComplexMoniker = GenInteractionClass;
+        CMI_topText = @PVAskPasswordBorderTitle;
+        CMI_fontSize = FOAM_NORMAL_FONT_SIZE;
+        GI_comp = @PVAskPasswordContents ;
+        CMI_iconBitmap = CMB_SERVICES_DEFINE;
+/*
+        HINT_DRAW_IN_BOX;
+        HINT_DRAW_SHADOW;
+*/
+        HINT_PLACE_MONIKER_ABOVE;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_COMPLEX_MONIKER_DRAW_SEPARATOR;
+        ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+        HINT_INDENT_CHILDREN = FOAM_HEADER_ICON_WIDTH ;
+        ATTR_COMPLEX_MONIKER_PLACE_BITMAP_AT_LEFT;
+    }
+@endif
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass PVAskPasswordContents = {
+        GI_comp =
+            @PVPasswordText,
+            @PVHintText,
+            @PVPasswordOKTrigger,
+            @PVPasswordChangeTrigger ;
+        HINT_CENTER_CHILDREN_ON_MONIKERS ;
+        ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+@ifdef DESKTOP_BUILD
+    @object GenTextClass PVPasswordText = {
+@endif
+@ifdef NSAFE_BUILD
+    @object NSafeGenTextClass PVPasswordText = {
+@endif
+        GI_visMoniker = "Password:" ;
+        GTXI_maxLength = PASSWORD_MAX_LENGTH ;
+        GTXI_text = "" ;
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+        ATTR_GEN_TEXT_CHAR_ATTR = @UserPasswordFont ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_DEFAULT_FOCUS ;
+    }
+    /*---------------------------------------------------------------------*/
+    @chunk VisTextCharAttr UserPasswordFont =
+                               CHAR_ATTR_FONT_SIZE(FID_BISON, 13) ;
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass PVHintText = {
+        GI_visMoniker = "Hint:" ;
+        GI_attrs = @default | GA_READ_ONLY ;
+        GTXI_text = "" ;
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+        GTXI_maxLength = PASSWORD_HINT_LENGTH ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass PVPasswordOKTrigger = {
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        HINT_SEEK_REPLY_BAR ;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_OK ;
+        HINT_DEFAULT_DEFAULT_ACTION ;
+@ifdef NSAFE_BUILD
+        HINT_SEEK_SLOT = 0;
+@endif
+    }
+    /*---------------------------------------------------------------------*/
+@ifdef NSAFE_BUILD
+    @chunk TCHAR PasswordChangeMoniker [] = "Change\rPassword" ;
+    @object ComplexMonikerClass PVPasswordChangeTrigger = {
+        ComplexMoniker = GenTriggerClass ;
+        CMI_topText = @PasswordChangeMoniker ;
+        HINT_SEEK_MENU_BAR ;
+        HINT_SEEK_SLOT = 1;
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_RESET ;
+    }
+@endif
+@ifdef DESKTOP_BUILD
+    @object GenTriggerClass PVPasswordChangeTrigger = {
+        GI_visMoniker = 'C', "Change password" ;
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        HINT_SEEK_REPLY_BAR ;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_RESET ;
+    }
+@endif
+    /*---------------------------------------------------------------------*/
+@end PasswordWithHintResource ;
+
+
+@start ChangePasswordResource ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass PVChangePasswordDialog = {
+        GI_visMoniker = "Change Password" ;
+@ifdef DESKTOP_BUILD
+        GI_comp = @PVChangePasswordContents ;
+@endif
+@ifdef NSAFE_BUILD
+        GI_comp = @PVChangePasswordBorder ;
+@endif
+        GII_visibility = GIV_DIALOG ;
+        GII_type = GIT_COMMAND ;
+        GII_attrs = @default |
+                    GIA_MODAL |
+                    GIA_NOT_USER_INITIATABLE |
+                    GIA_INITIATED_VIA_USER_DO_DIALOG ;
+        HINT_ORIENT_CHILDREN_VERTICALLY ;
+        HINT_CENTER_CHILDREN_ON_MONIKERS ;
+        ATTR_GEN_HELP_CONTEXT = "Change Password";
+    }
+    /*---------------------------------------------------------------------*/
+@ifdef NSAFE_BUILD
+    @chunk TCHAR PVChangePasswordBorderTitle[] = "Change Password";
+    @object ComplexMonikerClass PVChangePasswordBorder =  {
+        ComplexMoniker = GenInteractionClass;
+        CMI_topText = @PVChangePasswordBorderTitle;
+        CMI_fontSize = FOAM_NORMAL_FONT_SIZE;
+        GI_comp = @PVChangePasswordContents ;
+        CMI_iconBitmap = CMB_SERVICES_DEFINE;
+        HINT_DRAW_IN_BOX;
+        HINT_DRAW_SHADOW;
+        HINT_PLACE_MONIKER_ABOVE;
+/*        HINT_EXPAND_WIDTH_TO_FIT_PARENT; */
+        HINT_COMPLEX_MONIKER_DRAW_SEPARATOR;
+        ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+        HINT_INDENT_CHILDREN = FOAM_HEADER_ICON_WIDTH ;
+        ATTR_COMPLEX_MONIKER_PLACE_BITMAP_AT_LEFT;
+    }
+@endif
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass PVChangePasswordContents = {
+        GI_comp =
+            @PVChangePassword1,
+            @PVChangePassword2,
+            @PVChangePasswordHint,
+            @PVChangePasswordNote,
+            @PVChangePasswordOK;
+        HINT_CENTER_CHILDREN_ON_MONIKERS ;
+        ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+@ifdef NSAFE_BUILD
+    @object NSafeGenTextClass PVChangePassword1 = {
+@endif
+@ifdef DESKTOP_BUILD
+    @object GenTextClass PVChangePassword1 = {
+@endif
+        GI_visMoniker = "Password:" ;
+        GTXI_maxLength = PASSWORD_MAX_LENGTH ;
+        GTXI_text = "" ;
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+        ATTR_GEN_TEXT_CHAR_ATTR = @UserChangePasswordFont ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_DEFAULT_FOCUS ;
+        HINT_DEFAULT_TARGET ;
+    }
+    /*---------------------------------------------------------------------*/
+@ifdef NSAFE_BUILD
+    @object NSafeGenTextClass PVChangePassword2 = {
+@endif
+@ifdef DESKTOP_BUILD
+    @object GenTextClass PVChangePassword2 = {
+@endif
+        GI_visMoniker = "Retype Password:" ;
+        GTXI_maxLength = PASSWORD_MAX_LENGTH ;
+        GTXI_text = "" ;
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+        ATTR_GEN_TEXT_CHAR_ATTR = @UserChangePasswordFont ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+@ifdef NSAFE_BUILD
+    @object NSafeGenTextClass PVChangePasswordHint = {
+@endif
+@ifdef DESKTOP_BUILD
+    @object GenTextClass PVChangePasswordHint = {
+@endif
+        GI_visMoniker = "Hint:" ;
+        GTXI_text = "" ;
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+        GTXI_maxLength = PASSWORD_HINT_LENGTH ;
+@ifdef NSAFE_BUILD
+        HINT_MINIMUM_SIZE = { SST_PIXELS | 260, 0 } ;
+@endif
+@ifdef DESKTOP_BUILD
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_MINIMUM_SIZE = { SST_PIXELS | 400, 0 } ;
+@endif
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass PVChangePasswordNote = {
+        GI_visMoniker = "NOTE! " ;
+        GI_attrs = @default | GA_READ_ONLY ;
+        GTXI_text = "A hint is a reminder shown when asked for a password.  Be sure to put in information only you know.  This feature is optional." ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass PVChangePasswordOK = {
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        HINT_SEEK_REPLY_BAR ;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_OK ;
+        HINT_DEFAULT_DEFAULT_ACTION ;
+@ifdef NSAFE_BUILD
+        HINT_SEEK_SLOT = 0;
+@endif
+    }
+    /*---------------------------------------------------------------------*/
+    @chunk VisTextCharAttr UserChangePasswordFont =
+                               CHAR_ATTR_FONT_SIZE(FID_BISON, 13) ;
+    /*---------------------------------------------------------------------*/
+@end ChangePasswordResource ;
+
+@start PVStrings, data ;
+	 /*---------------------------------------------------------------------*/
+    @chunk char PVBadPassword = "Access denied!" ;
+    @chunk char PVChangePasswordError = "The entered passwords do not match.  Please try again." ;
+	 @chunk char PVOkToDelete = "Are you sure you want to delete this item?" ;
+	 @chunk char PVRequireTitle = "Please enter a title for this item." ;
+	 /*---------------------------------------------------------------------*/
+@end PVStrings ;
+
+
+/*=========================================================================*/
+
+
+
+/*=========================================================================*
+ *  METHODS FOR CLASS:  PVaultProcessClass
+ *=========================================================================*/
+
+/*-------------------------------------------------------------------------
+ | Method:  PVaultProcessClass::MSG_GEN_PROCESS_OPEN_APPLICATION
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Starts up the app.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/16/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method PVaultProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+	 PVDBOpen() ;
+
+    @callsuper() ;
+
+	 CreateSortFile();
+
+    /* needed to install app tiny icon */
+    @call PVaultApp::MSG_GEN_APPLICATION_INSTALL_TOKEN(); 
+
+@ifdef COMPILE_OPTION_EXPIRE_ON
+    @call ExpireDialog::MSG_EXPIRE_DIALOG_CHECK_DATE(
+              @EXPIRE_DATE_MONTH,
+              @EXPIRE_DATE_DAY,
+              @EXPIRE_DATE_YEAR,
+              TRUE) ;
+@endif
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  PVaultProcessClass::MSG_GEN_PROCESS_CLOSE_APPLICATION
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Ends the app.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/16/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method PVaultProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+	 PVDBClose() ;
+	 DeleteSortFile();
+
+    return @callsuper() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  PVaultProcessClass::MSG_POCKET_VAULT_OPEN_VAULT
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Try opening the vault.  A security check is done (if necessary).
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/16/99  Created
+ |    LES  06/24/99  Added encoding of main password
+ |    jfh  04/26/01  Added greying of open & del triggers
+ |
+ *-----------------------------------------------------------------------*/
+
+@method PVaultProcessClass, MSG_POCKET_VAULT_OPEN_VAULT
+{
+    T_password password ;
+    T_password mainPassword ;
+    AskPasswordResult result ;
+
+	 password.P_hint[0] = '\0' ;
+
+	 /* 8-23-01 added since the change trigger greys out after the 1st time the
+	  * vault is opened (desktop), but I can't find out where, so I'm forcing it
+	  * enabled here */
+	 @call PVPasswordChangeTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+
+	 if (PVDBIsOpen())   {
+        result = PVAskPassword(&password, TRUE) ;
+        if (result)  {
+            /* Got a password, let's see if it matches */
+            PVDBGetMainPassword(&mainPassword) ;
+
+            if (PVComparePasswords(&password, &mainPassword))  {
+                if (result == ASK_PASSWORD_RESULT_OK)  {
+						  InitSortArray();
+						  UITurnOff(@PVOpenVaultTrigger) ;
+                    UITurnOff(@PVClosedVault) ;
+@ifdef NSAFE_BUILD
+						  UITurnOff(@PVExitTrigger) ;
+@endif
+                    UITurnOn(@PVOpenedVault) ;
+                    UITurnOn(@PVCloseVaultTrigger) ;
+						  UITurnOn(@PVOpenItemTrigger) ;
+                    UITurnOn(@PVNewItemTrigger) ;
+						  UITurnOn(@PVDeleteItemTrigger) ;
+                    @call PVList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(
+										PVDBGetNumberItems()) ;
+						  if (!PVDBGetNumberItems()) {
+								@send PVOpenItemTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+								@send PVDeleteItemTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+								}
+						  else {
+								@send PVOpenItemTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+								@send PVDeleteItemTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+								}
+                    @send PVList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE) ;
+                    @call PVList::MSG_META_GRAB_FOCUS_EXCL() ;
+                    @call PVList::MSG_META_GRAB_TARGET_EXCL() ;
+                } else {
+                    /* Store the new password after encoding it */
+                    if (PVChangePassword(&password, FALSE))  {
+                        memcpy(
+                            mainPassword.P_password,
+                            passwordString,
+                            PASSWORD_MAX_LENGTH) ;
+                        PVEncode(
+                            &password,
+                            DEFAULT_PASSWORD_ID2,
+                            &mainPassword,
+                            sizeof(mainPassword)) ;
+                        PVDBSetMainPassword(&mainPassword) ;
+                    }
+                }
+            } else {
+                GEOSMessageBox(
+                    @PVBadPassword,
+                    CDT_ERROR,
+                    GIT_NOTIFICATION) ;
+            }
+        }
+    }
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  PVaultProcessClass::MSG_POCKET_VAULT_CLOSE_VAULT
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Try opening the vault.  A security check is done (if necessary).
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/16/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method PVaultProcessClass, MSG_POCKET_VAULT_CLOSE_VAULT
+{
+    if (PVDBIsOpen())   {
+        UITurnOff(@PVNewItemTrigger) ;
+		  UITurnOff(@PVOpenItemTrigger) ;
+        UITurnOff(@PVCloseVaultTrigger) ;
+        UITurnOff(@PVOpenedVault) ;
+        UITurnOff(@PVDeleteItemTrigger) ;
+        UITurnOn(@PVClosedVault) ;
+        UITurnOn(@PVOpenVaultTrigger) ;
+@ifdef NSAFE_BUILD
+		  UITurnOn(@PVExitTrigger) ;
+@endif
+    }
+
+    /* Save out the vault information extremely. */
+    PVDBClose() ;
+	 PVDBOpen() ;
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  PVaultProcessClass::MSG_POCKET_VAULT_QUERY_ITEM
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    UI is asking to identify a moniker in the dynamic list
+ |
+ | Inputs:
+ |    optr list                   -- UI list asking for query
+ |                                   (In this case PVList)
+ |    word item                   -- Item to get
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/21/99  Created
+ |    jfh  04/26/01  always has a title now
+ |    jfh  04/27/01  rewrote to look in sort array vs pv array
+ |
+ *-----------------------------------------------------------------------*/
+
+@method PVaultProcessClass, MSG_POCKET_VAULT_QUERY_ITEM
+{
+MemHandle	mh;
+SortElement	*sortEl;
+
+
+	VMLock(g_sortFile, g_sortVMBH, &mh);
+	sortEl = ChunkArrayElementToPtrHandles(
+						 mh,
+						 g_sortChunkArrayHan,
+						 item,
+						 0);
+	@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, sortEl->SE_title);
+	VMUnlock(mh);
+
+
+/*
+T_pvItemHeader *p_item ;
+
+	 p_item = PVDBGrab(item, FALSE) ;
+    if (p_item)  {
+		  @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
+							 item,
+							 p_item->PVIH_title) ;
+		  PVDBRelease(p_item) ;
+	 }
+*/
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  PVaultProcessClass::MSG_POCKET_VAULT_NEW_ITEM
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Add a new item to the list (setup with default data)
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/21/99  Created
+ |    jfh  04/26/01  Added ungreying of open and del triggers
+ |    jhf  04/27/01  Removed adding to dlist
+ |
+ *-----------------------------------------------------------------------*/
+
+@method PVaultProcessClass, MSG_POCKET_VAULT_NEW_ITEM
+{
+ //   word index ;
+
+ /*   index = */PVDBAllocItem() ;
+/* do this after saving??????
+	 @call PVList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(index, 1) ;
+	 if (PVDBGetNumberItems()== 1) {
+		@send PVOpenItemTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+		@send PVDeleteItemTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+		}
+	 @call PVList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(index, FALSE) ;
+	 @call PVList::MSG_META_GRAB_FOCUS_EXCL() ;
+*/
+	 G_isNewItem = TRUE ;
+	 @send ,forceQueue oself::MSG_POCKET_VAULT_OPEN_ITEM() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  PVaultProcessClass::MSG_POCKET_VAULT_OPEN_ITEM
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Open up the dialog if a password matches for the selected item.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/21/99  Created
+ |    jfh  04/27/01  Added sort index stuff
+ |
+ *-----------------------------------------------------------------------*/
+
+@method PVaultProcessClass, MSG_POCKET_VAULT_OPEN_ITEM
+{
+word item, index;
+T_pvItemHeader *p_item ;
+T_password password ;
+Boolean valid = FALSE ;
+MemHandle	mh;
+SortElement	*sortEl;
+
+
+	 /* just open a form if new */
+	 if (G_isNewItem) {
+		 /* this is kinda hacky but to avoid re-writing a lot of code... */
+		 p_item = PVDBGrab((PVDBGetNumberItems()-1), TRUE) ;
+		 @call PVEditItemDialog::MSG_EDIT_ITEM_DIALOG_OPEN(p_item);
+		 return;
+		 }
+
+	 item = @call PVList::MSG_GEN_ITEM_GROUP_GET_SELECTION() ;
+    if (item != GIGS_NONE)  {
+		  /* get the item from the index */
+		  VMLock(g_sortFile, g_sortVMBH, &mh);
+		  sortEl = ChunkArrayElementToPtrHandles(
+						 mh,
+						 g_sortChunkArrayHan,
+						 item,
+						 0);
+		  index = sortEl->SE_index;
+		  VMUnlock(mh);
+
+		  p_item = PVDBGrab(index, TRUE) ;
+        if (p_item)  {
+            if (p_item->PVIH_password.P_password[0])  {
+                memcpy(password.P_hint, p_item->PVIH_password.P_hint, sizeof(password.P_hint)) ;
+                if (PVAskPassword(&password, FALSE))  {
+                    valid = PVComparePasswords(
+                                &password,
+                                &p_item->PVIH_password) ;
+
+                    if (!valid)
+                        GEOSMessageBox(
+                            @PVBadPassword,
+                            CDT_ERROR,
+                            GIT_NOTIFICATION) ;
+                }
+            } else {
+                valid = TRUE ;
+            }
+				if (valid)
+					 @call PVEditItemDialog::MSG_EDIT_ITEM_DIALOG_OPEN(p_item) ;
+				else
+                PVDBRelease(p_item) ;
+        }
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  PVaultProcessClass::MSG_POCKET_VAULT_DELETE_ITEM
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Delete the currently selected item after checking if the user is
+ |    ok with that.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/24/99  Created
+ |    jfh  04/26/01  Added greying of open and del triggers
+ |                   fixed problem of selection when last item deleted
+ |		jfh  04/30/01  added sort stuff
+ |
+ *-----------------------------------------------------------------------*/
+
+@method PVaultProcessClass, MSG_POCKET_VAULT_DELETE_ITEM
+{
+InteractionCommand result ;
+word item, index ;
+MemHandle	mh;
+SortElement	*sortEl;
+
+
+	 item = @call PVList::MSG_GEN_ITEM_GROUP_GET_SELECTION() ;
+	 if (item != GIGS_NONE)  {
+		  /* get the item from the index */
+		  VMLock(g_sortFile, g_sortVMBH, &mh);
+		  sortEl = ChunkArrayElementToPtrHandles(
+						 mh,
+						 g_sortChunkArrayHan,
+						 item,
+						 0);
+		  index = sortEl->SE_index;
+		  VMUnlock(mh);
+
+		  result = GEOSMessageBox(
+                    @PVOkToDelete,
+                    CDT_WARNING,
+                    GIT_AFFIRMATION) ;
+        if (result == IC_YES)  {
+				/* Ok to delete item. */
+				PVDBDelete(index) ;
+				/* At this point I could delete the sort array item and then
+				 * go thru the remaining items and reset the
+				 * indexes accounting for the deleted item in the huge array...
+				 * but it's probably just as fast to reconstitute the sort array,
+				 * and certainly easier! */
+				InitSortArray();
+				if (!PVDBGetNumberItems()) {
+					@send PVOpenItemTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+					@send PVDeleteItemTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+					}
+				@call PVList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(
+							 PVDBGetNumberItems()) ;
+				if (PVDBGetNumberItems() == item) item--;
+				@call PVList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(item, FALSE) ;
+				@call PVList::MSG_META_GRAB_FOCUS_EXCL() ;
+        }
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  PVaultProcessClass::MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Don't allow any state file creations.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/30/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method PVaultProcessClass, MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE
+{
+    return NullHandle;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  PVDBOpen
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Open the database.  If it doesn't exist, create it.
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE if success.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/16/99  Created
+ |    jfh  04/26/01  added check for v1.0 data file location
+ |		jfh  05/06/01  and fixed again
+ *-----------------------------------------------------------------------*/
+
+Boolean PVDBOpen(void)
+{
+Boolean isSuccess = FALSE ;
+MemHandle mem ;
+T_pvHeader *p_header ;
+T_password mainPassword ;
+T_password password ;
+DiskHandle	dh;
+
+
+	 /* Only open if not already open */
+	 if (G_dbFile == NullHandle)  {
+		  /* Jump to the correct file location */
+		  FilePushDir() ;
+		  dh = FileSetCurrentPath(
+				PVAULT_DB_STANDARD_PATH,
+				PVAULT_DB_RELATIVE_PATH) ;
+
+		  if (dh) {
+			/* First, try opening without creating the file */
+			G_dbFile = VMOpen(
+							  PVAULT_DB_NAME,
+							  VMAF_FORCE_READ_WRITE,
+							  VMO_OPEN,
+							  0) ;
+			}
+
+		  /* If could not open... */
+		  if (!G_dbFile || !dh)  {
+@ifdef NSAFE_BUILD
+				/* see if file is in old location */
+				FilePushDir();
+				FileSetCurrentPath(
+						PVAULT_DB_V10_STANDARD_PATH,
+						PVAULT_DB_V10_RELATIVE_PATH) ;
+				G_dbFile = VMOpen(
+							  PVAULT_DB_NAME,
+							  VMAF_FORCE_READ_WRITE,
+							  VMO_OPEN,
+							  0) ;
+				if (G_dbFile)  {
+					/* found it in old loc - close it... */
+					VMClose(G_dbFile, FALSE);
+					/* create the new folder */
+					FilePushDir();
+					FileSetStandardPath(PVAULT_DB_STANDARD_PATH);
+					FileCreateDir(PVAULT_DB_RELATIVE_PATH);
+					FilePopDir();
+					/* move it... */
+					FileMove(PVAULT_DB_NAME,
+								PVAULT_DB_REL_PATH_AND_NAME,
+								0,
+								PVAULT_DB_STANDARD_PATH);
+					FileSetCurrentPath(
+						PVAULT_DB_STANDARD_PATH,
+						PVAULT_DB_RELATIVE_PATH) ;
+					/* and re-open it */
+					G_dbFile = VMOpen(
+							  PVAULT_DB_NAME,
+							  VMAF_FORCE_READ_WRITE,
+							  VMO_OPEN,
+							  0) ;
+					}
+				else {
+					/* didn't find it in old loc */
+					FilePopDir();
+					FileSetStandardPath(PVAULT_DB_STANDARD_PATH);
+					FileCreateDir(PVAULT_DB_RELATIVE_PATH);
+					FileSetCurrentPath(
+						PVAULT_DB_STANDARD_PATH,
+						PVAULT_DB_RELATIVE_PATH) ;
+					/* create the file in the new location */
+					G_dbFile = VMOpen(
+									PVAULT_DB_NAME,
+									VMAF_FORCE_READ_WRITE,
+									VMO_CREATE_ONLY,
+									0) ;
+					}  /* end of not in old location else */
+@endif  /* NSAFE_BUILD */
+@ifdef DESKTOP_BUILD
+				/* try creating the file */
+				G_dbFile = VMOpen(
+									PVAULT_DB_NAME,
+									VMAF_FORCE_READ_WRITE,
+									VMO_CREATE_ONLY,
+									0) ;
+@endif  /* DESKTOP_BUILD */
+				} /* end of could not open if */
+
+		  if (G_dbFile)  {
+				G_dbArray = VMGetMapBlock(G_dbFile) ;
+
+				/* Initialize if no map block */
+				if (!G_dbArray)  {
+					 /* Initialize the database */
+					 G_dbArray = HugeArrayCreate(G_dbFile, 0, sizeof(T_pvHeader));
+					 VMSetMapBlock(G_dbFile, G_dbArray) ;
+					 p_header = VMLock(G_dbFile, G_dbArray, &mem) ;
+					 p_header->PVH_password.P_password[0] = '\0' ;
+					 p_header->PVH_password.P_hint[0] = '\0' ;
+					 VMDirty(mem) ;
+					 VMUnlock(mem) ;
+
+					 memset(&password, 0, sizeof(password)) ;
+					 memcpy(
+						  mainPassword.P_password,
+						  passwordString,
+						  PASSWORD_MAX_LENGTH) ;
+					 PVEncode(
+						  &password,
+						  DEFAULT_PASSWORD_ID2,
+						  &mainPassword,
+						  sizeof(mainPassword)) ;
+					 PVDBSetMainPassword(&mainPassword) ;
+					 PVDBSave() ;
+					 isSuccess = TRUE ;
+					} /* end of init the map block if */
+				} /* end of we have a valid file if */
+
+		  FilePopDir() ;
+		} /* end of already open if */
+
+	 return isSuccess ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  PVDBIsOpen
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Open the database.  If it doesn't exist, create it.
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE if open already, else FALSE
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/16/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+Boolean PVDBIsOpen(void)
+{
+    return (G_dbFile)?TRUE:FALSE ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  PVDBClose
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Close the database.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/16/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+void PVDBClose(void)
+{
+    VMClose(G_dbFile, FALSE) ;
+    G_dbFile = NullHandle ;
+    G_dbArray = NullHandle ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  PVDBGetMainPassword
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Pull the main password entry out of the database
+ |    (encrypted at this point).
+ |
+ | Inputs:
+ |    T_password *p_password      -- Place to store the retrieved password
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/16/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+void PVDBGetMainPassword(T_password *p_password)
+{
+    T_pvHeader *p_header ;
+    MemHandle mem ;
+
+    if (PVDBIsOpen())  {
+        p_header = VMLock(G_dbFile, G_dbArray, &mem) ;
+        memcpy(p_password, &p_header->PVH_password, sizeof(*p_password)) ;
+        memset(p_password->P_hint, 0, sizeof(p_password->P_hint)) ;
+        VMUnlock(mem) ;
+    } else {
+        memset(p_password, 0, sizeof(*p_password)) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  PVDBSetMainPassword
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Store the main password entry in the database
+ |    (password is encrypted at this point).
+ |
+ | Inputs:
+ |    T_password *p_password      -- Password to store.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/16/99  Created
+ |    LES  06/25/99  Added a conversion routine to go in and change
+ |                   all the records if a new password is being created.
+ |
+ *-----------------------------------------------------------------------*/
+
+void PVDBSetMainPassword(T_password *p_password)
+{
+    T_pvHeader *p_header ;
+    MemHandle mem ;
+    T_password oldMain ;
+    word num ;
+    word i ;
+    word size ;
+    T_pvItemHeader *p_item ;
+
+    PVDBGetMainPassword(&oldMain) ;
+
+    p_header = VMLock(G_dbFile, G_dbArray, &mem) ;
+
+    /* Convert all entries from old to new */
+    num = PVDBGetNumberItems() ;
+    for (i=0; i<num; i++)  {
+        /* Lock with old password */
+        memcpy(&p_header->PVH_password, &oldMain, sizeof(oldMain)) ;
+        p_item = PVDBLock(i, &size) ;
+
+        /* Switch to new password and unlock */
+        memcpy(&p_header->PVH_password, p_password, sizeof(*p_password)) ;
+        PVDBDirty(p_item) ;
+        PVDBUnlock(p_item, size) ;
+    }
+
+    /* Make sure we have to the new password saved */
+    memcpy(&p_header->PVH_password, p_password, sizeof(*p_password)) ;
+    VMDirty(mem) ;
+    VMUnlock(mem) ;
+    PVDBSave() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  PVDBSave
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Update the database system and save out.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/16/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+void PVDBSave(void)
+{
+    /* No records are allowed to be locked */
+    EC_ERROR_IF(G_pvdbLockCount != 0, -1) ;
+
+    VMSave(G_dbFile) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  PVDBLock
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Lock one item in the database and return a pointer to it.  This
+ |    database assumes that no more than one item is locked at any
+ |    time.
+ |
+ | Inputs:
+ |    word index                  -- Index to item number
+ |
+ | Outputs:
+ |    T_pvItemHeader *            -- Pointer to structure containing
+ |                                   record (with data attached at end)
+ |                                   NULL if error.
+ |    word *p_size                -- Pointer to returned size
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/21/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+T_pvItemHeader *PVDBLock(word index, word *p_size)
+{
+    T_pvItemHeader *p_record ;
+    T_password main ;
+
+    EC_ERROR_IF(G_pvdbLockCount > 0, -1) ;
+    G_pvdbLockCount++ ;
+    *p_size = 0 ;
+    HugeArrayLock(G_dbFile, G_dbArray, index, &p_record, p_size) ;
+    if (*p_size == 0)  {
+        p_record = NULL ;
+    } else  {
+        PVDBGetMainPassword(&main) ;
+        PVDecode(&main, DEFAULT_PASSWORD_ID3, p_record, *p_size) ;
+    }
+
+    return p_record ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  PVDBDirty
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Marks a locked record as changed and needing to be saved.
+ |
+ | Inputs:
+ |    T_pvItemHeader *p_item      -- Item previously locked
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/21/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void PVDBDirty(T_pvItemHeader *p_item)
+{
+    ECCheckStack() ;
+    EC_ERROR_IF(G_pvdbLockCount == 0, -1) ;
+    HugeArrayDirty(p_item) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  PVDBUnlock
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Unlock the previous locked item by PVDBLock.
+ |
+ | Inputs:
+ |    T_pvItemHeader *p_item      -- Item previously locked
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/21/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void PVDBUnlock(T_pvItemHeader *p_item, word size)
+{
+    T_password main ;
+
+    PVDBGetMainPassword(&main) ;
+
+    ECCheckStack() ;
+    EC_ERROR_IF(G_pvdbLockCount == 0, -1) ;
+    G_pvdbLockCount-- ;
+    PVEncode(&main, DEFAULT_PASSWORD_ID3, p_item, size) ;
+    HugeArrayUnlock(p_item) ;
+}
+
+
+/*-------------------------------------------------------------------------
+ | Routine:  PVDBResizeData
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Resize the data field.  Note that the block cannot be locked.
+ |
+ | Inputs:
+ |    word index                  -- Index to unlocked item
+ |    word newLength              -- size of new data field
+ |
+ | Outputs:
+ |    word size                   -- Replace size from Lock with this
+ |                                   size
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/22/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+word PVDBResizeData(word index, word newLength)
+{
+    T_pvItemHeader *p_header ;
+    word size ;
+
+    ECCheckStack() ;
+    /* No records are allowed to be locked */
+    EC_ERROR_IF(G_pvdbLockCount != 0, -1) ;
+
+    HugeArrayResize(
+        G_dbFile,
+        G_dbArray,
+        index,
+        sizeof(T_pvItemHeader) + newLength) ;
+    p_header = PVDBLock(index, &size) ;
+    if (p_header)  {
+        p_header->PVIH_length = newLength ;
+        PVDBDirty(p_header) ;
+        PVDBUnlock(p_header, size) ;
+    }
+    ECCheckStack() ;
+
+    return sizeof(T_pvItemHeader) + newLength ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  PVDBGetNumberItems
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Return the number of items there are in the database
+ |
+ | Outputs:
+ |    word                        -- Number of items
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/21/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+word PVDBGetNumberItems(void)
+{
+    return HugeArrayGetCount(G_dbFile, G_dbArray) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  PVDBAllocItem
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Create another item in the database.
+ |
+ | Outputs:
+ |    word                        -- New item index
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/21/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+word PVDBAllocItem(void)
+{
+    word item ;
+    T_pvItemHeader *p_header ;
+    T_password pass ;
+    word size ;
+
+    ECCheckStack() ;
+    /* No records are allowed to be locked */
+    EC_ERROR_IF(G_pvdbLockCount != 0, -1) ;
+
+    item = HugeArrayAppend(G_dbFile, G_dbArray, sizeof(T_pvItemHeader), NULL) ;
+    p_header = PVDBLock(item, &size) ;
+    if (p_header)  {
+        memset(p_header, 0, sizeof(*p_header)) ;
+/*
+        strcpy(p_header->PVIH_title, "Untitled Item") ;
+*/
+
+        /* Use a semi-random number to lock the item */
+        p_header->PVIH_id = TimerGetCount() ;
+
+        PVGenerateIDBasedPassword(p_header->PVIH_id, &pass);
+        PVEncode(
+            &pass,
+            p_header->PVIH_id,
+            &p_header->PVIH_title,
+            sizeof(*p_header)-2*sizeof(word)) ;
+        PVDBDirty(p_header) ;
+        PVDBUnlock(p_header, size) ;
+    }
+    return item ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  PVDBGrab
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Grab a record and decrypt it fully and return a pointer to the
+ |    complete record.
+ |    NOTE:  Only one record can be decrypted/grabbed at a time.
+ |
+ | Inputs:
+ |    word index                  -- Index of item to grab
+ |    Boolean decodeAll           -- TRUE if more than title is decrypted
+ |
+ | Outputs:
+ |    T_pvComleteItem *           -- Complete item
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/22/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+T_pvCompleteItem *PVDBGrab(word index, Boolean decodeAll)
+{
+    T_pvCompleteItem *p_item = NULL ;
+    T_pvItemHeader *p_header ;
+    T_password pass ;
+    T_password main ;
+    word size ;
+
+    ECCheckStack() ;
+    /* Only grab if we can */
+    EC_ERROR_IF(G_pvdbGrabCount > 0, -1) ;
+    G_pvdbGrabCount++ ;
+
+    PVDBGetMainPassword(&main) ;
+
+    /* Lock in that item */
+    p_header = PVDBLock(index, &size) ;
+    if (p_header)  {
+        p_item = &G_pvdbItem ;
+
+        /* Copy over the data */
+        memset(p_item, 0, sizeof(*p_item)) ;
+        memcpy(p_item, p_header, sizeof(*p_header)+p_header->PVIH_length) ;
+        PVDBUnlock(p_header, size) ;
+
+        /* Decode the header */
+        PVGenerateIDBasedPassword(p_item->PVCI_header.PVIH_id, &pass) ;
+        PVDecode(
+            &pass,
+            p_item->PVCI_header.PVIH_id,
+            &p_item->PVCI_header.PVIH_title,
+            sizeof(p_item->PVCI_header)-2*sizeof(word)) ;
+
+        /* Decode the data based on our input request */
+        if (decodeAll)  {
+            PVDecode(
+                &p_item->PVCI_header.PVIH_password,
+                p_item->PVCI_header.PVIH_id,
+                p_item->PVCI_data,
+                p_item->PVCI_header.PVIH_length) ;
+        }
+
+        /* Note that this is 'fresh' and record the input params */
+        p_item->PVCI_isDirty = FALSE ;
+        p_item->PVCI_decodeAll = decodeAll ;
+        p_item->PVCI_index = index ;
+    }
+
+    return p_item ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  PVDBRelease
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Release a previously grabbed record.  Storing it if necessary.
+ |
+ | Inputs:
+ |    T_pvCompleteItem *p_item    -- Previously grabbed item
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/22/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void PVDBRelease(T_pvCompleteItem *p_item)
+{
+    T_pvItemHeader *p_header ;
+    word size ;
+    T_password pass ;
+    word sizeT ;
+
+    ECCheckStack() ;
+    EC_ERROR_IF(G_pvdbGrabCount == 0, -1) ;
+    G_pvdbGrabCount-- ;
+
+    /* Encode and save if dirty */
+    if (p_item->PVCI_isDirty)  {
+        /* Resize the location we are going to save to */
+        size = p_item->PVCI_header.PVIH_length+1 ;
+        sizeT = PVDBResizeData(p_item->PVCI_index, size) ;
+
+        /* Encode the data back again based on decoding Flag */
+
+        /* Now that everything is encoded and space is available, lets */
+        /* just copy it back */
+        p_header = PVDBLock(p_item->PVCI_index, &sizeT) ;
+        if (p_header)  {
+            if (p_item->PVCI_decodeAll)  {
+                PVEncode(
+                    &p_item->PVCI_header.PVIH_password,
+                    p_item->PVCI_header.PVIH_id,
+                    p_item->PVCI_data,
+                    p_item->PVCI_header.PVIH_length) ;
+            }
+            /* Recode the header */
+            PVGenerateIDBasedPassword(p_item->PVCI_header.PVIH_id, &pass) ;
+            PVEncode(
+                &pass,
+                p_item->PVCI_header.PVIH_id,
+                &p_item->PVCI_header.PVIH_title,
+                sizeof(p_item->PVCI_header)-2*sizeof(word)) ;
+            memcpy(p_header, p_item, size + sizeof(*p_header)) ;
+            PVDBDirty(p_header) ;
+            PVDBUnlock(p_header, sizeT) ;
+            PVDBSave() ;
+        }
+    }
+
+    /* Clear that memory otherwise */
+    memset(p_item, 0, sizeof(*p_item)) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  PVDBDelete
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Delete a given item by index.
+ |
+ | Inputs:
+ |    word index                  -- Index to item to delete
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/24/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+void PVDBDelete(word index)
+{
+    /* Just remove the record from the list */
+    HugeArrayDelete(G_dbFile, G_dbArray, 1, index) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  UITurnOff
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Disable an UI object
+ |
+ | Inputs:
+ |    optr object                 -- item to turn off
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/16/99  Created
+ |    jfh  04/27/01  don't need to mess with ENABLED
+ *-----------------------------------------------------------------------*/
+
+void UITurnOff(optr object)
+{
+	 @call object::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  UITurnOn
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Enable an UI object
+ |
+ | Inputs:
+ |    optr object                 -- item to turn off
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/16/99  Created
+ |    jfh  04/27/01  don't need to mess with ENABLED
+ *-----------------------------------------------------------------------*/
+
+void UITurnOn(optr object)
+{
+	 @call object::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  PVAskPassword
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Ask for a password in a dialog and return.
+ |
+ | Inputs:
+ |    TCHAR *p_enteredPassword    -- returned password if entered
+ |    TCHAR *p_hint               -- Textual hint to give to user
+ |                                   (or pass \0 if none)
+ |    Boolean askChange           -- TRUE if you want a "Change Password"
+ |                                   option.
+ |
+ | Outputs:
+ |    AskPasswordResult           -- Returned code value
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/16/99  Created
+ |    LES  06/23/99  Changed to support a 'change' button
+ |
+ *-----------------------------------------------------------------------*/
+
+AskPasswordResult PVAskPassword(T_password *p_password, Boolean askChange)
+{
+    InteractionCommand answer ;
+    AskPasswordResult result = ASK_PASSWORD_RESULT_CANCEL ;
+
+    /* Delete any old password */
+    @call PVPasswordText::MSG_VIS_TEXT_DELETE_ALL() ;
+    if (p_password->P_hint[0])  {
+        @call PVHintText::MSG_VIS_TEXT_REPLACE_ALL_PTR(p_password->P_hint, 0) ;
+        @call PVHintText::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+    } else {
+		  @call PVHintText::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE) ;
+    }
+    @call PVPasswordOKTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+	 if (askChange)  {
+		  UITurnOn(@PVPasswordChangeTrigger) ;
+    } else {
+		  UITurnOff(@PVPasswordChangeTrigger) ;
+    }
+
+    answer = UserDoDialog(@PVAskPasswordDialog) ;
+    if (answer == IC_OK)  {
+        /* User is trying to enter a password */
+        /* Get the entered data */
+        result = ASK_PASSWORD_RESULT_OK ;
+        @call PVPasswordText::MSG_VIS_TEXT_GET_ALL_PTR(p_password->P_password) ;
+    }
+    if (answer == IC_RESET)  {
+        result = ASK_PASSWORD_RESULT_CHANGE ;
+        @call PVPasswordText::MSG_VIS_TEXT_GET_ALL_PTR(p_password->P_password) ;
+    }
+
+    return result ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  PVChangePassword
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Ask for a new password in a dialog and return.
+ |
+ | Inputs:
+ |    T_password *p_password      -- Old hint and place for new password
+ |    Boolean changeHint          -- TRUE if you want the user to change
+ |                                   the hint right.
+ |
+ | Outputs:
+ |    Boolean                     -- FALSE if aborted, else TRUE
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/22/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+Boolean PVChangePassword(T_password *p_password, Boolean changeHint)
+{
+    InteractionCommand answer ;
+    Boolean havePassword = FALSE ;
+    char password1[PASSWORD_MAX_LENGTH+1] ;
+    char password2[PASSWORD_MAX_LENGTH+1] ;
+    Boolean repeat ;
+
+    ECCheckStack() ;
+    memset(password1, 0, sizeof(password1)) ;
+    memset(password2, 0, sizeof(password2)) ;
+    @call PVChangePasswordHint::MSG_VIS_TEXT_REPLACE_ALL_PTR(p_password->P_hint, 0) ;
+    do {
+        repeat = FALSE ;
+
+        /* Delete any old password */
+        @call PVChangePassword1::MSG_VIS_TEXT_DELETE_ALL() ;
+        @call PVChangePassword2::MSG_VIS_TEXT_DELETE_ALL() ;
+        @call PVChangePasswordOK::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+
+        if (changeHint)  {
+            UITurnOn(@PVChangePasswordHint) ;
+            UITurnOn(@PVChangePasswordNote) ;
+        } else {
+            UITurnOff(@PVChangePasswordHint) ;
+            UITurnOff(@PVChangePasswordNote) ;
+        }
+
+        @call PVChangePassword1::MSG_META_GRAB_FOCUS_EXCL() ;
+        @call PVChangePassword1::MSG_META_GRAB_TARGET_EXCL() ;
+        answer = UserDoDialog(@PVChangePasswordDialog) ;
+        if (answer == IC_OK)  {
+            /* User is trying to enter a new password */
+            /* Get the entered data and return positively (if matched) */
+            @call PVChangePassword1::MSG_VIS_TEXT_GET_ALL_PTR(password1) ;
+            @call PVChangePassword2::MSG_VIS_TEXT_GET_ALL_PTR(password2) ;
+            if (strcmp(password1, password2)==0)  {
+                strcpy(p_password->P_password, password1) ;
+                @call PVChangePasswordHint::MSG_VIS_TEXT_GET_ALL_PTR(
+                          p_password->P_hint) ;
+                havePassword = TRUE ;
+            } else {
+                /* Display an error message */
+                GEOSMessageBox(
+                    @PVChangePasswordError,
+                    CDT_ERROR,
+                    GIT_NOTIFICATION) ;
+
+                repeat = TRUE ;
+            }
+        }
+    } while (repeat) ;
+
+    /* Clear the old text out of memory */
+    @call PVChangePassword1::MSG_VIS_TEXT_DELETE_ALL() ;
+    @call PVChangePassword2::MSG_VIS_TEXT_DELETE_ALL() ;
+
+    /* Return with our status */
+    return havePassword ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  PVComparePasswords
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Compare two passwords by decrypting and seeing if the password
+ |    appears.
+ |
+ | Inputs:
+ |    T_password *p_entered       -- Password recently entered
+ |    T_password *p_stored        -- Password to compare to
+ |
+ | Outputs:
+ |    Boolean                     -- TRUE if passwords match, else FALSE
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/21/99  Created
+ |    LES  06/24/99  Removed use of 'index' parameter (was never used)
+ |
+ *-----------------------------------------------------------------------*/
+
+Boolean PVComparePasswords(
+         T_password *p_entered,
+         T_password *p_stored)
+{
+    Boolean isMatch = FALSE ;
+    T_password work ;
+
+    ECCheckStack() ;
+
+    memcpy(&work, p_stored, sizeof(work)) ;
+    PVDecode(p_entered, DEFAULT_PASSWORD_ID2, &work, sizeof(work)) ;
+    if (memcmp(work.P_password, passwordString, PASSWORD_MAX_LENGTH)==0)
+        isMatch = TRUE ;
+
+    return isMatch ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  GEOSMessageBox
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Short hand method of doing a UserStandardDialogOptr call.
+ |
+ | Inputs:
+ |    optr string                 -- Message to display
+ |    CustomDialogType type       -- Type of dialog (CDT_ERROR?)
+ |    GenInteractionType itype    -- Type of dialog question (GIT_NOTIF?)
+ |
+ | Outputs:
+ |    InteractionCommand          -- Answer to question
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/22/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+InteractionCommand GEOSMessageBox(
+                       optr string,
+                       CustomDialogType type,
+                       GenInteractionType itype)
+{
+    ECCheckStack() ;
+    return UserStandardDialogOptr(
+               NullHandle,
+               NullHandle,
+               NullHandle,
+               NullHandle,
+               string,
+               (type << CDBF_DIALOG_TYPE_OFFSET) |
+                  (itype << CDBF_INTERACTION_TYPE_OFFSET)) ;
+}
+
+/*=========================================================================*
+ *  METHODS FOR CLASS:  PVaultEditItemDialogClass
+ *=========================================================================*/
+
+@classdecl PVaultEditItemDialogClass ;
+
+/*-------------------------------------------------------------------------
+ | Method:  PVaultEditItemDialogClass::MSG_EDIT_ITEM_DIALOG_OPEN
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Bring up the edit item dialog using the the given item.
+ |
+ | Inputs:
+ |    T_pvItemHeader *p_item      -- Item to show in dialog
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/21/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method PVaultEditItemDialogClass, MSG_EDIT_ITEM_DIALOG_OPEN
+/* (T_pvCompleteItem *p_item) ; */
+{
+	 ECCheckStack() ;
+	 pself->EID_item = p_item ;
+
+	 if (G_isNewItem) {
+		@call PVEditItemTitle::MSG_VIS_TEXT_DELETE_ALL() ;
+		@call PVEditItemData::MSG_VIS_TEXT_DELETE_ALL() ;
+		}
+	 else {
+		@call PVEditItemTitle::MSG_VIS_TEXT_REPLACE_ALL_PTR(p_item->PVCI_header.PVIH_title, 0) ;
+		pself = ObjDerefGen(oself) ;
+		@call PVEditItemData::MSG_VIS_TEXT_REPLACE_ALL_PTR((char *)p_item->PVCI_data, 0) ;
+		}
+	 @call oself::MSG_GEN_INTERACTION_INITIATE() ;
+    @call PVEditItemTitle::MSG_META_GRAB_FOCUS_EXCL() ;
+    @call PVEditItemTitle::MSG_META_GRAB_TARGET_EXCL() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  PVaultEditItemDialogClass::MSG_EDIT_ITEM_DIALOG_CLOSE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    User is hitting OK and closing dialog.  We need to save out the data
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/21/99  Created
+ |    jfh  04/26/01  Added requirement for a title
+ |    jfh  04/27/01  Added index stuff
+ |                   Added to dlist if new
+ |    jfh  05/01/01  Added check for title change (and if so, redid sort)
+ |
+ *-----------------------------------------------------------------------*/
+
+@method PVaultEditItemDialogClass, MSG_EDIT_ITEM_DIALOG_CLOSE
+{
+T_pvCompleteItem *p_item ;
+char title[PVAULT_TITLE_MAX_LENGTH+1];
+word	len, sortPos, item;
+Boolean	changed = FALSE;
+
+
+	 len = @call PVEditItemTitle::MSG_VIS_TEXT_GET_ALL_PTR(title);
+	 if (!len) {
+		/* make the user enter a title */
+		GEOSMessageBox(
+						  @PVRequireTitle,
+						  CDT_ERROR,
+						  GIT_NOTIFICATION) ;
+		return;
+		}
+
+	 ECCheckStack() ;
+	 pself = ObjDerefGen(oself) ;
+	 p_item = pself->EID_item ;
+
+	 if (!G_isNewItem) {
+		/* check for title change */
+		if (strlen(p_item->PVCI_header.PVIH_title) != len) changed = TRUE;
+		else if(LocalCmpStrings(p_item->PVCI_header.PVIH_title, title, len))
+			changed = TRUE;
+		if (changed) {
+			/* the title has changed - need to re-order sort array */
+			item = @call PVList::MSG_GEN_ITEM_GROUP_GET_SELECTION() ;
+			DelFromSortArray(item);
+			sortPos = AddToSortArray(title, p_item->PVCI_index);
+			}
+		}
+
+	 @call PVEditItemTitle::MSG_VIS_TEXT_GET_ALL_PTR(
+				  p_item->PVCI_header.PVIH_title) ;
+	 @call PVEditItemData::MSG_VIS_TEXT_GET_ALL_PTR(
+				  (char *)p_item->PVCI_data) ;
+	 pself = ObjDerefGen(oself) ;
+	 pself->EID_item->PVCI_isDirty = TRUE ;
+	 pself->EID_item->PVCI_header.PVIH_length = strlen(p_item->PVCI_data)+1 ;
+
+	 /* if it is a new item add it to the sort array */
+	 if (G_isNewItem) {
+		sortPos = AddToSortArray(p_item->PVCI_header.PVIH_title, p_item->PVCI_index);
+		if (PVDBGetNumberItems()== 1) {
+			@send PVOpenItemTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+			@send PVDeleteItemTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE) ;
+			}
+		}
+
+	 /* reset the dlist */
+	 if (G_isNewItem || changed) {
+		@call PVList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(PVDBGetNumberItems()) ;
+		@call PVList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(sortPos, FALSE) ;
+		}
+
+	 @call oself::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+	 G_isNewItem = FALSE ;
+
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  PVaultEditItemDialogClass::MSG_VIS_CLOSE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Whenever the dialog is closed, make sure we do not hold an item
+ |    and that our pointer is invalidated.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/21/99  Created
+ |    jfh  04/27/01  removed the delete from dlist stuff
+ |
+ |
+ *-----------------------------------------------------------------------*/
+
+@method PVaultEditItemDialogClass, MSG_VIS_CLOSE
+{
+//    word index ;
+
+    pself = ObjDerefGen(oself) ;
+//	 index = pself->EID_item->PVCI_index ;
+    PVDBRelease(pself->EID_item) ;
+
+    /* Delete that item if it is new and we are cancelling */
+ /*   if (G_isNewItem)  {
+       PVDBDelete(index) ;
+	//    @call PVList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(index, 1) ;
+	//    @call PVList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE) ;
+	//    @call PVList::MSG_META_GRAB_FOCUS_EXCL() ;
+		 G_isNewItem = FALSE ;
+	 } */
+
+    pself->EID_item = NULL ;
+	 @callsuper() ;
+    @call PVList::MSG_META_GRAB_FOCUS_EXCL() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  PVaultEditItemDialogClass::MSG_EDIT_ITEM_DIALOG_CHANGE_PASSWORD
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Change the password and hint of the currently selected item.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/22/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+@method PVaultEditItemDialogClass, MSG_EDIT_ITEM_DIALOG_CHANGE_PASSWORD
+{
+    T_password newPassword ;
+    T_password *p_pass ;
+
+    /* Get the new password */
+    p_pass = &pself->EID_item->PVCI_header.PVIH_password ;
+    if (PVChangePassword(p_pass, TRUE))  {
+        if (p_pass->P_password[0])  {
+            /* Encode the password so that it isn't really stored */
+            memset(&newPassword, 0, sizeof(newPassword));
+            memcpy(newPassword.P_password, passwordString, PASSWORD_MAX_LENGTH) ;
+            PVEncode(
+                p_pass,
+                DEFAULT_PASSWORD_ID2,
+                &newPassword,
+                sizeof(newPassword.P_password)) ;
+            memcpy(
+                &p_pass->P_password,
+                &newPassword,
+                sizeof(p_pass->P_password)) ;
+            pself->EID_item->PVCI_isDirty = TRUE ;
+        }
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  PVGenerateRealPassword
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Convert a given text password into a cryptic special 'real' password
+ |    that we use internally.  Actually, our real goal is to convert
+ |    the possibly too long user password into a shorter more cryptic
+ |    password.  This is a one way translation (text -> cryptic)
+ |
+ | Inputs:
+ |    T_password *p_password      -- User entered password
+ |    word index                  -- Index of password in database
+ |                                   (can just be a 'scramble' value)
+ |    char rpass[]                -- Return 'real' password array
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/22/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+void PVGenerateRealPassword(
+         T_password *p_password,
+         word index,
+         byte rpass[MAX_ENCODE_PASSWORD_LENGTH])
+{
+    char rpassTemp[MAX_ENCODE_PASSWORD_LENGTH] ;
+    word i, j;
+
+    ECCheckStack() ;
+    memset(rpassTemp, 0, MAX_ENCODE_PASSWORD_LENGTH) ;
+    memset(rpass, 0, MAX_ENCODE_PASSWORD_LENGTH) ;
+    rpassTemp[0] = index & 0xFF ;
+	 rpassTemp[1] = (index >> 8) ;
+
+    j = 0 ;
+    for (i=2; i<MAX_ENCODE_PASSWORD_LENGTH; i++)  {
+        rpassTemp[i] = p_password->P_password[j] ;
+        if (p_password->P_password[j])
+            j++ ;
+    }
+    for (i=0; i<MAX_ENCODE_PASSWORD_LENGTH-2; i++)  {
+        rpass[i] = p_password->P_password[j] ;
+        if (p_password->P_password[j])
+            j++ ;
+    }
+    index ^= 0xFFFF ;
+    rpass[MAX_ENCODE_PASSWORD_LENGTH-2] = index & 0xFF ;
+    rpass[MAX_ENCODE_PASSWORD_LENGTH-1] = index >> 8 ;
+
+    /* Combine the two halves into some even stranger */
+    for (i=0; i<MAX_ENCODE_PASSWORD_LENGTH; i++)
+        rpass[i] ^= rpassTemp[i] ;
+    ECCheckStack() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  PVEncode
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Take the given password and encode the given section of memory.
+ |
+ | Inputs:
+ |    T_password *p_password      -- Text entered password
+ |    word index                  -- Scramble value (index of record)
+ |    void *p_data                -- data to encode
+ |    word len                    -- Length of data to convert
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  06/22/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+
+word G_valueA, G_valueB, G_valueC, G_valueD, G_valueS ;
+word G_valueX1, G_valueX1Array0[5], G_valueRes, G_valueI, G_valueInter ;
+byte G_stringCLE[MAX_ENCODE_PASSWORD_LENGTH];
+
+void EncodeDecodeInitGlobals(void)
+{
+    G_valueA = G_valueB = G_valueC = G_valueD =
+        G_valueRes = G_valueInter = 0 ;
+    G_valueS=0 ;
+    G_valueX1=0 ;
+    G_valueI=0 ;
+    memset(G_valueX1Array0, 0, sizeof(G_valueX1Array0)) ;
+}
+
+void EncodeDecodeCode(void)
+{
+    word temp ;
+
+    ECCheckStack() ;
+    G_valueD = G_valueX1+G_valueI ;
+    G_valueA = G_valueX1Array0[G_valueI] ;
+    G_valueC = 0x015a ;
+    G_valueB = 0x4e35 ;
+
+    temp=G_valueA ;
+    G_valueA=G_valueS ;
+    G_valueS=temp ;
+
+    temp=G_valueA ;
+    G_valueA=G_valueD ;
+    G_valueD=temp ;
+
+    if (G_valueA!=0)
+        G_valueA=G_valueA*G_valueB ;
+
+    temp=G_valueA ;
+    G_valueA=G_valueC ;
+    G_valueC=temp ;
+
+    if (G_valueA!=0)  {
+        G_valueA=G_valueA*G_valueS ;
+        G_valueC=G_valueA+G_valueC ;
+    }
+
+    temp=G_valueA ;
+    G_valueA=G_valueS ;
+    G_valueS=temp ;
+    G_valueA=G_valueA*G_valueB ;
+    G_valueD=G_valueC+G_valueD ;
+
+    G_valueA=G_valueA+1 ;
+
+    G_valueX1=G_valueD ;
+    G_valueX1Array0[G_valueI]=G_valueA ;
+
+    G_valueRes=G_valueA^G_valueD ;
+    G_valueI=G_valueI+1 ;
+}
+
+void EncodeDecodeAssemble(void)
+{
+    ECCheckStack() ;
+    G_valueX1Array0[0]= ( G_stringCLE[0]*256 )+ G_stringCLE[1] ;
+    EncodeDecodeCode() ;
+    G_valueInter=G_valueRes ;
+
+    G_valueX1Array0[1]= G_valueX1Array0[0] ^ ( (G_stringCLE[2]*256) + G_stringCLE[3] ) ;
+    EncodeDecodeCode() ;
+    G_valueInter=G_valueInter^G_valueRes ;
+
+    G_valueX1Array0[2]= G_valueX1Array0[1] ^ ( (G_stringCLE[4]*256) + G_stringCLE[5] ) ;
+    EncodeDecodeCode() ;
+    G_valueInter=G_valueInter^G_valueRes ;
+
+    G_valueX1Array0[3]= G_valueX1Array0[2] ^ ( (G_stringCLE[6]*256) + G_stringCLE[7] ) ;
+    EncodeDecodeCode() ;
+    G_valueInter=G_valueInter^G_valueRes ;
+
+    G_valueX1Array0[4]= G_valueX1Array0[3] ^ ( (G_stringCLE[8]*256) + G_stringCLE[9] ) ; ;
+    EncodeDecodeCode() ;
+    G_valueInter=G_valueInter^G_valueRes ;
+    G_valueI=0 ;
+}
+
+void PVEncode(T_password *p_password, word index, void *p_data, word len)
+{
+    byte *p_pos ;
+    byte c ;
+    word cfc = 0;
+    word cfd = 0;
+    word compute ;
+
+    ECCheckStack() ;
+    /* Convert the password into something else */
+    PVGenerateRealPassword(p_password, index, G_stringCLE) ;
+
+    EncodeDecodeInitGlobals() ;
+
+    /* Loop while we have data */
+    for (p_pos = (byte *)p_data; len; len--, p_pos++)  {
+        c = *p_pos ;
+        EncodeDecodeAssemble();
+        cfc = G_valueInter>>8;
+        cfd = G_valueInter&255; /* cfc^cfd = random byte */
+
+        /* K ZONE !!!!!!!!!!!!! */
+        /* here the mix of c and G_stringCLE[compute] is before */
+        /* the encryption of c */
+        for (compute=0; compute<=9; compute++)  {
+            /* we mix the plaintext byte with the key */
+            G_stringCLE[compute] = G_stringCLE[compute]^c;
+        }
+
+        c = c ^ (cfc^cfd);
+        *p_pos = c ;
+    }
+
+    EncodeDecodeInitGlobals() ;
+    ECCheckStack() ;
+}
+
+void PVDecode(T_password *p_password, word index, void *p_data, word len)
+{
+    byte *p_pos ;
+    byte c ;
+    word compute ;
+    word cfc = 0 ;
+    word cfd = 0 ;
+
+    ECCheckStack() ;
+    /* Convert the password into something else */
+    PVGenerateRealPassword(p_password, index, G_stringCLE) ;
+
+    EncodeDecodeInitGlobals() ;
+
+    /* Loop while we have data */
+    for (p_pos = (byte *)p_data; len; len--, p_pos++)  {
+        c = *p_pos ;
+        EncodeDecodeAssemble();
+        cfc = G_valueInter>>8;
+        cfd = G_valueInter&255; /* cfc^cfd = random byte */
+
+        /* K ZONE !!!!!!!!!!!!! */
+        /* here the mix of c and G_stringCLE[compute] is after */
+        /* the decryption of c */
+        c = c ^ (cfc^cfd);
+
+		  for (compute=0; compute<=9; compute++)  {
+            /* we mix the plaintext byte with the key */
+            G_stringCLE[compute]=G_stringCLE[compute]^c;
+        }
+
+        *p_pos = c ;
+    }
+
+    EncodeDecodeInitGlobals() ;
+    ECCheckStack() ;
+}
+
+void PVGenerateIDBasedPassword(word id, T_password *p_password)
+{
+	 sprintf(p_password->P_password, "!\250jK{\252%05u.", id) ;
+}
+
+@ifdef NSAFE_BUILD
+@method NSafeGenTextClass, MSG_META_KBD_CHAR
+{
+    if (pself->NGI_next)  {
+        if ((character&0xFF) == VC_TAB)  {
+            if (!(flags & CF_RELEASE))  {
+                @send ,forceQueue (pself->NGI_next)::MSG_META_GRAB_FOCUS_EXCL() ;
+            } else {
+                @callsuper() ;
+            }
+        } else {
+            @callsuper() ;
+        }
+    } else  {
+        @callsuper() ;
+    }
+}
+@endif
+
+/***************************************************************************
+ *  sort index routines                                                    *
+ ***************************************************************************/
+void CreateSortFile(void)
+{
+
+MemHandle		mh;
+
+
+	FilePushDir();
+	FileSetStandardPath(SP_PRIVATE_DATA);
+
+	/*  create the file (delete old one if it's there) */
+//jfh	g_sortFile = VMOpen(PVAULT_SORT_NAME, VMAF_FORCE_READ_WRITE, VMO_CREATE, 0);
+	g_sortFile = VMOpen(PVAULT_SORT_NAME, VMAF_FORCE_READ_WRITE, VMO_CREATE_ONLY, 0);
+	if (!g_sortFile)  {
+		if(ThreadGetError() == VM_FILE_EXISTS) {
+			FileDelete(PVAULT_SORT_NAME);
+			g_sortFile = VMOpen(PVAULT_SORT_NAME, VMAF_FORCE_READ_WRITE, VMO_CREATE_ONLY, 0);
+			}
+		}
+
+	/* Create a VM block for the index */
+	g_sortVMBH = VMAllocLMem(g_sortFile, LMEM_TYPE_GENERAL, 0);
+	VMLock(g_sortFile, g_sortVMBH, &mh);
+	/* create the chunk array  */
+	g_sortChunkArrayHan = ChunkArrayCreate(
+				mh,
+				sizeof(SortElement),
+				0,
+				0);
+	VMUnlock(mh);
+
+	// jfh - try this...
+	VMSave(g_sortFile);
+
+	FilePopDir();
+
+}
+
+void DeleteSortFile(void)
+{
+
+	VMClose(g_sortFile, FALSE);
+	g_sortFile = NullHandle;
+	FileSetStandardPath(SP_PRIVATE_DATA);
+	FileDelete(PVAULT_SORT_NAME);
+
+}
+
+void InitSortArray(void)
+{
+MemHandle	mh;
+optr			sortArray;
+word			numItems, i;
+T_pvItemHeader		*p_item ;
+
+
+	/* first make sure the array is empty */
+	VMLock(g_sortFile, g_sortVMBH, &mh);
+	sortArray = ConstructOptr(mh, g_sortChunkArrayHan);
+	if (ChunkArrayGetCount(sortArray))
+		ChunkArrayDeleteRange(sortArray, 0, -1);
+	VMUnlock(mh);
+
+	/* fill the sort array from the huge array */
+	numItems = PVDBGetNumberItems();
+	if (numItems)  {
+		for (i = 0; i < numItems; i++) {
+			p_item = PVDBGrab(i, FALSE) ;
+			AddToSortArray(p_item->PVIH_title, i);
+			PVDBRelease(p_item);
+			}
+		}  
+
+	// jfh - try this...
+	VMSave(g_sortFile);
+
+}
+
+word AddToSortArray(char *title, word item)
+{
+MemHandle	mh;
+optr			sortArray;
+word			numItems, j, newLen, cmpLen, insertPos;
+Boolean		inserted;
+SortElement	*sortEl, *insertSortEl;
+
+
+	VMLock(g_sortFile, g_sortVMBH, &mh);
+	sortArray = ConstructOptr(mh, g_sortChunkArrayHan);
+	numItems = ChunkArrayGetCount(sortArray);
+	inserted = FALSE;
+
+	newLen = strlen(title);
+	if(numItems) {
+		/* insert it somewhere */
+		for (j = 0; j < numItems; j++) {
+			sortEl = ChunkArrayElementToPtr(sortArray, j, 0);
+			if (strlen(sortEl->SE_title) > newLen) cmpLen = newLen;
+			else cmpLen = strlen(sortEl->SE_title);
+			if (LocalCmpStrings(sortEl->SE_title, title, cmpLen) > 0) {
+				/* insert it here */
+				insertSortEl = ChunkArrayInsertAt(sortArray, sortEl, 0);
+				strcpy(insertSortEl->SE_title, title);
+				insertSortEl->SE_index = item;
+				inserted = TRUE;
+				insertPos = j;
+				break;
+				}
+			}
+		}
+	if (!numItems || (numItems && !inserted)) {
+		/* just append it */
+		sortEl = ChunkArrayAppend(sortArray, 0);
+		strcpy(sortEl->SE_title, title);
+		sortEl->SE_index = item;
+		insertPos = numItems;
+		}
+	VMDirty(mh);
+	VMUnlock(mh);
+
+	// jfh - try this...
+	VMSave(g_sortFile);
+
+	return(insertPos);
+
+}
+
+void DelFromSortArray(word item)
+{
+MemHandle	mh;
+SortElement	*sortEl;
+
+
+	VMLock(g_sortFile, g_sortVMBH, &mh);
+	sortEl = ChunkArrayElementToPtrHandles(mh, g_sortChunkArrayHan, item, 0);
+	ChunkArrayDeleteHandle(g_sortChunkArrayHan, sortEl);
+
+	VMDirty(mh);
+	VMUnlock(mh);
+
+	// jfh - try this...
+	VMSave(g_sortFile);
+
+}
+/***************************************************************************
+ *  END OF FILE:  PVault.GOC                                               *
+ ***************************************************************************/
+
+

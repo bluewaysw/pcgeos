@@ -1,0 +1,287 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	(c) Copyright Geoworks 1996 -- All Rights Reserved
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		appt.goh
+
+AUTHOR:		Jason Ho, Aug 15, 1996
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kho	8/15/96   	Initial version.
+
+DESCRIPTION:
+	Definition of the structure of a generic appointment 
+	(MANUFACTURER_ID_GEOWORKS:GMDFID_APPOINTMENT)
+	
+	The structure allows one or more than one appointment to be transmitted
+	in a message body. Each appointment is in its own VM block. Use the
+	MANUFACTURER_ID_GEOWORKS:GMSID_VM_TREE storage driver
+		
+	To send more than one appointment, use a tree block to refer to the
+	individual appointments. I figure it's easier to code this way, as
+	you can have a routine that converts one of your appointments into
+	an MBAppointment block and call that for each of the appointments
+	you want to send, storing the handles into the tree block you've 
+	allocated.
+	
+	Receivers of GMDFID_APPOINTMENT should examine the MBA_meta.VMCL_next
+	field to see if it's VM_CHAIN_TREE. If it is, they've got a list of
+	appointments to add. Again, a routine can be called to process each
+	block in turn. If the field isn't VM_CHAIN_TREE, just call the routine
+	on the first block of the message body and you're done.	
+
+	$Id: appt.goh,v 1.1 97/04/04 15:55:46 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#ifndef _APPT_GOH_
+#define _APPT_GOH_
+
+/*********************************************************************
+ *
+ * Pre-event Alarm Information
+ *
+ * This says how long before the event the user should be notified of its
+ * impending arrival.
+ *
+ */
+
+typedef enum {
+    MBAIT_MINUTES = 0x0,
+    MBAIT_HOURS	= 0x1,
+    MBAIT_DAYS = 0x2,
+} MBAlarmIntervalType;
+
+typedef WordFlags MBAlarmInfo;
+#define MBAI_TYPE		0xC000   /* MBAlarmIntervalType */
+#define MBAI_HAS_ALARM		0x2000
+#define MBAI_INTERVAL		0x1fff
+#define MBAI_TYPE_OFFSET	14
+#define MBAI_HAS_ALARM_OFFSET	13
+#define MBAI_INTERVAL_OFFSET	0
+
+/*********************************************************************
+ *
+ * Repeating Event Information
+ *
+ * These things tell the recipient how the event is supposed to be repeated.
+ * It should cover all the bases. If you cannot handle some mode of repeating
+ * the event, tell the user, but register the initial event so the user can
+ * possibly duplicate it and place it in the proper place by hand.
+ *
+ */
+
+typedef enum {
+    MBRD_FOREVER = 0x0,	 /* no additional data */
+    MBRD_UNTIL = 0x1,	 /* MBRepeatEndDate */
+    MBRD_LENGTH	= 0x2,   /* MBRepeatLength */
+} MBRepeatDuration;
+
+typedef enum {
+    MBRLUT_DAY = 0x0,
+    MBRLUT_WEEK = 0x1,
+    MBRLUT_MONTH = 0x2,
+    MBRLUT_YEAR = 0x3,
+} MBRepeatLengthUnitType;
+
+typedef WordFlags MBRepeatLength;
+#define MBRL_UNIT		0xC000   /* MBRepeatLengthUnitType */
+#define MBRL_COUNT		0x3FFF   
+    /* number of those units, *including* the initial event day. thus
+    /*  an event repeating every day for 3 days set for 12/15 would have
+    /*  the event 12/15, 12/16, and 12/17 */
+
+#define MBRL_UNIT_OFFSET	14
+#define MBRL_COUNT_OFFSET	0
+
+typedef union {
+    FileDate            MBRDD_until;
+    MBRepeatLength      MBRDD_length;
+} MBRepeatDurationData;
+
+typedef enum {
+    MBRW_SUNDAY = 0x0,
+    MBRW_MONDAY	= 0x1,
+    MBRW_TUESDAY = 0x2,
+    MBRW_WEDNESDAY = 0x3,
+    MBRW_THURSDAY = 0x4,
+    MBRW_FRIDAY	= 0x5,
+    MBRW_SATURDAY = 0x6,
+} MBRepeatWeekday;
+
+typedef enum {
+    MBRIT_DAILY = 0x0,
+    MBRIT_WEEKLY = 0x1,
+    MBRIT_MONTHLY_WEEKDAY = 0x2,
+    MBRIT_MONTHLY_DATE = 0x3,
+    MBRIT_YEARLY_WEEKDAY = 0x4,
+    MBRIT_YEARLY_DATE = 0x5,
+    MBRIT_MON_TO_FRI = 0x6,		/* every Mon-Fri */
+    MBRIT_MON_TO_SAT = 0x7,		/* every Mon-Sat */
+} MBRepeatIntervalType;
+
+typedef WordFlags MBRepeatInterval;
+#define MBRI_WEEK			0xE000
+#define MBRI_DAY MBRepeatWeekday	0x1C00
+	    /* for MBRIT_MONTHLY_WEEKDAY or MBRIT_MONTHLY_DATE or */
+	    /*  MBRIT_YEARLY_WEEKDAY (month for that last is the same */
+	    /*  as the event; data indicates which weekday of which */
+	    /*  week within the month the event should repeat) */ 
+#define MBRI_COUNT			0x03F8
+            /* number of units between events. */
+#define MBRI_TYPE			0x0007
+            /* MBRepeatIntervalType */
+
+#define MBRI_WEEK_OFFSET		13
+#define MBRI_DAY_OFFSET			10
+#define MBRI_COUNT_OFFSET		3
+#define MBRI_TYPE_OFFSET		0
+
+typedef struct {
+    MBRepeatInterval		MBRI_interval;
+                                /* how long between events? */
+    MBRepeatDuration		MBRI_duration;
+				/* how long shall we keep this up? */
+    MBRepeatDurationData	MBRI_durationData;
+				/* more details of same */
+    word			MBRI_numExceptions;
+				/* number of exception dates */
+    FileDate                    MBRI_exceptions[0];
+    /* data to follow, an array of dates on which events is *not* to
+     * take places. */
+} MBRepeatInfo;
+
+/*********************************************************************
+ *
+ * Appointment Description Formats
+ *
+ * An appointment description can be textual, ink, or...? Note that not all
+ * receivers will be able to handle all formats. For example, a single-byte
+ * system cannot properly handle a Unicode textual description. If you get such
+ * an appointment, you need to tell the user why you can't handle it and then
+ * drop the whole thing on the floor.
+ *
+ */
+typedef enum {
+    MBADT_GEOS_TEXT = 0x0,	/* Description is a null-terminated,
+				 *  single-byte text string in the GEOS
+				 *  character set. */
+    MBADT_UNICODE = 0x1,	/* Description is a null-terminated,
+				 *  double-byte text string in the
+				 *  Unicode character set. */
+    MBADT_INK = 0x2,		/* Description is digital ink. Number
+				 *  of points can be determined from
+				 *  MBA_descSize */
+} MBAppointmentDescType;
+
+#ifdef __HWR_H			/* defined in hwr.h. include that
+				 *  file if you want to handle digital
+				 *  ink in appointments */
+				/* appt.def uses InkPoint, but we have
+				 * to use __HWR_H */
+typedef struct {
+    word	MBII_count;
+
+    /* data to follow, an array of InkPoint */
+} MBInkInfo;
+
+#endif /* __HWR_H InkPoint */
+
+/*********************************************************************
+ *
+ * Escape Table Definitions
+ *
+ * The idea behind escapes is to allow schedulers to include additional
+ * information about the appointment that is beyond the scope of a generic
+ * appointment. This allows them, if they are the recipient, to duplicate
+ * the original appointment exactly. If the recipient doesn't understand the
+ * escape, however, the appointment is still useful.
+ *
+ * Each escape contains the ManufacturerID of the developer who has defined the
+ * contents of the escape.
+ * 
+ */
+
+typedef struct {
+    word		MBEI_size;
+			/* size of escape, including the MBEscapeInfo
+			 *  header */ 
+    ManufacturerID	MBEI_manufacturer;
+			/* manufacturer who defined the contents of
+			 *  the escape. */
+    word                MBEI_escapeType;
+                        /* type of the escape, in case a manufacturer 
+			 * has several. */
+    byte                MBEI_data[0];
+    /* data to follow, in format determined by the manufacturer. */
+
+} MBEscapeInfo;
+
+typedef struct {
+    word		MBET_numEscapes;
+    MBEscapeInfo        MBET_escapes[0];
+    /* data to follow, arry of MBEscapeInfo */
+} MBEscapeTable;
+
+/*********************************************************************
+ *
+ * The Appointment Itself (finally)
+ *
+ * This structure appears at the start of the VM block. The description of
+ * the appointment follows immediately thereafter. All other optional
+ * information follows the description as you see fit.
+ *
+ */ 
+
+#define MB_NO_TIME		(-1)	/* value in FDAT_time if the event is
+					 *  not for a specific time of
+					 *  the day. */
+
+/*
+ * When creating to-do item, pass MBA_start to be one of the following:
+ */
+#define MB_TODO_NORMAL_PRIORITY	(16973823)
+					/* 102h << 16 + ffffh
+					 *  value in MBA_start if
+					 *  the event is actually a 
+					 *  to-do item, normal priority. */
+#define MB_TODO_HIGH_PRIORITY	(16908287)
+					/* 101h << 16 + ffffh: 
+					 *  value in MBA_start if
+					 *  the event is actually a 
+					 *  to-do item, high priority. */
+
+typedef struct {
+    VMChainLink		MBA_meta;
+    FileDateAndTime	MBA_start;	/* start date & time */
+    FileDateAndTime	MBA_end;	/* end date & time */
+    MBAlarmInfo		MBA_alarmInfo;	/* description of when alarm
+                        		 *  should be generated. 0 if
+					 *  no alarm */
+    MBRepeatInfo _near *MBA_repeatInfo;	/* description of how event
+					 *  should be repeated. 0 if
+                         		 *  one-time thing */
+    MBEscapeInfo _near *MBA_escapes;	/* pointer to manufacturer-
+                        		 *  specific information to be
+                         		 *  processed by those apps
+                         		 *  that understand it. Might
+                         		 *  include formatting info,
+                         		 *  for example. */
+    word                MBA_descSize;	/* number of bytes in the
+                         		 *  description */
+    byte /* MBAppointmentDescType */ MBA_descType;
+					/* type of data that make up the
+					 *  appointment description */
+    byte                MBA_description [0];
+} MBAppointment;
+
+#endif /* _APPT_GOH_ */

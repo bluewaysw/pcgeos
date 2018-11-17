@@ -1,0 +1,758 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		
+
+AUTHOR:		Cheng, 10/91
+
+ROUTINES:
+	Name			Description
+	----			-----------
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Cheng	10/91		Initial revision
+
+DESCRIPTION:
+		
+	$Id: lotus123Constant.def,v 1.1 97/04/07 11:41:57 newdeal Exp $
+
+
+The Lotus .WKS file format uses special records, each one controlling some
+aspect of the file: ranges, cell formats, etc.  The record format is
+	<opcode> <record length> <data>
+
+Rows and Columns are 0 based, word-sized, LSB first.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;*******************************************************************************
+;	CALC ROUTINES
+;*******************************************************************************
+
+ResidentCode	segment resource
+	global	TransLibraryEntry:far
+ResidentCode	ends
+
+CommonCode	segment	resource
+	global	InputCacheAttach:far
+	global	InputCacheGetChar:far
+	global	InputCacheDestroy:far
+	global	OutputCacheAttach:far
+	global	OutputCacheWrite:far
+	global	OutputCacheFlush:far
+	global	OutputCacheDestroy:far
+CommonCode	ends
+
+ImportCode	segment	resource
+	global	TransImport:far
+ImportCode	ends
+
+;1994-08-09(Tue)TOK ----------------
+if PZ_PCGEOS
+else
+ExportCode	segment	resource
+	global	TransExport:far
+ExportCode	ends
+endif
+;----------------
+
+;*******************************************************************************
+;	LOTUS CONSTANTS
+;*******************************************************************************
+
+; This enumerated type describes the code values that we look for in the
+; file. See Lotus's file format documentation for more information.
+
+LotusOpCodes	etype	word
+    CODE_BOF		enum LotusOpCodes, 0h	; beginning of file
+    CODE_EOF		enum LotusOpCodes, 1h	; end of file
+    CODE_CALC_MODE	enum LotusOpCodes, 2h	; calculation mode
+    CODE_CALC_ORDER	enum LotusOpCodes, 3h	; order of calculation
+    CODE_SPLIT		enum LotusOpCodes, 4h	; type of window split
+    CODE_SYNC		enum LotusOpCodes, 5h	; syncs windows to cursor
+    CODE_RANGE		enum LotusOpCodes, 6h	; range of cells
+    CODE_WINDOW1	enum LotusOpCodes, 7h	; window 1 record
+    CODE_COLW1		enum LotusOpCodes, 8h	; column width of window 1
+    CODE_WINDOW2	enum LotusOpCodes, 9h	; window 2 record
+    CODE_COLW2		enum LotusOpCodes, 0ah	; column width of window 2
+    CODE_NAME		enum LotusOpCodes, 0bh	; name of range
+    CODE_BLANK		enum LotusOpCodes, 0ch	; blank cell
+    CODE_INTEGER	enum LotusOpCodes, 0dh	; integer cell
+    CODE_NUMBER		enum LotusOpCodes, 0eh	; fp number
+    CODE_LABEL		enum LotusOpCodes, 0fh	; label cell
+    CODE_FORMULA	enum LotusOpCodes, 10h	; formula cell
+    CODE_TABLE		enum LotusOpCodes, 18h	; table range
+    CODE_QRANGE		enum LotusOpCodes, 19h	; query range
+    CODE_PRANGE		enum LotusOpCodes, 1ah	; print range
+    CODE_SRANGE		enum LotusOpCodes, 1bh	; sort range
+    CODE_FRANGE		enum LotusOpCodes, 1ch	; fill range
+    CODE_KRANGE		enum LotusOpCodes, 1dh	; primary sort key range
+    CODE_HRANGE		enum LotusOpCodes, 20h	; distribution range
+    CODE_KRANGE2	enum LotusOpCodes, 23h	; secondary sort key range
+    CODE_PROTEC		enum LotusOpCodes, 24h	; toggles global protection
+    CODE_FOOTER		enum LotusOpCodes, 25h	; print footer
+    CODE_HEADER		enum LotusOpCodes, 26h	; print header
+    CODE_SETUP		enum LotusOpCodes, 27h	; print setup
+    CODE_MARGINS	enum LotusOpCodes, 28h	; print margins
+    CODE_LABELFMT	enum LotusOpCodes, 29h	; label alignment
+    CODE_TITLES		enum LotusOpCodes, 2ah	; print borders
+    CODE_GRAPH		enum LotusOpCodes, 2dh	; current graph setting
+    CODE_NGRAPH		enum LotusOpCodes, 2eh	; for named, graph settings
+    CODE_CALC_COUNT	enum LotusOpCodes, 2fh	; iteration count
+    CODE_UNFORMATTED	enum LotusOpCodes, 30h	; toggles formatted/unf. print
+    CODE_CURSORW12	enum LotusOpCodes, 31h	; describes cursor location
+    CODE_WINDOW		enum LotusOpCodes, 32h	; describes window record
+    CODE_STRING		enum LotusOpCodes, 33h	; describes value of string func
+    CODE_LOCK_PASSWORD	enum LotusOpCodes, 37h	; restricts writing to a defined
+						; range
+    CODE_LOCKED		enum LotusOpCodes, 38h	; toggles lock flag
+    CODE_QUERY		enum LotusOpCodes, 3ch	; describes query settings
+    CODE_QUERYNAME	enum LotusOpCodes, 3dh	; describes current query name
+    CODE_PRINT		enum LotusOpCodes, 3eh	; describes print record
+    CODE_PRINTNAME	enum LotusOpCodes, 3fh	; current print record name
+    CODE_GRAPH2		enum LotusOpCodes, 40h	; describes graph record
+    CODE_GRAPHNAME	enum LotusOpCodes, 41h	; current graph record name
+    CODE_ZOOM		enum LotusOpCodes, 42h	; original coords of expanded
+						; window
+    CODE_NSROWS		enum LotusOpCodes, 44h	; number of screen rows
+    CODE_NSCOLS		enum LotusOpCodes, 45h	; number of screen columns
+    CODE_RULER		enum LotusOpCodes, 46h	; describes named ruler range
+    CODE_NNAME		enum LotusOpCodes, 47h	; describes named sheet range
+    CODE_ACOMM		enum LotusOpCodes, 48h	; autoload comms file *
+    CODE_AMACRO		enum LotusOpCodes, 49h	; autoexecute macro address
+    CODE_PARSE		enum LotusOpCodes, 4ah	; query parse info
+    CODE_WKSPWORD	enum LotusOpCodes, 4bh	; wksheet password function
+    CODE_HIDVEC1	enum LotusOpCodes, 64h	; hidden columns record *
+    CODE_HIDVEC2	enum LotusOpCodes, 65h	; hidden columns record *
+    CODE_PARSERANGES	enum LotusOpCodes, 66h	; parse ranges
+    CODE_RRANGES	enum LotusOpCodes, 67h	; linear regression ranges *
+    CODE_MATRIXRANGES	enum LotusOpCodes, 69h	; matrix math ranges *
+    CODE_MYSTERY	enum LotusOpCodes, 6bh	; "LICS"?
+    CODE_CPI		enum LotusOpCodes, 96h	; cell pointer index
+
+    CODE_STYLE		enum LotusOpCodes, 9dh
+    CODE_ERROR		enum LotusOpCodes, 0ffffh
+	; This code is NOT used in any format we read, it is used as a return
+	; value in the ReadRecordFromFile routine to distinguish between the
+	; "reached end of file" error and the "could not find what you
+	; requested" error.
+
+LotusFunctionCodes	etype	word
+    LOTUS_FUNCTION_CONSTANT	enum LotusFunctionCodes, 0h
+    LOTUS_FUNCTION_VARIABLE	enum LotusFunctionCodes, 1h
+    LOTUS_FUNCTION_RANGE	enum LotusFunctionCodes, 2h
+    LOTUS_FUNCTION_RETURN	enum LotusFunctionCodes, 3h
+    LOTUS_FUNCTION_PARENTHESES	enum LotusFunctionCodes, 4h
+    LOTUS_FUNCTION_2BYTE_INT	enum LotusFunctionCodes, 5h
+    LOTUS_FUNCTION_STR_CONST	enum LotusFunctionCodes, 6h
+
+    LOTUS_FUNCTION_UMINUS	enum LotusFunctionCodes, 8h
+    LOTUS_FUNCTION_PLUS		enum LotusFunctionCodes, 9h
+    LOTUS_FUNCTION_SUB		enum LotusFunctionCodes, 0ah
+    LOTUS_FUNCTION_MULTIPLY	enum LotusFunctionCodes, 0bh
+    LOTUS_FUNCTION_DIVIDE	enum LotusFunctionCodes, 0ch
+    LOTUS_FUNCTION_EXPONENT	enum LotusFunctionCodes, 0dh
+    LOTUS_FUNCTION_EQUAL	enum LotusFunctionCodes, 0eh
+    LOTUS_FUNCTION_NOT_EQUAL	enum LotusFunctionCodes, 0fh
+    LOTUS_FUNCTION_LT_OR_EQUAL	enum LotusFunctionCodes, 10h
+    LOTUS_FUNCTION_GT_OR_EQUAL	enum LotusFunctionCodes, 11h
+    LOTUS_FUNCTION_LT		enum LotusFunctionCodes, 12h
+    LOTUS_FUNCTION_GT		enum LotusFunctionCodes, 13h
+    LOTUS_FUNCTION_AND		enum LotusFunctionCodes, 14h
+    LOTUS_FUNCTION_OR		enum LotusFunctionCodes, 15h
+    LOTUS_FUNCTION_NOT		enum LotusFunctionCodes, 16h
+    LOTUS_FUNCTION_UPLUS	enum LotusFunctionCodes, 17h
+
+    LOTUS_FUNCTION_NA		enum LotusFunctionCodes, 1fh
+    LOTUS_FUNCTION_ERR		enum LotusFunctionCodes, 20h
+    LOTUS_FUNCTION_ABS		enum LotusFunctionCodes, 21h
+    LOTUS_FUNCTION_INT		enum LotusFunctionCodes, 22h
+    LOTUS_FUNCTION_SQRT		enum LotusFunctionCodes, 23h
+    LOTUS_FUNCTION_LOG		enum LotusFunctionCodes, 24h
+    LOTUS_FUNCTION_LN		enum LotusFunctionCodes, 25h
+    LOTUS_FUNCTION_PI		enum LotusFunctionCodes, 26h
+    LOTUS_FUNCTION_SIN		enum LotusFunctionCodes, 27h
+    LOTUS_FUNCTION_COS		enum LotusFunctionCodes, 28h
+    LOTUS_FUNCTION_TAN		enum LotusFunctionCodes, 29h
+    LOTUS_FUNCTION_ATAN2	enum LotusFunctionCodes, 2ah
+    LOTUS_FUNCTION_ATAN		enum LotusFunctionCodes, 2bh
+    LOTUS_FUNCTION_ASIN		enum LotusFunctionCodes, 2ch
+    LOTUS_FUNCTION_ACOS		enum LotusFunctionCodes, 2dh
+    LOTUS_FUNCTION_EXP		enum LotusFunctionCodes, 2eh
+    LOTUS_FUNCTION_MOD		enum LotusFunctionCodes, 2fh
+    LOTUS_FUNCTION_CHOOSE	enum LotusFunctionCodes, 30h
+    LOTUS_FUNCTION_ISNA		enum LotusFunctionCodes, 31h
+    LOTUS_FUNCTION_ISERR	enum LotusFunctionCodes, 32h
+    LOTUS_FUNCTION_FALSE	enum LotusFunctionCodes, 33h
+    LOTUS_FUNCTION_TRUE		enum LotusFunctionCodes, 34h
+    LOTUS_FUNCTION_RAND		enum LotusFunctionCodes, 35h
+    LOTUS_FUNCTION_DATE		enum LotusFunctionCodes, 36h
+    LOTUS_FUNCTION_TODAY	enum LotusFunctionCodes, 37h
+    LOTUS_FUNCTION_PMT		enum LotusFunctionCodes, 38h
+    LOTUS_FUNCTION_PV		enum LotusFunctionCodes, 39h
+    LOTUS_FUNCTION_FV		enum LotusFunctionCodes, 3ah
+    LOTUS_FUNCTION_IF		enum LotusFunctionCodes, 3bh
+    LOTUS_FUNCTION_DAY		enum LotusFunctionCodes, 3ch
+    LOTUS_FUNCTION_MONTH	enum LotusFunctionCodes, 3dh
+    LOTUS_FUNCTION_YEAR		enum LotusFunctionCodes, 3eh
+    LOTUS_FUNCTION_ROUND	enum LotusFunctionCodes, 3fh
+    LOTUS_FUNCTION_TIME		enum LotusFunctionCodes, 40h
+    LOTUS_FUNCTION_HOUR		enum LotusFunctionCodes, 41h
+    LOTUS_FUNCTION_MINUTE	enum LotusFunctionCodes, 42h
+    LOTUS_FUNCTION_SECOND	enum LotusFunctionCodes, 43h
+    LOTUS_FUNCTION_ISNUMBER	enum LotusFunctionCodes, 44h
+    LOTUS_FUNCTION_ISSTRING	enum LotusFunctionCodes, 45h
+    LOTUS_FUNCTION_LENGTH	enum LotusFunctionCodes, 46h
+    LOTUS_FUNCTION_VALUE	enum LotusFunctionCodes, 47h
+    LOTUS_FUNCTION_STRING	enum LotusFunctionCodes, 48h
+    LOTUS_FUNCTION_MID		enum LotusFunctionCodes, 49h
+    LOTUS_FUNCTION_CHR		enum LotusFunctionCodes, 4ah
+    LOTUS_FUNCTION_ASCII	enum LotusFunctionCodes, 4bh
+    LOTUS_FUNCTION_FIND		enum LotusFunctionCodes, 4ch
+    LOTUS_FUNCTION_DATEVALUE	enum LotusFunctionCodes, 4dh
+    LOTUS_FUNCTION_TIMEVALUE	enum LotusFunctionCodes, 4eh
+    LOTUS_FUNCTION_CELLPOINTER	enum LotusFunctionCodes, 4fh
+    ;
+    ; multiple argument opcodes follow
+    ;
+    LOTUS_FUNCTION_SUM		enum LotusFunctionCodes, 50h
+    LOTUS_FUNCTION_AVG		enum LotusFunctionCodes, 51h
+    LOTUS_FUNCTION_CNT		enum LotusFunctionCodes, 52h
+    LOTUS_FUNCTION_MIN		enum LotusFunctionCodes, 53h
+    LOTUS_FUNCTION_MAX		enum LotusFunctionCodes, 54h
+    LOTUS_FUNCTION_VLOOKUP	enum LotusFunctionCodes, 55h
+    LOTUS_FUNCTION_NPV		enum LotusFunctionCodes, 56h
+    LOTUS_FUNCTION_VAR		enum LotusFunctionCodes, 57h
+    LOTUS_FUNCTION_STD		enum LotusFunctionCodes, 58h
+    LOTUS_FUNCTION_IRR		enum LotusFunctionCodes, 59h
+    LOTUS_FUNCTION_HLOOKUP	enum LotusFunctionCodes, 5ah
+    LOTUS_FUNCTION_DSUM		enum LotusFunctionCodes, 5bh	; dbase
+    LOTUS_FUNCTION_DAVG		enum LotusFunctionCodes, 5ch	; dbase
+    LOTUS_FUNCTION_DCNT		enum LotusFunctionCodes, 5dh	; dbase
+    LOTUS_FUNCTION_DMIN		enum LotusFunctionCodes, 5eh	; dbase
+    LOTUS_FUNCTION_DMAX		enum LotusFunctionCodes, 5fh	; dbase
+    LOTUS_FUNCTION_DVAR		enum LotusFunctionCodes, 60h	; dbase
+    LOTUS_FUNCTION_DSTD		enum LotusFunctionCodes, 61h	; dbase
+    LOTUS_FUNCTION_INDEX	enum LotusFunctionCodes, 62h
+    LOTUS_FUNCTION_COLS		enum LotusFunctionCodes, 63h
+    LOTUS_FUNCTION_ROWS		enum LotusFunctionCodes, 64h
+    LOTUS_FUNCTION_REPEAT	enum LotusFunctionCodes, 65h
+    LOTUS_FUNCTION_UPPER	enum LotusFunctionCodes, 66h
+    LOTUS_FUNCTION_LOWER	enum LotusFunctionCodes, 67h
+    LOTUS_FUNCTION_LEFT		enum LotusFunctionCodes, 68h
+    LOTUS_FUNCTION_RIGHT	enum LotusFunctionCodes, 69h
+    LOTUS_FUNCTION_REPLACE	enum LotusFunctionCodes, 6ah
+    LOTUS_FUNCTION_PROPER	enum LotusFunctionCodes, 6bh
+    LOTUS_FUNCTION_CELL		enum LotusFunctionCodes, 6ch
+    LOTUS_FUNCTION_TRIM		enum LotusFunctionCodes, 6dh
+    LOTUS_FUNCTION_CLEAN	enum LotusFunctionCodes, 6eh
+    LOTUS_FUNCTION_S		enum LotusFunctionCodes, 6fh
+    LOTUS_FUNCTION_N		enum LotusFunctionCodes, 70h
+    LOTUS_FUNCTION_EXACT	enum LotusFunctionCodes, 71h
+    LOTUS_FUNCTION_CALL		enum LotusFunctionCodes, 72h
+    LOTUS_FUNCTION_APP		enum LotusFunctionCodes, 73h	; Symphony 1.0
+    LOTUS_FUNCTION_INDIRECT	= LOTUS_FUNCTION_APP		; Symphony 1.1
+    LOTUS_FUNCTION_RATE		enum LotusFunctionCodes, 74h
+    LOTUS_FUNCTION_TERM		enum LotusFunctionCodes, 75h
+    LOTUS_FUNCTION_CTERM	enum LotusFunctionCodes, 76h
+    LOTUS_FUNCTION_SLN		enum LotusFunctionCodes, 77h
+    LOTUS_FUNCTION_SOY		enum LotusFunctionCodes, 78h
+    LOTUS_FUNCTION_DDB		enum LotusFunctionCodes, 79h
+
+    LOTUS_FUNCTION_AAF_START	enum LotusFunctionCodes, 9ch
+    LOTUS_FUNCTION_AAF_UNKNOWN	enum LotusFunctionCodes, 0ceh	; 123/2
+    LOTUS_FUNCTION_AAF_END	enum LotusFunctionCodes, 0ffh	; 123/2
+    LOTUS_FUNCTION_AAF_MAX	= LOTUS_FUNCTION_AAF_END	; Symphony 1.1
+
+;-------------------------------------------------------------------------------
+;	OPERATOR PRECEDENCE
+;-------------------------------------------------------------------------------
+
+LOTUS_PRECEDENCE_UNARY_PLUS	= 6
+LOTUS_PRECEDENCE_BINARY_PLUS	= 4
+LOTUS_PRECEDENCE_UNARY_MINUS	= 6
+LOTUS_PRECEDENCE_BINARY_MINUS	= 4
+LOTUS_PRECEDENCE_MULTIPLY	= 5
+LOTUS_PRECEDENCE_DIVIDE		= 5
+LOTUS_PRECEDENCE_EXP		= 7	; ^
+LOTUS_PRECEDENCE_EQ		= 3	; =
+LOTUS_PRECEDENCE_NEQ		= 3	; <>
+LOTUS_PRECEDENCE_LEQ		= 3	; <=
+LOTUS_PRECEDENCE_GEQ		= 3	; >=
+LOTUS_PRECEDENCE_LT		= 3	; <
+LOTUS_PRECEDENCE_GT		= 3	; >
+LOTUS_PRECEDENCE_LOGICAL_AND	= 1
+LOTUS_PRECEDENCE_LOGICAL_OR	= 1
+LOTUS_PRECEDENCE_LOGICAL_NOT	= 2
+
+;-------------------------------------------------------------------------------
+;	MISC CONSTANTS
+;-------------------------------------------------------------------------------
+
+LotusFileFormat	etype	word
+	LFF_123		enum LotusFileFormat, 405h	; 123
+	LFF_SYM		enum LotusFileFormat, 406h	; 123 v2, Sym v1.1
+	LFF_123_R2	enum LotusFileFormat, 406h	; 123 v2, Sym v1.1
+
+LOTUS_BOF_ID	=	0406h
+
+LOTUS_DEFAULT_COL_WIDTH		= 9
+
+LOTUS_DEFAULT_BORDER_WIDTH_COL	= 4
+
+LOTUS_DEFAULT_BORDER_WIDTH_ROW	= 4
+
+LOTUS_MAX_STRING_LEN		= 240
+
+ABS_REL_REF_BIT_MASK		= 8000h	; Lotus as well as GeoCalc
+
+ABS_REL_REF_BIT_MASK_BYTE	= 80h
+
+LotusCellReference	record
+	LCR_ABS_REL_REF:1		; 0=absolute	
+	LCR_UNKNOWN:1
+	LCR_REF:14
+LotusCellReference	end
+
+;
+; In Lotus files, the 13th bit of the cell reference word is the
+; most significant bit (mask 20h on high byte), which is used to 
+; determine if it is a negative reference (in relation to the current cell).  
+;
+LOTUS_MS_CELL_REF_BIT		= 20h	; col & row most-significant byte
+;
+; In Quattro Pro files saved as Lotus files, the most significant bit 
+; for row references is mask 10h on high the byte, and for column 
+; references, mask 80h on the low byte.
+;
+LOTUS_QPRO_ROW_MS_CELL_REF_BIT 		= 10h	; mask for high byte
+LOTUS_QPRO_COL_MS_CELL_REF_BIT 		= 80h	; mask for low byte
+;
+; For Quattro Pro cell references, use these masks to sign extend
+; them for GeoCalc.
+;
+LOTUS_QPRO_COL_SIGN_EXTEND_MASK	= 7fh	; apply to high byte
+LOTUS_QPRO_ROW_SIGN_EXTEND_MASK	= 60h	; apply to high byte
+
+;*******************************************************************************
+;	LOTUS FORMATS
+;*******************************************************************************
+
+;
+; The Lotus format is as follows:
+; Bit 7 is the cell protection bit
+; Bits 4,5,6 store the format type
+;	000 = fixed
+;	001 = scientific
+;	010 = currency
+;	011 = percent
+;	100 = comma
+;	101 = unused
+;	110 = unused
+;	111 = special
+; if the format type is 0-6, bits 0,1,2,3 store the number of decimal places
+; if the format type is 7, bits 0,1,2,3 will mean the following:
+;	0000 = +/-
+;	0001 = general format
+;	0010 = day, month, year
+;	0011 = day, month
+;	0100 = month, year
+;	0101 = text
+; Lotus doesn't seem to have a name for this field.  I will refer to it as
+; the Special field.
+;
+
+LotusFormat	record
+	LF_protection:1,
+	LF_fmtType:3,
+	LF_special:4
+LotusFormat	end
+
+LOTUS_DEFAULT_PROT		= 1 shl offset LF_protection
+
+LOTUS_FORMAT_FIXED		= 0 shl offset LF_fmtType or LOTUS_DEFAULT_PROT
+LOTUS_FORMAT_SCIENTIFIC		= 1 shl offset LF_fmtType or LOTUS_DEFAULT_PROT
+LOTUS_FORMAT_CURRENCY		= 2 shl offset LF_fmtType or LOTUS_DEFAULT_PROT
+LOTUS_FORMAT_PERCENT		= 3 shl offset LF_fmtType or LOTUS_DEFAULT_PROT
+LOTUS_FORMAT_COMMA		= 4 shl offset LF_fmtType or LOTUS_DEFAULT_PROT
+LOTUS_FORMAT_SPECIAL		= 7 shl offset LF_fmtType or LOTUS_DEFAULT_PROT
+
+LOTUS_FORMAT_DEFAULT_DECIMALS	= 2 shl offset LF_special
+LOTUS_FORMAT_DEFAULT_FIXED	= LOTUS_FORMAT_FIXED or LOTUS_DEFAULT_DECIMALS
+LOTUS_FORMAT_DEFAULT_SCIENTIFIC	= LOTUS_FORMAT_SCIENTIFIC or \
+				  LOTUS_DEFAULT_DECIMALS
+LOTUS_FORMAT_DEFAULT_CURRENCY	= LOTUS_FORMAT_CURRENCY or \
+				  LOTUS_DEFAULT_DECIMALS
+LOTUS_FORMAT_DEFAULT_PERCENT	= LOTUS_FORMAT_PERCENT or LOTUS_DEFAULT_DECIMALS
+LOTUS_FORMAT_DEFAULT_COMMA	= LOTUS_FORMAT_COMMA or LOTUS_DEFAULT_DECIMALS
+
+;
+; there is an implicit 'shl offset LF_special' for the following:
+;
+LOTUS_FORMAT_PLUS_MINUS		= 0 or LOTUS_FORMAT_SPECIAL
+LOTUS_FORMAT_GENERAL		= 1 or LOTUS_FORMAT_SPECIAL
+LOTUS_FORMAT_DMY		= 2 or LOTUS_FORMAT_SPECIAL
+LOTUS_FORMAT_DM			= 3 or LOTUS_FORMAT_SPECIAL
+LOTUS_FORMAT_MY			= 4 or LOTUS_FORMAT_SPECIAL
+LOTUS_FORMAT_TEXT		= 5 or LOTUS_FORMAT_SPECIAL
+
+;*******************************************************************************
+;	LOTUS STRUCTURES
+;*******************************************************************************
+
+;-------------------------------------------------------------------------------
+;	RECORD STRUCTURES
+;-------------------------------------------------------------------------------
+
+LotusRecordHeader	struct
+	LRH_opcode	LotusOpCodes
+	LRH_length	word
+	LRH_data	label byte
+LotusRecordHeader	ends
+
+;
+; LotusCellInfo - structure that precedes the cell data
+;
+LotusCellInfo	struct
+	LCI_format	byte
+	LCI_colNum	word
+	LCI_rowNum	word
+LotusCellInfo	ends
+
+LotusCellRecordHeader	struct
+	LCR_recordHdr	LotusRecordHeader
+	LCR_cellInfo	LotusCellInfo
+LotusCellRecordHeader	ends
+
+;-------------------------------------------------------------------------------
+;	SPECIFIC CELL STRUCTURES
+;-------------------------------------------------------------------------------
+
+;
+; structure for a BLANK record
+;
+LotusBlankRecord	struct
+	LBR_recordHdr	LotusCellRecordHeader
+LotusBlankRecord	ends
+
+;
+; structure for a INTEGER record
+;
+LotusIntegerRecord	struct
+	LIR_recordHdr	LotusCellRecordHeader
+	LIR_integer	word
+LotusIntegerRecord	ends
+
+;
+; structure for a NUMBER record
+;
+LotusNumberRecord	struct
+	LNR_recordHdr	LotusCellRecordHeader
+	LNR_number	byte 8 dup (?)
+LotusNumberRecord	ends
+
+;
+; structure for a LABEL record
+;
+LotusLabelRecord	struct
+	LLR_recordHdr	LotusCellRecordHeader
+	LLR_string	byte 240 dup (?)
+LotusLabelRecord	ends
+
+;
+; structure for a FORMULA record
+;
+LotusFormulaRecord	struct
+	LFR_recordHdr	LotusCellRecordHeader
+	LFR_numericVal	byte 8 dup (?)
+	LFR_formulaSize	word
+	LFR_formula	byte 2048 dup (?)
+LotusFormulaRecord	ends
+
+;-------------------------------------------------------------------------------
+;	OTHER STRUCTURES
+;-------------------------------------------------------------------------------
+
+;
+; structure for a Lotus RANGE opcode
+;
+LotusRange	struct
+	LR_startCol		word
+	LR_startRow		word
+	LR_endCol		word
+	LR_endRow		word
+LotusRange	ends
+
+;
+; structure for a Lotus WINDOW1 opcode
+;
+LotusWindow	struct
+	LW_cursorCol		word
+	LW_cursorRow		word
+	LW_cellFormat		byte
+	LW_zero1		byte	; unused, must be 0
+	LW_colWidth		word
+	LW_screenCols		word	; number of columns on screen
+	LW_screenRows		word	; number of rows on screen
+	LW_leftmostCol		word
+	LW_topRow		word
+	LW_titleCols		word	; number of title columns
+	LW_titleRows		word	; number of title rows
+	LW_leftTitleCol		word
+	LW_topTitleRow		word
+	LW_borderWidthCol	word
+	LW_borderWidthRow	word
+	LW_windowWidth		word
+	LW_zero2		byte	; unused, must be 0
+LotusWindow	ends
+
+;
+; structure for a NAME opcode
+;
+LOTUS_NAME_LEN			= 16
+
+LotusName	struct
+	LN_name			byte LOTUS_NAME_LEN dup (?)
+	LN_range		LotusRange
+LotusName	ends
+
+;*******************************************************************************
+;	FATAL ERRORS
+;*******************************************************************************
+
+ROUTINE_USING_BAD_PARAMS			enum	FatalErrors
+IMPEX_ALREADY_HAVE_A_DATA_BLOCK_LOCKED		enum	FatalErrors
+IMPEX_NO_DATA_BLOCK_TO_UNLOCK			enum	FatalErrors
+IMPEX_BAD_DATA_BLOCK_ENTRY			enum	FatalErrors
+IMPEX_BAD_DATA_CHAIN_RECORD			enum	FatalErrors
+
+;;;IMPEX_IMPORTING_INVALID_DATA			enum	FatalErrors
+IMPEX_EXPORTING_INVALID_DATA			enum	FatalErrors
+IMPEX_ATTEMPTING_POP_FROM_EMPTY_STACK		enum	FatalErrors
+IMPEX_INVALID_DATA_IN_EXPORT_TABLE		enum	FatalErrors
+IMPEX_TRASHED_STACK_FRAME			enum	FatalErrors
+IMPEX_ENCOUNTERED_PREMATURE_EOF			enum	FatalErrors
+IMPEX_BAD_COUNT					enum	FatalErrors
+
+IMPEX_INVALID_DATA_IN_NODE_ARRAY		enum	FatalErrors
+;;;IMPEX_NODE_ARRAY_OVERFLOW			enum	FatalErrors
+IMPEX_NODE_ARRAY_UNDERFLOW			enum	FatalErrors
+IMPEX_NODE_STACK_OVERFLOW			enum	FatalErrors
+IMPEX_NODE_STACK_UNDERFLOW			enum	FatalErrors
+IMPEX_NODE_STACK_NOT_EMPTY			enum	FatalErrors
+IMPEX_REG_DESTROYED				enum	FatalErrors
+IMPEX_ASSERTION_FAILED				enum	FatalErrors
+IMPEX_ASSUMING_INCORRECT_RECORD_SIZE		enum	FatalErrors
+IMPEX_BAD_IMPORT_STACK_FRAME			enum	FatalErrors
+IMPEX_BAD_EXPORT_STACK_FRAME			enum	FatalErrors
+
+IMPEX_OPERATOR_STACK_NOT_EMPTY			enum	FatalErrors
+IMPEX_RECORD_TOO_LONG_TO_IMPORT			enum	FatalErrors
+IMPEX_CELL_DATA_TOO_LARGE			enum	FatalErrors
+IMPEX_BUFFER_OVERFLOW				enum	FatalErrors
+IMPEX_ATTEMPT_TO_TRANSLATE_AND_OR		enum	FatalErrors
+; An attempt was made to translate a Lotus and/or operator into a GeoCalc 
+; function. GeoCalc implements and/or as functions, not as binary operators.
+; There is special-case code tho handle them in the routine which
+; processes Lotus binary operators, and they should never be directly
+; translated into another binary operator.
+; 
+
+;
+; cache code errors
+;
+OUTPUT_CACHE_ROUTINE_CALLED_AFTER_ERROR_RETURNED	enum	FatalErrors
+CACHE_OFFSET_EXCEEDS_SIZE			enum	FatalErrors
+CACHE_NOT_FLUSHED				enum	FatalErrors
+READ_BEYOND_CACHE_END				enum	FatalErrors
+CANNOT_UNGET_CHAR_FROM_PREVIOUS_BLOCK		enum	FatalErrors
+
+
+;******************************************************************************
+;	WARNINGS
+;******************************************************************************
+IMPEX_IMPORTING_INVALID_DATA			enum	Warnings
+IMPEX_NODE_ARRAY_OVERFLOW			enum	Warnings
+
+
+;*******************************************************************************
+;	IMPEX STUFF
+;*******************************************************************************
+
+include	cell.def
+include	math.def
+include	parse.def
+include	ssheet.def
+
+EOF				equ 0xff	; InputCacheGetChar returns this
+
+OVERFLOW_SIG			= 'y' shl 8 or 'c'
+
+IMPORT_FORMULA_MAX_TOKENS	equ 256
+
+IMPORT_FORMULA_MAX_NODES	equ 256
+
+NULL_PTR			equ 0ffffh
+
+LotusRecordArrayElement	struct
+	LRA_cellRow		word
+	LRA_cellCol		word
+	LRA_recordFileOffset	word
+LotusRecordArrayElement	ends
+
+LotusRecordArraySortStackFrame	struct
+	LRASSF_lowhead	dword
+	LRASSF_lowtail	dword
+	LRASSF_highhead	dword
+	LRASSF_hightail	dword
+LotusRecordArraySortStackFrame	ends
+
+ImportFunctionTokenType	etype	byte, 0, 1
+	IMPORT_OPERAND		enum	ImportFunctionTokenType
+	IMPORT_UNARY_OP		enum	ImportFunctionTokenType
+	IMPORT_BINARY_OP	enum	ImportFunctionTokenType
+	IMPORT_PARENTHESES	enum	ImportFunctionTokenType
+	IMPORT_FUNCTION		enum	ImportFunctionTokenType
+	IMPORT_END_OF_EXPR	enum	ImportFunctionTokenType
+
+ImportFormulaNode	struct
+	IFN_token		byte	; Lotus opcode
+	IFN_tokenType		ImportFunctionTokenType
+	IFN_numChildren		byte	; number of children
+	IFN_tokenOffset		word	; offset into Lotus data stream
+					; to the token itself
+	IFN_childOffset		word	; offset into node array to child
+	IFN_siblingOffset	word	; offset into node array to sibling
+ImportFormulaNode	ends
+
+IMPORT_STACK_FRAME_SIG1 = 7763h
+IMPORT_STACK_FRAME_SIG2 = 1963h
+
+ImportStackFrame	struct
+	ISF_signature1			word
+	;
+	; transfer file
+	;
+	ISF_formatNumber		word
+	ISF_importOptions		word
+	ISF_transferVMFile		word
+	ISF_sourceFile			word
+;	ISF_transferVMBlkHan		hptr
+
+	;
+	; cache handles
+	;
+	ISF_inputCacheHan		hptr
+	ISF_outputCacheHan		hptr
+	ISF_cacheBufHan			word
+	ISF_cacheBufSize		word
+
+	;
+	; stream addresses
+	;
+	ISF_lotusDataStream		dword
+	ISF_geocalcOutputStream		dword
+
+	;
+	; translation vars, initialized by TransImportProcessRange
+	;
+	ISF_lotusToken			LotusOpCodes
+	ISF_number			byte FPSIZE_IEEE64 dup (?)
+
+	ISF_endRow			word
+	ISF_endCol			word
+
+	;
+	; handles of the blocks
+	;
+	ISF_nodeStackHan		hptr
+	ISF_nodeArrayHan		hptr
+
+	;
+	; fields that track the top of the node stack
+	;
+	ISF_nodeStackTopAddr	label	dword
+	ISF_nodeStackTopOff		word
+	ISF_nodeStackSeg		word
+
+	;
+	; fields that track the free portion of the node array
+	;
+	ISF_nodeArrayFreePtr	label	dword
+	ISF_nodeArrayFreeOff		word
+	ISF_nodeArraySeg		word
+
+	ISF_nodeArrayRoot		word	; node array offset of root
+
+	ISF_signature2			word
+ImportStackFrame	ends
+
+EXPORT_STACK_FRAME_SIG1 = 1963h
+EXPORT_STACK_FRAME_SIG2 = 7763h
+
+;
+; Allocate stack buffer big enough to hold the largest cell,
+; which ought to be a formula cell because of its large Cell structure.
+;
+EXPORT_STACK_FRAME_BUF_SIZE = CELL_FORMULA_BUFFER_SIZE	; (was = 256)
+EXPORT_STACK_FRAME_ENTRY_BUF_SIZE = (CELL_FORMULA_BUFFER_SIZE+ size SSMetaEntry)
+
+CheckHack <CELL_FORMULA_BUFFER_SIZE gt CELL_TEXT_BUFFER_SIZE>
+
+ExportStackFrame	struct
+	;
+	; NOTE! The order of the first 3 items must not be changed.
+	;
+	ESF_token		word	; the Lotus "opcode"
+	ESF_length		word	; length of data
+	ESF_data		byte EXPORT_STACK_FRAME_BUF_SIZE dup (?) 
+
+	ESF_signature1		word
+	ESF_transferFileHan	hptr	; VM file han of transfer item
+	ESF_transferHdrBlkHan	hptr	; SpreadsheetTransferHeader blk han
+
+	;
+	; items from the ExportFrame
+	;
+	ESF_formatNumber	word	; number of format to use
+	ESF_exportOptions	hptr	; 0=default
+	ESF_transferVMChain	dword	; VM chain containing tfer format
+	ESF_transferVMFile	word	; VM file handle of tfer format
+	ESF_outputFile		hptr
+
+	ESF_startRow		word
+	ESF_startCol		word
+	ESF_numRows		word
+	ESF_numCols		word
+	ESF_endRow		word
+	ESF_endCol		word
+	ESF_curRow		word
+	ESF_curCol		word
+	;
+	; handles and addresses of the data blocks
+	; entryBuf should be big enough for largest cell - formula
+	;
+	ESF_entryBuf		byte EXPORT_STACK_FRAME_ENTRY_BUF_SIZE dup (?)
+	ESF_overflowMarker	word
+	ESF_signature2		word
+	;
+	; item stack vars used during infix to postfix translation.
+	; item stack grows from low to high memory
+	;
+	ESF_operatorStackHan		hptr
+	ESF_operatorStackTopAddr	label	dword
+	ESF_operatorStackTopOffset	word
+	ESF_operatorStackSeg		word
+	ESF_operatorCount		byte	; # of operators on the stack
+
+	ESF_operatorStackTopToken	word	; operator stack entry
+	ESF_curOperator			word	; operator stack entry
+ExportStackFrame	ends
+
+OPERATOR_STACK_MAX_ENTRIES	equ 256
+

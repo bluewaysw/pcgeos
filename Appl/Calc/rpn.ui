@@ -1,0 +1,569 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1990 -- All Rights Reserved
+ *
+ * PROJECT:	  PCGEOS
+ * MODULE:	  rpn.ui
+ * FILE:	  rpn.ui
+ *
+ * AUTHOR:  	  Adam de Boor: Mar 18, 1990
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	3/18/90	  ardeb	    Initial version
+ *
+ * DESCRIPTION:
+ *	Interface components for Reverse Polish Notation (HP) version.
+ *
+ *
+ * 	$Id: rpn.ui,v 1.1 97/04/04 14:46:50 newdeal Exp $
+ *
+ ***********************************************************************/
+
+start Interface;
+
+RPNTop = GenInteraction {
+	children = RPNDisplay, RPNButtons;
+	hints = {
+	    HINT_ORIENT_CHILDREN_VERTICALLY,
+	    HINT_PREVENT_DEFAULT_OVERRIDES
+	}
+	genStates = default -usable;
+}
+
+
+end Interface;
+
+start RPN;
+
+RPNEngine = CalcEngine {
+	registers = RPNRegisters;
+	display = RPNDisplay;
+}
+
+chunk RPNRegisters = data {}
+
+#if 0
+chunk RPNDisplayRuler = data {
+    VisTextRuler <
+	<					;VTR_meta.
+	    <1, 0>				;    REH_refCount
+	>,
+	0,				;VTR_name
+	<				;VTR_border.
+	    0, 0, 0, 0,			;    VTPBF_(LEFT, TOP, RIGHT, BOTTOM)
+	    0, 0,			;    VTPBF_(DOUBLE, DRAW_INNER_LINES)
+	    0, 0, 0,			;    VTPBF_(WIDTH, SPACING, SHADOW)
+	    SA_TOP_LEFT			;    VTPBF_ANCHOR
+	>,
+	<SCP_index <			;VTR_borderColor.SCP_index.
+	    BLACK,			;    SCPI_index
+	    <				;    SCPI_info.
+		0,			;	VTCMM_COLOR_FLAG
+		VTGS_100,		;	VTCMM_GRAY_SCREEN
+		0,			;	VTCMM_TRANSPARENT
+		1,			;	VTCMM_ON_BLACK
+		COLOR_MAP_SOLID		;	VTCMM_COLOR_MAP_MODE
+	    >,
+	    0				;    SCPI_unused
+	>>,
+	<				;VTR_attributes.
+	    J_RIGHT,			;    VTRA_JUSTIFICATION
+	    VTDT_INCH			;    VTRA_DEFAULT_TABS
+	>,
+	0*PIXELS_PER_INCH + 0,		;VTR_leftMargin
+	0*PIXELS_PER_INCH + 0,		;VTR_rightMargin
+	0*PIXELS_PER_INCH + 0,		;VTR_paraMargin
+	<0, 1>,				;VTR_lineSpacing (BBFixed)
+	0,				;VTR_leading
+	<0, 0>,				;VTR_spaceOnTop (BBFixed)
+	<0, 0>,				;VTR_spaceOnBottom (BBFixed)
+	<SCP_index <			;VTR_bgColor.SCP_index.
+	    BLACK,			;    SCPI_index
+	    <				;    SCPI_info.
+		0,			;	VTCMM_COLOR_FLAG
+		VTGS_100,		;	VTCMM_GRAY_SCREEN
+		0,			;	VTCMM_TRANSPARENT
+		1,			;	VTCMM_ON_BLACK
+		COLOR_MAP_SOLID		;	VTCMM_COLOR_MAP_MODE
+	    >,
+	    0				;    SCPI_unused
+	>>,
+	0,				;VTR_numberOfTabs
+	<0, 0, 0, 0>			;VTR_reserved
+    >
+}
+#endif
+
+chunk RPNDisplayStyle = data {
+    CHAR_ATTR_FONT_SIZE_STYLE_COLOR(1, FONT_LED, 18, <>, LT_RED)
+}
+
+RPNDisplay = CalcDisplay {
+	text = "";
+	charAttrRuns = "RPNDisplayStyle";
+	hints = {
+		HINT_NO_SPACES,
+		HINT_SIGNED_DECIMAL,
+		HINT_WASH_COLOR {
+		    ColorQuad <
+			    BLACK,		;    SCPI_index
+			    COLOR_INDEX,	;    SCPI_info
+			    0, 0
+		    >
+    	    	},
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+	action = MSG_CALC_DISPLAY_RETURN, process;
+	engine = RPNEngine;
+	shortcuts = RPNShortCuts;
+}
+
+chunk RPNShortCuts = data {
+	CDShortcut 	<(CS_BSW shl 8) or '+', RPNPlus>,
+			<(CS_BSW shl 8) or '*', RPNMult>,
+			<(CS_BSW shl 8) or '/', RPNDivide>,
+			<(CS_BSW shl 8) or '-', RPNMinus>,
+			<(CS_CONTROL shl 8) or CV_NUMPAD_PLUS, RPNPlus>,
+			<(CS_CONTROL shl 8) or CV_NUMPAD_MULT, RPNMult>,
+			<(CS_CONTROL shl 8) or CV_NUMPAD_DIV, RPNDivide>,
+			<(CS_CONTROL shl 8) or CV_NUMPAD_MINUS, RPNMinus>,
+			<(CS_CONTROL shl 8) or CV_PRINTSCREEN, RPNMult>,
+			<(CS_BSW shl 8) or 'x', RPNMult>,
+			<(CS_BSW shl 8) or 'X', RPNMult>,
+			<(CS_BSW shl 8) or '0', RPN0>,
+			<(CS_BSW shl 8) or '1', RPN1>,
+			<(CS_BSW shl 8) or '2', RPN2>,
+			<(CS_BSW shl 8) or '3', RPN3>,
+			<(CS_BSW shl 8) or '4', RPN4>,
+			<(CS_BSW shl 8) or '5', RPN5>,
+			<(CS_BSW shl 8) or '6', RPN6>,
+			<(CS_BSW shl 8) or '7', RPN7>,
+			<(CS_BSW shl 8) or '8', RPN8>,
+			<(CS_BSW shl 8) or '9', RPN9>,
+			<(CS_CONTROL shl 8) or '0', RPN0>,
+			<(CS_CONTROL shl 8) or '1', RPN1>,
+			<(CS_CONTROL shl 8) or '2', RPN2>,
+			<(CS_CONTROL shl 8) or '3', RPN3>,
+			<(CS_CONTROL shl 8) or '4', RPN4>,
+			<(CS_CONTROL shl 8) or '5', RPN5>,
+			<(CS_CONTROL shl 8) or '6', RPN6>,
+			<(CS_CONTROL shl 8) or '7', RPN7>,
+			<(CS_CONTROL shl 8) or '8', RPN8>,
+			<(CS_CONTROL shl 8) or '9', RPN9>,
+			<(CS_BSW shl 8) or 'c', RPNCE>,
+			<(CS_BSW shl 8) or 'C', RPNCE>,
+			<(CS_BSW shl 8) or 's', RPNStore>,
+			<(CS_BSW shl 8) or 'S', RPNStore>,
+			<(CS_BSW shl 8) or 'r', RPNRecall>,
+			<(CS_BSW shl 8) or 'R', RPNRecall>,
+			<(CS_BSW shl 8) or 't', RPNStorePlus>,
+			<(CS_BSW shl 8) or 'T', RPNStorePlus>,
+			<(CS_BSW shl 8) or 'p', RPNStorePlus>,
+			<(CS_BSW shl 8) or 'P', RPNStorePlus>,
+			<(CS_BSW shl 8) or 'n', RPNChs>,
+			<(CS_BSW shl 8) or 'N', RPNChs>,
+			<(CS_BSW shl 8) or '.', RPNDot>,
+			<(CS_BSW shl 8) or ',', RPNDot>,
+			<(CS_CONTROL shl 8) or '.', RPNDot>
+}
+
+/*
+ * We have to divide the buttons into two main groups so the Enter button can
+ * be twice as wide as the others. The effective layout is:
+ *
+ *	+===========+=================+
+ *	|   Enter   |x<>y : Del : CE  |
+ *	+-----------+- - -+- - -+- - -+
+ *	|  7  :  8  |  9  :  /  : STO |
+ *	+- - -+- - -+- - -+- - -+- - -+
+ *	|  4  :  5  |  6  :  *  : RCL |
+ *	+- - -+- - -+- - -+- - -+- - -+
+ *	|  1  :  2  |  3  :  -  :STO+ |
+ *	+- - -+- - -+- - -+- - -+=====+
+ *	|  0  : +/- |  .  :  +  |
+ *	+=====+=====+=====+=====+
+ *
+ * Solid boundaries delineate GenInteractions. The wrapping interactions are
+ * vertically-oriented with HINT_EXPAND_WIDTH_TO_FIT_PARENT on the buttons
+ * to ensure all the buttons are the same size.   The enter key is also expand
+ * to fit, but would like to expand to Mars if allowed to, so we put a maximum
+ * size on the object that contains enter and the button composite below it.
+ * To keep enter from ever being bigger than the stuff below, the maximum
+ * size is set to be slightly narrower than the stuff below can get.  The stuff
+ * below will force it to the size we want, but prevents enter from expanding
+ * larger than that.
+ */
+
+RPNButtons = GenInteraction {
+	children = RPNLeftTwoColumns, RPNOthers;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY, 
+		HINT_PREVENT_DEFAULT_OVERRIDES
+	}
+}
+
+/*
+ * Left-most two columns.
+ */
+RPNLeftTwoColumns = GenInteraction {
+	children = RPNEnter, RPNLeftNumbers;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_PREVENT_DEFAULT_OVERRIDES,
+		HINT_MAXIMUM_SIZE {
+			SpecWidth <SST_NUMBER_OF_AVG_WIDTH_CHARS, 10>
+			SpecHeight <>
+			word	1
+		}
+	}
+}
+
+RPNLeftNumbers = GenInteraction {
+	children = RPN7, RPN4, RPN1, RPN0, RPN8, RPN5, RPN2, RPNChs;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_NUMBER_OF_AVG_WIDTH_CHARS, 5>
+			SpecHeight <SST_NUMBER_OF_TEXT_LINES, 4>
+			word	4
+		},
+		HINT_ALLOW_CHILDREN_TO_WRAP,
+		HINT_PREVENT_DEFAULT_OVERRIDES
+	}
+}
+
+RPNEnter = CalcDataTrigger {
+	moniker = "Enter";
+	kbdAccelerator = specificUI ENTER;
+	extraAccelerator1 = specificUI NUMPAD_ENTER;
+
+	action = MSG_CE_ENTER, RPNEngine;
+	hints = {
+		HINT_DONT_SHOW_SHORTCUT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+RPN7 = CalcDataTrigger {
+	moniker = "7";
+	kbdAccelerator = specificUI '7';
+	extraAccelerator1 = specificUI NUMPAD_7;
+	action = MSG_CD_KBD_CHAR, RPNDisplay;
+	hints = { 
+		HINT_DONT_SHOW_SHORTCUT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	(CS_BSW shl 8) or '7'
+			word	mask CF_FIRST_PRESS
+		}
+	}
+}
+		
+RPN8 = CalcDataTrigger {
+	moniker = "8";
+	kbdAccelerator = specificUI '8';
+	extraAccelerator1 = specificUI NUMPAD_8;
+	action = MSG_CD_KBD_CHAR, RPNDisplay;
+	hints = { 
+		HINT_DONT_SHOW_SHORTCUT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	(CS_BSW shl 8) or '8'
+			word	mask CF_FIRST_PRESS
+		}
+	}
+}
+
+RPN4 = CalcDataTrigger {
+	moniker = "4";
+	kbdAccelerator = specificUI '4';
+	extraAccelerator1 = specificUI NUMPAD_4;
+	action = MSG_CD_KBD_CHAR, RPNDisplay;
+	hints = { 
+		HINT_DONT_SHOW_SHORTCUT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	(CS_BSW shl 8) or '4'
+			word	mask CF_FIRST_PRESS
+		}
+	}
+}
+		
+RPN5 = CalcDataTrigger {
+	moniker = "5";
+	kbdAccelerator = specificUI '5';
+	extraAccelerator1 = specificUI NUMPAD_5;
+	action = MSG_CD_KBD_CHAR, RPNDisplay;
+	hints = { 
+		HINT_DONT_SHOW_SHORTCUT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	(CS_BSW shl 8) or '5'
+			word	mask CF_FIRST_PRESS
+		}
+	}
+}
+
+RPN1 = CalcDataTrigger {
+	moniker = "1";
+	kbdAccelerator = specificUI '1';
+	extraAccelerator1 = specificUI NUMPAD_1;
+	action = MSG_CD_KBD_CHAR, RPNDisplay;
+	hints = { 
+		HINT_DONT_SHOW_SHORTCUT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	(CS_BSW shl 8) or '1'
+			word	mask CF_FIRST_PRESS
+		}
+	}
+}
+		
+RPN2 = CalcDataTrigger {
+	moniker = "2";
+	kbdAccelerator = specificUI '2';
+	extraAccelerator1 = specificUI NUMPAD_2;
+	action = MSG_CD_KBD_CHAR, RPNDisplay;
+	hints = { 
+		HINT_DONT_SHOW_SHORTCUT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	(CS_BSW shl 8) or '2'
+			word	mask CF_FIRST_PRESS
+		}
+	}
+}
+
+RPN0 = CalcDataTrigger {
+	moniker = "0";
+	kbdAccelerator = specificUI '0';
+	extraAccelerator1 = specificUI NUMPAD_0;
+	action = MSG_CD_KBD_CHAR, RPNDisplay;
+	hints = { 
+		HINT_DONT_SHOW_SHORTCUT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	(CS_BSW shl 8) or '0'
+			word	mask CF_FIRST_PRESS
+		}
+	}
+}
+		
+RPNChs = GenTrigger {
+	moniker = "\\xb1";	/* +/- */
+	kbdAccelerator = specificUI 'n';
+	action = MSG_CD_CHANGE_SIGN, RPNDisplay;
+	hints = { 
+		HINT_DONT_SHOW_SHORTCUT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+		
+/*
+ * Right-most 3 columns
+ */
+RPNOthers = GenInteraction {
+	children = RPNXchg, RPN9, RPN6, RPN3, RPNDot,
+		   RPNBS, RPNDivide, RPNMult, RPNMinus, RPNPlus,
+		   RPNCE, RPNStore, RPNRecall, RPNStorePlus;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_NUMBER_OF_AVG_WIDTH_CHARS,5>
+			SpecHeight <SST_NUMBER_OF_TEXT_LINES,5>
+			word	5
+		},
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_ALLOW_CHILDREN_TO_WRAP
+	}
+}
+
+RPNBS = CalcDataTrigger {
+	moniker = "Del";
+	kbdAccelerator = specificUI DELETE;
+	extraAccelerator1 = specificUI BACKSPACE;
+	action = MSG_VIS_TEXT_DO_KEY_FUNCTION, RPNDisplay;
+	hints = { 
+		HINT_DONT_SHOW_SHORTCUT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	VTKF_DELETE_BACKWARD_CHAR
+		}
+	}
+}
+
+RPNXchg = GenTrigger {
+	moniker = "x\\xdc\\xddy";
+	kbdAccelerator = specificUI 'e';
+	action = MSG_CE_EXCHANGE, RPNEngine;
+	hints = { 
+		HINT_DONT_SHOW_SHORTCUT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+RPNCE = GenTrigger {
+	moniker = 'C', "C/CE";
+	kbdAccelerator = specificUI 'c';
+	action = MSG_CD_CLEAR, RPNDisplay;
+	hints = { 
+		HINT_DONT_SHOW_SHORTCUT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+		
+RPN9 = CalcDataTrigger {
+	moniker = "9";
+	kbdAccelerator = specificUI '9';
+	extraAccelerator1 = specificUI NUMPAD_9;
+	action = MSG_CD_KBD_CHAR, RPNDisplay;
+	hints = { 
+		HINT_DONT_SHOW_SHORTCUT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	(CS_BSW shl 8) or '9'
+			word	mask CF_FIRST_PRESS
+		}
+	}
+}
+
+RPNDivide = CalcDataTrigger {
+	moniker = "\\xd6";
+	kbdAccelerator = specificUI '/';
+	extraAccelerator1 = specificUI NUMPAD_DIV;
+	action = MSG_CE_EXECUTE_OP, RPNEngine;
+	hints = { 
+		HINT_DONT_SHOW_SHORTCUT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	CALC_OP_DIVIDE
+			word	MSG_CE_DIVIDE
+		}
+	}
+}
+
+RPNStore = GenTrigger {
+	moniker = 'S', "STO";
+	action = MSG_CE_STORE, RPNEngine;
+	hints = { 
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+		
+RPN6 = CalcDataTrigger {
+	moniker = "6";
+	kbdAccelerator = specificUI '6';
+	extraAccelerator1 = specificUI NUMPAD_6;
+	action = MSG_CD_KBD_CHAR, RPNDisplay;
+	hints = { 
+		HINT_DONT_SHOW_SHORTCUT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	(CS_BSW shl 8) or '6'
+			word	mask CF_FIRST_PRESS
+		}
+	}
+}
+
+RPNMult = CalcDataTrigger {
+	moniker = "x";
+	kbdAccelerator = specificUI 'x';
+	extraAccelerator1 = specificUI '*';
+	extraAccelerator2 = specificUI NUMPAD_MULT;
+
+	action = MSG_CE_EXECUTE_OP, RPNEngine;
+	hints = { 
+		HINT_DONT_SHOW_SHORTCUT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	CALC_OP_MULTIPLY
+			word	MSG_CE_MULTIPLY
+		}
+	}
+}
+
+RPNRecall = GenTrigger {
+	moniker = 'R', "RCL";
+	action = MSG_CE_RECALL_AND_ENTER, RPNEngine;
+	hints = { 
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+		
+RPN3 = CalcDataTrigger {
+	moniker = "3";
+	kbdAccelerator = specificUI '3';
+	extraAccelerator1 = specificUI NUMPAD_3;
+
+	action = MSG_CD_KBD_CHAR, RPNDisplay;
+	hints = { 
+		HINT_DONT_SHOW_SHORTCUT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	(CS_BSW shl 8) or '3'
+			word	mask CF_FIRST_PRESS
+		}
+	}
+}
+
+RPNMinus = CalcDataTrigger {
+	moniker = "\\xd0";	/* EN Dash */
+	kbdAccelerator = specificUI '-';
+	extraAccelerator1 = specificUI NUMPAD_MINUS;
+
+	action = MSG_CE_EXECUTE_OP, RPNEngine;
+	hints = { 
+		HINT_DONT_SHOW_SHORTCUT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	CALC_OP_SUBTRACT
+			word	MSG_CE_SUBTRACT
+		}
+	}
+}
+
+RPNStorePlus = GenTrigger {
+	moniker = 'T', "STO+";
+	action = MSG_CE_STORE_PLUS, RPNEngine;
+	hints = { 
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+RPNDot = CalcDataTrigger {
+	moniker = ".";
+	kbdAccelerator = specificUI '.';
+	extraAccelerator1 = specificUI NUMPAD_PERIOD;
+	extraAccelerator2 = specificUI ',';
+
+	action = MSG_CD_KBD_CHAR, RPNDisplay;
+	hints = { 
+		HINT_DONT_SHOW_SHORTCUT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	(CS_BSW shl 8) or '.'
+			word	mask CF_FIRST_PRESS
+		}
+	}
+}
+
+RPNPlus = CalcDataTrigger {
+	moniker = "+";
+	kbdAccelerator = specificUI '+';
+	extraAccelerator1 = specificUI NUMPAD_PLUS;
+
+	action = MSG_CE_EXECUTE_OP, RPNEngine;
+	hints = { 
+		HINT_DONT_SHOW_SHORTCUT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	CALC_OP_ADD
+			word	MSG_CE_ADD
+		}
+	}
+}
+
+end RPN;
+

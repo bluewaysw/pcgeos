@@ -1,0 +1,272 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+ *
+ * PROJECT:	PCGEOS
+ * MODULE:	Printer/Fax/CCom
+ * FILE:	ccomCoversheet.ui
+ *
+ * AUTHOR:  	  Adam de Boor: Feb  5, 1991
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	2/ 5/91	  ardeb	    Initial version
+ *
+ * DESCRIPTION:
+ *	This file contains the graphics string for the coversheet of a
+ *	fax. It was created by laying out the fields in GeoDraw, fusing
+ *	all the objects together (remembering to extend the user-alterable
+ *	text fields out to the edge of the surrounding box to get the
+ *	clip rectangle right), locating the GStringClass object that holds
+ *	the fused gstring, then using "pgs" in Swat to print out the
+ *	gstring in all its glory. The scroll buffer contents were then
+ *	saved and the output massaged into this gstring (e.g. all the
+ *	GR_ESCAPE opcodes added by Draw for its own purposes are gone and
+ *	all the GR_DRAW_TEXT_FIELD opcodes have been changed to their
+ *	respective quarks).
+ *
+ *	Note that the drawing of the text objects generates a very standard
+ *	set of opcodes. These are encapsulated in the DRAW_TEXT_FIELD and
+ *	LABEL_TEXT_FIELD macros. DRAW_TEXT_FIELD is used for unchangeable
+ *	text fields, while LABEL_TEXT_FIELD is used for changeable ones.
+ *	The only difference is in place of the string given to
+ *	DRAW_TEXT_FIELD, LABEL_TEXT_FIELD accepts the name of a text
+ *	object. A label formed by appending "Ptr" to the end of the
+ *	text object name is placed in the gstring at the start of the
+ *	OpDrawTextPtr structure where the contents of the text object
+ *	should be interpolated. The interpolation is done (for now) by
+ *	locating the text chunk for the object and stuffing its current
+ *	address into the OpDrawTextPtr structure. A hack, but it works
+ *	very well (and on the first try).
+ *
+ *	I have gone through and eliminated all the unecssary graphics
+ *	calls, as we know the environment from which this cover sheet
+ *	is printed. This saved approximately 400 bytes, which makes the
+ *	changes worthwhile. - Don
+ *
+ * 	$Id: ccomremCoversheet.ui,v 1.1 97/04/18 11:52:42 newdeal Exp $
+ *
+ ***********************************************************************/
+
+#define DRAW_TEXT_FIELD(transX,transY,tmSet,tmClear,crLeft,crTop,crRight,crBot,styleSet,styleClear,fontID,psInt,psFrac,dtX,dtY,dtText) \
+	GSSetDefaultTransform | \
+	GSApplyTranslation transX, transY | \
+	GSSetTextMode <tmSet>, <tmClear> | \
+	GSSetTextStyle <styleSet>, <styleClear> | \
+	GSSetFont fontID, psInt, psFrac | \
+	GSDrawText dtX, dtY, dtText
+
+#define LABEL_TEXT_FIELD(transX,transY,tmSet,tmClear,crLeft,crTop,crRight,crBot,styleSet,styleClear,fontID,psInt,psFrac,dtX,dtY,dtTextObj) \
+	GSSetDefaultTransform | \
+	GSApplyTranslation transX, transY | \
+	GSSetTextMode <tmSet>, <tmClear> | \
+	GSSetClipRect <PCT_REPLACE>, crLeft, crTop, crRight, crBot | \
+	GSSetTextStyle <styleSet>, <styleClear> | \
+	GSSetFont fontID, psInt, psFrac | \
+	dtTextObj##Ptr label OpDrawTextPtr | \
+	GSDrawTextPtr dtX, dtY, dtTextObj
+
+#define DRAW_RECT(x,y,width,height) \
+	GSSetDefaultTransform | \
+	GSApplyTranslation x, y | \
+	GSSetAreaAttr 0, 0, 0, CMT_CLOSEST, SDM_0 | \
+	GSSetMixMode MM_COPY | \
+	GSSetLineAttr 0, 0, 0, CMT_CLOSEST, SDM_100, 2, LE_BUTTCAP, LJ_MITERED, LS_SOLID | \
+	GSSetLineStyle LS_SOLID, 0 | \
+	GSSetMiterLimit 1.6875 | \
+	GSDrawRect 0, 0, width, height
+
+chunk CoverGString = data {
+CoverGStringBase	label	byte
+COVER_LEFT_MARGIN	equ	48	; 5/8"
+COVER_TOP_MARGIN	equ	90	; 1 1/4"
+HEADER_WIDTH		equ	382	; points available in the user-
+					;  changeable text fields.
+
+	GSBeginString
+
+	DRAW_TEXT_FIELD(110.0, 0.0, \
+		mask TM_DRAW_BASE, mask TM_DRAW_OPTIONAL_HYPHENS, \
+		1, 1, 295, 44, \
+		mask TS_BOLD or mask TS_ITALIC, \
+		mask TS_OUTLINE or mask TS_SUPERSCRIPT or \
+		mask TS_SUBSCRIPT or mask TS_STRIKE_THRU or mask TS_UNDERLINE, \
+		FID_DTC_COOPER_C_BLACK, 44, 0, \
+		1, 34, <FAX Message>)
+	
+	DRAW_RECT(1.0, 73.0, 495, 223)
+
+	DRAW_RECT(1.0, 345.0, 495, 293)
+
+	DRAW_TEXT_FIELD(16.0, 92.0, \
+		mask TM_DRAW_BASE, mask TM_DRAW_OPTIONAL_HYPHENS, \
+		1, 1, 47, 14, \
+		mask TS_BOLD, \
+		mask TS_ITALIC or mask TS_OUTLINE or mask TS_SUPERSCRIPT or \
+		mask TS_SUBSCRIPT or mask TS_STRIKE_THRU or mask TS_UNDERLINE, \
+		FID_DTC_URW_ROMAN, 14, 0, \
+		1, 11, <Date:>)
+	
+	DRAW_TEXT_FIELD(16.0, 113.0, \
+		mask TM_DRAW_BASE, mask TM_DRAW_OPTIONAL_HYPHENS, \
+		1, 1, 47, 14, \
+		mask TS_BOLD, \
+		mask TS_ITALIC or mask TS_OUTLINE or mask TS_SUPERSCRIPT or \
+		mask TS_SUBSCRIPT or mask TS_STRIKE_THRU or mask TS_UNDERLINE, \
+		FID_DTC_URW_ROMAN, 14, 0, \
+		1, 11, <To:>)
+	
+	DRAW_TEXT_FIELD(16.0, 134.0, \
+		mask TM_DRAW_BASE, mask TM_DRAW_OPTIONAL_HYPHENS, \
+		1, 1, 82, 14, \
+		mask TS_BOLD, \
+		mask TS_ITALIC or mask TS_OUTLINE or mask TS_SUPERSCRIPT or \
+		mask TS_SUBSCRIPT or mask TS_STRIKE_THRU or mask TS_UNDERLINE, \
+		FID_DTC_URW_ROMAN, 14, 0, \
+		1, 11, <Fax Number:>)
+	
+	DRAW_TEXT_FIELD(16.0, 155.0, \
+		mask TM_DRAW_BASE, mask TM_DRAW_OPTIONAL_HYPHENS, \
+		1, 1, 47, 14, \
+		mask TS_BOLD, \
+		mask TS_ITALIC or mask TS_OUTLINE or mask TS_SUPERSCRIPT or \
+		mask TS_SUBSCRIPT or mask TS_STRIKE_THRU or mask TS_UNDERLINE, \
+		FID_DTC_URW_ROMAN, 14, 0, \
+		1, 11, <CC:>)
+	
+	DRAW_TEXT_FIELD(16.0, 187.0, \
+		mask TM_DRAW_BASE, mask TM_DRAW_OPTIONAL_HYPHENS, \
+		1, 1, 47, 14, \
+		mask TS_BOLD, \
+		mask TS_ITALIC or mask TS_OUTLINE or mask TS_SUPERSCRIPT or \
+		mask TS_SUBSCRIPT or mask TS_STRIKE_THRU or mask TS_UNDERLINE, \
+		FID_DTC_URW_ROMAN, 14, 0, \
+		1, 11, <From:>)
+	
+	DRAW_TEXT_FIELD(16.0, 208.0, \
+		mask TM_DRAW_BASE, mask TM_DRAW_OPTIONAL_HYPHENS, \
+		1, 1, 51, 14, \
+		mask TS_BOLD, \
+		mask TS_ITALIC or mask TS_OUTLINE or mask TS_SUPERSCRIPT or \
+		mask TS_SUBSCRIPT or mask TS_STRIKE_THRU or mask TS_UNDERLINE, \
+		FID_DTC_URW_ROMAN, 14, 0, \
+		1, 11, <Subject:>)
+	
+	DRAW_TEXT_FIELD(16.0, 252.0, \
+		mask TM_DRAW_BASE, mask TM_DRAW_OPTIONAL_HYPHENS, \
+		1, 1, 190, 14, \
+		mask TS_BOLD, \
+		mask TS_ITALIC or mask TS_OUTLINE or mask TS_SUPERSCRIPT or \
+		mask TS_SUBSCRIPT or mask TS_STRIKE_THRU or mask TS_UNDERLINE, \
+		FID_DTC_URW_ROMAN, 14, 0, \
+		1, 11, <# Pages (including cover sheet):>)
+	
+	LABEL_TEXT_FIELD(110.0, 92.0, \
+		mask TM_DRAW_BASE, mask TM_DRAW_OPTIONAL_HYPHENS, \
+		1, 1, 383, 14, \
+		0, \
+		mask TS_BOLD or mask TS_ITALIC or mask TS_OUTLINE or \
+		mask TS_SUPERSCRIPT or mask TS_SUBSCRIPT or \
+		mask TS_STRIKE_THRU or mask TS_UNDERLINE, \
+		FID_DTC_URW_ROMAN, 14, 0, \
+		1, 11, CoverSheetDate)
+	
+	LABEL_TEXT_FIELD(110.0, 113.0, \
+		mask TM_DRAW_BASE, mask TM_DRAW_OPTIONAL_HYPHENS, \
+		1, 1, 383, 14, \
+		0, \
+		mask TS_BOLD or mask TS_ITALIC or mask TS_OUTLINE or \
+		mask TS_SUPERSCRIPT or mask TS_SUBSCRIPT or \
+		mask TS_STRIKE_THRU or mask TS_UNDERLINE, \
+		FID_DTC_URW_ROMAN, 14, 0, \
+		1, 11, CoverSheetTo)
+	
+	LABEL_TEXT_FIELD(110.0, 134.0, \
+		mask TM_DRAW_BASE, mask TM_DRAW_OPTIONAL_HYPHENS, \
+		1, 1, 383, 14, \
+		0, \
+		mask TS_BOLD or mask TS_ITALIC or mask TS_OUTLINE or \
+		mask TS_SUPERSCRIPT or mask TS_SUBSCRIPT or \
+		mask TS_STRIKE_THRU or mask TS_UNDERLINE, \
+		FID_DTC_URW_ROMAN, 14, 0, \
+		1, 11, PhoneNumber)
+	
+	LABEL_TEXT_FIELD(110.0, 155.0, \
+		mask TM_DRAW_BASE, mask TM_DRAW_OPTIONAL_HYPHENS, \
+		1, 1, 383, 14, \
+		0, \
+		mask TS_BOLD or mask TS_ITALIC or mask TS_OUTLINE or \
+		mask TS_SUPERSCRIPT or mask TS_SUBSCRIPT or \
+		mask TS_STRIKE_THRU or mask TS_UNDERLINE, \
+		FID_DTC_URW_ROMAN, 14, 0, \
+		1, 11, CoverSheetCC)
+	
+	LABEL_TEXT_FIELD(110.0, 187.0, \
+		mask TM_DRAW_BASE, mask TM_DRAW_OPTIONAL_HYPHENS, \
+		1, 1, 383, 14, \
+		0, \
+		mask TS_BOLD or mask TS_ITALIC or mask TS_OUTLINE or \
+		mask TS_SUPERSCRIPT or mask TS_SUBSCRIPT or \
+		mask TS_STRIKE_THRU or mask TS_UNDERLINE, \
+		FID_DTC_URW_ROMAN, 14, 0, \
+		1, 11, CoverSheetFrom)
+	
+	LABEL_TEXT_FIELD(110.0, 208.0, \
+		mask TM_DRAW_BASE, mask TM_DRAW_OPTIONAL_HYPHENS, \
+		1, 1, 383, 14, \
+		0, \
+		mask TS_BOLD or mask TS_ITALIC or mask TS_OUTLINE or \
+		mask TS_SUPERSCRIPT or mask TS_SUBSCRIPT or \
+		mask TS_STRIKE_THRU or mask TS_UNDERLINE, \
+		FID_DTC_URW_ROMAN, 14, 0, \
+		1, 11, CoverSheetSubject)
+
+	
+	LABEL_TEXT_FIELD(208.0, 252.0, \
+		mask TM_DRAW_BASE, mask TM_DRAW_OPTIONAL_HYPHENS, \
+		1, 1, 50, 14, \
+		0, \
+		mask TS_BOLD or mask TS_ITALIC or mask TS_OUTLINE or \
+		mask TS_SUPERSCRIPT or mask TS_SUBSCRIPT or \
+		mask TS_STRIKE_THRU or mask TS_UNDERLINE, \
+		FID_DTC_URW_ROMAN, 14, 0, \
+		1, 11, CoverSheetPages)
+
+	GSSetClipRect	PCT_NULL
+
+	DRAW_TEXT_FIELD(14.0, 316.0, \
+		mask TM_DRAW_BASE, mask TM_DRAW_OPTIONAL_HYPHENS, \
+		1, 1, 215, 24, \
+		mask TS_BOLD, \
+		mask TS_OUTLINE or mask TS_SUPERSCRIPT or mask TS_SUBSCRIPT or \
+		mask TS_STRIKE_THRU or mask TS_UNDERLINE or mask TS_ITALIC, \
+		FID_DTC_URW_ROMAN, 24, 0, \
+		1, 19, <Message:>)
+FAX_MESSAGE_MARGIN	equ	16
+FAX_MESSAGE_LEFT	equ	1
+FAX_MESSAGE_TOP		equ	345+FAX_MESSAGE_MARGIN
+FAX_MESSAGE_WIDTH	equ	495
+FAX_MESSAGE_HEIGHT	equ	293-FAX_MESSAGE_MARGIN
+
+	/* Message text goes in here too */
+
+	GSEndString
+}
+
+/* Hack to deal with bug in GR_DRAW_TEXT_PTR handling */
+chunk BlankString = " ";
+
+/* Text object for printing the Message box */
+PrintTextEdit = VisText {
+	left	= 16;
+	top	= 16;
+	right	= FAX_MESSAGE_WIDTH;
+	bottom	= FAX_MESSAGE_HEIGHT;
+	
+	optFlags = default -geometryInvalid;
+	charAttrRuns = "(VTDS_14 shl offset VTDCA_SIZE) or VTDF_URW_ROMAN";
+
+	text = " ";
+
+}

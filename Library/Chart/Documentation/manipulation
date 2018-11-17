@@ -1,0 +1,107 @@
+******************************************************************************
+$Id: manipulation,v 1.1.27.1 97/03/29 04:49:19 canavese Exp $
+******************************************************************************
+			       Overview
+******************************************************************************
+This file contains documentation describing interactions between the user
+and the chart objects.
+
+Chart objects are represented visually by graphics objects. The user
+interacts with these graphic objects. There needs to be some communication
+back from the graphic objects to the chart objects to communicate what
+changes the user has made.
+
+
+******************************************************************************
+		   Enabling/Disabling Attribute UI
+******************************************************************************
+Only certain attributes are appropriate for a given chart object. When the
+graphic objects representing a certain chart object are selected the chart
+object needs to be notified so that it can enable and disable attribute
+setting UI appropriately.
+
+
+******************************************************************************
+			      Attributes
+******************************************************************************
+Some attribute changes need to be communicated back from the graphic objects
+to the chart objects.
+
+The changes we are interested in are changes to objects which may be
+unrealized and then re-realized again. There are many objects which will
+only be unrealized if the chart is being destroyed. This set would include
+the main chart object and the plot group.
+
+There are other objects which may be temporarily hidden by the user or
+which may change in configuration (requiring an unrealize/realize).
+This set includes:
+	Series Data
+		- Attributes such as color need to apply to series data
+		  even when the form of that data changes. (For instance
+		  a change from columns to bars).
+
+	Axes
+		- Axes may get shuffled around. (For instance when the
+		  value axis moves from a vertical position to a horizontal
+		  position when the chart type goes from column->bar).
+		  This change may require an unrealize/realize.
+
+	Chart and Axis Titles
+		- Chart and axis titles may be hidden and then 
+		  redisplayed. For this reason we need to save 
+		  attributes associated with these objects.
+
+	Legend
+		- The legend can be hidden and then redisplayed.
+		  We need to save attributes for it.
+
+
+Since text attributes are inherited by some chart objects from their
+controlling objects we need to be notified whenever a text attribute
+related change is made. The other reason for this notification is that
+some text attribute changes can cause the geometry for a chart to change.
+
+
+******************************************************************************
+			       Movement
+******************************************************************************
+There are only some objects which can be moved. They are:
+	- Main Chart
+	- Legend
+	- Axes
+
+It would be nice if whenever another object was selected to be moved
+the Main Chart object would actually be moved.
+
+These objects react in different ways to being moved.
+
+Main Chart:
+	When the main chart object is moved it needs to move all of its
+	dependent objects. These objects must in turn move their dependents
+	as well as moving the graphic objects which are their visual
+	representation.
+
+Legend:
+	When the legend moves the graphic objects which represent 
+	the legend must also be moved.
+
+Axes:
+	Axes can move only in a constrained manner. Moving an axis
+	causes it to changes its position relative to its related
+	axis. Thus moving a category axis up causes it to change the
+	value position at which it crosses its related value axis.
+
+	This change not only causes the instance data of the axis
+	to change (to reflect the new intersection position) but
+	can also cause the geometry of the chart to be recomputed.
+
+
+******************************************************************************
+				Resize
+******************************************************************************
+The only object that can be resized is the main chart object. When it is
+resized the following steps can be followed:
+	1) Unrealize chart
+	2) Resize main chart
+	3) Redo geometry
+	4) Realize chart

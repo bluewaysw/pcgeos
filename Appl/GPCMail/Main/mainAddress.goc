@@ -1,0 +1,818 @@
+/***********************************************************************
+ *
+ *	Copyright (c) New Deal 1998 -- All Rights Reserved
+ *
+ * PROJECT:	  Mail
+ * MODULE:	  Mail
+ * FILE:	  mainAddress.goc
+ *
+ * AUTHOR:  	  Gene Anderson: 12/28/98
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	12/28/98   gene	    Initial version
+ *
+ * DESCRIPTION:
+ *	AddressDialogClass for the Mail application
+ *
+ *      chunk array elements are no longer AddressListEntry (259 bytes),
+ *      but are instead: name, 0, address, 0, alias (maximum of 259 bytes)
+ *
+ * 	$Id$
+ *
+ ***********************************************************************/
+
+@include "mail.goh"
+@include "class.goh"
+@include "global.goh"
+@include "dex.goh"
+
+@classdecl AddressDialogClass;
+@classdecl AddressListClass;
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_ADDRESS_DIALOG_GET_ITEM_MONIKER
+* PASS:            buffer - dest buffer
+*                  bufSize - size of dest buffer
+*                  identifier - item #
+* RETURN:          # of chars in returned string
+* DESCRIPTION:     get the moniker for a
+*
+* REVISION HISTORY:
+*         Name      Date        Description
+*         ----      ----        -----------
+*         gene      12/28/98    Initial Revision
+
+***************************************************************/
+
+@method AddressDialogClass, MSG_ADDRESS_DIALOG_GET_ITEM_MONIKER
+{
+    MemHandle mh = pself->ADI_addressArray;
+    word i;
+    TCHAR *nameP, *addrP;
+@ifdef MAIL_ALIAS_SUPPORT
+@if 0
+    TCHAR *aliasP;
+@endif
+@endif
+
+    if (mh) {
+        MemLock(mh);
+	nameP = ChunkArrayElementToPtr(ME_FIRST_CHUNK, identifier, &i);
+	addrP = nameP + strlen(nameP)+1;
+	strcpy(buffer, nameP);
+@ifdef MAIL_ALIAS_SUPPORT
+@if 0
+	aliasP = addrP + strlen(addrP)+1;
+	if (aliasP[0]) {
+	    strcat(buffer, "  (");
+	    strcat(buffer, aliasP);
+	    strcat(buffer, ")");
+	}
+@endif
+@endif
+        strcat(buffer, "  <");
+        strcat(buffer, addrP);
+	strcat(buffer, ">");
+        MemUnlock(mh);
+    }
+    return(strlen(buffer));
+}
+
+
+/**************************************************************
+*          
+* FUNCTION:        FindPhoneEntry
+* PASS:            
+* RETURN:          
+* DESCRIPTION:     find the specified phone entry, if any
+*
+* REVISION HISTORY:
+*         Name      Date        Description
+*         ----      ----        -----------
+*         gene      12/31/98    Initial Revision
+
+***************************************************************/
+
+TCHAR *
+FindPhoneEntry(DB_Record *curRecord, word *phoneTableOff, TCHAR *field)
+{
+    word j;
+    PhoneEntry *curPhone;
+    Boolean found;
+    TCHAR *phoneName, *cpName;
+    TCHAR field2[PHONE_MONIKER_SIZE+1];
+
+    curPhone = ((byte *)curRecord + curRecord->DBR_toPhone);
+
+    strcpy(field2, field);
+    strcat(field2, ":");
+
+    found = FALSE;
+    for (j = 0; !found && j < curRecord->DBR_noPhoneNo ; j++ ) {
+        phoneName = (TCHAR *) phoneTableOff + phoneTableOff[curPhone->PE_type];
+	if (curPhone->PE_length) {
+            found = !LocalCmpStringsNoCase(phoneName, field, 0);
+	    /*
+	     * if "field" not found, check for "field:"
+	     */
+	    if (!found) {
+		found = !LocalCmpStringsNoCase(phoneName, field2, 0);
+	    }
+	} else {
+	    found = FALSE;
+	}
+        if (!found) {
+	    curPhone = ((byte *)curPhone + curPhone->PE_length + sizeof(PhoneEntry));
+	}
+    }
+    cpName = (TCHAR *)curPhone+sizeof(PhoneEntry);
+    /*
+     * if the string was found and non-empty, return it
+     */
+    if (found && *cpName) {
+        return(cpName);
+    } else {
+        return(0);
+    }
+}
+
+
+/**************************************************************
+*          
+* FUNCTION:        ReadAddressBook
+* PASS:            arrHan - handle of lmem block w/chunk array
+* RETURN:          word - non-zero if error
+* DESCRIPTION:     read the addresses from a file
+*
+* REVISION HISTORY:
+*         Name      Date        Description
+*         ----      ----        -----------
+*         gene      12/28/98    Initial Revision
+
+***************************************************************/
+
+word
+ReadAddressBook(MemHandle mh)
+{
+    VMFileHandle vmfh;
+    GeoDexMapBlock *abmb;
+    DBGroup abGrp;
+    word numRecords, i, szName, szAddr, szAlias;
+    TableEntry *mainTable;
+    word *phoneTableOff;
+    DB_Record *curRecord;
+    TCHAR *cpName, *cpName2;
+    TCHAR *alep;
+
+    /*
+     * open the address book file
+     */
+    LockStrings();
+    FilePushDir();
+    FileSetCurrentPath(SP_DOCUMENT, "");
+@ifdef ALLOW_ADDR_BOOK_WRITE
+    vmfh = VMOpen(LMemDeref(@addrBookFileName),
+		  VMAF_FORCE_READ_ONLY, VMO_OPEN, 0);
+@else
+    vmfh = VMOpen(LMemDeref(@addrBookFileName),
+		  VMAF_FORCE_READ_ONLY|VMAF_FORCE_DENY_WRITE, VMO_OPEN, 0);
+@endif
+    FilePopDir();
+    UnlockStrings();
+    if (!vmfh) {
+        return(1);
+    }
+    /*
+     * get the map block where all the good stuff is
+     * also get the DB group, as there is only one for the file (bad Ted!)
+     */
+    abmb = DBLockMap(vmfh);
+    abGrp = DBGroupFromGroupAndItem(DBGetMap(vmfh));
+    /*
+     * no records: we're done
+     */
+    numRecords = abmb->GMB_numMainTab;
+    if (!numRecords) {
+        DBUnlock(abmb);
+        VMClose(vmfh, FALSE);
+        return(0);
+    }
+    mainTable = (TableEntry *) DBLock(vmfh, abGrp, abmb->GMB_mainTable);
+    phoneTableOff = DBLock(vmfh, abGrp, abmb->GMB_phoneTypeBlk);
+    LockStrings();
+    /*
+     * go through all the records
+     */
+    for ( i = 0; i < numRecords; i++) {
+        /*
+         * lock the current record
+	 */
+        curRecord = (DB_Record *) DBLock(vmfh, abGrp, mainTable[i].TE_item);
+	/*
+	 * look for "EMAIL"
+	 */
+	cpName = FindPhoneEntry(curRecord, phoneTableOff,
+				LMemDeref(@addrBookMailField));
+	if (cpName) {
+	    /*
+	     * "EMAIL" was found: copy the name
+	     */
+	    szName = strlen((TCHAR *)curRecord+sizeof(DB_Record))+1;
+	    szAddr = strlen(cpName)+1;
+@ifdef MAIL_ALIAS_SUPPORT
+            cpName2 = FindPhoneEntry(curRecord, phoneTableOff,
+				    LMemDeref(@addrBookAliasField));
+            if (cpName2) {
+		szAlias = strlen(cpName2)+1;
+	    } else {
+		szAlias = 1;
+	    }
+@else
+            szAlias = 0;
+@endif
+            /*
+	     * add a chunk array element big enough for
+	     * the name, address, and alias, plus NULLs.
+	     */
+	    alep = ChunkArrayAppend(ME_FIRST_CHUNK, sizeof(TCHAR)*(szName+szAddr+szAlias));
+	    strcpy(alep, (TCHAR *)curRecord+sizeof(DB_Record));
+	    strcpy(alep+szName, cpName);
+@ifdef MAIL_ALIAS_SUPPORT
+            if (cpName2) {
+	        strcpy(alep+szName+szAddr, cpName2);
+	    }
+@endif
+	}
+	DBUnlock(curRecord);
+    }
+    /*
+     * unlock everything and close the file
+     */
+    UnlockStrings();
+    DBUnlock(mainTable);
+    DBUnlock(phoneTableOff);
+    DBUnlock(abmb);
+    VMClose(vmfh, FALSE);
+    return(0);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_ADDRESS_DIALOG_UPDATE_LIST
+ * PASS:            none
+ * RETURN:          none
+ * DESCRIPTION:
+ *         update the address list
+ *
+ * REVISION HISTORY:
+ *         Name      Date        Description
+ *         ----      ----        -----------
+ *         gene      12/30/98    Initial Revision
+ ***************************************************************/
+@method AddressDialogClass, MSG_ADDRESS_DIALOG_UPDATE_LIST
+{
+    word numAddrs;
+    MemHandle mh = pself->ADI_addressArray;
+
+    /*
+     * 0 is for variable-size chunk array
+     */
+    mh = EmptyChunkArray(mh, 0);
+    pself->ADI_addressArray = mh;
+    /*
+     * read the address book file
+     */
+    ReadAddressBook(mh);
+    /*
+     * update the dynamic list
+     */
+    numAddrs = ChunkArrayGetCount(ME_FIRST_CHUNK);
+    MemUnlock(mh);
+    @call ComposeToList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numAddrs);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_ADDRESS_DIALOG_INIT
+ * PASS:            textObj - chunk of dest text object (in same block)
+ *                  mkr - chunk of moniker (in same block)
+ * RETURN:          none
+ * DESCRIPTION:
+ *         initialize the address list
+ *
+ * REVISION HISTORY:
+ *         Name      Date        Description
+ *         ----      ----        -----------
+ *         gene      12/30/98    Initial Revision
+ ***************************************************************/
+@method AddressDialogClass, MSG_ADDRESS_DIALOG_INIT
+{
+    EC ( optr o );
+    EC ( o = ConstructOptr(OptrToHandle(oself), textObj) );
+    EC ( ECCheckObject( o ) );
+    EC ( o = ConstructOptr(OptrToHandle(oself), mkr) );
+    EC ( ECLMemExists( o ) );
+
+    /*
+     * Set the destination text object
+     */
+    pself->ADI_textObj = textObj;
+    /*
+     * Set the moniker
+     */
+    @call oself::MSG_GEN_USE_VIS_MONIKER(mkr, VUM_NOW);
+    /*
+     * update the list
+     */
+    @call oself::MSG_ADDRESS_DIALOG_UPDATE_LIST();
+    /*
+     * ...and bring ourselves on screen
+     */
+    @call oself::MSG_GEN_INTERACTION_INITIATE();
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        ReverseName
+ * PASS:            buf - ptr to buffer (must contain 0 or text)
+ *                  name - ptr to name
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Reverse an address list name from last, first to first last
+ *
+ * REVISION HISTORY:
+ *         Name      Date        Description
+ *         ----      ----        -----------
+ *         gene      1/13/99     Initial Revision
+ ***************************************************************/
+
+void
+ReverseName(TCHAR *buf, TCHAR *name)
+{
+    TCHAR *p1, *p2;
+
+    /*
+     * reverse the name from Last, First to First Last if needed
+     */
+    p1 = strchr(name, ',');
+    if (p1) {
+         p2 = p1;
+         /*
+	  * skip comma and spaces after comma if needed
+	  */
+         while (*p1 == ',' || *p1 == ' ') {
+	     p1++;
+	 }
+	 /*
+	  * copy the first name and a space
+	  */
+         strcat(buf, p1);
+	 strcat(buf, " ");
+	 /*
+	  * copy up to the comma, i.e., the last name
+	  */
+	 strncat(buf, name, p2-name);
+    } else {
+         /*
+	  * no comma, so don't reverse
+	  */
+         strcat(buf, name);
+    }
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MakeMailAddress
+ * PASS:            buf - ptr to buffer
+ *                  alp - ptr to AddressListEntry
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Make an email address of the form: real name <mail@address>
+ *
+ * REVISION HISTORY:
+ *         Name      Date        Description
+ *         ----      ----        -----------
+ *         gene      1/1/99      Initial Revision
+ ***************************************************************/
+void
+MakeMailAddress(TCHAR *buf, TCHAR *alep)
+{
+    TCHAR *strP;
+
+    strP = alep;
+    buf[0] = '"';              /* " */
+    buf[1] = 0;
+    ReverseName(buf, strP);    /* copy name */
+    strcat(buf, "\" <");       /* " < */
+    strP += strlen(alep)+1;    /* skip name */
+    strcat(buf, strP);         /* copy address */
+    strcat(buf, ">");          /* > */
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        PasteAddress
+ * PASS:            mh - handle of address array
+ *                  num - index of address
+ *                  textObj - destination text object
+ * RETURN:          none
+ * DESCRIPTION:
+ *         paste any selected addresses
+ *
+ * REVISION HISTORY:
+ *         Name      Date        Description
+ *         ----      ----        -----------
+ *         gene      12/30/98    Initial Revision
+ ***************************************************************/
+
+TCHAR paCommaSpace[] = ", ";
+
+void
+PasteAddress(MemHandle mh, word num, optr textObj)
+{
+    word elSize;
+    TCHAR *alep;
+    MailAddress buf;
+
+    dword tSize = @call textObj::MSG_VIS_TEXT_GET_TEXT_SIZE();
+
+    /*
+     * if there is already something in the text object, start with a comma
+     */
+    if (tSize) {
+       @call textObj::MSG_VIS_TEXT_APPEND_PTR(paCommaSpace, 0);
+    }
+    MemLock(mh);
+    alep = ChunkArrayElementToPtr(ME_FIRST_CHUNK, num, &elSize);
+    /*
+     * append: Real Name <mail@addr>
+     */
+    MakeMailAddress(buf, alep);
+    @call textObj::MSG_VIS_TEXT_APPEND_PTR(buf, 0);
+    MemUnlock(mh);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_ADDRESS_DIALOG_PASTE_ADDRESSES
+ * PASS:            none
+ * RETURN:          none
+ * DESCRIPTION:
+ *         paste any selected addresses
+ * NOTE:
+ *      The selections returned from MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS
+ *      are not sorted, but are in the order the selections were made.  As
+ *      a result, the names are added in the order the selections were made.
+ *      If adding the names in NewDex order is desired, sort the returned
+ *      array using ArrayQuickSort (or sim.)
+ *
+ * REVISION HISTORY:
+ *         Name      Date        Description
+ *         ----      ----        -----------
+ *         gene      12/31/98    Initial Revision
+ ***************************************************************/
+@method AddressDialogClass, MSG_ADDRESS_DIALOG_PASTE_ADDRESSES
+{
+    MemHandle mh;
+    word *selBuf, sel, i;
+    word numSels = @call ComposeToList::MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS();
+    optr tObj = ConstructOptr(OptrToHandle(oself), pself->ADI_textObj);
+
+    if (numSels && pself->ADI_textObj) {
+        if (numSels == 1) {
+	    /*
+	     * if only one selection, just get it and paste it
+	     */
+            sel = @call ComposeToList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	    PasteAddress(pself->ADI_addressArray, sel, tObj);
+	} else {
+	    /*
+	     * allocate a buffer to get the selections
+	     */
+	    mh = MemAlloc(numSels * sizeof(word), HF_DYNAMIC, HAF_STANDARD);
+	    if (mh) {
+	        selBuf = MemLock(mh);
+		@call ComposeToList::MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS(selBuf, numSels);
+		for (i = 0; i < numSels;  i++) {
+		    sel = selBuf[i];
+		    PasteAddress(pself->ADI_addressArray, sel, tObj);
+		}
+		MemFree(mh);
+	    }
+	}
+    }
+    /*
+     * set the selection to the end of the text object
+     */
+    @call tObj::MSG_VIS_TEXT_SELECT_END();
+    /*
+     * take the dialog off screen
+     */
+    @call oself::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+}
+
+@ifdef MAIL_ALIAS_SUPPORT
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        CheckExpandAlias
+ * PASS:            alias - ptr to possible alias
+ *                  buf - ptr to result buffer
+ *                  mh - array handle of address list (locked)
+ * RETURN:          ptr to expansion (else zero)
+ * DESCRIPTION:
+ *         expand any email aliases in the text object
+ *
+ * REVISION HISTORY:
+ *         Name      Date        Description
+ *         ----      ----        -----------
+ *         gene      1/1/99      Initial Revision
+ ***************************************************************/
+
+typedef struct {
+    TCHAR *FA_alias;
+    TCHAR *FA_entry;
+} FAStruct;
+
+Boolean
+_pascal CheckAliasCB (void *el, void *retVal)
+{
+    TCHAR *p1, *aName, *aAddr, *aAlias;
+    FAStruct *p2;
+    MailName name;
+
+    p1 = el;
+    p2 = retVal;
+
+    aName = p1;
+    aAddr = aName + strlen(aName)+1;
+    aAlias = aAddr + strlen(aAddr)+1;
+
+    if (aAlias[0] && !LocalCmpStringsNoSpaceCase(aAlias, p2->FA_alias, 0)) {
+        p2->FA_entry =  p1;
+        return(TRUE);
+    }
+    /*
+     * also check against the real name
+     */
+    name[0] = 0;
+    ReverseName(name, aName);
+    if (!LocalCmpStringsNoSpaceCase(name, p2->FA_alias, 0)) {
+	p2->FA_entry = p1;
+	return(TRUE);
+    }
+    return(FALSE);
+}
+
+void
+CheckExpandAlias(TCHAR *alias, TCHAR *buf, MemHandle mh)
+{
+    FAStruct fa;
+
+    fa.FA_alias = alias;
+    if (ChunkArrayEnum(ME_FIRST_CHUNK, &fa, CheckAliasCB)) {
+        MakeMailAddress(buf, fa.FA_entry);
+    } else {
+        strcpy(buf, alias);
+    }
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_ADDRESS_DIALOG_EXPAND_ALIASES
+ * PASS:            textObj - optr of dest text object
+ * RETURN:          none
+ * DESCRIPTION:
+ *         expand any email aliases in the text object
+ *
+ * REVISION HISTORY:
+ *         Name      Date        Description
+ *         ----      ----        -----------
+ *         gene      1/1/99      Initial Revision
+ ***************************************************************/
+@method AddressDialogClass, MSG_ADDRESS_DIALOG_EXPAND_ALIASES
+{
+    TCHAR *p1, *p2;
+    TCHAR *alias, *start, *end;
+    TCHAR *buf;
+    MemHandle th, mh, bufHan;
+
+    bufHan = MemAlloc(FIELD_BUFFER_BLOCK_SIZE, HF_DYNAMIC, HAF_STANDARD);
+    if (!bufHan) {
+	return;
+    }
+    buf = MemLock(bufHan);
+    th = @call textObj::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+    @call textObj::MSG_VIS_TEXT_DELETE_ALL();
+    mh = pself->ADI_addressArray;
+
+    start = MemLock(th);
+    end = start+strlen(start);
+    if (strlen(start)) {
+        MemLock(mh);
+	p1 = start;
+        do {
+	    /*
+	     * look for a comma
+	     */
+	    alias = p1;
+	    p2 = strchr(p1, ',');
+	    if (p2) {
+	        /*
+		 * found a comma; get everything up to it
+		 */
+	        p1 = p2;
+		while (*p1 == ',' || *p1 == ' ') {
+		    p1++;
+		}
+	        *p2 = 0;
+		CheckExpandAlias(alias, buf, mh);
+		strcat(buf, paCommaSpace);
+	    } else {
+	        /*
+		 * last address or only one, try to expand it
+		 */
+		CheckExpandAlias(alias, buf, mh);
+		p1 = end;
+	    }
+	    @call textObj::MSG_VIS_TEXT_APPEND_PTR(buf, 0);
+	} while (p1 != end);
+	MemUnlock(mh);
+    }
+    MemFree(th);
+    MemFree(bufHan);
+}
+
+@endif  /* @ifdef MAIL_ALIAS_SUPPORT */
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_ADDRESS_DIALOG_FIND_ITEM
+ * PASS:            *itemPtr - ptr to item # return
+ *                  str - string to match
+ * RETURN:          TRUE if found, *itemPtr = item #
+ *                  FALSE if not found, *itemPtr = item after
+ * DESCRIPTION:
+ *         find an array entry
+ *
+ * REVISION HISTORY:
+ *         Name      Date        Description
+ *         ----      ----        -----------
+ *         gene      1/13/99     Initial Revision
+ ***************************************************************/
+
+typedef struct {
+    TCHAR  *FE_str;
+    word    FE_found;
+    word    FE_number;
+} FEStruct;
+
+Boolean
+_pascal FindEntryCB (void *el, void *retVal)
+{
+    TCHAR *p1 = el;
+    FEStruct *r1 = retVal;
+    sword cpv;
+
+    cpv = LocalCmpStringsNoCase(r1->FE_str, p1, strlen(r1->FE_str));
+    if (!cpv) {
+	/*
+	 * found a match: stop, return match
+	 */
+	r1->FE_found = TRUE;
+	return(TRUE);
+    }
+    if (cpv < 0) {
+	/*
+	 * gone beyond entry: stop
+	 */
+	return(TRUE);
+    }
+    r1->FE_number++;
+    return(FALSE);
+}
+
+@method AddressDialogClass, MSG_ADDRESS_DIALOG_FIND_ITEM
+{
+    MemHandle mh = pself->ADI_addressArray;
+    FEStruct fes;
+
+    fes.FE_str = str;
+    fes.FE_number = 0;
+    fes.FE_found = FALSE;
+    MemLock(mh);
+    ChunkArrayEnum(ME_FIRST_CHUNK, &fes, FindEntryCB);
+    MemUnlock(mh);
+    *itemPtr = fes.FE_number;
+    return(fes.FE_found);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_PREF_DYNAMIC_LIST_FIND_ITEM
+ * PASS:            *itemPtr - ptr to item # return
+ *                  str - string to match
+ *                  ignoreCase - TRUE to ignore case
+ * RETURN:          TRUE if found, *itemPtr = item #
+ *                  FALSE if not found, *itemPtr = item after
+ * DESCRIPTION:
+ *         find an array entry
+ *
+ * REVISION HISTORY:
+ *         Name      Date        Description
+ *         ----      ----        -----------
+ *         gene      1/13/99     Initial Revision
+ ***************************************************************/
+
+@method AddressListClass, MSG_PREF_DYNAMIC_LIST_FIND_ITEM
+{
+    /*
+     * ignore ignoreCase flag and always ignore case
+     */
+    return(@call ComposeAddressDialog::MSG_ADDRESS_DIALOG_FIND_ITEM(itemPtr, str));
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_PREF_DYNAMIC_LIST_BUILD_ARRAY
+ * PASS:            none
+ * RETURN:          none
+ * DESCRIPTION:
+ *         build the array
+ *
+ * REVISION HISTORY:
+ *         Name      Date        Description
+ *         ----      ----        -----------
+ *         gene      1/13/99     Initial Revision
+ ***************************************************************/
+@method AddressListClass, MSG_PREF_DYNAMIC_LIST_BUILD_ARRAY
+{
+    @call ComposeAddressDialog::MSG_ADDRESS_DIALOG_UPDATE_LIST();
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_PREF_ITEM_GROUP_GET_ITEM_MONIKER
+ * PASS:            buffer - dest buffer
+ *                  bufSize - size of dest buffer
+ *                  identifier - item #
+ * RETURN:          # of chars in returned string
+ * DESCRIPTION:
+ *         get the moniker for an address
+ *
+ * REVISION HISTORY:
+ *         Name      Date        Description
+ *         ----      ----        -----------
+ *         gene      1/13/99     Initial Revision
+ ***************************************************************/
+@method AddressListClass, MSG_PREF_ITEM_GROUP_GET_ITEM_MONIKER
+{
+    return(@call ComposeAddressDialog::MSG_ADDRESS_DIALOG_GET_ITEM_MONIKER(buffer, bufSize, identifier));
+}
+
+
+#ifdef __BORLANDC__
+#pragma codeseg InitCode
+#endif
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_ADDRESS_DIALOG_FREE
+ * PASS:            none
+ * RETURN:          none
+ * DESCRIPTION:
+ *         we're shutting down
+ *
+ * REVISION HISTORY:
+ *         Name      Date        Description
+ *         ----      ----        -----------
+ *         gene      10/26/99    Initial Revision
+ ***************************************************************/
+
+@method AddressDialogClass, MSG_ADDRESS_DIALOG_FREE
+{
+    if (pself->ADI_addressArray) {
+	MemFree(pself->ADI_addressArray);
+	pself->ADI_addressArray = 0;
+    }
+}

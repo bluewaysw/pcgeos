@@ -1,0 +1,154 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+ *
+ * PROJECT:	  PCGEOS
+ * MODULE:	  taskmax.ui
+ * FILE:	  taskmax.ui
+ *
+ * AUTHOR:  	  Adam de Boor: Sep 19, 1991
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	9/19/91	  ardeb	    Initial version
+ *
+ * DESCRIPTION:
+ *	wheeee.
+ *
+ *
+ * 	$Id: taskmax.ui,v 1.1 97/04/18 11:58:08 newdeal Exp $
+ *
+ ***********************************************************************/
+
+#include	"generic.uih"
+
+#define TASK_CONTROL_BOX	TaskControl
+
+#include	"task.ui"
+
+/*
+ * Subclass of GenSummons so we know when the thing goes up and comes down
+ */
+class TaskMaxSummons = GenInteraction {
+	default type = notification;
+	default visibility = dialog;
+	default attributes = notUserInitiatable, sysModal;
+
+	static /* curTask */ wordComp : "-1";
+	static /* doEMSStuff */ byteComp : 0;
+}
+
+
+start	Interface;
+
+TaskControl = TaskMaxSummons {
+	moniker = 'T', "TaskMax Control";
+	children = ActiveTasks, EMSLimitRange, SwapSpaceInfo, CopyPasteList;
+	hints = { HINT_ORIENT_CHILDREN_VERTICALLY }
+}
+
+chunk kbText = "Kb";
+
+end	Interface;
+
+start	ControlBox;
+
+ActiveTasks = GenInteraction {
+	moniker = "Active Tasks";
+	children = ActiveTaskTriggerGroup, ActiveTaskList;
+	hints = {
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_DRAW_IN_BOX,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY
+	}
+}
+
+ActiveTaskList = GenItemGroup ignoreDirty {
+	applyMsg = MSG_TMS_TASK_SELECT;
+	destination = TaskControl;
+	hints = {
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_FIXED_SIZE {
+			CompSizeHintArgs <0,0,5>	; 5 entries shown
+							;  at a time, please
+		},
+		ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS {
+			word	MSG_TMS_RUN_SELECTED_TASK
+		}
+	}
+}
+
+ActiveTaskTriggerGroup = GenInteraction {
+	children = TaskAddTrigger, TaskRunTrigger, TaskDeleteTrigger;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_CENTER_CHILDREN_HORIZONTALLY
+	}
+}
+
+TaskAddTrigger = GenTrigger {
+	moniker = 'A', "Add";
+	kbdAccelerator = ctrl 'A';
+	genAttributes = default +signalInteractionComplete;
+	action = MSG_TMS_ADD_NEW_SHELL, TaskControl;
+}
+
+TaskRunTrigger = GenTrigger {
+	moniker = 'R', "Run";
+	kbdAccelerator = ctrl 'R';
+	genStates = default -enabled;
+	genAttributes = default +signalInteractionComplete;
+	action = MSG_TMS_RUN_SELECTED_TASK, TaskControl;
+}
+
+TaskDeleteTrigger = GenTrigger {
+	moniker = 'D', "Delete";
+	kbdAccelerator = ctrl 'D';
+	genStates = default -enabled;
+	genAttributes = default +signalInteractionComplete;
+	action = MSG_TMS_DELETE_SELECTED_TASK, TaskControl;
+}
+
+EMSLimitRange = GenValue {
+	moniker = "Per-task EMS Limit (Kbytes):";
+	minimum = 0;
+	increment = 16;
+}
+
+
+SwapSpaceInfo = GenText {
+	genAttributes = readOnly;
+	moniker = "Free Swap Space:";
+	textDisplayAttributes = singleLineText,
+		noWordWrapping, useTabForNavigation;
+	/* XXX: Hack b/c GTD doesn't resize when more text is added to it */
+	hints = { HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		  ATTR_GEN_TEXT_SELECTABLE }
+}
+
+CopyPasteList = GenItemGroup {
+	moniker = "Clipboard Support:";
+	genStates = default -enabled;
+	children = CBOn, CBOff;
+	applyMsg = MSG_TM_SET_CB_SUPPORT;
+	destination = process;
+	selection = FALSE;
+	numSelections = 1;
+}
+
+CBOn = GenItem {
+	moniker = "On";
+	identifier = TRUE;
+}
+
+CBOff = GenItem {
+	moniker = "Off";
+	identifier = FALSE;
+}
+
+
+end	ControlBox;

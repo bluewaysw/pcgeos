@@ -1,0 +1,118 @@
+@ifndef _IBTREE_GOH_
+@define _IBTREE_GOH_
+
+@include <ibdll.goh>
+
+/*
+   The IBTree (Index Based Tree) system is used for handling a large number
+   of items (dwords/IBTreeDatas in this case) in a hierarchy of folders.
+   The way this works is you create folder objects which are basically lists
+   of 'entry' objects.  An entry has two pieces of data:
+   A IBTreeData (dword) and IBTreeUserFlags (byte) stored on it.
+
+   An entry can also have a sub-folder attached to it and is what really
+   makes this whole system powerful.
+
+   The IBTree system handles all the links and you just have to make
+   calls to append, delete, or walk data.
+
+   Although IBTreeData can be any dword value, it is expected that it will
+   be a IBMSIndex to some memory.  HOWEVER!  keep in mind that deleting
+   a whole folder of IBMSIndex items will NOT delete the IBMS data blocks.
+   This code just handles the tree structure, not the memory management of
+   individual items.
+
+   Also keep in mind that the code is recursive, so you will need a stack
+   that is appropriate for the depth of your trees.
+*/
+
+typedef IBMSIndex IBTreeFolder ;
+typedef IBMSIndex IBTreeEntry ;
+typedef byte IBTreeUserFlags ;
+typedef IBDLLData IBTreeData ;
+#define IBTREE_FOLDER_BAD  IBMS_BAD
+#define IBTREE_ENTRY_BAD   IBDLL_ITEM_BAD
+
+/* Create a new folder in the system (free floating with no parent) */
+IBTreeFolder IBTreeFolderCreate(IBMSHandle memory) ;
+
+/* Destroys a folder and all of its children entries and sub-folders */
+void IBTreeFolderDestroy(IBMSHandle memory, IBTreeFolder rootFolder) ;
+
+/* Insert a piece of data into the tree's folder.  Pass IBTREE_ENTRY_BAD
+   to append at the end. */
+IBTreeEntry IBTreeFolderInsertData(
+                IBMSHandle memory,
+                IBTreeFolder folder,
+                IBTreeEntry entryToInsertBefore,
+                IBTreeData data,
+                IBTreeUserFlags flags) ;
+
+/* Insert a sub-folder into the tree's folder */
+#define IBTREE_APPEND   IBTREE_ENTRY_BAD
+IBTreeEntry IBTreeFolderInsertFolder(
+                IBMSHandle memory,
+                IBTreeFolder folder,
+                IBTreeEntry entryToInsertBefore,
+                IBTreeFolder subFolder,
+                IBTreeData data,
+                IBTreeUserFlags flags) ;
+
+/* Delete a single entry in the folder.  If the entry is a folder, that
+   folder is just detached (not destroyed) and returned.  You can then
+   call IBTreeFolderDestroy on it. */
+IBTreeFolder IBTreeEntryDelete(
+                 IBMSHandle memory,
+                 IBTreeFolder folder,
+                 IBTreeEntry entry) ;
+
+typedef IBDLLLocation IBTreeLocation ;
+#define IBTREE_LOCATION_FIRST   IBDLL_LOCATION_FIRST
+#define IBTREE_LOCATION_LAST    IBDLL_LOCATION_LAST
+
+/* Find an entry in a folder by its Nth location or the above constants */
+IBTreeEntry IBTreeFolderGetEntry(
+                IBMSHandle memory,
+                IBTreeFolder folder,
+                IBTreeLocation location) ;
+
+/* Get the number of items in this folder */
+dword IBTreeFolderGetCount(IBMSHandle memory, IBTreeFolder folder) ;
+
+/* Given a folder, return the parent folder and entry in the folder */
+IBTreeFolder IBTreeFolderGetParent(
+                 IBMSHandle memory,
+                 IBTreeFolder folder,
+                 IBTreeEntry *p_returnedEntry) ;
+
+/* Routines to get/set the data attached to any entry */
+IBTreeData IBTreeEntryGetData(IBMSHandle memory, IBTreeEntry entry) ;
+void IBTreeEntrySetData(
+         IBMSHandle memory,
+         IBTreeEntry entry,
+         IBTreeData newData) ;
+
+/* Routines to get/set the user flags */
+IBTreeUserFlags IBTreeEntryGetFlags(IBMSHandle memory, IBTreeEntry entry) ;
+void IBTreeEntrySetFlags(
+         IBMSHandle memory,
+         IBTreeEntry entry,
+         IBTreeUserFlags newFlags) ;
+
+/* Routines to walk through a folder.  Routines IBTREE_ENTRY_BAD if no
+   next or previous. */
+IBTreeEntry IBTreeEntryGetPrevious(IBMSHandle memory, IBTreeEntry entry) ;
+IBTreeEntry IBTreeEntryGetNext(IBMSHandle memory, IBTreeEntry entry) ;
+
+/* If an entry has a folder, it is returned here.  Else returns
+   IBTREE_FOLDER_BAD.  Use this to determine if an entry is a folder. */
+IBTreeFolder IBTreeEntryGetFolder(IBMSHandle memory, IBTreeEntry entry) ;
+
+IBTreeEntry IBTreeEntryMoveTo(
+                IBMSHandle memory,
+                IBTreeFolder folder,                /* Folder containing entry to move */
+                IBTreeEntry entry,                  /* Entry to move (folder or normal) */
+                IBTreeFolder insertIntoFolder,    /* Folder containing new entry */
+                IBTreeEntry insertBeforeEntry) ;     /* Entry to move before */
+
+@endif

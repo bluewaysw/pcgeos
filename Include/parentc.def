@@ -1,0 +1,195 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Globalpc 1999 -- All Rights Reserved
+
+PROJECT:	
+MODULE:		
+FILE:		parentc.def
+
+AUTHOR:		Edwin Yu, July 27, 1999
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	edwin	7/27/99   	Initial revision
+   jfh	6/5/02		added IM & FTP
+
+DESCRIPTION:
+	
+		
+	$Id: $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+StartLibrary	parentc
+
+ParentalControlType	etype	word, 0
+PC_DEFAULT	enum	ParentalControlType
+PC_PARENTAL_CONTROL enum	ParentalControlType
+PC_NEWSGROUP	enum	ParentalControlType
+PC_EMAIL	enum	ParentalControlType
+PC_WWW		enum	ParentalControlType
+PC_CHAT		enum	ParentalControlType
+PC_IM		enum	ParentalControlType
+PC_FTP		enum	ParentalControlType
+
+;
+; The following defines the bit for the access control.
+;
+AccessFlags	record
+	AF_WWWBROWSING:1
+	AF_WWWLIMITED:1
+	AF_EMAIL:1
+	AF_NEWSGROUP:1
+	AF_CHATROOM:1
+	AF_IM:1
+	AF_FTP:1
+	AF_PCON:1
+AccessFlags	end
+
+
+PCMapBlock	struct
+	PCMB_hugeArray		word
+PCMapBlock	ends
+
+PCBlockID	etype	word
+	PC_MAP_BLOCK	enum PCBlockID
+
+
+ParentalControlClass	class	GenInteractionClass
+
+; If passed cx == 0, bring up the 'Set Password' dialog box
+; If passed cx == 1, bring up a 'Enter Password' dialog box for
+;   authentication.
+;
+MSG_PC_BRING_UP_PASSWORD_DB		message
+
+; Bring up the "Permissble WWW Sites" dialog box.  This dialog box
+; allows users to Add/Modify/Delete web sites from database that the 
+; browser refers to for allowable sites.
+;
+MSG_PC_BRING_UP_WEBSITE_DB		message
+
+; Called by other applications, like news reader, which wishes to check
+; user's authentication.  This is similar to MSG_PC_BRING_UP_PASSWORD with
+; cx==1, except the content of the dialog box is different.
+; The app (or other library module) calls this method in the following
+; way:
+;
+;	CheckPassWordTrigger = GenTrigger {
+;	    moniker = 'P', "Check Password";
+;	    action = MSG_PC_CHECK_PASSWORD_DB, ParentControlWebSiteRoot;
+;	    hints = {
+;		ATTR_GEN_TRIGGER_ACTION_DATA {
+;		    byte    PC_NEWSGROUP     /* show newsgroup text in db */
+;		}
+;	    }
+;	}
+; The other possible value for ATTR_GEN_TRIGGER_ACTION_DATA is
+; PC_EMAIL.  The value is used to show up different text in the dialog box.
+;
+MSG_PC_CHECK_PASSWORD_DB		message
+
+;--------------------------------------------------------------------------
+;			Class internal methods
+;
+
+;
+; Store the pass web sites string into the database file
+;
+MSG_PC_SET_WEBSITES			message
+
+;
+; Delete the selected web site in the DynamicList.
+;
+MSG_PC_DELETE_WEBSITE			message
+
+;
+; Modify the selected web site entry in the DaynamicList.
+; This is done by deletion and addition.
+;
+MSG_PC_MODIFY_WEBSITE			message
+
+ParentalControlClass	endc
+
+
+WWWDynamicListClass	class	GenDynamicListClass
+MSG_WWW_LIST_MONIKER_QUERY		message
+WWWDynamicListClass	endc
+
+ModifyPrefTextClass	class	PrefTextClass
+ModifyPrefTextClass	endc
+
+WWWSiteTextClass	class	GenTextClass
+WWWSiteTextClass	endc
+
+;
+;  Return the access level of the following
+;    WWW browsering,
+;    Email,
+;    Newsgroup reading,
+;    Chatroom discussion.
+;
+global ParentalControlGetAccessInfo:far
+
+;
+;  Set the access level of the following
+;    WWW browsering,
+;    Email,
+;    Newsgroup reading,
+;    Chatroom discussion.
+;
+global ParentalControlSetAccessInfo:far
+
+;
+;  Open the vm file that contains all the entered web sites
+;  that are allowed to visit.  If the vm file doesn't exist,
+;  a new one is created
+;  Pass: nothing
+;
+global PCEnsureOpenData:far
+
+;
+;  Close the vm file opened by PCEnsureOpenData.
+;  Pass: nothing
+;
+global PCCloseData:far
+
+;
+;  Find an URL in the vm file opened by PCEnsureOpenData.
+;  Pass:	ds:di = start of URL to find
+;		ds:si = end of URL to find (null-terminator)
+;		PCEnsureOpenData must have been called before.
+;  Return: 	carry set if found
+;		dx:ax = position found
+;		carry clear if not found
+;		dx:ax = position to insert
+;		(dx:ax = -1 if append)
+;
+global PCFindURL:far
+
+;
+;  Store a URL in the vm file opened by PCEnsureOpenData.
+;  Pass:	ds:di = start of URL to store
+;		ds:si = end of URL to store (null-terminator)
+;		PCEnsureOpenData must have been called before.
+;  Return: 	carry set if stored
+;		carry clear if not stored
+;
+global PCStoreURLs:far
+
+;
+;  Delete a URL in the vm file opened by PCEnsureOpenData.
+;  Pass:	ax = position of URL to delete (from PCFindURL)
+;		PCEnsureOpenData must have been called before.
+;  Return: 	carry set if deleted
+;		carry clear if not deleted
+;
+global PCDataDeleteItem:far
+
+EndLibrary	parentc

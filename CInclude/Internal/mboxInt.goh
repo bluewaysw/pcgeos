@@ -1,0 +1,361 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1995 -- All Rights Reserved
+ *
+ * PROJECT:	  
+ * MODULE:	  
+ * FILE:	  mboxInt.goh
+ *
+ * AUTHOR:  	  Adam de Boor: Jan 13, 1995
+ *
+ * REVISION HISTORY:
+ *	Name	  Date	    Description
+ *	----	  ----	    -----------
+ *	ardeb	  1/13/95    Initial version
+ *
+ * DESCRIPTION:
+ *	Internal mailbox definitions for use by transport and storage
+ *	drivers.
+ *
+ *
+ * 	$Id: mboxInt.goh,v 1.1 97/04/04 15:54:00 newdeal Exp $
+ *
+ ***********************************************************************/
+
+@deflib mailbox
+
+@class  MailboxAddressControlClass, GenControlClass;
+
+typedef struct {
+	MediumType		MACSMA_medium;
+	MailboxTransportOption	MACSMA_transOption;
+	Boolean			MACSMA_changed;
+} MACSetMediumArgs;
+
+@message void MSG_MAILBOX_ADDRESS_CONTROL_SET_MEDIUM
+				(MACSetMediumArgs *args = ss:bp);
+
+@message ChunkHandle MSG_MAILBOX_ADDRESS_CONTROL_GET_ADDRESSES
+				(dword transData = cx:dx) = ax;
+
+/* MBACAddress */
+typedef struct {	
+    word			MBACA_opaqueSize;
+ /* label byte			MBACA_opaque; */
+} MBACAddress;
+
+
+/*
+ * Sets the addresses for the message, wiping out any other addresses the
+ * controller might have on record for the message.
+ */
+@message void MSG_MAILBOX_ADDRESS_CONTROL_SET_ADDRESSES(optr addr = cx:dx);
+
+@message dword MSG_MAILBOX_ADDRESS_CONTROL_GET_TRANS_DATA() = dx:ax;
+
+@message void MSG_MAILBOX_ADDRESS_CONTROL_MESSAGE_CANCELED(dword transData = cx:dx);
+
+@message void MSG_MAILBOX_ADDRESS_CONTROL_TWEAK_PARAMS
+	 			(MailboxRegisterMessageArgs *mrmArgs = cx:dx);
+
+@message void MSG_MAILBOX_ADDRESS_CONTROL_ADD_REF();
+
+@message void MSG_MAILBOX_ADDRESS_CONTROL_DEL_REF();
+
+@message void MSG_MAILBOX_ADDRESS_CONTROL_SET_VALID_STATE(Boolean valid = cx);
+
+@message Boolean MSG_MAILBOX_ADDRESS_CONTROL_CREATE_MESSAGE
+	 		 	(Boolean *reentrantPtr = multipleax,
+				 MailboxObjectType objType = cx,
+				 optr mscTransaction = dx:bp) = carry;
+
+@message optr MSG_MAILBOX_ADDRESS_CONTROL_GET_TRANSMIT_MONIKER() = cx:dx;
+
+@message void MSG_MAILBOX_ADDRESS_CONTROL_SET_VALID_ACTION
+	 			(optr notifOD = cx:dx,	Message mesg = bp);
+
+@message void MSG_MAILBOX_ADDRESS_CONTROL_SET_TRANSPORT_DRIVER
+	 				(GeodeHandle driverHandle = cx);
+
+/*
+ *  Process the block of data stored under a HINT_MAILBOX_SEND_CONTROL_TRANS-
+ *  PORT_DATA on the MailboxSendControl. The data in the body of the hint are
+ *  completely under the address control's interpretation.
+ * 
+ *  Context:	Called by MailboxSendControl when the transport has been
+ * 		selected before the address control is set usable.
+ *  Source:	MailboxSendControl
+ *  Destination:  MailboxAddressControl subclass
+ *  Interception: must be intercepted to be useful. Warning will result if
+ * 		control reaches MailboxAddressControl, as it implies that
+ * 		the programmer has specified data for a transport that
+ * 		doesn't know what to do with them.
+ * 
+ *  Pass:
+ * 		cx:dx	= pointer to data following the MailboxTransportAnd-
+ *			  Option token stored at the start of the hint.
+ * 		bp	= handle of block holding the hint, in case it contains
+ * 			  things that need to be relocated with ObjDoRelocation
+ *  Return:
+ * 		nothing
+ * 		ax, cx, dx, bp - destroyed
+ */
+@message void MSG_MAILBOX_ADDRESS_CONTROL_PROCESS_TRANSPORT_HINT
+	 		(const void *data = cx:dx, MemHandle hintBlock = bp); 
+
+/*
+ * Note that a message has been successfully registered.
+ *
+ * Context:	Called once MailboxRegisterMessage has been successfully called,
+ *		to allow the address control to clean up after itself, if
+ *		it needs to.
+ * Source:	MailboxSendDialogClass
+ * Destination:  subclass of MailboxAddressControl
+ * Interception: MailboxAddressControl method does nothing
+ *
+ * Pass:
+ *		cxdx	= transData
+ *		bp	= transaction chunk
+ * Return:
+ *		nothing
+ *		ax, cx, dx, bp - destroyed
+ */
+@message void MSG_MAILBOX_ADDRESS_CONTROL_MESSAGE_REGISTERED
+		(dword transData = cx:dx, ChunkHandle transHandle = bp);
+
+/*
+ * Check the current set of addresses and see if they are hunky-dory. This is
+ * also a fine time to see if there's any point in allowing the message to
+ * be created (e.g. if there's some essential system component missing that
+ * needs to be installed at a service center, now would be a good time to tell
+ * the user s/he's hosed).
+ *
+ * Context:	Called by MailboxSendDialog before calling GET_TRANS_DATA.
+ *		The creation dialog remains on-screen
+ * Source:	MailboxSendDialog
+ * Destination:  MailboxAddressControl subclass
+ * Interception: MailboxAddressControl returns carry clear. No point in calling
+ *		your superclass
+ *
+ * Pass:
+ *		nothing
+ * Return:
+ *		carry set if addresses not valid
+ *			- this will prevent the dialog box from coming down.
+ *			- address control should tell the user what is wrong
+ *		carry clear if addresses are ok
+ *		ax, cx, dx, bp - destroyed
+ */
+@message Boolean MSG_MAILBOX_ADDRESS_CONTROL_VALIDATE_ADDRESSES () = carry;
+
+/*
+ * Take note that the body for the message is now available. This is normally
+ * only of interest to transport drivers that set MBTC_NEED_MESSAGE_BODY
+ *
+ * Context:	Called when MSG_MAILBOX_SEND_CONTROL_REGISTER_MESSAGE
+ *		has been called by whoever created the message body.
+ * Source:	MailboxSendControl
+ * Destination:  MailboxAddressControl subclass
+ * Interception: must be subclassed to do anything
+ *
+ * Pass:
+ *		*dx:bp	= MSCTransaction for which body is available.
+ *			  MSCT_bodyFormat, MSCT_bodyStorage, and MSCT_bodyRef
+ *			  are all filled in (*(dx:bp->MSCT_bodyRef) is the data
+ *			  for the body reference)
+ * Return:
+ *		nothing
+ *		ax, cx, dx, bp - destroyed
+ */
+
+@message void MSG_MAILBOX_ADDRESS_CONTROL_BODY_AVAILABLE (MSCTransaction _near * _far *trans = dx:bp);
+
+/* Convert the "trans" parameter for the above message into an optr */
+#define MAC_TRANS_TO_OPTR(trans) (ConstructOptr(((LMemBlockHeader *)((dword)(trans)&0xffff0000L))->LMBH_handle, ((dword)(trans))&0xffff))
+
+@message optr MSG_MAILBOX_ADDRESS_CONTROL_GET_FEEDBACK_STRING() = cx:dx;
+
+@message optr MSG_MAILBOX_ADDRESS_CONTROL_GET_FEEDBACK_GLYPH() = cx:dx;
+
+@message void MSG_MAILBOX_ADDRESS_CONTROL_CREATE_FEEDBACK(optr mscTransaction = dx:bp);
+
+	@instance word MACI_refCount = 1;
+	@instance optr MACI_validDest = 0;
+	@instance Message MACI_validMsg = 0;
+	@instance GeodeHandle MACI_driver = 0;
+	@instance ChunkHandle MACI_defaultAddrs = 0;
+
+@endc	/* MailboxAddressControlClass */
+
+@class MailboxSpoolAddressControlClass, MailboxAddressControlClass;
+
+@message void MSG_MSAC_PRINTING_COMPLETE (MemHandle jobParams = cx,
+	 				  optr printControl = dx:bp);
+
+@message void MSG_MSAC_PRINTING_CANCELED (optr printControl = dx:bp);
+
+#define MSCA_FIRST_PAGE(range) (((range)>>16)&0xffff)
+#define MSCA_LAST_PAGE(range) ((range)&0xffff)
+
+@message dword MSG_MSAC_GET_PAGE_RANGE () = cx:dx;
+
+@message word MSG_MSAC_GET_OBJECT_TYPE ();
+
+/* XXX: MUST NOT DESTROY CX OR BP... */
+@message void MSG_MSAC_ADJUST_ADDRESS (MemHandle jobParams = cx);
+
+@message PrinterDriverType MSG_MSAC_GET_DRIVER_TYPE () = ax;
+
+@message PrintControlAttrs MSG_MSAC_MODIFY_PRINT_CONTROL_ATTRS (
+				PrintControlAttrs attrs = cx) = cx;
+
+@message word MSG_MSAC_GET_EXTRA_TOP_SPACE () = dx;
+
+@message void MSG_MSAC_ATTACH_PRINT_CONTROL ();
+
+	@instance optr MSACI_pc = 0;
+	@instance word MSACI_pcAttrs = 0;
+	@instance ChunkHandle MSACI_trans = 0;
+@endc;
+
+typedef enum {
+	MPT_STRING=0,		/* use MRP_STRING_OPTR_DATA() or 
+				 * MRP_STRING_HANDLE_DATA() to construct the
+				 * "data" argument */
+	MPT_PERCENTAGE=2,   	/* use MRP_PERCENT_DATA() to construct the
+				 * "data" argument */
+	MPT_PAGES=4, 	    	/* use MRP_PAGE_DATA() to construct the "data"
+				 * argument */
+ 	MPT_GRAPHIC=6,		/* Use MRP_GRAPHIC_OPTR_DATA() or
+				 * MRP_GRAPHIC_HANDLE_DATA() to construct the
+				 * "data" argument */
+	MPT_BYTES=8		/* use MRP_BYTES_DATA to construct the "data"
+				 * argument */
+} MailboxProgressType;
+
+#define MRP_PAGE_DATA(cur,total)	(((dword)(total)<<16) | (cur))
+#define MRP_PERCENT_DATA(pct)		(pct)
+#define MRP_STRING_OPTR_DATA(str)	(str)
+#define MRP_STRING_HANDLE_DATA(h,c)	(((dword)(h)<<16) | (c))
+#define MRP_GRAPHIC_OPTR_DATA(str)	(str)
+#define MRP_GRAPHIC_HANDLE_DATA(h,c)	(((dword)(h)<<16) | (c))
+#define MRP_BYTES_DATA(bytes)		(bytes)
+
+typedef WordFlags MailboxProgressAction;
+
+#define MPA_REPLACE_SHIFT   	2
+#define MPA_UPDATE_MODE_SHIFT	0
+
+#define MRP_PROGRESS_ACTION(replace, updateMode) \
+	(((replace) ? 1 << MPA_REPLACE_SHIFT : 0) | \
+	 (updateMode))
+
+/* untested */
+extern void
+	_pascal MailboxReportProgress(MailboxProgressType type,
+				      dword data,
+				      MailboxProgressAction action);
+
+/* untested */
+extern word
+	_pascal MailboxGetRemainingMessages(void);
+
+/* untested */
+extern dword
+	_pascal MailboxGetRemainingDestinations(MailboxMessage msg);
+
+/* Decompose result of MailboxGetRemainingDestinations to return the number of
+ * destinations to be sent to "soon", i.e. that are currently queued for
+ * transmission */
+#define MGRD_QUEUED(val) ((word)(((val)>>16)&0xffff))
+
+/* Decompose result of MailboxGetRemainingDestinations to return the number
+ * of destinations that have yet to be sent to */
+#define MGRD_TOTAL(val)	((word)((val)&0xffff))
+
+/* untested */
+extern word *
+	_pascal MailboxGetCancelFlag(void);
+
+/* untested */
+extern void
+	_pascal MailboxSetCancelAction(optr destination, 
+					Message messageToSend);
+
+@class MailboxProgressBoxClass, GenInteractionClass;
+
+typedef enum {
+	MCA_CANCEL_NONE,
+	MCA_CANCEL_MESSAGE,
+	MCA_CANCEL_CONNECT,
+	MCA_CANCEL_ALL
+} MailboxCancelAction;
+
+typedef struct {
+	ThreadHandle 	MPBSA_thread;
+	word		MPBSA_gen;
+	byte            MPBSA_showProgress;           /* BooleanByte */
+} MPBSetupArgs;
+
+@message void MSG_MPB_SETUP(MPBSetupArgs *args = ss:bp);
+
+@message ChunkHandle MSG_MPB_GET_MONIKER_STRING (MPBSetupArgs *args = ss:bp);
+
+typedef struct {
+	MailboxProgressType MPBSPA_type;
+	word		    MPBSA_cx;
+	word		    MPBSA_dx;
+	MailboxProgressAction MPBSA_action;
+} MPBSetProgressArgs;
+
+@message void MSG_MPB_SET_PROGRESS (MPBSetProgressArgs *args = ss:bp);
+
+@message void MSG_MPB_HIDE_THYSELF ();
+
+	@instance ChunkHandle MPBI_progressGauge = 0;
+
+@message void MSG_MPB_DETACH_THREAD ();
+
+	@instance ThreadHandle MPBI_thread = 0;
+	@instance word MPBI_gen = 0;
+
+typedef enum {
+	MPBT_INBOX,
+	MPBT_OUTBOX
+} MPBType;
+
+	@instance MPBType MPBI_type = MPBT_INBOX;
+@endc;
+
+@class MailboxProgressGaugeClass, GenInteractionClass;
+
+@message void MSG_MPG_RESET (Boolean destroy = cx);
+
+@message void MSG_MPG_SET_PROGRESS (MPBSetProgressArgs *args = ss:bp);
+
+	@instance ChunkHandle MPGI_text = 0;
+	@instance ChunkHandle MPGI_percent = 0;
+	@instance ChunkHandle MPGI_pages = 0;
+	@instance ChunkHandle MPGI_graphic = 0;
+	@instance ChunkHandle MPGI_bytes = 0;
+
+@endc;
+
+@class MailboxPagesClass, GenTextClass;
+
+@message void MSG_MP_SET_PAGE (word currentPage = cx, word totalPages = dx);
+
+@message void MSG_MP_SET_BYTES (dword num = cx:dx);
+
+@endc;
+
+#ifdef __HIGHC__
+pragma Alias (MailboxReportProgress, "MAILBOXREPORTPROGRESS");
+pragma Alias (MailboxGetCancelFlag, "MAILBOXGETCANCELFLAG");
+pragma Alias (MailboxSetCancelAction, "MAILBOXSETCANCELACTION");
+pragma Alias (MailboxReportProgress, "MAILBOXREPORTPROGRESS");
+pragma Alias (MailboxGetRemainingDestinations, "MAILBOXGETREMAININGDESTINATIONS");
+pragma Alias (MailboxGetRemainingMessages, "MAILBOXGETREMAININGMESSAGES");
+#endif
+
+@endlib

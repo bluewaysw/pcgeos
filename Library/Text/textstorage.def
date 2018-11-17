@@ -1,0 +1,307 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		textstorage.def
+
+AUTHOR:		John Wedgwood, Nov 19, 1991
+
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jcw	11/19/91	Initial revision
+
+
+DESCRIPTION:
+	Definition of exported routines, etc from TextStorage module
+		
+	$Id: textstorage.def,v 1.1 97/04/07 11:19:11 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+;------------------------------------------------------------------------------
+;		Constants
+;------------------------------------------------------------------------------
+CharacterClass		etype	word, 0, 2
+CC_ANYTHING		enum	CharacterClass
+;
+; All characters are in this class.
+;
+
+if DBCS_PCGEOS
+
+CC_WORD_PART_MISMATCH	enum	CharacterClass
+;
+; WordPartType of character is different than passed WordPartType
+;
+
+else
+
+CC_WORD_PART		enum	CharacterClass
+;
+; Character is part of a word
+;
+
+CC_NOT_WORD_PART	enum	CharacterClass
+;
+; Character is not part of a word
+;
+
+endif
+
+CC_PARAGRAPH_BOUNDARY	enum	CharacterClass
+;
+; Character is a paragraph boundary
+;
+
+CC_WHITE_SPACE		enum	CharacterClass
+;
+; Character is white-space
+;
+
+CC_VISIBLE		enum	CharacterClass
+;
+; Character is visible
+;
+
+CC_WORD_WRAP_BREAK	enum	CharacterClass
+;
+; Character is one where a line could be word-wrapped
+;
+
+;------------------------------------------------------------------------------
+;		Structures
+;------------------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+;		Variables
+;------------------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+;		Routines
+;------------------------------------------------------------------------------
+Text	segment	resource
+	global	TS_LockTextPtrESDI:far
+	;
+	; Get a pointer to a particular offset in the text.
+	;	PASS:	*ds:si	= Text object instance
+	;		dx.ax	= Offset into the text
+	;	RETURN:	es:di	= Pointer to the text
+	;		ax	= Number of valid characters after ptr
+	;		cx	= Number of valid characters before ptr
+	;
+
+	global	TS_ReplaceRange:far
+	;
+	; Replace a range of text with new text
+	;	PASS:	*ds:si	= Text object instance
+	;		ss:bp	= VisTextReplaceParameters
+	;	RETURN:	ds	= Segment containing instance (may have moved)
+	;
+	
+	global	TS_GetReplaceSize:far
+	;
+	; Convert a virtual VTRP_insCount field of a VisTextReplaceParameters
+	; structure to something real.
+	;	PASS:	*ds:si	= Text object instance
+	;		ss:bp	= VisTextReplaceParameters
+	;
+	
+	global	TS_ComputeReferenceSize:far
+	;
+	; Compute the size of a given TextReference.
+	;	PASS:	ss:bp	= TextReference
+	;	RETURN:	dx.ax	= Size of the text in that reference
+	;
+
+	global	TS_CheckLegalChange:far
+	;
+	; Check that a change is a legal one
+	;	PASS:	*ds:si	= Text instance
+	;		ss:bp	= VisTextReplaceParameters
+	;	RETURN:	carry set if change is legal
+	;
+
+	global	TS_GetTextRange:far
+	;
+	; Get a range of text.
+	;	PASS:	*ds:si	= Text instance
+	;		ss:bp	= TextReference
+	;		ss:bx	= VisTextRange
+	;	RETURN:	dx.ax	= Number of characters copied
+	;
+	
+	global	TS_TextStorageCreate:far
+	;
+	; Make a new storage area for text for this object.
+	;	PASS:	*ds:si	= Instance ptr, VTI_storageFlags must be set
+	;	RETURN:	ds	= Segment containing instance (may have moved)
+	;
+	
+	global	TS_FindStringInText:far
+	;
+	; Find a string in the text object
+	;
+	;	PASS:	*ds:si	= Instance ptr
+	;		bx.cx   = Offset to char in text object to begin searcn
+	;		dx.ax	= Offset into text object of last char to 
+	;			  include in search
+	;		es	= Segment address of SearchReplaceStruct
+	;	RETURN:	carry set if string not found
+	;		dx.ax	= Offset to start of string found
+	;		cx.bx	= Number of characters which matched
+	;
+
+	global TS_SmallCreateTextStorage:far
+
+Text	ends
+
+TextEC	segment resource
+EC <	global	TS_ECCheckParams:far				>
+	;
+	; Validate a VisTextReplaceParameters block
+	;	PASS:	*ds:si	= Text object instance
+	;		ss:bp	= VisTextReplaceParameters
+	;
+TextEC	ends
+	
+
+TextFilter segment resource
+	global	TS_EnumTextReference:near
+	;
+	; Enumerate a text reference
+	;	PASS:	*ds:si	= Instance ptr
+	;		ss:bp = text reference
+	;		di = callback routine
+	;		dxax - text size
+	;	RETURN:	carry - from enumeration
+	;
+	;	Callback:
+	;		Pass:
+	;			cl - character
+	;		Return:
+	;			carry - set to end enumeraton
+	;
+	;
+TextFilter ends
+
+TextStorageCode	segment	resource
+
+	global TS_LargeCreateTextStorage:far
+
+;
+; method handlers
+;
+global VisTextSaveToDBItem:far
+global VisTextSaveToDBItemWithStyles:far
+global VisTextLoadFromDBItem:far
+global VisTextLoadFromDBItemFormat:far
+global VisTextLoadFromDBItemWithStyles:far
+global VisTextSetVMFile:far
+
+TextStorageCode	ends
+
+TextFixed	segment
+	global	TS_LockTextPtr:far
+	;
+	; Get a pointer to a particular offset in the text.
+	;	PASS:	*ds:si	= Text object instance
+	;		dx.ax	= Offset into the text
+	;	RETURN:	ds:si	= Pointer to the text
+	;		ax	= Number of valid characters after ptr
+	;		cx	= Number of valid characters before ptr
+	;
+
+	global	TS_UnlockTextPtr:far
+	;
+	; Release a body of text pointed at by ds.
+	;	PASS:	*ds:si	= Text object instance
+	;		ax	= Segment containing the text
+	;
+	
+	global	TS_GetTextSize:far
+	;
+	; Get the number of bytes of text.
+	;	PASS:	*ds:si	= Text object instance
+	;	RETURN:	dx.ax	= Number of bytes of text in the text object
+	;
+	
+	global	TS_IsCharAtOffsetInClass:far
+	;
+	; Determine if the character at an offset is in a given class.
+	;	PASS:	*ds:si	= Instance ptr
+	;		dx.ax	= Offset of character
+	;		bx	= CharacterClass
+	;	RETURN:	Zero flag clear (nz) if the character is in the class
+	;
+
+	global	TS_IsCharInClass:far
+	;
+	; Determine if a character is in a given class.
+	;	PASS:	ax	= Character
+	;		bx	= CharacterClass
+	;	RETURN:	Zero flag clear (nz) if the character is in the class
+	;
+
+	global	TS_GetCharAtOffset:far
+	;
+	; Get a character at a given position in the text.
+	;	PASS:	*ds:si	= Text instance
+	;		dx.ax	= Position in the text
+	;	RETURN:	ax	= Character at that position
+	;
+
+	global	TS_PrevCharInClass:far
+	;
+	; Move to the previous character of a given class.
+	;	PASS:	*ds:si	= Instance ptr
+	;		dx.ax	= Offset to start at
+	;		bx	= CharacterClass
+	;	RETURN:	dx.ax	= Offset of previous character of this class
+	;		carry set if there is no previous character in this
+	;			class.
+	;		if no character of this class was found, dx.ax will
+	;			hold the offset of the start of the text object.
+	;
+
+TextFixed	ends
+
+TextSelect	segment resource
+
+	global	TS_NextCharInClass:far
+	;
+	; Move to the next character of a given class.
+	;	PASS:	*ds:si	= Instance ptr
+	;		dx.ax	= Offset to start at
+	;		bx	= CharacterClass
+	;	RETURN:	dx.ax	= Offset of next character of this class
+	;		carry set if there is no next character in this
+	;			class.
+	;		if no character of this class was found, dx.ax will
+	;			hold the offset of the end of the text object.
+	;
+
+if DBCS_PCGEOS
+	global TS_GetWordPartAtOffset:far
+
+	;
+	; Get the WordPartType of the character at the given offset
+	;
+	;	PASS:	*ds:si	= Instance ptr
+	;		dx:ax	= offset into text
+	;	RETURN:	bh	= WordPartType of character
+	;
+
+endif
+
+TextSelect	ends
+
+TextObscure segment resource
+	global	TS_GetWordCount:far
+	;
+	; Get the word count
+	;
+	;	Return:	dxax - word count
+TextObscure ends

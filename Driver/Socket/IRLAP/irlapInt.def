@@ -1,0 +1,642 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1994 -- All Rights Reserved
+
+PROJECT:	
+MODULE:		
+FILE:		irlapInt.def
+
+AUTHOR:		Cody Kwok, May  8, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CK	5/ 8/94   	Initial revision
+	SJ	8/16/94		Drastic changes
+
+DESCRIPTION:
+	Internal data structures for IRLAP driver.
+	(Non protocol specific data structures).
+		
+	$Id: irlapInt.def,v 1.1 97/04/18 11:56:52 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;
+; Compiler directives
+;
+
+IRLAP_STAT		equ	0
+;
+; Writes the following statistics to INI file:
+; [irlap]
+; badCrc = 0		; number of bad CRC frames in the last connection
+;
+
+ifdef IRLAP_TEST
+GENOA_TEST		equ	1
+else
+GENOA_TEST		equ	0
+endif
+
+ifdef IRLAP_TEST_BUSY
+PrintMessage < IRLAP_TEST_BUSY flag is on >
+PrintMessage < IRLAP_TEST_BUSY flag is on >
+PrintMessage < IRLAP_TEST_BUSY flag is on >
+PrintMessage < IRLAP_TEST_BUSY flag is on >
+PrintMessage < IRLAP_TEST_BUSY flag is on >
+endif
+
+if ERROR_CHECK
+SLOW_TIMEOUT		equ	0	; you may toggle this
+else
+SLOW_TIMEOUT		equ	0	; never change this to 1!
+endif
+
+;------------------------------------------------------------------------------
+;			Station structure
+;------------------------------------------------------------------------------
+
+IrlapStationStatus	record
+	;
+	; Irlap specific only
+	;
+	ISS_REMOTE_BUSY:1		; Remote station cannot accept data
+	ISS_FRAME_SENT:1		; DiscoveryXidRsp frame sent
+	ISS_DISC_FLAG:1			; We are disconnecting
+	ISS_GOING_AWAY:1		; We are getting unloaded
+	ISS_PENDING_DISCONNECT:1	; A disconnect request is pending
+	ISS_YIELD_DATA_XMIT:1		; wait one turn before sending our data
+	ISS_CONNECTION_CONFIRMED:1	; connection confirmed by initiator
+
+	ISS_MEDIA_BUSY:1		;This flag is used by 
+					;  IrlapCheckMediaBusy to check if 
+					;  there is IR activity going on.
+					;  Cleared in IrlapCheckMediaBusy and
+					;  set by IrlapRecv.
+	;
+	; Socke lib interface
+	;
+	ISS_SOCKET_CLIENT:1	    ; We are using socketDr interface
+	ISS_IRLAP_CONNECT_PROGRESS:1; IRLAP connection(or attempt) in progress
+	ISS_CONNECT_REQ_TIMED_OUT:1 ; connection request timed out
+	ISS_SOCKET_LINK_OPEN:1	    ; virtual socket lib level link
+	ISS_DISCOVERY_ERROR:1	    ; set to redo discovery
+	ISS_XMIT_FLAG:1		    ; when set secondary is allowed to send
+				    ; snrm frame in RESET_WAIT state
+	ISS_WARNED_USER:1	    ; the connection was interfered and we
+				    ; warned the user that we may be facing
+				    ; disconnection
+IrlapStationStatus	end
+
+IrlapExtendedStatus	record
+	IES_MIN_TURNAROUND:1
+		; 0 = wait min dealy next time we send a packet
+		; 1 = do not wait min delay when we send packet
+	IES_HANDLED_1ST_PKT:1
+		; 0 = we have never encountered packet with P/F bit set since
+		;     last time we handled(not discarded) one while
+		;     IS_recvCount is non-zero
+		; 1 = we have handled the first P/F bit since last time
+	IES_DETACHED:1
+		; 0 = event thread is running
+		; 1 = event thread was killed
+		;
+	IES_MEMORY_SHORT:1
+		; 0 = We have memory
+		; 1 = We are out of memory.  Waiting for more memory now
+	:12
+IrlapExtendedStatus	end
+
+IrlapWindowFlags	record
+	IWF_ACK:1			; set if acknowledged
+	IWF_VALID:1			; set if this window is in use
+	IWF_NS_RANGE:1			; 1 if within valid Ns range
+	IWF_LAST_FRAGMENT:1		; set if this window is last fragment
+					; of a fragmented packet
+	IWF_URGENT_EVENT:1		; this window contains urgent event
+	:11				; reserved
+IrlapWindowFlags	end
+
+ExtendedIrlapWindow	struct		
+
+	; EIW_dataOffset and EIW_seqInfo are used by socket clients only.
+	; However, they are kept in this structure to maintain the size of
+	; IrlapWindow.
+					; reserved for fragmentation of the
+	EIW_dataOffset	nptr		; packets that are bigger than max size
+					; allowed in IRLAP(socket lib I/O only)
+	EIW_seqInfo	word		; size of entire packet or 0
+
+	EIW_urgentEvent	word		; urgent event
+	EIW_word3	word		; reserved
+ExtendedIrlapWindow	ends
+
+IrlapWindow	struct
+	IW_flags	IrlapWindowFlags	;
+	IW_buffer	optr			; HugeLMem buffer optr
+	IW_size		word			; size of the buffer
+	IW_extended	ExtendedIrlapWindow	; used for segmented data
+IrlapWindow	ends
+
+.assert (size IrlapWindow eq 16)		; to make multiplication easy
+IrlapWindowArray	TYPE	IRLAP_MAX_WINDOWS dup (IrlapWindow)
+
+if _SOCKET_INTERFACE
+
+IrlapAddressAlias	struct
+	IAA_key		IrlapUserAddress
+	IAA_value	IrlapUserAddress
+IrlapAddressAlias	ends
+
+endif ;_SOCKET_INTERFACE
+
+
+FragmentType		etype	byte, 0, 2
+	FT_FIRST	enum	FragmentType
+	FT_MIDDLE	enum	FragmentType
+
+IrlapPacketAssembly	struct
+	IPA_packet	optr		; a packet for socket lib
+					; IPA_packet.high is 0 if there is no
+					; packet being reassembled currently
+	IPA_packetBound	word		; offset to the word following data
+					; packet buffer limit( currentData-
+					; -Offset must never cross this bound )
+	IPA_curOffset	word		; used in packet reassembly; offset 
+					; into the buffer for the next byte.
+IrlapPacketAssembly	ends
+
+;
+; line capacity calculation flag( LccFlag )
+; : This flag is passed into LineCapacityCalculation routine to indicate
+;   whether we are computing line capacity for local or remote side.
+;
+LccFlag		record
+	LF_REMOTE:1		; 0= local, 1= remote
+	:15
+LccFlag		end
+
+;; The state machine:
+;; The state machine keeps a variable of the state it is in.  The various
+;; compoents will keep track of things and send appropriate messages if
+;; necessary.  According to the state,  the events are taken care of.  The
+;; messages/events are ignored if they don't apply to a particular state.
+;; The state machine is represented by the IrlapProcessClass.
+
+;; IS_recvCount
+;;	1. incremented at the end of HandleDataPacket if the packet has P/F bit
+;;	2. decremented when checking for external event if P/F bit is set
+;;         but if it is already 0, count is not decremented
+;;	   if the count is ABOVE zero, it is not handled
+;;	3. outgoing frames are discarded if this count is non-zero
+;;
+	
+IrlapStation	struct
+	;
+	; FSM related
+	;
+	IS_state	IrlapMachineState
+	IS_savedState	IrlapMachineState
+	IS_status	IrlapStationStatus	; various boolean variables
+	IS_recvCount	word			; explained above
+	IS_extStatus	IrlapExtendedStatus
+	;
+	; IrLAP stat
+	;
+if IRLAP_STAT
+	IS_badCrc	word			; number of bad CRC frames
+endif
+	;
+	; Debugging only
+	;
+if ERROR_CHECK
+	IS_stateLast1	IrlapMachineState	; the last state
+	IS_eventLast1	fptr.far	 	; routine that caused state chg
+	IS_stateLast2	IrlapMachineState	; the state before the last
+	IS_eventLast2	fptr.far		; routine that caused state chg
+	IS_ranOutOfMemory word			; we ran out of memory count
+endif
+	;
+	; Connection related variables
+	;
+	IS_devAddr	IrlapDevAddr		; local device address (32-bit)
+	IS_destDevAddr	IrlapDevAddr		; dest  device address (32-bit)
+	IS_connAddr	IrlapConnectionAddr	; generated on connection
+	IS_retryCount	byte			; retry for everything...
+	IS_connMutex	Semaphore		; any two connection-related
+	;					; reqs are mutually exclusive
+	; Socket Lib I/O specific
+	;
+if _SOCKET_INTERFACE
+	IS_linkMgtMode	IrlapConnectionFlags	; whether this is sniff or not
+	IS_selectedAddr	word			; address selected in Address
+endif
+						; dialog
+	IS_connFailureCount byte		; how many times we failed to
+	;					; establish IrLAP connection
+	; negotiation
+	;	id index    = index to ParameterIdTable in irlapAction.asm
+	; 	value index = the most signf bit in a Param Value(0-7)
+	;
+	
+	;
+	; Below are negotiated parameters (see NegotiateConnectionParameters.)
+	;
+	IS_numBofComputed byte			;number of BOFs to transmit,
+						;  requested by remote, already
+						;  adjusted by baud rate.  In
+						;  ApplyNegotiationParams, this
+						;  value is copied into 
+						;  IS_numBof, which is actually
+						;  used by IrlapSendPacket.
+	IS_remoteNumBofComputed byte		;number of BOFs to transmit,
+						;  requested by us, already
+						;  adjusted by baud rate.
+	IS_baudRate	  SerialBaud		;baud rate, negotiated with
+						;  remote.  This is the highest
+						;  baud rate that both stations
+						;  say they can handle.
+	IS_maxTurnAround  word			;Max turnaround time in ticks,
+						;  requested by remote.  This
+						;  is the maximum time we can
+						;  hold the P/F bit.
+	IS_remoteMaxTurnAround word		;Remote max TAT in ticks,
+						;  requested by us.  This
+						;  is the maximum time we can
+						;  hold the P/F bit.
+	IS_minTurnAround  word			;Min turnaround time in ticks,
+						;  requested by remote.  We
+						;  must wait at least this
+						;  long before starting to
+						;  transmit after a link 
+						;  turnaround.
+	IS_remoteMinTurnAround  word		;Remote Min TAT in ticks,
+						;  requested by us.  They
+						;  must wait at least this
+						;  long before starting to
+						;  transmit after a link 
+						;  turnaround.
+	IS_linkDisconnect word			;Link disconnect time in ticks,
+						;  negotiated with remote.
+	
+	IS_connectionParams label IrlapConnectionParams
+	;
+	; Contains local connection parameters.  These could be the hard-coded
+	; defaults, or read in from the initfile, or passed by the user to
+	; NIR_CONNECT_REQUEST.
+	; WARNING!!!!!: this part overlaps with the connection parameter part
+	;               in IS_qos field.  So, you should never insert anything
+	; 		between this and IS_qos...
+	;
+	IS_qos		  QualityOfService	; (used in indication/confirm)
+
+	IS_remoteSnrmFrame optr			; remote snrm frame stored here
+	IS_frmrFrame	   IrlapFrmrFrame	; FRMR frame to send
+	;
+	; Discovery related
+	; Aliases
+	;     [ QUERY ]
+	; 	IS_maxSlot = IS_retry2
+	; 	IS_slotCount = IS_retryN1
+	;     [ REPLY ]
+	; 	IS_selectedSlot = IS_retryN1
+	;
+	IS_discoveryLogBlock	hptr		       ; Stores discovery logs
+						       ; for an extended period
+	IS_chosenIndex		word		       ; index to address
+						       ; chosen in dialog box
+	IS_discoveryXIDFrame	IrlapDiscoveryXidFrame ; store discoveryInfo
+						       ; for an extended period
+	;
+	; Sniff
+	;
+	IS_sleepTime		word		       ; how long to sleep when
+	;					       ; sniffing
+	; Timers
+	;
+	IS_pTimer		dword
+	IS_fTimer		dword
+	IS_lastReceiptTime	dword	; result of TimerGetCount
+	;
+	; Urgent event queue
+	;
+	IS_urgentQueueFront	byte
+	IS_urgentQueueEnd	byte
+	;
+	; Transfer related variables
+	;
+	IS_maxIFrameSize	word	;Outgoing frame size in bytes.
+					;  In IrlapNativeRegister, this is
+					;  initialized to IRLAP_DEFAULT_IFRAME_
+					;  SIZE, but this default value 
+					;  shouldn't get used.
+	IS_maxIFrameSizeIn	word	;Incoming frame size, requested
+					;  by remote.  This is set in 
+					;  NegotiateConnectionParameters, and
+					;  used ProcessFrameHeader to calculate
+					;  the buffer size to allocate for
+					;  incoming I frames.  -chl 10/25/95
+	IS_store		IrlapWindowArray
+	IS_serialPort		SerialPortNum
+	IS_serialSem		hptr	;
+	IS_vs			byte	; Vs = bits 1-3, other bits = 0
+	IS_vr			byte	; Vr = bits 5-7, other bits = 0
+	IS_rr			byte	; number of consecutive RRs
+	IS_maxWindows		byte	; max num of frames in a window(local)
+	IS_remoteMaxWindows	byte	; remote side's max window
+	IS_window		byte	; # availbale windows for outgoing pkts
+	IS_pendingData		word	; pending data requests
+	IS_pendingConnectedData	word	; data that require connection
+
+	IS_numBof	  	byte	;number of Bof's to transmit, already
+					;  adjusted by baud rate.
+
+	IS_retryN1		byte	; disconnect warning threshold
+	IS_retryN2		byte	; disconnect threshold
+	IS_retryN3		byte	; disconnect threshold for RESET state
+	IS_retryN4		byte	; xchg give up threshold
+	;
+	; Hacks
+	;
+	IS_ad			word	; used by ProcessFrameHeader only
+	IS_cField		word	; used by IrlapSendPacket only
+	IS_lastCField		word	; used by ProcessFrameHeader and
+					; IrlapBusyDetected only
+	;
+	; sequenced data reassembly
+	;
+if _SOCKET_INTERFACE
+	IS_seqPacket		IrlapPacketAssembly
+	IS_datagramPacket	IrlapPacketAssembly
+	IS_addressAlias		IrlapAddressAlias
+endif ;_SOCKET_INTERFACE
+	;
+	; Implementation Specific
+	;
+	IS_suspendSem		Semaphore
+	IS_eventQueue		hptr.HandleQueue
+	IS_pendingEventQueue	hptr.HandleQueue
+	IS_eventThreadHandle	hptr.HandleThread
+	IS_callVector		nptr
+	IS_serverThreadHandle	hptr.HandleThread
+	IS_hugeLMemHandle	hptr
+if	0
+;
+; we really need to have irlap thread has TIME_CRITICAL priority.
+;
+	IS_priorityTimerHandle	hptr
+	IS_priorityTimerID	word
+endif
+	;
+	; Socket Interface
+	;
+if _SOCKET_INTERFACE
+	IS_domainHandle		word	; domain handle for the driver
+endif ;_SOCKET_INTERFACE
+	IS_clientHandle		word	; the same as connection handle
+	IS_stationHandle	hptr	; handle to station mem block
+	IS_clientCallback	vfptr	; vfpt to client callback
+	IS_serialStrategy	fptr	; fpt to serial strategy
+	IS_domainName		label	char	; domain name is stored here
+
+IrlapStation	ends
+
+; ...........................................................................
+; ALIASES WITHIN Station structure
+; ...........................................................................
+
+;
+; slot and query timers can use pf timer w/o ambiguity
+;
+IS_wdTimer    		equ IS_pTimer
+IS_slotTimer  		equ IS_pTimer
+IS_queryTimer 		equ IS_pTimer
+IS_senseTimer		equ IS_pTimer
+IS_sniffTimer		equ IS_pTimer
+IS_sleepTimer		equ IS_pTimer
+
+;
+; discovery
+;
+IS_slotCount		equ (IS_discoveryXIDFrame + IDXF_slotNumber)
+IS_selectedSlot		equ IS_slotCount
+IS_maxSlot		equ IS_retryN2
+IS_discoveryInfo	equ (IS_discoveryXIDFrame + IDXF_discoveryInfo)
+			; basically address string is stored here
+			;
+IS_userAddress		equ IS_discoveryInfo
+
+;------------------------------------------------------------------------------
+;			Socket Interface: Datagram packets
+;------------------------------------------------------------------------------
+
+IRLAP_SOCKET_HEADER_SIZE equ (size SequencedPacketHeader)
+
+;
+; Internal use of SequencedPacketHeader in IrLAP
+;
+; PH_dataSize	= real data size
+; PH_dataOffset	= real data offset
+; PH_flags	
+; PH_domain.low
+; PH_domain.high
+; PH_reserved	= IrlapDataRequestType.low( in case the frame is UI frame )
+; SPH_link.low	= connAddr received
+; SPH_link.high = control field
+;
+
+EXTRA_U_FRAME_SIZE	equ	64
+PrintMessage	<Read this>
+;
+; Actually info field of XID frame may become larger than 27 bytes in the
+; future.  We need to find a more permanent solution for this. 2/7/96 SJ
+; I will hopefully make changes before responder ships, but this is not
+; crucial in current status quo.
+;
+
+if _SOCKET_INTERFACE
+IRLAP_U_FRAME_MAX_SIZE equ IRLAP_SOCKET_HEADER_SIZE + \
+			   size IrlapDiscoveryXidFrame + size word + \
+			   EXTRA_U_FRAME_SIZE
+		   ; for check sum
+		   ; XID frame is the largest among U frames except
+		   ; for UI frame.
+else 
+
+IRLAP_U_FRAME_MAX_SIZE equ IRLAP_SOCKET_HEADER_SIZE + \
+			   size IrlapDiscoveryXidFrame + size word + \
+			   EXTRA_U_FRAME_SIZE
+endif ;_SOCKET_INTERFACE
+
+IRLAP_S_FRAME_MAX_SIZE equ IRLAP_SOCKET_HEADER_SIZE + \
+			   size word			; for check sum
+		   ;
+		   ; S Frames don't have data
+		   ;
+
+;------------------------------------------------------------------------------
+;			Socket Interface: Datagram packets
+;------------------------------------------------------------------------------
+
+if _SOCKET_INTERFACE
+
+IrlapDatagramSig	type dword
+IRLAP_DATAGRAM_SIG1	equ	6964h	; 'id'
+IRLAP_DATAGRAM_SIG2	equ	7367h	; 'sg'
+
+IrlapDatagramInfo		struct
+	IDI_sig1		word
+	IDI_sig2		word
+				; used to identify the first fragment
+	IDI_dataOffset		word
+	IDI_addrSize		byte
+	IDI_addrOffset		byte	; converted to offset into the data
+	IDI_localPort		word
+	IDI_remotePort		word
+	IDI_userAddr		IrlapUserAddress
+IrlapDatagramInfo		ends
+
+IrlapDatagramHeader		struct
+	IDH_socketHeader	DatagramPacketHeader
+	IDH_info		IrlapDatagramInfo
+IrlapDatagramHeader		ends
+
+endif ;_SOCKET_INTERFACE
+
+;------------------------------------------------------------------------------
+; 			Socket Interface: Segmentation
+;------------------------------------------------------------------------------
+
+DataRequestParams	struct
+	DRP_dataOffset	word
+
+if _SOCKET_INTERFACE
+	DRP_seqInfo	word
+endif
+
+	DRP_buffer	optr
+DataRequestParams	ends
+
+UnitdataRequestParams	record
+	URP_PFBIT:1
+	URP_DATASIZE:15
+UnitdataRequestParams	end
+
+;------------------------------------------------------------------------------
+; 			Irlap client
+;------------------------------------------------------------------------------
+
+IRLAP_MAX_NUM_CLIENTS	equ	1
+
+IrlapClientFlags	record
+	ICF_ACTIVE:1		; set if this entry is being used
+	ICF_SOCKET:1		; set if native client
+	ICF_RESERVED:1		; set if this client entry is reserved
+	:13			; reserved
+IrlapClientFlags	end
+
+IrlapClient		struct
+	IC_flags	   IrlapClientFlags	0
+	IC_station	   word			0	; station segment
+
+if _SOCKET_INTERFACE
+	IC_connectBlockSem hptr			0	; used for blocking
+							; connect.req thread
+	IC_discoveryBlockSem hptr		0	; used for blocking
+							; discovery.req thread
+	IC_addrDialogBlockSem hptr		0	; used for blocking for
+							; addr dialog to finish
+	IC_scoCallback	   fptr.far		0	; callback routine for
+							; SCO_ functions
+endif ;_SOCKET_INTERFACE
+
+IrlapClient		ends
+
+IrlapClientArray	TYPE	IRLAP_MAX_NUM_CLIENTS	dup (IrlapClient)
+IrlapFlushSemArray	TYPE	IRLAP_MAX_NUM_CLIENTS	dup (Semaphore)
+	
+;------------------------------------------------------------------------------
+;			Temporary constants
+;------------------------------------------------------------------------------
+
+IRLAP_INPUT_BUFFER_SIZE		equ 5000	; 5k buffer
+IRLAP_OUTPUT_BUFFER_SIZE	equ 3000	; 3k buffer
+	
+;IRLAP_MAX_BUF_SIZE	equ size word + IRLAP_MAX_PACKET_SIZE + size word
+; max size A + C + I + FCS
+
+ifdef	IRLAP_TEST_BUSY
+IRLAP_MAX_NUM_BUFFER_BLOCK	equ 5
+IRLAP_MIN_BLOCK_SIZE		equ 50
+IRLAP_MAX_BLOCK_SIZE		equ 100
+else
+IRLAP_MAX_NUM_BUFFER_BLOCK	equ 25
+IRLAP_MIN_BLOCK_SIZE		equ 100
+IRLAP_MAX_BLOCK_SIZE		equ 7000
+endif	; IRLAP_TEST_BUSY
+
+IRLAP_SERIAL_OPEN_TIMEOUT	equ 500
+IRLAP_MEM_ALLOC_TIMEOUT		equ 500
+
+;------------------------------------------------------------------------------
+;			UDATA resource
+;------------------------------------------------------------------------------
+
+udata	segment
+
+randomSeed		word		; seed for random addr generation
+hugeLMemHandle		hptr		; global hugeLMem handle
+lurkerUsed		BooleanByte	; true if lurker loaded driver
+
+udata	ends
+
+;------------------------------------------------------------------------------
+;			IDATA Resource
+;------------------------------------------------------------------------------
+
+IrlapDriverTable	segment
+
+DriverTable	SocketDriverInfoStruct <
+		<IrlapStrategy,
+		0,
+		DRIVER_TYPE_SOCKET>,
+		0,
+		(mask SDPO_ADDRESS or mask SDPO_UNIT or mask SDPO_CUSTOM_UI),
+		0
+	>
+
+public DriverTable
+
+IrlapDriverTable	ends
+
+
+;
+; irlapClientTable can't be the first thing in dgroup.
+; the client handle is an offset into the table, so if it's on
+; top, there is a possibility of the handle being zero. 3/25/96 ACJ
+;
+; One more thing. Looking in IrlapInit, irlapFlushSem and irlapClientTable
+; have to be concurrent.
+;
+
+
+idata	segment	
+;
+; Flush Semaphores
+;
+	irlapFlushSem		IrlapFlushSemArray
+;
+; Station table
+;
+	irlapClientTable	IrlapClientArray
+;
+; Physical layer
+;
+	serialStrategy	fptr.far		0 ; serial driver strategy
+
+idata	ends

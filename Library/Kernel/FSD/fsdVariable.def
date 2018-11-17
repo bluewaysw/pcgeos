@@ -1,0 +1,127 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC/GEOS
+MODULE:		Kernel -- FSD
+FILE:		fsdVariable.def
+
+AUTHOR:		Adam de Boor, July 18, 1991
+
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb   07/18/91        Initial revision.
+
+
+DESCRIPTION:
+	Variables local to this module.
+		
+	$Id: fsdVariable.def,v 1.1 97/04/05 01:17:52 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+idata		segment
+
+if		TEST_RECORD_INT21
+recInt21Func	word	0		; offset into table for current function
+recInt21Start	TimeRecord <>		; # of timer units at start of call
+recInt21Table   Int21RecordEntry        256 dup (<>)
+recFileReads	dword	0		; total # of bytes read
+recFileWrites	dword	0		; total # of bytes written
+endif
+
+if MULTI_LANGUAGE
+	fullFileSystemDriverLoaded	BooleanByte	FALSE
+		; Set after the full file system driver (as opposed to just
+		; the skeleton driver) has been loaded.
+endif
+
+idata		ends
+
+
+
+udata	segment
+
+assocNum	word	; current number for associating fake labels with
+			;  nameless disks
+
+dosAddr		fptr.far ?	;initial value of int 21 vector. Used so app
+				;can take over int 21 to provide emulation for
+				;DOS program, if we ever get around to it...
+
+dosVersion	word	(?)	;hi byte = minor ver #, lo byte = major ver #
+
+oemSerialNum	dword	(?)	;OEM serial number, see pg 389 of Duncan
+
+
+isDRDOS		byte	BB_FALSE;non-zero if running under supported DR-DOS
+				; version
+
+isWINNT		byte	BB_FALSE ;non-zero if running in WinNT DOS box
+
+
+openCloseNotificationCount	byte	0	; number of people that want
+						;  to receive FileOpen/FileClose
+						;  notifications
+udata	ends
+
+;==============================================================================
+;			  FILE INFO RESOURCE
+;==============================================================================
+FSInfoResource	segment lmem LMEM_TYPE_GENERAL, mask LMF_NO_HANDLES
+FSInfoHeader	<
+	{},			; Filled in by Esp
+	0,			; No drives known yet
+	fileSkeletonDriver,	; Skeleton driver is only one known.
+	fileSkeletonDriver,	; Skeleton is primary until real primary
+				;  is loaded.
+	0,			; No disks encountered yet.
+	segment dgroup,
+>
+
+;
+; Descriptor for the skeleton FS driver used during initialization.
+; 
+fileSkeletonDriver	chunk.FSDriver	<
+	0,			; No next driver
+	<
+		0,			; Can't accept network paths
+		0,			; Not the primary driver
+		1,			; Is the skeleton driver
+		0,			; Can't format
+		0			; Can't copy
+	>,
+	0,			; Strategy filled in later, since segment is
+				;  unknown.
+	handle 0		; Driver handle is kernel's core block
+>
+
+;
+; Template drive descriptor to make initializing the darn thing simple.
+; 
+fsdTemplateDrive	chunk.DriveStatusEntry <
+	0,	; DSE_next:		No next drive
+	-1,	; DSE_number:		Drive number to be filled in
+	-1,	; DSE_defaultMedia:	Default media to be filled in
+	-1,	; DSE_status:		Status to be filled in
+	-1,	; DSE_fsd:		FSD to be filled in
+	<>,	; DSE_exclusive:	Exclusive semaphore available (default)
+	0,	; DSE_shareCount:	Nothing sharing the drive yet
+	<>,	; DSE_shareSem:		Share semaphore available (default)
+	<>,	; DSE_diskLock:		Disk lock available (default)
+	<>,	; DSE_lockSem:		Locking semaphore available (default)
+	0,	; DSE_lastAccess:	Never accessed
+	0,	; DSE_lastDisk:		None ever validated
+	0	; DSE_private:		No private data
+>
+
+;
+; Spare disk descriptor used during registration to avoid having to release the
+; drive in order to gain exclusive access to the FSInfoResource.
+; 
+fsdTemplateDisk	chunk.DiskDesc <>
+
+FSInfoResource	ends

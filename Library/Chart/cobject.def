@@ -1,0 +1,596 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:	
+FILE:		cobject.def
+
+AUTHOR:		Chris Boyke
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CDB	12/13/91	Initial version.
+
+DESCRIPTION:
+	
+
+	$Id: cobject.def,v 1.1 97/04/04 17:46:10 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;-----------------------------------------------------------------------------
+;	These flags are used to determine what has changed to cause
+;the current BUILD.  Used for optimizations		
+;-----------------------------------------------------------------------------
+ 
+
+BuildChangeFlags	record
+	BCF_CHART_TYPE:1
+	BCF_CHART_VARIATION:1
+	BCF_AXIS_REMOVE:1
+	BCF_AXIS_ROTATE:1
+
+	BCF_DATA:1
+	; If set, the data block has changed.  Numbers and
+	; series/category titles may have changed, so geometry may
+	; change, etc.
+
+	BCF_GROUP_FLAGS:1
+	; Group flags have changed.  This involves adding/removing
+	; titles / legend
+
+	BCF_GRID_FLAGS:1
+	; grid flags have changed
+
+	BCF_LEGEND_PICTURE:1
+	; If legend goes from rectangles to markers or vice/versa
+
+	BCF_LEGEND_REMOVE:1
+	; If legend isn't applicable for this type of chart (ie, high-low)
+
+	BCF_CHART_VARIATION_ATTR:1
+	;
+	; This flag is set when a variation change is serious enough
+	; that the grobjes for the series need to be re-created.  An
+	; example if this is going from standard to single-color. XXX:
+	; We could actually just force an attribute change rather than
+	; recreating the objects -- but the time difference is
+	; minimal.
+
+	BCF_SERIES_COUNT:1
+	; The series count has changed.  Series objects may need to be
+	; nuked/created. 
+
+	BCF_CATEGORY_COUNT:1
+	; The category count has changed.  Series objects may need to
+	; be nuked or created
+
+	:4			; Keep it word-sized
+BuildChangeFlags	end	
+
+;----------------------------------------------------------------------------
+;			  Chart Object Class
+;----------------------------------------------------------------------------
+
+ChartObjectClass	class	MetaClass
+COMMENT @--------------------------------------------------------------------
+	INHERITANCE		
+-----------------------------------------------------------------------------
+MSG_META_SEND_CLASSED_EVENT - only call the superclass (thus, sending
+	message to self) if this object is selected.
+----------------------------------------------------------------------------@
+
+ChartObjectRotationType		etype	byte,0,1
+CORT_0_DEGREES		enum	ChartObjectRotationType
+CORT_90_DEGREES		enum	ChartObjectRotationType
+
+;CORT_270_DEGREES		enum	TextOrientation
+
+;-----------------------------------------------------------------------------
+;			  Border Attributes
+;-----------------------------------------------------------------------------
+ChartBorderEdges	record
+	CBE_TOP:1			; Set: Top edge is on
+	CBE_LEFT:1			; Set: Left edge is on
+	CBE_BOTTOM:1		; Set: Bottom edge is on
+	CBE_RIGHT:1			; Set: Right edge is on
+	:4
+ChartBorderEdges	end
+
+ChartBorderType	etype		word, 0, 2
+CBT_NONE	enum		ChartBorderType
+CBT_FRAME	enum		ChartBorderType
+CBT_SHADOW	enum		ChartBorderType
+
+ChartBorderAttributes	struct
+	CBA_type		ChartBorderType		CBT_NONE
+	CBA_edges		ChartBorderEdges	<1,1,1,1>
+	CBA_thickness	word			1
+ChartBorderAttributes	ends
+
+
+;----------------------------------------------------------------------------
+;				Geometry Flags
+;----------------------------------------------------------------------------
+ChartObjectGeometryFlags	record
+	COGF_EXPAND_TO_FIT:1
+	; Set: object will take up all available size
+	;
+	; This bit is set for objects that will take up all available
+	; size.  The Chart geometry is limited in that only one such
+	; object is allowed per composite.
+
+	COGF_CENTER_HORIZONTALLY:1
+	COGF_CENTER_VERTICALLY:1
+
+	:4
+ChartObjectGeometryFlags	end
+
+ChartObjectState	record
+	COS_GEOMETRY_LOOP:1
+	; Set if geometry computation has gone into endless loop
+
+	COS_BUILT:1
+	; Set by objects that want to avoid getting redundant
+	; MSG_CHART_OBJECT_BUILD messages.
+
+	COS_BUILD_INVALID:1
+	; Set if a build needs to be performed on this object.  Not
+	; normally used except by the ChartGroup, which may get this
+	; bit set while suspended.
+
+	COS_IMAGE_INVALID:1
+	; Set if the image needs to be updated (via REALIZE)
+
+	COS_IMAGE_PATH:1
+	; Not currently used
+
+	COS_GEOMETRY_INVALID:1
+	; Set if the size/position need to be updated.
+
+	COS_UPDATING:1
+	; This bit is set whenever the object is in the middle of
+	; updating its children or grobjes that it controls. When
+	; children or grobjes are changed, they send out
+	; notifications, which this object will ignore or treat
+	; differently if the bit is set.  
+
+ChartObjectState	end
+
+
+
+;-----------------------------------------------------------------------------
+;				Build Messages
+;-----------------------------------------------------------------------------
+MSG_CHART_OBJECT_BUILD			message
+;
+; Build a chart object. Building an object involves instantiating any
+; children  and then passing the message on to those children.
+; Default behavior sets the IMAGE and GEOMETRY invalid
+;
+; Context:	happens during chart creation/type change
+; Source:	passed down chart tree
+; Destination:  any ChartObject class object
+; Interception: subclass will want to create child objects, etc.
+;
+; Pass:		bp - BuildChangeFlags (ALWAYS)
+;		(for children of ChartGroup):
+;			cl - chart type
+;			ch - chart variation
+;			dx - chart flags
+;			
+; Return:	(ChartGroup object ONLY)  al - ChartReturnType
+;			al = CRT_OK, if chart built OK.
+;
+; Destroyed:	nothing 
+;
+
+
+
+;-----------------------------------------------------------------------------
+;			   Geometry Messages
+;-----------------------------------------------------------------------------
+MSG_CHART_OBJECT_RECALC_SIZE		message
+;
+; Recalculate the size of a chart object. Compute and set the sizes of all
+; of the objects dependents.  Objects may request more size than they
+; are initially given, in which case this request is propagated up the
+; tree. 
+;
+;
+;	PASS:	cx	= Maximum width
+;		dx	= Maximum height
+;	RETURN:	cx	= Desired width
+;		dx	= Desired height
+;
+
+MSG_CHART_OBJECT_SET_SIZE		message
+;
+; Set the size of a chart object.
+;	PASS:	cx	= Width
+;		dx	= Height
+;	RETURN:	carry set if the new size is different than the old one.
+;
+
+MSG_CHART_OBJECT_GET_SIZE		message
+;
+; Get the size of a chart object.
+;	RETURN:	cx	= Width
+;		dx	= Height
+;
+
+MSG_CHART_OBJECT_GET_MAX_TEXT_SIZE	message
+; Return the largest bounds for the text objects associated with this
+; chart object and all its children.
+;
+; Pass:		bp - series or category # (where appropriate)
+;		cx, dx - current maximum
+; Return: 	cx, dx - maximum of passed & new values.
+;		bp - incremented
+;
+; Destroyed: 	nothing
+;
+
+;-----------------------------------------------------------------------------
+;	Positioning Messages
+;-----------------------------------------------------------------------------
+
+MSG_CHART_OBJECT_GET_POSITION		message
+;
+; Get the position of a chart object.
+;	RETURN:	cx, dx	= position
+;	DESTROYED: nothing
+
+MSG_CHART_OBJECT_SET_POSITION		message
+;
+; Set the position of a chart object.
+;	PASS:	cx, dx = position
+; 	RETURN: nothing
+;	DESTROYED: nothing
+
+;-----------------------------------------------------------------------------
+;	 Realizing Messages
+;-----------------------------------------------------------------------------
+MSG_CHART_OBJECT_REALIZE	message
+;
+; Realize a chart object.  Either create a GrObject for it, or modify
+; the existing grObject with new size/position/image data.
+; Default behavior is to reset the size/image/position changed flags
+; -- it is assumed that the subclass will do the work of updating the
+; grobj. 
+;
+; Context:	
+; Source:	
+; Destination:  
+; Interception: Subclass should call superclass AFTER handling this
+;		message
+;
+; Pass:		nothing 
+;			
+; Return:	nothing 
+;
+; Destroyed:	nothing 
+;
+
+MSG_CHART_OBJECT_SET_STATE	message
+;
+; Set/clear the state flags of this chart object
+;
+;
+; Context:	
+; Source:	
+; Destination:  
+; Interception: 
+;
+; Pass:		cl - ChartObjectState flags to set
+;		ch - flags to clear
+;			
+; Return:	nothing 
+;
+; Destroyed:	nothing 
+;
+;
+;
+;
+
+
+MSG_CHART_OBJECT_MARK_INVALID	message
+;
+; Mark this chart object as invalid.  Will travel up the tree to the
+; chart group, marking all objects along path with same flags
+;
+; Context:	
+; Source:	
+; Destination:  
+; Interception: 
+;
+; Pass:		cl - ChartObjectState flags to set
+;			
+; Return:	nothing 
+;
+; Destroyed:	nothing 
+;
+
+MSG_CHART_OBJECT_MARK_TREE_INVALID	message
+; Mark a tree invalid -- marks the chart object and all its children
+; invalid.  Will NOT call the parent, so caller should also call
+; MSG_CHART_OBJECT_MARK_INVALID 
+;
+;
+; Context:	
+; Source:	
+; Destination:  
+; Interception: 
+;
+; Pass:		cl - ChartObjectState flags to set
+;			
+; Return:	nothing 
+;
+; Destroyed:	nothing 
+;
+
+MSG_CHART_OBJECT_FIND_PARENT		message
+; Return the parent of this chart object
+;
+; Pass:		nothing
+; Return:	*ds:cx - parent
+; Destroy:	nothing
+
+
+
+;-----------------------------------------------------------------------------
+;	GrObj messages
+;-----------------------------------------------------------------------------
+
+
+;
+MSG_CHART_OBJECT_GROBJ_MOVED	message
+; Handle notification that the grobj has moved
+;
+; Pass:		^lcx:dx - grobject
+;			
+; Return:	nothing 
+;
+; Destroyed:	nothing 
+;
+;
+;
+;
+
+MSG_CHART_OBJECT_GROBJ_SELECTED	message
+; Handle notification that the grobj has become selected.  Increment
+; the selection count for this object, etc.
+;
+; Pass:		^lcx:dx - OD of grobj
+; Return:	nothing 
+; Destroyed:	nothing 
+
+MSG_CHART_OBJECT_GROBJ_UNSELECTED	message
+;
+;
+; Pass:		^lcx:dx - OD of grobj
+; Return:	nothing 
+; Destroyed:	nothing 
+;
+
+MSG_CHART_OBJECT_GROBJ_RESIZED	message
+;
+; Pass:		^lcx:dx - GrObject that sent the message
+; Return:	nothing 
+; Destroyed:	nothing 
+;
+
+MSG_CHART_OBJECT_GROBJ_DELETED	message
+;
+; Handle notification that a GrObj was deleted
+;
+;
+; Pass:		^lcx:dx - OD of grobj
+; Return:	bp = non-zero to really delete the object
+; Destroyed:	nothing 
+;
+;
+;
+;
+
+MSG_CHART_OBJECT_GROBJ_ATTRED 	message
+;
+; the grobj's attributes have changed.  For axis objects, the axis
+; will most likely need to have its geometry redone.
+;
+; Pass:		^lcx:dx - OD of grobj
+; Return: 	nothing
+; Destroyed: 	ax,cx,dx,bp
+;
+
+
+
+MSG_CHART_OBJECT_SELECT		message
+;
+; Select the chart object, or some aspect thereof
+;
+; Context:	
+; Source:	
+; Destination:  
+; Interception: No default handler -- SeriesGroup, Legend, and Series
+; 		classes perform some sorts of behavior
+;
+; Pass:		cx = series or category number to select
+;			
+; Return:	nothing 
+;
+; Destroyed:	nothing 
+;
+;
+
+MSG_CHART_OBJECT_UNSELECT	message
+;
+; Unselect the chart object or some part thereof
+;
+;
+; Context:	
+; Source:	
+; Destination:  
+; Interception: 
+;
+; Pass:		cx - series or category number to unselect
+;			
+; Return:	nothing 
+;
+; Destroyed:	nothing 
+;
+;
+
+MSG_CHART_OBJECT_FIND_GROBJ	message
+;
+; return the OD of a grobject for this grobj -- for column/bar
+; objects, returns the OD of the FIRST picture grobj.
+; 
+;
+; Context:	
+; Source:	
+; Destination:  
+; Interception: 
+;
+; Pass:		nothing 
+;			
+; Return:	^lcx:dx - od of grobj
+;
+; Destroyed:	ax
+
+
+MSG_CHART_OBJECT_CLEAR_ALL_GROBJES	message
+;
+; Destroy all the grobjes for this chart object, and all of its children,
+; if any.
+;
+; Pass:		nothing 
+;			
+; Return:	nothing 
+;
+; Destroyed:	nothing
+;
+;
+;
+;
+
+MSG_CHART_OBJECT_SEND_TO_GROBJ	message
+;
+; Send a message to all grobjes controlled by this chart object and
+; any of its children. 
+;
+; Pass:		cx - message to send
+; Return: 	nothing
+; Destroyed: 	ax,cx,dx,bp
+
+
+MSG_CHART_OBJECT_REMOVE		message
+; Remove this chart object from its tree
+; Pass:		nothing
+; Return: 	nothing
+; Destroyed: 	nothing
+
+
+MSG_CHART_OBJECT_GET_GROBJ_TEXT	message
+; Return the OD of the text object associated with this chart object.
+; By default, returns the OD of the GOAM's text object.  Subclasses
+; might return a more suitable OD.
+;
+; Pass:		cx, dx, bp -- depends on subclass.  MAY be
+; 			series/category number, etc.
+;
+; Return: 	^lcx:dx - OD of text object
+; Destroyed: 	ax
+
+
+MSG_CHART_OBJECT_GET_TOP_GROBJ_POSITION	message
+; Return the draw list position of the topmost GrObj for this chart object.
+;
+; Pass:		nothing 
+; Return:	cx - top grobj
+; Destroyed:	ax,dx,bp
+
+
+;----------------------------------------------------------------------------
+;	INSTANCE DATA
+;----------------------------------------------------------------------------
+	COI_link	LinkPart
+		public COI_link	; so that chart body can use it
+
+	COI_geoFlags	ChartObjectGeometryFlags
+
+	COI_selection	word
+	; selection count
+
+	COI_position	Point
+	; position relative to upper left-hand corner of chart group
+
+	COI_size	Point
+
+	COI_state	ChartObjectState
+	COI_grobj	optr
+
+
+ChartObjectClass	endc
+
+
+; This class deals with multiple grobjs.  2 ChunkArrays are
+; maintained, which the subclass can do with as it pleases.
+
+ChartObjectMultipleClass 	class	ChartObjectClass
+
+;-----------------------------------------------------------------------------
+;	INHERITANCE		
+;-----------------------------------------------------------------------------
+ 
+; This class uses the COI_grobj field to keep the OD of the "current"
+; grobj around.
+
+;-----------------------------------------------------------------------------
+;	INSTANCE DATA		
+;-----------------------------------------------------------------------------
+ 
+	COMI_array1	lptr
+	COMI_array2	lptr
+
+; To access the grobj arrays, pass a ChartObjectMultipleType in CX,
+; or, if subclassing, pass the offset to the field in the instance
+; data where the array's lptr should be stored. 
+
+ChartObjectMultipleType	etype	byte
+	COMT_FIRST_ARRAY	equ	offset COMI_array1
+	COMT_SECOND_ARRAY	equ	offset COMI_array2
+
+	COMT_PICTURE		equ 	COMT_FIRST_ARRAY
+	COMT_TEXT		equ 	COMT_SECOND_ARRAY
+
+
+ChartObjectMultipleClass	endc
+
+
+;-----------------------------------------------------------------------------
+;	ChartObjectDualClass - for chart objects that keep track of
+;exactly 2 grobjects -- doesn't incur the overhead of the 2 chunk
+;arrays of ChartObjectMultipleClass. 
+;-----------------------------------------------------------------------------
+ 
+ChartObjectDualClass	class	ChartObjectClass
+;-----------------------------------------------------------------------------
+;	INHERITANCE		
+;-----------------------------------------------------------------------------
+; COI_grobj field is used to keep track of the current grobject.
+
+	CODI_grobj1	optr
+	CODI_grobj2	optr
+
+	CODT_FIRST_GROBJ	equ	offset CODI_grobj1
+	CODT_SECOND_GROBJ	equ	offset CODI_grobj2
+
+	; Primarily, the 2 grobjs are used for "picture" and "text".
+	; Therefore, these constants should be used where appropriate
+
+	CODT_PICTURE		equ	CODT_FIRST_GROBJ
+	CODT_TEXT		equ	CODT_SECOND_GROBJ
+ChartObjectDualClass	endc

@@ -1,0 +1,65 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1993 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		zoomxip.def
+
+AUTHOR:		Adam de Boor, Apr 16, 1993
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	4/16/93		Initial revision
+
+
+DESCRIPTION:
+	Definitions pertaining to executing the kernel in-place on the Zoomer
+		
+	$Id: zoomxip.def,v 1.1 97/04/04 14:14:03 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+ifndef FULL_EXECUTE_IN_PLACE
+	FULL_EXECUTE_IN_PLACE 	equ 	0
+endif
+
+if FULL_EXECUTE_IN_PLACE
+
+PHYSICAL_PAGE_SIZE		equ	0x4000
+ZOOMER_XIP_MAP_PAGE_ADDR	equ	0xc400
+ZOOMER_XIP_MAP_PAGE_REG		equ	0x00a2
+
+ZOOMER_XIP_HEADER_SEGMENT	equ	0xa000
+
+else
+
+ZOOMER_XIP_HEADER_SEGMENT	equ	0xe000
+
+XIPHeader			struct
+    XIPH_writableStart		dword		; address of ram data (not fptr)
+    XIPH_writableSize		dword		; size of writable data
+    XIPH_dgroupAddr		dword		; address of dgroup (not fptr)
+    XIPH_coreBlockAddr		dword		; address of GeodeHeader
+    XIPH_handleTableStart	word		; offset of table from DGroup
+    XIPH_firstFreeHandle	word		; first free handle in list
+    XIPH_firstUsedHandle	word		; first used handle in list
+    XIPH_freeHandles		word		; # of remaining free handles
+    XIPH_romFSStart		dword		; address of GEOS ROM filesys
+						;  (not fptr)
+    XIPH_unused			byte	4 dup (?)
+XIPHeader			ends
+
+endif
+
+LoadXIPSeg	macro	segreg, trashreg
+		mov	trashreg, ZOOMER_XIP_HEADER_SEGMENT
+		mov	segreg, trashreg
+endm
+
+

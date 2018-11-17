@@ -1,0 +1,115 @@
+#!/usr/public/tsh
+##############################################################################
+#
+# 	Copyright (c) Berkeley Softworks 1989 -- All Rights Reserved
+#
+# PROJECT:	PC GEOS
+# MODULE:	Tools -- Procedure Header Extraction
+# FILE: 	ref
+# AUTHOR: 	Adam de Boor, July 21, 1989
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	ardeb	7/21/89		Initial Revision
+#
+# DESCRIPTION:
+#	Accepts a list of procedure names and extracts their headers,
+#   	locating the procedures themselves via /usr/lib/tags. In other
+#   	words, it will only find installed procedures.
+#
+#	$Id: ref,v 1.2 89/07/24 16:00:34 adam Exp $
+#
+###############################################################################
+#
+# Simple things gloss.tcl requires
+#
+[proc defcommand {name args class help body} {proc $name $args $body}]
+[proc null {str}
+{
+    return [expr {[string c $str nil] == 0 || [length $str chars] == 0}]
+}]
+
+#
+# Fetch gloss.tcl so we get the extract-header function
+#
+source /staff/pcgeos/Tools/swat/lib/gloss.tcl
+
+#
+# Sed can only take 199 commands, total, so we break the arguments down
+# into groups of 150, just to be safe.
+#
+var oargs $args
+for {var olen [length $oargs]} {$olen > 0} {var olen [length $oargs]} {
+    var args [range $oargs 0 150]
+    if {$olen > 150} {
+    	var oargs [range $oargs 151 end]
+    } else {
+    	var oargs {}
+    }
+
+    #
+    # Form the sed script for this bunch. The script needs to locate the
+    # proper tag line for each function and print it out in braces, so
+    # all the lines together form a proper TCL list.
+    #
+    var sedScript {}
+    foreach i $args {
+	var sedScript [format {%s\n/^%s\t.*$/s//{&}/p} $sedScript $i]
+    }
+    var tlines [exec sed -n -e $sedScript /usr/lib/tags]
+
+    var argc [length $args]
+    if {$argc != [length $tlines]} {
+    	#
+	# Didn't get back as many lines as we gave patterns -- find the
+	# ones we missed and tell the user about them. The missed ones
+	# are left in $args
+	#
+	foreach i $tlines {
+    	    # Extract found procedure name
+	    var j [index $i 0]
+    	    # Locate the thing in $args
+	    var k 0
+	    foreach l $args {
+		if {[string c $l $j] == 0} {
+		    break
+		}
+		var k [expr $k+1]
+	    }
+	    # Remove the found procedure from the args list
+	    if {$k == 0} {
+		var args [range $args 1 end]
+	    } elif {$k == $argc-1} {
+		var args [range $args 0 [expr $argc-2]]
+	    } else {
+		var args [concat [range $args 0 [expr $k-1]]
+				 [range $args [expr $k+1] end]]
+	    }
+	    # One more down...
+	    var argc [expr $argc-1]
+	}
+	#
+	# Now tell the user (in proper english :) what procedures we couldn't
+	# find in this batch.
+	#
+	[case [length $args] in
+	 1 {echo $args: no such tag defined}
+	 2 {echo [index $args 0] and [index $args 1]: no such tags defined}
+	 default {
+	    for {var i 0} {$i < $argc-1} {var i [expr $i+1]} {
+		echo -n [format {%s, } [index $args $i]]
+	    }
+	    echo and [index $args $i]: no such tags defined
+	 }]
+    }
+    #
+    # Extract the headers for all found procedures and print them, with
+    # appropriate separation, of course.
+    #
+    foreach i $tlines {
+	echo Extracted from [index $i 1]:
+	echo [eval [format {extract-header %s %s} [index $i 0] [index $i 1]]]
+	echo ==============================================================================
+    }
+}

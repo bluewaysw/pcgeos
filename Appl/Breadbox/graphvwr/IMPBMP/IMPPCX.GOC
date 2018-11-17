@@ -1,0 +1,385 @@
+@include <stdapp.goh>
+#include <graphics.h>
+#include <ansi\string.h>
+#include "impbmp\imppcx.h"
+#include "impbmp\ibcommon.h"
+@include "statbar\statbar.goh"
+
+#define IP_BUFFER_SIZE 16384
+
+
+ImpBmpStatus _pascal ImpPCXGetHeader(FileHandle source, ImpPCXFileHeader *fh)
+{
+  int result; /* normally word */
+
+  result = FileRead(source, fh, sizeof(ImpPCXFileHeader), 0);
+  if(result == -1)
+	 return(IBS_SYS_ERROR);
+  if(result != sizeof(ImpPCXFileHeader))
+	 return(IBS_WRONG_FORMAT);
+  if(fh->IPFH_sign != 0x0a)
+	 return(IBS_WRONG_FORMAT);
+  if(fh->IPFH_version > 5)
+	 return(IBS_WRONG_FORMAT);
+  return(IBS_NO_ERROR);
+};
+
+ImpBmpStatus _pascal ImpPCXGetRawByte(ImpBmpStream *stream, byte *value)
+{
+  byte *buffer;
+  int result;
+  ImpBmpStatus status;
+
+  buffer = stream->IBST_mem;
+  status = IBS_NO_ERROR;
+  if(stream->IBST_count == 0)
+  {
+	 result = FileRead(stream->IBST_file, buffer, stream->IBST_size, 0);
+	 if(result == -1)
+		status = IBS_SYS_ERROR;
+	 if(result == 0)
+		status = IBS_WRONG_FILE;
+	 if (status == IBS_NO_ERROR)
+	 {
+		stream->IBST_index = 0;
+		stream->IBST_count = result;
+	 };
+  };
+  *value = buffer[stream->IBST_index];
+  stream->IBST_index++;
+  stream->IBST_count--;
+  return(status);
+};
+
+ImpBmpStatus _pascal ImpPCXReadByte(ImpBmpStream *stream,
+			  ImpPCXStream *pcxstr, byte *value)
+{
+  byte read;
+  ImpBmpStatus status;
+
+  status = IBS_NO_ERROR;
+  if(pcxstr->IPS_count != 0)
+  {
+	 *value = pcxstr->IPS_byte;
+	 (pcxstr->IPS_count)--;
+  }
+  else
+  {
+	 status = ImpPCXGetRawByte(stream, &read);
+	 if(status == IBS_NO_ERROR)
+		if(((read&0xc0)!=0xc0)||((pcxstr->IPS_pack==0)))
+		{
+		  *value = read;
+		}
+		else
+		{
+		  pcxstr->IPS_count = (read & 0x3f)-1;
+		  status = ImpPCXGetRawByte(stream, value);
+		  if(status == IBS_NO_ERROR)
+		  {
+			 pcxstr->IPS_byte = *value;
+		  };
+		};
+  };
+  return(status);
+};
+
+ImpBmpStatus _pascal ImpPCXReadLine(byte *ptr,
+												ImpBmpStream *stream,
+												ImpPCXStream *pcxstr)
+{
+  word count, count3;
+  byte pass, count2;
+  ImpBmpStatus status;
+  byte read;
+
+  switch(pcxstr->IPS_format)
+  {
+	 case BMF_MONO:
+			{
+			  count = 0;
+			  do
+			  {
+				 status = ImpPCXReadByte(stream, pcxstr, &read);
+				 if(count < pcxstr->IPS_size)
+					ptr[count] = read ^ 0xff;
+				 count++;
+			  }
+			  while((pcxstr->IPS_width !=  count)&&
+								  (status == IBS_NO_ERROR));
+			};
+			break;
+
+	 case BMF_4BIT:
+			{
+			  if(pcxstr->IPS_planes == 1)
+			  {
+				 count = 0;
+				 do
+				 {
+					status = ImpPCXReadByte(stream, pcxstr, &read);
+					if(count < pcxstr->IPS_size)
+					  ptr[count] = read;
+					count++;
+				 }
+				 while((pcxstr->IPS_width !=  count)&&
+								  (status == IBS_NO_ERROR));
+			  }
+			  else
+			  {
+				 pass = 0;
+				 do
+				 {
+					count = 0;
+					do
+					{
+					  status = ImpPCXReadByte(stream, pcxstr, &read);
+					  count2 = 0;
+					  while((count2 != 4)&&((count*4+count2) < pcxstr->IPS_size))
+					  {
+						 count3 = count*4 +count2;
+						 ptr[count3] >>= 1;
+						 switch(read&0xc0)
+						 {
+							case 0x80:
+							  ptr[count3] &= ~0x08;
+							  ptr[count3] |= 0x80;
+							  break;
+
+							case 0x40:
+							  ptr[count3] &= ~0x80;
+							  ptr[count3] |= 0x08;
+							  break;
+
+							case 0xc0:
+							  ptr[count3] |= 0x88;
+							  break;
+
+							case 0x00:
+							  ptr[count3] &= ~0x88;
+							  break;
+						 };
+						 count2++;
+						 read <<= 2;
+					  };
+					  count++;
+					}
+					while((pcxstr->IPS_width !=  count)&&
+								  (status == IBS_NO_ERROR));
+					pass++;
+				 } while((pass != 4)&&(status == IBS_NO_ERROR));
+			  };
+			};
+			break;
+
+	 case BMF_8BIT:
+			{
+			  count = 0;
+			  do
+			  {
+				 status = ImpPCXReadByte(stream, pcxstr, &read);
+				 if(count < pcxstr->IPS_size)
+					ptr[count] = read;
+				 count++;
+			  }
+			  while((pcxstr->IPS_width !=  count)&&
+								  (status == IBS_NO_ERROR));
+			};
+			break;
+
+	 case BMF_24BIT:
+			status = IBS_WRONG_FORMAT;
+			break;
+  };
+  return(status);
+
+};
+
+ImpBmpStatus _pascal ImpPCXProcessFile(ImpBmpParams *params)
+{
+  Boolean flag;
+  word size;
+  void *lineptr;
+  word count;
+  ImpPCXFileHeader fh;
+  ImpPCXStream pcxstr;
+  ImpBmpStream stream;
+  MemHandle buffermem, stuffmem;
+  VMBlockHandle bmblock;
+  byte read, *pal;
+  BMFormat bmformat;
+  GStateHandle bmstate;
+  ImpBmpStatus status;
+  word offset;
+
+  strcpy(params->IBP_impForm, ".PCX");
+
+  if(params->IBP_status != NULL)
+	 @call params->IBP_status::MSG_SB_START_PROCESS();
+
+  /* file position at start */
+  if(FilePos(params->IBP_source, 0, FILE_POS_START) != 0)
+	 return(IBS_WRONG_FILE);
+
+  /* read pcx header */
+  status = ImpPCXGetHeader(params->IBP_source, &fh);
+
+  if(status != IBS_NO_ERROR)
+  {
+	 if(params->IBP_status != NULL)
+		@call params->IBP_status::MSG_SB_STOP_PROCESS();
+	 return(status);
+  };
+
+  /* buffer for reading gif file */
+  buffermem = MemAlloc(IP_BUFFER_SIZE, HF_FIXED, 0);
+  if(buffermem == NULL)
+  {
+	 if(params->IBP_status != NULL)
+		@call params->IBP_status::MSG_SB_STOP_PROCESS();
+	 return(IBS_NO_MEMORY);
+  };
+
+
+  /* define file stream */
+  stream.IBST_mem = MemDeref(buffermem);
+  stream.IBST_size = IP_BUFFER_SIZE;
+  stream.IBST_file = params->IBP_source;
+  stream.IBST_count = 0;
+
+  if((fh.IPFH_bitsPixel == 1)&&(fh.IPFH_planes == 1))
+	 bmformat = BMF_MONO;
+  else
+	 if((fh.IPFH_bitsPixel == 1)&&(fh.IPFH_planes == 4))
+		bmformat = BMF_4BIT;
+	 else
+		if((fh.IPFH_bitsPixel == 4)&&(fh.IPFH_planes == 1))
+		  bmformat = BMF_4BIT;
+		else
+		  if((fh.IPFH_bitsPixel == 8)&&(fh.IPFH_planes == 1))
+			 bmformat = BMF_8BIT;
+		  else
+/*             if((fh.IPFH_bitsPixel == 8)&&(fh.IPFH_planes == 3))
+				bmformat = BMF_24BIT;
+             else   */
+			 {
+				MemFree(buffermem);
+				if(params->IBP_status != NULL)
+				  @call params->IBP_status::MSG_SB_STOP_PROCESS();
+				return(IBS_WRONG_FORMAT);
+			 };
+
+  if((pcxstr.IPS_pack = fh.IPFH_compression) > 1)
+  {
+	 MemFree(buffermem);
+	 if(params->IBP_status != NULL)
+	   @call params->IBP_status::MSG_SB_STOP_PROCESS();
+	 return(IBS_WRONG_FORMAT);
+  };
+
+  /* create bitmap and save palette */
+  params->IBP_format = bmformat;
+  params->IBP_width = fh.IPFH_maxx - fh.IPFH_minx + 1;
+  params->IBP_height = fh.IPFH_maxy - fh.IPFH_miny + 1;
+  params->IBP_bitmap =
+  bmblock = GrCreateBitmap(bmformat|BMT_PALETTE|BMT_COMPLEX,
+						params->IBP_width, params->IBP_height,
+					  params->IBP_dest, 0, &bmstate);
+
+  /* destroy bitmap gstate */
+  GrDestroyBitmap(bmstate, BMD_LEAVE_DATA);
+
+  pcxstr.IPS_count = 0;
+  pcxstr.IPS_format = bmformat;
+  pcxstr.IPS_width = fh.IPFH_bytesPerLine;
+  pcxstr.IPS_planes = fh.IPFH_planes;
+  /* read bitmap line by line */
+  count = 0;
+  do
+  {
+	 if(HAL_COUNT(HugeArrayLock(params->IBP_dest ,bmblock,
+						(dword) count,&lineptr,&size)) != 0)
+	 {
+		pcxstr.IPS_size = size;
+		status = ImpPCXReadLine(lineptr, &stream, &pcxstr);
+		HugeArrayDirty(lineptr);
+		HugeArrayUnlock(lineptr);
+		count++;
+		if(params->IBP_status != NULL)
+		  flag = @call params->IBP_status::
+				  MSG_SB_SET_STATUS_VALUE(((dword)count)*100/params->IBP_height);
+		if(flag == FALSE)
+		  status = IBS_IMPORT_STOPPED;
+	 }
+	 else
+		status = IBS_SYS_ERROR;
+  } while((count != params->IBP_height) && (status == IBS_NO_ERROR));
+
+  /* read palette */
+  if((bmformat>=1) && (status == IBS_NO_ERROR))
+  {
+	 pal = VMLock(params->IBP_dest, bmblock, &stuffmem);
+	 offset = pal[0x28]+256*(pal[0x29]);
+	 offset += 0x1c;
+
+	 if(bmformat == BMF_4BIT)
+		memcpy(&(pal[offset]), &fh.IPFH_palette, 16*3);
+	 else
+	 {
+		if(fh.IPFH_version == 5)
+		{
+		  stream.IBST_count = 0;
+		  FilePos(stream.IBST_file, -769, FILE_POS_END);
+		  status = ImpPCXGetRawByte(&stream, &read);
+		  if(status == IBS_NO_ERROR)
+			 if(read == 0x0c)
+			 {
+				count = 0;
+				do
+				{
+				  status = ImpPCXGetRawByte(&stream, &(pal[offset+count]));
+				  count++;
+				} while((count != 256*3) && (status == IBS_NO_ERROR));
+			 }
+			 else
+				status = IBS_WRONG_FORMAT;
+		}
+		else
+		  status = IBS_WRONG_FORMAT;
+	 };
+	 VMDirty(stuffmem);
+	 VMUnlock(stuffmem);
+  };
+
+  if(status != IBS_NO_ERROR)
+  {
+	 bmstate = GrEditBitmap(params->IBP_dest, bmblock, 0);
+	 GrDestroyBitmap(bmstate, BMD_KILL_DATA);
+  };      
+
+  /* free buffer */
+  MemFree(buffermem);
+
+  /* stop slider */
+  if(params->IBP_status != NULL)
+	 @call params->IBP_status::MSG_SB_END_PROCESS();
+
+  return(status);
+};
+
+ImpBmpStatus _pascal ImpPCXTestFile(FileHandle file)
+{
+  int result;
+  byte read;
+
+  if(FilePos(file, 0, FILE_POS_START)!=0)
+	 return(IBS_WRONG_FILE);
+  result = FileRead(file, &read, 1, 0);
+  if(result == -1)
+	 return(IBS_SYS_ERROR);
+  if(result != 1)
+	 return(IBS_WRONG_FILE);
+  if(read == 0x0a)
+	 return(IBS_NO_ERROR);
+  return(IBS_WRONG_FORMAT);
+};

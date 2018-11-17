@@ -1,0 +1,167 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		wavConstants.def
+
+AUTHOR:		Steve Scholl
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	srs	8/12/92   	Initial version.
+
+DESCRIPTION:
+	
+
+	$Id: wavConstants.def,v 1.1 97/04/07 11:51:32 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;-----------------------------------------------------------------------------
+;	Constants		
+;-----------------------------------------------------------------------------
+
+
+ID_STRING_LENGTH	equ	4
+FORMAT_STRING_LENGTH	equ	4
+
+NUM_TRIALS		equ	25		; how long to wait for a DAC
+DATA_BUFFER_SIZE	equ	8192
+DAC_STREAM_SIZE		equ	4000		; no longer used...
+
+; NOTE: The ADPCM converters assume that the PCM buffer (size DATA_BUFFER_SIZE)
+; is at least large enough to hold the result of decomp'ing a full ADPCM buffer
+; (size ADPCM_IN_BUFFER_SIZE).  Typically, this means that this length must be
+; no more than half of DATA_BUFFER_SIZE.  Also, since ADPCM data is segmented
+; into blocks, using an ADPCM buffer size that is a multiple of the block size
+; will avoid moving extra data between conversions.  The block size is usually
+; 256 or 512 bytes.
+ADPCM_IN_BUFFER_SIZE	equ	4096
+
+MONO			equ	1
+STEREO			equ	2
+
+WAVE_FORMAT_PCM		equ	1
+WAVE_FORMAT_ADPCM	equ	2
+WAVE_FORMAT_IMA_ADPCM	equ	011h
+
+IBM_FORMAT_MULAW	equ	0101h
+IBM_FORMAT_ALAW		equ	0102h
+IBM_FORMAT_ADPCM	equ	0103h
+
+GEN_FILE_PATH_BLOCK_SIZE equ 75
+
+
+;-----------------------------------------------------------------------------
+;	Structures		
+;-----------------------------------------------------------------------------
+
+FloatExp	record
+	FE_SIGN:1		; set if number is negative
+	FE_EXPONENT:15		; the exponent is biased by 3fffh
+FloatExp	end
+
+FloatNumber	struct
+	F_exponent	FloatExp <>		; offset 0
+	F_mantissa_wd3	word			; offset 2
+	F_mantissa_wd2	word			; offset 4
+	F_mantissa_wd1	word			; offset 6
+	F_mantissa_wd0	word			; offset 8
+FloatNumber	ends
+
+
+FileFormatFlags		record
+	:6
+	FFF_16_TO_8_BITS:1		; Low byte of 16-bit PCM data dropped
+	FFF_UNDERSAMPLE:1		; Every other sample skipped
+FileFormatFlags		end
+
+FileFormatDescriptor	struct
+	FFD_format		DACSampleFormat
+	FFD_formatMID		ManufacturerID
+	FFD_sampleRate		word
+	FFD_blockAlign		word
+	FFD_flags		FileFormatFlags
+	FFD_dataOffset		dword
+	FFD_dataSize		dword
+	FFD_bytesLeft		dword
+FileFormatDescriptor	ends
+
+FormatChunkDescriptor	struct
+	FCD_formatTag		word
+	FCD_numChannels		word
+	FCD_samplesPerSec	dword
+	FCD_avgBytesPerSec	dword
+	FCD_blockAlign		word
+	FCD_bitsPerSample	word
+FormatChunkDescriptor	ends
+
+; All non-PCM formats extend the FormatChunkDescriptor with an additional
+; word giving the count in bytes of the size of the extra structure,
+; followed by the extra structure itself.
+
+; Extra structure for IMA ADPCM format.
+IMAADPCMWaveFormat	struct
+	IAWF_samplesPerBlock	word
+IMAADPCMWaveFormat	ends
+
+; Extra structures for Microsoft ADPCM format.
+MSADPCMCOEFSET	struct
+	MSACS_coef1	BBFixed
+	MSACS_coef2	BBFixed
+MSADPCMCOEFSET	ends
+
+MSADPCMWaveFormat	struct
+	MSAWF_samplesPerBlock	word	; count of samples per block
+	MSAWF_numCoeff		word	; number of coefficient sets
+	MSAWF_coeff	label	MSADPCMCOEFSET	; coefficient sets
+MSADPCMWaveFormat	ends
+
+CommonChunkDescriptor	struct
+	CCD_size		byte 4 dup (0)
+	CCD_numChannels		byte 2 dup (0)
+	CCD_numSampleFrames	byte 4 dup (0)
+	CCD_bitsPerSample	byte 2 dup (0)
+	CCD_samplesPerSec	FloatNumber
+CommonChunkDescriptor	ends
+
+SSNDHeaderDescriptor	struct
+	SHD_size		byte 4 dup (0)
+	SHD_offset		byte 4 dup (0)
+	SHD_blockSize		byte 2 dup (0)
+SSNDHeaderDescriptor	ends
+
+HeaderDescriptor	struct
+	HD_fileID		byte ID_STRING_LENGTH dup (0)
+	HD_fileSize		dword
+	HD_fileFormat		byte FORMAT_STRING_LENGTH dup (0)
+HeaderDescriptor	ends
+
+SoundFileFormats	etype	word, 0, 2
+	SFF_RIFF	enum	SoundFileFormats
+	SFF_AIFF	enum	SoundFileFormats
+	; Not currently supported
+
+
+WavFilePathBlock	struct
+	WFPB_disk	word		;Handle of disk on which the path 
+					;resides. May be initialized to a 
+					;StandardPath constant.
+	WFPB_path	PathName	;Absolute path (relative if GFP_disk 
+					;is a StandardPath constant) 
+					;to the directory
+	WFPB_file	FileLongName	;Name of wav file
+WavFilePathBlock	ends
+
+WAV_OTHER_THREAD_STACK_SIZE	equ 1024
+
+ASSUMED_STREAM_BUFFER_SIZE = 10240
+
+
+;-----------------------------------------------------------------------------
+;	Fatal Errors		
+;-----------------------------------------------------------------------------
+ 

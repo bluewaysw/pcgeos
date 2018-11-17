@@ -1,0 +1,132 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Desktop Connectivity
+FILE:		ctXferDr.goh
+
+AUTHOR:		Thomas E Lester, Jun 27, 1995
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	lester	6/27/95   	Initial version.
+
+DESCRIPTION:
+	Interface definition for Connect Transfer drivers.
+
+	$Id: ctXferDr.goh,v 1.1 97/04/04 15:54:17 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+#ifndef _CTXFERDR_H_
+#define _CTXFERDR_H_
+
+#include <driver.h>
+
+/*
+ * Protocol number for this interface. 
+ */
+#define CTFER_PROTO_MAJOR	(DRIVER_PROTO_MAJOR+1)
+#define CTFER_PROTO_MINOR	(DRIVER_PROTO_MAJOR+0)
+
+/*----------------------------------------------------------------------------
+ *		Structures and Constants
+ *--------------------------------------------------------------------------*/
+
+typedef enum {
+    CTFDE_NO_ERROR,					
+    CTFDE_ERROR,					
+    CTFDE_FILE_OPEN,
+    CTFDE_FILE_READ,				
+    CTFDE_FILE_WRITE,					
+    CTFDE_FILE_CREATE,				
+    CTFDE_DISK_FULL,				
+    CTFDE_OUT_OF_MEMORY,				
+    CTFDE_CANCELED,					
+    CTFDE_TRANSFER_STARTING,			
+    CTFDE_TRANSFER_CONTINUES,
+    CTFDE_TRANSFER_COMPLETE,
+
+} ConnectTransferDriverError;
+
+
+/*
+ * Structure to pass with DR_CTFD_GET_FILE and DR_CTFD_SEND_FILE
+ */
+typedef struct {
+    DiskHandle	CTFDTA_localDiskHandle;
+    char _far *	CTFDTA_localFilePath;
+    /*
+     * Disk handle and file path specifying the local file.
+     */
+
+    char _far *	CTFDTA_remoteFilePath;
+    /*
+     * Absolute file path specifying the remote file.
+     */
+
+    word	CTFDTA_bytesPerStatusReport;
+    /*
+     * How often to send status reports.
+     * 		The driver may not be able to send status reports at the 
+     *		specified interval, but it needs to send at least a 
+     *		transfer_starting report and a transfer_complete report.
+     */
+	
+    optr	CTFDTA_statusOptr;
+    /*
+     * Object to receive status reports.
+     */
+
+    Message	CTFDTA_statusMsg;
+    /*
+     * The message to send for status reports.
+     *		Use the prototype MSG_CTFER_STATUS_MSG below.
+     */
+
+} ConnectTransferDriverTransferArgs;
+
+/*
+ * Connect Transfer Driver Status Types
+ */
+typedef enum {
+    CTDST_BYTE_COUNT,
+} ConnectTransferDriverStatusType;
+
+/*
+ * Structure passed with transfer status message.
+ */
+typedef struct {
+    ConnectTransferDriverError		CTFSP_error;
+    ConnectTransferDriverStatusType	CTFSP_type;
+    dword				CTFSP_data;
+} ConnectTransferStatusParams;
+
+
+/*
+ * Prototype for transfer status message.
+ */
+@prototype void CONNECT_TRANSFER_DRIVER_STATUS_MSG(ConnectTransferStatusParams *params = ss:bp);
+
+
+/*----------------------------------------------------------------------------
+ *		Driver Function Calls
+ *--------------------------------------------------------------------------*/
+
+/* enum ConnectTransferDriverFunction */
+typedef enum {
+    DR_CTFD_GET_FILE = 8,
+    DR_CTFD_SEND_FILE = 10,
+    DR_CTFD_CANCEL = 12,
+
+} ConnectTransferDriverFunction;
+
+#endif /* _CTXFERDR_H_ */
+
+

@@ -1,0 +1,284 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Condo viewer
+MODULE:		viewer constants
+FILE:		contentConstant.def
+
+AUTHOR:		Jonathan Magasin, Apr 20, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JM	4/20/94   	Initial revision
+
+
+DESCRIPTION:
+	Constants for the content viewer.
+		
+	$Id: contentConstant.def,v 1.1 97/04/04 17:49:49 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SetDef __CONTENTCONSTANT
+
+	_JEDI 			equ	FALSE
+	_NO_COLOR_MONIKERS	equ	FALSE
+
+	_NIKE 		equ FALSE
+
+tchar 	equ 	<TCHAR>
+
+;
+; We need to use MSG_VIS_TEXT_CONVERT_OFFSET_TO_COORDINATE without
+; referencing it by name, else the "platform zoomer" statement won't work.
+; So I'll define my own constant in terms of the last VisTextMessage which
+; is available on the zoomer platform, which just happens to be
+; MSG_VIS_TEXT_FREE_ALL_STORAGE. The message I want to use is 7 messages
+; later, so I add 7 to get the message number.
+;
+CONVERT_OFFSET_TO_COORDINATE_MSG_NUMBER equ MSG_VIS_TEXT_FREE_ALL_STORAGE + 7
+
+
+;*********************************************************************
+; Locals used by the content tree for doing things like following 
+; hyperlinks.                     
+;*********************************************************************
+
+;
+; PageNameArrayElement data part
+;
+ContentFileNameData		struct
+    CFND_text		VisTextNameData
+    CFND_help		byte 8 dup (?)	;reserved for future use
+ContentFileNameData	ends
+
+SEARCH_LOCALS	equ	<\
+.warn -unref_local\
+conGenView 	local	optr\
+params		local	ContentTextRequest\
+mapBlock	local	hptr		;used in MSGetNextContentFile\
+bookFile	local	hptr		;used in MSGetNextContentFile\
+searchDirection	local	word		;forward = 1, backwards = -1\
+.warn @unref_local\
+>
+
+
+;*********************************************************************
+;** Locals used by the ContentNavControl so that it can maintain its
+;** history list when links are followed.		 
+;*********************************************************************
+CONTENT_NAV_LOCALS	equ	<\
+.warn -unref_local\
+features	local	CNCFeatures\
+childBlock	local	hptr\
+toolFeatures	local	CNCToolboxFeatures\
+toolBlock	local	hptr\
+filename	local	FileLongName\
+context		local	ContextName\
+bookFeatures	local	BookFeatureFlags\
+enableFeatures	local	CNCFeaturesAndTools\
+disableFeatures	local	CNCFeaturesAndTools\
+.warn @unref_local\
+>
+
+;Status bar size.  The 16 is for the page number (65536 is max), 
+;space, and null.
+MAX_STATUS_BAR_ENTRY_LENGTH	equ	(size ContextName) + 16
+
+;
+; values for how history is displayed
+;
+MAXIMUM_HISTORY_LENGTH	equ	30	;remembered
+MAXIMUM_HISTORY_ENTRIES	equ	30	;displayed
+HIST_LIST_WIDTH		equ	40
+HIST_LIST_HEIGHT	equ	10
+
+;
+; Entry saved for each history entry
+;
+ContentNavHistoryElement	struct
+    CNHE_filename	lptr		;name of help file
+    CNHE_context	lptr		;context
+ContentNavHistoryElement	ends
+
+;
+; Chunk handle of history list.  It is stored in an object block so
+;	that can save block to state; however, have to shift it down
+;	down by one chunk, the flags chunk.
+;
+CONTENT_NAV_HISTORY_CHUNK	= (size LMemBlockHeader)
+
+;
+; The following structure is defined in splineConstant.def, which is
+; internal to the Spline library.  All I want from this structure is
+; SPS_point.  
+;
+SplinePointStruct	struct
+	SPS_point	PointWBFixed
+	SPS_unused	byte
+SplinePointStruct	ends
+
+;
+; flag passed to VerifyHelpFile to tell it what kind of file to check for
+;
+HelpFileType	etype	byte
+    HFT_CONTENT	enum	HelpFileType	;content file
+    HFT_BOOK	enum	HelpFileType	;book file
+    HFT_HELP	enum	HelpFileType	;regular old help file
+
+;
+; Structures for dealing with paths in mainBook.asm
+;
+PathBuffer	struct
+	PB_handle	hptr.PathBuffer
+	PB_path		PathName		<>
+PathBuffer	ends
+
+PathBuffer2	struct
+	PB2_handle	hptr.PathBuffer2
+	PB2_path1	PathName		<>
+	PB2_path2	PathName		<>
+PathBuffer2	ends
+
+;-------------------------------------------------------------------------
+;		FatalErrors and Warnings
+;-------------------------------------------------------------------------
+
+
+BAD_CONTENT_COMPACT_TYPE				enum FatalErrors
+
+BAD_NUM_BYTES_WRITTEN_OUT				enum FatalErrors
+
+HELP_FILE_HAS_NO_MAP_BLOCK				enum FatalErrors
+; The help file specified has no map block (which is where all the cool
+; and very necessary stuff like the names are kept).
+
+JM_PROBLEM_WITH_CLOSING_FILE				enum FatalErrors
+; See MSG_META_DETACH, and have a nice day!!!
+
+SELECTION_DID_NOT_INCLUDE_LINK				enum FatalErrors
+
+HELP_LINK_TO_NO_WHERE					enum FatalErrors
+
+HELP_NAME_TOO_LONG					enum FatalErrors
+
+CONTENT_COULDNT_FIND_FILE_IN_VARDATA			enum FatalErrors
+
+CONTENT_COULDNT_FIND_VARDATA_ITEM			enum FatalErrors
+
+CONTENT_NO_HISTORY					enum FatalErrors
+; No elements in history array.
+
+CONTENT_HISTORY_ILLEGAL_NUMBER				enum FatalErrors
+; Attempted to dereference an element which does not exist in
+; the history list chunk array.
+;
+
+CONTENT_HISTORY_BUFFER_NOT_EMPTY			enum FatalErrors
+; The buffer the history information is stored in was not empty on startup.
+
+JM_SEE_BACKTRACE					enum FatalErrors
+;General error message.
+
+OBJECT_IS_NOT_A_NAV_CONTROLLER				enum FatalErrors
+; Used by ec code to check if passed *ds:si is 
+; the nav controller.
+
+OBJECT_IS_NOT_A_CONTENT_GEN_VIEW			enum FatalErrors
+; Used by ec code to check if passed *ds:si is
+; an instance of a ContentGenView.
+
+NOTHING_SELECTED_IN_HISTORY_LIST			enum FatalErrors
+
+CANNOT_GO_BACK						enum FatalErrors
+; Go back won't work because there is nowhere to go back to.
+; The go back tool/trigger should be disabled.
+
+ERROR_INVALID_HELP_FILE_TYPE				enum FatalErrors
+;An invalid value for HelpFileType was passed to VerifyHelpFile
+;
+
+CONTENT_TEXT_HAS_INVALID_LINK_SELECTION			enum FatalErrors
+; Vardata CONTENT_TEXT_HAS_INVALID_LINK_SELECTION was set/not set when
+; when it should have been.
+;
+
+ILLEGAL_CONTEXT_ELEMENT_NUMBER				enum FatalErrors
+; Attempted to dereference a non-existent context element number.
+;
+
+CONTEXT_NAME_ELEMENT_NOT_FOUND				enum FatalErrors
+; A context name was not found in the name array.
+;
+
+BAD_VIS_TEXT_NAME_DATA					enum FatalErrors
+; The VisTextNameData for a page name is bad.
+;
+
+CONTROLLER_OBJECT_INTERNAL_ERROR			enum FatalErrors
+;
+
+FINDCONTROL_ERROR_NULL_SEARCH_CONTROLLER_OPTR		enum FatalErrors
+; The optr of the search controller is null and it sould not be.
+;
+
+FINDCONTROL_ERROR_SEARCH_CONTROLLER_OPTR_NOT_NULL	enum FatalErrors
+; The optr of the search controller is NOT null and it should be.
+;
+
+CONTROLLER_UPDATE_UI_UNEXPECTED_NOTIFICATION_TYPE	enum FatalErrors
+; The controller was not expecting a notification of the type it
+; received. Either the controller GCBI_notificationList has a 
+; notification type that is not supported or the handler for 
+; MSG_GEN_CONTROL_UPDATE_UI needs to be updated to deal with the 
+; notification type.
+;
+
+SENDCONTROL_ERROR_OPTR_NOT_NULL				enum FatalErrors
+; An optr is not null when it should be. Look at the code to see what
+; optr is the problem.
+;
+
+OBJECT_IS_NOT_A_CONTENT_TEXT				enum FatalErrors
+; Used by ec code to check if passed *ds:si is
+; an instance of a ContentText
+
+SENDCONTROL_INVALID_DIALOG_DESCRIPTION_TYPE		enum FatalErrors
+; Out of range ContentSendDialogDescripionType.
+;
+
+CURRENT_FILE_NOT_IN_BOOK_LIST				enum FatalErrors
+; When starting a search, the current file was not found in the book's
+; file list.
+;
+
+LINE_DOES_NOT_EXIST					enum FatalErrors
+; GetLineHeightAndBaselineOffset was called to get info on a line that
+; does not exist
+;
+
+CONTENT_TEXT_HAS_NO_TYPE_INFO				enum FatalErrors
+; The ContentText object has no type info but it should.
+;
+
+INVALID_SPECIAL_LINK_CHAR				enum FatalErrors
+; An invalid character followed the special hyperlink character.
+;
+
+FXIP_CANNOT_CALL_TEXT_MSG_DIRECTLY			enum FatalErrors
+; In the full xip version, it is not permissible to call the text
+; message MSG_VIS_TEXT_CONERT_OFFSET_TO_COORDINATE by calculating
+; its handler's offset and jumping to it - it must be called via the
+; messaging system. If you get this fatal error, it means the text
+; library protocol is less than 3.13, which shouldn't be the case on
+; a system with an xip'ed version of this library.
+;
+
+INVALID_LOAD_FILE_ERROR					enum FatalErrors
+
+PATH_CONSTRUCTION_ERROR					enum FatalErrors

@@ -1,0 +1,976 @@
+/***********************************************************************
+ *
+ *  Copyright (c) Cool Lava Productions 1998 -- All Rights Reserved
+ *                Breadbox Computer Company
+ * PROJECT:   Kid NUMBERS
+ * MODULE:    VisContent methods
+ * FILE:      content.goc
+ *
+ * AUTHOR:    Duane E. Char
+ *
+ * REVISION HISTORY:
+ *  Date        Name                Description
+ *  ----        ----                -----------
+ ************************************************************************/
+
+@include <stdapp.goh>
+#include <ansi/string.h>
+#include <Ansi/stdio.h>
+
+@define __NUMBERS_CONTENT_GOC
+@include "numbers.goh"
+
+@classdecl      NumbersVisContentClass;
+
+/***********************************************************************
+ *      Code for NumbersVisContentClass 
+ ***********************************************************************
+ */
+
+/***********************************************************************
+ *      MSG_VIS_CONTENT_BEGIN_GAME for NumbersVisContentClass
+ ***********************************************************************
+ * SYNOPSIS:        Initializes things.  Called by
+ *		              MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT.
+ * PARAMETERS:      void
+ *
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *  Name    Date        Description
+ *  ----    ----        -----------
+ *
+ ***********************************************************************/
+@method NumbersVisContentClass, MSG_VIS_CONTENT_BEGIN_GAME
+{
+	PlaySimpleSound(SOUND_ID_START_QUIZ, 5) ;
+	 /* Reset all variables. */
+	g_linesDrawn = 0; /*lines drawn set to 0 */
+	g_pageNumber = 0;
+	g_correct = 0;
+	g_incorrect = 0;
+//	g_appOpening = TRUE;
+	g_selectedWordBox = 0;
+	g_selectedDefBox = 0;
+	g_defboxVertMidpoint = 0;
+	g_defboxHorizMidpoint = 0;
+	g_wordboxVertMidpoint = 0;
+	g_wordboxHorizMidpoint = 0;
+	g_defbox1Val = 0;
+	g_defbox2Val = 0;
+	g_defbox3Val = 0;
+	g_defbox4Val = 0;
+	g_defbox5Val = 0;
+	g_defbox6Val = 0;
+	g_defbox7Val = 0;
+	pself->DEFBOX1_HORZ_MIDPOINT = 0;
+	pself->DEFBOX1_VERT_MIDPOINT = 0;
+	pself->DEFBOX2_HORZ_MIDPOINT = 0;
+	pself->DEFBOX2_VERT_MIDPOINT = 0;
+	pself->DEFBOX3_HORZ_MIDPOINT = 0;
+	pself->DEFBOX3_VERT_MIDPOINT = 0;
+	pself->DEFBOX4_HORZ_MIDPOINT = 0;
+	pself->DEFBOX4_VERT_MIDPOINT = 0;
+	pself->DEFBOX5_HORZ_MIDPOINT = 0;
+	pself->DEFBOX5_VERT_MIDPOINT = 0;
+	pself->DEFBOX6_HORZ_MIDPOINT = 0;
+	pself->DEFBOX6_VERT_MIDPOINT = 0;
+	pself->DEFBOX7_HORZ_MIDPOINT = 0;
+	pself->DEFBOX7_VERT_MIDPOINT = 0;
+	pself->WORDBOX1_HORZ_MIDPOINT = 0;
+	pself->WORDBOX1_VERT_MIDPOINT = 0;
+	pself->WORDBOX2_HORZ_MIDPOINT = 0;
+	pself->WORDBOX2_VERT_MIDPOINT = 0;
+	pself->WORDBOX3_HORZ_MIDPOINT = 0;
+	pself->WORDBOX3_VERT_MIDPOINT = 0;
+	pself->WORDBOX4_HORZ_MIDPOINT = 0;
+	pself->WORDBOX4_VERT_MIDPOINT = 0;
+	pself->WORDBOX5_HORZ_MIDPOINT = 0;
+	pself->WORDBOX5_VERT_MIDPOINT = 0;
+	pself->WORDBOX6_HORZ_MIDPOINT = 0;
+	pself->WORDBOX6_VERT_MIDPOINT = 0;
+	pself->WORDBOX7_HORZ_MIDPOINT = 0;
+	pself->WORDBOX7_VERT_MIDPOINT = 0;
+	pself->NumbersC_firstline = 0;
+	pself->NumbersC_secondline = 0;
+	pself->NumbersC_thirdline = 0;
+	pself->NumbersC_fourthline = 0;
+	pself->NumbersC_fifthline = 0;
+	pself->NumbersC_sixthline = 0;
+	pself->NumbersC_seventhline = 0;
+	
+	g_playingGame = TRUE;
+    
+	/* Clear the pressed state for all boxes. */
+	@send @visChildren::MSG_VIS_BOX_RESET_PRESSED(0);
+	@send @visChildren::MSG_VIS_BOX_RESET_PRESSED(1);
+
+/* now reset the vis children to be selectable again, they have been turned off with
+MSG_VIS_CONTENT_SET_LINE. */
+
+	@send @visChildren::MSG_VIS_SET_ATTRS(VA_DETECTABLE, 0, VUM_NOW);
+	@call self::MSG_VIS_CONTENT_LOAD_PAGE();
+	@call self::MSG_VIS_MARK_INVALID(
+		 VOF_GEOMETRY_INVALID | VOF_IMAGE_INVALID,
+		 VUM_NOW);
+}
+
+/***********************************************************************
+ *      MSG_VIS_CONTENT_END_GAME for NumbersVisContentClass
+ ***********************************************************************
+ * SYNOPSIS:        Resets some things.  Called by
+ *		              MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT.
+ * PARAMETERS:      void
+ *
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *  Name    Date        Description
+ *  ----    ----        -----------
+ *
+ ***********************************************************************/
+@method NumbersVisContentClass, MSG_VIS_CONTENT_END_GAME
+{
+    g_playingGame = FALSE;
+    
+    /* Set all vis children undetectable. */
+	@send @visChildren::MSG_VIS_SET_ATTRS(0, VA_DETECTABLE, VUM_NOW);
+
+	@call self::MSG_VIS_MARK_INVALID(
+		 VOF_GEOMETRY_INVALID | VOF_IMAGE_INVALID,
+		 VUM_NOW);
+}
+
+/***********************************************************************
+ *      MSG_VIS_CONTENT_NEW_PAGE for NumbersVisContentClass
+ ***********************************************************************
+ * SYNOPSIS:        set a page and force MSG_VIS_DRAW.  Called by
+ *		              MSG_PROCESS_GET_DB_INFO at startup and when 7
+ *						  lines are drawn
+ *
+ * PARAMETERS:      Boolean flash
+ *
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *  Name    Date        Description
+ *  ----    ----        -----------
+ *
+ ***********************************************************************/
+@method NumbersVisContentClass, MSG_VIS_CONTENT_NEW_PAGE
+{
+
+	pself = ObjDerefVis(oself);
+
+		g_linesDrawn = 0; /*lines drawn set to 0 */
+ //		g_pageNumber += 1;
+ //		g_randomX = TimerGetCount() % 10;  /* get random # to determine shape to draw */
+ /*		if (g_randomX > 6){
+			g_whatShape = 2;
+		}
+		else if (g_randomX < 3){
+			g_whatShape = 1;
+		}
+		else {
+			g_whatShape = 0;
+		}
+  */		g_selectedWordBox = 0;
+		g_selectedDefBox = 0;
+		g_defboxVertMidpoint = 0;
+		g_defboxHorizMidpoint = 0;
+		g_wordboxVertMidpoint = 0;
+		g_wordboxHorizMidpoint = 0;
+		g_defbox1Val = 0;
+		g_defbox2Val = 0;
+		g_defbox3Val = 0;
+		g_defbox4Val = 0;
+		g_defbox5Val = 0;
+		g_defbox6Val = 0;
+		g_defbox7Val = 0;
+		pself->DEFBOX1_HORZ_MIDPOINT = 0;
+		pself->DEFBOX1_VERT_MIDPOINT = 0;
+		pself->DEFBOX2_HORZ_MIDPOINT = 0;
+		pself->DEFBOX2_VERT_MIDPOINT = 0;
+		pself->DEFBOX3_HORZ_MIDPOINT = 0;
+		pself->DEFBOX3_VERT_MIDPOINT = 0;
+		pself->DEFBOX4_HORZ_MIDPOINT = 0;
+		pself->DEFBOX4_VERT_MIDPOINT = 0;
+		pself->DEFBOX5_HORZ_MIDPOINT = 0;
+		pself->DEFBOX5_VERT_MIDPOINT = 0;
+		pself->DEFBOX6_HORZ_MIDPOINT = 0;
+		pself->DEFBOX6_VERT_MIDPOINT = 0;
+		pself->DEFBOX7_HORZ_MIDPOINT = 0;
+		pself->DEFBOX7_VERT_MIDPOINT = 0;
+		pself->WORDBOX1_HORZ_MIDPOINT = 0;
+		pself->WORDBOX1_VERT_MIDPOINT = 0;
+		pself->WORDBOX2_HORZ_MIDPOINT = 0;
+		pself->WORDBOX2_VERT_MIDPOINT = 0;
+		pself->WORDBOX3_HORZ_MIDPOINT = 0;
+		pself->WORDBOX3_VERT_MIDPOINT = 0;
+		pself->WORDBOX4_HORZ_MIDPOINT = 0;
+		pself->WORDBOX4_VERT_MIDPOINT = 0;
+		pself->WORDBOX5_HORZ_MIDPOINT = 0;
+		pself->WORDBOX5_VERT_MIDPOINT = 0;
+		pself->WORDBOX6_HORZ_MIDPOINT = 0;
+		pself->WORDBOX6_VERT_MIDPOINT = 0;
+		pself->WORDBOX7_HORZ_MIDPOINT = 0;
+		pself->WORDBOX7_VERT_MIDPOINT = 0;
+		pself->NumbersC_firstline = 0;
+		pself->NumbersC_secondline = 0;
+		pself->NumbersC_thirdline = 0;
+		pself->NumbersC_fourthline = 0;
+		pself->NumbersC_fifthline = 0;
+		pself->NumbersC_sixthline = 0;
+		pself->NumbersC_seventhline = 0;
+
+/* now reset the vis children to be selectable again, they have been turned off with
+MSG_VIS_CONTENT_SET_LINE. */
+
+		@send @visChildren::MSG_VIS_SET_ATTRS(VA_DETECTABLE, 0, VUM_NOW);
+		@call self::MSG_VIS_CONTENT_LOAD_PAGE();
+		if (flash)  @call self::MSG_VIS_CONTENT_FLASH_MESSAGE();
+
+}
+
+/***********************************************************************
+ *      MSG_VIS_CONTENT_LOAD_PAGE for NumbersVisContentClass
+ ***********************************************************************
+ * SYNOPSIS:        load a page and forces MSG_VIS_DRAW.  Called by
+ *              MSG_VIS_CONTENT_NEW_PAGE
+ * PARAMETERS:      void
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:    
+ *
+ * REVISION HISTORY:
+ *  Name    Date        Description
+ *  ----    ----        -----------
+ *
+ ***********************************************************************/
+@method NumbersVisContentClass, MSG_VIS_CONTENT_LOAD_PAGE
+{
+
+	char   *def1, *def2, *def3, *def4, *def5, *def6, *def7;
+	int    val1=1, val2=2, val3=3, val4=4, val5=5, val6=6, val7=7;
+
+
+	GetRandomColor();
+	GetRandomShape();
+
+	pself = ObjDerefVis(oself);
+
+/* assign the global vars to instance vars, why?, in case of redraws */
+	pself->word1 = g_dbWord1;
+	def1 = g_dbDef1;
+	pself->word2 = g_dbWord2;
+	def2 = g_dbDef2;
+	pself->word3 = g_dbWord3;
+	def3 = g_dbDef3;
+	pself->word4 = g_dbWord4;
+	def4 = g_dbDef4;
+	pself->word5 = g_dbWord5;
+	def5 = g_dbDef5;
+	pself->word6 = g_dbWord6;
+	def6 = g_dbDef6;
+	pself->word7 = g_dbWord7;
+	def7 = g_dbDef7;
+
+	g_randomX = TimerGetCount() % 7; /* randomize the fakeout placement*/
+	MemLock(OptrToHandle(@fakeoutString));
+	switch (g_randomX){
+		case 0:
+			strcpy(def1, LMemDeref(@fakeoutString));
+			break;
+		case 1:
+			strcpy(def2, LMemDeref(@fakeoutString));
+			break;
+		case 2:
+			strcpy(def3, LMemDeref(@fakeoutString));
+			break;
+		case 3:
+			strcpy(def4, LMemDeref(@fakeoutString));
+			break;
+		case 4:
+			strcpy(def5, LMemDeref(@fakeoutString));
+			break;
+		case 5:
+			strcpy(def6, LMemDeref(@fakeoutString));
+			break;
+		default:
+			strcpy(def7, LMemDeref(@fakeoutString));
+			break;
+	}
+	MemUnlock(OptrToHandle(@fakeoutString));
+
+	if(g_appOpening){ /* if app is opening, turn the flag off and get a random # */
+		g_randomX = TimerGetCount() % 10;
+		g_appOpening = FALSE;
+	}
+/* randomize the placement of the right column, so that the matches change position*/
+	switch (g_randomX){
+		case 0:
+			pself->def1 = def2;
+			g_defbox1Val = val2;
+			pself->def2 = def1;
+			g_defbox2Val   = val1;
+			pself->def3 = def5;
+			g_defbox3Val   = val5;
+			pself->def4 = def7;
+			g_defbox4Val   = val7;
+			pself->def5 = def3;
+			g_defbox5Val   = val3;
+			pself->def6 = def4;
+			g_defbox6Val   = val4;
+			pself->def7 = def6;
+			g_defbox7Val   = val6;
+			break;
+		case 1:
+			pself->def1 = def7;
+			g_defbox1Val   = val7;
+			pself->def2 = def5;
+			g_defbox2Val   = val5;
+			pself->def3 = def4;
+			g_defbox3Val   = val4;
+			pself->def4 = def2;
+			g_defbox4Val   = val2;
+			pself->def5 = def3;
+			g_defbox5Val   = val3;
+			pself->def6 = def6;
+			g_defbox6Val   = val6;
+			pself->def7 = def1;
+			g_defbox7Val   = val1;
+			break;
+		case 2:
+			pself->def1 = def4;
+			g_defbox1Val   = val4;
+			pself->def2 = def6;
+			g_defbox2Val   = val6;
+			pself->def3 = def3;
+			g_defbox3Val   = val3;
+			pself->def4 = def2;
+			g_defbox4Val   = val2;
+			pself->def5 = def1;
+			g_defbox5Val   = val1;
+			pself->def6 = def7;
+			g_defbox6Val   = val7;
+			pself->def7 = def5;
+			g_defbox7Val   = val5;
+			break;      
+		case 3:
+			pself->def1 = def6;
+			g_defbox1Val   = val6;
+			pself->def2 = def7;
+			g_defbox2Val   = val7;
+			pself->def3 = def5;
+			g_defbox3Val   = val5;
+			pself->def4 = def2;
+			g_defbox4Val   = val2;
+			pself->def5 = def4;
+			g_defbox5Val   = val4;
+			pself->def6 = def1;
+			g_defbox6Val   = val1;
+			pself->def7 = def3;
+			g_defbox7Val   = val3;
+			break;
+		case 4:
+			pself->def1 = def3;
+			g_defbox1Val   = val3;
+			pself->def2 = def6;
+			g_defbox2Val   = val6;
+			pself->def3 = def1;
+			g_defbox3Val   = val1;
+			pself->def4 = def2;
+			g_defbox4Val   = val2;
+			pself->def5 = def5;
+			g_defbox5Val   = val5;
+			pself->def6 = def4;
+			g_defbox6Val   = val4;
+			pself->def7 = def7;
+			g_defbox7Val   = val7;
+			break;
+		case 5:
+			pself->def1 = def6;
+			g_defbox1Val   = val6;
+			pself->def2 = def1;
+			g_defbox2Val   = val1;
+			pself->def3 = def7;
+			g_defbox3Val   = val7;
+			pself->def4 = def5;
+			g_defbox4Val   = val5;
+			pself->def5 = def3;
+			g_defbox5Val   = val3;
+			pself->def6 = def4;
+			g_defbox6Val   = val4;
+			pself->def7 = def2;
+			g_defbox7Val   = val2;
+			break;
+		case 6:
+			pself->def1 = def5;
+			g_defbox1Val   = val5;
+			pself->def2 = def1;
+			g_defbox2Val   = val1;
+			pself->def3 = def3;
+			g_defbox3Val   = val3;
+			pself->def4 = def2;
+			g_defbox4Val   = val2;
+			pself->def5 = def7;
+			g_defbox5Val   = val7;
+			pself->def6 = def6;
+			g_defbox6Val   = val6;
+			pself->def7 = def4;
+			g_defbox7Val   = val4;
+			break;
+		case 7:
+			pself->def1 = def7;
+			g_defbox1Val   = val7;
+			pself->def2 = def5;
+			g_defbox2Val   = val5;
+			pself->def3 = def2;
+			g_defbox3Val   = val2;
+			pself->def4 = def1;
+			g_defbox4Val   = val1;
+			pself->def5 = def6;
+			g_defbox5Val   = val6;
+			pself->def6 = def4;
+			g_defbox6Val   = val4;
+			pself->def7 = def3;
+			g_defbox7Val   = val3;
+			break;
+		case 8:
+			pself->def1 = def2;
+			g_defbox1Val   = val2;
+			pself->def2 = def6;
+			g_defbox2Val   = val6;
+			pself->def3 = def1;
+			g_defbox3Val   = val1;
+			pself->def4 = def7;
+			g_defbox4Val   = val7;
+			pself->def5 = def4;
+			g_defbox5Val   = val4;
+			pself->def6 = def3;
+			g_defbox6Val   = val3;
+			pself->def7 = def5;
+			g_defbox7Val   = val5;
+			break;
+		default:
+			pself->def1 = def2;
+			g_defbox1Val   = val2;
+			pself->def2 = def7;
+			g_defbox2Val   = val7;
+			pself->def3 = def5;
+			g_defbox3Val   = val5;
+			pself->def4 = def1;
+			g_defbox4Val   = val1;
+			pself->def5 = def3;
+			g_defbox5Val   = val3;
+			pself->def6 = def6;
+			g_defbox6Val   = val6;
+			pself->def7 = def4;
+			g_defbox7Val   = val4;
+			break;
+	}
+}
+
+/***********************************************************************
+ *   MSG_VIS_RESET_BOXES      for NumbersVisContentClass
+ ***********************************************************************
+ * SYNOPSIS:        reset isPressed flag.  Called by Vis Child MSG_META
+ *                      _START_SELECT.
+ * PARAMETERS:      byte wordbox, 1 or 0
+ * SIDE EFFECTS:    send to visChildren
+ *
+ * STRATEGY:        
+ * REVISION HISTORY:
+ *  Name    Date        Description
+ *  ----    ----        -----------
+ *
+ ***********************************************************************/
+@method NumbersVisContentClass,  MSG_VIS_RESET_BOXES
+{
+	@send @visChildren::MSG_VIS_BOX_RESET_PRESSED(wordbox);
+}
+
+/***********************************************************************
+ *      MSG_VIS_CONTENT_SET_LINE for NumbersVisContentClass
+ ***********************************************************************
+ * SYNOPSIS:        Set lines to draw. Called by Vis Child MSG_META_SELECT
+ * PARAMETERS:      word lineno
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:    this is where a lot of the global vars are used. This 
+ *		method is confusing and could use more work.
+ *
+ *
+ * REVISION HISTORY:
+ *  Name    Date        Description
+ *  ----    ----        -----------
+ *
+ ***********************************************************************/
+@method NumbersVisContentClass, MSG_VIS_CONTENT_SET_LINE
+{
+	PlaySimpleSound(SOUND_ID_RIGHT, 5) ;
+	pself = ObjDerefVis(oself);
+
+/* notice the pself->NumbersC_??????line  statements, we use these for redraw
+ * purposes, see MSG_VIS_DRAW
+ */
+	switch(lineno){
+		case 1:
+			pself->NumbersC_firstline = 1; 
+			/* this if statement deals with a DEFBOX case */
+			if(pself->DEFBOX1_HORZ_MIDPOINT == 0){ /*if no value, assign defined value */
+				pself->DEFBOX1_HORZ_MIDPOINT = g_defboxHorizMidpoint;
+				pself->DEFBOX1_VERT_MIDPOINT = g_defboxVertMidpoint;
+			}
+			/* this if statement deals with a WORDBOX case */
+			if(pself->WORDBOX1_HORZ_MIDPOINT == 0){
+				pself->WORDBOX1_HORZ_MIDPOINT = g_wordboxHorizMidpoint;
+				pself->WORDBOX1_VERT_MIDPOINT = g_wordboxVertMidpoint;
+			}
+			break;
+		case 2:
+			pself->NumbersC_secondline = 1;
+			if(pself->DEFBOX2_HORZ_MIDPOINT == 0){
+				pself->DEFBOX2_HORZ_MIDPOINT = g_defboxHorizMidpoint;
+				pself->DEFBOX2_VERT_MIDPOINT = g_defboxVertMidpoint;
+			}
+			if(pself->WORDBOX2_HORZ_MIDPOINT == 0){
+				pself->WORDBOX2_HORZ_MIDPOINT = g_wordboxHorizMidpoint;
+				pself->WORDBOX2_VERT_MIDPOINT = g_wordboxVertMidpoint;
+			}
+			break;
+		case 3:
+			pself->NumbersC_thirdline = 1;
+			if(pself->DEFBOX3_HORZ_MIDPOINT == 0){
+				pself->DEFBOX3_HORZ_MIDPOINT = g_defboxHorizMidpoint;
+				pself->DEFBOX3_VERT_MIDPOINT = g_defboxVertMidpoint;
+			}
+			if(pself->WORDBOX3_HORZ_MIDPOINT == 0){
+				pself->WORDBOX3_HORZ_MIDPOINT = g_wordboxHorizMidpoint;
+				pself->WORDBOX3_VERT_MIDPOINT = g_wordboxVertMidpoint;
+			}
+			break;
+		case 4:
+			pself->NumbersC_fourthline = 1;
+			if(pself->DEFBOX4_HORZ_MIDPOINT == 0){
+				pself->DEFBOX4_HORZ_MIDPOINT = g_defboxHorizMidpoint;
+				pself->DEFBOX4_VERT_MIDPOINT = g_defboxVertMidpoint;
+			}
+			if(pself->WORDBOX4_HORZ_MIDPOINT == 0){
+				pself->WORDBOX4_HORZ_MIDPOINT = g_wordboxHorizMidpoint;
+				pself->WORDBOX4_VERT_MIDPOINT = g_wordboxVertMidpoint;
+			}
+			break;
+		case 5:
+			pself->NumbersC_fifthline = 1;
+			if(pself->DEFBOX5_HORZ_MIDPOINT == 0){
+				pself->DEFBOX5_HORZ_MIDPOINT = g_defboxHorizMidpoint;
+				pself->DEFBOX5_VERT_MIDPOINT = g_defboxVertMidpoint;
+			}
+			if(pself->WORDBOX5_HORZ_MIDPOINT == 0){
+				pself->WORDBOX5_HORZ_MIDPOINT = g_wordboxHorizMidpoint;
+				pself->WORDBOX5_VERT_MIDPOINT = g_wordboxVertMidpoint;
+			}
+			break;
+		case 6:
+			pself->NumbersC_sixthline = 1;
+			if(pself->DEFBOX6_HORZ_MIDPOINT == 0){
+				pself->DEFBOX6_HORZ_MIDPOINT = g_defboxHorizMidpoint;
+				pself->DEFBOX6_VERT_MIDPOINT = g_defboxVertMidpoint;
+			}
+			if(pself->WORDBOX6_HORZ_MIDPOINT == 0){
+				pself->WORDBOX6_HORZ_MIDPOINT = g_wordboxHorizMidpoint;
+				pself->WORDBOX6_VERT_MIDPOINT = g_wordboxVertMidpoint;
+			}
+			break;
+		case 7:
+			pself->NumbersC_seventhline = 1;
+			if(pself->DEFBOX7_HORZ_MIDPOINT == 0){
+				pself->DEFBOX7_HORZ_MIDPOINT = g_defboxHorizMidpoint;
+				pself->DEFBOX7_VERT_MIDPOINT = g_defboxVertMidpoint;
+			}
+			if(pself->WORDBOX7_HORZ_MIDPOINT == 0){
+				pself->WORDBOX7_HORZ_MIDPOINT = g_wordboxHorizMidpoint;
+				pself->WORDBOX7_VERT_MIDPOINT = g_wordboxVertMidpoint;
+			}
+			break;
+	}
+	g_rightAns = TRUE;
+	g_linesDrawn++; /* a line has been drawn, increment */
+	/* now inc the # correct, reset pressed values */
+	g_correct++;
+	g_defBoxPressed = FALSE;
+	g_wordBoxPressed = FALSE;
+	/* this next line is important, we need to disable the vis objects so that
+	 * no further matches can be made, otherwise the app can go on forever
+	 * and it breaks down, they will be re-enabled after the line between the
+	 * matches is drawn
+	 */
+	@send @visChildren::MSG_VIS_UNDETECT_BOXES(0,1,0);
+
+	PlaySimpleSound(SOUND_ID_RIGHT, 5) ;
+	@send self::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+
+	/* jfh - instead of having the Next Page button, we'll automatically go
+	 * after all 7 lines are drawn */
+	if (g_linesDrawn == 7)  {
+		if(g_pageNumber+1 == g_numPages){
+			PlaySimpleSound(SOUND_ID_SUMMARY, 5) ;
+			@call self::MSG_VIS_CONTENT_SHOW_SCORE();
+			}
+		else  {
+			PlaySimpleSound(SOUND_ID_NEXT, 5) ;
+			g_pageNumber++;
+			@send process::MSG_PROCESS_GET_DB_INFO(FALSE);
+			@send self::MSG_VIS_CONTENT_NEW_PAGE(TRUE); /*display this new record*/
+         }
+		}
+
+}
+/***********************************************************************
+ *      MSG_VIS_DRAW for NumbersVisContentClass
+ ***********************************************************************
+ * SYNOPSIS:        Draw ourselves in the document space. Automatic call.
+ * PARAMETERS:      void (DrawFlags drawFlags, GStateHandle gstate)
+ * SIDE EFFECTS:    Attributes of the gstate are altered.
+ *
+ * STRATEGY:   I guess the char array could be put into an external 
+ *	chunkarray resource, but it really does not hurt to have it here.
+ *
+ * REVISION HISTORY:
+ *  Name    Date        Description
+ *  ----    ----        -----------
+ *
+ ***********************************************************************/
+@method NumbersVisContentClass, MSG_VIS_DRAW
+{
+	word            word1x,word2x,word3x,word4x,word5x,word6x,word7x;
+	word            xcoord, ycoord;
+	word            doc_width, doc_height;
+	byte            backcolor;
+	char				 titleStr[FILE_LONGNAME_BUFFER_SIZE + 10];
+	char				 tempStr[3];
+
+
+    /* Don't draw a thing unless the game is on and a DB file is open! */
+	 if (!g_playingGame || g_dbFileHan == NullHandle)
+        return;
+        
+	if(g_appOpening){ /* this is an easy way to display on startup */
+		@call self::MSG_VIS_CONTENT_LOAD_PAGE();
+	}
+	pself = ObjDerefVis(oself);     
+	doc_width = pself->VI_bounds.R_right;
+	doc_height = pself->VI_bounds.R_bottom;
+	backcolor = (g_isColor) ? C_LIGHT_GRAY : C_WHITE;
+
+	if (g_flashMessage){ /*flash an attaboy to the screen */
+	    byte flashcolor = (g_isColor) ? C_YELLOW : C_WHITE;
+	    char *messagetext;
+	    int i, count;
+
+		GrSetAreaColor (gstate, CF_INDEX, C_BLACK, 0, 0);
+		GrFillRect (gstate, 0, 0, doc_width, doc_height);
+		GrSetFont(gstate, FID_DTC_URW_SANS, MakeWWFixed(pself->VC_FLASH_MESSAGE_SIZE));
+		ycoord = doc_height / 2 - (pself->VC_FLASH_MESSAGE_SIZE / 2);
+
+		/* grab the attaboys string */
+		MemLock(HandleOf(@MessageTxt));
+		messagetext = LMemDeref(@MessageTxt);
+		MemUnlock(HandleOf(@MessageTxt));
+		/* see how many attaboys there are - count the *s */
+		count = 0;
+		for (i = 0; i < strlen(messagetext); i++) {
+			if (messagetext[i] == '*') count++;
+			}
+
+		/* get a random attaboy */
+//		g_randomX = TimerGetCount() % 13;  /*randomize the message sent */
+		g_randomX = TimerGetCount() % count;  /*randomize the message sent */
+//		 MemLock(HandleOf(@MessageTxt));
+//		 messagetext = LMemDeref(@MessageTxt);
+		for (i = 0; i < g_randomX; i++)  {
+			while (*messagetext != '*')
+				messagetext++;
+			messagetext++;
+			}
+		/* and null term it */
+		i = 0;
+		while (messagetext[i] != '*')
+			i++;
+      messagetext[i] = 0;
+
+		xcoord = doc_width / 2 - (GrTextWidth(gstate,messagetext,0)) / 2;
+		GrSetTextColor(gstate, CF_INDEX, flashcolor, 0, 0);
+		GrDrawText(gstate, xcoord, ycoord, messagetext, 0);
+//		MemUnlock(HandleOf(@MessageTxt));
+
+        return;
+	}
+	
+/* this next section will drop some numbers, for right answers */
+	if (g_rightAns){
+		char number[2];
+		byte dropcolor;
+		word y_axis = 0;
+		int i;
+
+      g_rightAns = FALSE;
+		for(i = 0; i < 10; i++){
+    		GrSetFont(gstate, FID_DTC_URW_ROMAN, MakeWWFixed(pself->VC_DROP_NUMBER_SIZE));
+			dropcolor = (g_isColor) ? pself->wordcolor : C_BLACK;
+			GrSetTextColor(gstate, CF_INDEX, dropcolor, 0, 0);
+			g_randomX = TimerGetCount() % 7; 
+			number[0] = '1' + g_randomX;
+			number[1] = '\0';
+			GrDrawText(gstate, pself->VC_DROP_NUMBER_X, y_axis, number, 0);
+			TimerSleep(5*1);   
+			GrSetTextColor(gstate, CF_INDEX, backcolor, 0, 0);
+			GrDrawText(gstate, pself->VC_DROP_NUMBER_X, y_axis, number, 0);
+			y_axis += pself->VC_DROP_NUMBER_Y_STEP;
+//		}
+		pself->wordcolor +=1;
+		if (pself->wordcolor == 16) pself->wordcolor = 0;
+		else if (pself->wordcolor == backcolor) pself->wordcolor += 1;
+      }
+	}
+
+/* draw the title */
+	strcpy(titleStr, g_fileName);
+	UtilHex32ToAscii(tempStr, (dword)(g_pageNumber+1), UHTAF_NULL_TERMINATE);
+	strcat(titleStr, "  ");
+	strcat(titleStr, tempStr);
+	MemLock(OptrToHandle(@ofString));
+	strcat(titleStr, LMemDeref(@ofString));
+	MemUnlock(OptrToHandle(@ofString));
+	UtilHex32ToAscii(tempStr, (dword)g_numPages, UHTAF_NULL_TERMINATE);
+	strcat(titleStr, tempStr);
+
+	GrSetFont(gstate, FID_DTC_URW_ROMAN,
+		MakeWWFixed(pself->VC_TITLE_SIZE));
+	GrSetTextColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+	xcoord = doc_width / 2 - (GrTextWidth(gstate,titleStr,0))/2;
+	GrDrawText(gstate, xcoord, pself->VC_TITLE_Y, titleStr, 0);
+
+	GrSetFont(gstate, FID_DTC_URW_MONO, MakeWWFixed(pself->VC_LABEL_SIZE)); 
+	GrSetTextStyle(gstate, TS_BOLD, 0);
+/* now get values to center labels */
+	word1x = pself->VC_WORDX - GrTextWidth(gstate,pself->word1,strlen(pself->word1));
+	word2x = pself->VC_WORDX - GrTextWidth(gstate,pself->word2,strlen(pself->word2));
+	word3x = pself->VC_WORDX - GrTextWidth(gstate,pself->word3,strlen(pself->word3));
+	word4x = pself->VC_WORDX - GrTextWidth(gstate,pself->word4,strlen(pself->word4));
+	word5x = pself->VC_WORDX - GrTextWidth(gstate,pself->word5,strlen(pself->word5));
+	word6x = pself->VC_WORDX - GrTextWidth(gstate,pself->word6,strlen(pself->word6));
+	word7x = pself->VC_WORDX - GrTextWidth(gstate,pself->word7,strlen(pself->word7));
+/* draw the left column */
+	GrDrawText(gstate, word1x, pself->VC_LINEY[0], pself->word1, 0);
+	GrDrawText(gstate, word2x, pself->VC_LINEY[1], pself->word2, 0);
+	GrDrawText(gstate, word3x, pself->VC_LINEY[2], pself->word3, 0);
+	GrDrawText(gstate, word4x, pself->VC_LINEY[3], pself->word4, 0);
+	GrDrawText(gstate, word5x, pself->VC_LINEY[4], pself->word5, 0);
+	GrDrawText(gstate, word6x, pself->VC_LINEY[5], pself->word6, 0);
+	GrDrawText(gstate, word7x, pself->VC_LINEY[6], pself->word7, 0);
+/* now draw the values for the right column */
+	GrDrawText(gstate, pself->VC_DEFX, pself->VC_LINEY[0], pself->def1, 0);
+	GrDrawText(gstate, pself->VC_DEFX, pself->VC_LINEY[1], pself->def2, 0);
+	GrDrawText(gstate, pself->VC_DEFX, pself->VC_LINEY[2], pself->def3, 0);
+	GrDrawText(gstate, pself->VC_DEFX, pself->VC_LINEY[3], pself->def4, 0);
+	GrDrawText(gstate, pself->VC_DEFX, pself->VC_LINEY[4], pself->def5, 0);
+	GrDrawText(gstate, pself->VC_DEFX, pself->VC_LINEY[5], pself->def6, 0);
+	GrDrawText(gstate, pself->VC_DEFX, pself->VC_LINEY[6], pself->def7, 0);
+	GrSetTextStyle(gstate, 0, TS_BOLD);
+	GrSetLineWidth(gstate, MakeWWFixed(pself->VC_LINE_WIDTH));
+	if (g_isColor)
+		GrSetLineColor(gstate, CF_INDEX, g_color, 0, 0);
+
+/* if lines need to be drawn, do that here (this could have been in another method) */
+	if(pself->NumbersC_firstline){
+		GrDrawLine(gstate, pself->WORDBOX1_HORZ_MIDPOINT, 
+			pself->WORDBOX1_VERT_MIDPOINT, pself->DEFBOX1_HORZ_MIDPOINT,
+				pself->DEFBOX1_VERT_MIDPOINT);
+	}
+	if(pself->NumbersC_secondline){
+			GrDrawLine(gstate, pself->WORDBOX2_HORZ_MIDPOINT, 
+			pself->WORDBOX2_VERT_MIDPOINT, pself->DEFBOX2_HORZ_MIDPOINT,
+				pself->DEFBOX2_VERT_MIDPOINT);
+	}
+	if(pself->NumbersC_thirdline){
+			GrDrawLine(gstate, pself->WORDBOX3_HORZ_MIDPOINT, 
+			pself->WORDBOX3_VERT_MIDPOINT, pself->DEFBOX3_HORZ_MIDPOINT,
+				pself->DEFBOX3_VERT_MIDPOINT);
+	}
+	if(pself->NumbersC_fourthline){
+			GrDrawLine(gstate, pself->WORDBOX4_HORZ_MIDPOINT, 
+			pself->WORDBOX4_VERT_MIDPOINT, pself->DEFBOX4_HORZ_MIDPOINT,
+				pself->DEFBOX4_VERT_MIDPOINT);
+	}
+	if(pself->NumbersC_fifthline){
+			GrDrawLine(gstate, pself->WORDBOX5_HORZ_MIDPOINT, 
+			pself->WORDBOX5_VERT_MIDPOINT, pself->DEFBOX5_HORZ_MIDPOINT,
+				pself->DEFBOX5_VERT_MIDPOINT);
+	}
+	if(pself->NumbersC_sixthline){
+			GrDrawLine(gstate, pself->WORDBOX6_HORZ_MIDPOINT, 
+			pself->WORDBOX6_VERT_MIDPOINT, pself->DEFBOX6_HORZ_MIDPOINT,
+				pself->DEFBOX6_VERT_MIDPOINT);
+	}
+	if(pself->NumbersC_seventhline){
+			GrDrawLine(gstate, pself->WORDBOX7_HORZ_MIDPOINT, 
+			pself->WORDBOX7_VERT_MIDPOINT, pself->DEFBOX7_HORZ_MIDPOINT,
+				pself->DEFBOX7_VERT_MIDPOINT);
+	}
+	
+	GrSetLineWidth(gstate, MakeWWFixed(1));
+	@send @visChildren::MSG_VIS_DRAW(drawFlags, gstate);
+
+}
+
+/***********************************************************************
+ *   MSG_VIS_CONTENT_SHOW_SCORE    for NumbersVisContentClass
+ ***********************************************************************
+ * SYNOPSIS:        drill/game is over, show the score before everything
+ *              resets.  Could have created a gen object to show this,
+ *		and polish this up a bit, but this way was easier to do.
+ *
+ * PARAMETERS:      GStateHandle gstate - no longer
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *  Name    Date        Description
+ *  ----    ----        -----------
+ *
+ ***********************************************************************/
+@method NumbersVisContentClass,  MSG_VIS_CONTENT_SHOW_SCORE
+{
+/* At first, there was much ugliness... DH 7/14/99 */
+
+    
+/* On the first day, he banished the ugliness. DH 7/14/99 */
+/* and on the second day he revised the scoring system to a percentage
+	and 86ed the every 3 pages nonsense jfh 10/28/01 */
+
+	char stringbuf[40];
+	word   /*correctpts, incorrectpts, */finalPts;
+	
+//	correctpts = g_correct*5;
+//	incorrectpts = g_incorrect*5;
+//	finalpts = correctpts - incorrectpts;
+//	if(finalpts < 0)finalpts = 0;
+
+   finalPts = g_correct*100/(g_correct+g_incorrect);
+
+	MemLock(HandleOf(@SDCorrectText));
+	sprintf(stringbuf, LMemDeref(@SDCorrectText), g_correct/*, 5, correctpts*/);
+	@call SDStaticCorrect::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(stringbuf, VUM_NOW);
+	sprintf(stringbuf, LMemDeref(@SDIncorrectText), g_incorrect/*, -5, -incorrectpts*/);
+	@call SDStaticIncorrect::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(stringbuf, VUM_NOW);
+	sprintf(stringbuf, LMemDeref(@SDFinalText), finalPts);
+	@call SDStaticFinal::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(stringbuf, VUM_NOW);
+	MemUnlock(HandleOf(@SDCorrectText));
+
+//   UserDoDialog(@ScoreDialog);
+	@send ScoreDialog::MSG_GEN_INTERACTION_INITIATE();
+
+/* And on the seventh day, he rested. */
+}
+
+TimerHandle NVCTimerHandle = NullHandle;
+word NVCTimerID;
+
+/***********************************************************************
+ *   MSG_VIS_CONTENT_FLASH_MESSAGE    for NumbersVisContentClass
+ ***********************************************************************
+ * SYNOPSIS:
+ *
+ *
+ *
+ * PARAMETERS:
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *  Name    Date        Description
+ *  ----    ----        -----------
+ *
+ ***********************************************************************/
+@method NumbersVisContentClass, MSG_VIS_CONTENT_FLASH_MESSAGE
+{
+    g_flashMessage = TRUE;
+//	g_randomX = TimerGetCount() % 13;  /*randomize the message sent */
+	if ((NVCTimerHandle = TimerStart(TIMER_EVENT_ONE_SHOT, oself, 2 * 60, 
+	  MSG_VIS_CONTENT_END_FLASH_MESSAGE, 0, &NVCTimerID)) == NullHandle)
+        g_flashMessage = FALSE;
+	@call self::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID, VUM_NOW);
+}
+
+@method NumbersVisContentClass, MSG_VIS_CONTENT_END_FLASH_MESSAGE
+{
+	 if (NVCTimerHandle != NullHandle)
+        TimerStop(NVCTimerHandle, NVCTimerID);
+    g_flashMessage = FALSE;
+	@send self::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID,
+		 VUM_DELAYED_VIA_APP_QUEUE);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	GetRandomColor
+ *
+ * CALLED BY:  MSG_VIS_CONTENT_LOAD_PAGE
+ *
+ *
+ * STRATEGY:    picks a color
+ *					 
+ *
+ *
+ ***********************************************************************/
+void GetRandomColor()
+{
+ byte newColor = 0;
+
+	while ((newColor == C_BLACK) ||
+			 (newColor == C_WHITE) ||
+			 (newColor == C_BROWN) ||
+			 (newColor == C_LIGHT_GRAY) ||
+			 (newColor == g_color)) {
+		newColor = TimerGetCount() % 15;
+		}
+	g_color = newColor;
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	GetRandomShape
+ *
+ * CALLED BY:  MSG_VIS_CONTENT_LOAD_PAGE
+ *
+ *
+ * STRATEGY:    picks a shape
+ *					 
+ *
+ *
+ ***********************************************************************/
+void GetRandomShape()
+{
+ byte newShape = 0;
+
+	while (newShape == g_whatShape) {
+		newShape = TimerGetCount() % 3;
+		}
+	g_whatShape = newShape;
+
+}
+

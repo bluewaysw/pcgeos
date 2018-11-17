@@ -1,0 +1,133 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1993 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		pcmciaDr.def
+
+AUTHOR:		Adam de Boor, May 12, 1993
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	5/12/93		Initial revision
+
+
+DESCRIPTION:
+	Interface definition for device drivers that get loaded to manage
+	the insertion and removal of a card.
+		
+	$Id: pcmciaDr.def,v 1.1 97/04/04 14:16:40 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__PCMCIADR
+;
+; Include Zoomer PCMCIA driver definitions if assembling for the Zoomer
+; platform.
+; 
+ifdef HARDWARE_TYPE
+endif
+
+StartDriver	pcmcia_dr
+
+UseLib	pcmcia.def
+
+PCMCIA_PROTO_MAJOR	equ	DRIVER_PROTO_MAJOR+3
+PCMCIA_PROTO_MINOR	equ	DRIVER_PROTO_MAJOR+0
+
+PCMCIAFunction	etype	word, DriverFunction, 2
+DR_PCMCIA_CHECK_SOCKET				enum PCMCIAFunction
+;	PASS:		cx	= socket number
+;	RETURN:		carry set if card in the socket is supported by
+;				the driver.
+;			carry clear if driver can't manage the card.
+;	DESTROYS:	di
+;
+;	Called by the PCMCIA library when it is looking for drivers for
+;	a card that was just inserted. The driver should determine, in its
+;	CSEC_CARD_INSERTION Card Services callback, whether it supports the
+;	card or not. This function should be able to loop waiting for that
+;	routine to make up its mind, then return the result of the decision.
+;
+
+DR_PCMCIA_OBJECTION_RESOLVED			enum PCMCIAFunction
+;	PASS:		cx	= socket number
+;			dx	= PCMCIAObjectionResolution
+;	RETURN:		carry set if PCMOR_CLEAN_UP passed and clean up
+;				not possible
+;			carry clear if some other resolution was indicated
+;			      	or things were successfully cleaned up
+;	DESTROYS:	di
+;
+;	Called by the PCMCIA library when the user has answered the objection,
+;	or, if dx is PCMOR_CLEAN_UP, has asked that the card be ejected.
+;
+
+PCMCIAObjectionResolution	etype	word, 0, 1
+PCMOR_CLEAN_UP			enum PCMCIAObjectionResolution
+PCMOR_USER_CANCELED		enum PCMCIAObjectionResolution
+PCMOR_SYSTEM_CANCELED		enum PCMCIAObjectionResolution
+
+DR_PCMCIA_CLOSE_SOCKET				enum PCMCIAFunction
+;	PASS:		cx	= socket number
+;	RETURN:		nothing
+;	DESTROYS:	di
+;
+;	Called by the PCMCIA library when no one has objected to the removal
+;	of the card, just before the driver is unloaded (if it wasn't loaded
+;	for another socket, too) to allow it to clean up auxilliary structures
+;	created when the driver successfully returned from CHECK_SOCKET.
+;
+	
+DR_PCMCIA_DEVICE_ON				enum PCMCIAFunction
+;	PASS:		cx	= socket number
+;	RETURN:		nothing
+;	DESTROYS:	di
+;
+;	Called by the PCMCIA library when it is told by the power management
+;	driver that someone wishes to turn on the socket and the library
+;	thinks the socket is off (as happens after the library has turned
+;	off the socket, or after the card has been inserted).
+;
+;	Only drivers that invoke the Card Services RequestConfiguration
+;	function will ever receive this call.
+;
+
+DR_PCMCIA_DEVICE_OFF				enum PCMCIAFunction
+;	PASS:		cx	= socket number
+;	RETURN:		nothing
+;	DESTROYS:	di
+;
+;	Called by the PCMCIA library when a sufficient time has elapsed since
+;	the last thing requested the PCMCIA socket be turned off.
+;
+;	Only drivers that invoke the Card Services RequestConfiguration
+;	function will ever receive this call.
+;
+
+;------------------------------------------------------------------------------
+;
+; 	Escape Functions
+;
+; Not all need be supported by all drivers.
+;
+PCMCIAEscape		etype	word, 0x8100, 1
+
+DR_PCMCIA_ESC_GET_DESCRIPTION		enum	PCMCIAEscape
+;	PASS:	ds	= lmem block into which to copy string
+;		cx	= socket number
+;	RETURN:	carry clear if have description:
+;			*ds:ax	= description of the card and how it's
+;				  configured
+;		carry set if function not supported or socket not configured
+;			by driver.
+;	DESTROYS:	di
+;
+
+EndDriver	pcmcia_dr

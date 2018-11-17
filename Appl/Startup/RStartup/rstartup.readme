@@ -1,0 +1,164 @@
+##############################################################################
+#
+#	(c) Copyright Geoworks 1995 -- All Rights Reserved
+#	GEOWORKS CONFIDENTIAL
+#
+# PROJECT:	PC GEOS
+# MODULE:	Start up
+# FILE:		rstartup.readme
+#
+# AUTHOR:	Jason Ho, Oct 18, 1995
+#
+# REVISION HISTORY:
+#       Name    Date            Description
+#       ----    ----            -----------
+#	kho	10/18/95	Initial version.
+#
+# 	Readme file for rstartup.
+#
+#	$Id: rstartup.readme,v 1.3.4.1 97/03/29 10:20:38 canavese Exp $
+#
+##############################################################################
+
+(1) Mechanism
+
+Startup app is launched by changing ini file:
+
+	[uiFeatures]
+	defaultLauncher = EC Start up	or	Start up
+
+and starting GEOS.
+
+If you need to run it many times, I suggest:
+
+	[hardIconBar]    
+	app0 = EC Start up	or	Start up
+
+and press F5 to launch it.
+
+In any case, [uiFeatures]defaultLauncher will be changed by startup
+app to Phone app or Contact Manager app after startup is finished. So,
+it will only be run "the very first time Responder is started", unless
+startup app quits unexpected in the middle. Obviously, the
+defaultLaunder will be Start up in the final product. 
+
+
+(2) Keyboard shme
+
+To identify a scandinavian keyboard, an ini file key is used:
+
+	[keyboard]
+	scandinavian = true	or	false
+
+While the key should be found anyway, the default is false if it is
+not found.
+
+To simulate what will happen if a scandinavian keyboard is used, do
+the following steps in your demo:
+
+	RSPTRUNK.EC> cd privdata
+	RSPTRUNK.EC\PRIVDATA> mkdir kbd
+	RSPTRUNK.EC\PRIVDATA\KBD> touch keymap.den
+	RSPTRUNK.EC\PRIVDATA\KBD> touch keymap.fin
+
+	(or use whatever means to create those two files)
+
+Startup will change either one of them "keymap.dat", and
+reboot. Because this is one time change, startup remembers if the
+keyboard type has been chosen or not:
+
+	[keyboard]
+	kbdTypeChosen = true	or	false
+
+If kbdTypeChosen is true when startup runs, it will skip country
+selection and language selection, and go to date selection.
+
+Similarly, if [keyboard]scandinavian is false, startup will do
+country, and then date, skipping keyboard selection.
+
+To test the execution of startup after keyboard selection and reboot,
+you must have
+
+	[uiFeatures]
+	defaultHandler = EC Start up
+
+
+(3) ECI without hardware
+
+At one point, an ECI message is sent to the hardware to get the
+name/phone of responder (company). Startup expects a reply, and if it
+doesn't get a reply, it will appear to be hung. (Recovery, workaround
+TBD)
+
+At this time, I don't have a hardware to make the ECI reply. For
+testing purpose, there is a mini app to simulate the ECI reply. Do the
+following:
+
+	o	Before the execution of startup:
+		
+		Run QA Start Up Test app from Extras
+
+		Break in swat:
+
+		=> alias qaeci {
+			omfq qastrtpt::MSG_CALL_FROM_SWAT qastrtpt cx $1
+		   }
+		=> c(ontinue)
+
+	o	At any time you wish to simulate an ECI message from
+		the hardware, break in swat, and type
+
+		=> qaeci 1   or
+		=> qaeci 0
+
+If you play with the test app a little bit you will see there are two
+possible reply from the hardware, and the above two commands simulate
+those two.
+
+Yes, startup app will reject ECI reply if the app doesn't expect
+it. You have to press OK in dialog (Figure 19, Filling info) before
+startup app will accept the ECI reply. That is to say, if you send the
+reply excessively, the app will either not receive it (because it
+hasn't register itself to VP library), or will give a warning (in
+swat) that it doesn't expect a ECI. The bottom line, it will not
+crash.
+
+The above assumes you can get to Extras app before you run
+startup. (Oh yes, once you run startup, you have no way to run other
+apps by pressing hard icons.) If you have startup as the
+defaultLauncher, then the above procedure won't work.
+
+What you can do is, have startup as defaultLauncher, start GEOS, and
+at some point when startup executes, run qastrtptest by typing
+
+		=> run qastrtptest
+		=> (do alias, continue, and qaeci)
+
+in swat. I have experimented with it, and I know it doesn't work if
+you don't have a local copy of the geode in the world/extrapps/
+directory. So if it doesn't work, find the geode from Installed
+directory (Appl/FApps/Test/QAStrtpTest), and download to local machine
+(I suspect this applies to our QA people only. I have no idea how Nokia
+sets up the test machines).
+
+
+(4) Misc
+
+If you want to run the app again, you need to undo what the app has
+done to the ini file:
+
+	Change
+	o	[uiFeatures]defaultLauncher =  (EC) Start up
+	o	[keyboard]kbdTypeChosen = false
+	o	[security]showUserDataWhenSIMChanges = false
+
+	o	Rename PRIVDATA\KBD\keymap.dat to whatever it should
+		be
+
+Remember, SIM card copying is totally taken away from startup. It is
+security library's responsibility (I did that part anyway).
+
+As I said, once startup is running, hard icons won't work
+(F5-F12). You can start apps from swat by using "run", but no app will
+come up above the startup app. (Dialogs of startup have very high
+priority)

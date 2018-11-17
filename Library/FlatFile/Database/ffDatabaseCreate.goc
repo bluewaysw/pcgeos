@@ -1,0 +1,4959 @@
+/***********************************************************************
+ *
+ *      Copyright (c) Geoworks 1992 -- All Rights Reserved
+ *
+ * PROJECT:     GeoFile
+ * MODULE:      FlatFile/Database
+ * FILE:        ffDatabaseCreate.goc
+ *
+ * AUTHOR:      Jeremy Dashe : Aug 10, 1992
+ *
+ * DESCRIPTION:
+ *      This file contains function and method handlers for creating
+ *      and maintaining fields in a flat file database.
+ *
+ * RCS STAMP:
+ *      $Id: ffDatabaseCreate.goc,v 1.1 97/04/04 18:03:03 newdeal Exp $
+ *
+ ***********************************************************************/
+
+#ifdef __HIGHC__
+pragma Code ("DATABASEFIELDCREATION");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg DATABASEFIELDCREATION
+#endif
+
+@include <stdapp.goh>
+#include <geoworks.h>
+#include <system.h>
+
+#include <Ansi/stdio.h>
+#include <Ansi/string.h>
+#include <Ansi/ctype.h>
+
+@include <ffile.goh>
+@include <grobj.goh>
+@include <ssheet.goh>
+@include <Objects/FlatFile/ffileC.goh>
+#include <extern.h>
+#include <ffFatal.h>
+
+
+/*************************************************************************
+		External Declarations
+ *************************************************************************/
+
+#include <Database/ffdExtrn.h>
+
+@extern chunk @FFDAutoFieldName;
+@extern chunk @FFDPageLabelString;
+@extern chunk @FFMemoryFullError;
+
+@extern chunk @FFConfirmFieldTypeChange;
+@extern chunk @FFDType_text;
+@extern chunk @FFDType_computed;
+@extern chunk @FFDType_integer;
+@extern chunk @FFDType_real;
+@extern chunk @FFDType_date;
+@extern chunk @FFDType_time;
+
+optr FFConfirmFieldTypeTable[] = {
+    @FFDType_text,
+    @FFDType_computed,
+    @FFDType_integer,
+    @FFDType_real,
+    @FFDType_date,
+    @FFDType_time,
+};
+
+#ifdef DO_DBCS
+#define FF_DEF_TEXT_SIZE VTDS_16
+#else
+#define FF_DEF_TEXT_SIZE VTDS_14
+#endif
+
+
+/*************************************************************************
+		Forward Declarations
+ *************************************************************************/
+
+void FFDStoreRemainingFieldInfo(optr oself,
+				FFFieldPropertiesMessageBlock *dataPtr,
+				word fieldNameToken,
+				byte fieldColumnNum);
+
+void FFDSetDependencies(optr oself, FieldID colNum);
+
+word StoreNewFieldName(TCHAR *textPtr, optr databaseObject, FieldID *newColNum,
+		       FFFieldCreationResult *errorValue);
+
+word StoreFieldNameIntoSpreadsheet(TCHAR *textPtr, optr oself, FieldID colNum);
+
+void StoreDefaultField(optr selfOptr, byte *defaultTokenStream, word numTokens,
+		       byte fieldColumnNum, FieldDataType fieldType); 
+
+void FFDSetFieldNameInGrObj(optr grObjBodyOptr,
+		       optr fieldGuardianOptr,
+		       optr databaseOptr,
+		       FieldID colNum,
+		       Boolean addToBody,
+		       Boolean setDefaultAttrs);
+
+void DrawNewPageNumber(optr grObjBodyOptr,
+		       optr fieldGuardianOptr,
+		       dword xPosition,
+		       dword yPosition);
+
+void DrawNewPageNumberLabel(optr grObjBodyOptr,
+			    optr labelGuardianOptr,
+			    dword xPosition,
+			    dword yPosition);
+
+Boolean
+FFDRequestUniqueFieldName(optr oself, optr textObject, TCHAR *candidate,
+			  TCHAR *newFieldName);
+
+Boolean FFDGetNewFieldPosition(optr oself,
+			       optr grObjBody,
+			       sdword *newY,
+			       sdword rectHeight);
+
+void FFDEnlargeLayoutToFitNewField(optr oself,
+				   sdword baseY,
+				   sdword rectHeight);
+
+Boolean FFDRequestUniqueFieldName(optr oself,
+				  optr textObject,
+				  TCHAR *candidate,
+				  TCHAR *newFieldName);
+
+void FFDConvertFieldData(optr oself,
+			 FieldID fieldId,
+			 FieldDataType oldType,
+			 FieldDataType newType);
+
+void FFDConvertToText(FlatFileDatabaseInstance *pself,
+		      word numRecords,
+		      FieldID colNum,
+		      FieldDataType oldType,
+		      CellText *newCell);
+
+void FFDConvertToNumber(FlatFileDatabaseInstance *pself,
+			word numRecords,
+			FieldID colNum,
+			FieldDataType oldType,
+			CellConstant *newCell);
+
+void FFDFinishOffConversion(FlatFileDatabaseInstance *pself,
+			    word row,
+			    FieldID colNum,
+			    void *oldCell,
+			    CellCommon *newCell,
+			    Boolean emptyCell,
+			    word cellSize);
+
+void FFDConvertToDate(FlatFileDatabaseInstance *pself,
+		      word numRecords,
+		      FieldID colNum,
+		      FieldDataType oldType,
+		      CellConstant *newCell);
+
+void FFDConvertToTime(FlatFileDatabaseInstance *pself,
+		      word numRecords,
+		      FieldID colNum,
+		      FieldDataType oldType,
+		      CellConstant *newCell);
+
+void FFDResetFieldTypeInAllLayouts(optr oself,
+				   FieldID colNum,
+				   FieldDataType newType);
+
+void FFDChangeFieldNameInALayout(optr oself,
+				 FieldID colNum,
+				 TCHAR *newName,
+				 word layout);
+void 
+FFDDeleteFieldFromTabOrderList(optr oself, byte colNum, byte layoutNum);
+
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_REQUEST_UNIQUE_FIELD_NAME_WITH_RESPONSE
+ *                  for FlatFileDatabaseClass
+ *
+ * DESCRIPTION: This method calls MSG_FFD_REQUEST_UNIQUE_FIELD_NAME then
+ *              calls a message passed in resultMsg to a destination passed
+ *              in resultDest.  The message takes no arguments.
+ *
+ * PARAMETERS:
+ *      Boolean (optr textObject, TCHAR *candidate, TCHAR *newFieldName,
+ *               optr resultDest, Message resultMsg)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *      The result message is always called, even if the new field ID
+ *      failed.  Caveat usor.
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  9/8/92          Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass,
+				MSG_FFD_REQUEST_UNIQUE_FIELD_NAME_WITH_RESPONSE
+{
+    (void) FFDRequestUniqueFieldName(oself, textObject, candidate,
+				     newFieldName);
+
+    @call {MSG_FFD_RESULT_OF_REQUEST_UNIQUE_FIELD_NAME} resultDest::
+	(resultMsg)();
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDGetFreeColumnNum (INTERNAL)
+ *
+ * DESCRIPTION: look through field row and get first free field column
+ *              available.
+ *
+ * CALLED BY:   StoreFieldName
+ *              
+ * PARAMETERS:  FieldID FFDGetFreeColumnNum(byte *columnsTaken)
+ *              Returns -1 if no more columns available
+ *
+ * STRATEGY:    Checks columnsTaken bit array, and returns first
+ *              available field (column) number. Also marks this
+ *              field as taken.
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    2/92            Initial Revision
+ *
+ ***********************************************************************/
+FieldID FFDGetFreeColumnNum(byte *columnsTaken) 
+{
+    byte        columnNum;
+    Boolean     found = FALSE;
+
+    columnNum = 0;
+
+    while (columnNum <= MAX_NUM_FIELDS - 1) {
+	if (columnsTaken[columnNum/8] & (0x80 >> (columnNum % 8))) {
+		/* field already exists here */
+	    columnNum++;
+	}
+	else {
+	    /* we've found our guy; mark it as taken */
+	    columnsTaken[columnNum/8] |= (0x80 >> (columnNum % 8)); 
+	    found = TRUE;
+	    break;
+	}
+    }           /* while */
+
+    return(found ? columnNum : -1);
+}
+
+/***********************************************************************
+*
+* FUNCTION:     InsertSortedFieldArray (INTERNAL)
+*
+* DESCRIPTION:  Insert column of given name into an array of
+*               sorted names. Use binary search, and return
+*               the insertion index when done.
+*
+*               If the name already exists in the list (an error condition),
+*               return -1.
+*
+*               The first parameter is the name of a function which
+*               will get the name for a given item, and return it
+*               in the pointer passed to it.
+*
+* CALLED BY:    StoreFieldName
+*               
+* PARAMETERS:   void (MemHandle (*getnamefunc) (optr, word, TCHAR *),
+*                       byte *sortedColumns, byte colNum, byte numFields,
+*                       TCHAR *newFieldName, optr databaseObject);
+*
+* STRATEGY:     
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*      Name    Date            Description
+*      ----    ----            -----------
+*      anna    2/92            Initial Revision
+*
+***********************************************************************/
+byte 
+InsertSortedFieldArray(MemHandle _pascal (*getnamefunc) (optr, word, TCHAR *),
+			byte *sortedColumns, byte colNum, byte numFields,
+			TCHAR *newFieldName, optr databaseObject) 
+{
+    byte i, j, lessThan, greaterThan;
+    TCHAR namePtr[MAX_TOTAL_NAME_LENGTH];
+    Boolean leftComp, rightComp;
+    int stringCompResult;
+
+    i = numFields/2;
+    lessThan = numFields;
+    greaterThan = 0;
+    leftComp = FALSE;
+    rightComp = FALSE;
+
+    while (((lessThan - greaterThan) >= 1) && (i < numFields)) {
+
+	(void) ProcCallFixedOrMovable_pascal(databaseObject,
+					     (word) sortedColumns[i], 
+					     namePtr,
+					     getnamefunc);
+
+	stringCompResult = strcmp (newFieldName, namePtr);
+
+	if (stringCompResult == 0) {
+	/* The strings were equal, so return an error */
+	    return(-1);
+	}
+
+	if (stringCompResult < 0) {
+	    /* new string is less than */
+	    leftComp = TRUE;    /* set flag so we know we've compared here */
+	    lessThan = i;
+	    if (((lessThan - greaterThan) == 1) && rightComp) {
+		break;
+	    }
+	    else {
+		if (((i-greaterThan) %2) == 0) {
+		    i = i - (i-greaterThan)/2;
+		}
+		else {          /* if it's odd, want to round down */
+		    i = i - (i-greaterThan)/2 - 1;
+		}
+	    }
+	}
+	else {
+	    /* new string is greater than */
+	    rightComp = TRUE;   /* set flag so we know we've compared here */
+	    greaterThan = i;
+	    if (((lessThan - greaterThan) == 1) && leftComp) {
+		i = i+1;
+		break;
+	    }
+	    else {
+		if (((lessThan-i) % 2) == 0) {
+		    i = i + (lessThan-i)/2;
+		}
+		else {          /* if it's odd, don't want to round down */
+		    i = i + (lessThan-i)/2 + 1;
+		}
+	    }
+	}
+    }   /* end while */
+
+    /* 
+     * Move up all old fields to make room for new one 
+     */
+    j = numFields-1;
+    while ((j >= i) && (j < numFields)) {
+	sortedColumns[j+1] = sortedColumns[j];
+	j--;
+    }
+
+    /* New position: i */
+    sortedColumns[i] = colNum;
+
+    return(i);
+}
+
+/***********************************************************************
+*
+* FUNCTION:     StoreNewFieldName (INTERNAL)
+*
+* DESCRIPTION:  Store field name for a new field.  This function
+*               checks to see if the name is already in use, and if
+*               not sets up the field in a new column and adds the
+*               name to the database_name_list.
+*
+*               Returns the new token number and new column number
+*               (via *newColNum) if successful, or -1 and an error
+*               number (via *errorValue) if the name was invalid or
+*               already in use.
+*               
+* CALLED BY:    INTERNAL
+*               
+* PARAMETERS:   textPtr - pointer to the new field name
+*               databaseObject - optr to the current database
+*               newColNum - pointer for the new column number.
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*      Name    Date            Description
+*      ----    ----            -----------
+*      jeremy  6/4/92          Initial Revamping
+*
+***********************************************************************/
+word StoreNewFieldName(TCHAR *textPtr, optr databaseObject, FieldID *newColNum,
+				FFFieldCreationResult *errorValue)
+{
+    FlatFileDatabaseInstance *pself;
+    word fieldTokenNum;
+
+    pself = ObjDerefGen(databaseObject);
+
+    /*
+     * Get a new column for this field.
+     */
+    *newColNum = FFDGetFreeColumnNum(pself->FFI_columnsTaken);
+
+    /*
+     * Were we able to find a free column?
+     */
+    if (*newColNum == (byte) -1) {
+	*errorValue = FFD_TOO_MANY_FIELDS;
+	return(-1);
+    }
+
+    fieldTokenNum = StoreFieldNameIntoSpreadsheet(textPtr, 
+						  databaseObject, 
+						  *newColNum);
+    pself = ObjDerefGen(databaseObject);
+
+    if (fieldTokenNum == -1) {
+	*errorValue = FFD_DUPLICATE_FIELD_NAME;
+
+	/*
+	 * Update "columns taken" array
+	 */
+	pself->FFI_columnsTaken[*newColNum/8] =
+	 pself->FFI_columnsTaken[*newColNum/8] & (~(0x80 >> (*newColNum % 8))); 
+    }
+
+    return(fieldTokenNum);
+}
+
+/***********************************************************************
+*
+* FUNCTION:     ChangeFieldName (INTERNAL)
+*
+* DESCRIPTION:  Change field name for an existing field.  This function
+*               checks to see if the new name is already in use, and if
+*               not resets the new field in the database_name_list.
+*
+*               If the name hasn't changed, the Boolean pointed to by
+*               sameName is set to TRUE, and the old token is returned.
+*
+*               If the name changed and was successfully added, sameName
+*               is set to FALSE, and the new token is returned.
+*
+*               If the name was invalid, -1 is returned.
+*               
+* CALLED BY:    INTERNAL
+*               
+* PARAMETERS:   textPtr - pointer to the new field name
+*               databaseObject - optr to the current database 
+*               colNum - column of the field
+*               sameName - pointer to a Boolean to flag if the same
+*                          name is being used.
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*      Name    Date            Description
+*      ----    ----            -----------
+*      jeremy  6/4/92          Initial Revamping
+*      jeremy  8/6/92          Now uses MSG_SPREADSHEET_CHANGE_NAME.
+*
+***********************************************************************/
+word ChangeFieldName(TCHAR *textPtr, optr databaseObject, FieldID colNum,
+		     Boolean *sameName, FFFieldCreationResult *errorValue)
+{
+    word oldNameToken;
+    FieldDataAttrs *cellDataPtr;
+    FlatFileDatabaseInstance *pself;
+    SpreadsheetNameParams fieldNameParams;
+    TCHAR oldFieldName[MAX_FIELD_NAME_LENGTH + 1],
+	 upperOldString[MAX_FIELD_NAME_LENGTH + 1],
+	 upperNewString[MAX_FIELD_NAME_LENGTH + 1];
+    GetNameInfo gni;
+    word nameLen;
+
+    pself = ObjDerefGen(databaseObject);
+
+    /*
+     * First, check if the name changed.  Lock the cell with field info
+     */
+    cellDataPtr = CellLock(&pself->SSI_cellParams,
+			   FIELD_TYPE_ROW, 
+			   (word) colNum);
+#if ERROR_CHECK
+    if (!cellDataPtr) {
+	EC_ERROR(BAD_CELL_POINTER);
+    }
+#endif /* ERROR_CHECK */
+
+    oldNameToken = cellDataPtr->FDA_nameToken;
+    CellUnlock(cellDataPtr);
+
+    nameLen = SpreadsheetNameTextFromToken((SpreadsheetInstance *)pself,
+					   oldNameToken,
+					   oldFieldName,
+					   MAX_FIELD_NAME_LENGTH);
+    oldFieldName[nameLen] = _TEXT('\0');
+    
+    if (strcmp(oldFieldName, textPtr) == 0) {
+	/* 
+	 * The new name is the same as the old. We're done; 
+	 * return the old token 
+	 */
+	*sameName = TRUE;
+	return(oldNameToken);
+    }
+
+    /*
+     * The name changed!  Check to see if the new name already exists.
+     */
+    fieldNameParams.SNP_textLength = strlen(textPtr);
+    strcpy(fieldNameParams.SNP_text, textPtr);
+    @call databaseObject::
+	   MSG_SPREADSHEET_VALIDATE_NAME(&gni, &fieldNameParams); 
+
+    /*
+     * If the new name already exists, bail.
+     */
+    if (gni.GNI_entryNum == -1) {
+	/*
+	 * Check if the new name is the same as the current field name,
+	 * with the exception of capitalized letters. Since names stored
+	 * by the spreadsheet are case-insensitive, the following scenario
+	 * is possible:
+	 * 1. User capitalizes field name & hits Apply
+	 * 2. The spreadsheet goes to validate the name, and already finds
+	 *    it present. So it sends back a "thumbs down".
+	 * The solution is to check whether the upper()'s of the old and
+	 * new field name match. If they do, then the name is OK
+	 */
+	strcpy(upperOldString, oldFieldName);
+	LocalUpcaseString(upperOldString, 0);
+	strcpy(upperNewString,textPtr);
+	LocalUpcaseString(upperNewString, 0);
+
+	if (strcmp(upperOldString, upperNewString) != 0) {
+	    /* The new name is different; it is indeed an error */
+	    *errorValue = FFD_DUPLICATE_FIELD_NAME;
+	    return (-1);
+	}
+    }
+
+    /*
+     * Get the definition for this name.
+     */
+    fieldNameParams.SNP_flags = NAF_BY_TOKEN | NAF_DEFINITION;
+    fieldNameParams.SNP_listEntry = oldNameToken;
+    @call databaseObject::MSG_SPREADSHEET_GET_NAME_INFO(&fieldNameParams);
+
+    /*
+     * The new name is fine.  Delete the old name from the database_name_list,
+     * then set the new name.
+     */
+    *sameName = FALSE;
+    pself = ObjDerefGen(databaseObject);
+    (void) DeleteAbsoluteFieldFromList(pself->FFI_databaseNameList, colNum,
+				       pself->FFI_numFields);
+
+    /*
+     * Change the name in the spreadsheet's NAME_ROW.  The token will be
+     * the same.
+     */
+    fieldNameParams.SNP_textLength = strlen(textPtr);
+    strcpy(fieldNameParams.SNP_text, textPtr);
+    @call databaseObject::MSG_SPREADSHEET_CHANGE_NAME(&gni, &fieldNameParams);
+
+    /* Insert the new name into the database name list. */
+    pself = ObjDerefGen(databaseObject);
+    (void) InsertSortedFieldArray(FFDGetColumnFieldName,
+				  pself->FFI_databaseNameList, 
+				  colNum,
+				  pself->FFI_numFields - 1,
+				  fieldNameParams.SNP_text,
+				  databaseObject);
+
+    /*
+     * Notify all of the existing layouts that the name has changed.
+     */
+    FFDChangeFieldNameInAllLayouts(databaseObject,
+				   colNum,
+				   fieldNameParams.SNP_text);
+
+    /* send a notification to map controller */
+
+    CreateDataBlockAndSendNotification(databaseObject);
+
+    ObjMarkDirty(databaseObject);
+    return(oldNameToken);
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:    StoreFieldNameIntoSpreadsheet
+ *
+ * DESCRIPTION: This function stores a field name into a specific column
+ *              and returns its token number.  If the name was
+ *              invalid, -1 is returned.
+ *
+ * PARAMETERS:  textPtr - pointer to the new name
+ *              oself - OD of the current database
+ *              colNum - column for this field
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  6/ 4/92         Initial Revision
+ *
+ ***********************************************************************/
+word
+StoreFieldNameIntoSpreadsheet(TCHAR *textPtr, optr oself, FieldID colNum)
+{
+    #define COLUMN_STRING_SIZE      4
+    #define DEPENDENCY_ROW_OFFSET   0
+
+    SpreadsheetNameParams fieldNameParams;
+    TCHAR columnString[COLUMN_STRING_SIZE];
+    GetNameInfo fieldNameInfo;
+    word fieldNameToken;
+    CellRowColumn oldRow;
+    FlatFileDatabaseInstance *pself;
+
+    /*
+     * Reset the active row to be row 1, remembering what the old
+     * value was.
+     */
+    pself = ObjDerefGen(oself);
+    oldRow = pself->SSI_active.CR_row;
+    pself->SSI_active.CR_row = DEPENDENCY_ROW_OFFSET;
+
+    strcpy((TCHAR *) &fieldNameParams.SNP_text, textPtr);
+    fieldNameParams.SNP_textLength = strlen(fieldNameParams.SNP_text);
+
+    /*
+     * Create a cell reference of the form "$<field #>1" for this
+     * name.
+     */
+    ParserFormatColumnReference(colNum,
+			  columnString,
+			  COLUMN_STRING_SIZE);
+    sprintf( fieldNameParams.SNP_definition, _TEXT("$%s1"),
+	    columnString);
+    fieldNameParams.SNP_defLength =
+	strlen( fieldNameParams.SNP_definition);
+    
+    /*
+     * Send message to database object
+     */
+    @call oself::MSG_SPREADSHEET_ADD_NAME(&fieldNameInfo, &fieldNameParams); 
+
+    /*
+     * Reset the active row to whatever it used to be.
+     */
+    pself = ObjDerefGen(oself);
+    pself->SSI_active.CR_row = oldRow;
+
+    /*
+     * Check Spreadsheet_Add_Name for error; if no error, 
+     * insert into sorted array of all field names
+     */
+    if (fieldNameInfo.GNI_entryNum == -1) {
+	return(-1);
+    }
+
+    /* No error!  Insert away. */
+    fieldNameToken = fieldNameInfo.GNI_token; 
+    pself = ObjDerefGen(oself);
+    (void) InsertSortedFieldArray(FFDGetColumnFieldName,
+				  pself->FFI_databaseNameList, 
+				  colNum,
+				  pself->FFI_numFields,
+				  fieldNameParams.SNP_text,
+				  oself);
+    /*
+     * Increment field count
+     */
+    pself = ObjDerefGen(oself);
+    pself->FFI_numFields++;
+
+    ObjMarkDirty(oself);
+    return(fieldNameToken);
+}
+
+/***********************************************************************
+*
+* FUNCTION:    StoreDefaultField (INTERNAL)
+*
+* DESCRIPTION:  Store default token stream for a given field.
+*
+* CALLED BY:   
+*               
+*
+* PARAMETERS:   selfOptr - optr to the current database
+*               defaultTokenStream - the new token stream
+*               numTokens - the number of tokens in the stream
+*               fieldColumnNum - the affected field's column
+*               fieldType - the field data type of the field
+*
+* STRATEGY:     
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*      Name    Date            Description
+*      ----    ----            -----------
+*      anna    4/8/92          Initial Revision
+*      jeremy  4-5/92          Updated for token streams
+*      jeremy  6/17/92         Added numTokens
+*
+***********************************************************************/
+void 
+StoreDefaultField(optr selfOptr, byte *defaultTokenStream, word numTokens,
+		  byte fieldColumnNum, FieldDataType fieldType) 
+{
+    CellFormula *tsa;
+    MemHandle tsaHandle;
+    FlatFileDatabaseInstance *pself;
+    dword oldDeps = 0;
+
+    /*
+     * If we already have a default expression, remove any dependencies.
+     */
+    FFDRemoveDependencies(selfOptr, FIELD_DEFAULT_VALUE_ROW, fieldColumnNum);
+
+    /*
+     * If we already exist, preserve any dependencies we currently have.
+     */
+    pself = ObjDerefGen(selfOptr);
+    tsa = CellLock(&pself->SSI_cellParams,
+		   FIELD_DEFAULT_VALUE_ROW,
+		   (word) fieldColumnNum);
+    if (tsa) {
+	oldDeps = tsa->CF_common.CC_dependencies;
+	CellUnlock(tsa);
+    }
+
+    /*
+     * Now create a function block to store our expression, and
+     * the place where default expression dependencies are stored.
+     */
+    tsaHandle = MemAlloc(sizeof(CellFormula) + numTokens, HF_SWAPABLE,
+			 HAF_NO_ERR | HAF_ZERO_INIT);
+    tsa = MemLock(tsaHandle);
+
+    tsa->CF_common.CC_type = CT_FORMULA;
+    tsa->CF_common.CC_recalcFlags = 0;
+    tsa->CF_common.CC_attrs = 0;
+    tsa->CF_common.CC_notes = 0;
+    tsa->CF_common.CC_dependencies = oldDeps;
+    tsa->CF_formulaSize = numTokens;
+    if (numTokens != 0) {
+        memcpy((char *)tsa+sizeof(CellFormula), defaultTokenStream, numTokens);
+    }
+
+    /* insert the cell */
+    pself = ObjDerefGen(selfOptr);
+    CellReplace(&pself->SSI_cellParams,
+		FIELD_DEFAULT_VALUE_ROW,
+		(word) fieldColumnNum,
+		tsa,
+		sizeof(CellFormula) + numTokens);
+
+    MemFree(tsaHandle);
+
+    /*
+     * Add dependencies, if not a computed field.
+     */
+    if ((numTokens != 0) && (fieldType != FDT_COMPUTED)) {
+	SpreadsheetCellAddRemoveDeps((SpreadsheetInstance *)pself,
+				     (dword) &(pself->SSI_cellParams),
+				     FFDParseLibraryCallback,
+				     (word) 0,
+				     (word) EF_MAKE_DEPENDENCIES,
+				     (word) FIELD_DEFAULT_VALUE_ROW,
+				     (word) fieldColumnNum,
+				     (word) FIELD_DEFAULT_VALUE_ROW,
+				     (word) pself->SSI_maxCol);
+    }
+}
+
+/***********************************************************************
+*
+* MESSAGE:      MSG_FFD_CREATE_NEW_FIELD_WITH_RESPONSE
+*
+* DESCRIPTION:  This message adds a field to the database and adds it to the
+*               database_name_list, then sends back messages based on the
+*               success or failure of adding the new field.
+*
+*               successMessage must have no parameters and no return
+*               value. It is sent if the insert was successful.
+*
+*               resultMessage has two parameters: a Boolean (indicating
+*               whether the insert was successful or not) and a byte for
+*               the new column number.
+*
+*               NOTE: This routine frees the data block which is
+*               passed to it.
+*
+*               You must use this msg instead of MSG_FFD_STORE_FIELD_INFO
+*               if you are calling from the UI thread and therefore
+*               cannot use "@call" but must use "@send".
+*
+*               The outputOD is the optr to an object which will be
+*               notified of the outcome of the insertion of this new
+*               field.
+*
+*
+* CALLED BY:   GLOBAL
+*
+* PARAMETERS:   void (MemHandle fieldInfoHandle,
+*                     optr outputOD,
+*                     Message successMessage,
+*                     Message resultMessage);
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*      Name    Date            Description
+*      ----    ----            -----------
+*      anna    4/09/92         Initial Revision
+*      jeremy  5/22/92         Broke the method in two so we don't wait
+*                              so long to find out whether a field's
+*                              name is legal or not.
+*      jeremy  6/4/92          Updated it for the First Great Revamping.
+*
+***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_CREATE_NEW_FIELD_WITH_RESPONSE
+{
+    word fieldNameToken;
+    FieldID fieldColumnNum;
+    FFFieldPropertiesMessageBlock *fieldInfo;
+    FFFieldCreationResult errorValue;
+
+    fieldInfo = MemLock(fieldInfoHandle);
+    fieldNameToken = StoreNewFieldName(fieldInfo->fieldName, oself,
+				       &fieldColumnNum, &errorValue);
+
+    if (fieldNameToken == -1) {
+	/*
+	 * The name is already in use or something else was wrong with it.
+	 * Return the resultMessage reporting this.
+	 */
+	MemFree(fieldInfoHandle);
+	if (resultMessage) {
+	    @send {MSG_FFD_RESULT_OF_FIELD_CREATION_TEMPLATE} outputOD::
+		(resultMessage)(errorValue, -1);
+	}
+	return;
+    }
+
+    /*
+     * If the field we're creating is a computed field, add
+     * dependencies and check for circular references.
+     */
+    if (fieldInfo->dataType == FDT_COMPUTED) {
+	/*
+	 * Do the rest of the work for creating the field.
+	 */
+	FFDStoreRemainingFieldInfo(oself, fieldInfo, fieldNameToken,
+				   fieldColumnNum);
+	FFDSetDependencies(oself, fieldColumnNum);
+    }
+	
+    /*
+     * The name was fine.  Signal success!
+     */
+    if (resultMessage) {
+	@send {MSG_FFD_RESULT_OF_FIELD_CREATION_TEMPLATE} outputOD::
+	    (resultMessage)(FFD_NAME_OK, fieldColumnNum);
+    }
+
+    if (successMessage) {
+	@send {MSG_FFD_SUCCESSFUL_FIELD_CREATION_OR_MODIFICATION_TEMPLATE}
+	    outputOD::(successMessage)();
+    }
+
+    /*
+     * Increment the automatic field number.
+     */
+    pself = ObjDerefGen(oself);
+    pself->FFI_automaticFieldNumber++;
+
+    /*
+     * Alert anyone out there that the database list has changed.
+     */
+    SendWholeListNotification (oself, fieldColumnNum,
+			       ADDED, pself->FFI_numFields);
+    
+    /*
+     * Do the rest of the work for creating the field.
+     */
+    if (fieldInfo->dataType != FDT_COMPUTED) {
+	FFDStoreRemainingFieldInfo(oself, fieldInfo, fieldNameToken,
+				   fieldColumnNum);
+    }
+    MemFree(fieldInfoHandle);
+
+    /* send a notification to map controller */
+
+    CreateDataBlockAndSendNotification(oself);
+
+    /*
+     * Dirty our optr, since tons o' instance data changed.
+     */
+    ObjMarkDirty(oself);
+}
+
+/***********************************************************************
+*
+* MESSAGE:      MSG_FFD_CREATE_NEW_FIELD
+*
+* DESCRIPTION:  This message adds a field to the database and adds it to the
+*               database_name_list.
+*
+*               If the name was successfully added to the database, TRUE
+*               is returned; otherwise, FALSE is returned.
+*
+*               NOTE: This routine frees the data block which is
+*               passed to it.
+*
+* CALLED BY:    GLOBAL
+*
+* PARAMETERS:   Boolean (MemHandle fieldInfoHandle, FieldID *colNum)
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*      Name    Date            Description
+*      ----    ----            -----------
+*      anna    4/09/92         Initial Revision
+*      jeremy  5/22/92         Broke the method in two so we don't wait
+*                              so long to find out whether a field's
+*                              name is legal or not.
+*      jeremy  6/5/92          Updated it for the First Great Revamping.
+*
+***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_CREATE_NEW_FIELD
+{
+    word fieldNameToken;
+    FieldID fieldColumnNum;
+    FFFieldPropertiesMessageBlock *fieldInfo;
+    FFFieldCreationResult errorValue;
+
+    fieldInfo = MemLock(fieldInfoHandle);
+    fieldNameToken = StoreNewFieldName(fieldInfo->fieldName, oself,
+				       &fieldColumnNum, &errorValue);
+
+    if (fieldNameToken == -1) {
+	/*
+	 * The name is already in use or something else was wrong with it.
+	 * Return the resultMessage reporting this.
+	 */
+	MemFree(fieldInfoHandle);
+	return FALSE;
+    }
+
+    /*
+     * Increment the automatic field number.
+     */
+    pself = ObjDerefGen(oself);
+    pself->FFI_automaticFieldNumber++;
+
+    /*
+     * The name was fine.  Alert anyone out there that the database
+     * list has changed.
+     */
+    SendWholeListNotification (oself, fieldColumnNum,
+			       ADDED, pself->FFI_numFields);
+
+    /*
+     * Do the rest of the work for creating the field.
+     */
+    FFDStoreRemainingFieldInfo(oself, fieldInfo, fieldNameToken,
+			       fieldColumnNum);
+    MemFree(fieldInfoHandle);
+
+    /* send a notification to map controller */
+
+    CreateDataBlockAndSendNotification(oself);
+
+    /*
+     * Dirty our optr, since tons o' instance data changed.
+     */
+    ObjMarkDirty(oself);
+
+    *colNum = fieldColumnNum;   /* return the new column number */
+    return TRUE;
+}
+
+/***********************************************************************
+ * MSG_FFD_CREATE_DATA_BLOCK_AND_SEND_NOTIFICATION for FlatFileDatabaseClass
+ ***********************************************************************
+ * SYNOPSIS:    Create a data block and send it off to map controller
+ *
+ * PARAMETERS:  void ()         
+ *
+ * SIDE EFFECTS: nothing
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      ted     9/92            Initial Revision
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, 
+				MSG_FFD_CREATE_DATA_BLOCK_AND_SEND_NOTIFICATION
+{
+    /* call an internal routine */
+
+    CreateDataBlockAndSendNotification(oself);
+}
+
+
+/***********************************************************************
+ *				FFDGetColumnNumForExport
+ ***********************************************************************
+ * SYNOPSIS:	    Return the field number given a column number.
+ *	    	The column number passed is the ordering in which the
+ *	        columns were created.  For export, we want to use the
+ *	    	layout ordering, but, since not all fields are in the
+ *	    	current layout, we may also need to look in the "not in
+ *	    	layout" list.
+ *
+ * CALLED BY:	CreateDataBlockAndSendNotification,
+ *	    	
+ * RETURN:	field number in layout order    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *     chrisb	10/26/94   	Initial Revision
+ *
+ ***********************************************************************/
+int
+FFDGetColumnNumForExport (FlatFileDatabaseInstance *pself, int i)
+{
+    if(i >= pself->FFI_numInLayoutNameList )
+	return 
+	    (pself->FFI_notInLayoutNameList[i-pself->FFI_numInLayoutNameList]);
+    else
+	return
+	    (pself->FFI_fieldOrderInfo.FNOI_fieldOrderList[i]);
+
+
+}	/* End of FFDGetColumnNumForExport.	*/
+
+
+/***********************************************************************
+ * 		CreateDataBlockAndSendNotification
+ ***********************************************************************
+ * SYNOPSIS:	Create a data block that contains field names and number
+ *		of fields and send the block to map controller. 
+ *
+ * CALLED BY:	INTERNAL
+ *
+ * RETURN: 	nothing  
+ *
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      ted     9/92            Initial Revision
+ *
+ ***********************************************************************/
+void
+CreateDataBlockAndSendNotification(optr oself)
+{
+    MemHandle dataBlock;
+    ImpexMapFileInfoHeader *fieldInfo;
+    ChunkHandle chunk;
+    FieldID j, colNum;
+    TCHAR fieldName[MAX_TOTAL_NAME_LENGTH];
+    TCHAR *destination;
+    EventHandle msg;
+    FlatFileDatabaseInstance *pself;
+
+    pself = ObjDerefGen(oself);
+
+    /* create a data block and mark it as a lmem block */
+
+    dataBlock = MemAllocLMem(LMEM_TYPE_GENERAL,sizeof(ImpexMapFileInfoHeader));
+    MemModifyFlags(dataBlock, HF_SHARABLE, (HeapFlags) 0);
+
+    /* lock this data block */
+
+    (void) MemLock(dataBlock);
+    chunk = ChunkArrayCreate(dataBlock, 0, 0, 0); 
+
+    /* Re-deref the thing, in case it moved. */
+
+    fieldInfo = MemDeref(dataBlock);
+
+    /* initialize the header of lmem block */
+
+    fieldInfo->IMFIH_fieldChunk = chunk;
+    fieldInfo->IMFIH_numFields = pself->FFI_numFields; 
+    fieldInfo->IMFIH_flag = DFNU_FIELD;
+
+    /* grab field string for each field and copy it into the data block */
+
+    for (j=0; j < pself->FFI_numFields; j++) {         
+	colNum = FFDGetColumnNumForExport(pself,j);
+	FFDGetColumnFieldName(oself, colNum, fieldName);  
+	destination = ChunkArrayAppend(ConstructOptr(dataBlock, chunk),
+				       (strlen(fieldName)+1)*sizeof(TCHAR));
+	strcpy(destination, fieldName);
+	pself = ObjDerefGen(oself);
+    }
+    MemUnlock(dataBlock);
+
+    /* initialize the reference count to one */
+
+    MemInitRefCount(dataBlock, 1);
+
+    /* create the classed event */
+
+    msg = @record (optr) NullClass::MSG_META_NOTIFY_WITH_DATA_BLOCK(
+		      MANUFACTURER_ID_GEOWORKS,    /* Manufacturer's ID */
+		      GWNT_MAP_APP_CHANGE, /* Manufacturer's list type */
+		      dataBlock);             /* Handle of data block */
+
+    /* send the event to GCN list */
+
+    @call GeodeGetAppObject(0)::MSG_META_GCN_LIST_SEND(
+		      (word) GCNLSF_SET_STATUS, /* GCNListSendFlags */
+		      (EventHandle) msg,    /* Handle to classed event */
+		      (MemHandle) dataBlock,  /* Handle of extra data block */
+		      (word) GAGCNLT_APP_TARGET_NOTIFY_APP_CHANGE,
+					      /* Manufacturer's list type */
+		      (word) MANUFACTURER_ID_GEOWORKS);
+					      /* Manufacturer's ID */
+}
+
+/***********************************************************************
+ *              FlushMapControl
+ ***********************************************************************
+ * SYNOPSIS:    Send a null memory handle of data block to map controller.
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * RETURN:      nothing  
+ *
+ * SIDE EFFECTS:
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      ted     11/92           Initial Revision
+ *
+ ***********************************************************************/
+void
+FlushMapControl(optr oself)
+{
+    EventHandle msg;
+
+    /* create the classed event */
+
+    msg = @record (optr) NullClass::MSG_META_NOTIFY_WITH_DATA_BLOCK(
+		      MANUFACTURER_ID_GEOWORKS,    /* Manufacturer's ID */
+		      GWNT_MAP_APP_CHANGE, /* Manufacturer's list type */
+		      (MemHandle) 0);         /* Handle of data block */
+
+    /* send the event to GCN list */
+
+    @call GeodeGetAppObject(0)::MSG_META_GCN_LIST_SEND(
+		      (word) GCNLSF_SET_STATUS, /* GCNListSendFlags */
+		      (EventHandle) msg,    /* Handle to classed event */
+		      (MemHandle) 0,  /* Handle of extra data block */
+		      (word) GAGCNLT_APP_TARGET_NOTIFY_APP_CHANGE,
+					      /* Manufacturer's list type */
+		      (word) MANUFACTURER_ID_GEOWORKS);
+					      /* Manufacturer's ID */
+}
+ 
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDUserWantsToChangeDataType
+ *
+ * DESCRIPTION: This function warns the user that if they change a field's
+ *              type, all of its internal data changes.
+ *
+ *              Returns a TRUE if the user really wants to do it, or
+ *              a FALSE if they do not.
+ *
+ * PARAMETERS:  oself - an optr to the current database
+ *              originalType - the present field type
+ *              newType - the field type the user wants to change to
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  1/18/93         Initial version
+ *
+ ***********************************************************************/
+Boolean
+FFDUserWantsToChangeDataType(optr oself,
+			     FieldDataType originalType,
+			     FieldDataType newType)
+{
+    TCHAR *dialogString, *newTypeString, *originalTypeString;
+    InteractionCommand usdReply;
+    FlatFileDatabaseInstance *pself;
+
+    #if ERROR_CHECK
+	switch (newType) {
+	    case FDT_GENERAL_TEXT:
+	    case FDT_COMPUTED:
+	    case FDT_INTEGER:
+	    case FDT_REAL:
+	    case FDT_DATE:
+	    case FDT_TIME:
+		break;
+	    default:
+		EC_ERROR(BAD_FIELD_DATA_TYPE);
+	}
+
+	switch (originalType) {
+	    case FDT_GENERAL_TEXT:
+	    case FDT_COMPUTED:
+	    case FDT_INTEGER:
+	    case FDT_REAL:
+	    case FDT_DATE:
+	    case FDT_TIME:
+		break;
+	    default:
+		EC_ERROR(BAD_FIELD_DATA_TYPE);
+	}
+    #endif /* ERROR_CHECK */
+
+    if (newType == originalType) {
+	/*
+	 * I was too lazy to create a fatal error called
+	 * "HEY_THESE_TYPES_SHOULD_NOT_MATCH."
+	 */
+	EC_ERROR(BAD_FIELD_DATA_TYPE);
+	return TRUE;
+    }
+
+    /*
+     * Don't prompt them if there is no data in the database.
+     */
+    pself = ObjDerefGen(oself);
+    if (!pself->FFI_totalNumRecordsInDatabase) {
+	return TRUE;
+    }
+
+    MemLock(OptrToHandle(@FFConfirmFieldTypeChange));
+    MemLock(HandleOf(FFConfirmFieldTypeTable[newType]));
+    MemLock(HandleOf(FFConfirmFieldTypeTable[originalType]));
+
+    dialogString = LMemDeref(@FFConfirmFieldTypeChange);
+    newTypeString = LMemDeref(FFConfirmFieldTypeTable[newType]);
+    originalTypeString = LMemDeref(FFConfirmFieldTypeTable[originalType]);
+    
+    /*
+     * Find out what the user wants to do.
+     */
+    usdReply = UserStandardDialog(
+	 (TCHAR *) 0,            /* No help context      */
+	 (TCHAR *) 0,            /* No custom responses. */
+	 newTypeString,         /* Two arguments: the field types. */
+	 originalTypeString,
+	 dialogString,          /* User prompt string.  */
+	 ((GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET) |
+	  (CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET)));
+    
+    /*
+     * Get rid of the string blocks.
+     */
+    MemUnlock(OptrToHandle(@FFConfirmFieldTypeChange));
+    MemUnlock(HandleOf(FFConfirmFieldTypeTable[newType]));
+    MemUnlock(HandleOf(FFConfirmFieldTypeTable[originalType]));
+
+    return (usdReply == IC_YES);
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_CHANGE_FIELD_ATTRIBUTES_WITH_RESPONSE for
+ *              FlatFileDatabaseClass
+ *
+ * DESCRIPTION: 
+ *              This message changes the attributes of an existing
+ *              field in the database and in the database_name_list.
+ *              The database_name_list is affected only if the name
+ *              changed.
+ *
+ *              Pass a handle to a FFFieldPropertiesMessageBlock with
+ *              the new information and a column number to blast the
+ *              changes into.  Two passed messages will be sent back
+ *              based on the success or failure of the attribute
+ *              change:
+ *
+ *              successMessage has no parameters and no return value.
+ *              It is sent if the modification was successful.
+ *
+ *              resultMessage has two parameters: a Boolean
+ *              (indicating whether the modification was successful or
+ *              not) and a byte for the old column number.
+ *
+ *
+ * PARAMETERS:
+ *      void (MemHandle fieldInfoHandle,
+ *            byte colNum,
+ *            optr outputOD,
+ *            Message successMessage,
+ *            Message resultMessage);
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  6/ 5/92         Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass,
+    MSG_FFD_CHANGE_FIELD_ATTRIBUTES_WITH_RESPONSE
+{
+    word fieldNameToken;
+    FFFieldPropertiesMessageBlock *fieldInfo;
+    Boolean sameName, sameDataType;
+    FieldDataType dataType;
+    FFFieldCreationResult errorValue;
+
+    fieldInfo = MemLock(fieldInfoHandle);
+
+    /*
+     * Check to see if the field type changed, and alert the user that
+     * it can cause strange things to happen..
+     */
+    sameDataType = TRUE;
+    dataType = FFDGetDataTypeAndFlags(oself, colNum, NULL);
+    if (dataType != fieldInfo->dataType) {
+	/*
+	 * The user wants to change the data type.  Warn them that this
+	 * might do strange things.
+	 */
+	if (!FFDUserWantsToChangeDataType(oself,
+					  dataType,
+					  fieldInfo->dataType)) {
+	    /*
+	     * The user changed their mind.  Return with a
+	     * cancel flag.
+	     */
+	    MemFree(fieldInfoHandle);
+	    if (resultMessage) {
+		@send {MSG_FFD_RESULT_OF_FIELD_MODIFICATION_TEMPLATE}outputOD::
+		    (resultMessage)(FFD_ABORT_TYPE_CHANGE, -1, FALSE);
+	    }
+	    return;
+	} else {
+	    /*
+	     * The user does indeed want to change the type.  Set
+	     * a flag and proceed.
+	     */
+	    sameDataType = FALSE;
+	}
+    }   
+    
+    /*
+     * Check to see if the new name is valid.
+     */
+    fieldNameToken = ChangeFieldName(fieldInfo->fieldName, oself,
+				     colNum, &sameName, &errorValue);
+
+    if (fieldNameToken == -1) {
+	/*
+	 * The name is already in use or something else was wrong with it.
+	 * Return the resultMessage to report this.
+	 */
+	MemFree(fieldInfoHandle);
+	if (resultMessage) {
+	    @send {MSG_FFD_RESULT_OF_FIELD_MODIFICATION_TEMPLATE} outputOD::
+		(resultMessage)(errorValue, -1, FALSE);
+	}
+	return;
+    }
+
+    /*
+     * The name was fine.  Signal success, and do the rest of the
+     * work for modifying the field.
+     */
+    if (resultMessage) {
+	@send {MSG_FFD_RESULT_OF_FIELD_MODIFICATION_TEMPLATE} outputOD::
+	    (resultMessage)(FFD_NAME_OK, colNum, !sameName);
+    }
+    if (successMessage) {
+	@send {MSG_FFD_SUCCESSFUL_FIELD_CREATION_OR_MODIFICATION_TEMPLATE} \
+	      outputOD::(successMessage)();
+    }
+
+    /*
+     * Alert anyone out there that the database list has changed (if
+     * the name changed).
+     */
+    if (!sameName) {
+	pself = ObjDerefGen(oself);
+	SendWholeListNotification (oself, colNum,
+				   CHANGED, pself->FFI_numFields);
+    }
+    
+    /*
+     * Do the rest of the work for creating the field.
+     */
+    FFDStoreRemainingFieldInfo(oself, fieldInfo, fieldNameToken, colNum);
+
+    /*
+     * Convert the data if the field type changed.
+     */
+    if (!sameDataType) {
+	FFDConvertFieldData(oself,
+			    colNum,
+			    dataType,
+			    fieldInfo->dataType);
+    }
+    
+    /*
+     * Reset its dependencies if this is a computed field.
+     */
+    if (fieldInfo->dataType == FDT_COMPUTED) {
+	FFDSetDependencies(oself, colNum);
+    }
+
+    MemFree(fieldInfoHandle);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_CHANGE_FIELD_ATTRIBUTES for
+ *              FlatFileDatabaseClass
+ *
+ * DESCRIPTION: 
+ *              This message changes the attributes of an existing
+ *              field in the database and in the database_name_list.
+ *              The database_name_list is affected only if the name
+ *              changed.
+ *
+ *              Pass a handle to a FFFieldPropertiesMessageBlock with
+ *              the new information and a column number to blast the
+ *              changes into.
+ * 
+ *              If the field attribute change was successful, TRUE is
+ *              returned; otherwise, FALSE is.
+ *
+ * PARAMETERS:
+ *      Boolean (MemHandle fieldInfoHandle,
+ *               byte colNum)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  6/ 5/92         Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_CHANGE_FIELD_ATTRIBUTES
+{
+    word fieldNameToken;
+    FFFieldPropertiesMessageBlock *fieldInfo;
+    Boolean sameName;
+    FFFieldCreationResult errorValue;
+
+    fieldInfo = MemLock(fieldInfoHandle);
+    fieldNameToken = ChangeFieldName(fieldInfo->fieldName, oself,
+				     colNum, &sameName, &errorValue);
+
+    if (fieldNameToken == -1) {
+	/*
+	 * The name is already in use or something else was wrong with it.
+	 * Return the resultMessage to report this.
+	 */
+	MemFree(fieldInfoHandle);
+	return FALSE;
+    }
+
+    /*
+     * The name was fine.  Do the rest of the work for modifying the field.
+     * Alert anyone out there that the database list has changed (if
+     * the name changed).
+     */
+    if (!sameName) {
+	pself = ObjDerefGen(oself);
+	SendWholeListNotification (oself, colNum,
+				   CHANGED, pself->FFI_numFields);
+    }
+    
+    /*
+     * Do the rest of the work for creating the field.
+     */
+    FFDStoreRemainingFieldInfo(oself, fieldInfo, fieldNameToken, colNum);
+
+    MemFree(fieldInfoHandle);
+    return TRUE;
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDStoreRemainingFieldInfo
+ *
+ * DESCRIPTION: This function finishes the work that MSG_FFD_
+ *              STORE_FIELD_INFO{AND_SEND_BACK_MESSAGES}.  It
+ *              should be used after a fieldNameToken is already
+ *              determined.
+ *
+ *              This function allocates a field definition based on
+ *              the new field's type, and enters the definition
+ *              and default expression into appropriate rows for the
+ *              field's column.
+ *              
+ * PARAMETERS:  oself - an optr to a database object
+ *              dataPtr - a pointer to a FFFieldPropertiesMessageBlock
+ *              fieldNameToken - a token for the field's name
+ *              fieldColumnNum - the determined column number for this field
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  5/22/92         Initial Revision
+ *
+ ***********************************************************************/
+void
+FFDStoreRemainingFieldInfo(optr oself,
+			   FFFieldPropertiesMessageBlock *dataPtr,
+			   word fieldNameToken,
+			   byte fieldColumnNum)
+{
+    TextFieldDataAttrs       *textAttrPtr;
+    ValueFieldDataAttrs      *intAttrPtr;
+    DateFieldDataAttrs       *dateAttrPtr;
+    ComputedFieldDataAttrs   *computedAttrPtr;
+    MemHandle                dataTypeHandle;
+    word                     dataAttrStructureSize;
+    FieldDataAttrs           *commonDataAttrs;
+    byte                     notesTextLength;
+    void                     *dataAttrPtr;
+    FlatFileDatabaseInstance *pself;
+
+    pself = ObjDerefGen(oself);
+
+    /* get size of block needed. No space is allocated in the field
+       data structure for the for the "notes" string
+       (they are arrays of length 0).
+       Once the string is known, it is appended to the end of the
+       structure. Therefore, we need to allocate a block of size:
+       structure + notes string length + 1   
+       (the extra 1 is a null terminator) */
+    notesTextLength = strlen(dataPtr->notes);
+
+    switch(dataPtr->dataType) {
+	case FDT_GENERAL_TEXT:
+	    dataAttrStructureSize = sizeof(TextFieldDataAttrs) 
+	      + (notesTextLength + 1)*sizeof(TCHAR);
+	    /* 
+	     * allocate structure for field info 
+	     */
+	    dataTypeHandle = MemAlloc(dataAttrStructureSize, HF_SWAPABLE, 
+					HAF_NO_ERR | HAF_ZERO_INIT);
+	    textAttrPtr = MemLock(dataTypeHandle);
+	    commonDataAttrs = &(textAttrPtr->TFDA_common);
+
+	    /* 
+	     * store default field entry 
+	     */
+	    StoreDefaultField(oself,
+			      dataPtr->computedDefaultTokenStream,
+			      dataPtr->numTokensInTokenStream,
+			      fieldColumnNum,
+			      FDT_GENERAL_TEXT);
+
+	    /* 
+	     * store notes  
+	     */
+	    if (notesTextLength) {
+		strcpy((char *)textAttrPtr+sizeof(TextFieldDataAttrs),
+		       dataPtr->notes);
+	    }
+
+	    textAttrPtr->TFDA_maxLength = 
+				dataPtr->maxNumCharsAllowedInThisTextField;
+	    dataAttrPtr = textAttrPtr;
+	    break;
+
+	case FDT_INTEGER:
+	case FDT_REAL:
+	    dataAttrStructureSize = sizeof(ValueFieldDataAttrs)
+					+ (notesTextLength + 1)*sizeof(TCHAR);
+	    /* 
+	     * allocate structure for field info 
+	     */
+	    dataTypeHandle = MemAlloc(dataAttrStructureSize, HF_SWAPABLE, 
+					HAF_NO_ERR | HAF_ZERO_INIT);
+	    intAttrPtr = MemLock(dataTypeHandle);
+	    commonDataAttrs = &(intAttrPtr->VFDA_common);
+
+	    /* 
+	     * store default field entry 
+	     */
+	    StoreDefaultField(oself,
+			      dataPtr->computedDefaultTokenStream,
+			      dataPtr->numTokensInTokenStream,
+			      fieldColumnNum,
+			      dataPtr->dataType);
+
+	    if (notesTextLength) {      /* if there are notes */
+		strcpy((char *)intAttrPtr + sizeof(ValueFieldDataAttrs),
+		       dataPtr->notes);
+	    }
+
+	    intAttrPtr->VFDA_min = dataPtr->minValue;
+	    intAttrPtr->VFDA_max = dataPtr->maxValue;
+	    dataAttrPtr = intAttrPtr;
+	    break;
+
+	case FDT_TIME:
+	case FDT_DATE:      
+	    dataAttrStructureSize = sizeof(DateFieldDataAttrs)
+					+ (notesTextLength + 1)*sizeof(TCHAR);
+	    /* 
+	     * allocate structure for field info 
+	     */
+	    dataTypeHandle = MemAlloc(dataAttrStructureSize, HF_SWAPABLE, 
+					HAF_NO_ERR | HAF_ZERO_INIT);
+	    dateAttrPtr = MemLock(dataTypeHandle);
+	    commonDataAttrs = &(dateAttrPtr->DFDA_common);
+
+	    /* 
+	     * store default field entry 
+	     */
+	    StoreDefaultField(oself,
+			      dataPtr->computedDefaultTokenStream,
+			      dataPtr->numTokensInTokenStream,
+			      fieldColumnNum,
+			      dataPtr->dataType);
+
+	    if (notesTextLength) {      /* if there are notes */
+		strcpy((char *)dateAttrPtr+sizeof(DateFieldDataAttrs),
+		       dataPtr->notes);
+	    }
+
+	    dateAttrPtr->DFDA_min = dataPtr->minValue;
+	    dateAttrPtr->DFDA_max = dataPtr->maxValue;
+	    dataAttrPtr = dateAttrPtr;
+	    break;
+
+	case FDT_COMPUTED:          
+	    dataAttrStructureSize = sizeof(ComputedFieldDataAttrs)
+					+ (notesTextLength + 1)*sizeof(TCHAR);
+	    /* 
+	     * allocate structure for field info 
+	     */
+	    dataTypeHandle = MemAlloc(dataAttrStructureSize, HF_SWAPABLE, 
+					HAF_NO_ERR | HAF_ZERO_INIT);
+	    computedAttrPtr = MemLock(dataTypeHandle);
+	    commonDataAttrs = &(computedAttrPtr->CFDA_common);
+
+	    /* 
+	     * store default field entry 
+	     */
+	    StoreDefaultField(oself,
+			      dataPtr->computedDefaultTokenStream,
+			      dataPtr->numTokensInTokenStream,
+			      fieldColumnNum,
+			      dataPtr->dataType);
+
+	    if (notesTextLength) {      /* if there are notes */
+		strcpy((char *)computedAttrPtr+sizeof(ComputedFieldDataAttrs),
+		       dataPtr->notes);
+	    }
+
+	    dataAttrPtr = computedAttrPtr;
+	    break;
+
+#if PICTURE_TYPE_SUPPORTED
+	case FDT_PICTURE:           
+	    dataAttrStructureSize = sizeof(PictureFieldDataAttrs)
+					+ (notesTextLength + 1)*sizeof(TCHAR);
+	    /* 
+	     * allocate structure for field info 
+	     */
+	    dataTypeHandle = MemAlloc(dataAttrStructureSize, HF_SWAPABLE, 
+					HAF_NO_ERR | HAF_ZERO_INIT);
+	    pictureAttrPtr = MemLock(dataTypeHandle);
+	    commonDataAttrs = &(pictureAttrPtr->PFDA_common);
+
+	    if (notesTextLength) {      /* if there are notes */
+		strcpy(pictureAttrPtr->PFDA_notes, dataPtr->notes);
+	    }
+	    dataAttrPtr = pictureAttrPtr;
+	    break;
+#endif /* PICTURE_TYPE_SUPPORTED */
+    }
+
+    /* Now set up all the common data attributes */
+    commonDataAttrs->FDA_type = dataPtr->dataType;
+
+    /* Set notes bit if notes exist */
+    if (notesTextLength) {
+	commonDataAttrs->FDA_flags |= FDTF_HAS_NOTES;
+    } else {
+	commonDataAttrs->FDA_flags &= ~FDTF_HAS_NOTES;
+    }
+
+    /* Set "default" bit if default exists */
+    if (dataPtr->numTokensInTokenStream) {
+	commonDataAttrs->FDA_flags |= FDTF_HAS_DEFAULT;
+    } else {
+	commonDataAttrs->FDA_flags &= ~FDTF_HAS_DEFAULT;
+    }
+
+    commonDataAttrs->FDA_nameToken = fieldNameToken;
+
+    /* insert the cell */
+    pself = ObjDerefGen(oself);
+    CellReplace(&pself->SSI_cellParams,
+		FIELD_TYPE_ROW, 
+		(word) fieldColumnNum,
+		dataAttrPtr,
+		dataAttrStructureSize);
+
+    /*
+     * Free up the scratch space.
+     */
+    MemFree(dataTypeHandle);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDSetDependencies
+ *
+ * DESCRIPTION: This function sets up dependencies for a computed field.
+ *              There is no way to tell if a circular dependency was
+ *              created, unfortunately, until data entry mode.
+ *
+ * PARAMETERS:  oself - an optr to the current database
+ *              colNum - the column of the computed field
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  7/10/92         Initial version
+ *
+ ***********************************************************************/
+void
+FFDSetDependencies(optr oself, FieldID colNum)
+{
+    FlatFileDatabaseInstance *pself;
+    MemHandle eHandle;
+    FormulaCellStruct *expression, *oldExpression;
+
+    /*
+     * If the cell already exists, remove its dependencies.
+     */
+    pself = ObjDerefGen(oself);
+    oldExpression = CellLock(&pself->SSI_cellParams,
+			     TEMP_DATA_ROW, 
+			     colNum);
+    /*
+     * Remove any existing dependencies for this field.
+     */
+    if (oldExpression) {
+	CellUnlock(oldExpression);
+	if (oldExpression->cf.CF_common.CC_type == CT_FORMULA) {
+	    SpreadsheetCellAddRemoveDeps((SpreadsheetInstance *)pself,
+					 (dword) &(pself->SSI_cellParams),
+					 FFDParseLibraryCallback,
+					 (word) 1,
+					 (word) EF_MAKE_DEPENDENCIES,
+					 (word) TEMP_DATA_ROW,
+					 (word) colNum,
+					 (word) TEMP_DATA_ROW,
+					 (word) pself->SSI_maxCol);
+	}
+    }
+
+    if ((eHandle = MemAlloc(sizeof(FormulaCellStruct),
+			    HF_SHARABLE | HF_SWAPABLE, 0)) == 0) {
+	/* No more memory.  Bummer.  Notify user & return */
+	DisplayUserError(@FFMemoryFullError);
+	return;
+    }
+    expression = MemLock(eHandle);
+
+    /*
+     * Create a new field for this formula.
+     */
+    FFDLoadFormulaCell(oself, colNum, (CellFormula *)expression);
+    
+    /*
+     * Place the new formula in its spot in the dependency row.
+     */
+    pself = ObjDerefGen(oself);
+    CellReplace(&pself->SSI_cellParams,
+		TEMP_DATA_ROW,
+		(word) colNum,
+		expression,
+		(sizeof(CellFormula) + expression->cf.CF_formulaSize ));
+    MemFree(eHandle);
+
+    /*
+     * Create new dependencies!
+     */
+    pself = ObjDerefGen(oself);
+    SpreadsheetCellAddRemoveDeps((SpreadsheetInstance *)pself,
+				 (dword) &(pself->SSI_cellParams),
+				 FFDParseLibraryCallback,
+				 (word) 0,
+				 (word) EF_MAKE_DEPENDENCIES,
+				 (word) TEMP_DATA_ROW,
+				 (word) colNum,
+				 (word) TEMP_DATA_ROW,
+				 (word) pself->SSI_maxCol);
+
+}
+
+
+/***********************************************************************
+*
+* FUNCTION:    DrawNewLabel (INTERNAL)
+*
+* DESCRIPTION:  Creates & draws a label for a field 
+*
+* CALLED BY:    
+*               
+*
+* PARAMETERS:   grObjBodyOptr - what you'd think. 
+*               yPosition - y position to draw the label
+*               databaseOptr - optr to the current database.
+*               colNum - column number of the field
+*       
+* STRATEGY:     
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*       Name    Date            Description
+*       ----    ----            -----------
+*       anna    5/6/92          Initial Revision
+*       jeremy  5/14/92         Now draws the field's name.
+*       anna    6/10/92         Got rid of box around label
+*
+***********************************************************************/
+void 
+DrawNewLabel(optr grObjBodyOptr,
+	     optr labelGuardianOptr,
+	     dword yPosition,
+	     optr databaseOptr,
+	     FieldID colNum) 
+{
+    optr labelOptr;
+    GrObjInitializeData initData;
+    TCHAR fieldName[MAX_TOTAL_NAME_LENGTH + 2];
+    int i;
+
+    /*
+     * Specify the position and size of the new grobject and
+     * have it initialize itself to the default attributes
+     */
+    initData.GOID_position.PDF_x.DWF_int = 
+			((dword)0 << 16) | DEFAULT_LABEL_X_POSITION;
+    initData.GOID_position.PDF_x.DWF_frac = 0;
+    initData.GOID_position.PDF_y.DWF_int = yPosition;
+    initData.GOID_position.PDF_y.DWF_frac = 0;
+    initData.GOID_width.WWF_int = DEFAULT_LABEL_WIDTH;
+    initData.GOID_width.WWF_frac = 0;
+    initData.GOID_height.WWF_int = DEFAULT_FIELD_HEIGHT;
+    initData.GOID_height.WWF_frac = 0;
+    
+    @call labelGuardianOptr::MSG_GO_INITIALIZE(&initData);
+
+    labelOptr = @call labelGuardianOptr::MSG_GOVG_GET_VIS_WARD_OD();
+
+    /*
+     * Tell this text object not to care about losing the target.
+     */
+    @call labelOptr::MSG_FFT_INITIALIZE((FieldID) -1);
+
+    /*
+     * Notify object that it is complete and ready to go
+     */
+    @call labelGuardianOptr::MSG_GO_NOTIFY_GROBJ_VALID();
+    
+    /*
+     * Get the field's name from the database.
+     */
+    FFDGetColumnFieldName(databaseOptr, (word) colNum, fieldName);
+
+    /* Add a colon on to the end just for kicks. */
+    i = strlen(fieldName);
+    fieldName[i++] = _TEXT(':');
+    fieldName[i] = _TEXT('\0');
+
+    /*
+     * Add the text label with default attributes.
+     */
+    @call labelOptr::MSG_VIS_TEXT_SET_PARA_ATTR_BY_DEFAULT(
+					VIS_TEXT_INITIAL_PARA_ATTR,
+					TEXT_ADDRESS_PAST_END, (dword) 0); 
+
+#ifdef DO_PIZZA
+    @call labelOptr::MSG_VIS_TEXT_SET_FONT_ID(
+			FID_BITSTREAM_KANJI_HON_MINCHO,
+		    	TEXT_ADDRESS_PAST_END, (dword) 0);
+#else
+    @call labelOptr::MSG_VIS_TEXT_SET_CHAR_ATTR_BY_DEFAULT(
+			(FF_DEF_TEXT_SIZE << VTDCA_SIZE_OFFSET) | VTDF_URW_ROMAN,
+			TEXT_ADDRESS_PAST_END, (dword) 0); 
+#endif
+
+    @call labelOptr::MSG_VIS_TEXT_SET_PARA_ATTRIBUTES(0,
+					(J_RIGHT << VTDPA_JUSTIFICATION_OFFSET),
+					TEXT_ADDRESS_PAST_END, (dword) 0); 
+
+    @call labelOptr::MSG_VIS_TEXT_REPLACE_ALL_PTR(fieldName, 0);
+
+    /*
+     * Add the new grobject to the body and have it drawn.
+     */
+    @call grObjBodyOptr::MSG_GB_ADD_GROBJ_THEN_DRAW(labelGuardianOptr, 
+		GOBAGOR_LAST | GOBAGOF_DRAW_LIST_POSITION);
+
+}
+
+/***********************************************************************
+*
+* FUNCTION:    DrawNewField (INTERNAL)
+*
+* DESCRIPTION:  Draws the given GrObject onto the current layout. 
+*               Also creates & draws a label for the field.
+*
+* CALLED BY:    
+*               
+* PARAMETERS:   grObjBodyOptr - what you'd think. 
+*               fieldOptr - optr to a field GrObject 
+*               yPosition - y position to draw the label
+*               databaseOptr - optr to the current database.
+*               colNum - column number of the field
+*               width - width of field box
+* STRATEGY:     
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*       Name    Date            Description
+*       ----    ----            -----------
+*       anna    5/6/92          Initial Revision
+*       jeremy  5/14/92         Added field index arg
+*       anna    6/9/92          Added field name display
+*       ted     1/25/93         Added one more argument 
+*
+***********************************************************************/
+void 
+DrawNewField(optr grObjBodyOptr,
+	     optr fieldGuardianOptr,
+	     dword yPosition,
+	     optr databaseOptr,
+	     FieldID colNum,
+	     word width)
+{
+    GrObjInitializeData initData;
+    EventHandle event;
+    dword contentSize;
+
+    /*
+     * Specify the position and size of the new grobject and
+     * have it initialize itself to the default attributes
+     */
+    initData.GOID_position.PDF_x.DWF_int = (dword) DEFAULT_FIELD_X_POSITION;
+    initData.GOID_position.PDF_x.DWF_frac = 0;
+    initData.GOID_position.PDF_y.DWF_int = yPosition;
+    initData.GOID_position.PDF_y.DWF_frac = 0;
+
+    /*
+     * Check to see if the width is passed in from the calling routine.
+     * If passed in, then use it.  Otherwise, send a message to GenView
+     * to get the width.
+     */
+
+    if (width) {
+	initData.GOID_width.WWF_int = width;
+    } else {
+	/*
+	 * We want the field to fit within the bounds of the current view.
+	 * Make sure it's at least 1/2 an inch wide, though...
+	 */
+	event = @record VisContentClass::
+	    MSG_VIS_CONTENT_GET_WIN_SIZE();
+	contentSize = @call {MSG_VIS_CONTENT_GET_WIN_SIZE} databaseOptr::
+	    MSG_VIS_VUP_CALL_OBJECT_OF_CLASS(event);
+
+	initData.GOID_width.WWF_int = DWORD_WIDTH(contentSize) -
+	    (DEFAULT_LABEL_X_POSITION + DEFAULT_FIELD_X_POSITION);
+
+	if (initData.GOID_width.WWF_int < MIN_FIELD_WIDTH) {
+	    initData.GOID_width.WWF_int = MIN_FIELD_WIDTH;
+	}
+    }
+
+    initData.GOID_width.WWF_frac = 0;
+    initData.GOID_height.WWF_int = DEFAULT_FIELD_HEIGHT;
+    initData.GOID_height.WWF_frac = 0;
+    
+    @call fieldGuardianOptr::MSG_GO_INITIALIZE(&initData);
+    
+    /*
+     * Set some bits and flags to make sure that the text field
+     * in data entry will be drawn at whatever height the user
+     * has drawn it to in design
+     */
+    @call fieldGuardianOptr::MSG_TG_SET_TEXT_GUARDIAN_FLAGS(
+					TGF_ENFORCE_DESIRED_MIN_HEIGHT |
+					TGF_ENFORCE_DESIRED_MAX_HEIGHT, 0);
+    @call fieldGuardianOptr::MSG_TG_CALC_DESIRED_MIN_HEIGHT();
+    @call fieldGuardianOptr::MSG_TG_CALC_DESIRED_MAX_HEIGHT();
+
+    /*
+     * Put a box around the field, and make it opaque so it doesn't
+     * blink when you navigate out of it.
+     */
+    @call fieldGuardianOptr::MSG_GO_SET_LINE_MASK(SDM_100);
+    @call fieldGuardianOptr::MSG_GO_SET_TRANSPARENCY(FALSE);
+
+    /*
+     * Notify object that it is complete and ready to go
+     */
+    @call fieldGuardianOptr::MSG_GO_NOTIFY_GROBJ_VALID();
+
+    /*
+     * Do the rest of the work.
+     */
+    FFDSetFieldNameInGrObj(grObjBodyOptr, fieldGuardianOptr,
+			   databaseOptr, colNum, TRUE, TRUE);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDSetFieldNameInGrObj
+ *
+ * DESCRIPTION: This function sets a field's GrObject for design mode
+ *              and otherwise initializes it for the big game that
+ *              is data entry.
+ *
+ *              If the addToBody flag is set, it'll add the field
+ *              to the body and draw it.
+ *
+ *              If the setDefaultAttrs flag is set, it'll set the field's font
+ *              and attributes to default values.
+ *
+ * PARAMETERS:  grObjBodyOptr - what you'd think. 
+ *              fieldOptr - optr to a field GrObject 
+ *              databaseOptr - optr to the current database.
+ *              colNum - column number of the field
+ *              addToBody - flag: add to body and draw, or not.
+ *              setDefaultAttrs - flag: set default font and attrs, or not.
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  8/13/92         Initial version
+ *
+ ***********************************************************************/
+void
+FFDSetFieldNameInGrObj(optr grObjBodyOptr,
+		       optr fieldGuardianOptr,
+		       optr databaseOptr,
+		       FieldID colNum,
+		       Boolean addToBody,
+		       Boolean setDefaultAttrs)
+{
+    optr fieldOptr;
+    TCHAR fieldName[MAX_FIELD_NAME_LENGTH + 1];
+    FieldDataType dataType;
+
+    /*
+     * Get the text object's optr from its guardian.
+     */
+    fieldOptr = @call fieldGuardianOptr::MSG_GOVG_GET_VIS_WARD_OD();
+
+    /*
+     * Send this text object its field column number.
+     */
+    @send fieldOptr::MSG_FFT_INITIALIZE(colNum);
+    
+    /*
+     * Get the field's name from the database.
+     */
+    FFDGetColumnFieldName(databaseOptr, (word) colNum, fieldName);
+
+    /*
+     * Add the field text with default attributes.
+     */
+    if (setDefaultAttrs) {
+	@call fieldOptr::MSG_VIS_TEXT_SET_PARA_ATTR_BY_DEFAULT(
+					VIS_TEXT_INITIAL_PARA_ATTR,
+					TEXT_ADDRESS_PAST_END, (dword) 0); 
+
+#ifdef DO_PIZZA
+	@call fieldOptr::MSG_VIS_TEXT_SET_FONT_ID(
+			FID_BITSTREAM_KANJI_HON_MINCHO,
+		    	TEXT_ADDRESS_PAST_END, (dword) 0);
+#else
+	@call fieldOptr::MSG_VIS_TEXT_SET_CHAR_ATTR_BY_DEFAULT(
+			(FF_DEF_TEXT_SIZE << VTDCA_SIZE_OFFSET) | VTDF_URW_ROMAN,
+			TEXT_ADDRESS_PAST_END, (dword) 0); 
+#endif
+
+    }
+
+    /*
+     * Display the field name
+     */
+    @call fieldOptr::MSG_VIS_TEXT_REPLACE_ALL_PTR(fieldName, 0);
+
+    /*
+     * Set the field non-editable to user can't change the text
+     */
+    @call fieldGuardianOptr::MSG_GO_CHANGE_LOCKS(GOL_LOCK | GOL_EDIT,
+						 GOL_LOCK);
+
+    /*
+     * Set its field type.
+     */
+    dataType = FFDGetDataTypeAndFlags(databaseOptr, colNum, NULL);
+    @send fieldGuardianOptr::MSG_FFTFG_SET_FIELD_TYPE(dataType);
+    @send fieldGuardianOptr::MSG_FFTFG_SET_FOR_DESIGN_MODE();
+    
+    /*
+     * Add the new grobject to the body and have it drawn.
+     */
+    if (addToBody) {
+	@call grObjBodyOptr::MSG_GB_ADD_GROBJ_THEN_DRAW(fieldGuardianOptr, 
+		GOBAGOR_LAST | GOBAGOF_DRAW_LIST_POSITION);
+    }
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDChangeFieldLabel
+ *
+ * DESCRIPTION: This function attempts to change a field's label text
+ *              object.
+ *
+ * PARAMETERS:  oself - od of the current database
+ *              index - index of the field to change (NOTE: this is the
+ *                      layoutlist index, not a column number!)
+ *              layout - the layout in which the name is to be changed
+ *              text - pointer to the new name.
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  6/ 3/92         Initial Revision
+ *
+ ***********************************************************************/
+void
+FFDChangeFieldLabel(optr oself, FieldID index, word layout, TCHAR *text)
+{
+    FlatFileDatabaseInstance *pself;
+    RecordLayoutChunkArrayHeader *cellDataPtr;
+    CellRef cellOptr;
+    RecordLayoutChunkArrayElement *currentIndexElement;
+    MemHandle grObjectMemBlock;
+    VMFileHandle documentHandle;
+    optr fieldOptr, labelOptr;
+    optr fieldTextOptr, labelTextOptr;
+    TCHAR labelText[MAX_FIELD_NAME_LENGTH + 2];
+
+    /*
+     * First, retrieve the record layout chunk array.
+     */
+    pself = ObjDerefGen(oself);
+    documentHandle = pself->documentHandle;
+    cellDataPtr = CellLockGetRef(&pself->SSI_cellParams,
+			     RECORD_LAYOUT_ROW, 
+			     layout,
+			     &cellOptr);
+#if ERROR_CHECK
+    if (!cellDataPtr) {
+	EC_ERROR(CELL_DOES_NOT_EXIST);
+    }
+#endif  /* ERROR_CHECK */
+
+    /*
+     * Get a pointer to this element.
+     */
+    currentIndexElement = ChunkArrayElementToPtr(cellOptr, index, (word *)0);
+
+    /*
+     * Get the associated field GrObj.
+     */
+    grObjectMemBlock = VMVMBlockToMemBlock(documentHandle, 
+			      currentIndexElement->GOEOP_grObjectVMBlock);
+    fieldOptr = ConstructOptr(grObjectMemBlock, 
+			      currentIndexElement->GOEOP_grObjectChunk);
+
+    /*
+     * Get a pointer to the label GrObj.
+     */
+    labelOptr = @call fieldOptr::
+	MSG_FFTFG_GET_LABEL_OPTR(documentHandle);
+
+    /*
+     * Get the text optrs.
+     */
+    fieldTextOptr = @call fieldOptr::MSG_GOVG_GET_VIS_WARD_OD();
+
+    CellUnlock(cellDataPtr);
+
+    /*
+     * Does this field have a label?
+     */
+    if (labelOptr) {
+	/*
+	 * The field has a label!  Change it to the new name.
+	 */
+	labelTextOptr = @call labelOptr::MSG_GOVG_GET_VIS_WARD_OD();
+	sprintf(labelText, _TEXT("%s:"), text);
+	@call labelTextOptr::MSG_VIS_TEXT_REPLACE_ALL_PTR(labelText, 0);
+    }
+
+    @call fieldTextOptr::MSG_VIS_TEXT_REPLACE_ALL_PTR(text, 0);
+}
+
+/***********************************************************************
+*
+* FUNCTION:    MSG_FFD_ADD_FIELD_TO_LAYOUT
+*
+* DESCRIPTION:  - Creates a label (multText GrObject)
+*                 and a field (text GrObject), and adds them to the 
+*                 GrObjBody of the current layout. 
+*               - Adds them to the record layout chunk
+*                 array for the current layout.
+*               - Draws them on the current layout.
+*               - Copies over the latest copy of the layout's sorted
+*                 list from the instance data into the header of the
+*                 chunk array. This is so that when we switch layouts,
+*                 we can just copy the sorted list from the chunk array
+*                 into the instance data (instead of having to re-sort
+*                 every time we switch layouts: slow.......)
+*               - adds the field to the field tab order list
+*
+* CALLED BY:   GLOBAL
+*
+* PARAMETERS:   void (FieldID index, word width);
+*               NOTE: This index is the index into the LAYOUT_NAME_LIST,
+*                       NOT an absolute column number!
+*                     Width is the default field width that will be passed
+*                       to 'DrawNewField'
+*
+* STRATEGY:     
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*      Name    Date             Description
+*      ----    ----             -----------
+*      anna    5/4/92           Initial Revision
+*      ted     1/25/93          Added one more argument
+*       anna    3/26/93         Added code to deal with field tab order
+*
+***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_ADD_FIELD_TO_LAYOUT 
+{
+    optr fieldOptr, labelOptr;
+    CellRef cellOptr;   /* Memhandle & ChunkHandle of cell */
+    RecordLayoutChunkArrayElement *chunkArrayElement, *currentIndexElement;
+    RecordLayoutChunkArrayHeader *cellDataPtr;
+    VMFileHandle file;
+    sdword newFieldYPosition;
+    optr grObjBodyOptr;
+    MemHandle memBlock;
+    FieldID colNum;
+
+    /*
+     * First, retrieve the record layout chunk array.
+     */
+    cellDataPtr = CellLockGetRef(&pself->SSI_cellParams,
+				 RECORD_LAYOUT_ROW, 
+				 pself->FFI_currentLayout,
+				 &cellOptr);
+#if ERROR_CHECK
+    if (!cellDataPtr) {
+	EC_ERROR(CELL_DOES_NOT_EXIST);
+    }
+#endif /* ERROR_CHECK */
+
+    pself = ObjDerefGen(oself);
+    memBlock = VMVMBlockToMemBlock(pself->documentHandle, 
+			cellDataPtr->RLCAH_layoutCommon.LC_grObjBodyVMBlock);
+
+    grObjBodyOptr = ConstructOptr(memBlock, 
+			cellDataPtr->RLCAH_layoutCommon.LC_grObjBodyChunk);
+
+    /*
+     * Have the graphic body create the new grobjects in one of the
+     * blocks that it manages
+     */
+    fieldOptr = @call grObjBodyOptr::MSG_GB_INSTANTIATE_GROBJ(
+			  (ClassStruct *) &FFTextFieldGuardianClass);
+    /*
+     * Don't allow the field to be grouped
+     */
+    @call fieldOptr::MSG_GO_CHANGE_LOCKS(GOL_LOCK | GOL_GROUP, GOL_LOCK);
+
+    labelOptr = @call grObjBodyOptr::MSG_GB_INSTANTIATE_GROBJ(
+			  (ClassStruct *) &FFLabelGuardianClass);
+
+    /*
+     * Store the new sorted field list in the chunk array header
+     */
+    pself = ObjDerefGen(oself);
+    memcpy(&cellDataPtr->RLCAH_layoutSortedFieldList, 
+	   &pself->FFI_layoutNameList,
+	   MAX_NUM_FIELDS);
+
+    /*
+     * Add the field to the field navigation order
+     */
+    @call oself::MSG_FFD_FNO_INFO_ADD_ITEM(pself->FFI_layoutNameList[index]);
+
+    /*
+     *Copy the field navigation order from instance data into the chunk header.
+     */
+    pself = ObjDerefGen(oself);
+    memcpy(&cellDataPtr->RLCAH_fieldOrderInfo,
+	   &pself->FFI_fieldOrderInfo,
+	   sizeof(FFDBFieldNavigationOrderInfo));
+
+    /*
+     * update the # of fields in the layout
+     */
+    cellDataPtr->RLCAH_numFieldsInLayout = pself->FFI_numInLayoutNameList;
+
+    /*
+     * Figure out the bottom-most Y position we can place the new field.
+     * If the document and page are too small, enlarge them to fit the
+     * new field.
+     */
+    if (!FFDGetNewFieldPosition(oself, grObjBodyOptr, &newFieldYPosition,
+		    DEFAULT_FIELD_HEIGHT + DEFAULT_Y_DISTANCE_BETWEEN_FIELDS)) {
+	/*
+	 * The field can't fit into the current layout.  Enlarge the layout
+	 * and possibly the page to fit the new size.
+	 */
+	FFDEnlargeLayoutToFitNewField(oself,
+				      newFieldYPosition,
+				      (DEFAULT_FIELD_HEIGHT +
+				       DEFAULT_Y_DISTANCE_BETWEEN_FIELDS +
+				       A_BIT_EXTRA_TO_LOOK_NICE));
+    }
+
+    /*
+     * The newFieldYPosition is now the bottom of the bottom-most
+     * object in the body.  Add a little space.
+     */
+    newFieldYPosition += DEFAULT_Y_DISTANCE_BETWEEN_FIELDS;
+    
+    cellDataPtr->RLCAH_lastFieldYPosition = newFieldYPosition;
+
+    /*
+     * See if this element should be added at the end; if so,
+     * append it (otherwise insert)
+     */
+    pself = ObjDerefGen(oself);
+    if (index == pself->FFI_numInLayoutNameList - 1) {
+	chunkArrayElement = ChunkArrayAppend(cellOptr, 0);
+    } else {
+	/*
+	 * Get a pointer to the grobject we want to insert _before_
+	 */
+	currentIndexElement = ChunkArrayElementToPtr(cellOptr, 
+						     index, 
+						     (word *)0);
+
+	chunkArrayElement = ChunkArrayInsertAt(cellOptr, 
+					       currentIndexElement, 
+					       0);
+    }
+    
+    /*
+     * Fill in the VM block and chunk handle for the new Gr object
+     */
+    chunkArrayElement->GOEOP_grObjectVMBlock =
+	VMMemBlockToVMBlock(OptrToHandle(fieldOptr), &file);
+
+    chunkArrayElement->GOEOP_grObjectChunk = OptrToChunk(fieldOptr);
+
+    /*
+     * Link the field and label GrObjects by giving the other's VMBlock and
+     * chunk address.
+     */
+    @send fieldOptr::MSG_FFTFG_INITIALIZE(
+	    VMMemBlockToVMBlock(OptrToHandle(labelOptr), &file),
+	    OptrToChunk(labelOptr),
+	    FEF_ALL_EDGES);
+
+    @send labelOptr::MSG_FFLG_INITIALIZE(
+	    chunkArrayElement->GOEOP_grObjectVMBlock,
+	    chunkArrayElement->GOEOP_grObjectChunk,
+	    &file);
+    
+    /*
+     * Get new pointer to the chunk array--it may have moved when
+     * the last element was added
+     */
+    cellDataPtr = LMemDeref(cellOptr);
+
+    /*
+     * Dirty & unlock the cell 
+     */
+    CellDirty(cellDataPtr);
+
+    CellUnlock(cellDataPtr);
+
+    /*
+     * Draw the field and label.
+     */
+    pself = ObjDerefGen(oself);
+    colNum = pself->FFI_layoutNameList[index];
+    
+    DrawNewField(grObjBodyOptr, fieldOptr, newFieldYPosition, oself, colNum,
+		 width);
+    DrawNewLabel(grObjBodyOptr, labelOptr, newFieldYPosition, oself, colNum);
+
+    /*
+     * Make sure the new field is visible.
+     */
+    FFDForceFieldOnScreen(oself, colNum);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    MSG_FFD_ADD_EXISTING_GROBJ_TO_LAYOUT
+ *
+ * DESCRIPTION: - Adds the passed TextGuardian to the 
+ *                GrObjBody of the current layout. 
+ *              - Adds it to the record layout chunk
+ *                array for the current layout.
+ *              - Redraws it with its new name.
+ *              - Copies over the latest copy of the layout's sorted
+ *                list from the instance data into the header of the
+ *                chunk array. This is so that when we switch layouts,
+ *                we can just copy the sorted list from the chunk array
+ *                into the instance data (instead of having to re-sort
+ *                every time we switch layouts: slow.......)
+ *              - Re-attach the associated label.
+ *
+ * CALLED BY:   GLOBAL
+ *
+ * PARAMETERS:  void (FieldID index, optr fieldOptr, optr labelOptr);
+ *              NOTE: This index is the index into the LAYOUT_NAME_LIST,
+ *                      NOT an absolute column number!
+ *
+ * STRATEGY:    
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date                    Description
+ *      ----    ----                    -----------
+ *      jdashe  8/13/92                 Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_ADD_EXISTING_GROBJ_TO_LAYOUT
+{
+    CellRef cellOptr;   /* Memhandle & ChunkHandle of cell */
+    RecordLayoutChunkArrayElement *chunkArrayElement, *currentIndexElement;
+    RecordLayoutChunkArrayHeader *cellDataPtr;
+    VMFileHandle file;
+    optr grObjBodyOptr;
+    optr labelWard;
+    MemHandle memBlock;
+    FieldID colNum;
+    TCHAR fieldName[MAX_FIELD_NAME_LENGTH];
+
+    /*
+     * First, retrieve the record layout chunk array.
+     */
+    cellDataPtr = CellLockGetRef(&pself->SSI_cellParams,
+				 RECORD_LAYOUT_ROW, 
+				 pself->FFI_currentLayout,
+				 &cellOptr);
+#if ERROR_CHECK
+    if (!cellDataPtr) {
+	EC_ERROR(CELL_DOES_NOT_EXIST);
+    }
+#endif /* ERROR_CHECK */
+
+    pself = ObjDerefGen(oself);
+    memBlock = VMVMBlockToMemBlock(pself->documentHandle, 
+			cellDataPtr->RLCAH_layoutCommon.LC_grObjBodyVMBlock);
+
+    grObjBodyOptr = ConstructOptr(memBlock, 
+			cellDataPtr->RLCAH_layoutCommon.LC_grObjBodyChunk);
+
+    /*
+     * Store the new sorted field list in the chunk array header
+     */
+    pself = ObjDerefGen(oself);
+    memcpy(&cellDataPtr->RLCAH_layoutSortedFieldList, 
+	   &pself->FFI_layoutNameList,
+	   MAX_NUM_FIELDS);
+
+    /*
+     * update the # of fields in the layout
+     */
+    cellDataPtr->RLCAH_numFieldsInLayout = pself->FFI_numInLayoutNameList;
+
+    /*
+     * See if this element should be added at the end; if so,
+     * append it (otherwise insert)
+     */
+    if (index == pself->FFI_numInLayoutNameList - 1) {
+	chunkArrayElement = ChunkArrayAppend(cellOptr, 0);
+    } else {
+	/*
+	 * Get a pointer to the grobject we want to insert _before_
+	 */
+	currentIndexElement = ChunkArrayElementToPtr(cellOptr, 
+						     index, 
+						     (word *)0);
+
+	chunkArrayElement = ChunkArrayInsertAt(cellOptr, 
+					       currentIndexElement, 
+					       0);
+    }
+    
+    /*
+     * Fill in the VM block and chunk handle for the new Gr object
+     */
+    chunkArrayElement->GOEOP_grObjectVMBlock =
+	VMMemBlockToVMBlock(OptrToHandle(fieldOptr), &file);
+
+    chunkArrayElement->GOEOP_grObjectChunk = OptrToChunk(fieldOptr);
+
+    /*
+     * Link the field and label GrObjects by giving the other's VMBlock and
+     * chunk address.
+     */
+    if (labelOptr) {
+	@send fieldOptr::MSG_FFTFG_INITIALIZE(
+	    VMMemBlockToVMBlock(OptrToHandle(labelOptr), &file),
+	    OptrToChunk(labelOptr), FEF_LEAVE_EDGES_ALONE);
+
+	@send labelOptr::MSG_FFLG_INITIALIZE(
+	    chunkArrayElement->GOEOP_grObjectVMBlock,
+	    chunkArrayElement->GOEOP_grObjectChunk,
+	    &file);
+    } else {
+	@send fieldOptr::MSG_FFTFG_INITIALIZE(0, 0, FEF_LEAVE_EDGES_ALONE);
+    }
+
+    /*
+     * Get new pointer to the chunk array--it may have moved when
+     * the last element was added
+     */
+    cellDataPtr = LMemDeref(cellOptr);
+
+    /*
+     * Dirty & unlock the cell 
+     */
+    CellDirty(cellDataPtr);
+
+    CellUnlock(cellDataPtr);
+
+    /*
+     * Draw the field and label.
+     */
+    pself = ObjDerefGen(oself);
+    colNum = pself->FFI_layoutNameList[index];
+    
+    FFDSetFieldNameInGrObj(grObjBodyOptr, fieldOptr,
+			   oself, colNum, FALSE, FALSE);
+
+    if (labelOptr) {
+	labelWard = @call labelOptr::MSG_GOVG_GET_VIS_WARD_OD();
+	FFDGetColumnFieldName(oself, (word) colNum, fieldName);
+	@call labelWard::MSG_VIS_TEXT_REPLACE_ALL_PTR(fieldName, 0);
+    }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_GET_DOCUMENT_HANDLE for FlatFileDatabaseClass
+ *
+ * DESCRIPTION: This message returns the current VMFileHandle.
+ *
+ * PARAMETERS:
+ *      VMFileHandle ()
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  6/29/92         Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_GET_DOCUMENT_HANDLE
+{
+    return(pself->documentHandle);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    MSG_FFD_DELETE_CHUNK_ELEMENT_FROM_LAYOUT for
+ *              FlatFileDatabaseClass
+ *
+ * DESCRIPTION:         - Deletes the field reference from the given layout's
+ *                        chunk array.
+ *                      - If it's for the current layout, copies over the 
+ *                        latest copy of the layout's sorted
+ *                        list from the instance data into the header of the
+ *                        chunk array. This is so that when we switch layouts,
+ *                        we can just copy the sorted list from the chunk array
+ *                        into the instance data (instead of having to re-sort
+ *                        every time we switch layouts: slow.......)
+ *
+ * CALLED BY:   Dying GrObjects -- FFTextClass objects.
+ *
+ * PARAMETERS:  void (FieldID colNum)
+ *              NOTE: This is the absolute column number of the field.
+ *
+ * PARAMETERS:
+ *      Pass:   optr oself - optr to database
+ *              FieldID colNum - absolute column number
+ *      Returns:
+ *              nothing
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  7/ 2/92         Initial version
+ *      anna    9/28/92         Broke out into function
+ *
+ ***********************************************************************/
+void
+FFDDeleteChunkElementFromLayout(optr oself, FieldID colNum, byte layoutNum)
+{
+    RecordLayoutChunkArrayHeader *cellDataPtr;
+    RecordLayoutChunkArrayElement *currentIndexElement;
+    CellRef cellOptr;
+    FieldListID layoutListIndex;
+    FlatFileDatabaseInstance *pself = ObjDerefGen(oself);
+
+    /*
+     * Retrieve the record layout chunk array.
+     */
+    cellDataPtr = CellLockGetRef(&pself->SSI_cellParams,
+				 RECORD_LAYOUT_ROW, 
+				 layoutNum, 
+				 &cellOptr);
+#if ERROR_CHECK
+    if (!cellDataPtr) {
+	EC_ERROR(CELL_DOES_NOT_EXIST);
+    }
+#endif /* ERROR_CHECK */
+
+    /*
+     * Get a pointer to this element
+     */
+    pself = ObjDerefGen(oself);
+    layoutListIndex =
+	FindFieldListElement(cellDataPtr->RLCAH_layoutSortedFieldList,
+			     colNum,
+			     cellDataPtr->RLCAH_numFieldsInLayout);
+    /*
+     * If the field doesn't exist on this layout, do nothing
+     */
+    if (layoutListIndex == (byte) -1) {
+	CellUnlock(cellDataPtr);
+	return;
+    }
+
+    currentIndexElement = ChunkArrayElementToPtr(cellOptr, 
+						 layoutListIndex, 
+						 (word *)0);
+
+    /*
+     * Delete the field from the layout list, if necessary.
+     */
+    pself = ObjDerefGen(oself);
+    if (layoutNum == pself->FFI_currentLayout) {
+	layoutListIndex = DeleteAbsoluteFieldFromList(
+					     pself->FFI_layoutNameList,
+					     colNum,
+					     pself->FFI_numInLayoutNameList);
+    }
+
+
+    /*
+     * Delete the field from the sorted field list in the chunk array header.
+     */
+    pself = ObjDerefGen(oself);
+    layoutListIndex = DeleteAbsoluteFieldFromList(
+				cellDataPtr->RLCAH_layoutSortedFieldList,
+				colNum,
+				cellDataPtr->RLCAH_numFieldsInLayout);
+
+    /*
+     * Update the # of fields in the layout header
+     */
+    cellDataPtr->RLCAH_numFieldsInLayout--;
+
+    /*
+     * Delete the element from the chunk array
+     */
+    ChunkArrayDelete(cellOptr, currentIndexElement);
+
+    /*
+     * Dirty & unlock the cell 
+     */
+    CellDirty(cellDataPtr);
+
+    CellUnlock(cellDataPtr);
+
+    /*
+     * Remove the field from the tab order list (before notification below)
+     */
+    FFDDeleteFieldFromTabOrderList(oself, colNum, layoutNum);
+
+    pself = ObjDerefGen(oself);
+    if (layoutNum == pself->FFI_currentLayout) {
+	if (layoutListIndex != (FieldID) -1) {
+	    /*
+	     * Send out a notification that a field has been removed from the
+	     * layout list and place it in the not_in_layout list.
+	     */
+	    pself->FFI_numInLayoutNameList--;
+
+	    @call self::MSG_FFD_ADD_NAME_TO_NOT_IN_LAYOUT_LIST(colNum);
+
+	    SendLayoutListNotification(oself, layoutListIndex, DELETED, 0);
+	}
+    }
+
+    ObjMarkDirty(oself);
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_DELETE_CHUNK_ELEMENT_FROM_LAYOUT for
+ *              FlatFileDatabaseClass
+ *
+ * DESCRIPTION:         - Deletes the field reference from the current layout's
+ *                        chunk array.
+ *                      - Copies over the latest copy of the layout's sorted
+ *                        list from the instance data into the header of the
+ *                        chunk array. This is so that when we switch layouts,
+ *                        we can just copy the sorted list from the chunk array
+ *                        into the instance data (instead of having to re-sort
+ *                        every time we switch layouts: slow.......)
+ *
+ * CALLED BY:   Dying GrObjects -- FFTextClass objects.
+ *
+ * PARAMETERS:  void (FieldID colNum)
+ *              NOTE: This is the absolute column number of the field.
+ *
+ * PARAMETERS:
+ *      void (FieldID colNum);
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  7/ 2/92         Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_DELETE_CHUNK_ELEMENT_FROM_LAYOUT
+{
+    FFDDeleteChunkElementFromLayout(oself, colNum, pself->FFI_currentLayout);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDDeleteFieldFromTabOrderList
+ *
+ * DESCRIPTION: This message deletes the given field from the given 
+ *              layout's tab order list.
+ *
+ * PARAMETERS:  oself - FlatFileDatabase optr.
+ *              colNum - field column number
+ *              layoutNum - layout number
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    3/25/93         Initial Revision
+ *
+ ***********************************************************************/
+void 
+FFDDeleteFieldFromTabOrderList(optr oself, byte colNum, byte layoutNum)
+{
+    RecordLayoutChunkArrayHeader *cellDataPtr;
+    FlatFileDatabaseInstance *pself;
+    optr cellOptr;
+    byte fieldIndex;
+
+    pself = ObjDerefGen(oself);
+
+    /*
+     * Retrieve the record layout chunk array header
+     */
+    cellDataPtr = CellLockGetRef(&pself->SSI_cellParams,
+					RECORD_LAYOUT_ROW,
+					layoutNum,
+					&cellOptr);
+    
+    fieldIndex = FindFieldListElement(
+		    cellDataPtr->RLCAH_fieldOrderInfo.FNOI_fieldOrderList,
+		    colNum,
+		    cellDataPtr->RLCAH_fieldOrderInfo.FNOI_lastItemIndex+1);
+
+    /*
+     * If the field doesn't exist in this layout, do nothing
+     */
+    if (fieldIndex == (byte) -1) {
+	CellUnlock(cellDataPtr);
+	return;
+    }
+
+    /*
+     * If it does, delete it
+     */
+    (void) DeleteFieldFromList(
+		cellDataPtr->RLCAH_fieldOrderInfo.FNOI_fieldOrderList,
+		fieldIndex,
+		cellDataPtr->RLCAH_fieldOrderInfo.FNOI_lastItemIndex+1);
+
+    /*
+     * Update the pointer to the last item
+     */
+    cellDataPtr->RLCAH_fieldOrderInfo.FNOI_lastItemIndex--;
+
+    /*
+     * Dirty & unlock the cell
+     */
+    cellDataPtr = LMemDeref(cellOptr);
+    CellDirty(cellDataPtr);
+
+    cellDataPtr = LMemDeref(cellOptr);
+    CellUnlock(cellDataPtr);
+
+    /*
+     * If this is the current layout, update the instance data as well
+     */
+    pself = ObjDerefGen(oself);
+    if (layoutNum == pself->FFI_currentLayout) {
+	memcpy(&pself->FFI_fieldOrderInfo,
+	   &cellDataPtr->RLCAH_fieldOrderInfo,
+	   sizeof(FFDBFieldNavigationOrderInfo));
+    }
+}
+
+/***********************************************************************
+*
+* FUNCTION:    FFDDeleteFieldFromLayout
+*
+* DESCRIPTION:  
+*               - Deletes the field's associated GrObject and clears the visual
+*                 representation of it from the given layout.
+*               - Removes the field from the tab order list
+*
+* CALLED BY:   GLOBAL
+*
+* PARAMETERS:   Pass:   optr oself - optr to database
+*                       byte colNum - Column number 
+*                       byte layoutNum - absolute column number of layout
+*
+* STRATEGY:     
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*      Name    Date             Description
+*      ----    ----             -----------
+*      anna    5/7/92           Initial Revision
+*       anna    3/26/93         Field tab order stuff
+*
+***********************************************************************/
+void
+FFDDeleteFieldFromLayout(optr oself, byte colNum, byte layoutNum)
+{
+    RecordLayoutChunkArrayHeader *cellDataPtr;
+    CellRef cellOptr;
+    RecordLayoutChunkArrayElement *currentIndexElement;
+    MemHandle grObjectMemBlock;
+    optr grObjectOptr, labelOptr, grObjBody;
+    FlatFileDatabaseInstance *pself = ObjDerefGen(oself);
+    byte indexIntoList;
+
+    /*
+     * First, retrieve the record layout chunk array.
+     */
+    cellDataPtr = CellLockGetRef(&pself->SSI_cellParams,
+				 RECORD_LAYOUT_ROW, 
+				 layoutNum,
+				 &cellOptr);
+#if ERROR_CHECK
+    if (!cellDataPtr) {
+	EC_ERROR(CELL_DOES_NOT_EXIST);
+    }
+#endif /* ERROR_CHECK */
+
+    /*
+     * Get a pointer to this element
+     */
+    indexIntoList = FindFieldListElement(
+				 cellDataPtr->RLCAH_layoutSortedFieldList,
+				 colNum,
+				 cellDataPtr->RLCAH_numFieldsInLayout);
+
+    /*
+     * The field does not exist in this layout; do nothing.
+     */
+    if (indexIntoList == (byte) -1) {
+	CellUnlock(cellDataPtr);
+	return;
+    }
+
+    currentIndexElement = ChunkArrayElementToPtr(cellOptr, 
+						 indexIntoList, 
+						 (word *)0);
+
+    /*
+     * Delete the associated GrObjects -- the field and its label.
+     */
+    pself = ObjDerefGen(oself);
+    grObjectMemBlock = VMVMBlockToMemBlock(pself->documentHandle, 
+				   currentIndexElement->GOEOP_grObjectVMBlock);
+
+    grObjectOptr = ConstructOptr(grObjectMemBlock, 
+				 currentIndexElement->GOEOP_grObjectChunk);
+
+    /*
+     * Let the record layout chunk array go.
+     */
+    CellUnlock(cellDataPtr);
+
+    pself = ObjDerefGen(oself);
+    labelOptr = @call grObjectOptr::
+	MSG_FFTFG_GET_LABEL_OPTR(pself->documentHandle);
+    
+    /*
+     * If we're not the current layout, we're not in the vis-tree, so
+     * the GO_CLEAR routines won't be able to VIS_VUP up to get the
+     * info they want. In this case, temporarily attach this layout's
+     * GrObjBody to the vis-tree
+     */
+    if (layoutNum != pself->FFI_currentLayout) {
+	grObjBody = FFDGetGrObjBodyForLayout(oself, layoutNum, 
+						LT_SINGLE_RECORD);
+	@call oself::MSG_VIS_ADD_CHILD(grObjBody, 0);
+    }
+
+    @send grObjectOptr::MSG_GO_CLEAR();
+
+    if (labelOptr) {
+	@send labelOptr::MSG_GO_CLEAR();
+    }
+
+    pself = ObjDerefGen(oself);
+    if (layoutNum != pself->FFI_currentLayout) {
+	@call grObjBody::MSG_VIS_REMOVE(VUM_MANUAL);
+    }
+
+    /*
+     *The elements will be deleted in MSG_FFD_DELETE_CHUNK_ELEMENT_FROM_LAYOUT.
+     */
+}
+
+/***********************************************************************
+*
+* FUNCTION:    MSG_FFD_DELETE_FIELD_FROM_LAYOUT
+*
+* DESCRIPTION:  - Deletes the field reference from the current layout's
+*                 chunk array.
+*               - Deletes the associated GrObject and clears the visual
+*                 representation of it from the current layout.
+*               - Copies over the latest copy of the layout's sorted
+*                 list from the instance data into the header of the
+*                 chunk array. This is so that when we switch layouts,
+*                 we can just copy the sorted list from the chunk array
+*                 into the instance data (instead of having to re-sort
+*                 every time we switch layouts: slow.......)
+*               - Deletes the field reference from the tab order list
+*
+* CALLED BY:   GLOBAL
+*
+* PARAMETERS:   void (byte index);
+*               NOTE: This is an index into the layoutNameList, *not*
+*                       the column number
+*
+* STRATEGY:     
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*      Name    Date             Description
+*      ----    ----             -----------
+*      anna    5/7/92           Initial Revision
+*
+***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_DELETE_FIELD_FROM_LAYOUT 
+{
+    FFDDeleteFieldFromLayout(oself, pself->FFI_layoutNameList[index], 
+				pself->FFI_currentLayout);
+}
+
+/***********************************************************************
+*
+* FUNCTION:    SendLayoutListNotification
+*
+* DESCRIPTION: Notify anyone out there that the layout list of
+*              fields has changed.
+*
+* CALLED BY:   MSG_FFD_STORE_FIELD_INFO,
+*               MSG_FFD_MOVE_FIELDS_BETWEEN_LISTS
+*               
+* PARAMETERS:  oself - an optr to the current database
+*              field - index of field that's been modified (used in
+*                      ADDED, DELETED, and CHANGED actions)
+*              action - what's happened to the field.  If the action is
+*                      RESET, the list is to redraw itself.
+*              howMany - how many items are in the list now.  Used only
+*                      when the action is RESET.
+*               
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*      Name    Date            Description
+*      ----    ----            -----------
+*      jeremy  4/30/92         Initial version
+*
+***********************************************************************/
+void
+SendLayoutListNotification(optr oself,
+			   FieldListID field,
+			   FFFieldListChangeStatus action,
+			   word howMany)
+{
+    SendListNotifications(LAYOUT_NAME_LIST, oself, field, action, howMany);
+    CreateDataBlockAndSendNotification(oself);
+}
+
+/***********************************************************************
+*
+* FUNCTION:    SendDatabaseListNotification
+*
+* DESCRIPTION: Notify anyone out there that the database list of
+*              fields has changed.
+*
+* CALLED BY:   MSG_FFD_STORE_FIELD_INFO,
+*               MSG_FFD_MOVE_FIELDS_BETWEEN_LISTS
+*               
+* PARAMETERS:  oself - an optr to the current database
+*              field - index of field that's been modified (used in
+*                      ADDED, DELETED, and CHANGED actions)
+*              action - what's happened to the field.  If the action is
+*                      RESET, the list is to redraw itself.
+*              howMany - how many items are in the list now.  Used only
+*                      when the action is RESET.
+*               
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*      Name    Date            Description
+*      ----    ----            -----------
+*      jeremy  4/30/92         Initial version
+*
+***********************************************************************/
+void
+SendDatabaseListNotification(optr oself,
+			     FieldID field,
+			     FFFieldListChangeStatus action,
+			     word howMany)
+{
+    SendListNotifications(NOT_IN_LAYOUT_NAME_LIST, oself, field, action,
+			  howMany);
+}
+
+/***********************************************************************
+*
+* FUNCTION:    SendWholeListNotification
+*
+* DESCRIPTION: Notify anyone out there that the entire database list of
+*              fields has changed.
+*
+* CALLED BY:   MSG_FFD_STORE_FIELD_INFO,
+*              MSG_FFD_MOVE_FIELDS_BETWEEN_LISTS
+*               
+* PARAMETERS:  oself - an optr to the current database
+*              field - index of field that's been modified (used in
+*                      ADDED, DELETED, and CHANGED actions)
+*              action - what's happened to the field.  If the action is
+*                      RESET, the list is to redraw itself.
+*              howMany - how many items are in the list now.  Used only
+*                      when the action is RESET.
+*               
+*
+* KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+*
+* REVISION HISTORY:
+*      Name    Date            Description
+*      ----    ----            -----------
+*      jeremy  4/30/92         Initial version
+*
+***********************************************************************/
+void
+SendWholeListNotification(optr oself,
+			   FieldID field,
+			   FFFieldListChangeStatus action,
+			   word howMany)
+{
+    SendListNotifications(DATABASE_NAME_LIST, oself, field, action, howMany);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    SendListNotifications
+ *
+ * DESCRIPTION: Sends off a list notification.
+ *
+ * PARAMETERS: same as Send{Layout, Database, General}ListNotification
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  4/30/92         Initial Revision
+ *      JDM     92.09.01        Rewrote for optimizations.
+ *
+ ***********************************************************************/
+void
+SendListNotifications (FieldListQuery whichList,
+		       optr oself,
+		       FieldListID field,
+		       FFFieldListChangeStatus action,
+		       word howMany)
+{
+    FlatFileDatabaseInstance            *pself;
+    FFDListStatusChangeMessageBlock     *statusBlockPtr;
+    MemHandle   databaseChangeDataBlock;
+    EventHandle msg;
+    GCNListSendFlags GCNflags;
+
+    /* Allocate and lock a  block to fill with the status message data. */
+    databaseChangeDataBlock = MemAlloc
+				(sizeof(FFDListStatusChangeMessageBlock),
+				 (HF_DYNAMIC | HF_SHARABLE | HF_SWAPABLE),
+				 HAF_STANDARD | HAF_NO_ERR);
+    statusBlockPtr = MemLock (databaseChangeDataBlock);
+
+    /* Fill the block with the status message data.     */
+    pself = ObjDerefGen (oself);
+    statusBlockPtr->whichList   = whichList;
+    statusBlockPtr->fieldIndex  = field;
+    statusBlockPtr->changeType  = action;
+    statusBlockPtr->numFields   = howMany;
+    statusBlockPtr->nonce       = ++(pself->FFI_nonce);
+    statusBlockPtr->databaseOptr        = oself;
+    statusBlockPtr->disableImmediately  = FALSE;
+
+    /*
+     * Only have the notification be a SET_STATUS if we're resetting
+     * everything.
+     *
+     * NOTE:    This works for now but is not a general solution.
+     *          The right thing to do is to add a ENABLE handler for each
+     *          controller that sets instance data (in the controller)
+     *          letting the UPDATE_UI handler know to ignore the changeType
+     *          field and therefore force a complete resetting.
+     */
+    GCNflags = ((action == RESET) ? GCNLSF_SET_STATUS : 0);
+
+    /* Unlock the block but set it's reference count for the GCN stuff. */
+    MemUnlock (databaseChangeDataBlock);
+    MemInitRefCount (databaseChangeDataBlock, 1);
+
+    /* Build the message to send to the GCN system.     */
+    msg = @record (optr) NullClass::MSG_META_NOTIFY_WITH_DATA_BLOCK
+		(MANUFACTURER_ID_GEOWORKS,      /* Manufacturer's ID    */
+		 GWNT_FLAT_FILE_FIELD_LIST_CHANGE,      /* List type.   */
+		 databaseChangeDataBlock);      /* Data block handle.   */
+
+    /* Send it the message to the controllers.  */
+    @call GeodeGetAppObject(0)::MSG_META_GCN_LIST_SEND(
+		 GCNflags,                      /* GCNListSendFlags.    */
+		 msg,                           /* Event handle.        */
+		 databaseChangeDataBlock,       /* Extra data block.    */
+		 GAGCNLT_APP_TARGET_NOTIFY_FLAT_FILE_FIELD_LIST_CHANGE,
+						/* Manufacturer's type. */
+		 (word) MANUFACTURER_ID_GEOWORKS);
+						/* Manufacturer's ID */
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDRequestUniqueFieldName
+ *
+ * DESCRIPTION: This function provides the caller with a unique field
+ *              name.
+ *
+ *              The caller can provide a candidate name, which
+ *              will be used as the base of the new, unique name.  For
+ *              example, if "Foo" is passed as the candidate, and no
+ *              other fields exist with this name, "Foo" will be returned.
+ *              Then, if "Foo" is used again as the candidate, then
+ *              "Foo_2" will be returned, and so on.
+ *
+ *              If the candidate field ends with an underscore and a number,
+ *              the number will be incremented until the name is accepted.
+ *              For example, if "Foo_2" is provided as the candidate, the
+ *              result will be "Foo_3".
+ *
+ *              If no candidate name is provided, "Field_1" will be
+ *              used (with the number incremented accordingly).
+ *              
+ *              As an added bonus, if an optr to a text object is
+ *              provided, the new name will be loaded into the field
+ *              and will be selected.
+ *
+ *              If an error occurred (like the candidate name being un-
+ *              acceptable), FALSE will be returned.  Otherwise, TRUE
+ *              is returned.
+ *
+ * PARAMETERS:
+ *      Boolean (optr textObject, TCHAR *candidate, TCHAR *newFieldName)
+ *            
+ *              NOTE: If newFieldName is NULL, then the new name is
+ *                    not inserted there (of course).
+ *                    If textObject is a NullOptr, then the new name
+ *                    is not inserted there, either.
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  9/ 8/92         Initial version
+ *
+ ***********************************************************************/
+Boolean
+FFDRequestUniqueFieldName(optr oself, optr textObject, TCHAR *candidate,
+			  TCHAR *newFieldName)
+{
+    TCHAR testName[MAX_FIELD_NAME_LENGTH + 1];
+    TCHAR *autoFieldName;
+    TCHAR *uscore, *s;
+    word candidateNum;
+    SpreadsheetNameParams fieldNameParams;
+    GetNameInfo gni;
+    FlatFileDatabaseInstance *pself = ObjDerefGen(oself);
+
+    /*
+     * If there is a candidate name, copy it as the test name.  Otherwise,
+     * put Field_# as the test name.
+     */
+    if (candidate) {
+	strcpy(testName, candidate);
+    } else {
+	(void) MemLock(HandleOf(@FFDAutoFieldName));
+	autoFieldName = LMemDeref(@FFDAutoFieldName);
+
+	pself = ObjDerefGen(oself);
+	sprintf(testName, _TEXT("%s%d"), autoFieldName,
+		pself->FFI_automaticFieldNumber);
+
+	MemUnlock(HandleOf(@FFDAutoFieldName));
+    }
+	
+    /*
+     * See if the test name is acceptable.
+     */
+    fieldNameParams.SNP_textLength = strlen(testName);
+    strcpy(fieldNameParams.SNP_text, testName);
+    @call oself::
+	MSG_SPREADSHEET_VALIDATE_NAME(&gni, &fieldNameParams); 
+
+    /*
+     * Is the name already being used?
+     */
+    if (gni.GNI_entryNum == -1) {
+	if ((gni.GNI_numDefinedNames & 0xff) != PSEE_NAME_ALREADY_DEFINED) {
+	    /*
+	     * Some other kind of error occurred.  Get out of here.
+	     */
+	    return FALSE;
+	}
+
+	/*
+	 * The name is already being used.  See if there is an underscore
+	 * and a number at its end.
+	 *
+	 * Make sure that there is enough space for the worst-case
+	 * appended string: "_65535". 
+	 */
+	testName[MAX_FIELD_NAME_LENGTH - 7] = _TEXT('\0');
+
+	uscore = strrchr(testName, _TEXT('_'));
+	if (uscore) {
+	    /*
+	     * There is an underscore somewhere in the field name.  If there
+	     * is a number and nothing else after the underscore then increment
+	     * the number in the string.
+	     */
+	    candidateNum = 0;
+	    for (s = uscore + 1; *s; s++) {
+		if (!*s || !isdigit(*s)) {
+		    /* We hit a non-number or the EOS.  Leave the loop. */
+		    break;
+		}
+		/* We hit a{nother} number.  Keep track of its value. */
+		candidateNum *= 10;
+		candidateNum += (*s - _TEXT('0'));
+	    }
+
+	    if (*s) {
+		/*
+		 * There was something other than a number after the
+		 * underscore.  Add a new underscore and point to the
+		 * the end of the string.
+		 */
+		candidateNum = 2;
+		strcat(testName, _TEXT("_"));
+		uscore = testName + strlen(testName);
+	    } else {
+		/*
+		 * There was a number right after the underscore.
+		 * point to one after the underscore and increment the
+		 * number.
+		 */
+		candidateNum++;
+		uscore = strrchr(testName, _TEXT('_')) + 1;
+	    }
+	} else {
+	    /*
+	     * There was not an underscore in the field name.  Append one.
+	     */
+	    candidateNum = 2;
+	    strcat(testName, _TEXT("_"));
+	    uscore = testName + strlen(testName);
+	}
+	
+	/*
+	 * Ok, everything's set to attempt to validate the new name,
+	 * and to loop many times until it actually happens.
+	 */
+	for (/* nothing */ ; candidateNum <= 0xffff; candidateNum++) {
+	    /*
+	     * Put a new number after the underscore.
+	     */
+	    sprintf(uscore, _TEXT("%d"), candidateNum);
+	    fieldNameParams.SNP_textLength = strlen(testName);
+	    strcpy(fieldNameParams.SNP_text, testName);
+	    @call oself::
+		MSG_SPREADSHEET_VALIDATE_NAME(&gni, &fieldNameParams); 
+	    /*
+	     * Is the name already being used?
+	     */
+	    if (gni.GNI_entryNum == -1) {
+		if ((gni.GNI_numDefinedNames & 0xff) !=
+		    PSEE_NAME_ALREADY_DEFINED) {
+		    /*
+		     * Some other kind of error occurred.  Get out of here.
+		     */
+		    return FALSE;
+		}
+	    } else {
+		/*
+		 * The name was fine!  Leave the loop!
+		 */
+		break;
+	    }
+	}
+    }
+
+    /*
+     * At this point, the testName has been accepted.  Load it into the
+     * newFieldName and/or the textObject.
+     */
+    if (newFieldName) {
+	strcpy(newFieldName, testName);
+    }
+
+    if (textObject) {
+	@call textObject::MSG_VIS_TEXT_REPLACE_ALL_PTR(testName, 0);
+	@call textObject::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@call textObject::MSG_META_GRAB_FOCUS_EXCL();
+	@call textObject::MSG_META_GRAB_TARGET_EXCL();
+	@call textObject::MSG_VIS_TEXT_SELECT_ALL();
+    }
+
+    /* Signal success. */
+    return TRUE;
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFD_REQUEST_UNIQUE_FIELD_NAME for FlatFileDatabaseClass
+ *
+ * DESCRIPTION: This method provides the caller with a unique field
+ *              name.
+ *
+ *              The caller can provide a candidate name, which
+ *              will be used as the base of the new, unique name.  For
+ *              example, if "Foo" is passed as the candidate, and no
+ *              other fields exist with this name, "Foo" will be returned.
+ *              Then, if "Foo" is used again as the candidate, then
+ *              "Foo_2" will be returned, and so on.
+ *
+ *              If the candidate field ends with an underscore and a number,
+ *              the number will be incremented until the name is accepted.
+ *              For example, if "Foo_2" is provided as the candidate, the
+ *              result will be "Foo_3".
+ *
+ *              If no candidate name is provided, "Field_1" will be
+ *              used (with the number incremented accordingly).
+ *              
+ *              As an added bonus, if an optr to a text object is
+ *              provided, the new name will be loaded into the field
+ *              and will be selected.
+ *
+ *              If an error occurred (like the candidate name being un-
+ *              acceptable), FALSE will be returned.  Otherwise, TRUE
+ *              is returned.
+ *
+ * PARAMETERS:
+ *      Boolean (optr textObject, TCHAR *candidate, TCHAR *newFieldName)
+ *            
+ *              NOTE: If newFieldName is NULL, then the new name is
+ *                    not inserted there (of course).
+ *                    If textObject is a NullOptr, then the new name
+ *                    is not inserted there, either.
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  8/ 3/92         Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_REQUEST_UNIQUE_FIELD_NAME
+{
+    return (FFDRequestUniqueFieldName(oself, textObject, candidate,
+				      newFieldName));
+}
+
+#ifdef __HIGHC__
+pragma Code("DATABASEPAGENUMBERING");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg DATABASEPAGENUMBERING
+#endif
+
+/***********************************************************************
+ *
+ * FUNCTION:     MSG_FFD_ADD_PAGE_NUMBER_TO_LAYOUT
+ *
+ * DESCRIPTION: - Can only be called when in multi-record layout
+ *                design mode.
+ *              - Creates a label (multText GrObject)
+ *                and a field (text GrObject), and adds them to the 
+ *                GrObjBody of the current layout. 
+ *              - Tells the label to say "Page", and the field
+ *                to be a FDT_PAGE_NUMBER.  This is a non-data-holding
+ *                data type that appears as a "#" in design mode, and
+ *                as the current page number in data-entry mode.
+ *
+ * CALLED BY:   GLOBAL
+ *
+ * PARAMETERS:  void ();
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date        Description
+ *      ----    ----        -----------
+ *      jeremy  9/4/92      Initial version
+ *
+ ***********************************************************************/
+@extern method FlatFileDatabaseClass, MSG_FFD_ADD_PAGE_NUMBER_TO_LAYOUT
+{
+    optr fieldOptr, labelOptr;
+    CellRef cellOptr;   /* Memhandle & ChunkHandle of cell */
+    MultiRecordLayoutStruct *MRLayoutPtr;
+    EventHandle msg;
+    dword newFieldXPosition, newFieldYPosition;
+    RectDWord bounds;
+    optr grObjBodyOptr;
+    MemHandle memBlock;
+
+    /*
+     * Get the current layout's GrObj body optr.
+     */
+    grObjBodyOptr = FFDGetCurrentLayoutGrObjBody(oself, LT_MULTI_RECORD);
+    
+    MRLayoutPtr = CellLockGetRef(&pself->SSI_cellParams,
+				 MULTI_RECORD_LAYOUT_ROW, 
+				 pself->FFI_currentLayout,
+				 &cellOptr);
+#if ERROR_CHECK
+    if (!MRLayoutPtr) {
+	EC_ERROR(CELL_DOES_NOT_EXIST);
+    }
+#endif /* ERROR_CHECK */
+
+    pself = ObjDerefGen(oself);
+    memBlock = VMVMBlockToMemBlock(pself->documentHandle, 
+			MRLayoutPtr->MRLS_layoutCommon.LC_grObjBodyVMBlock);
+
+    grObjBodyOptr = ConstructOptr(memBlock, 
+			MRLayoutPtr->MRLS_layoutCommon.LC_grObjBodyChunk);
+
+    /*
+     * Unlock the cell 
+     */
+    CellUnlock(MRLayoutPtr);
+
+    /*
+     * Have the graphic body create the new grobjects.
+     */
+    fieldOptr = @call grObjBodyOptr::MSG_GB_INSTANTIATE_GROBJ(
+			  (ClassStruct *) &FFTextFieldGuardianClass);
+    labelOptr = @call grObjBodyOptr::MSG_GB_INSTANTIATE_GROBJ(
+			  (ClassStruct *) &FFLabelGuardianClass);
+
+    /*
+     * Get the X and Y position from the middle of the view.
+     */
+    msg = @record GenViewClass::MSG_GEN_VIEW_GET_VISIBLE_RECT(&bounds);
+    @call oself::MSG_VIS_VUP_CALL_OBJECT_OF_CLASS(msg);
+    newFieldYPosition = (bounds.RD_top + bounds.RD_bottom) / 2;
+    newFieldXPosition = (bounds.RD_left + bounds.RD_right) / 2 -
+			DEFAULT_LABEL_WIDTH;
+
+    /*
+     * Draw the new page number objects.
+     */
+    DrawNewPageNumber(grObjBodyOptr, fieldOptr, newFieldXPosition,
+		      newFieldYPosition);
+    DrawNewPageNumberLabel(grObjBodyOptr, labelOptr, newFieldXPosition,
+			   newFieldYPosition);
+
+    /*
+     * Deselect anything that's currently selected, then select the new
+     * objects.
+     */
+    @call grObjBodyOptr::MSG_GB_REMOVE_ALL_GROBJS_FROM_SELECTION_LIST();
+    @call fieldOptr::MSG_GO_BECOME_SELECTED(HUM_NOW);
+    @call labelOptr::MSG_GO_BECOME_SELECTED(HUM_NOW);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    DrawNewPageNumber (INTERNAL)
+ *
+ * DESCRIPTION:  Draws the given GrObject onto the current layout. 
+ *
+ * PARAMETERS:  grObjBodyOptr - what you'd think. 
+ *              fieldOptr - optr to a field GrObject 
+ *              xPosition - x position to draw the page number
+ *              yPosition - y position to draw the page number
+ * STRATEGY:    
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  9/7/92          Initial version
+ *
+ ***********************************************************************/
+void 
+DrawNewPageNumber(optr grObjBodyOptr,
+		  optr fieldGuardianOptr,
+		  dword xPosition,
+		  dword yPosition)
+{
+    optr fieldOptr;
+    GrObjInitializeData initData;
+
+    /*
+     * Specify the position and size of the new grobject and
+     * have it initialize itself to the default attributes
+     */
+    initData.GOID_position.PDF_x.DWF_int = xPosition;
+    initData.GOID_position.PDF_x.DWF_frac = 0;
+    initData.GOID_position.PDF_y.DWF_int = yPosition;
+    initData.GOID_position.PDF_y.DWF_frac = 0;
+    initData.GOID_width.WWF_int = DEFAULT_PAGE_NUMBER_WIDTH;
+    initData.GOID_width.WWF_frac = 0;
+    initData.GOID_height.WWF_int = DEFAULT_FIELD_HEIGHT;
+    initData.GOID_height.WWF_frac = 0;
+    
+    @call fieldGuardianOptr::MSG_GO_INITIALIZE(&initData);
+    
+    fieldOptr = @call fieldGuardianOptr::MSG_GOVG_GET_VIS_WARD_OD();
+
+    /*
+     * Tell this text object not to care about losing the target
+     * and that it is a label.
+     */
+    @call fieldOptr::MSG_FFT_INITIALIZE((FieldID) -1);
+
+    /*
+     * Get rid of the box surrounding the label
+     */
+    @call fieldGuardianOptr::MSG_GO_SET_LINE_MASK(SDM_0);
+
+    /*
+     * Notify object that it is complete and ready to go
+     */
+    @call fieldGuardianOptr::MSG_GO_NOTIFY_GROBJ_VALID();
+
+    /*
+     * Add text attributes.
+     */
+    @call fieldOptr::MSG_VIS_TEXT_SET_PARA_ATTR_BY_DEFAULT(
+					VIS_TEXT_INITIAL_PARA_ATTR,
+					TEXT_ADDRESS_PAST_END, (dword) 0); 
+
+#ifdef DO_PIZZA
+    @call fieldOptr::MSG_VIS_TEXT_SET_FONT_ID(
+			FID_BITSTREAM_KANJI_HON_MINCHO,
+		    	TEXT_ADDRESS_PAST_END, (dword) 0);
+#else
+    @call fieldOptr::MSG_VIS_TEXT_SET_CHAR_ATTR_BY_DEFAULT(
+			(VTDS_12 << VTDCA_SIZE_OFFSET) | VTDF_URW_ROMAN,
+			TEXT_ADDRESS_PAST_END, (dword) 0); 
+#endif
+
+    /*
+     * Set the field non-editable to user can't change the text
+     */
+    @call fieldGuardianOptr::MSG_GO_CHANGE_LOCKS(GOL_LOCK | GOL_EDIT,
+						 GOL_LOCK);
+
+    /*
+     * Tell the guardian that this is a page number.
+     */
+    @call fieldGuardianOptr::MSG_FFTFG_SET_FIELD_TYPE(FDT_PAGE_NUMBER);
+    @send fieldGuardianOptr::MSG_FFTFG_SET_FOR_DESIGN_MODE();
+    
+    /*
+     * Add the new grobject to the body and have it drawn.
+     */
+    @call grObjBodyOptr::MSG_GB_ADD_GROBJ_THEN_DRAW(fieldGuardianOptr, 
+		GOBAGOR_LAST | GOBAGOF_DRAW_LIST_POSITION);
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    DrawNewPageNumberLabel (INTERNAL)
+ *
+ * DESCRIPTION:  Draws the given GrObject onto the current layout. 
+ *
+ * PARAMETERS:  grObjBodyOptr - what you'd think. 
+ *              fieldOptr - optr to a field GrObject 
+ *              xPosition - x position to draw the page number
+ *              yPosition - y position to draw the page number
+ * STRATEGY:    
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  9/7/92          Initial version
+ *
+ ***********************************************************************/
+void 
+DrawNewPageNumberLabel(optr grObjBodyOptr,
+		       optr labelGuardianOptr,
+		       dword xPosition,
+		       dword yPosition)
+{
+    optr labelOptr;
+    GrObjInitializeData initData;
+    TCHAR *pageLabelString;
+
+    /*
+     * Specify the position and size of the new grobject and
+     * have it initialize itself to the default attributes
+     */
+    initData.GOID_position.PDF_x.DWF_int = xPosition - DEFAULT_LABEL_WIDTH;
+    initData.GOID_position.PDF_x.DWF_frac = 0;
+    initData.GOID_position.PDF_y.DWF_int = yPosition;
+    initData.GOID_position.PDF_y.DWF_frac = 0;
+    initData.GOID_width.WWF_int = DEFAULT_LABEL_WIDTH; 
+    initData.GOID_width.WWF_frac = 0;
+    initData.GOID_height.WWF_int = DEFAULT_FIELD_HEIGHT;
+    initData.GOID_height.WWF_frac = 0;
+
+    @call labelGuardianOptr::MSG_GO_INITIALIZE(&initData);
+
+    labelOptr = @call labelGuardianOptr::MSG_GOVG_GET_VIS_WARD_OD();
+
+    /*
+     * Tell this text object not to care about losing the target.
+     */
+    @call labelOptr::MSG_FFT_INITIALIZE((FieldID) -1);
+
+    /*
+     * Get rid of the box surrounding the label
+     */
+    @call labelGuardianOptr::MSG_GO_SET_LINE_MASK(SDM_0);
+
+    /*
+     * Notify object that it is complete and ready to go
+     */
+    @call labelGuardianOptr::MSG_GO_NOTIFY_GROBJ_VALID();
+    
+    /*
+     * Add the text label with default attributes.
+     */
+    @call labelOptr::MSG_VIS_TEXT_SET_PARA_ATTR_BY_DEFAULT(
+					VIS_TEXT_INITIAL_PARA_ATTR,
+					TEXT_ADDRESS_PAST_END, (dword) 0); 
+
+#ifdef DO_PIZZA
+    @call labelOptr::MSG_VIS_TEXT_SET_FONT_ID(
+			FID_BITSTREAM_KANJI_HON_MINCHO,
+		    	TEXT_ADDRESS_PAST_END, (dword) 0);
+#else
+    @call labelOptr::MSG_VIS_TEXT_SET_CHAR_ATTR_BY_DEFAULT(
+		(FF_DEF_TEXT_SIZE << VTDCA_SIZE_OFFSET) | VTDF_URW_ROMAN,
+		TEXT_ADDRESS_PAST_END, (dword) 0); 
+#endif
+
+    @call labelOptr::MSG_VIS_TEXT_SET_PARA_ATTRIBUTES(0,
+				(J_RIGHT << VTDPA_JUSTIFICATION_OFFSET),
+				TEXT_ADDRESS_PAST_END, (dword) 0); 
+
+    (void) MemLock(HandleOf(@FFDPageLabelString));
+    pageLabelString = LMemDeref(@FFDPageLabelString);
+    @call labelOptr::MSG_VIS_TEXT_REPLACE_ALL_PTR(pageLabelString, 0);
+    MemUnlock(HandleOf(@FFDPageLabelString));
+
+    /*
+     * Add the new grobject to the body and have it drawn.
+     */
+    @call grObjBodyOptr::MSG_GB_ADD_GROBJ_THEN_DRAW(labelGuardianOptr, 
+		GOBAGOR_LAST | GOBAGOF_DRAW_LIST_POSITION);
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDGetNewFieldPosition
+ *
+ * DESCRIPTION: This function looks through the current GrObjBody and single
+ *              record to figure out if a rectangle of a certain height will fit
+ *              below all other GrObjects in the body.
+ *
+ *              The bottom-most Y-coordinate of the bottom-most
+ *              GrObject is always loaded into the newY pointer; if
+ *              there is enough space to place the requested
+ *              rectangle, TRUE is returned.
+ *
+ *              If the rectangle won't fit, FALSE is returned.
+ *
+ * PARAMETERS:  oself - an optr to the current database
+ *              grObjBody - an optr to the GrObj body we're scanning through
+ *              newY - a pointer to the new Y coordinate to be filled
+ *              rectHeight - the height (in points) of the rectangle
+ *                           we want to be placed in the body
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  9/18/92         Initial version
+ *
+ ***********************************************************************/
+Boolean
+FFDGetNewFieldPosition(optr oself,
+		       optr grObjBody,
+		       sdword *newY,
+		       sdword rectHeight)
+{
+    RectDWord grObjBounds;
+    LayoutSize srBounds;
+
+    /*
+     * Get the bounds of all of the objects in the supplied GrObjBody.
+     */
+    @call grObjBody::MSG_GB_GET_BOUNDS_OF_GROBJS(&grObjBounds);
+
+    /*
+     * If there are no objects in the body, the left side will be greater
+     * than the right side.  If there are no objects, then set the size
+     * to 0 and continue.
+     */
+    if (grObjBounds.RD_left > grObjBounds.RD_right) {
+	grObjBounds.RD_bottom = 0;
+    }
+
+    /*
+     * Get the size of the current single record.
+     */
+    FFDGetSingleRecordBounds(oself, &srBounds);
+
+    /*
+     * No matter what, return the bottom-most Y-coordinate of the bottom-
+     * most GrObject in the body.
+     */
+    *newY = grObjBounds.RD_bottom;
+    
+    /*
+     * Is there enough space between the bottom of the body and the
+     * document for the requested height?  Return TRUE if so, FALSE
+     * otherwise.
+     */
+    return ((grObjBounds.RD_bottom < srBounds.LS_height) &&
+	    (srBounds.LS_height - grObjBounds.RD_bottom > rectHeight));
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDEnlargeLayoutToFitNewField
+ *
+ * DESCRIPTION: This function enlarges the current GrObj body and document
+ *              to be large enough to fit a rectangle that is "rectHeight"
+ *              points tall in an area starting at "baseY".
+ *
+ * PARAMETERS:  oself - an optr pointing to the current database.
+ *              baseY - the top-most Y coordinate of the rectangle to fit
+ *                      in the body and the document.
+ *              rectHeight - the height (in points) of the rectangle
+ *                           we want to be placed in the body
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  9/18/92         Initial version
+ *
+ ***********************************************************************/
+void
+FFDEnlargeLayoutToFitNewField(optr oself, sdword baseY, sdword rectHeight)
+{
+    LayoutSize srBounds;
+    sdword sizeAvailable, sizeNeeded;
+    PageSizeReport psr;
+    EventHandle event;
+
+    /*
+     * Get the size of the current document/GrObj body.
+     */
+    FFDGetSingleRecordBounds(oself, &srBounds);
+
+    sizeAvailable = srBounds.LS_height - baseY;
+
+    /*
+     * If we already have enough available space, return.
+     */
+    if (sizeAvailable > rectHeight) {
+	return;
+    }
+
+    /*
+     * Figure out how much space we need to enlarge things by.
+     * This works even if sizeAvailable is negative, of course...
+     */
+    sizeNeeded = rectHeight - sizeAvailable;
+
+    /*
+     * Enlarge the single record grobj body.  If the multi-record
+     * layout is smaller than the new single record layout, it will be
+     * resized as well.
+     */
+    srBounds.LS_height += sizeNeeded;
+    FFDSetSingleRecordBounds(oself, srBounds);
+
+    /*
+     * Now make sure the page size is large enough.
+     */
+    FFDResizePageIfNecessary(oself, srBounds);
+
+    /*
+     * Set the multi-record grobj body to the (perhaps) new page size.
+     */
+    FFDSetMultiRecordGrObjBodyToPageSize(oself);
+
+    /*
+     * Enlarge the view.
+     */
+    event = @record VisContentClass::
+	MSG_VIS_CONTENT_SET_DOC_BOUNDS(srBounds.LS_height,
+				       srBounds.LS_width,
+				       0, 0);
+    @call oself::MSG_VIS_VUP_CALL_OBJECT_OF_CLASS(event);
+
+    /*
+     * Notify the application that the single record and possibly the
+     * page size have changed.
+     */
+    FFDGetPageBounds(oself, &psr);
+    @call oself::MSG_FFD_NOTIFY_LAYOUT_SIZE_GREW(srBounds, psr);
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDGetCurrentLayoutGrObjBody
+ *
+ * DESCRIPTION: This function returns an optr to one of the current
+ *              layout's GrObj bodies (the single record or the
+ *              multi-record body).
+ *
+ * PARAMETERS:  oself - an optr to the current database
+ *              whichLayout - either LT_SINGLE_RECORD or LT_MULTI_RECORD
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *              WARNING!  Do NOT call this function if you have any other
+ *              cell locked already, since CellLock is called.
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  9/22/92         Initial version
+ *
+ ***********************************************************************/
+optr
+FFDGetCurrentLayoutGrObjBody(optr oself, LayoutType whichLayout)
+{
+    MultiRecordLayoutStruct *MRLayoutPtr;
+    RecordLayoutChunkArrayHeader *cellDataPtr;
+    optr grObjBodyOptr;
+    MemHandle memBlock;
+    FlatFileDatabaseInstance *pself = ObjDerefGen(oself);
+
+    if (whichLayout == LT_MULTI_RECORD) {
+	MRLayoutPtr = CellLock(&pself->SSI_cellParams,
+			       MULTI_RECORD_LAYOUT_ROW, 
+			       pself->FFI_currentLayout);
+
+#if ERROR_CHECK
+	if (!MRLayoutPtr) {
+	    EC_ERROR(CELL_DOES_NOT_EXIST);
+	}
+#endif /* ERROR_CHECK */
+
+	pself = ObjDerefGen(oself);
+	memBlock = VMVMBlockToMemBlock(pself->documentHandle, 
+		    MRLayoutPtr->MRLS_layoutCommon.LC_grObjBodyVMBlock);
+
+	grObjBodyOptr = ConstructOptr(memBlock, 
+			    MRLayoutPtr->MRLS_layoutCommon.LC_grObjBodyChunk);
+
+	/*
+	 * Unlock the cell 
+	 */
+	CellUnlock(MRLayoutPtr);
+    } else {
+	cellDataPtr = CellLock(&pself->SSI_cellParams,
+			       RECORD_LAYOUT_ROW, 
+			       pself->FFI_currentLayout);
+
+#if ERROR_CHECK
+	if (!cellDataPtr) {
+	    EC_ERROR(CELL_DOES_NOT_EXIST);
+	}
+#endif /* ERROR_CHECK */
+
+	memBlock = VMVMBlockToMemBlock(pself->documentHandle, 
+			cellDataPtr->RLCAH_layoutCommon.LC_grObjBodyVMBlock);
+
+	grObjBodyOptr = ConstructOptr(memBlock, 
+			cellDataPtr->RLCAH_layoutCommon.LC_grObjBodyChunk);
+	/*
+	 * Unlock the cell 
+	 */
+	CellUnlock(cellDataPtr);
+    }
+
+    return grObjBodyOptr;
+}
+
+
+#ifdef __HIGHC__
+pragma Code("DATABASETYPECONVERSION");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg DATABASETYPECONVERSION
+#endif
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDConvertFieldData
+ *
+ * DESCRIPTION: This routine attempts to convert a field's data from
+ *              one type to another.
+ *
+ * PARAMETERS:  oself - an optr to the current database
+ *              fieldId - the field column number to convert
+ *              oldType - the type we're converting from
+ *              newType - the type to convert to
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  1/18/93         Initial version
+ *
+ ***********************************************************************/
+void
+FFDConvertFieldData(optr oself,
+		    FieldID fieldId,
+		    FieldDataType oldType,
+		    FieldDataType newType)
+{
+    int numRecords;
+    optr newCellHandle;
+    CellCommon *newCell;
+    FlatFileDatabaseInstance *pself = ObjDerefGen(oself);
+
+    /*
+     * Allocate a scratch buffer for the converted data.
+     */
+    if ((newCellHandle = MemAlloc(MAX_CELL_DATA_SIZE,
+				  (HF_DYNAMIC | HF_SHARABLE | HF_SWAPABLE),
+				  HAF_STANDARD)) == 0) {
+	DisplayUserError(@FFMemoryFullError);
+	return;
+    }
+    newCell = MemLock(newCellHandle);
+    
+    numRecords = pself->FFI_totalNumRecordsInDatabase;
+
+    /*
+     * Set up the common cell structure.
+     */
+    newCell->CC_dependencies = 0;
+    newCell->CC_recalcFlags  = 0;
+    newCell->CC_attrs        = 0;
+    newCell->CC_notes        = 0;
+
+    /*
+     * Set up specific structures, then convert the field.
+     */
+    switch (newType) {
+	case FDT_GENERAL_TEXT:
+	    newCell->CC_type = CT_TEXT;
+	    FFDConvertToText(pself, numRecords, fieldId, oldType,
+			     (CellText *)newCell);
+	    break;
+
+	case FDT_COMPUTED:
+	    /*
+	     * Do nothing, since computed fields save their values as
+	     * whatever they come out as.
+	     *
+	     * Ah, one thing: clear out the cell in the TEMP_DATA_ROW,
+	     * because that's where computed field dependencies hang
+	     * out.
+	     */
+	    CellReplace(&pself->SSI_cellParams,
+			TEMP_DATA_ROW,
+			fieldId,
+			0, 0);
+	    break;
+
+	case FDT_INTEGER:
+	case FDT_REAL:
+	    newCell->CC_type = CT_CONSTANT;
+	    FFDConvertToNumber(pself, numRecords, fieldId, oldType,
+			       (CellConstant *)newCell);
+	    break;
+
+	case FDT_DATE:
+	    newCell->CC_type = CT_CONSTANT;
+	    FFDConvertToDate(pself, numRecords, fieldId, oldType,
+			     (CellConstant *)newCell);
+	    break;
+
+	case FDT_TIME:
+	    newCell->CC_type = CT_CONSTANT;
+	    FFDConvertToTime(pself, numRecords, fieldId, oldType,
+			     (CellConstant *)newCell);
+	    break;
+
+	default:
+	    EC_ERROR(BAD_FIELD_DATA_TYPE);
+	    break;
+    }
+
+    /*
+     * Tell the field grobjects to expect the new type.
+     */
+    FFDResetFieldTypeInAllLayouts(oself, fieldId, newType);
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDConvertToText
+ *
+ * DESCRIPTION: This function converts a cell's data to a text
+ *              cell as best it can.
+ *
+ * PARAMETERS:  pself - a pointer to the current database
+ *              numRecords - the number of records in the database
+ *              colNum - the column number of the field we're changing
+ *              oldType - the field data type we're converting from
+ *              scratch - a big buffer in which to place the new data
+ *                        temporarily.
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  1/18/93         Initial version
+ *
+ ***********************************************************************/
+void
+FFDConvertToText(FlatFileDatabaseInstance *pself,
+		 word numRecords,
+		 FieldID colNum,
+		 FieldDataType oldType,
+		 CellText *newCell)
+{
+    CellCommon *cell;
+    word curRecord;
+    Boolean emptyCell;
+    FormatIdType displayFormat;
+
+    for (curRecord = 0; curRecord < numRecords; curRecord++) {
+	/*
+	 * Lock down the original cell.
+	 */
+	cell = CellLock(&pself->SSI_cellParams,
+			curRecord,
+			colNum);
+	/*
+	 * If the cell has no data, jump to the next record.
+	 */
+	if (!cell) {
+	    continue;
+	}
+
+	emptyCell = FALSE;
+	
+	/*
+	 * Convert-o-rama.
+	 */
+	switch (cell->CC_type) {
+	    case CT_TEXT:
+		/*
+		 * Done already.
+		 */
+		CellUnlock(cell);
+		continue;
+	    
+	    case CT_CONSTANT:
+		/*
+		 * Convert the number to text, depending on its data type.
+		 */
+		switch (oldType) {
+		    case FDT_INTEGER:
+			displayFormat = FORMAT_ID_FIXED_INTEGER;
+			break;
+		    case FDT_REAL:
+			displayFormat = FORMAT_ID_GENERAL;
+			break;
+		    case FDT_DATE:
+			displayFormat = FORMAT_ID_DATE_SHORT;
+			break;
+		    case FDT_TIME:
+			displayFormat = FORMAT_ID_TIME_HMS;
+			break;
+		    default:
+		    	displayFormat = FORMAT_ID_GENERAL;
+			break;
+		}
+		FloatFormatNumber(displayFormat, 0, 0,
+				  &(((CellConstant *)cell)->CC_current),
+				  (char *)newCell + sizeof(CellText));
+		break;
+	     
+	case CT_EMPTY:
+		/*
+		 * Done alreay.
+		 */
+		continue;
+
+	default:
+		emptyCell = TRUE;
+		EC_ERROR(BAD_CELL_TYPE);
+		break;
+	}
+
+	FFDFinishOffConversion(pself, curRecord, colNum, cell,
+		       (CellCommon *)newCell, emptyCell, 
+		       sizeof(CellText) + 
+		       (strlen((char *)newCell+sizeof(CellText)) + 1)*
+			       sizeof(TCHAR));
+    }
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDConvertToNumber
+ *
+ * DESCRIPTION: This function converts a cell's data to an integer
+ *              constant cell as best it can.
+ *
+ * PARAMETERS:  pself - a pointer to the current database
+ *              numRecords - the number of records in the database
+ *              colNum - the column number of the field we're changing
+ *              oldType - the field data type we're converting from
+ *              newCell - a big buffer in which to place the new data
+ *                        temporarily.
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  1/19/93         Initial version
+ *
+ ***********************************************************************/
+void
+FFDConvertToNumber(FlatFileDatabaseInstance *pself,
+		   word numRecords,
+		   FieldID colNum,
+		   FieldDataType oldType,
+		   CellConstant *newCell)
+{
+    CellCommon *cell;
+    word curRecord;
+    TCHAR *str;
+    int len;
+    FloatNum *num;
+    Boolean emptyCell;
+
+    for (curRecord = 0; curRecord < numRecords; curRecord++) {
+	/*
+	 * Lock down the original cell.
+	 */
+	cell = CellLock(&pself->SSI_cellParams,
+			curRecord,
+			colNum);
+	/*
+	 * If the cell has no data, jump to the next record.
+	 */
+	if (!cell) {
+	    continue;
+	}
+
+	emptyCell = FALSE;
+	
+	/*
+	 * Convert-o-rama.
+	 */
+	switch (cell->CC_type) {
+	    case CT_TEXT:
+		/*
+		 * Convert the text to a floating point number.
+		 */
+		str = (char *) cell+sizeof(CellText);
+		num = &(newCell->CC_current);
+		if ((len = strlen(str)) != 0) {
+		    if ((FloatAsciiToFloat(FAF_STORE_NUMBER, len,
+					   str, num)) != 0) {
+			/* error! */
+			FLOAT_EXPONENT(num) = FP_NAN;
+		    }
+		} else {
+		    /*
+		     * value does not exist
+		     */
+		    FLOAT_EXPONENT(num) = FP_NAN;
+		}
+		break;
+	    
+	    case CT_CONSTANT:
+		/*
+		 * Done already.
+		 */
+		CellUnlock(cell);
+		continue;
+	     
+	case CT_EMPTY:
+		/*
+		 * Done alreay.
+		 */
+		continue;
+
+	default:
+		emptyCell = TRUE;
+		EC_ERROR(BAD_CELL_TYPE);
+		break;
+	}
+
+	FFDFinishOffConversion(pself, curRecord, colNum, cell,
+			       (CellCommon *)newCell, emptyCell,
+			       sizeof(CellConstant));
+    }
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDFinishOffConversion
+ *
+ * DESCRIPTION: This function unlocks a cell then replaces it with
+ *              another cell.
+ *
+ * PARAMETERS:  pself - a pointer to the current database
+ *              row - the row of the cell to replace
+ *              colNum - the column number of the field we're changing
+ *              oldCell - the cell to unlock
+ *              newCell - the data to place into the cell
+ *              emptyCell - flag: should be just replace the thing
+ *                          with an empty cell?
+ *              cellSize - the size of the new cell
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  1/19/93         Initial version
+ *
+ ***********************************************************************/
+void
+FFDFinishOffConversion(FlatFileDatabaseInstance *pself,
+		       word row,
+		       FieldID colNum,
+		       void *oldCell,
+		       CellCommon *newCell,
+		       Boolean emptyCell,
+		       word cellSize)
+{
+    CellType tempType;
+
+    CellUnlock(oldCell);
+	
+    /*
+     * Deal with empty cells.
+     */
+    if (emptyCell) {
+	tempType = newCell->CC_type;
+	newCell->CC_type = CT_EMPTY;
+	CellReplace(&pself->SSI_cellParams, row, colNum, newCell,
+		    sizeof(CellEmpty));
+	newCell->CC_type = tempType;
+    } else {
+	/*
+	 * Replace the cell with the new critter.
+	 */
+	CellReplace(&pself->SSI_cellParams, row, colNum, newCell, cellSize);
+    }
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDConvertToDate
+ *
+ * DESCRIPTION: This function converts a cell's data to a date
+ *              constant cell as best it can.
+ *
+ * PARAMETERS:  pself - a pointer to the current database
+ *              numRecords - the number of records in the database
+ *              colNum - the column number of the field we're changing
+ *              oldType - the field data type we're converting from
+ *              newCell - a big buffer in which to place the new data
+ *                        temporarily.
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  1/19/93         Initial version
+ *
+ ***********************************************************************/
+void
+FFDConvertToDate(FlatFileDatabaseInstance *pself,
+		 word numRecords,
+		 FieldID colNum,
+		 FieldDataType oldType,
+		 CellConstant *newCell)
+{
+    CellCommon *cell;
+    word curRecord;
+    TCHAR *str;
+    void *num;
+    Boolean emptyCell;
+
+    for (curRecord = 0; curRecord < numRecords; curRecord++) {
+	/*
+	 * Lock down the original cell.
+	 */
+	cell = CellLock(&pself->SSI_cellParams,
+			curRecord,
+			colNum);
+	/*
+	 * If the cell has no data, jump to the next record.
+	 */
+	if (!cell) {
+	    continue;
+	}
+
+	emptyCell = FALSE;
+	
+	/*
+	 * Convert-o-rama.
+	 */
+	switch (cell->CC_type) {
+	    case CT_TEXT:
+		/*
+		 * Convert the text to a floating point number.
+		 */
+		str = (char *)cell + sizeof(CellText);
+		num = &(newCell->CC_current);
+		if (FloatStringGetDateNumber(str)) {
+		    /*
+		     * There was an error of some sort.  Set the cell as empty.
+		     */
+		    emptyCell = TRUE;
+		} else {
+		    /*
+		     * The string converted!
+		     */
+		    FloatPopNumber(num);
+		}
+		break;
+	    
+	    case CT_CONSTANT:
+		/*
+		 * Done already.
+		 */
+		CellUnlock(cell);
+		continue;
+	     
+	    case CT_EMPTY:
+		/*
+		 * Done alreay.
+		 */
+		continue;
+
+	    default:
+		emptyCell = TRUE;
+		EC_ERROR(BAD_CELL_TYPE);
+		break;
+	}
+
+	FFDFinishOffConversion(pself, curRecord, colNum, cell,
+			       (CellCommon *)newCell, emptyCell,
+			       sizeof(CellConstant));
+    }
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDConvertToTime
+ *
+ * DESCRIPTION: This function converts a cell's data to a time
+ *              constant cell as best it can.
+ *
+ * PARAMETERS:  pself - a pointer to the current database
+ *              numRecords - the number of records in the database
+ *              colNum - the column number of the field we're changing
+ *              oldType - the field data type we're converting from
+ *              newCell - a big buffer in which to place the new data
+ *                        temporarily.
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  1/19/93         Initial version
+ *
+ ***********************************************************************/
+void
+FFDConvertToTime(FlatFileDatabaseInstance *pself,
+		 word numRecords,
+		 FieldID colNum,
+		 FieldDataType oldType,
+		 CellConstant *newCell)
+{
+    CellCommon *cell;
+    word curRecord;
+    TCHAR *str;
+    void *num;
+    Boolean emptyCell;
+
+    for (curRecord = 0; curRecord < numRecords; curRecord++) {
+	/*
+	 * Lock down the original cell.
+	 */
+	cell = CellLock(&pself->SSI_cellParams,
+			curRecord,
+			colNum);
+	/*
+	 * If the cell has no data, jump to the next record.
+	 */
+	if (!cell) {
+	    continue;
+	}
+
+	emptyCell = FALSE;
+	
+	/*
+	 * Convert-o-rama.
+	 */
+	switch (cell->CC_type) {
+	    case CT_TEXT:
+		/*
+		 * Convert the text to a floating point number.
+		 */
+		str = (char *)cell+sizeof(CellText);
+		num = &(newCell->CC_current);
+		if (FloatStringGetTimeNumber(str)) {
+		    /*
+		     * There was an error of some sort.  Set the cell as empty.
+		     */
+		    emptyCell = TRUE;
+		} else {
+		    /*
+		     * The string converted!
+		     */
+		    FloatPopNumber(num);
+		}
+		break;
+	    
+	    case CT_CONSTANT:
+		/*
+		 * Done already.
+		 */
+		CellUnlock(cell);
+		continue;
+	     
+	    case CT_EMPTY:
+		/*
+		 * Done alreay.
+		 */
+		continue;
+
+	    default:
+		emptyCell = TRUE;
+		EC_ERROR(BAD_CELL_TYPE);
+		break;
+	}
+
+	FFDFinishOffConversion(pself, curRecord, colNum, cell,
+			       (CellCommon *)newCell, emptyCell,
+			       sizeof(CellConstant));
+    }
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDResetFieldTypeInAllLayouts
+ *
+ * DESCRIPTION: This routine runs though all the layouts and resets
+ *              the field objects associated with a field to a new
+ *              type.  It does NOT reset the field's display format.
+ *
+ * PARAMETERS:  oself - an optr to the current database
+ *              colNum - the field's column
+ *              newType - the type to reset to
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  1/26/93         Initial version
+ *
+ ***********************************************************************/
+void
+FFDResetFieldTypeInAllLayouts(optr oself, FieldID colNum, FieldDataType newType)
+{
+    word curLayout, numLayouts;
+    RecordLayoutChunkArrayHeader *cellDataPtr;
+    RecordLayoutChunkArrayElement *currentIndexElement;
+    CellRef cellOptr;
+    MemHandle grObjectMemBlock;
+    optr grObjectOptr;
+    optr fieldOptr;
+    FieldListID layoutListIndex;
+    FlatFileDatabaseInstance *pself = ObjDerefGen(oself);
+
+    numLayouts = pself->FFI_numLayouts;
+    for (curLayout = 1; curLayout <= numLayouts; curLayout++) {
+	/*
+	 * Retrieve the record layout chunk array.
+	 */
+	pself = ObjDerefGen(oself);
+	cellDataPtr = CellLockGetRef(&pself->SSI_cellParams,
+				     RECORD_LAYOUT_ROW, 
+				     curLayout, 
+				     &cellOptr);
+	#if ERROR_CHECK
+	    if (!cellDataPtr) {
+		EC_ERROR(CELL_DOES_NOT_EXIST);
+	    }
+	#endif /* ERROR_CHECK */
+
+	/*
+	 * Get a pointer to this element
+	 */
+	layoutListIndex =
+	    FindFieldListElement(cellDataPtr->RLCAH_layoutSortedFieldList,
+				 colNum,
+				 cellDataPtr->RLCAH_numFieldsInLayout);
+	
+	/*
+	 * If the field doesn't exist on this layout, continue to the
+	 * next layout.
+	 */
+	if (layoutListIndex == (byte) -1) {
+	    CellUnlock(cellDataPtr);
+	    continue;
+	}
+
+	currentIndexElement = ChunkArrayElementToPtr(cellOptr, 
+						     layoutListIndex, 
+						     (word *)0);
+	/*
+	 * Get the associated GrObj
+	 */
+	pself = ObjDerefGen(oself);
+	grObjectMemBlock = VMVMBlockToMemBlock(pself->documentHandle, 
+			    currentIndexElement->GOEOP_grObjectVMBlock);
+	grObjectOptr = ConstructOptr(grObjectMemBlock, 
+			    currentIndexElement->GOEOP_grObjectChunk);
+
+	/*
+	 * Unlock the record layout chunk array -- two consecutive CellLocks
+	 * is a bad thing.
+	 */
+	CellUnlock(cellDataPtr);
+    
+	/*
+	 * Give the field a new data type.
+	 */
+	fieldOptr = @call grObjectOptr::MSG_GOVG_GET_VIS_WARD_OD();
+	@call fieldOptr::MSG_FFT_SET_FIELD_TYPE(newType, FALSE);
+
+	/*
+	 * In case the thing used to be a computed field, make sure
+	 * it's editable.
+	 */
+	if (newType != FDT_COMPUTED) {
+	    @call fieldOptr::MSG_VIS_TEXT_MODIFY_EDITABLE_SELECTABLE(
+		(VTS_SELECTABLE | VTS_TARGETABLE | VTS_EDITABLE),
+		 (VTS_ONE_LINE | VTS_SUBCLASS_VIRT_PHYS_TRANSLATION |
+		  VTS_OVERSTRIKE_MODE | VTS_USER_MODIFIED));
+	}
+    }
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDChangeFieldNameInAllLayouts
+ *
+ * DESCRIPTION: This function changes a field's name in all but the
+ *              current layout.
+ *
+ * PARAMETERS:  oself - an optr to the current database
+ *              colNum - the column number of the field that just changed
+ *              newName - a pointer to the new name, NULL-terminated.
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  3/19/93         Initial version
+ *
+ ***********************************************************************/
+void
+FFDChangeFieldNameInAllLayouts(optr oself, FieldID colNum, TCHAR *newName)
+{
+    word curLayout, numLayouts, databaseCurrentLayout;
+    FlatFileDatabaseInstance *pself = ObjDerefGen(oself);
+
+    numLayouts = pself->FFI_numLayouts;
+    databaseCurrentLayout = pself->FFI_currentLayout;
+
+    for (curLayout = 1; curLayout <= numLayouts; curLayout++) {
+	/*
+	 * Skip the current layout.
+	 */
+	if (curLayout == databaseCurrentLayout) {
+	    continue;
+	}
+
+	FFDChangeFieldNameInALayout(oself, colNum, newName, curLayout);
+    }
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFDChangeFieldNameInALayout
+ *
+ * DESCRIPTION: This function changes a field's name in a specified
+ *              layout.
+ *
+ * PARAMETERS:  oself - an optr to the current database
+ *              colNum - the column number of the field that just changed
+ *              newName - a pointer to the new name, NULL-terminated
+ *              layout - the layout in which to change the field name
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      jeremy  3/19/93         Initial version
+ *
+ ***********************************************************************/
+void
+FFDChangeFieldNameInALayout(optr oself, FieldID colNum, TCHAR *newName,
+			    word layout)
+{
+    RecordLayoutChunkArrayHeader *cellDataPtr;
+    RecordLayoutChunkArrayElement *currentIndexElement,
+				  *chunkArrayElement, tempLayoutElement;
+    CellRef cellOptr;
+    FieldListID layoutListIndex, newIndex;
+    FieldID tempFieldList[MAX_NUM_FIELDS];
+    word tempNumFieldsInLayout;
+    FlatFileDatabaseInstance *pself = ObjDerefGen(oself);
+
+    /*
+     * Retrieve the record layout chunk array.
+     */
+    cellDataPtr = CellLockGetRef(&pself->SSI_cellParams,
+				 RECORD_LAYOUT_ROW, 
+				 layout, 
+				 &cellOptr);
+#if ERROR_CHECK
+    if (!cellDataPtr) {
+	EC_ERROR(CELL_DOES_NOT_EXIST);
+    }
+#endif /* ERROR_CHECK */
+
+    /*
+     * Get the layout index of the field that just changed.
+     */
+    pself = ObjDerefGen(oself);
+    layoutListIndex =
+	    FindFieldListElement(cellDataPtr->RLCAH_layoutSortedFieldList,
+				 colNum,
+				 cellDataPtr->RLCAH_numFieldsInLayout);
+	
+    /*
+     * If the field doesn't exist on this layout, we're done.
+     */
+    if (layoutListIndex == (byte) -1) {
+	return;
+    }
+
+    currentIndexElement = ChunkArrayElementToPtr(cellOptr, 
+						 layoutListIndex, 
+						 (word *)0);
+    /*
+     * Copy the field's grobject element.
+     */
+    memcpy(&tempLayoutElement,
+	   currentIndexElement,
+	   sizeof(RecordLayoutChunkArrayElement));
+	
+    /*
+     * Copy the layout's field list and the number of fields in the
+     * layout.
+     */
+    memcpy(&tempFieldList,
+	   cellDataPtr->RLCAH_layoutSortedFieldList,
+	   sizeof(FieldID) * MAX_NUM_FIELDS);
+    tempNumFieldsInLayout = cellDataPtr->RLCAH_numFieldsInLayout;
+
+    /*
+     * Delete the field's grobject element from the chunk array.  We'll
+     * re-insert it as soon as we find out its new place in the field
+     * list.
+     */
+    ChunkArrayDelete(cellOptr, currentIndexElement);
+
+    /*
+     * Unlock the header so we can delete the old field from the
+     * field list and re-insert it in its new place.
+     */
+    CellUnlock(cellDataPtr);
+
+    /*
+     * Delete the field from the layout's field list, then re-insert it.
+     */
+    DeleteAbsoluteFieldFromList(tempFieldList,
+				colNum,
+				tempNumFieldsInLayout);
+
+    newIndex = InsertSortedFieldArray(FFDGetColumnFieldName,
+				      tempFieldList,
+				      colNum,
+				      tempNumFieldsInLayout - 1,
+				      newName,
+				      oself);
+
+    /*
+     * Re-open the header and copy the new list into it.
+     */
+    pself = ObjDerefGen(oself);
+    cellDataPtr = CellLockGetRef(&pself->SSI_cellParams,
+				 RECORD_LAYOUT_ROW, 
+				 layout, 
+				 &cellOptr);
+
+    memcpy(cellDataPtr->RLCAH_layoutSortedFieldList,
+	   &tempFieldList,
+	   sizeof(FieldListID) * MAX_NUM_FIELDS);
+	
+    /*
+     * Place the field grobj element back in the chunk array.
+     * See if this element should be added at the end; if so,
+     * append it (otherwise insert)
+     */
+    if (newIndex == cellDataPtr->RLCAH_numFieldsInLayout - 1) {
+	chunkArrayElement = ChunkArrayAppend(cellOptr, 0);
+    } else {
+	/*
+	 * Get a pointer to the grobject we want to insert _before_
+	 */
+	currentIndexElement = ChunkArrayElementToPtr(cellOptr, 
+						     newIndex, 
+						     (word *)0);
+
+	chunkArrayElement = ChunkArrayInsertAt(cellOptr, 
+					       currentIndexElement, 
+					       0);
+    }
+	
+    /*
+     * Copy the grobject element back into the chunk array.
+     */
+    memcpy(chunkArrayElement,
+	   &tempLayoutElement,
+	   sizeof(RecordLayoutChunkArrayElement));
+	
+    /*
+     * Dirty and unlock the record layout chunk array.
+     */
+    CellDirty(cellDataPtr);
+    CellUnlock(cellDataPtr);
+    
+    /*
+     * Tell the GrObjects that our name just changed.
+     */
+    FFDChangeFieldLabel(oself, newIndex, layout, newName);
+
+    ObjMarkDirty(oself);
+}

@@ -1,0 +1,98 @@
+#!/usr/public/perl
+# -*- perl -*-
+##############################################################################
+#
+#       Copyright (c) Geoworks 1995 -- All Rights Reserved
+#	GEOWORKS CONFIDENTIAL
+#
+# PROJECT:      Spock
+# MODULE:       Tools/scripts/perl -- validate a distFinn directory tree
+# FILE:         validateDistFinn
+# AUTHOR:       Chris Hawley-Ruppel
+#
+# REVISION HISTORY:
+#       Name    Date            Description
+#       ----    ----            -----------
+#	CBH	12/ 5/96	Initial revision
+#
+# DESCRIPTION:
+#       Makes sure all of the files in the tree below us are correctly
+#	on the passed branch.
+#
+# USAGE:
+#	Run "validateDistFinn -h" with no arguments for help.
+#
+#       $Id: validateDistFinn,v 1.2 96/12/05 16:06:26 chris Exp $
+#
+###############################################################################
+
+require("newgetopt.pl");
+
+$0 =~ s,.*/([^/]+),\1,;		# munge argv[0]
+
+&NGetOpt("b=s", "h") || &usage;
+
+$DEF_BRANCH	= "Responder";
+$branch = $opt_b || $DEF_BRANCH;
+if ($branch eq "trunk") {
+	$branch = ".";
+}
+
+&usage if ($opt_h);
+
+if (!(-d "/staff/pcgeos/$branch")) {
+	die("/staff/pcgeos/$branch not found");
+}
+
+&checkFilesHere("");
+
+
+
+sub checkFilesHere {
+
+	local($curPath) = @_;
+
+	opendir(DIR,'.') || die("can't open directory");
+	local(@filenames) = readdir(DIR);
+	closedir(DIR);
+
+	for (@filenames) {
+	    $file = $_;
+
+	    if (!/\.$/) {
+    	      if (-d $file) {
+		chdir("$file") || die("can't cd to $file");
+		&checkFilesHere($curPath . "/" . $file);
+		chdir("..") || die("can't get back up from $file");
+
+	      } else {
+		  $results = `diff $file /staff/pcgeos/$branch$curPath`;
+		  if ($results) {
+		      print $file, ":\n";
+		      print $results;
+		  }
+	      }
+	   }
+        }
+}
+
+
+## Special version that prints what it's about to do.
+sub system {
+    local($command,$noerror) = @_;
+
+    print $command, "\n";    
+
+    system($command) && (!$noerror) && 
+	die("$0: preceding command failed");
+}
+
+
+sub usage {
+	print "usage: $0 [-b branch] [-h]
+
+	    -b branch   - branch to use instead of $BRANCH, or 'trunk'
+	    -h 	 	- prints usage\n";
+
+    exit -1;
+}

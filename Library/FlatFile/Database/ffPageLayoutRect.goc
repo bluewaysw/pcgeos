@@ -1,0 +1,433 @@
+/***********************************************************************
+ *
+ *      Copyright (c) Geoworks 1992 -- All Rights Reserved
+ *
+ * PROJECT:       PCGEOS
+ * MODULE:        ffDatabasePageLayoutRect.goc
+ * FILE:          ffDatabasePageLayoutRect.goc
+ *
+ * AUTHOR:        Anna Lijphart : Jul 22, 1992
+ *
+ * DESCRIPTION:
+ *      This file contains methods and functions for the flat file
+ *      PageLayoutRect class.
+ *
+ * RCS STAMP:
+ *      $Id: ffPageLayoutRect.goc,v 1.1 97/04/04 18:02:52 newdeal Exp $
+ *
+ ***********************************************************************/
+
+@include <stdapp.goh>
+#include <geoworks.h>
+#include <system.h>
+
+#include <Ansi/stdio.h>
+#include <Ansi/string.h>
+#include <Ansi/ctype.h>
+
+#include <char.h>
+#include <input.h>
+#include <chunkarr.h>
+#include <ec.h>
+@include <Objects/FlatFile/ffileC.goh>
+@include <Objects/uiInputC.goh>
+@include <ffile.goh>
+@include <grobj.goh>
+
+typedef struct {
+    word harumph;
+    byte argle;
+} OH_HOW_I_HATE_METWARE;
+
+@classdecl      FFPageLayoutRectClass ;
+
+/***********************************************************************
+ *
+ * FUNCTION:    FFPLRDrawRecordLayoutGrid
+ *
+ * DESCRIPTION: This routine draws dashed boundaries for as many record
+ *              boundaries as fit in the given layout boundary.
+ *
+ * PARAMETERS:  pself - ptr to FFPageLayoutRect instance data
+ *              gstate - current gstate 
+ *              pageLayoutHeight - height of page layout object
+ *              pageLayoutWidth - width of page layout object
+ *              layoutBoundaryDrawFlags - LBDF_SPRITE or LBDF_OBJECT
+ *
+ *
+ * CALLED BY:   INTERNAL
+ *
+ * STRATEGY:
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    8/11/92         Initial Revision
+ *
+ ***********************************************************************/
+void
+FFPLRDrawRecordLayoutGrid(FFPageLayoutRectInstance *pself,
+			  GStateHandle gstate,
+			  LayoutSize recordBounds,
+			  LayoutBoundaryDrawFlags layoutBoundaryDrawFlags)
+{
+    sword recordLayoutLeft, recordLayoutTop;
+    sdword recordLayoutGridHeight, recordLayoutGridWidth,
+	   recordLayoutGridTop,    recordLayoutGridLeft,
+	   recordLayoutGridBottom, recordLayoutGridRight;
+    word numHorizontalLines, numVerticalLines, i;
+
+    numHorizontalLines = recordBounds.LS_height /
+			 pself->FFPLRI_recordLayoutBounds.LS_height;
+
+    recordLayoutGridHeight = pself->FFPLRI_recordLayoutBounds.LS_height * 
+			     numHorizontalLines;
+
+    numVerticalLines = recordBounds.LS_width /
+		       pself->FFPLRI_recordLayoutBounds.LS_width;
+
+    recordLayoutGridWidth = pself->FFPLRI_recordLayoutBounds.LS_width * 
+			    numVerticalLines;
+
+    recordLayoutGridLeft = 0 - (recordBounds.LS_width / 2);
+    recordLayoutGridTop  = 0 - (recordBounds.LS_height / 2);
+
+    recordLayoutGridRight = recordLayoutGridLeft + recordLayoutGridWidth;
+    recordLayoutGridBottom = recordLayoutGridTop + recordLayoutGridHeight;
+
+    recordLayoutLeft = recordLayoutGridLeft;
+    recordLayoutTop = recordLayoutGridTop;
+
+    for (i = 0; i < numVerticalLines; i++) {
+	
+	recordLayoutLeft = recordLayoutLeft + 
+				pself->FFPLRI_recordLayoutBounds.LS_width;
+
+	if (layoutBoundaryDrawFlags == LBDF_OBJECT) {
+	    GrSetLineStyle(gstate, LS_DASHED, 0, 0, 0);
+	}
+	else {
+	    GrSetLineMaskSys(gstate, SDM_50);
+	}
+
+	GrDrawVLine(gstate, recordLayoutLeft, recordLayoutGridTop,
+		    recordLayoutGridBottom);
+
+    }
+
+    for (i = 0; i < numHorizontalLines; i++) {
+	
+	recordLayoutTop = recordLayoutTop + 
+				pself->FFPLRI_recordLayoutBounds.LS_height;
+
+	GrDrawHLine(gstate, recordLayoutGridLeft, recordLayoutTop,
+		    recordLayoutGridRight);
+
+    }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_GO_DRAW_SPRITE_LINE for FFPageLayoutRectClass
+ *
+ * DESCRIPTION: 
+ *
+ * PARAMETERS:
+ *      void (GStateHandle gstate)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/22/92         Initial version
+ *
+ ***********************************************************************/
+@method FFPageLayoutRectClass, MSG_GO_DRAW_SPRITE_LINE
+{
+    WWFixedAsDWord spriteHeight, spriteWidth;
+    LayoutSize spriteBounds;
+
+    GrSaveTransform(gstate);
+    @callsuper();
+    GrRestoreTransform(gstate);
+
+    GrObjGetSpriteOBJECTDimensions(oself, (WWFixed *) &spriteWidth, 
+					(WWFixed *) &spriteHeight);
+
+    spriteBounds.LS_width = IntegerOf(spriteWidth);
+    spriteBounds.LS_height = IntegerOf(spriteHeight);
+
+    FFPLRDrawRecordLayoutGrid(pself, gstate, spriteBounds, LBDF_SPRITE);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_GO_DRAW_FG for FFPageLayoutRectClass
+ *
+ * DESCRIPTION: 
+ *
+ * PARAMETERS:
+ *      void (DrawFlags drawFlags, GStateHandle gstate)
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    8/11/92         Initial version
+ *      anna    11/5/92         Don't draw this object when printing
+ *
+ ***********************************************************************/
+@method FFPageLayoutRectClass, MSG_GO_DRAW_FG_LINE,
+				MSG_GO_DRAW_FG_LINE_HI_RES
+{
+    WWFixedAsDWord pageLayoutWidth, pageLayoutHeight;
+    LayoutSize pageBounds;
+
+    /*
+     * If we're printing, we don't want this object to draw itself
+     */
+    if (drawFlags & DF_PRINT) {
+	return;
+    }
+
+    GrSaveTransform(gstate);
+    @callsuper();
+    GrRestoreTransform(gstate);
+
+    GrObjGetNormalOBJECTDimensions(oself, (WWFixed *) &pageLayoutWidth, 
+					(WWFixed *) &pageLayoutHeight);
+
+    pageBounds.LS_width = IntegerOf(pageLayoutWidth);
+    pageBounds.LS_height = IntegerOf(pageLayoutHeight);
+
+    /*
+     * Draw the grid of tiled record layouts
+     */
+    FFPLRDrawRecordLayoutGrid(pself, gstate, pageBounds, LBDF_OBJECT);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFPLR_SET_RECORD_BOUNDARY_SIZE for FFPageLayoutRectClass
+ *
+ * DESCRIPTION: Sets the width and height of the associated record layout's
+ *              boundary in our instance data.
+ *
+ * PARAMETERS:
+ *      Pass:
+ *              LayoutSize recordBounds - width and height of
+ *                                        record layout's boundary
+ *      Returns:
+ *              nothing
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    7/30/92         Initial version
+ *
+ ***********************************************************************/
+@method FFPageLayoutRectClass, MSG_FFPLR_SET_RECORD_BOUNDARY_SIZE
+{
+    WWFixedAsDWord pageLayoutWidth, pageLayoutHeight;
+    PointWWFixed newSize;
+    Boolean resize = FALSE;
+
+	memcpy(&pself->FFPLRI_recordLayoutBounds, &recordBounds,sizeof(LayoutSize));
+
+    /* 
+     * Make sure that the minimum size of the page layout boundary at
+     * least covers the size of the record layout boundary.
+     * Check the size here, and resize if necessary.
+     */
+    GrObjGetNormalOBJECTDimensions(oself, (WWFixed *) &pageLayoutWidth,
+					(WWFixed *) &pageLayoutHeight);
+
+    newSize.PF_x.WWF_int = IntegerOf(pageLayoutWidth);
+    newSize.PF_x.WWF_frac = FractionOf(pageLayoutWidth);
+
+    newSize.PF_y.WWF_int = IntegerOf(pageLayoutHeight);
+    newSize.PF_y.WWF_frac = FractionOf(pageLayoutHeight);
+
+    if (IntegerOf(pageLayoutWidth) < recordBounds.LS_width) {
+	newSize.PF_x.WWF_int = recordBounds.LS_width;
+	newSize.PF_x.WWF_frac = 0;
+	resize = TRUE;
+    }
+
+    if (IntegerOf(pageLayoutHeight) < recordBounds.LS_height) {
+	newSize.PF_y.WWF_int = recordBounds.LS_height;
+	newSize.PF_y.WWF_frac = 0;
+	resize = TRUE;
+    }
+   
+    ObjMarkDirty(oself);
+
+    if (resize) {
+	@call self::MSG_GO_SET_SIZE(&newSize);
+    }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_FFPLR_GET_RECORD_BOUNDARY_SIZE for FFPageLayoutRectClass
+ *
+ * DESCRIPTION: Returns the width and height of the associated record layout's
+ *              boundary in our instance data.
+ *
+ * PARAMETERS:
+ *      Pass:
+ *              LayoutSize *recordBounds - pointer to width and height
+ *                              of the associated record layout's boundary
+ *      Returns:
+ *              the above, filled in
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    8/27/92         Initial version
+ *
+ ***********************************************************************/
+@method FFPageLayoutRectClass, MSG_FFPLR_GET_RECORD_BOUNDARY_SIZE
+{
+    memcpy(recordBounds, &pself->FFPLRI_recordLayoutBounds, sizeof(LayoutSize));
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_META_INITIALIZE for FFPageLayoutRectClass
+ *
+ * DESCRIPTION: Sets the GOAF_SPECIAL_RESIZE_CONSTRAIN bit.
+ *              We need this set, because we want to make sure that
+ *              the Page Layout boundary cannot be resized smaller than the
+ *              Record Layout Boundary (i.e. it must contain at least
+ *              one record layout)
+ *
+ * PARAMETERS:
+ *      Pass:
+ *              nothing
+ *      Returns:
+ *              nothing
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    8/19/92         Initial version
+ *
+ ***********************************************************************/
+@method FFPageLayoutRectClass, MSG_META_INITIALIZE
+{
+    @callsuper();
+
+    pself = ObjDerefGrObj(oself);
+    pself->GOI_msgOptFlags |= GOMOF_SPECIAL_RESIZE_CONSTRAIN;
+
+    /*
+     * Don't want the user to be able to delete this thing
+     */
+    pself->GOI_locks |= GOL_DELETE;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:     MSG_GO_SPECIAL_RESIZE_CONSTRAIN for FFPageLayoutRectClass
+ *
+ * DESCRIPTION: If the object (page layout boundary) is smaller than
+ *              the record layout boundary, resize it to be at least
+ *              as big.
+ *
+ * PARAMETERS:
+ *      Pass:
+ *              GrObjHandleSpecification grObjHandleSpec
+ *      Returns:
+ *              nothing
+ *
+ * KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      anna    8/19/92         Initial version
+ *
+ ***********************************************************************/
+@method FFPageLayoutRectClass, MSG_GO_SPECIAL_RESIZE_CONSTRAIN
+{
+    WWFixedAsDWord spriteHeight, spriteWidth;
+    sdword deltaHeight, deltaWidth;
+    PointDWFixed objectDeltaResize;
+
+    /*
+     * Are we going to the left or above the boundary?
+     */
+    GrObjGetSpriteOBJECTDimensions(oself, (WWFixed *) &spriteWidth,
+					  (WWFixed *) &spriteHeight);
+    if ((sword) IntegerOf(spriteWidth) < 0) {
+	/*
+	 * The weirdnesses below are to get the type conversion from
+	 * WWFixedAsDWord to sdword to work correctly.
+	 * Basically all it's doing is setting deltaWidth = spriteWidth
+	 */
+	deltaWidth = (sdword) (0 - (IntegerOf(spriteWidth)));
+	deltaWidth = 0 - (pself->FFPLRI_recordLayoutBounds.LS_width 
+					+ deltaWidth);
+    }
+    else {
+	deltaWidth = 0;
+    }
+    
+    if ((sword) IntegerOf(spriteHeight) < 0) {
+	deltaHeight = (sdword) (0 - (IntegerOf(spriteHeight)));
+	deltaHeight = 0 - (pself->FFPLRI_recordLayoutBounds.LS_height 
+					+ deltaHeight);
+    }
+    else {
+	deltaHeight = 0;
+    }
+    
+    /*
+     * Now check for other adjustments
+     */
+    GrObjGetAbsSpriteOBJECTDimensions(oself, (WWFixed *) &spriteWidth, 
+					     (WWFixed *) &spriteHeight);
+
+    if (deltaWidth == 0) {
+	if (pself->FFPLRI_recordLayoutBounds.LS_width > 
+						IntegerOf(spriteWidth)) {
+	    deltaWidth = pself->FFPLRI_recordLayoutBounds.LS_width -
+		     IntegerOf(spriteWidth);
+	}
+    } 
+
+    if (deltaHeight == 0) {
+	if (pself->FFPLRI_recordLayoutBounds.LS_height > 
+					IntegerOf(spriteHeight)) {
+	    deltaHeight = pself->FFPLRI_recordLayoutBounds.LS_height -
+		      IntegerOf(spriteHeight);
+	}
+    } 
+
+    /*
+     * Was any adjustment necessary? If not, don't do anything
+     */
+    if ((deltaHeight != 0) || (deltaWidth != 0)) {
+
+	objectDeltaResize.PDF_x.DWF_int = deltaWidth;
+	objectDeltaResize.PDF_x.DWF_frac = 0;
+	objectDeltaResize.PDF_y.DWF_int = deltaHeight;
+	objectDeltaResize.PDF_y.DWF_frac = 0;
+
+	GrObjResizeSpriteRelativeToSprite(oself, 
+				      (word) grObjHandleSpec, 
+				      &objectDeltaResize);
+    }
+}

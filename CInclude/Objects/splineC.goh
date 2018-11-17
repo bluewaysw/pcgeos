@@ -1,0 +1,1601 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1993 -- All Rights Reserved
+
+PROJECT:	PCGEOS
+MODULE:		splineC.goh
+FILE:		splineC.goh
+
+AUTHOR:		Joon Song, Nov 16, 1993
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Joon	11/16/93   	Initial version.
+
+DESCRIPTION:
+	This is the main Include file for users of the spline library.
+
+	$Id: splineC.goh,v 1.1 97/04/04 15:52:37 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@optimize
+
+@include <Objects/gInterC.goh>
+
+@deflib	spline
+
+typedef ByteEnum SplineReturnType;
+
+	#define SRT_OK				0x0
+
+	#define SRT_NULL_OPERATION		0x2
+	/*
+	 *  The requested operation was not necessary, and therefore,
+	 *  was not performed (ie, closing an already closed spline, or
+	 *  adding controls to a point that already has control points,
+	 *  etc.)  
+	 */
+
+	#define SRT_TOO_MANY_POINTS		0x4
+	/*
+	 *  The desired operation could not be performed, since the
+	 *  result would create an illegal number of points
+	 */
+
+
+/*  returned from MSG_SPLINE_REPLACE_WITH_TRANSFER_FORMAT */
+typedef ByteEnum SplinePasteReturnType;
+
+	#define SPRT_OK				0x0
+	/*  data was read correctly. */
+
+	#define SPRT_TOO_OLD			0x1
+	/*
+	 *  transfer item's protocol was too old to work with this
+	 *  version of the VisSpline
+	 */
+
+	#define SPRT_TOO_NEW			0x2
+	/*
+	 *  transfer item's protocol was too new to work with this
+	 *  version of the VisSpline
+	 */
+
+
+typedef struct {
+	optr	SJP_otherSpline;
+	/*
+	 *  OD of spline to join with this one.  This other spline will
+	 *  be nuked after this call.
+	 */
+
+	word	SJP_deltaX;
+	/*
+	 *  Deltas are the distance between the upper left-hand corners
+	 *  of the 2 splines.
+	 */
+
+	word	SJP_deltaY;
+} SplineJoinParams;
+
+
+typedef ByteFlags SplineUnSuspendFlags;
+	/* 6 bits unused */
+
+	#define SUSF_GEOMETRY			(0x02)
+	/*  Size needs to be recalculated */
+
+	#define SUSF_UPDATE_UI			(0x01)
+	/*  Notification should be sent to the controllers. */
+
+
+typedef WordFlags SplineGenerateNotifyFlags;
+	#define SGNF_MARKER_SHAPE		(0x8000)
+	#define SGNF_SPLINE_POINT		(0x4000)
+	#define SGNF_POLYLINE			(0x2000)
+	#define SGNF_SMOOTHNESS			(0x1000)
+	#define SGNF_OPEN_CLOSE			(0x0800)
+	#define SGNF_EDIT			(0x0400)
+
+	/* 10 bits unused */
+
+
+typedef ByteEnum MarkerShape;
+	#define MS_NONE				0x0
+	#define MS_SQUARE			0x2
+	#define MS_CROSS1			0x4
+	#define MS_DIAMOND			0x6
+	#define MS_CROSS2			0x8
+	#define MS_TRIANGLE			0xa
+	#define MS_BAR1				0xc
+	#define MS_BAR2				0xe
+	#define MS_CIRCLE			0x10
+
+
+/*
+ *  Dumb hack:  SIF_DONT_ALLOC_ATTR_CHUNKS and SS_HAS_ATTR_CHUNKS are
+ *  both at the same position in their respective records.  This 
+ *  minimizes shifting during MSG_SPLINE_COPY
+ */
+
+typedef ByteFlags SplineInitFlags;		/* CHECKME */
+	/* 3 bits unused */
+
+	#define SIF_MANAGE_ATTRIBUTES		(0x10)
+	/*
+	 *  If set, then the spline is to manage its attributes.
+	 *  Otherwise, the spline will assume that a subclass is
+	 *  managing them.
+	 */
+
+	#define SIF_INTERNAL			(0x08)
+	/*  Don't set this flag unless you want to visit the yang-man! */
+	
+	#define SIF_RESET_LINKAGES		(0x04)
+	/*
+	 *  This flag is set if the spline should clear its link data
+	 *  (ie, data may contain garbage).  This flag is used during
+	 *  SplineCopy  (MSG_SPLINE_COPY).
+	 */
+
+	/* 2 bits unused */
+
+
+/* ****************************************************************************
+ *  SplineInitParams - parameters passed when sending a
+ *  MSG_SPLINE_INTIALIZE.	If you change this, please change the
+ *  SplineCopy procedure
+ * ****************************************************************************
+ */
+
+typedef struct {
+	MemHandle	SIP_lmemBlock;
+	/*
+	 *  block handle of lmem block containing points.  MUST be in
+	 *  same VM file as the spline object.  Pass 0 if you want the
+	 *  spline to create and manage its own lmem block.
+	 */
+
+	SplineInitFlags	SIP_flags;
+} SplineInitParams;
+
+
+/* ****************************************************************************
+ *  This structure is used to get lengths/percentages along spline copies
+ * ****************************************************************************
+ */
+
+typedef struct {
+	word		LS_pointNum;
+	word		LS_length;
+	word		LS_percent;
+} LengthStruct;
+
+
+/* ****************************************************************************
+ * 	SmoothType - Different types of smoothness that an anchor point
+ * 	can have.
+ * ****************************************************************************
+ */
+
+typedef ByteEnum SmoothType;
+	#define ST_NONE				0x0
+	/*
+	 *  there is no interaction between the control points.  If one
+	 *  control point is moved, the other stays where it is.
+	 */
+
+	#define ST_SEMI_SMOOTH			0x1
+	/*
+	 *  Control points stay on opposite sides of their anchor, but
+	 *  their distances to the anchor are unrelated.  Thus, if the
+	 *  user moves one control point, the other control point will
+	 *  modify its position so that it remains on the opposite side
+	 *  of the anchor from the control being edited, but will NOT
+	 *  change its distance to the anchor.  This is the default
+	 *  behavior for all points in SM_ADVANCED_EDIT mode.
+	 */
+
+
+	#define ST_VERY_SMOOTH			0x2
+	/*
+	 *  control points are on opposite sides and identical distances
+	 *  from the anchor.  This is the behavior in SM_ADVANCED_CREATE.
+	 */
+
+	#define ST_AUTO_SMOOTH			0x3
+	/*
+	 *  Positioning of controls is determined automatically based on
+	 *  the position of the anchor relative to its two closest
+	 *  neighbors.  The controls will always remain equidistant and
+	 *  on opposite sides from their anchor.
+	 */
+
+	#define ST_MAX_SMOOTHNESS		ST_AUTO_SMOOTH
+
+
+/* ****************************************************************************
+ *  ActionType - describes what sort of action the spline is currently
+ *  undergoing. 
+ * ****************************************************************************
+ */
+
+typedef ByteEnum ActionType;
+	/*  nothing going on */
+	#define AT_NONE				0x0
+
+/*  selection actions: */
+	#define AT_SELECT_ANCHOR		0x1
+	#define AT_SELECT_SEGMENT		0x2
+	#define AT_SELECT_CONTROL		0x3
+	#define AT_SELECT_NOTHING		0x4
+
+/*  move actions: */
+	/*  anchor point(s) being moved */
+	#define AT_MOVE_ANCHOR			0x5
+
+	/*  a segment is being moved */
+	#define AT_MOVE_SEGMENT			0x6
+
+	/*  controls  */
+	#define AT_MOVE_CONTROL			0x7
+
+	/*  a rectangle being dragged around */
+	#define AT_MOVE_RECTANGLE		0x8
+
+/*  Mouse buttons are UP, but we want to follow the mouse around anyway. */
+	#define AT_CREATE_MODE_MOUSE_UP		0x9
+
+
+/* ****************************************************************************
+ *  SplineSelectType - describes type of "thing" being selected in a spline.
+ * ****************************************************************************
+ */
+
+typedef ByteEnum SplineSelectType;
+	#define SST_NONE			0x0
+	#define SST_ANCHOR_POINT		0x1
+	#define SST_SEGMENT			0x2
+	#define SST_CONTROL_POINT		0x3
+	#define SST_INSIDE_CLOSED_CURVE		0x4
+	#define SST_INSIDE_VIS_BOUNDS		0x5
+
+
+/* ****************************************************************************
+ *  Spline modes -- The basic editing modes of the spline object.  Many
+ *  jump tables rely on the order of these, so don't rearrange them
+ *  unnecessarily! (see splineData.asm)
+ * ****************************************************************************
+ */
+
+typedef ByteEnum SplineMode;
+	#define SM_BEGINNER_POLYLINE_CREATE	0x0
+	/*
+	 *  Mouse clicks place new anchor points.  All segments are
+	 *  straight lines -- the user has no way of making curves in
+	 *  this mode.
+	 */
+
+	#define SM_BEGINNER_SPLINE_CREATE	0x1
+	/*
+	 *  Mouse clicks place new anchor points.  All segments are
+	 *  curvy -- the curviness of the PREVIOUS anchor is
+	 *  automatically determined by the position of the mouse.
+	 */
+
+	#define SM_ADVANCED_CREATE		0x2
+	/*
+	 *  Mouse click (START_SELECT) place anchors, and the user may
+	 *  then DRAG the mouse to place control points.
+	 */
+
+	#define SM_BEGINNER_EDIT		0x3
+	/*
+	 *  Mouse clicks either select anchors or segments -- if a
+	 *  segment is selected, a new anchor will be created at the
+	 *  mouse position.  Clicking and dragging causes anchors to
+	 *  move, with curviness of neighboring points being adjusted
+	 *  automatically. 
+	 */
+
+	#define SM_ADVANCED_EDIT		0x4
+	/*  The user can click on and edit anchor and control points. */
+
+	#define SM_INACTIVE			0x5
+	/*
+	 *  Mouse events have no effect -- points are generally not
+	 *  drawn. 
+	 */
+
+
+/* ****************************************************************************
+ *  SplineState - general state attributes of the spline object
+ * ****************************************************************************
+ */
+  
+typedef ByteFlags SplineState;
+	#define SS_VIS_BOUNDARY_DRAWN		(0x80)
+	/*  Set if a rectangle is drawn around the vis bounds */
+
+	#define SS_CLOSED			(0x40)
+	/*  Set if the spline is a closed curve */
+
+	#define SS_FILLED			(0x20)
+	/*  spline is FILLED with area fill stuff */
+
+	#define SS_HAS_ATTR_CHUNKS		(0x10)
+	/*
+	 *  if set, spline has lmem chunks for its line/area attributes.
+	 *  If false, attributes are managed (in a subclass) in an
+	 *  element array or other structure.
+	 */
+
+	#define SS_CREATED_BLOCK		(0x08)
+	/*
+	 *  If set, spline is the creator of the lmem block containing
+	 *  its points and must free it upon being freed.
+	 */
+
+	#define SS_MODE				(0x04 | 0x02 | 0x01)
+	#define SS_MODE_OFFSET			0
+	/*  SplineMode  */
+
+/* ****************************************************************************
+ *  Spline Edit State -- additional state information.
+ * ****************************************************************************
+ */
+
+typedef ByteFlags SplineEditState;
+	#define SES_SELECT_STATE_CHANGED	(0x80)
+	/*
+	 *  If set, then the selection state has changed, and the UI
+	 *  needs to be updated (will happen on EndSelect/EndMoveCopy)
+	 */
+
+	#define SES_FOCUS			(0x40)
+	/*  Set if we have the (app) focus -- not used. */
+
+	#define SES_TARGET			(0x20)
+	/*
+	 *  Set if we have the (app) target. If not set, won't draw
+	 *  selection. 
+	 */
+
+	#define SES_SELECTED			(0x10)
+	/*  Set if the spline or any of its points are selected */
+
+	#define SES_ACTION			(0x08 | 0x04 | 0x02 | 0x01)
+	#define SES_ACTION_OFFSET		0
+	/*  ActionType  */
+
+
+@class  VisSplineClass, VisClass;
+
+/* COMMENT --------------------------------------------------------------------
+	INHERITANCE		
+   ----------------------------------------------------------------------------
+
+VisClass:
+    MSG_VIS_OPEN - sends itself MSG_VIS_RECREATE_CACHED_GSTATES
+
+    MSG_VIS_DRAW - calls MSG_SPLINE_DRAW_BASE_OBJECT followed by
+	MSG_SPLINE_DRAW_EVERYTHING_ELSE (handles, etc).
+
+    MSG_VIS_RECALC_SIZE - recalculates bounds based on positions of
+	points, etc. 
+
+   ------------------------------------------------------------------------- */
+
+/* ----------------------------------------------------------------------------
+ * 	Messages		
+ * ----------------------------------------------------------------------------
+ */
+
+@message SplineReturnType MSG_SPLINE_INSERT_ANCHORS() = al;
+/*
+ * 	Add anchor points to all of the currently selected SEGMENTS
+ * 
+ *  Pass:	nothing
+ * 
+ * 	the Spline must have its SEGMENT mode bit set for this operation
+ * 	to work.  Anchor points will be placed in the (parametric) MIDDLE
+ * 	of each selected segment, so as to not change the shape of any
+ *  	of the segments.
+ * 
+ *  Return:	SplineReturnType
+ */
+
+@message SplineReturnType MSG_SPLINE_INSERT_CONTROLS() = al;
+/*
+ * 	Add control points (if possible) to all of the selected ANCHOR 
+ * 	points.  Control points will be placed in such a way as to make
+ *  	the curve "very smooth".
+ * 
+ *  Pass:	nothing
+ *  Return:	SplineReturnType
+ */
+
+@message SplineReturnType MSG_SPLINE_DELETE_ANCHORS() = al;
+/*
+ * 	Delete all of the selected anchor points (and all of their control
+ * 	points)
+ * 
+ *  Pass: 	nothing
+ *  Return:	SplineReturnType
+ */
+
+@message SplineReturnType MSG_SPLINE_DELETE_CONTROLS() = al;
+/*
+ * 	Delete all of the control points for all of the selected anchor 
+ * 	points
+ * 
+ *  Pass:	nothing
+ *  Return:	SplineReturnType
+ */
+
+
+/* ****************************************************************************
+ *  	LINE AND AREA ATTRIBUTES
+ * ****************************************************************************
+ */
+
+@message void MSG_SPLINE_APPLY_ATTRIBUTES_TO_GSTATE(GState gstate = bp);
+/*
+ *  Set the line/area attributes of a gstate with the spline's
+ *  attributes.
+ * 
+ *  Pass:	GState handle
+ *  Return:	nothing -- gstate updated
+ */
+
+@message void MSG_SPLINE_SET_DEFAULT_LINE_ATTRS();
+/*
+ *  Initialize the default line attributes data structure for this
+ *  spline. 
+ * 
+ *  Pass:	nothing
+ *  Return:	nothing
+ */
+
+@message void MSG_SPLINE_SET_DEFAULT_AREA_ATTRS();
+/*
+ *  Set the default area attributes for the spline
+ * 
+ *  Pass:	nothing
+ *  Return:	nothing
+ */
+
+@message void MSG_SPLINE_SET_LINE_ATTRS(LineAttr *lineAttr = cx:dx);
+/*
+ *  Set the line attributes for the spline
+ *  
+ *  Pass:	lineAttr - fptr to a LineAttr structure
+ *  Return:	nothing
+ */
+
+@message void MSG_SPLINE_GET_LINE_ATTRS(LineAttr *lineAttr = cx:dx);
+/*
+ *  Get the line attributes for a vis spline
+ * 
+ *  Pass:	lineAttr - fptr to a LineAttr structure
+ *  Return: 	nothing -- buffer filled in
+ */
+
+@message void MSG_SPLINE_SET_AREA_ATTRS(AreaAttr *areaAttr = cx:dx);
+/*
+ *  Set the area attributes
+ * 
+ *  Pass:	areaAttr - fptr to an AreaAttr structure
+ *  Return:	nothing
+ */
+
+@message void MSG_SPLINE_GET_AREA_ATTRS(AreaAttr *areaAttr = cx:dx);
+/*
+ *  Get the area attributes for a vis spline
+ * 
+ *  Pass:	areaAttr - fptr to an AreaAttr structure
+ *  Return:	nothing -- buffer filled in
+ */
+
+@message void MSG_SPLINE_SET_LINE_WIDTH(WWFixedAsDWord lineWidth = dx.cx);
+/*
+ * 	Set line width
+ *  Pass:	lineWidth  dx.cx - line width (WWFixed)
+ *  Return:	nothing
+ *  
+ *  See NOTE 1 on Line/Area attributes
+ */
+
+@message WWFixedAsDWord MSG_SPLINE_GET_LINE_WIDTH() = dx.cx;
+/*
+ *  Pass:	nothing
+ *  Return:	dx.cx - line width (WWFixed)
+ *
+ *  See NOTE 1 on Line/Area attributes
+ */
+
+@message void MSG_SPLINE_SET_LINE_STYLE(LineStype lineStyle = cl);
+/*
+ *  Pass:	lineStype
+ *  Return:	nothing
+ *
+ *  See NOTE 1 on Line/Area attributes
+ */
+
+@message LineStyle MSG_SPLINE_GET_LINE_STYLE() = cl;
+/*
+ *  Pass:	nothing
+ *  Return:	LineStyle enum
+ * 
+ *  See NOTE 1 on Line/Area attributes
+ */
+
+@message void MSG_SPLINE_SET_LINE_COLOR(byte red = cl,
+					byte green = ch,
+					byte blue = dl);
+/*
+ *  Pass:	red
+ * 		green
+ * 		blue
+ *  Return:	nothing
+ * 
+ *  See NOTE 1 on Line/Area attributes
+ */
+
+typedef struct {
+	byte	RGBQ_blue;
+	byte	RGBQ_blank;
+	byte	RGBQ_red;
+	byte	RGBQ_green;
+} RGBQuad;
+
+@message void MSG_SPLINE_GET_LINE_COLOR(RGBQuad *retVal = dxcx);
+/*
+ *  Pass:	retVal - address of RGBQuad
+ *  Return: 	RGBQuad fill in with red, blue, and green.
+ * 		(CQR_rgb = ???)
+ * 
+ *  See NOTE 1 on Line/Area attributes
+ */
+
+@message void MSG_SPLINE_SET_LINE_MASK(SystemDrawMask sysDrawMask = cl);
+/*
+ *  Pass:	SystemDrawMask
+ *  Return:	nothing 
+ */
+
+@message SystemDrawMask MSG_SPLINE_GET_LINE_MASK() = cl;
+/*
+ *  return the spline's line mask
+ * 
+ *  Pass:	nothing 
+ *  Return:	SystemDrawMask
+ */
+
+@message void MSG_SPLINE_SET_AREA_COLOR(byte red = cl,
+					byte green = ch,
+					byte blue = dl);
+/*
+ *  Pass:  	red
+ * 	 	green
+ * 	 	blue 
+ *  Return:	nothing
+ *
+ *  See NOTE 1 on Line/Area attributes 
+ */
+
+@message void MSG_SPLINE_GET_AREA_COLOR(RGBQuad *retVal = dxcx);
+/*
+ *  Pass:	retVal - address of RGBQuad
+ *  Return: 	RGBQuad fill in with red, blue, and green.
+ * 		(CQR_rgb = ???)
+ * 
+ *  See NOTE 1 on Line/Area attributes 
+ */
+
+@message void MSG_SPLINE_SET_AREA_MASK(word areaMask = cx);
+/*
+ *  Pass:	areaMask
+ *  Return:	nothing
+ * 
+ *  See NOTE 1 on Line/Area attributes 
+ */
+
+@message word MSG_SPLINE_GET_AREA_MASK() = cx;
+/*
+ *  Pass:	nothing
+ *  Return:	area mask
+ * 
+ *  See NOTE 1 on Line/Area attributes 
+ */
+
+
+/*
+ *  NOTE 1:  The spline uses the above messages when setting the
+ *  gstate's area attributes to draw -- thus, just subclass them to
+ *  provide different behavior (ie, for the GrObj spline)
+ */
+
+
+@message void MSG_SPLINE_SET_MODE(SplineMode splineMode = cl);
+/*
+ *  Pass:	SplineMode
+ *  Return:	nothing
+ */
+
+@message SplineMode MSG_SPLINE_GET_MODE() = cl;
+/*
+ *  Pass:	nothing 
+ *  Return:	SplineMode
+ */
+
+@message void MSG_SPLINE_SET_SMOOTHNESS(SmoothType smoothType = cl);
+/*
+ * 	Set the smoothness of the currently selected anchor points
+ *
+ *  Pass:	SmoothType
+ *  Return:	nothing
+ */
+
+@message void MSG_SPLINE_OPEN_CURVE();
+/*
+ *  	Make the spline an open curve
+ *
+ *  Pass:	nothing
+ *  Return:	nothing
+ */
+
+@message void MSG_SPLINE_CLOSE_CURVE();
+/*
+ *  	Close the spline curve
+ *
+ *  Pass:	nothing
+ *  Return:	nothing
+ */
+
+@message void MSG_SPLINE_DRAW_VIS_BOUNDARY();
+/*
+ * 	Draw the visual boundary of the spline object
+ *
+ *  Pass:	nothing
+ *  Return:	nothing
+ */
+
+@message void MSG_SPLINE_ERASE_VIS_BOUNDARY();
+/*
+ * 	I'm not going to tell you what this does!
+ *
+ *  Pass:	nothing
+ *  Return:	nothing
+ */
+
+@message void MSG_SPLINE_SET_VIS_BOUNDS(@stack Rectangle rect);
+/*
+ *  	Set new Vis bounds for the spline object without moving any of
+ *  its points relative to the screen.
+ * 
+ *  Pass: 	rect - a Rectangle structure containing the new Vis bounds.
+ *  Return:	nothing
+ */
+
+@message void MSG_SPLINE_DELTA_VIS_BOUNDS(@stack Rectangle rect);
+/*
+ * 	Change the Vis bounds of the spline object by the amount
+ *  specified in the passed Rectangle structure.
+ *
+ *  Pass: 	rect	- a Rectangle structure containing deltas to
+ *   			  the new Vis bounds
+ *  Return:	nothing
+ */
+
+@message void MSG_SPLINE_NOTIFY_CHANGE_BOUNDS(@stack Rectangle rect);
+/*
+ *  	This message does nothing.  It is sent from the VisSplineClass
+ *  object to itself when it senses that its Vis bounds should change
+ *  (when control/anchor points are moved outside the Vis bounds, or, on
+ *  an END_SELECT, when the Vis Bounds should shrink.)  Application
+ *  writers may want to subclass the VisSpline to examine the passed
+ *  rectangle, modify it, and send a MSG_SPLINE_SET_VIS_BOUNDS to
+ *  itself.
+ * 
+ *  Pass:	rect - A Rectangle structure containing (desired)
+ * 		       new Vis Bounds
+ *  Return:	nothing
+ */
+		
+@message void MSG_SPLINE_INITIALIZE(@stack SplineInitParams params);
+/*
+ *  Initialize the instance data of the VisSplineClass object. NOT
+ *  THE SAME AS MSG_META_INITIALIZE, which is NOT subclassed.
+ * 
+ *  Pass:	params	- SplineInitParams
+ *  Return:	nothing
+ */
+
+@message void MSG_SPLINE_ABORT_CURRENT_OPERATION();
+/*
+ *  	Tell the spline to end a MOVE or DRAG operation -- happens if
+ *  the user selects another object, etc.
+ *
+ *  Pass:	nothing
+ *  Return:	nothing
+ */
+
+@message void MSG_SPLINE_TRANSFORM_POINTS(GState gstate = bp);
+/*
+ * 	Transform the spline's points by the TMatrix contained in the
+ *  passed GSTATE
+ *
+ *  Pass:	gstate handle containing transformation matrix
+ *  Return:	nothing
+ */
+
+@message void MSG_SPLINE_READ_GSTRING(GState gstate = bp);
+/*
+ * 	Read a graphics string, adding points to the spline object
+ *  from the string.
+ *
+ *  Pass:	gstring handle
+ *  Return:	nothing
+ */
+
+typedef struct {
+	SplineSelectType	SHDP_selectType;
+	byte			SHDP_nothing;
+	word			SHDP_pointNumber;
+} SplineHitDetectParams;
+
+@message void MSG_SPLINE_HIT_DETECT(SplineHitDetectParams *retValue = dxcx,
+				    word xcoord = cx,
+				    word ycoord = dx);
+/*
+ * 	See if a point in document coordinates correlates with any
+ * point or segment of the spline object.
+ * 
+ *  Pass:	retValue	 - address of SplineHitDetectParams
+ *  		(xcoord, ycoord) - point coordinates
+ *  Return: 	SplineHitDetectParams filled in
+ *  		    SHDP_selectType  - SplineSelectType
+ * 		    SHDP_pointNumber - (if applicable) - point # that was hit
+ */
+
+@message void MSG_SPLINE_SELECT(word pointNumber = cx,
+				SplineSelectType splineSelectType = dl);
+/*
+ * 	Select a point of the spline object
+ *
+ *  Pass:	point number
+ * 		SplineSelectType
+ *  Return:	nothing
+ */
+
+@message void MSG_SPLINE_SELECT_AT_COORDS(word xcoord = cx,
+					  word ycoord = dx);
+/*
+ * 	Select whatever happens to be at the passed coordinates
+ *
+ *  Pass:	(xcoord,ycoord) - coordinates
+ *  Return:	nothing
+ */
+
+@message void MSG_SPLINE_BEGIN_MOVE();
+/*
+ * 	Begin a MOVE of the currently selected point(s)
+ *
+ *  Pass:	nothing
+ *  Return:	nothing
+ */
+
+@message void MSG_SPLINE_MOVE(word deltaX = cx,
+			      word deltaY = dx);
+/*
+ * 	Move points of the spline
+ *
+ *  Pass:	deltaX, deltaY to move selected points
+ *  Return:	nothing
+ */
+
+@message void MSG_SPLINE_END_MOVE();
+/*
+ * 	End a move operation
+ *
+ *  Pass:	nothing
+ *  Return:	nothing
+ */
+
+@message void MSG_SPLINE_SUBDIVIDE_CURVE(word anchorPoint = cx,
+					 word subdivision = dx);
+/*
+ *  	Subdivide a spline curve based on the passed parameter
+ *
+ *  Pass:	anchorPoint - current anchor point
+ * 		subdivision - subdivision parameter (between 0 and 1)
+ *  Return:	nothing
+ */
+
+@message void MSG_SPLINE_GET_ALL_LENGTHS(void *chunkArray = cx:dx);
+/*
+ * 	Get the lengths of ALL spline curves
+ *
+ *  Pass: 	chunkArray - chunk array which must be initialized to
+ * 			     contain elements of AT LEAST size LengthStruct.
+ *  Return:	array filled in
+ */
+
+@message void MSG_SPLINE_INSERT_ALL_CONTROLS();
+/*
+ * 	Insert control points around EVERY anchor point that doesn't
+ * already have them, putting them at distance zero from their owner
+ * anchors.
+ *
+ *  Pass:	nothing
+ *  Return:	nothing
+ */
+
+@message ChunkHandle MSG_SPLINE_COPY(MemHandle objBlock = cx,
+				     MemHandle lmemBlock = dx) = cx;
+/*
+ * 	Make a copy of the current spline object
+ *
+ *  Pass:	objBlock	- handle of object block to copy object to
+ * 		lmemBlock	- handle of lmem block in which to place points
+ * 				  array (or 0 if copy is supposed to create its
+ *				  own internal mem block)
+ *  Return:	chunk handle of new spline (copy)
+ */
+
+@message void MSG_SPLINE_UNSELECT_ALL_POINTS();
+/*
+ *  	Unselect all selected spline points
+ *
+ *  Pass:	nothing
+ *  Return:	nothing
+ */
+
+typedef struct {
+    Rectangle		SSRP_rect;
+    UIFunctionsActive	SSRP_flags;
+} SplineSelectRectangleParams;
+
+@message void
+    MSG_SPLINE_SELECT_RECTANGLE(@stack SplineSelectRectangleParams params);
+/*
+ * 	This message is sent to cause the spline object to visually
+ *  update its anchor points based their location in relation to a
+ *  passed rectangle.  Update is performed based on the UIFA flags
+ *  passed in cl.  If no flags are passed, any points INSIDE the
+ *  rectangle are drawn with FILLED handles.
+ *
+ *
+ *  If the UIFA_ADJUST flag is passed:
+ * 	If anchor was previously selected:
+ * 		anchor is drawn with a HOLLOW handle
+ * 	else
+ * 		anchor is drawn with a FILLED handle
+ * 
+ *  Any points that are OUTSIDE the rectangle will have their handles
+ *  drawn in accordance to whether they're selected.
+ * 
+ *  	This message DOES NOT change the selection of any points (it
+ *  can't since otherwise UIFA_ADJUST wouldn't work!), it merely changes
+ *  their visual representation.  In order to have the changes take
+ *  effect, the caller must pass a MSG_SPLINE_END_SELECT_RECTANGLE after
+ *  the last MSG_SPLINE_SELECT_RECTANGLE.
+ * 
+ *  	For normal selection operations, the caller may wish to pass a
+ *  MSG_SPLINE_UNSELECT_ALL before passing the first
+ *  MSG_SPLINE_SELECT_RECTANGLE.
+ * 
+ *  Pass:	SplineSelectRectangleParams
+ *  Return:	nothing
+ */
+
+@message void MSG_SPLINE_END_SELECT_RECTANGLE();
+/*
+ * 	Selects any anchor points with FILLED HANDLES.  To be called
+ *  after sending a series of MSG_SPLINE_SELECT_RECTANGLE messages in
+ *  order for the selection list to correspond with what appears
+ *  on-screen.  Should have no effect if called any other time (one
+ *  would hope!).
+ * 
+ *  Pass:	nothing
+ *  Return:	nothing
+ */
+
+@message void MSG_SPLINE_SET_HANDLE_SIZE(BBFixed handleSize = cx);
+/*
+ * 	Set the spline's handle size
+ *
+ *  Pass:	handle size (BBFixed)
+ *  Return:	nothing 
+ */
+
+@message BBFixed MSG_SPLINE_GET_HANDLE_SIZE() = cx;
+/*
+ * 	Get the spline's handle size
+ *
+ *  Pass:	nothing 
+ *  Return:	handle size (BBFixed)
+ */
+
+@message void MSG_SPLINE_DRAW_BASE_OBJECT(GState gstate = bp);
+/*
+ * 	Draw the permanent parts of the spline
+ * 
+ *  Pass:	gstate handle
+ *  Return:	nothing
+ */
+
+@message void MSG_SPLINE_DRAW_EVERYTHING_ELSE(GState gstate = bp);
+/*
+ * 	Draw all handles, invert-mode curves, etc.
+ * 
+ *  Pass:	gstate handle
+ *  Return:	nothing
+ */
+
+@message void MSG_SPLINE_REMOVE_EXTRA_CONTROL_POINTS(word tolerance = cx);
+/*
+ * 	Remove any control points that are very close to their owner
+ *  anchor points.  This operation may affect the shape of the spline,
+ *  depending on the parameter passed (if tolerance value = 0, this will
+ *  NOT change the shape).
+ *
+ *  Pass:	tolerance value.  The x and y deltas between each control
+ * 		     point and its anchor are summed and compared with the
+ * 		     tolerance value.  If they are equal or below, then the
+ * 		     control will be deleted.  If the tolerance value = 0,
+ * 		     then only controls that are EXACTLY on the anchor are
+ * 		     deleted.
+ *  Return:	nothing
+ */
+
+@message void MSG_SPLINE_SET_MARKER_SHAPE(MarkerShape markerShape = cl);
+/*
+ * 	Set the shape of the markers drawn at each point
+ * 
+ *  Pass:	MarkerShape
+ *  Return:	nothing
+ */
+
+@message MarkerShape MSG_SPLINE_GET_MARKER_SHAPE() = al;
+/*
+ * 	Return the marker shape for this spline
+ * 
+ *  Pass:	nothing 
+ *  Return:	MarkerShape
+ */
+
+
+typedef WordFlags SplineNotifySendFlags;
+	/* 1 bit unused */
+
+	#define SNSF_UPDATE_APP_TARGET_GCN_LISTS	(0x4000)
+	/*
+	 *  Set if pertinent Application Target GCN Lists should be updated
+	 *  with changes in status
+	 */
+
+	#define SNSF_NULL_STATUS			(0x2000)
+	/*
+	 *  Send notification of null status, for all notification types
+	 *  (used only to notify GCN Lists of loss of eligibility to update,
+	 *  i.e. lost target)
+	 */
+
+	#define SNSF_STRUCTURE_INITIALIZED		(0x1000)
+	/*
+	 *  Set if the rest of the SplineGenerateNotifyParams structure is
+	 *  initialized
+	 */
+
+	#define SNSF_SEND_AFTER_GENERATION		(0x0800)
+	/*  Set to send the notifications after generating them */
+
+	#define SNSF_SEND_ONLY				(0x0400)
+	/*  Set to send the notifications *only* */
+
+	#define SNSF_RELAYED_TO_LIKE_OBJECTS		(0x0200)
+	/*
+	 *  Set if the message has been registered with the object responsible
+	 *  for relaying the message to multiple text objects.
+	 */
+
+	/* 9 bits unused */
+
+
+@message void MSG_SPLINE_BEGIN_UPDATE_UI(SplineGenerateNotifyFlags flags = cx);
+/*
+ *  Cause the spline object to send itself a MSG_SPLINE_GENERATE_NOTIFY
+ *  message, with the SplineGenerateNotifyParams structure filled in.
+ *
+ *  Pass:	flags	- SplineGenerateNotifyFlags
+ *  Return:	nothing
+ */
+
+
+typedef struct {
+	SplineGenerateNotifyFlags	SGNP_notificationFlags;
+	SplineNotifySendFlags		SGNP_sendFlags;
+	MemHandle			SGNP_notificationBlocks[16];
+} SplineGenerateNotifyParams;
+
+
+@message void
+    MSG_SPLINE_GENERATE_NOTIFY(@stack SplineGenerateNotifyParams params);
+/*
+ *  Generate the notifications for this spline object
+ *
+ *  Pass:	SplineGenerateNotifyParams on stack
+ *  Return:	nothing
+ */
+
+@message optr MSG_SPLINE_SPLIT(MemHandle splineBlock = cx,
+			       MemHandle pointsBlock = dx) = cx:dx;
+/*
+ *  Split the spline at its first selected anchor point.  Create a new
+ *  spline, and stick all points starting from the (duplicated) first
+ *  selected anchor to the end of the spline in the newly created
+ *  object. 
+ * 
+ *  Pass:   	splineBlock: Handle of object block in which to place new
+ *			     spline.
+ * 		pointsBlock: lmem block in which to place new points.
+ * 			     pass pointsBlock=0 to create new block
+ *  Return:	OD of new spline
+ */
+
+@message void MSG_SPLINE_DELETE_RANGE(word begin = cx, word end = dx);
+/*
+ *  Delete a range of spline points
+ * 
+ *  Pass:	beginning of range to delete
+ * 		end of range to delete
+ *  Return:	nothing
+ */
+
+@message void MSG_SPLINE_REVERSE_POINTS();
+/*
+ *  Reverse the order of the spline's points
+ * 
+ *  Pass:	nothing
+ *  Return:	nothing
+ * 
+ *  NOTE:  This method copies the points to a new chunk -- invalidating
+ *  stored references to the existing chunk array of spline points.
+ */
+
+@message void MSG_SPLINE_SET_FIRST_POINT(word anchor = cx);
+/*
+ *  Rotate the points so that the passed point is the first
+ *  point in the array.  
+ * 
+ *  Pass:	anchor point number to move to head of list
+ *  Return:	nothing
+ * 
+ *  NOTE:  This method copies the points to a new chunk -- invalidating
+ *  stored references to the existing chunk array of spline points.
+ */
+
+@message SplineReturnType MSG_SPLINE_JOIN(@stack SplineJoinParams params) = al;
+/*
+ *  Join the passed spline with this one.  The passed spline acquires all
+ *  the attributes of the first spline -- its attributes are thus
+ *  destroyed. 
+ * 
+ *  Pass:	SplineJoinParams
+ *  Return:	SplineReturnType
+ */
+
+@message optr MSG_SPLINE_GET_POINTS() = cx:dx;
+/*
+ *  Return the OD of the chunk array of spline points.
+ * 
+ *  Pass:	nothing
+ *  Return:	OD of the chunk array of spline points.
+ */
+
+@message void MSG_SPLINE_REPLACE_POINTS(optr chunkArray = cx:dx);
+/*
+ *  Set the points of the spline.  The passed points MUST be a valid
+ *  chunkArray of SplinePointStruct structures.  The spline's existing
+ *  points are tossed out/nuked/destroyed, and the new ones copied in.
+ *  Note that the original points are COPIED into the spline's lmem block.
+ * 
+ *  Pass:	chunkArray
+ *  Return:	nothing
+ */
+
+@message word MSG_SPLINE_GET_NUMBER_OF_POINTS() = cx;
+/*
+ *  Return the number of points this spline has
+ * 
+ *  Pass:	nothing 
+ *  Return:	# points
+ */
+
+@message word MSG_SPLINE_CREATE_TRANSFER_FORMAT(word fileHandle = cx) = ax;
+/*
+ *  Pass:	fileHandle - VM file handle in which to create transfer data
+ *  Return:	VM block
+ */
+
+@message SplinePasteReturnType
+    MSG_SPLINE_REPLACE_WITH_TRANSFER_FORMAT(word fileHandle = cx,
+					    word blockHandle = dx) = ax;
+/*
+ *  Replace all spline data with that passed in the vm chain.
+ * 
+ *  Context:	Sent to a vis spline object by its "manager"
+ *		(a GrObject, most likely).
+ * 
+ *  Pass:	fileHandle	- vm file handle of transfer file
+ * 		blockHandle	- vm block handle (same as that returned by 
+ *  				  MSG_SPLINE_CREATE_TRANSFER_FORMAT)
+ *  Return:	SplinePasteReturnType
+ */
+
+
+typedef ByteEnum SplineSetPointType;
+	#define SSPT_POINT			(sizeof(Point))
+	#define SSPT_WWFIXED			(sizeof(PointWWFixed))
+
+
+typedef ByteFlags SplineSetPointFlags;
+	/* 2 bits unused */
+
+	#define SSPF_HAS_CONTROLS		(0x20)
+	/*  If set, then the array contains control points. */
+
+	#define SSPF_FIRST_POINT_IS_CONTROL	(0x10)
+	/*
+	 *  If set, then the first point is a control point.  The points
+	 *  are assumed to be of the form:
+	 *  	C, A, C, C, A, C, C, A, C, C, A...
+	 *  If this is not set, and SSPF_CONTAINS_CONTROL_POINTS is set,
+	 *  then the points are of the form:
+	 * 	A, C, C, A, C, C, A...
+	 * 
+	 *  It is an error to set this flag if SSPF_HAS_CONTROLS  is
+	 *  not set.
+	 */
+
+	#define SSPF_TYPE			(0x08 | 0x04 | 0x02 | 0x01)
+	#define SSPF_TYPE_OFFSET		0
+	/*  Data type of passed points */
+
+
+typedef struct {
+	void			*SSPP_points;
+	word			SSPP_numPoints;
+	SplineSetPointFlags	SSPP_flags;
+} SplineSetPointParams;
+
+
+@message void MSG_SPLINE_SET_POINTS(@stack SplineSetPointParams params);
+/*
+ *  Replace the spline's points with the passed set of points. 
+ * 
+ *  Pass:	SplineSetPointParams
+ *  Return:	nothing
+ */
+
+@message void MSG_SPLINE_MAKE_POLYGON(word halfWidth = cx,
+				      word halfHeight = dx,
+				      word numPoints = bp);
+/*
+ *  Replace the spline's points with a regular polygon
+ * 
+ *  Pass:	half width, half height of polygon
+ * 		number of polygon points
+ *  Return:	nothing
+ */
+
+
+typedef struct {
+	word	SMSP_starPoints;
+	Point	SMSP_innerRadius;
+	Point	SMSP_outerRadius;
+} SplineMakeStarParams;
+
+
+@message void MSG_SPLINE_MAKE_STAR(@stack SplineMakeStarParams params);
+/*
+ *  Replace the spline's points with a regular polygon
+ * 
+ *  Pass:	SplineMakeStarParams
+ *  Return:	nothing 
+ */
+
+@message void MSG_SPLINE_SET_MARKER_FLAGS(byte setFlags = cl,
+					  byte clearFlags = ch);
+/*
+ *  Set the flags for how the spline draws its markers.
+ * 
+ *  Pass:	flags to set
+ * 		flags to clear
+ *  Return:	nothing 
+ */
+
+@message void MSG_SPLINE_INVERT_HOLLOW_HANDLES();
+/*
+ *  Draw hollow handles along the spline.  THIS FUNCTION IS SOLELY FOR
+ *  USE BY THE CHART LIBRARY -- DO NOT USE.
+ * 
+ *  Pass:	???
+ *  Return:	nothing 
+ */
+
+
+typedef ByteFlags SplineMarkerFlags;
+	/* 7 bits unused */
+
+	#define SMKF_DONT_DRAW_ENDPOINTS	(0x01)
+
+
+@message void
+    MSG_SPLINE_DRAW_USING_PASSED_GSTATE_ATTRIBUTES(GState gstate = bp);
+/*
+ *  Draw the spline using the passed gstate attributes, rather than its own.
+ * 
+ *  Pass:	gstate handle
+ *  Return:	nothing 
+ */
+
+
+typedef ByteEnum GetEndpointType;
+	#define GET_FIRST			0x0
+	#define GET_LAST			0x1
+
+typedef struct {
+	Point	SEIP_endPoint;
+	Point	SEIP_adjacentPoint;
+} SplineEndPointInfoParams;
+
+@message Boolean
+    MSG_SPLINE_GET_ENDPOINT_INFO(SplineEndPointInfoParams *retVal = axbpcxdx,
+				 GetEndpointType type = cl) = carry;
+/*
+ *  Return data about the endpoints
+ * 
+ *  Pass:	retVal	- address of SplineEndPointInfoParams
+ *		type	- GetEndpointType
+ *  Return:	IF spline has the requested points:
+ * 			zero
+ *				SplineEndPointInfoParams filled in with
+ * 					x,y coords of endpoint
+ * 					x,y coords of adjacent point
+ * 		ELSE
+ * 			non-zero
+ */
+
+@message void MSG_SPLINE_DRAW_LINE_ONLY(GState gstate = bp);
+/*
+ *  Draw the "LINE" part of the spline only -- using the passed Gstate
+ *  attributes 
+ * 
+ *  Pass:	gstate handle
+ *  Return:	nothing 
+ */
+
+@message void MSG_SPLINE_DRAW_AREA_ONLY(GState gstate = bp);
+/*
+ *  Draw the AREA part of the spline only -- using the passed Gstate
+ *  attributes. 
+ *
+ *  Pass:	gstate handle
+ *  Return:	nothing 
+ */
+
+@message void MSG_SPLINE_SET_MINIMAL_VIS_BOUNDS();
+/*
+ *  This message causes the spline to calculate and set (using
+ *  MSG_SPLINE_NOTIFY_CHANGE_BOUNDS) a tight-fitting VisBounds by
+ *  drawing to a path and then getting the path bounds.  This is much
+ *  slower than than the normal method, which is to calculate the
+ *  bounding box of all spline anchor and control points.
+ * 
+ *  Pass:	nothing 
+ *  Return:	nothing 
+ */
+
+@message void MSG_SPLINE_NOTIFY_CREATE_MODE_DONE();
+/*
+ * 	Spline notifies itself that the user is ending create mode
+ * 
+ *  Context:		When spline wishes to leave create mode. Usually when
+ * 			user clicks on the first or last anchor point.
+ *  Source:		Spline itself
+ *  Destination:  	Spline itself
+ *  Interception:	The default handler puts the spline in inactive mode.
+ * 			If you wish to switch to a differnt mode then intercept
+ * 			this message, set the desired mode and don't call your
+ * 			superclass. If you just have some additional
+ * 			functionality that wish to perform at this time, then
+ * 			you may do that before or after calling	the superclass.
+ *
+ *  Pass:		nothing
+ *  Return:		nothing
+ */
+
+@message byte MSG_SPLINE_GET_CLOSED_STATE() = cl;
+/*
+ * 	Return if the spline is closed or not
+ * 
+ *  Context:		Spline Utility
+ *  Source:		Unrestricted
+ *  Destination:	VisSpline
+ *  Interception:	Nope
+ * 
+ *  Pass:		nothing		
+ *  Return:		non zero - spline closed
+ * 			zero - spline open
+ */
+
+
+/* ----------------------------------------------------------------------------
+ * 	INSTANCE DATA
+ * ----------------------------------------------------------------------------
+ */
+ 
+@instance	SplineState		VSI_state;
+	/*  State of the spline object */
+
+@instance	SplineEditState		VSI_editState;
+	/*  State of the various edit operations of the spline */
+
+@instance	MemHandle		VSI_lmemBlock;
+	/*
+	 *  block handle of a local-memory heap where all the
+	 *  variable-sized instance data of the VisSpline object are
+	 *  stored. -- contains the points array, the selection list,
+	 *  undo data, and the scratch chunk.
+	 */
+
+@instance	ChunkHandle		VSI_points;
+	/*  chunk where the spline's points are stored in the lmemBlock. */
+
+@instance	ChunkHandle		VSI_selectedPoints;
+	/*
+	 *  selectedPoints is a list of points that are currently
+	 *  "selected" by the user.
+	 */
+
+@instance	ChunkHandle		VSI_lineAttr;
+
+@instance	ChunkHandle		VSI_areaAttr;
+
+@instance	ChunkHandle		VSI_undoPoints;
+
+@instance	ChunkHandle		VSI_newPoints;
+
+@instance	word			VSI_actionPoint;
+	/*  point number of the current "action point" */
+
+@instance	word			VSI_gstate;
+
+@instance	byte			VSI_gstateRefCount;
+
+@instance	ChunkHandle		VSI_scratch;
+
+@instance	BBFixed			VSI_handleSize;
+@instance	BBFixed			VSI_handleHeight;
+
+@instance	MarkerShape		VSI_markerShape;
+
+@instance	SplineMarkerFlags	VSI_markerFlags;
+
+@instance	byte			VSI_suspendCount;
+
+@instance	SplineUnSuspendFlags	VSI_unSuspendFlags;
+	/*  actions to be performed when suspend count reaches zero */
+
+@endc	/* VisSplineClass */
+
+
+/* ----------------------------------------------------------------------------
+ * 	CONTROLLERS		
+ * ----------------------------------------------------------------------------
+ */
+ 
+/* ----------------------------------------------------------------------------
+ * 	Marker control		
+ * ----------------------------------------------------------------------------
+ */
+ 
+@class  SplineMarkerControlClass, GenControlClass;
+
+@message void MSG_SMC_SET_MARKER_SHAPE(MarkerShape markerShape = cl);
+/*
+ *  Pass:	MarkerShape
+ *  Return:	nothing
+ */
+
+@default GCI_output = (TO_APP_TARGET);
+
+@endc	/* SplineMarkerControlClass */
+
+
+typedef ByteFlags SplineMarkerControlFeatures;
+	/* 7 bits unused */
+
+	#define SMCF_MARKER_SHAPE	(0x01)
+
+
+/* ----------------------------------------------------------------------------
+ * 	Point control -- insert/delete anchors/controls.		
+ * ----------------------------------------------------------------------------
+ */
+
+@class  SplinePointControlClass, GenControlClass;
+
+@default GCI_output = (TO_APP_TARGET);
+
+@endc	/* SplinePointControlClass */
+
+
+typedef ByteFlags SplinePointControlFeatures;
+	/* 4 bits unused */
+	#define SPCF_INSERT_ANCHORS	(0x08)
+	#define SPCF_DELETE_ANCHORS	(0x04)
+	#define SPCF_INSERT_CONTROLS	(0x02)
+	#define SPCF_DELETE_CONTROLS	(0x01)
+
+typedef ByteFlags SplinePointControlToolFeatures;
+	/* 4 bits unused */
+	#define SPCTF_INSERT_ANCHORS	(0x08)
+	#define SPCTF_DELETE_ANCHORS	(0x04)
+	#define SPCTF_INSERT_CONTROLS	(0x02)
+	#define SPCTF_DELETE_CONTROLS	(0x01)
+
+#define SPC_DEFAULT_FEATURES		(SPCF_INSERT_ANCHORS | \
+					 SPCF_DELETE_ANCHORS | \
+					 SPCF_INSERT_CONTROLS | \
+					 SPCF_DELETE_CONTROLS)
+
+#define SPC_DEFAULT_TOOLBOX_FEATURES	(SPCTF_INSERT_ANCHORS | \
+					 SPCTF_DELETE_ANCHORS | \
+					 SPCTF_INSERT_CONTROLS | \
+					 SPCTF_DELETE_CONTROLS)
+
+
+/* ----------------------------------------------------------------------------
+ * 	Polyline control -- straight/curvy
+ * ----------------------------------------------------------------------------
+ */
+ 
+@class  SplinePolylineControlClass, GenControlClass;
+
+@default GCI_output = (TO_APP_TARGET);
+
+@endc	/* SplinePolylineControlClass */
+
+
+typedef ByteFlags SplinePolylineControlFeatures;
+	/* 5 bits unused */
+	#define SPLCF_MAKE_CURVY	(0x04)
+	#define SPLCF_MAKE_STRAIGHT	(0x02)
+	#define SPLCF_DELETE		(0x01)
+
+typedef ByteFlags SplinePolylineControlToolFeatures;
+	/* 5 bits unused */
+	#define SPLCTF_MAKE_CURVY	(0x04)
+	#define SPLCTF_MAKE_STRAIGHT	(0x02)
+	#define SPLCTF_DELETE		(0x01)
+
+#define SPLC_DEFAULT_FEATURES	\
+		(SPLCF_MAKE_CURVY | SPLCF_MAKE_STRAIGHT | SPLCF_DELETE)
+
+#define SPLC_DEFAULT_TOOLBOX_FEATURES	\
+		(SPLCTF_MAKE_CURVY | SPLCTF_MAKE_STRAIGHT | SPLCTF_DELETE)
+
+
+/* ----------------------------------------------------------------------------
+ * 	Smoothness control
+ * ----------------------------------------------------------------------------
+ */
+ 
+@class  SplineSmoothnessControlClass, GenControlClass;
+
+@default GCI_output = (TO_APP_TARGET);
+
+@endc	/* SplineSmoothnessControlClass */
+
+
+typedef ByteFlags SplineSmoothnessControlFeatures;
+	/* 4 bits unused */
+	#define SSCF_NONE		(0x08)
+	#define SSCF_SEMI_SMOOTH	(0x04)
+	#define SSCF_VERY_SMOOTH	(0x02)
+	#define SSCF_AUTO_SMOOTH	(0x01)
+
+typedef ByteFlags SplineSmoothnessControlToolFeatures;
+	/* 4 bits unused */
+	#define SSCTF_NONE		(0x08)
+	#define SSCTF_SEMI_SMOOTH	(0x04)
+	#define SSCTF_VERY_SMOOTH	(0x02)
+	#define SSCTF_AUTO_SMOOTH	(0x01)
+
+/*  SSC is already used by the style control, so using SSMC instead. */
+
+#define SSMC_DEFAULT_FEATURES	\
+	(SSCF_NONE | SSCF_SEMI_SMOOTH | SSCF_VERY_SMOOTH | SSCF_AUTO_SMOOTH)
+
+#define SSMC_DEFAULT_TOOLBOX_FEATURES	\
+	(SSCTF_NONE|SSCTF_SEMI_SMOOTH|SSCTF_VERY_SMOOTH|SSCTF_AUTO_SMOOTH)
+
+
+/* ----------------------------------------------------------------------------
+ * 	SplineOpenCloseControl		
+ * ----------------------------------------------------------------------------
+ */
+ 
+@class  SplineOpenCloseControlClass, GenControlClass;
+
+@message void MSG_OPEN_CLOSE_CONTROL_CHANGE(word message = cx);
+/*
+ *  Pass:	message to send to spline object
+ */
+
+@default GCI_output = (TO_APP_TARGET);
+
+@endc	/* SplineOpenCloseControlClass */
+
+
+typedef ByteFlags SplineOpenCloseControlFeatures;
+	/* 6 bits unused */
+	#define SOCF_OPEN		(0x02)
+	#define SOCF_CLOSE		(0x01)
+
+#define SOCF_DEFAULT_FEATURES		(SOCF_OPEN | SOCF_CLOSE)
+
+#define SOCF_DEFAULT_TOOLBOX_FEATURES	(SOCF_OPEN | SOCF_CLOSE)
+
+
+/* ----------------------------------------------------------------------------
+ * 	BLEND		
+ * ----------------------------------------------------------------------------
+ */
+ 
+typedef struct {
+	/*  VM file handle that contains both splines */
+	word		BP_vmFileHandle;
+
+	/*  OD of first spline */
+	optr		BP_firstOD;
+
+	/*  OD of second spline */
+	optr		BP_secondOD;
+
+	/*  OD of destination object */
+	optr		BP_outputOD;
+
+	/*
+	 *  When a new spline is created by BLEND, this message will be sent to
+	 *  the output OD, which should know what to do with it.  ^lcx:dx will
+	 *  be the spline's OD
+	 */
+	word		BP_outputMessage;
+	word		BP_firstPct;
+	word		BP_lastPct;
+
+	/*  number of steps */
+	word		BP_numSteps;
+} BlendParams;
+
+
+extern void _pascal Blend(BlendParams *params);
+
+
+#ifdef __HIGHC__
+
+pragma Alias(Blend, "BLEND");
+
+#endif
+
+@endlib

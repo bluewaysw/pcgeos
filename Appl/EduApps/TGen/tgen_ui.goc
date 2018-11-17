@@ -1,0 +1,1921 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT: Breadbox Test Generator
+ * FILE:        tgen_ui.goc
+ * AUTHOR:  John F. Howard    08/02
+ *
+ * DESCRIPTION:
+ *  This is the UI code for the Test Generator application.
+ *
+ * WHATS NEW:  Beginning of version 0.0
+ *		1/6/03	jfh		adding PC test generation
+ *                      changed doc proto to 1.1 for test grading & history
+ *		2/4/03	jfh		added limit on questions on a test (150)
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *      Include files
+ ***************************************************************************
+ */
+
+@include "tgen.goh"
+@include "art\bboxreg.goh"
+@include "art\tgicons.goh"
+
+/*
+ ***************************************************************************
+ *      UI Objects
+ ***************************************************************************
+ */
+
+@start  AppResource;
+@object GenApplicationClass TGenApp = {
+    GI_visMoniker = list {
+			@TGenTextMoniker,
+			@TGLCAppIconMoniker,
+			@TGTinyAppIconMoniker
+     }
+	 GI_comp = @TGenPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) =
+					 @TGenPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) =
+					 @TGenDocumentControl;
+    gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_APP_STARTUP) =
+					 @TGenDocumentControl;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS ) =
+			 @TGenDocumentControl;
+	 ATTR_GEN_HELP_FILE = "TGenHelp";
+}
+
+@visMoniker TGenTextMoniker = "Test Generator";
+
+@end AppResource
+
+
+@start  Interface;
+@object GenPrimaryClass TGenPrimary = {
+	 GI_comp = @TGenFileMenu, @TGenMenuBar, @TGenMainEntryGroup,
+	           @TGenDialogs;
+    GI_attrs = @default | GA_TARGETABLE
+                    | GA_KBD_SEARCH_PATH;
+    ATTR_GEN_HELP_CONTEXT = "TOC";
+}
+
+@object GenInteractionClass TGenFileMenu = {
+	 GI_comp = @TGenDocumentControl,
+			 @ImpExSubGroup, @AboutDBox;
+    GI_attrs = @default | GA_TARGETABLE
+                    | GA_KBD_SEARCH_PATH;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+}
+
+@object GenDocumentControlClass TGenDocumentControl = {
+    GI_attrs = @default | GA_TARGETABLE
+                    | GA_KBD_SEARCH_PATH;
+	 GDCI_features = @default & ~GDCF_SUPPORTS_TEMPLATES;
+ 	 GDCI_documentToken = {"TGd1", 16431};
+    GDCI_noNameText = "No File";
+	 GDCI_documentGroup = TGenDocumentGroup;
+	 GDCI_enableDisableList = TGenEnableList;
+}
+
+@chunk optr TGenEnableList[] = {
+	 @ImpExSubGroup, @TGenMainEntryGroup
+};
+
+@object GenInteractionClass ImpExSubGroup = {
+    GI_comp = @ImportTrigger, @ExportTrigger;
+	 GI_states = @default & ~GS_ENABLED;
+	 GII_visibility = GIV_SUB_GROUP;
+}
+
+@object GenTriggerClass ImportTrigger = {
+    GI_visMoniker = 'I', "Import";
+    @localize "Opens Import dialog box";
+	 GTI_destination = (TO_APP_MODEL);
+    GTI_actionMsg = MSG_OPEN_IMPORT;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	 HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass ExportTrigger = {
+    GI_visMoniker = 'E', "Export";
+    @localize "Opens Export dialog box";
+	 GTI_destination = (TO_APP_MODEL);
+    GTI_actionMsg = MSG_OPEN_EXPORT;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenInteractionClass AboutDBox = {
+    GI_visMoniker = 'b', "About";
+    GI_comp = @AppName, @Beta, @By, @BreadBoxLogo, @Visit,
+		    @Web, @Copyright;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_NOTIFICATION;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass AppName = {
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "Test Generator";
+	 ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @AppNameCharAttrs;
+}
+
+@chunk VisTextCharAttr AppNameCharAttrs =
+	CHAR_ATTR_FONT_SIZE_STYLE(
+		FID_DTC_URW_SANS, 24, TS_BOLD);
+
+@object GenGlyphClass Beta = {
+  GI_visMoniker = "An Educational Product";
+}
+
+@object GenGlyphClass By = {
+  GI_visMoniker = "from";
+}
+
+@object GenGlyphClass BreadBoxLogo = {
+  GI_visMoniker = list { @BreadboxLogoMoniker}
+}
+
+@object GenGlyphClass Copyright = {
+  GI_visMoniker = "Copyright 1994-2003 Breadbox Computer Company LLC";
+}
+
+@object GenGlyphClass Visit = {
+  GI_visMoniker = "Visit us at...";
+}
+
+@object GenGlyphClass Web = {
+  GI_visMoniker = "www.breadbox.com";
+}
+
+/*---------------------------------------------------------------------*/
+@object GenInteractionClass TGenMenuBar = {
+	 GI_comp = @TestMenu, /*@GradeMenu, */@OptionsMenu, @ToolMenu;
+    GI_attrs = @default | GA_KBD_SEARCH_PATH
+                    | GA_TARGETABLE  ;
+}
+
+@object GenInteractionClass TestMenu = {
+	 GI_visMoniker = 'T', "Tests";
+	 GI_comp = @GenerateButton, @GradeButton;
+	 GII_visibility = GIV_POPUP;
+}
+
+@object GenTriggerClass GenerateButton = {
+	 GI_visMoniker = 'G', "Generate Test";
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_TGEN_DOCUMENT_OPEN_GENERATE;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	 HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+/*@object GenInteractionClass GradeMenu = {
+	 GI_visMoniker = 'G', "Grade";
+	 GI_comp = @GradeButton;
+	 GII_visibility = GIV_POPUP;
+}
+*/
+@object GenTriggerClass GradeButton = {
+	 GI_visMoniker = 'T', "Grade Test";
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_TGEN_DOCUMENT_OPEN_GRADE_SEL;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	 HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenInteractionClass OptionsMenu = {
+	 GI_visMoniker = 'O', "Options";
+	 GI_comp = @SortOptionsMenuitem, @ShowStatsMenuItem, @EraseStatsDBox;
+	 GII_visibility = GIV_POPUP;
+}
+
+@object GenTriggerClass SortOptionsMenuitem = {
+	 GI_visMoniker = 'S', "Sort Options";
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_TGEN_DOCUMENT_OPEN_SORT_OPTS;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	 HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@visMoniker ShowStatsButtonMoniker = 'h', "Show Statistics";
+@visMoniker DontShowStatsButtonMoniker = 'D', "Don't Show Statistics";
+@object GenTriggerClass ShowStatsMenuItem = {
+	 GI_visMoniker = @ShowStatsButtonMoniker;
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_TGEN_DOCUMENT_SHOW_STATS_TOGGLE;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	 HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenInteractionClass EraseStatsDBox = {
+	 GI_visMoniker = 'E', "Erase All Stats";
+	 GI_comp = @EraseStatsGlyph1, @EraseStatsGlyph2, @EraseStatsButton, @EraseStatsCancel;
+	 GI_states = @default & ~GS_USABLE;
+	 GII_visibility = GIV_DIALOG;
+	 ATTR_GEN_HELP_CONTEXT = "EraseAllDB";
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+@object GenGlyphClass EraseStatsGlyph1 = {
+	 GI_visMoniker = "Click the 'Erase All' button to zero out all the Right/Wrong";
+}
+@object GenGlyphClass EraseStatsGlyph2 = {
+	 GI_visMoniker = "answer statistics for this test data bank.";
+}
+@object GenTriggerClass EraseStatsButton = {
+	 GI_visMoniker = "Erase All";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_TGEN_DOCUMENT_ERASE_STATS;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	 HINT_SEEK_REPLY_BAR;
+}
+@object GenTriggerClass EraseStatsCancel = {
+	 GI_visMoniker = "Cancel";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	 HINT_SEEK_REPLY_BAR;
+}
+
+
+@object GenInteractionClass ToolMenu = {
+	 GI_visMoniker = 'o', "Tools";
+	 @localize "Opens tools menu";
+	 GI_comp = @CalcMenuItem, @PlanMenuItem;
+	 GII_visibility = GIV_POPUP;
+}
+
+@object GenTriggerClass CalcMenuItem = {
+    GI_visMoniker = 'C', "Calculator";
+    @localize "Opens system calculator";
+    GTI_destination = process;
+	 GTI_actionMsg = MSG_TGEN_PROCESS_LAUNCH_TOOL;
+    ATTR_GEN_TRIGGER_ACTION_DATA = APP_CALC;
+}
+
+@object GenTriggerClass PlanMenuItem = {
+	 GI_visMoniker = 'C', "Calendar";
+	 @localize "Opens system calendar";
+	 GTI_destination = process;
+	 GTI_actionMsg = MSG_TGEN_PROCESS_LAUNCH_TOOL;
+	 ATTR_GEN_TRIGGER_ACTION_DATA = APP_PLAN;
+}
+
+@end Interface;
+
+/* -------------------------------------------------------------*/
+@start DocumentUI;
+@object TGenDocumentGroupClass TGenDocumentGroup ={
+    GDGI_untitledName = "Untitled Test Bank";
+    @localize "The default name of a new, untitled file";
+    GDGI_protocolMajor = 1;
+	 GDGI_protocolMinor = 1;
+	 GDGI_documentClass = &TGenDocumentClass;
+	 GDGI_documentControl = TGenDocumentControl;
+}
+@end DocumentUI;
+
+@start Interface;
+/*---------------------------------------------------------------------*/
+@object GenInteractionClass TGenMainEntryGroup = {
+	 GI_comp = @MESummaryGroup, @MEQuestionAnswerGroup;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass MESummaryGroup = {
+	 GI_comp = @MESBreakdownGroup, @MESummaryDListGroup, @MESummaryButtons;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	 HINT_DRAW_IN_BOX;
+}
+
+@object GenInteractionClass MESBreakdownGroup = {
+	 GI_visMoniker = "Questions in bank";
+	 GI_comp = @MESBMCNumber, @MESBTFNumber, @MESBFINumber, @MESBTotNumber;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 HINT_PLACE_MONIKER_ABOVE;
+	 HINT_DRAW_IN_BOX;
+	 HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	 HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+}
+
+@object GenTextClass MESBMCNumber = {
+	 GI_visMoniker = "Multiple Choice: ";
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "0";
+}
+
+@object GenTextClass MESBTFNumber = {
+	 GI_visMoniker = "True/False: ";
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "0";
+}
+
+@object GenTextClass MESBFINumber = {
+	 GI_visMoniker = "Free Form: ";
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "0";
+}
+
+@object GenTextClass MESBTotNumber = {
+	 GI_visMoniker = "Total: ";
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "0";
+}
+
+@object GenInteractionClass MESummaryDListGroup = {
+	 GI_comp = @MESummaryHeader, @MESummaryDList;
+	 HINT_MINIMIZE_CHILD_SPACING;
+	 HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass MESummaryHeader = {
+	 GI_comp = @MESHTypeGlyph, @MESHQuestionGlyph, @MESHStatsGlyph;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenGlyphClass MESHTypeGlyph = {
+	 GI_visMoniker = "    Type              ";
+}
+
+@object GenGlyphClass MESHQuestionGlyph = {
+	 GI_visMoniker = "Question";
+}
+
+@object GenGlyphClass MESHStatsGlyph = {
+	 GI_visMoniker = "Right/Wrong     ";
+	 GI_states = @default & ~GS_USABLE;
+	 HINT_ALIGN_RIGHT_EDGE_WITH_OBJECT = @MESummaryHeader;
+}
+
+@object TGenGenDynamicListClass MESummaryDList = {
+	GIGI_destination = (TO_APP_MODEL);
+	GDLI_queryMsg = MSG_TGEN_DOCUMENT_SUMMARY_DLIST_MONIKER_QUERY;
+	GDLI_numItems = 0;
+	GIGI_numSelections = 0;
+	ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_TGEN_DOCUMENT_SUMMARY_DLIST_STATUS;
+	ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS = MSG_TGEN_DOCUMENT_SUMMARY_DLIST_DBL_CLICK;
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object GenInteractionClass MESummaryButtons = {
+	 GI_comp = @MESBDelQButton, @MESBModQButton, @MESBNewQButton,
+				  @MESBAddDataButton, @DeleteDataDBox;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	 HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	 HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+}
+
+@object GenTriggerClass MESBDelQButton = {
+	 GI_visMoniker = "Delete Question";
+	 GI_states = @default & ~GS_ENABLED;
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_TGEN_DOCUMENT_DELETE_QUESTION;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+}
+
+@visMoniker ModQButtonMoniker = "Change Question";
+@visMoniker NewQButtonMoniker = "New Question";
+
+@object GenTriggerClass MESBModQButton = {
+	 GI_visMoniker = ModQButtonMoniker;
+	 GI_states = @default & ~GS_ENABLED;
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_TGEN_DOCUMENT_OPEN_QA_FORM;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+}
+
+@object GenTriggerClass MESBNewQButton = {
+	 GI_visMoniker = NewQButtonMoniker;
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_TGEN_DOCUMENT_OPEN_QA_FORM;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+}
+
+@object GenTriggerClass MESBAddDataButton = {
+	 GI_visMoniker = "Add Data";
+	 GI_states = 0;
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_TGEN_DOCUMENT_OPEN_ADD_DATA;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+}
+
+@object GenInteractionClass DeleteDataDBox = {
+	 GI_visMoniker = "Delete Data";
+	 GI_comp = @DeleteDataGlyph1, @DeleteDataGlyph2, @DeleteDataButton, @DeleteDataCancel;
+	 GI_states = 0;
+	 GII_visibility = GIV_DIALOG;
+	 ATTR_GEN_HELP_CONTEXT = "DeleteDataDB";
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+@object GenGlyphClass DeleteDataGlyph1 = {
+	 GI_visMoniker = "Click the 'Delete' button to zero out the Right/Wrong";
+}
+@object GenGlyphClass DeleteDataGlyph2 = {
+	 GI_visMoniker = "answer statistics for this question.";
+}
+@object GenTriggerClass DeleteDataButton = {
+	 GI_visMoniker = "Delete";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_TGEN_DOCUMENT_DELETE_DATA;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	 HINT_SEEK_REPLY_BAR;
+}
+@object GenTriggerClass DeleteDataCancel = {
+	 GI_visMoniker = "Cancel";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	 HINT_SEEK_REPLY_BAR;
+}
+
+/*---------------------------------------------------------------------*/
+@object TGenQAInteractionClass MEQuestionAnswerGroup = {
+	 GI_comp = @MEQAQuestionTypeGroup, @MEQAQuestions, @MEQAAnswers,
+				  @MEQAButtons;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+    GII_attrs = @default | GIA_MODAL; 
+	 GII_type = GIT_ORGANIZATIONAL;
+	 GII_visibility = GIV_DIALOG;
+	 GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+	 ATTR_GEN_HELP_CONTEXT = "EnterQDB";
+    HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+}
+
+@object GenItemGroupClass MEQAQuestionTypeGroup = {
+	 GI_visMoniker = "Question Type" ;
+	 GI_comp = @QTypeMChoice, @QTypeTF, @QTypeFill;
+	 GIGI_selection = QTYPE_MC;
+	 GIGI_destination = process;
+	 GIGI_applyMsg = MSG_TGEN_PROCESS_QTYPE_APPLY ;
+	 HINT_PLACE_MONIKER_ABOVE ;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+} ;
+
+@object GenItemClass QTypeMChoice = {
+	 GI_visMoniker = "Multiple Choice" ;
+	 GII_identifier = QTYPE_MC ;
+}
+
+@object GenItemClass QTypeTF = {
+	 GI_visMoniker = "True/False" ;
+	 GII_identifier = QTYPE_TF ;
+}
+
+@object GenItemClass QTypeFill = {
+	 GI_visMoniker = "Free Form" ;
+	 GII_identifier = QTYPE_FILL ;
+}
+
+@object GenInteractionClass MEQAQuestions = {
+	 GI_visMoniker = "Question";
+	 GI_comp = @MEQAQuestionText, @MEQAMCQuestionChoice;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_DRAW_IN_BOX;
+}
+
+@object GenTextClass MEQAQuestionText = {
+	 GTXI_attrs = @default | GTA_INIT_SCROLLING;
+	 GTXI_maxLength = MAX_QUESTION_LENGTH - 1;
+	 ATTR_GEN_TEXT_SET_OBJECT_ENABLED_WHEN_TEXT_EXISTS = @MEQAEnterButton;
+	 HINT_MINIMUM_SIZE = {0, SST_LINES_OF_TEXT | 4, 0};
+	 HINT_TEXT_WHITE_WASH_COLOR ;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenInteractionClass MEQAMCQuestionChoice = {
+	 GI_comp = @MEQAMCQSelectA, @MEQAMCQSelectB, @MEQAMCQSelectC,
+				  @MEQAMCQSelectD, @MEQAMCQSelectE, @MEQAMCQSelectF;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    HINT_CENTER_CHILDREN_ON_MONIKERS;
+}
+
+@object GenTextClass MEQAMCQSelectA = {
+	 GI_visMoniker = "A:";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_maxLength = MAX_CHOICE_LENGTH - 1;
+	 HINT_TEXT_WHITE_WASH_COLOR ;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenTextClass MEQAMCQSelectB = {
+	 GI_visMoniker = "B:";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_maxLength = MAX_CHOICE_LENGTH - 1;
+	 HINT_TEXT_WHITE_WASH_COLOR ;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenTextClass MEQAMCQSelectC = {
+	 GI_visMoniker = "C:";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_maxLength = MAX_CHOICE_LENGTH - 1;
+	 HINT_TEXT_WHITE_WASH_COLOR ;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenTextClass MEQAMCQSelectD = {
+	 GI_visMoniker = "D:";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_maxLength = MAX_CHOICE_LENGTH - 1;
+	 HINT_TEXT_WHITE_WASH_COLOR ;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenTextClass MEQAMCQSelectE = {
+	 GI_visMoniker = "E:";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_maxLength = MAX_CHOICE_LENGTH - 1;
+	 HINT_TEXT_WHITE_WASH_COLOR ;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenTextClass MEQAMCQSelectF = {
+	 GI_visMoniker = "F:";
+	 GTXI_maxLength = MAX_CHOICE_LENGTH - 1;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 HINT_TEXT_WHITE_WASH_COLOR ;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+/*------------------------------------------------------*/
+@object GenInteractionClass MEQAAnswers = {
+	 GI_visMoniker = "Answer";
+	 GI_comp = @MEQAMCAnswer, @MEQATFAnswer, @MEQAFillAnswerGroup;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_DRAW_IN_BOX;
+}
+
+@object GenItemGroupClass MEQAMCAnswer = {
+	 GI_comp = @MEQMCASelectA, @MEQMCASelectB, @MEQMCASelectC,
+				  @MEQMCASelectD, @MEQMCASelectE, @MEQMCASelectF;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 GIGI_selection = MC_SELECT_C;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+}
+
+@object GenItemClass MEQMCASelectA = {
+	 GI_visMoniker = "A" ;
+	 GII_identifier = MC_SELECT_A ;
+}
+
+@object GenItemClass MEQMCASelectB = {
+	 GI_visMoniker = "B" ;
+	 GII_identifier = MC_SELECT_B ;
+}
+
+@object GenItemClass MEQMCASelectC = {
+	 GI_visMoniker = "C" ;
+	 GII_identifier = MC_SELECT_C ;
+}
+
+@object GenItemClass MEQMCASelectD = {
+	 GI_visMoniker = "D" ;
+	 GII_identifier = MC_SELECT_D ;
+}
+
+@object GenItemClass MEQMCASelectE = {
+	 GI_visMoniker = "E" ;
+	 GII_identifier = MC_SELECT_E ;
+}
+
+@object GenItemClass MEQMCASelectF = {
+	 GI_visMoniker = "F" ;
+	 GII_identifier = MC_SELECT_F ;
+}
+
+@object GenItemGroupClass MEQATFAnswer = {
+	 GI_states = @default & ~GS_USABLE;
+	 GI_comp = @MEQTFATrue, @MEQTFAFalse;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 GIGI_selection = TF_TRUE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	 HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+}
+
+@object GenItemClass MEQTFATrue = {
+	 GI_visMoniker = "True" ;
+	 GII_identifier = TF_TRUE ;
+}
+
+@object GenItemClass MEQTFAFalse = {
+	 GI_visMoniker = "False" ;
+	 GII_identifier = TF_FALSE ;
+}
+
+@object GenInteractionClass MEQAFillAnswerGroup = {
+	 GI_comp = @MEQAFillAnswer, @MEQAFillLines;
+    GI_states = @default & ~GS_USABLE;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+}
+
+@object GenTextClass MEQAFillAnswer = {
+	 GTXI_attrs = @default | GTA_INIT_SCROLLING;
+	 GTXI_maxLength = MAX_QUESTION_LENGTH - 1;
+	 HINT_TEXT_WHITE_WASH_COLOR ;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_MINIMUM_SIZE = {0, SST_LINES_OF_TEXT | 4, 0};
+}
+
+@object GenValueClass MEQAFillLines = {
+	 GI_visMoniker = "How many lines for answer?";
+	 GVLI_maximum = MakeWWFixed(20.0);
+}
+
+@object GenInteractionClass MEQAButtons = {
+	 GI_comp = @MEQAEnterButton, @MEQACancelButton;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 HINT_MAKE_REPLY_BAR;
+}
+
+@object GenTriggerClass MEQAEnterButton = {
+	 GI_visMoniker = "Enter in database";
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_TGEN_DOCUMENT_SAVE_ENTRY;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+}
+
+@object GenTriggerClass MEQACancelButton = {
+	 GI_visMoniker = "Cancel";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+}
+
+/* -------------------------------------------------------------- */
+@object GenInteractionClass TGenDialogs = {
+	 GI_comp = @ImportDBox, @ImportProg, @ExportDBox, @GenerateDBox,
+				  @SelQDBox, @SortOptsDBox, @SelGradeFileDBox, @GradeFileDBox,
+				  @AddDataDBox, @SelTAFileDBox, @TAFileDBox;
+	 GI_attrs = @default | GA_TARGETABLE
+						  | GA_KBD_SEARCH_PATH;
+	 GII_type = GIT_ORGANIZATIONAL;
+	 GII_visibility = GIV_DIALOG;
+	 GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+}
+
+/* -------------------------------------------------------------- */
+@object GenInteractionClass SortOptsDBox = {
+	 GI_visMoniker = "Sort Options";
+	 GI_comp = @SortOptsItemGroup,
+				  @SortOptsOK, @SortOptsCancel;
+	 GII_visibility = GIV_DIALOG;
+	 ATTR_GEN_HELP_CONTEXT = "SortDB";
+}
+
+@object GenItemGroupClass SortOptsItemGroup = {
+	 GI_visMoniker = "Sort questions by:";
+	 GI_comp = @SONoneItem, @SOTypeItem, @SOAlphaItem;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 GIGI_selection = SO_NONE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_ORIENT_CHILDREN_VERTICALLY;
+	 HINT_CENTER_CHILDREN_ON_MONIKERS;
+}
+
+@object GenItemClass SONoneItem = {
+	 GI_visMoniker = "Entry order (not sorted)" ;
+	 GII_identifier = SO_NONE ;
+}
+
+@object GenItemClass SOTypeItem = {
+	 GI_visMoniker = "Type" ;
+	 GII_identifier = SO_TYPE ;
+}
+
+@object GenItemClass SOAlphaItem = {
+	 GI_visMoniker = "Alphabetically" ;
+	 GII_identifier = SO_ALPHA ;
+}
+
+@object GenTriggerClass SortOptsOK = {
+	 GI_visMoniker = "OK";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_TGEN_DOCUMENT_CHANGE_SORT;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	 HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass SortOptsCancel = {
+	 GI_visMoniker = "Cancel";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	 HINT_SEEK_REPLY_BAR;
+}
+
+@end Interface;
+
+@start GenerateDialogs;
+/* -------------------------------------------------------------- */
+@object GenInteractionClass GenerateDBox = {
+	 GI_visMoniker = "Generate Test";
+	 GI_comp = @TestTypeGroup,
+				  @GenHeaderStuff, @GenQuestionsStuff, @GenAnswersStuff,
+				  @GenCFileStuff, @GenShuffleGroup,
+				  @GenGenerate, @GenCancel,
+				  @GenTitleStuff, @GenTest;
+	 GII_visibility = GIV_DIALOG;
+	 ATTR_GEN_HELP_CONTEXT = "GenDB";
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+}
+
+@object GenItemGroupClass TestTypeGroup = {
+	 GI_visMoniker = "Test on: ";
+	 GI_comp = @TestOnPaperItem, @TestOnPCItem;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 GIGI_selection = TO_PAPER;
+	 GIGI_destination = (TO_APP_MODEL);
+	 GIGI_applyMsg = MSG_TGEN_DOCUMENT_GEN_TEST_TYPE_APPLY ;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+@object GenItemClass TestOnPaperItem = {
+	 GI_visMoniker = "Paper" ;
+	 GII_identifier = TO_PAPER ;
+}
+@object GenItemClass TestOnPCItem = {
+	 GI_visMoniker = "PC" ;
+	 GII_identifier = TO_PC ;
+}
+
+
+@object GenInteractionClass GenHeaderStuff = {
+	 GI_visMoniker = "Test Info";
+	 GI_comp = @GenTitleBlockGroup, @GenNameBlockGroup;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_PLACE_MONIKER_ABOVE;
+	 HINT_CENTER_MONIKER;
+	 HINT_DRAW_IN_BOX;
+}
+
+@object GenItemGroupClass GenTitleBlockGroup = {
+	 GI_visMoniker = "Show title block?";
+	 GI_comp = @GTBYes, @GTBNo;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 GIGI_selection = GEN_NO;
+	 GIGI_destination = (TO_APP_MODEL);
+	 GIGI_applyMsg = MSG_TGEN_DOCUMENT_GEN_TITLE_BLOCK_APPLY ;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenItemClass GTBYes = {
+	 GI_visMoniker = "Yes" ;
+	 GII_identifier = GEN_YES ;
+}
+
+@object GenItemClass GTBNo = {
+	 GI_visMoniker = "No" ;
+	 GII_identifier = GEN_NO ;
+}
+
+@object GenItemGroupClass GenNameBlockGroup = {
+	 GI_visMoniker = "Show name & date block?";
+	 GI_comp = @GNBYes, @GNBNo;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 GIGI_selection = GEN_YES;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenItemClass GNBYes = {
+	 GI_visMoniker = "Yes" ;
+	 GII_identifier = GEN_YES ;
+}
+
+@object GenItemClass GNBNo = {
+	 GI_visMoniker = "No" ;
+	 GII_identifier = GEN_NO ;
+}
+
+@object GenInteractionClass GenQuestionsStuff = {
+	 GI_visMoniker = "Questions";
+	 GI_comp = @GenNumQuestionsStuff, @GenSelQuestionsGroup, @GenStuGradableGroup;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_PLACE_MONIKER_ABOVE;
+	 HINT_CENTER_MONIKER;
+	 HINT_DRAW_IN_BOX;
+}
+
+@object GenInteractionClass GenNumQuestionsStuff = {
+	 GI_comp = @GenNumQuestionsGroup, @GenNumQuestions;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenItemGroupClass GenNumQuestionsGroup = {
+	 GI_visMoniker = "How many questions?";
+	 GI_comp = @GNQ10, @GNQ25, @GNQ50;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 GIGI_behaviorType = GIGBT_EXCLUSIVE_NONE;
+	 GIGI_destination = (TO_APP_MODEL);
+	 GIGI_applyMsg = MSG_TGEN_DOCUMENT_GEN_NUM_Q_APPLY ;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenItemClass GNQ10 = {
+	 GI_visMoniker = "10" ;
+	 GII_identifier = 10 ;
+}
+@object GenItemClass GNQ25 = {
+	 GI_visMoniker = "25" ;
+	 GII_identifier = 25 ;
+}
+@object GenItemClass GNQ50 = {
+	 GI_visMoniker = "50" ;
+	 GII_identifier = 50 ;
+}
+
+@object GenValueClass GenNumQuestions = {
+	 GI_visMoniker = "Other";
+	 GVLI_minimum = MakeWWFixed(1.0);
+}
+
+@object GenItemGroupClass GenSelQuestionsGroup = {
+	 GI_visMoniker = "Select specific Questions?";
+	 GI_comp = @GSQYes, @GSQNo;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 GIGI_selection = GEN_NO;
+	 GIGI_destination = (TO_APP_MODEL);
+	 GIGI_applyMsg = MSG_TGEN_DOCUMENT_GEN_SEL_Q_APPLY ;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenItemClass GSQYes = {
+	 GI_visMoniker = "Yes" ;
+	 GII_identifier = GEN_YES ;
+}
+
+@object GenItemClass GSQNo = {
+	 GI_visMoniker = "No" ;
+	 GII_identifier = GEN_NO ;
+}
+
+@object GenItemGroupClass GenStuGradableGroup = {
+	 GI_visMoniker = "Allow Student Grading?";
+	 GI_comp = @GSGYes, @GSGNo;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 GIGI_selection = GEN_NO;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenItemClass GSGYes = {
+	 GI_visMoniker = "Yes" ;
+	 GII_identifier = GEN_YES ;
+}
+
+@object GenItemClass GSGNo = {
+	 GI_visMoniker = "No" ;
+	 GII_identifier = GEN_NO ;
+}
+
+@object GenInteractionClass GenAnswersStuff = {
+	 GI_visMoniker = "Answers";
+	 GI_comp = @GenWithAnswersGroup, @GenAnsOnTestGroup;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_PLACE_MONIKER_ABOVE;
+	 HINT_CENTER_MONIKER;
+	 HINT_DRAW_IN_BOX;
+}
+
+@object GenItemGroupClass GenWithAnswersGroup = {
+	 GI_visMoniker = "Show answers?";
+	 GI_comp = @GWAYes, @GWANo;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 GIGI_selection = GEN_NO;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenItemClass GWAYes = {
+	 GI_visMoniker = "Yes" ;
+	 GII_identifier = GEN_YES ;
+}
+
+@object GenItemClass GWANo = {
+	 GI_visMoniker = "No" ;
+	 GII_identifier = GEN_NO ;
+}
+
+@object GenItemGroupClass GenAnsOnTestGroup = {
+	 GI_visMoniker = "Student answers on test sheet?";
+	 GI_comp = @GAOTYes, @GAOTNo;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 GIGI_selection = GEN_NO;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenItemClass GAOTYes = {
+	 GI_visMoniker = "Yes" ;
+	 GII_identifier = GEN_YES ;
+}
+
+@object GenItemClass GAOTNo = {
+	 GI_visMoniker = "No" ;
+	 GII_identifier = GEN_NO ;
+}
+
+@object GenItemGroupClass GenShuffleGroup = {
+	 GI_visMoniker = "Shuffle questions?";
+	 GI_comp = @GSYes, @GSNo;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 GIGI_selection = GEN_NO;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenItemClass GSYes = {
+	 GI_visMoniker = "Yes" ;
+	 GII_identifier = GEN_YES ;
+}
+
+@object GenItemClass GSNo = {
+	 GI_visMoniker = "No" ;
+	 GII_identifier = GEN_NO ;
+}
+
+@object GenInteractionClass GenCFileStuff = {
+	 GI_visMoniker = "Test File";
+	 GI_comp = @TestFileName, @TestFileSel;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_PLACE_MONIKER_ABOVE;
+	 HINT_CENTER_MONIKER;
+	 HINT_DRAW_IN_BOX;
+}
+@object GenTextClass TestFileName = {
+	 GI_visMoniker = "Test File Name:";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_maxLength = FILE_LONGNAME_LENGTH;
+	 ATTR_GEN_TEXT_LEGAL_FILENAMES;
+	 HINT_TEXT_WHITE_WASH_COLOR;
+}
+@object GenFileSelectorClass TestFileSel = {
+    GFSI_attrs = @default | FSA_SHOW_FILES_DISABLED;
+	 HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 8;
+    HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 40;
+}
+
+@visMoniker GenNewButtonMoniker = "Generate Test";
+@visMoniker GenAgainButtonMoniker = "Generate Again";
+@visMoniker GenCancelButtonMoniker = "Cancel";
+@visMoniker GenDoneButtonMoniker = "Done";
+
+@object GenTriggerClass GenGenerate = {
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_TGEN_DOCUMENT_GENERATE_COMMON;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	 HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass GenCancel = {
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	 HINT_SEEK_REPLY_BAR;
+}
+
+/* This is the dialog box that the report text is displayed in */
+@object GenTextReportDialogClass GenTest = {
+	 GI_visMoniker = "Generated Test" ;
+	 GI_attrs = @default | GA_TARGETABLE | GA_KBD_SEARCH_PATH;
+	 GII_visibility = GIV_DIALOG;
+	 GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+	 GTRDI_generateMsg = MSG_TGEN_DOCUMENT_GENERATE_PAPER_TEST;
+	 ATTR_GEN_HELP_CONTEXT = "TestDB";
+	 HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = {
+			SWSS_RATIO | PCT_10, SWSS_RATIO | PCT_10};
+	 HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD = {
+          SWSS_RATIO | PCT_80, SWSS_RATIO | PCT_80};
+	 HINT_INTERACTION_MAKE_RESIZABLE;
+}
+
+@object GenInteractionClass GenTitleStuff = {
+	 GI_visMoniker = "Title Info";
+	 GI_comp = @GTLine1, @GTLine2, @GTLine3, @GTSave, @GTCancel;
+	 GII_type = GIT_ORGANIZATIONAL;
+	 GII_visibility = GIV_DIALOG;
+	 GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenTextClass GTLine1 = {
+	 GI_visMoniker = "Line 1:";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_maxLength = (MAX_TITLE_LENGTH - 1);
+	 HINT_TEXT_WHITE_WASH_COLOR;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenTextClass GTLine2 = {
+	 GI_visMoniker = "Line 2:";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_maxLength = (MAX_TITLE_LENGTH - 1);
+	 HINT_TEXT_WHITE_WASH_COLOR;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenTextClass GTLine3 = {
+	 GI_visMoniker = "Line 3:";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_maxLength = (MAX_TITLE_LENGTH - 1);
+	 HINT_TEXT_WHITE_WASH_COLOR;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenTriggerClass GTSave = {
+	 GI_visMoniker = "Save";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_TGEN_DOCUMENT_SET_TITLE_BLOCK;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	 HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass GTCancel = {
+	 GI_visMoniker = "Cancel";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	 HINT_SEEK_REPLY_BAR;
+}
+
+@end GenerateDialogs;
+
+@start GradeDialogs;
+/* -------------------------------------------------------------- */
+@object GenInteractionClass SelGradeFileDBox = {
+	 GI_visMoniker = "Open Test";
+	 GI_comp = @SelGradeFileStuff, @SelGrade, @SelGradeCancel;
+	 GII_visibility = GIV_DIALOG;
+	 ATTR_GEN_HELP_CONTEXT = "OpenGradeDB";
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+	 HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+}
+
+@object GenInteractionClass SelGradeFileStuff = {
+	 GI_comp = @GradeFileInstr, @GradeFileSpc, @GradeFileSel;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenGlyphClass GradeFileInstr = {
+	 GI_visMoniker = "Select file to open for grading.";
+}
+
+@object GenGlyphClass GradeFileSpc = {
+	 GI_visMoniker = " ";
+}
+
+@object GenFileSelectorClass GradeFileSel = {
+	 GFSI_destination = (TO_APP_MODEL);
+	 GFSI_notificationMsg = MSG_TGEN_DOCUMENT_GRADE_SELECTOR_ACTION;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	 ATTR_GEN_FILE_SELECTOR_TOKEN_MATCH = {{"TTd1"}, 16431};
+	 HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 8;
+    HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 40;
+}
+
+@object GenTriggerClass SelGrade = {
+	 GI_visMoniker = "Open";
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_TGEN_DOCUMENT_OPEN_GRADE;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	 HINT_SEEK_REPLY_BAR;
+	 HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass SelGradeCancel = {
+	 GI_visMoniker = "Cancel";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	 HINT_SEEK_REPLY_BAR;
+}
+
+/* -------------------------------------------------------------- */
+@object TGGradeInteractionClass GradeFileDBox = {
+	 GI_visMoniker = "Grade Test";
+	 GI_comp = @GradeDBLeft, @GTMarkStuff, @GTButtons,
+					@GradeFreeFormQDBox;
+	 GII_visibility = GIV_DIALOG;
+	 ATTR_GEN_HELP_CONTEXT = "GradeDB";
+	 HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+	 HINT_NO_WIDER_THAN_CHILDREN_REQUIRE;
+	 HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass GradeDBLeft = {
+	 GI_comp = @GTInfoStuff, @GTGradeStuff;
+}
+
+@object GenInteractionClass GTInfoStuff = {
+	 GI_visMoniker = "Test Info";
+	 GI_comp = @GTInfoLeft, @GTInfoRight;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_PLACE_MONIKER_ABOVE;
+	 HINT_CENTER_MONIKER;
+	 HINT_DRAW_IN_BOX;
+	 HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	 HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	 HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+	 HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenInteractionClass GTInfoLeft = {
+	 GI_comp = @GTILine1, @GTILine2, @GTILine3;
+}
+
+@object GenTextClass GTILine1 = {
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 HINT_TEXT_NO_FRAME;
+}
+
+@object GenTextClass GTILine2 = {
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 HINT_TEXT_NO_FRAME;
+}
+
+@object GenTextClass GTILine3 = {
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 HINT_TEXT_NO_FRAME;
+}
+
+@object GenInteractionClass GTInfoRight = {
+	 GI_comp = @GTIName, @GTIDate;
+}
+
+@object GenTextClass GTIName = {
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 HINT_TEXT_NO_FRAME;
+}
+
+@object GenTextClass GTIDate = {
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 HINT_TEXT_NO_FRAME;
+}
+
+@object GenInteractionClass GTGradeStuff = {
+	 GI_visMoniker = "Grade Info";
+	 GI_comp = @GInfoTop/*, @GInfoBottom*/;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_PLACE_MONIKER_ABOVE;
+	 HINT_CENTER_MONIKER;
+	 HINT_DRAW_IN_BOX;
+}
+
+@object GenInteractionClass GInfoTop = {
+	 GI_comp = @GInfoLeft, @GInfoRight;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	 HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	 HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+	 HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenInteractionClass GInfoLeft = {
+	 GI_comp = @GIQs, @GIUngraded;
+}
+
+@object GenTextClass GIQs = {
+	 GI_visMoniker = "Total Questions: ";
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 HINT_MAXIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 4, 0, 0};
+	 HINT_TEXT_NO_FRAME;
+}
+
+@object GenTextClass GIUngraded = {
+	 GI_visMoniker = "Unmarked Questions: ";
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_text = "0";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 HINT_MAXIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 4, 0, 0};
+	 HINT_TEXT_NO_FRAME;
+}
+
+@object GenInteractionClass GInfoRight = {
+	 GI_comp = @GIRight, /*@GIWrong*/ @GIScore;
+}
+
+@object GenTextClass GIRight = {
+	 GI_visMoniker = "Correct Answers: ";
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_text = "0";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 HINT_MAXIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 4, 0, 0};
+	 HINT_TEXT_NO_FRAME;
+}
+
+/*@object GenTextClass GIWrong = {
+	 GI_visMoniker = "Incorrect Answers: ";
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_text = "0";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 HINT_MAXIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 4, 0, 0};
+	 HINT_TEXT_NO_FRAME;
+}
+
+@object GenInteractionClass GInfoBottom = {
+	 GI_comp = @GIScore;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+*/
+@object GenTextClass GIScore = {
+	 GI_visMoniker = "Test Score: ";
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_text = "0";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 HINT_MAXIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 5, 0, 0};
+	 HINT_TEXT_NO_FRAME;
+}
+
+@object GenInteractionClass GTMarkStuff = {
+	 GI_visMoniker = "Questions to Mark";
+	 GI_comp = @GTMDList;
+	 GI_states = @default & ~GS_USABLE;
+//	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	 HINT_PLACE_MONIKER_ABOVE;
+	 HINT_CENTER_MONIKER;
+	 HINT_DRAW_IN_BOX;
+	 HINT_NO_WIDER_THAN_CHILDREN_REQUIRE;
+}
+
+@object GenDynamicListClass GTMDList = {
+	GIGI_destination = (TO_APP_MODEL);
+	GIGI_numSelections = 0;
+	GDLI_queryMsg = MSG_TGEN_DOCUMENT_MARK_DLIST_MONIKER_QUERY;
+	GDLI_numItems = 0;
+//	ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_TGEN_DOCUMENT_SUMMARY_DLIST_STATUS;
+	ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS = MSG_TGEN_DOCUMENT_MARK_DLIST_DBL_CLICK;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_MINIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 30, 0, 0};
+}
+
+@object GenInteractionClass GTButtons = {
+	 GI_comp = @GTStatsButton, @GTTAideButton, @GTCanxButton;
+	 HINT_MAKE_REPLY_BAR;
+}
+
+@object GenTriggerClass GTStatsButton = {
+	 GI_visMoniker = "Enter Stats";
+	 GI_states = @default & ~GS_ENABLED;
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_TGEN_DOCUMENT_SAVE_STATS;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+}
+
+@object GenTriggerClass GTTAideButton = {
+	 GI_visMoniker = "Teacher's Aide";
+	 GI_states = @default & ~GS_ENABLED;
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = 	 MSG_TGEN_DOCUMENT_OPEN_TAFILE_SEL;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	 HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass GTCanxButton = {
+	 GI_visMoniker = "Done";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+}
+
+/*------------------------------*/
+@object GenInteractionClass GradeFreeFormQDBox = {
+	 GI_visMoniker = "Mark an Answer";
+	 GI_comp = @GradeQText, @GradeAText, @GradeSAText,
+				  @GradeValue, @GradeOKButton, @GradeCancelButton;
+	 GI_attrs = @default | GA_TARGETABLE
+						  | GA_KBD_SEARCH_PATH;
+	 GII_visibility = GIV_DIALOG;
+	 GII_attrs = @default | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+	 ATTR_GEN_HELP_CONTEXT = "MarkDB";
+}
+
+@object GenTextClass GradeQText = {
+	 GI_visMoniker = "Question";
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_INIT_SCROLLING;
+	 GTXI_maxLength = MAX_QUESTION_LENGTH - 1;
+	 HINT_MINIMUM_SIZE = {0, SST_LINES_OF_TEXT | 4, 0};
+	 HINT_TEXT_WHITE_WASH_COLOR ;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object GenTextClass GradeAText = {
+	 GI_visMoniker = "Answer";
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_INIT_SCROLLING;
+	 GTXI_maxLength = MAX_QUESTION_LENGTH - 1;
+	 HINT_MINIMUM_SIZE = {0, SST_LINES_OF_TEXT | 4, 0};
+	 HINT_TEXT_WHITE_WASH_COLOR ;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object GenTextClass GradeSAText = {
+	 GI_visMoniker = "Student Answer";
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_INIT_SCROLLING;
+	 GTXI_maxLength = MAX_QUESTION_LENGTH - 1;
+	 HINT_MINIMUM_SIZE = {0, SST_LINES_OF_TEXT | 4, 0};
+	 HINT_TEXT_WHITE_WASH_COLOR ;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object GenValueClass GradeValue = {
+	 GI_visMoniker = "Mark: ";
+	 GVLI_maximum = MakeWWFixed(1.0);
+	 GVLI_increment = MakeWWFixed(0.1);
+	 GVLI_displayFormat = GVDF_DECIMAL;
+    HINT_DEFAULT_FOCUS;
+}
+
+@object GenTriggerClass GradeOKButton = {
+	 GI_visMoniker = "Enter mark";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_TGEN_DOCUMENT_ENTER_GRADE;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	 HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass GradeCancelButton = {
+	 GI_visMoniker = "Cancel";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	 HINT_SEEK_REPLY_BAR;
+}
+
+@end GradeDialogs;
+
+@start AddDataDialogs;
+/* -------------------------------------------------------------- */
+@object GenInteractionClass AddDataDBox = {
+	 GI_visMoniker = "Add Data";
+	 GI_comp = @ADQuestionInfo, @ADAddRWData,
+				  @EnterDataButton, @AddDataCancel;
+	 GII_visibility = GIV_DIALOG;
+	 ATTR_GEN_HELP_CONTEXT = "AddDataDB";
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+	 HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+}
+
+@object GenInteractionClass ADQuestionInfo = {
+	 GI_visMoniker = "Data in Bank";
+	 GI_comp = @ADQuestionType, @ADQuestionText, @ADRWInfo;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_DRAW_IN_BOX;
+	 HINT_PLACE_MONIKER_ABOVE;
+	 HINT_CENTER_MONIKER;
+}
+
+@object GenTextClass ADQuestionType = {
+	 GI_visMoniker = "Type: " ;
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+}
+
+@object GenTextClass ADQuestionText = {
+	 GI_visMoniker = "Question: " ;
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_INIT_SCROLLING;
+	 HINT_MINIMUM_SIZE = {0, SST_LINES_OF_TEXT | 4, 0};
+	 HINT_TEXT_WHITE_WASH_COLOR ;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object GenInteractionClass ADRWInfo = {
+	 GI_comp = @ADRightText, @ADWrongText;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	 HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+    HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+}
+
+@object GenTextClass ADRightText = {
+	 GI_visMoniker = "Right: " ;
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 HINT_MAXIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 4, 0, 0};
+}
+
+@object GenTextClass ADWrongText = {
+	 GI_visMoniker = "Wrong: " ;
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 HINT_MAXIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 4, 0, 0};
+}
+
+@object GenInteractionClass ADAddRWData = {
+	 GI_visMoniker = "Add Data";
+	 GI_comp = @ADRightValue, @ADWrongValue;
+	 GI_attrs = @default | GA_KBD_SEARCH_PATH
+						  | GA_TARGETABLE;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	 HINT_DRAW_IN_BOX;
+	 HINT_PLACE_MONIKER_ABOVE;
+	 HINT_CENTER_MONIKER;
+	 HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+}
+
+@object GenValueClass ADRightValue = {
+	 GI_visMoniker = "Right:";
+}
+
+@object GenValueClass ADWrongValue = {
+	 GI_visMoniker = "Wrong:";
+}
+
+@object GenTriggerClass EnterDataButton = {
+	 GI_visMoniker = "Enter data";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_TGEN_DOCUMENT_ENTER_STATS_DATA;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	 HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass AddDataCancel = {
+	 GI_visMoniker = "Cancel";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	 HINT_SEEK_REPLY_BAR;
+}
+
+@end AddDataDialogs;
+
+@start TALinkDialogs;
+/* -------------------------------------------------------------- */
+@object GenInteractionClass SelTAFileDBox = {
+	 GI_visMoniker = "Open Teacher's Aide File";
+	 GI_comp = @SelTAFileStuff, @SelTAFile, @SelTACancel;
+	 GII_visibility = GIV_DIALOG;
+	 ATTR_GEN_HELP_CONTEXT = "OpenTAFileDB";
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+	 HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+}
+
+@object GenInteractionClass SelTAFileStuff = {
+	 GI_comp = @TAFileInstr, @TAFileSpc, @TAFileSel;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenGlyphClass TAFileInstr = {
+	 GI_visMoniker = "Select Teacher's Aide file to open.";
+}
+
+@object GenGlyphClass TAFileSpc = {
+	 GI_visMoniker = " ";
+}
+
+@object GenFileSelectorClass TAFileSel = {
+	 GFSI_destination = (TO_APP_MODEL);
+	 GFSI_notificationMsg = MSG_TGEN_DOCUMENT_TAFILE_SELECTOR_ACTION;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	 ATTR_GEN_FILE_SELECTOR_TOKEN_MATCH = {{"TAd1"}, 16431};
+	 HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 8;
+    HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 40;
+}
+
+@object GenTriggerClass SelTAFile = {
+	 GI_visMoniker = "Open";
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_TGEN_DOCUMENT_OPEN_TAFILE;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	 HINT_SEEK_REPLY_BAR;
+	 HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass SelTACancel = {
+	 GI_visMoniker = "Cancel";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	 HINT_SEEK_REPLY_BAR;
+}
+
+/* -------------------------------------------------------------- */
+@object TGTAInteractionClass TAFileDBox = {
+	 GI_visMoniker = "Teacher's Aide File";
+	 GI_comp = @TAFileInstrGlyph, @TAFileLists, @TAFileGradeGroup,
+	           @TASave, @TACancel;
+	 GII_visibility = GIV_DIALOG;
+	 ATTR_GEN_HELP_CONTEXT = "TAFileDB";
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+	 HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+}
+
+@object GenGlyphClass TAFileInstrGlyph = {
+	 GI_visMoniker = "Select the student, grade period and grade element.";
+}
+
+@object GenInteractionClass TAFileLists = {
+	 GI_comp = @TANameDList, @TAGradeElementGroup;
+	 HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenDynamicListClass TANameDList = {
+	GI_visMoniker = "Student Name";
+	GIGI_destination = (TO_APP_MODEL);
+	GIGI_numSelections = 0;
+	GDLI_queryMsg = MSG_TGEN_DOCUMENT_TANAME_DLIST_MONIKER_QUERY;
+	GDLI_numItems = 0;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_TGEN_DOCUMENT_TANAME_DLIST_STATUS;
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_MINIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 18, 0, 0};
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_ALIGN_BOTTOM_EDGE_WITH_OBJECT = @TAFileLists;
+}
+
+@object GenInteractionClass TAGradeElementGroup = {
+	 GI_comp = @TAGradePdGroup, @TAGradeElementDList;
+}
+
+@object GenItemGroupClass TAGradePdGroup = {
+	 GI_visMoniker = "  Grade Period: " ;
+	 GI_comp = @TAGP1, @TAGP2, @TAGP3, @TAGP4, @TAGP5, @TAGP6;
+	 GIGI_selection = 1;
+	 GIGI_destination = (TO_APP_MODEL);
+	 GIGI_applyMsg = MSG_TGEN_DOCUMENT_TAGP_APPLY ;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenItemClass TAGP1 = {
+	 GI_visMoniker = "1" ;
+	 GII_identifier = 1 ;
+}
+
+@object GenItemClass TAGP2 = {
+	 GI_visMoniker = "2" ;
+	 GII_identifier = 2 ;
+}
+
+@object GenItemClass TAGP3 = {
+	 GI_visMoniker = "3" ;
+	 GII_identifier = 3 ;
+}
+
+@object GenItemClass TAGP4 = {
+	 GI_visMoniker = "4" ;
+	 GII_identifier = 4 ;
+}
+
+@object GenItemClass TAGP5 = {
+	 GI_visMoniker = "5" ;
+	 GII_identifier = 5 ;
+}
+
+@object GenItemClass TAGP6 = {
+	 GI_visMoniker = "6" ;
+	 GII_identifier = 6 ;
+}
+
+@object GenDynamicListClass TAGradeElementDList = {
+	GIGI_destination = (TO_APP_MODEL);
+	GIGI_numSelections = 0;
+	GDLI_queryMsg = MSG_TGEN_DOCUMENT_TAGRELEM_DLIST_MONIKER_QUERY;
+	GDLI_numItems = 0;
+	ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_TGEN_DOCUMENT_TAGRELEM_DLIST_STATUS;
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_MINIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 40, 0, 0};
+	HINT_PLACE_MONIKER_ABOVE;
+}
+
+@object GenInteractionClass TAFileGradeGroup = {
+	GI_comp = @TATestGrade, @TAFileGrade;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+	HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+}
+
+@object GenTextClass TATestGrade = {
+	GI_visMoniker = "Test grade: ";
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+}
+
+@object GenTextClass TAFileGrade = {
+	GI_visMoniker = "Current grade: ";
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "None";
+}
+
+@object GenTriggerClass TASave = {
+	 GI_visMoniker = "Save grade";
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_TGEN_DOCUMENT_SAVE_GRADE_TO_TA;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	 HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass TACancel = {
+	 GI_visMoniker = "Cancel";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	 HINT_SEEK_REPLY_BAR;
+}
+
+@end TALinkDialogs;
+
+
+
+@start DataTextSettings, data;
+	 /*---------------------------------------------------------------------*/
+	 @chunk Tab QuestionTabs[] = {
+		SIMPLE_TAB(0.25),
+		SIMPLE_TAB(0.5),
+		TAB_GROUP_END
+	 } ;
+	 /*---------------------------------------------------------------------*/
+	 @chunk Tab NameBlockTabs[] = {
+		SIMPLE_TAB(3.25),
+		TAB_GROUP_END
+	 } ;
+	 /*---------------------------------------------------------------------*/
+	 @chunk VisTextCharAttr TRepTitleCharAttrs =
+	    CHAR_ATTR_STYLE_FONT_SIZE_STYLE_COLOR(
+			 2, CA_NULL_ELEMENT, FID_DTC_URW_SANS, 14, TS_BOLD, C_BLACK);
+	 /*---------------------------------------------------------------------*/
+	 @chunk VisTextCharAttr TRepTestCharAttrs =
+		 CHAR_ATTR_STYLE_FONT_SIZE_STYLE_COLOR(
+			 2, CA_NULL_ELEMENT, FID_DTC_URW_SANS, 12, 0, C_BLACK);
+	 /*---------------------------------------------------------------------*/
+	 @chunk VisTextCharAttr TRepTestBoldCharAttrs =
+		 CHAR_ATTR_STYLE_FONT_SIZE_STYLE_COLOR(
+			 2, CA_NULL_ELEMENT, FID_DTC_URW_SANS, 12, TS_BOLD, C_BLACK);
+	 /*---------------------------------------------------------------------*/
+	 @chunk VisTextParaAttr TRepTitleParaAttrs =
+	    PARA_ATTR_STYLE_JUST_LEFT_RIGHT_PARA(
+			 0, 0, J_CENTER, 0, 0, 0);
+	 /*---------------------------------------------------------------------*/
+	 @chunk VisTextParaAttr TRepTestParaAttrs =
+	    PARA_ATTR_STYLE_JUST_LEFT_RIGHT_PARA(
+			 0, 0, J_LEFT, 0, 0, 0);
+    /*---------------------------------------------------------------------*/
+@end DataTextSettings ;
+
+
+@start ImpExDialogs;
+/* -------------------------------------------------------------- */
+@object GenInteractionClass ImportDBox = {
+	 GI_visMoniker = "Import";
+	 GI_comp = @ImpFileSel, @ImportButton, @ImpCanx;
+	 GII_visibility = GIV_DIALOG;
+	 ATTR_GEN_HELP_CONTEXT = "ImportDB";
+}
+
+@object GenFileSelectorClass ImpFileSel = {
+	 ATTR_GEN_FILE_SELECTOR_NAME_MASK = {"*.BTG"};
+    HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 8;
+    HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 40;
+}
+
+@object GenTriggerClass ImportButton = {
+    GI_visMoniker = "Import";
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_IMPORT_TEST_DATA;
+    ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+	 HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass ImpCanx = {
+    GI_visMoniker = "Cancel";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    HINT_SEEK_REPLY_BAR;
+}
+
+/* ---------------------------------------- */
+@object GenInteractionClass ImportProg = {
+    GI_visMoniker = "Import status";
+	 GI_comp = @IPExamine, @IPCount;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_NOTIFICATION;
+}
+
+@object GenTextClass IPExamine = {
+    GI_visMoniker = "Examining File...";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_text = "                    ";
+    @localize "Placeholding spaces... leave as is";
+	 HINT_MAXIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 19, 0, 0};
+	 HINT_TEXT_NO_FRAME;
+}
+
+@object GenTextClass IPCount = {
+	 GI_visMoniker = "Questions imported:";
+	 GI_states = @default & ~GS_USABLE;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_text = "0";
+    HINT_MAXIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 14, 0, 0};
+    HINT_TEXT_NO_FRAME;
+}
+
+/* -------------------------------------------------------------- */
+@object GenInteractionClass ExportDBox = {
+	 GI_visMoniker = "Export";
+	 GI_comp = @ExpNameStuff, @ExpWhichQsStuff, @ExpFileSel,
+			 @Export, @ExpCanx;
+    GII_visibility = GIV_DIALOG;
+	 ATTR_GEN_HELP_CONTEXT = "ExportDB";
+	 HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass ExpNameStuff = {
+    GI_comp = @ExpFileName, @ExpNameWarn;
+ //   HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	 HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+@object GenTextClass ExpFileName = {
+    GI_visMoniker = "File Name:";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = (12);
+    ATTR_GEN_TEXT_LEGAL_DOS_FILENAMES;
+    ATTR_GEN_TEXT_MAKE_UPPERCASE;
+	 ATTR_GEN_TEXT_SET_OBJECT_ENABLED_WHEN_TEXT_EXISTS = @Export;
+	 HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS | 16, 0, 0};
+    HINT_TEXT_WHITE_WASH_COLOR;
+    HINT_DEFAULT_FOCUS;
+}
+
+@object GenGlyphClass ExpNameWarn = {
+    GI_visMoniker = "(DOS file name)";
+}
+
+@object GenInteractionClass ExpWhichQsStuff = {
+	 GI_comp = @ExpQSelectGroup, @ExpSelQTrigger;
+	 HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenBooleanGroupClass ExpQSelectGroup = {
+	 GI_comp = @ExpSAllBoolean;
+	 GBGI_selectedBooleans = 1;
+	 GBGI_destination = (TO_APP_MODEL);
+	 ATTR_GEN_BOOLEAN_GROUP_STATUS_MSG = MSG_EXP_Q_SEL_BOOLEAN_STATUS;
+    ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+}
+
+@object GenBooleanClass ExpSAllBoolean = {
+    GI_visMoniker = "All Questions";
+	 GBI_identifier = 1;
+}
+
+@object GenTriggerClass ExpSelQTrigger = {
+	 GI_states = @default & ~GS_ENABLED;
+    GI_visMoniker = "Selected";
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_OPEN_SELECT_QUESTIONS;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenFileSelectorClass ExpFileSel = {
+    GFSI_attrs = @default | FSA_SHOW_FILES_DISABLED;
+    ATTR_GEN_FILE_SELECTOR_NAME_MASK = {"*.BTG"};
+    HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 8;
+    HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 40;
+}
+
+@object GenTriggerClass Export = {
+    GI_visMoniker = "Export";
+	 GI_states = @default &~GS_ENABLED;
+	 GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_EXPORT_TEST_DATA;
+    ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass ExpCanx = {
+    GI_visMoniker = "Cancel";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    HINT_SEEK_REPLY_BAR;
+}
+@end ImpExDialogs;
+
+@start SelQDialog;
+/* --------------------------------------------------------- */
+@object GenInteractionClass SelQDBox = {
+	 GI_visMoniker = "Questions";
+	 GI_comp = @SDBDList, @SDBQsSelected, @SDBClear, @SDBDone;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+	 ATTR_GEN_HELP_CONTEXT = "SelQDB";
+	 HINT_INTERACTION_MAKE_RESIZABLE;
+}
+
+@object GenDynamicListClass SDBDList = {
+    GIGI_selection = 0;
+    GIGI_behaviorType = GIGBT_NON_EXCLUSIVE;
+    GIGI_destination = (TO_APP_MODEL);
+	 GIGI_applyMsg = MSG_SEL_Q_DLIST_APPLY;
+	 GDLI_queryMsg = MSG_SEL_Q_DLIST_MONIKER_QUERY;
+    GDLI_numItems = 0;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_MINIMUM_SIZE = {SST_AVG_CHAR_WIDTHS | 30, 0, 0};
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_DEFAULT_FOCUS;
+}
+
+@object GenTextClass SDBQsSelected = {
+	 GI_visMoniker = "Selections: ";
+	 GI_attrs = @default | GA_READ_ONLY;
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "0";
+}
+
+@object GenTriggerClass SDBClear = {
+    GI_visMoniker = "Clear All";
+    GTI_destination = (TO_APP_MODEL);
+	 GTI_actionMsg = MSG_SEL_Q_CLEAR_ALL;
+	 ATTR_GEN_DESTINATION_CLASS = {(ClassStruct *)&TGenDocumentClass};
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass SDBDone = {
+    GI_visMoniker = "Done";
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@end SelQDialog;
+
+
+
+

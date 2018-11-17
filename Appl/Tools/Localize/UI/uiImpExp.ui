@@ -1,0 +1,393 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1995 -- All Rights Reserved
+ *
+ * PROJECT:	  PC GEOS
+ * MODULE:	  ResEdit
+ * FILE:	  uiImpExp.ui
+ *
+ * AUTHOR:  	  Jonathan Magasin, Feb  8, 1995
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	JM	2/ 8/95   	Initial version
+ *
+ * DESCRIPTION:
+ *	UI for import/export of ASCII translation files.
+ *
+ *
+ * 	$Id: uiImpExp.ui,v 1.1 97/04/04 17:13:45 newdeal Exp $
+ *
+ ***********************************************************************/
+
+start FileMenuUI;
+
+/* ----------------------------------------------------------------------------
+			UI for exporting
+-----------------------------------------------------------------------------*/
+
+ResEditExportInteraction = GenInteraction {
+	moniker = "Export ASCII Translation File";
+	type = command;
+	visibility = dialog;
+	attributes = default +modal;
+	genAttributes = default +notifyVisibility;
+	genStates = default +usable, +enabled;
+	children =
+		ExportAsciiFileSelectorGroup,
+		ExportAsciiFileInteraction,
+		ExportAsciiFileOK;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_KEEP_ENTIRELY_ONSCREEN,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		ATTR_GEN_HELP_CONTEXT {char "dbExport", 0}
+	}
+}
+
+
+ExportAsciiFileSelectorGroup = GenInteraction {
+	children = ExportAsciiFileSelector;
+	hints = {
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_FIXED_SIZE {
+			SpecWidth <>
+			SpecHeight <SST_PCT_OF_FIELD_HEIGHT, PCT_45>
+			word	1
+		}
+	}
+}
+
+ExportAsciiFileSelector = GenFileSelector {
+	fileCriteria = dirs, geosExecutables, nonGeosFiles;
+	attributes = default +showFilesDisabled;
+	hints = {
+		/* Expand_width_to_fit_parent caused width *NOT* to
+		   be expanded to fit parent!  Zoiks!  Put the width
+		   hint in the parent of the file selector. */
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		ATTR_GEN_PATH_DATA { GenFilePath <SP_APPLICATION,> },
+		HINT_FILE_SELECTOR_SINGLE_ACTION
+	}
+}
+
+ExportAsciiFileOK = GenTrigger vardataReloc {
+	action = MSG_RESEDIT_DOCUMENT_ASCII_EXPORT, "TO_APP_MODEL";
+	genStates = default -enabled;
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {
+			word	IC_OK
+		},
+		ATTR_GEN_DESTINATION_CLASS { UN_DD ResEditDocumentClass }
+	}
+}
+
+ExportAsciiFileInteraction = GenInteraction {
+	children = ExportAsciiFileText,
+		   ExportBooleanList;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+ExportAsciiFileText = GenText vardataReloc{
+	moniker = "Name:";
+	text = "";
+	maxLength = "FILE_LONGNAME_LENGTH";
+	textDisplayAttributes = default +singleLineText;
+	hints = {
+		  ATTR_GEN_TEXT_SET_OBJECT_ENABLED_WHEN_TEXT_EXISTS {
+			I_OPTR	ExportAsciiFileOK
+		  },
+		  ATTR_GEN_TEXT_LEGAL_FILENAMES,
+		  HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 
+				   FILE_LONGNAME_LENGTH>
+			SpecHeight <>
+		  }
+	}
+}
+
+ExportBooleanList = GenBooleanGroup {
+	children = ExportOnlyChangedChunks;
+	hints = { HINT_CENTER_CHILDREN_HORIZONTALLY }
+}
+
+ExportOnlyChangedChunks = GenBoolean ignoreDirty {
+	moniker = 'E', "Export only changed chunks";
+	identifier = 1;
+}
+
+
+
+ExportAsciiFileUnmappedChars = GenInteraction {
+	moniker = "Text with Unmapped Characters";
+	visibility = dialog;
+	type = notification;
+	attributes = default +modal, +notUserInitiatable;
+	children = UnmappedCharsExplain,
+		   UnmappedChars;
+	hints = {
+		HINT_NO_TALLER_THAN_CHILDREN_REQUIRE,
+		HINT_NO_WIDER_THAN_CHILDREN_REQUIRE
+	}
+}
+
+UnmappedCharsExplain = GenText {
+	text = "The following strings have had '_' substituted "
+	       "for some character for which there is no GEOS/DOS "
+	       "mapping.";
+	genAttributes = default +readOnly;
+	hints = {
+		  HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 40>
+			SpecHeight <SST_LINES_OF_TEXT, 4>
+		  }
+	}
+}
+
+UnmappedChars = GenText {
+	genAttributes = default +readOnly;
+	text = "";
+	hints = {
+		  HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 40>
+			SpecHeight <SST_LINES_OF_TEXT, 10>
+		  }
+	}
+}
+
+
+/* ----------------------------------------------------------------------------
+			UI for importing
+-----------------------------------------------------------------------------*/
+
+ResEditImportInteraction = GenInteraction vardataReloc {
+	moniker = "Import ASCII Translation File";
+	type = command;
+	visibility = dialog;
+	attributes = default +modal, +notUserInitiatable;
+	children =
+		ImportAsciiFileSelectorGroup,
+		ImportAsciiFileInteraction,
+		ImportAsciiFileOK,
+		ImportAsciiFileCancel;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_KEEP_ENTIRELY_ONSCREEN,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		ATTR_GEN_HELP_CONTEXT {char "dbImport", 0}
+	}
+}
+
+ImportAsciiFileSelectorGroup = GenInteraction {
+	children = ImportAsciiFileSelector;
+	hints = {
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_FIXED_SIZE {
+			SpecWidth <>
+			SpecHeight <SST_PCT_OF_FIELD_HEIGHT, PCT_45>
+			word	1
+		}
+	}
+}
+
+ImportAsciiFileSelector = ResEditFileSelector {
+	fileCriteria = dirs, geosNonExecutables, nonGeosFiles;
+	action = MSG_RESEDIT_FILE_SELECTOR_NOTIFY_TEXT, 
+		 ImportAsciiFileSelector;
+	hints = {
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		ATTR_GEN_PATH_DATA { GenFilePath <SP_APPLICATION,> },
+		HINT_FILE_SELECTOR_SINGLE_ACTION
+	}
+}
+
+ImportAsciiFileOK = GenTrigger {
+	action = MSG_RESEDIT_GEN_DOCUMENT_CONTROL_OPEN_ASCII_IMPORT_SELECTED,
+		 ResEditDocumentControl;
+	genAttributes = default +signalInteractionComplete;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+/*		HINT_DEFAULT_FOCUS,  
+		HINT_DEFAULT_TARGET, 
+		HINT_DEFAULT_DEFAULT_ACTION,*/
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {
+			word	IC_OK
+		}
+	}
+}
+
+ImportAsciiFileCancel = GenTrigger {
+	genAttributes = default +signalInteractionComplete;
+	action = MSG_RESEDIT_GEN_DOCUMENT_CONTROL_DISPLAY_DIALOG,
+		 ResEditDocumentControl;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { 
+			word	IC_DISMISS
+		}
+	}
+}
+
+
+ImportAsciiFileInteraction = GenInteraction {
+	children = ImportAsciiFileHelpText,
+		   ImportAsciiFileATFText,
+		   ImportAsciiFileLocText;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_ALLOW_CHILDREN_TO_WRAP,
+		HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY
+	}
+}
+
+ImportAsciiFileHelpText = GenText {
+	text = "Please enter the ASCII translation "
+	       "file followed by the geode file.";
+	genAttributes = default +readOnly;
+/*	hints = {
+		  HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 40>
+			SpecHeight <SST_LINES_OF_TEXT, 2>
+		  }
+	}*/
+}
+
+/* ASCII Translation File to import. */
+ImportAsciiFileATFText = ResEditImpText {
+	moniker = "ASCII import file:";
+	text = "";
+	maxLength = "FILE_LONGNAME_LENGTH";
+	textDisplayAttributes = default +singleLineText;
+	hints = {
+		  ATTR_GEN_TEXT_LEGAL_FILENAMES,
+/*		  HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 
+				   FILE_LONGNAME_LENGTH>
+			SpecHeight <>
+		  }*/
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+/* Localization file: read into DB file,                    */ 
+/*                    ATF changes applied to DB file        */
+ImportAsciiFileLocText = ResEditImpText {
+	moniker = "Geode file:";
+	text = "";
+	maxLength = "FILE_LONGNAME_LENGTH";
+	textDisplayAttributes = default +singleLineText;
+	hints = {
+		  ATTR_GEN_TEXT_LEGAL_FILENAMES,
+/*		  HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 
+				   FILE_LONGNAME_LENGTH>
+			SpecHeight <>
+		  }*/
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+
+ImportAsciiFileItemsMissing = GenInteraction {
+	moniker = "Import Results";
+	visibility = dialog;
+	type = notification;
+	attributes = default +modal, +notUserInitiatable;
+	children = MissingItemsExplain,
+		   MissingItems;
+	hints = {
+		HINT_NO_TALLER_THAN_CHILDREN_REQUIRE,
+		HINT_NO_WIDER_THAN_CHILDREN_REQUIRE
+	}
+}
+
+MissingItemsExplain = GenText {
+	text = "The following resources and chunks "
+		  "are not in the localization file.  "
+		  "Your ASCII changes to these items "
+		  "have not been imported.";
+	genAttributes = default +readOnly;
+	hints = {
+		  HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 40>
+			SpecHeight <SST_LINES_OF_TEXT, 4>
+		  }
+	}
+}
+
+MissingItems = GenText {
+	genAttributes = default +readOnly;
+	text = "";
+	hints = {
+		  HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 40>
+			SpecHeight <SST_LINES_OF_TEXT, 10>
+		  }
+	}
+}
+
+end FileMenuUI;
+
+start	ResEditKeywordResource, data;
+
+chunk	ChunkString      = "[chunk     ] ";
+chunk	RscBeginString   = "[resource  ] ";
+chunk	RscEndString     = "[endresrc  ] ";
+chunk	OrigTextString   = "[original  ] ";
+chunk	TransTextString  = "[translated] ";
+chunk	LocalizeString   = "[localize  ] ";
+chunk	MnemonicString   = "[mnemonic  ] ";
+chunk	NullMnemonic	 = "null";
+chunk	EscMnemonic	 = "esc";
+chunk	ShortcutString	 = "[shortcut  ] ";
+chunk	BodyString	 = "[************ BODY ************]";
+chunk	HeaderString	 = "[*********** HEADER ***********]";
+chunk	SourceGeodeString= "[source    ] ";
+chunk	PathString	 = "[path      ] ";
+chunk	VersionString	 = "[version   ] ";
+chunk	DosNameString	 = "[DOS name  ] ";
+
+
+/* Array of keywords.
+ * Make sure the order of the array matches ResEditKeywordType,
+ * the corresponding enumerated type.  Also make sure the second 
+ * entry in each structure is the number of bytes in the string.
+ */
+
+chunk	ResEditKeywordArray = data {
+   ResEditKeywordArrayStruct <ChunkString,KEYWORD_STD_LENGTH>
+   ResEditKeywordArrayStruct <RscBeginString,KEYWORD_STD_LENGTH>
+   ResEditKeywordArrayStruct <RscEndString,KEYWORD_STD_LENGTH>
+   ResEditKeywordArrayStruct <OrigTextString,KEYWORD_STD_LENGTH>
+   ResEditKeywordArrayStruct <TransTextString,KEYWORD_STD_LENGTH>
+   ResEditKeywordArrayStruct <LocalizeString,KEYWORD_STD_LENGTH>
+   ResEditKeywordArrayStruct <MnemonicString,KEYWORD_STD_LENGTH>
+   ResEditKeywordArrayStruct <NullMnemonic,KEYWORD_NULL_LENGTH>
+   ResEditKeywordArrayStruct <EscMnemonic,KEYWORD_ESC_LENGTH>
+   ResEditKeywordArrayStruct <ShortcutString,KEYWORD_STD_LENGTH>
+   ResEditKeywordArrayStruct <BodyString,KEYWORD_BODY_LENGTH>
+   ResEditKeywordArrayStruct <HeaderString,KEYWORD_HEADER_LENGTH>
+   ResEditKeywordArrayStruct <SourceGeodeString,KEYWORD_STD_LENGTH>
+   ResEditKeywordArrayStruct <PathString,KEYWORD_STD_LENGTH>
+   ResEditKeywordArrayStruct <VersionString,KEYWORD_STD_LENGTH>
+   ResEditKeywordArrayStruct <DosNameString,KEYWORD_STD_LENGTH>
+}
+
+end	ResEditKeywordResource;
+
+/* When importing an ASCII translation file, we'll need a place to
+ * put its contents, whether keywords or text.
+ */
+start	ImportResource;
+end	ImportResource;
+

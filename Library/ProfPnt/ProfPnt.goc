@@ -1,0 +1,202 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1997.  All rights reserved.
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	Profile Point Tool
+MODULE:		ProfPnt
+FILE:		ProfPnt.goc
+
+AUTHOR:		LShields 09/29/00
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name		Date		Description
+	----		----		-----------
+	lshields        09/29/00        Created
+
+DESCRIPTION:
+
+	
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+#include <Ansi/stdio.h>
+#include <Ansi/string.h>
+#include <sem.h>
+#include <library.h>
+#include <ProfPnt.goh>
+
+static SemaphoreHandle G_semaphore;
+FileHandle G_file = NullHandle ;
+word G_lastTime = 0 ;
+
+#define MyThreadPSem(sem) ThreadPSem(sem)
+#define MyThreadVSem(sem) ThreadVSem(sem)
+
+#define MAX_RECORD_STACK 32
+
+typedef struct {
+    char *p_name ;
+    word startTime ;
+} T_routineStart ;
+
+T_routineStart G_routineStarts[MAX_RECORD_STACK+5] ;
+word G_recordStackDepth = 0 ;
+
+#define MAX_TALLIES  32
+typedef struct {
+    dword count ;
+    char *p_name ;
+} T_tallyPoint ;
+T_tallyPoint G_tallyList[MAX_TALLIES+5] ;
+word G_numTallies = 0 ;
+
+void myprintf(char *fmt, ...)
+{
+     char buf[128];
+     va_list arg;
+
+     va_start(arg, fmt);
+     vsprintf(buf, fmt, arg);
+     va_end(arg);
+
+     FileWrite(G_file, buf, strlen(buf), FALSE) ;
+}
+
+void _export _pascal ProfPointRoutine(char *p_namedPoint)
+{
+    word time ; 
+    MyThreadPSem(G_semaphore);
+    time = TimerGetCount() ;
+
+    /* If starts with a star, then we always what to produce it, */
+    /* but just in a simple way */
+    if (*p_namedPoint=='*')  {
+        /* Just dump it with zero time */
+        myprintf("\t0\t%s\r\n", p_namedPoint) ;
+        p_namedPoint++ ;
+    }
+    if (G_lastTime != time)  {
+        myprintf("\t%5d\t%s\r\n", time-G_lastTime, p_namedPoint) ;
+        G_lastTime = time ;
+    }
+    MyThreadVSem(G_semaphore);
+}
+
+void _export _pascal ProfilePointStart(char *p_namedRoutine)
+{
+    MyThreadPSem(G_semaphore);
+
+    if (G_recordStackDepth < MAX_RECORD_STACK)  {
+        G_routineStarts[G_recordStackDepth].p_name = p_namedRoutine ;
+        G_routineStarts[G_recordStackDepth].startTime = TimerGetCount() ;
+    }
+    G_recordStackDepth++ ;
+
+    MyThreadVSem(G_semaphore);
+}
+
+void _export _pascal ProfilePointEnd(void)
+{
+    word time ;
+    MyThreadPSem(G_semaphore);
+
+    if (G_recordStackDepth)  {
+        G_recordStackDepth-- ;
+
+        /* Only report if we had a time reported */
+        if (G_recordStackDepth < MAX_RECORD_STACK)  {
+            time = TimerGetCount() - G_routineStarts[G_recordStackDepth].startTime ;
+            if (time)  {
+                myprintf("\t%5d\t@%s\t%d\r\n", 
+                    time, 
+                    G_routineStarts[G_recordStackDepth].p_name,
+                    G_recordStackDepth) ;
+            }
+        }
+    }
+
+    MyThreadVSem(G_semaphore);
+}
+
+word _export _pascal ProfilePointTally(char *p_routineName, word tallyNum)
+{
+    MyThreadPSem(G_semaphore);
+    if (!tallyNum)  {
+        if (G_numTallies < MAX_TALLIES)  {
+            tallyNum = ++G_numTallies ;
+            G_tallyList[tallyNum-1].p_name = p_routineName ;
+            G_tallyList[tallyNum-1].count = 1 ;
+        } else {
+            tallyNum = 0xFFFF ;
+        }
+    } else if (tallyNum < MAX_TALLIES)  {
+        G_tallyList[tallyNum-1].count++ ;
+    }
+    MyThreadVSem(G_semaphore);
+
+    return tallyNum ;
+}
+
+void _export _pascal ProfilePointDumpTallies(void)
+{
+    word i ;
+    MyThreadPSem(G_semaphore);
+    for (i=0; i<G_numTallies; i++)  {
+        myprintf("\t%5ld\t\#%s\r\n", G_tallyList[i].count, G_tallyList[i].p_name) ;
+    }
+    MyThreadVSem(G_semaphore);
+}
+
+void ProfPntInitialize(void)
+{
+    G_semaphore = ThreadAllocSem(1);
+    MyThreadPSem(G_semaphore);
+    HandleModifyOwner(G_semaphore, GeodeGetCodeProcessHandle());
+
+    FilePushDir() ;
+    FileSetStandardPath(SP_DOCUMENT) ;
+    FileDelete("profpnt.log") ;
+    G_file = FileCreate(
+                "profpnt.log", 
+                FILE_CREATE_NO_TRUNCATE|FCF_NATIVE|(FILE_DENY_NONE|FILE_ACCESS_W), 
+                FILE_ATTR_NORMAL) ;
+    myprintf("** Attached **\r\n") ;
+    G_lastTime = TimerGetCount() ;
+    FilePopDir() ;
+
+    G_recordStackDepth = 0 ;
+    G_numTallies = 0 ;
+    MyThreadVSem(G_semaphore);
+}
+
+void ProfPntDetach(void)
+{
+    if (G_recordStackDepth)  {
+        myprintf("\r\nWarning!  Elements still on record stack -- dumping!\r\n") ;
+        while (G_recordStackDepth)
+            ProfilePointEnd() ;
+    }
+    ProfilePointDumpTallies() ;
+    MyThreadPSem(G_semaphore);
+    myprintf("** Detached **\r\n\r\n") ;
+    FileClose(G_file, FALSE) ;
+    G_file = NullHandle ;
+    MyThreadVSem(G_semaphore);
+    ThreadFreeSem(G_semaphore);
+}
+
+#pragma argsused
+Boolean _export _pascal PROFPNT_ENTRY(LibraryCallType ty, GeodeHandle client)
+{
+    if (ty == LCT_ATTACH)
+        ProfPntInitialize();
+    else if (ty == LCT_DETACH)
+        ProfPntDetach();
+
+    return FALSE;
+}

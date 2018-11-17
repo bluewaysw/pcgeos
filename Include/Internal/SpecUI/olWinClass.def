@@ -1,0 +1,1241 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	SPUI
+MODULE:		
+FILE:		olWinClass.def
+
+AUTHOR:		David Litwin, Oct  5, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	10/ 5/94   	Initial revision
+
+
+DESCRIPTION:
+	Definition of OLWinClass
+		
+	$Id: olWinClass.def,v 1.3 98/07/13 10:21:14 joon Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+	;
+	;	For documentation of the OLWinClass see:
+	;	/staff/pcgeos/Spec/olWinClass.doc
+	; 
+
+
+OLWinClass	class	OLCtrlClass
+	uses	GenClass
+
+
+;------------------------------------------------------------------------------
+;			Method Declarations
+;------------------------------------------------------------------------------
+
+MSG_OL_WIN_STARTUP_GRAB	message
+;	Used internally to startup the "grab" on this UI window.  This
+; entails grabbing the window (via FlowWinGrab) to ensure that only this
+; window gets button & ptr events, & installing a post-passive grab
+; so that we can see when all buttons are released, when we end the
+; grab on this window.
+;
+;	Pass:	nothing
+
+MSG_OL_WIN_END_GRAB	message
+;	Used internally to end a "grab" on this UI window.  Basically,
+; we're undoing the work of MSG_OL_WIN_START_GRAB.
+;
+;	Pass:	cx	= TRUE to force release of grabs, even if is menu
+;			in stay-up mode.
+
+
+;MSG_OL_WIN_SET_HAS_DISP_CTRL	message
+;	This method is sent when this OLWinClass object is a GenPrimary
+;	which has a DisplayControl (and its children will be contained
+;	by the DC).
+;
+;	Pass:	cx:dx	= handle of OLDisplayGroup object
+;	Return:	nothing
+
+MSG_OL_BASE_WIN_SET_APPLICATION_MENU_BUTTON	message
+
+MSG_OL_WIN_UPDATE_HEADER	message
+;	This method is sent by OpenWinHeaderMarkInvalid when we know that
+;	a the header's geometry or image is invalid (has changed). We send this
+;	message back to this object via the UI queue, so that several MarkInvalid
+;	calls can occur first. When this method finally arrives, it checks
+;	OLWI_headerState to see what needs to be done.
+;
+;	Pass:	nothing
+
+MSG_OL_WIN_REDRAW_HEADER	message
+;	Causes just the header to redraw. Use by OpenLook to update
+;	pushpin image.
+;
+;	Pass:	nothing
+
+MSG_OL_POPUP_ACTIVATE	message
+;	This method is used to put popup windows on screen.  The position
+; that the window should appear if it is a menu is passed, so that the
+; menu class can intercept & position the window.
+;
+; 	Pass:	cx, dx	- position to putup menu
+
+MSG_OL_POPUP_REQUEST_DISMISS	message
+;	Requests that the window be dismissed.  This method has NO effect
+; if the window is pinned.
+;
+; 	Pass:	Nothing
+
+MSG_OL_POPUP_TOGGLE_PUSHPIN	message	MetaSpecificUIMessages
+;	An internal method sent from the OLWinClass level whenever the
+; button is released over the pushpin.  This method is intercepted at
+; the OLPopupWinClass level to either pin or unpin the window.
+;
+;IMPORTANT: this method is imported from MetaClass because OLButtonChangeEnabled
+;performs a test to see if the AD of a GenTrigger is this method or not,
+;and we want to ensure that some application method does not have the same #. 
+;
+; 	Pass:	bp = TRUE if when unpinning a menu, it should be closed.
+
+MSG_MO_SYSMENU_MOVE	message
+MSG_MO_SYSMENU_SIZE	message
+;	These methods are sent by the items in the System Menu.
+; We should translate these into generic equivalent methods and resend.
+;
+;	Pass:	nothing
+;	Return:	nothing
+
+MSG_MO_NEXT_WIN		message
+;	This method is sent by the Display's "Next" system menu item or by
+;the keyboard accelerator checking code.
+;
+; Pass:		none
+; Returns:	none
+
+MSG_OL_RESTORE_WIN	message
+;	This method is sent when the user selects the RESTORE item from
+; the system menu or presses on the RESTORE icon. We translate this
+; into MSG_GEN_DISPLAY_SET_NOT_MINIMIZED or MSG_GEN_DISPLAY_SET_NOT_MAXIMIZED
+; and resend.
+;	Pass:	nothing
+;	Return:	nothing
+
+MSG_OL_WIN_MINIMIZE	message
+MSG_OL_WIN_MAXIMIZE	message
+;	This method is sent when the user selects the MINIMIZE/MAXIMIZE items
+; from the system menu or presses on the MINIMIZE/MAXIMIZE icons.  Handled in
+; OLMenuedWinClass by translating into MSG_GEN_DISPLAY_SET_MINIMIZED or
+; MSG_GEN_DISPLAY_SET_MAXIMIZED and resending.
+;	Pass:	nothing
+;	Return:	nothing
+
+MSG_OL_WIN_CLOSE	message
+;	This method is sent when the user selects the CLOSE item from
+; the system menu.  Handled in OLMenuedWinClass by translating into
+; MSG_GEN_DISPLAY_CLOSE and resending.
+;	Pass:	nothing
+;	Return:	nothing
+
+MSG_OL_WINDOW_REFRESH	message
+;	Method available to user via "REFRESH" button in popup menu in
+; OPEN LOOK.  Refreshes window area by doing a WinInvalTree.
+;
+;	Pass:	Nothing
+
+MSG_OL_WINDOW_BACK	message
+;	Method available to user via "BACK" button in popup menu in
+; OPEN LOOK.  Sends window to the back
+;
+;	Pass:	Nothing
+
+MSG_GET_MENU_BAR_WIN	message	VisSpecMessages
+;	This method is sent when someone needs to get to the menu bar which
+; is associated with this window.
+;
+;	Pass:	nothing
+;	Return:	handle of menu window (NIL if none)
+
+;MSG_META_GAINED_DEFAULT_EXCL	message	VisSpecMessages
+;MSG_META_LOST_DEFAULT_EXCL	message	VisSpecMessages
+;
+; The above methods are sent out in response to this object receiving
+; MSG_VIS_VUP_QUERY with SVQT_TAKE_DEFAULT_EXCLUSIVE or
+; SVQT_RELEASE_DEFAULT_EXCLUSIVE, to notify a GenTrigger that it has gained/lost
+; the default exclusive.
+
+MSG_OL_WIN_IS_VISIBLE_WIN_TYPE	message
+;
+;	This method simply sets the carry flag if the window is of the type
+; specified & is VA_VISIBLE.
+; This is used in conjunction with MSG_SPEC_GUP_QUERY_ACTIVE_LIST
+; to look for the first PRIMARY/DISPLAY in an active list.
+;
+; Pass:
+;	cx	- OLWinType
+; Return:
+;	cx:dx	- object OD
+;	carry	- set if window is of passed type
+
+MSG_OL_WIN_TOGGLE_MENU_NAVIGATION	message
+;
+; This method is sent to a window object such as this one to change the
+; state of menu navigation.
+;
+; Pass:		nothing 
+; Returns:	nothing
+ 
+MSG_OL_WIN_QUERY_MENU_BAR		message
+;
+; Returns handle of menu bar, or null if there ain't one in this window.
+;
+; Pass:		nothing
+; Returns:	cx -- handle of menu bar, or zero if none
+
+MSG_OL_WIN_RESTORE_PREVIOUS_FOCUS_EXCL	message
+;	This method is sent from an OLWinClass object to itself, when a menu
+; closes, thus releasing the FOCUS exclusive. When this method arrives,
+; we see if another menu has opened. If not, we restore the previous owner
+; of the FOCUS exclusive.
+; Pass:		nothing
+; Returns:	nothing
+
+MSG_VIS_VUP_RELEASE_MENU_FOCUS	message	VisSpecMessages
+;
+; If the menu bar currently has the focus, this will release it.  
+;
+; Pass:		nothing
+; Return:	nothing
+;
+
+
+	
+MSG_OL_WIN_QUERY_MENU_BAR_HAS_FOCUS	message
+;
+; Used to see if the menu bar currently has the focus.
+;
+; Pass:		nothing
+; Return:	carry set if menu bar has the focus
+;		Does NOT destroy cx, dx, bp
+;
+	
+MSG_OL_VUP_MAKE_APPLYABLE	message	VisSpecMessages
+;
+; Used to set notice windows applyable.  Sent by a gadget show user value
+; now differs from its actual value.
+;
+; Pass:		nothing
+; Return:	nothing
+;
+
+MSG_OL_MAKE_APPLYABLE	message	VisSpecMessages
+;
+; Broadcast to children of a notice window to make the apply/reset buttons
+; active.
+;
+; Pass:		nothing
+; Return:	nothing
+;
+	
+MSG_OL_MAKE_NOT_APPLYABLE	message	VisSpecMessages
+;
+; Broadcast to children of a notice window to make the apply/reset buttons
+; inactive.
+;
+; Pass:		nothing
+; Return:	nothing
+;
+
+MSG_OL_WIN_IS_MAXIMIZED		message	
+;
+; Returns whether window is both maximizable and maximized.
+;
+; Pass:		nothing
+; Return:	carry set if maximized.
+;		ax, cx, dx, bp -- preserved
+;
+
+MSG_OL_WIN_GET_HEADER_TITLE_BOUNDS	message	
+;
+; Not quite what you'd think, returns the width of the icons left of the
+; header, and the icons right of the header.
+;
+; Pass:		nothing
+; Return:	ax -- width of icons left of header
+;		bp -- width of icons right of header.
+;
+
+MSG_OL_WIN_NOTIFY_OF_REPLY_BAR		message
+;
+; Notification to dialog box by reply bar that wishes to be THE reply bar 
+; for that dialog.  Declared here so that CallOLWin may be used to deliver
+; the message efficiently, without possible adverse affect.
+;
+; Pass:		cx:dx	- optr of GenInteraction w/HINT_REPLY_BAR
+; Return:	nothing
+; 		ax, cx, dx, bp - destroy
+
+MSG_OL_WIN_RECALC_DISPLAY_SIZE		message
+;
+; A query from the display control to get a child window's size.  This
+; will cause a window's geometry to be updated, and the size returned.
+;
+; Pass:		cx, dx -- suggested size, ala MSG_VIS_RECALC_SIZE
+; Return:	carry set if answered
+;		cx, dx -- window size
+;		ax, bp -- destroyed
+;
+
+MSG_OL_WIN_IS_DEFAULT_ACTION_NAVIGATE_TO_NEXT_FIELD	message
+;
+; A query from dialog gadgets to determine if the default action of this dialog
+; is to navigate to next field.
+;
+; Pass:		nothing
+; Return:	carry set if default action is navigate to next field
+;		carry clear if not
+
+MSG_OL_WIN_SET_CUSTOM_SYSTEM_MENU_MONIKER	message
+;
+; See if the window has a VMS_TINY moniker in it's moniker list.  If not
+; check the applications moniker list.  If a VMS_TINY moniker is found,
+; then replace the default system menu moniker with the one we just found.
+; Currently used only in PM.
+;
+
+;MSG_OL_WIN_NOTIFY_OF_TITLE_BAR_LEFT_GROUP	message
+;
+; Notification to OLWin by title bar left group.  Sent via GenCallParent as
+; title bar group must be a direct generic child of window.
+;
+; Pass:		cx:dx	- optr of title bar left group
+; Return:	nothing
+
+;MSG_OL_WIN_NOTIFY_OF_TITLE_BAR_RIGHT_GROUP	message
+;
+; Notification to OLWin by title bar right group.  Sent via GenCallParent as
+; title bar group must be a direct generic child of window.
+;
+; Pass:		cx:dx	- optr of title bar right group
+; Return:	nothing
+
+MSG_OL_WIN_GET_OR_CREATE_TITLE_GROUP		message
+;
+;  Return the handle of the passed title bar group (creating
+;  the group if necessary).  Used when an object is requesting
+;  to go into the title bar, such as a view scroller.
+;
+;  Pass:	cx = TitleGroupType
+;  Return:	^lcx:dx = title bar group
+;
+
+MSG_OL_WIN_GET_TITLE_BAR_HEIGHT			message
+;
+; Returns title bar height.
+;
+; Pass:		nothing
+; Return:	cx - title bar height
+
+MSG_OL_WIN_CHECK_IF_POTENTIAL_NEXT_WINDOW	message
+;
+; Check if this window is a potential next window for the Alt-F6 shortcut.
+;
+; Pass:		nothing
+; Return:	carry set if so
+
+MSG_OL_WIN_CLEAR_TOGGLE_MENU_NAV_PENDING	message
+;
+; Clear pending menu navigation flag.
+;
+; Pass:		nothing
+; Return:	nothing
+
+NotifyOfInteractionCommandFlags	record
+	NOICF_TRIGGER_CREATED:1
+	NOICF_TRIGGER_DEMISE:1
+	:14				; force word-size
+NotifyOfInteractionCommandFlags	end
+
+NotifyOfInteractionCommandStruct	struct
+	NOICS_optr	optr
+	NOICS_ic	word
+	NOICS_flags	NotifyOfInteractionCommandFlags
+NotifyOfInteractionCommandStruct	ends
+
+MSG_OL_WIN_NOTIFY_OF_INTERACTION_COMMAND	message
+;
+; Notification that a trigger with ATTR_GEN_TRIGGER_INTERACTION_COMMAND is
+; present.
+;
+; Pass:		dx:bp = NotifyOfInteractionCommandStruct
+; Return:	nothing
+
+MSG_OL_WIN_TURN_ON_AND_BUMP_MOUSE		message
+;
+; Do a MSG_VIS_VUP_BUMP_MOUSE after turning on ptr.
+;
+; Pass:		Same as MSG_VIS_VUP_BUMP_MOUSE
+; Return:	Same as MSG_VIS_VUP_BUMP_MOUSE
+;
+
+MSG_OL_WIN_ABORT_MOVE_RESIZE			message
+;
+; Stop any move/resize.
+;
+; Pass:		nothing
+; Return:	nothing
+;
+
+MSG_OL_WIN_ALLOWS_EXPRESS_MENU_SHORTCUTS_THROUGH	message	
+;
+; Returns whether an object allows express menu shortcuts up to the field.
+; Usually modal dialog boxes will not allow them, but the New/Open
+; dialog box will be a special case.  (This is all for keyboard-only
+; navigation.)
+;
+; Pass:		nothing
+; Return:	carry set if sys-modal
+;
+
+if	_ROUND_THICK_DIALOGS
+MSG_OL_WIN_SHOULD_TITLE_BUTTON_HAVE_ROUNDED_CORNER		message
+;
+; Called by button class to determine if button in the title bar
+; should have rounded corners because the window is rounded, and if
+; so, which corner should be rounded.  Used for the Stylus UI.
+;
+; Context:	Called when button needs to know if it should have
+; 		rounded corners
+; Source:	Button object
+; Destination:  Window object
+; Interception: Not likely
+;
+; Pass:		cx = button left position
+;		dx = button right position
+;			
+; Return:	carry	= set if button should have a rounded corner
+;		ax	- if carry is set:
+;			    true if top-left corner should be round, false
+;			    if top-right corner should be round
+;			  if carry is clear:
+;			    destroyed
+;
+;	ax (if carry is clear), cx, dx, bp - destroyed
+;
+endif	;_ROUND_THICK_DIALOGS
+
+
+
+MSG_OL_WIN_UPDATE_FOR_TITLE_GROUP	message
+;
+; Update window because title bar group was changed by adding or removing
+; object.
+;
+; Pass:		nothing
+; Return:	nothing
+; Destroy:	ax, cx, dx, bp
+;
+
+
+if _DUI
+MSG_OL_WIN_UPDATE_FLOATING_KBD		message
+;
+; Handle turning off floating kbd to prevent on-off-on.
+;
+; Pass:		cx = layer ID
+;		dx = FloatingKbdFlags
+; Return:	nothing
+; Destroy:	ax, cx, dx, bp
+;
+endif
+
+
+if TOOL_AREA_IS_TASK_BAR
+MSG_OL_WIN_UPDATE_POSITION_FOR_TASK_BAR	message
+;
+; Update position to account for taskbar position change
+;
+; Pass:		cx	= TRUE if only minimized windows are to be updated
+; Return:	nothing
+; Destoryed:	ax, cx, dx, bp
+;
+endif
+
+
+;------------------------------------------------------------------------------
+;	Hints
+;------------------------------------------------------------------------------
+HINT_EXPRESS_MENU		vardata
+;this is used internally in the specific UI when creating
+;a button for the express menu.
+
+SaveInfoObjectStruct	struct
+	SIOS_object	optr	; object to save window info to
+	SIOS_tag	word	; vardata to use to store GenSaveWindowInfo
+	SIOS_hiddenTag	word	; vardata to add if window is not visible
+				;	(zero to do nothing extra for non-
+				;	 visible window)
+SaveInfoObjectStruct	ends
+
+TEMP_OL_WIN_SAVE_INFO_OBJECT	vardata	SaveInfoObjectStruct
+;this is used internally to save an OLWin's size and position information
+;to an object other than the OLWin itself.  Currently used for dialog
+;portion of OLPopout.
+
+TEMP_POPUP_OPENING_TO_RIGHT		vardata
+; 
+; Added to a popup opening to the right of its button, so that appropriate
+; behavior can be used to keep it from overlapping the button.
+;
+
+
+if BUBBLE_DIALOGS
+
+CURVED_BUBBLE_DIALOG		=	FALSE
+
+if CURVED_BUBBLE_DIALOG
+	NUM_WINDOW_REGION_POINTS	=	19
+else
+	NUM_WINDOW_REGION_POINTS	=	7
+endif
+
+
+WedgeWinBorderStruct	struct
+	WWBS_points	Point NUM_WINDOW_REGION_POINTS dup (0)
+WedgeWinBorderStruct	ends
+
+
+
+TEMP_OL_WIN_BORDER_POINTS		vardata	WedgeWinBorderStruct
+;
+; This is used internally to store the points which make up the border
+; of the window.
+;
+
+TEMP_OL_WIN_BUBBLE_MARGIN		vardata	Point
+;
+; Used internally to store the extra left/top margin used in bubble popups.
+;
+
+if BUBBLE_DIALOG_INSET
+TEMP_OL_WIN_INSET_POINTS		vardata WedgeWinBorderStruct
+;
+; This is used internally to store the points which make up the inset
+; of the window.
+;
+
+WedgeWinInsetFlags	record
+	WWIF_INC_X1:1
+	WWIF_DEC_X1:1
+	WWIF_INC_Y1:1
+	WWIF_DEC_Y1:1
+	WWIF_INC_X2:1
+	WWIF_DEC_X2:1
+	WWIF_INC_Y2:1
+	WWIF_DEC_Y2:1
+WedgeWinInsetFlags	end
+
+WedgeWinColorInfo	struct
+	WWCI_color	Color
+	WWCI_flags	WedgeWinInsetFlags
+WedgeWinColorInfo	ends
+
+WedgeWinInsetColorInfo	struct
+	WWICI_colorInfo	WedgeWinColorInfo NUM_WINDOW_REGION_POINTS dup (0)
+WedgeWinInsetColorInfo	ends
+
+TEMP_OL_WIN_INSET_COLORS		vardata WedgeWinInsetColorInfo
+;
+; This is used internally to store the colors of the line segments
+; which make up the inset of the window.
+;
+endif
+
+endif
+
+
+if	 _ROUND_THICK_DIALOGS
+
+OLWinTitleBarCornerAttributes	record
+    OLWTBCA_LEFT_CORNER_ROUNDED:1	;Left corner should be drawn rounded
+    OLWTBCA_RIGHT_CORNER_ROUNDED:1	;Right corner should be drawn rounded
+    :6
+OLWinTitleBarCornerAttributes	end
+
+ATTR_TITLE_BAR_HAS_ROUNDED_CORNERS	vardata OLWinTitleBarCornerAttributes
+;
+; Set if the title bar should be drawn with at least one rounded corner.
+;
+endif	;_ROUND_THICK_DIALOGS
+
+
+if 	DIALOGS_WITH_FOLDER_TABS
+
+LineSegment		struct
+	LS_start		word
+	LS_end			word
+LineSegment		ends
+
+OLWinFolderTabStruct	struct
+	OLWFTS_tabPosition	word NUMBER_OF_TABS dup (0)
+	OLWFTS_tabs		LineSegment NUMBER_OF_TABS dup (0)
+OLWinFolderTabStruct	ends
+
+TEMP_OL_WIN_TAB_INFO			vardata	OLWinFolderTabStruct
+; Extra data contain sizes of tabs
+
+endif	; DIALOGS_WITH_FOLDER_TABS
+
+
+if _DUI
+TEMP_OL_WIN_FLOATING_KBD_OFF_PENDING	vardata
+;
+; Handle turning off floating kbd to prevent on-off-on.
+;
+endif
+
+if _ISUI
+TEMP_OL_WIN_HELP_TRIGGER	vardata	lptr
+;
+; Chunk of help trigger (in same block as window)
+;
+
+TEMP_OL_WIN_MINIMIZE_IS_CLOSE	vardata
+;
+; Set if HINT_PRIMARY_MINIMIZE_REPLACES_CLOSE_FUNCTION has been
+; set on OLBaseWin objects.
+;
+
+TEMP_OL_WIN_HIDE_MINIMIZE	vardata
+;
+; Set if HINT_PRIMARY_HIDE_MINIMIZE_UI has been set on OLBaseWin
+; objects.
+;
+endif
+
+;------------------------------------------------------------------------------
+;	Constants & Structures
+;------------------------------------------------------------------------------
+
+
+;------------------------------------------------------------------------------
+;	Window Fixed Attributes (added later, when out of room in original
+; attributes flags).  Let's try & only put attributes common across
+; specific UI's in here.
+;------------------------------------------------------------------------------
+
+OLWinFixedAttr	record
+    ;flags to describe which subclass is in use:
+
+    OWFA_IS_WIN_ICON:1	;if this is actually an OLWinIcon object, subclassing
+			;the functionality of OLWinClass. OLWinIcon directly
+			;overrides some methods, the remainder of its specific
+			;functionality is implemented in OLWinClass by checking
+			;for this flag.
+
+    OWFA_IS_MENU:1	; Set if this object belongs to OLMenuWinClass
+
+    ; permanent attribute flags for this object.
+    ; I'm not conditionally compiling the GCM flag, since there are
+    ; so many places in the CommonUI code that rely on the bit orders
+    ; of records I'm afraid I'll break something.  -stevey 7/24/94
+
+    OWFA_GCM_TITLED:1	; Set for GCM windows.  Indicates that the title area
+			; for the window, if titled, should have GCM
+			; characteristics. See OLBaseWinClass for specifics.
+
+    OWFA_OPEN_ON_TOP:1	; Set to open window on top, when WinOpen'd.
+			; Flag used temporarily between initiation &
+			; MSG_VIS_OPEN_WIN.
+
+    OWFA_PREVENT_DEFAULT_OVERRIDES:1
+			; Set with HINT_PREVENT_DEFAULT_OVERRIDES. Prevents the
+			; default exclusive from moving to non-default triggers.
+
+    OWFA_RESTORABLE:1	; Set by default, reset via
+			; ATTR_GEN_DISPLAY_NOT_RESTORABLE.
+			; Allows creation of maximized windows which cannot
+			; be "restored" by the user.
+    OWFA_LONG_TERM:1	; In cwinPopup.asm, Set by default, reset via
+		        ; HINT_IS_TEMPORARY. Indicates whether window
+			; is pinned when it opens.
+    OWFA_PRESERVE_FOCUS:1
+			; Set by default in GenPrimary and GenDisplays,
+			; reset by default in command windows and summons.
+			; If set, means that when this window is reopened,
+			; or regains the focus via navigation, should keep
+			; focus on same object within window that had focus
+			; before this window lost the focus window exclusive.
+			; Set via HINT_PRESERVE_FOCUS, reset via
+			; HINT_DO_NOT_PRESERVE_FOCUS.
+
+
+OLWinFixedAttr	end
+
+OLWinMoreFixedAttr	record
+    OWMFA_NO_DISTURB:1	; Set with HINT_INTERACTION_NO_DISTURB for
+			; dialog GenInteractions that should not take the
+			; focus and target when user interacts with them.
+    OWMFA_IS_POPUP:1	; Set if this object belongs to OLPopupWinClass
+    OWMFA_DEFAULT_ACTION_IS_NAVIGATE_TO_NEXT_FIELD:1
+			; Set if the default action for this window should be
+			; to navigate to the next field instead of the
+			; activating the object with the default exclusive
+    OWMFA_CUSTOM_WINDOW:1
+			; Set with HINT_GEN_WINDOW_CUSTOM_WINDOW
+			; If set, then gadget area (title bar, menus, etc.)
+			; isn't created.
+    OMWFA_MINIMIZE_TITLE_BAR:1
+    			; Set with HINT_WINDOW_MINIMIZE_TITLE_BAR.
+			; If set, then try to make a smaller title bar with
+			; no gadgets or moniker.
+    OMWFA_DRAW_DISABLED:1
+			; Set to draw the window so it looks like it's "disabled".
+			; This is independent of GS_ENABLED and also draws differently.
+    :2
+OLWinMoreFixedAttr      end
+
+;------------------------------------------------------------------------------
+;			Window Attributes
+;------------------------------------------------------------------------------
+
+if _OL_STYLE	;--------------------------------------------------------------
+
+OLWinAttr	record
+    	:1
+	OWA_DISMISS_WHEN_DISABLED:1
+				;window should be dismissed when disabled.
+    ;attribute flags for this object:
+	OWA_MOVABLE:1		;set if window is movable (can be picked up by
+				;bg area)
+	OWA_RESIZABLE:1		;set if window is resizable (is given resize
+				;corners)
+	OWA_PINNABLE:1		;if can be pinned (NOTE: if Pinnable, object
+				;MUST be subclassed from OLPopupWinClass)
+	OWA_MINIMIZABLE:1	;if the window can be "minimized" to an icon
+				;i.e.  (Note that even though this bit is
+				;set, the user may not be offered this feature)
+	OWA_MAXIMIZABLE:1	;if the window is allowed to be "maximized" to
+				;fill the screen.  (Note that even though this
+				;bit is set, the user may not be offered this
+				;feature)
+	OWA_CLOSABLE:1		;if is closable: this does not affect the
+				;functionality; it only determines which
+				;gadgets/glyphs are added to the window to allow
+				;the user to close it.
+	OWA_FOCUSABLE:1		;if window may be given the input focus.  If
+				;the window may not be given the focus, then
+				;no components within it may grab the keyboard
+				;focus.
+	OWA_TARGETABLE:1	;if contains data which may be given the
+				;active selected data exclusive.  Any window
+				;containing data which may be selected & then
+				;acted on by the application must be targetable.
+    ;descriptive flags for this object:
+	OWA_HEADER:1		;if window has header, which might contain
+				;a title, system icons, pins, etc.
+	OWA_TITLED:1		;if window shows its title in the header area.
+	OWA_THICK_LINE_BORDER:1	;if there is a thick line border (notice window)
+	OWA_SHADOW:1		;if there is a shadow (shadows are always
+				;rounded, this implies that the border width
+				;is 1 and is also rounded)
+    ;OpenLook - specific
+	OWA_HAS_WIN_MENU:1	;if there is a menu associated w/window,
+				;available by clicking MENU on background
+	OWA_HAS_POPUP_MENU:1	;
+
+;removed by Eric because we ran out of bits and this is not yet used.
+;	OWA_LONG_TERM:1		;if title and long term message (if any)
+;				;should be seperated by a " - " instead of a ":"
+;
+;	OWA_FOOTER:1		;if window has a footer
+OLWinAttr	end
+
+;Composite Attribute masks for each window type:
+
+OL_ATTRS_BASE_WIN = mask OWA_HEADER or mask OWA_TITLED or mask OWA_FOCUSABLE \
+	or mask OWA_MOVABLE or mask OWA_RESIZABLE \
+	or mask OWA_HAS_WIN_MENU \
+	or mask OWA_MINIMIZABLE or mask OWA_MAXIMIZABLE
+
+endif		;END of OPEN LOOK specific code -------------------------------
+
+
+if _CUA_STYLE
+
+OLWinAttr	record
+    	OWA_REAL_MARGINS:1
+				;for windows that want some serious margins
+				;for their children, not just one pixel inside
+				;the border. (Belongs with KIDS_INSIDE_BORDER)
+	OWA_DISMISS_WHEN_DISABLED:1
+				;window should be dismissed when disabled.
+    ;attribute flags for this object:
+
+	OWA_MOVABLE:1		;set if window is movable (can be picked up by
+				;bg area)
+	OWA_RESIZABLE:1		;set if window is resizable (is given resize
+				;corners)
+	OWA_PINNABLE:1		;if can be pinned (NOTE: if Pinnable, object
+				;MUST be subclassed from OLPopupWinClass)
+	OWA_MINIMIZABLE:1	;if the window can be "minimized" to an icon
+				;i.e. during its lifetime -- this
+				;functionality is not allowed when the window
+				;is MINIMIZED, even if this flag is TRUE.
+	OWA_MAXIMIZABLE:1	;if the window can be "maximized" to fill the
+				;screen i.e. during its lifetime -- this
+				;functionality is not allowed when the window
+				;is MAXIMIZED, even if this flag is TRUE.
+	OWA_CLOSABLE:1		;if is closable: this does not affect the
+				;functionality; it only determines which
+				;gadgets/glyphs are added to the window to allow
+				;the user to close it.
+	OWA_FOCUSABLE:1		;if window may be given the input focus.  If
+				;the window may not be given the focus, then
+				;no components within it may grab the keyboard
+				;focus.
+	OWA_TARGETABLE:1	;if contains data which may be given the
+				;active selected data exclusive.  Any window
+				;containing data which may be selected & then
+				;acted on by the application must be targetable.
+    ;descriptive flags for this object:
+	OWA_HEADER:1		;if window has header, which might contain
+				;a title, system icons, pins, etc.
+	OWA_TITLED:1		;if window shows its title in the header area.
+	OWA_THICK_LINE_BORDER:1	;if there is a thick line border (notice window)
+    ;CUA/Motif- specific
+	OWA_HAS_WIN_MENU:1	;if there is a menu associated w/window,
+				;available by clicking MENU on background
+	OWA_HAS_SYS_MENU:1	;if the window has a system menu icon in the
+				;upper-left corner, which opens to the system
+				;menu.  Implies that three system menu icons
+				;should also appear.
+	OWA_KIDS_INSIDE_BORDER:1;if children should be located INSIDE the
+				;frame border, instead of on it. This bit set
+				;for menus.  
+				
+OLWinAttr	end
+
+;Basic attributes-groups that can be added to any window type:
+
+MO_ATTR1	= mask OWA_HEADER or \
+		  mask OWA_TITLED or \
+		  mask OWA_HAS_SYS_MENU or \
+		  mask OWA_MOVABLE
+					;most windows support these, because of
+					;keyboard navigation)
+
+MO_ATTR2	= mask OWA_RESIZABLE or \
+		  mask OWA_MINIMIZABLE or \
+		  mask OWA_MAXIMIZABLE
+					;general resize flags
+
+;Composite Attribute masks for each window type:
+
+MO_ATTRS_PRIMARY_WINDOW = MO_ATTR1 or MO_ATTR2 or \
+			  mask OWA_FOCUSABLE or \
+			  mask OWA_HAS_WIN_MENU or \
+			  mask OWA_THICK_LINE_BORDER
+
+MO_ATTRS_DISPLAY_WINDOW = MO_ATTR1 or MO_ATTR2 or \
+			  mask OWA_FOCUSABLE or \
+			  mask OWA_THICK_LINE_BORDER \
+			  and not (mask OWA_MINIMIZABLE)
+			  ; Change default display to NOT be minimizable,
+			  ; since our MDI implementation does not support it.
+
+MO_ATTRS_NOTICE_WINDOW = mask OWA_HEADER or \
+			 mask OWA_CLOSABLE or \
+			 mask OWA_FOCUSABLE or mask OWA_THICK_LINE_BORDER \
+			  or mask OWA_KIDS_INSIDE_BORDER \
+			  or mask OWA_REAL_MARGINS
+
+MO_ATTRS_COMMAND_WINDOW = MO_ATTR1 or mask OWA_CLOSABLE or mask OWA_FOCUSABLE \
+			or mask OWA_THICK_LINE_BORDER \
+			or mask OWA_KIDS_INSIDE_BORDER \
+			or mask OWA_REAL_MARGINS
+			  
+;Note: OLBaseWinInitialize and OLDisplayInitialize will check GenDisplay
+;attribute GDA_USER_DISMISSABLE and update the OWA_CLOSABLE flag accordingly.
+
+endif		;END of MOTIF specific code -----------------------------------
+
+OL_ATTRS_WIN_ICON	= mask OWA_FOCUSABLE or mask OWA_MOVABLE
+
+;------------------------------------------------------------------------------
+;			Window Specific State
+;------------------------------------------------------------------------------
+
+OLWinSpecState	record
+    OLWSS_SYS_ICONS_ATTACHED:1	;set if OpenWinEnsureSysMenuIcons has
+				;set one-way upward generic links for icons,
+				;& spec-built them.
+
+    OLWSS_MAXIMIZED:1		;if the window is currently full-screen
+    OLWSS_MINIMIZED:1		;if the window is presently an icon
+
+    OLWSS_PTR_IN_RAW_UNIV:1	;is set if ptr is in this window's universe
+
+    OLWSS_GRABBED:1		;if window controls are in active use
+				;-- window is grabbed for mouse input.
+				;See "SelectMyControlsOnly".
+
+    OLWSS_PINNED:1		;if window is pinned
+    OLWSS_DRAWN_PINNED:1	;OpenLook only: if pin is drawn in but not
+				;actually pinned
+    OLWSS_NOTIFY_TRIGGERS_IS_PINNED:1
+				;if window is pinned (OL menus only) and have
+				;not yet notified children GenTriggers to set
+				;themselves bordered
+
+OLWinSpecState	end
+
+
+;------------------------------------------------------------------------------
+;			Window Menu State
+;------------------------------------------------------------------------------
+
+
+OLWinMenuState	record
+    OLWMS_MENU_WINDOW_GRABS_ARE_TEMPORARY:1
+			; If set, it means that when a menu window requests
+			; the FOCUS or TARGET window exclusive, the current
+			; owner of the exclusive should be saved so can be
+			; restored later.
+
+    OLWMS_OD_IS_OWNER_BEFORE_MENU:1
+			; If set, indicates that OLWI_prevFocusExcl
+			; holds the OD & HierarchicalGrabFlags of an
+			; object that would have the focus were it not
+			; for a menu currently being up.
+
+    OLWMS_HAS_MENU_IN_STAY_UP_MODE:1
+			;if this window (GenPrimary, GenDisplay, command
+			;window, or menu) has a menu which is in
+			;stay-up mode. This prevents us from taking the
+			;GADGET exclusive when the mouse button is
+			;released in this window.
+
+    OLWMS_TOGGLE_MENU_NAV_PENDING:1
+			;waiting for release of menu nav key
+
+    ;doesn't really belong here, but no more OLWinAttr bits!
+    OWA_SYS_MENU_IS_CLOSE_BUTTON:1
+			;set if system menu is really just a close button
+
+    :3
+
+OLWinMenuState	end
+
+
+;------------------------------------------------------------------------------
+;			Window Header State
+;------------------------------------------------------------------------------
+
+OLWinHeaderState	record
+    OLWHS_UPDATE_PENDING:1		;TRUE if OpenWinHeaderMarkInvalid has
+					;been called, and there already in a
+					;MSG_OL_WIN_UPDATE_HEADER for this
+					;object on the UI queue.
+
+    ;these invalid flags start with the most general, and lead up the most
+    ;specific. For example, if the HEADER area is invalid, that implies that
+    ;the title area and icon images are invalid.
+
+    OLWHS_HEADER_AREA_INVALID:1		;TRUE if the entire header area is
+					;invalid - has changed height, etc.
+
+    OLWHS_FOCUS_AREA_INVALID:1		;TRUE if focus state has changed,
+					;and so we need to redraw that portion
+					;of the header that indicates the
+					;focus state. For OpenLook, this is the
+					;entire header area. For Motif, this
+					;is the title area alone.
+
+    OLWHS_TITLE_AREA_INVALID:1		;TRUE if the the color or size of the
+					;title background has changed. Should
+					;redraw title BG and moniker.
+
+    OLWHS_TITLE_IMAGE_INVALID:1		;TRUE if the title moniker has changed
+
+    OLWHS_HEADER_MARK_IMAGES_INVALID:1	;TRUE if the Close icon or Pin icon
+					;{OpenLook only) need redrawing.
+
+    OLWHS_SYS_ICON_IMAGES_INVALID:1	;TRUE if the System Icons (Motif only)
+					;need redrawing.
+
+    OLWHS_FIELD_ICON_IMAGES_INVALID:1	;TRUE if the Workspace and Applications
+					;menu buttons need to be drawn.
+OLWinHeaderState	end
+
+OLWHS_FULLY_INVALID =	mask OLWHS_HEADER_AREA_INVALID or \
+			mask OLWHS_FOCUS_AREA_INVALID or \
+			mask OLWHS_TITLE_AREA_INVALID or \
+			mask OLWHS_TITLE_IMAGE_INVALID or \
+			mask OLWHS_HEADER_MARK_IMAGES_INVALID or \
+			mask OLWHS_SYS_ICON_IMAGES_INVALID or \
+			mask OLWHS_FIELD_ICON_IMAGES_INVALID
+
+
+;------------------------------------------------------------------------------
+;			Window Move/Resize State
+;------------------------------------------------------------------------------
+
+if _OL_STYLE	;START of OPEN LOOK specific code -----------------------------
+
+OLWinMoveResizeState	record
+    OLWMRS_MOVE_RESIZE_PENDING:1 ;set when a START_SELECT is interpreted as
+				 ;the beginning of a move and resize. cleared
+				 ;when a DRAG_SELECT is received and the
+				 ;operation begins. If still set when get
+				 ;END_SELECT, means void the operation.
+    OLWMRS_MOVING:1		;if window is being moved
+    OLWMRS_RESIZING_UL:1	;if window is resizing from the upper left
+    OLWMRS_RESIZING_UR:1	;if window is resizing from the upper right
+    OLWMRS_RESIZING_LL:1	;if window is resizing from the lower left
+    OLWMRS_RESIZING_LR:1	;if window is resizing from the lower right
+    OLWMRS_RESIZE_PENDING:1	;set if waiting for user to indicate which
+				;direction to resize in (keyboard resize)
+    :1
+OLWinMoveResizeState	end
+
+OLWMRS_RESIZING_MASK	= mask OLWMRS_RESIZING_UL or mask OLWMRS_RESIZING_UR \
+			  or mask OLWMRS_RESIZING_LL or mask OLWMRS_RESIZING_LR
+OLWMRS_MOVING_OR_RESIZING_MASK	= OLWMRS_RESIZING_MASK or mask OLWMRS_MOVING
+endif		;END of OPEN LOOK specific code -------------------------------
+
+
+if _CUA_STYLE
+
+;CUA style window flags: can resize in eight directions, so let's store separate
+;horizontal and vertical resize flags, and allow one from each group to be set.
+
+OLWinMoveResizeState	record
+    OLWMRS_MOVE_RESIZE_PENDING:1 ;set when a START_SELECT is interpreted as
+				 ;the beginning of a move and resize. cleared
+				 ;when a DRAG_SELECT is received and the
+				 ;operation begins. If still set when get
+				 ;END_SELECT, means void the operation.
+    OLWMRS_MOVING:1		;if window is being moved
+    OLWMRS_RESIZING_UP:1	;if window is resizing upwards
+    OLWMRS_RESIZING_DOWN:1	;if window is resizing downwards
+    OLWMRS_RESIZING_LEFT:1	;if window is resizing to the left
+    OLWMRS_RESIZING_RIGHT:1	;if window is resizing to the right
+    OLWMRS_RESIZE_PENDING:1	;set if waiting for user to indicate which
+				;direction to resize in (keyboard resize)
+    :1
+OLWinMoveResizeState	end
+
+OLWMRS_RESIZING_MASK	= mask OLWMRS_RESIZING_UP or mask OLWMRS_RESIZING_DOWN \
+			  or mask OLWMRS_RESIZING_LEFT or mask OLWMRS_RESIZING_RIGHT
+
+OLWMRS_MOVING_OR_RESIZING_MASK	= OLWMRS_RESIZING_MASK or mask OLWMRS_MOVING
+
+endif		;END of MOTIF specific code -----------------------------------
+
+
+;------------------------------------------------------------------------------
+;			Window Position/Size State
+;------------------------------------------------------------------------------
+
+;This record describes the state of the window concerning its size and position
+;on its parent window. This information is used during ATTACH, SPEC_BUILD,
+;WIN_MOVE_RESIZE, etc to decide how to handle the positioning/sizing behavior
+;that is described in the WinPosSizeFlags record.
+
+;When this windowed object is closed (or detached), this state info is
+;saved onto the ActiveList, so that when the window re-opens, it can
+;retain its staggered slot # and position/size.
+
+WinPosSizeState	record
+    ;this must line up with WPSF_PERSIST
+
+    WPSS_HAS_MOVED_OR_RESIZED:1
+			;window has been moved or resized by user or app.
+
+    ;this field should be in bits 6-0 of the higher byte of this word record
+    					;COULD MAKE THIS SMALLER
+    WPSS_STAGGERED_SLOT:7
+			;if this window has ever appeared in a staggered
+			;manner, which slot it occupied (0=has not)
+			;(high bit of field indicates is staggered icon)
+
+    WPSS_HAS_RESTARTED:1
+			;TRUE if this window was ATTACHED with extra data
+			;on the active list, meaning that the window was
+			;previously shut-down (AND it was staggered or
+			;moved by the user.) This is reset after a new
+			;stagger position is determined.
+
+    :2
+
+    WPSS_VIS_POS_IS_SPEC_PAIR:1
+			;TRUE if VI_bounds.R_left and R_top contain
+			;a SpecWinSizePair structure which describes the
+			;window's position in terms of a ratio of the
+			;Parent or Field window's size. During SPEC_BUILD,
+			;this structure will be converted into a coordinate
+			;pair. IMPORTANT: when this is true, the R_right and
+			;R_bottom fields contains actual size info, which is
+			;either in pixels or a SpecWinSizePair, as indicated
+			;by the WPSS_VIS_SIZE_IS_SPEC_PAIR... flags.
+
+    WPSS_VIS_SIZE_IS_SPEC_PAIR_PARENT:1
+			;TRUE if VI_bounds.R_left and R_top contain
+			;a SpecWinSizePair structure which describes the
+			;window's position in terms of pixels or a ratio of the
+			;Parent window's size.
+
+    WPSS_VIS_SIZE_IS_SPEC_PAIR_FIELD:1
+			;this is used in cases where the user has specified
+			;the size as a ratio of the field, and we have
+			;stuff the VI_bounds with the size info.
+
+    WPSS_POSITION_INVALID:1
+			;window position needs to be recalculated
+
+    WPSS_SIZE_INVALID:1
+			;window size needs to be recalculated
+
+WinPosSizeState	end
+
+	.assert	offset WPSS_STAGGERED_SLOT eq 8
+	.assert	offset WPSS_HAS_MOVED_OR_RESIZED eq offset WPSF_PERSIST
+
+
+
+;------------------------------------------------------------------------------
+;			Window Type
+;------------------------------------------------------------------------------
+
+if _OL_STYLE	;START of OPEN LOOK specific code -----------------------------
+OLWinType etype byte, 0
+OLWT_BASE_WINDOW		enum OLWinType	; Application base win
+OLWT_DISPLAY_WINDOW		enum OLWinType	; MDI secondary win
+OLWT_COMMAND_WINDOW		enum OLWinType
+OLWT_PROPERTIES_WINDOW		enum OLWinType
+OLWT_NOTICE_WINDOW		enum OLWinType
+OLWT_HELP_WINDOW		enum OLWinType
+OLWT_MENU			enum OLWinType
+OLWT_SUBMENU			enum OLWinType
+OLWT_SYSTEM_MENU		enum OLWinType
+OLWT_WINDOW_ICON		enum OLWinType
+endif		;END of OPEN LOOK specific code -------------------------------
+
+if _CUA_STYLE
+OLWinType etype byte, 0
+MOWT_PRIMARY_WINDOW		enum OLWinType
+MOWT_DISPLAY_WINDOW		enum OLWinType
+MOWT_COMMAND_WINDOW		enum OLWinType
+MOWT_PROPERTIES_WINDOW		enum OLWinType		;nuke this
+MOWT_NOTICE_WINDOW		enum OLWinType
+MOWT_HELP_WINDOW		enum OLWinType
+MOWT_MENU			enum OLWinType
+MOWT_SUBMENU			enum OLWinType
+MOWT_SYSTEM_MENU		enum OLWinType
+MOWT_WINDOW_ICON		enum OLWinType
+endif		;END of MOTIF specific code -----------------------------------
+
+
+;------------------------------------------------------------------------------
+;			Instance Data
+;------------------------------------------------------------------------------
+
+    OLWI_type		OLWinType <>
+    OLWI_fixedAttr	OLWinFixedAttr <>	;fixed attributes (can't change)
+    OLWI_moreFixedAttr	OLWinMoreFixedAttr <>
+
+    ;THESE THREE MUST BE IN ORDER FOR OpenWinSwapState to work:
+
+    OLWI_attrs		OLWinAttr <>
+    OLWI_winPosSizeFlags WinPosSizeFlags <>	;window position and size
+						;preferences.
+    OLWI_winPosSizeState WinPosSizeState <>	;current state, including
+						;stagger slot number
+
+    OLWI_specState	OLWinSpecState <>
+    OLWI_menuState	OLWinMenuState <>
+    OLWI_headerState	OLWinHeaderState <>
+    OLWI_moveResizeState OLWinMoveResizeState <>
+
+    ;Whenever this window is created, moved, or resized, we get
+    ;MSG_VIS_UPDATE_GEOMETRY. We check window attributes flags (min, max,
+    ;closable, etc) and store the calculated size of the title area here.
+
+    OLWI_titleBarBounds	Rectangle <>
+
+if _OL_STYLE	;START of OPEN LOOK specific code -----------------------------
+    OLWI_menu		lptr			;popup window menu
+endif		;END of OPEN LOOK specific code -------------------------------
+
+if _CUA_STYLE
+    ; Since we create the System menu on the fly when OLWinClass gets
+    ; UPDATE_SPEC_BUILD, we need to send this method on to them.  When the
+    ; SystemMenuButton is created, it will tell OLWinClass its handle, so
+    ; OLWinClass can update the button's position.
+
+    OLWI_sysMenu	hptr
+    ; Block that StandardWindowMenuResource/DisplayWindowMenuResource has
+    ; been copied into, if any.
+
+    OLWI_sysMenuButton	lptr			;system menu button
+    ; OLMenuButton object created for StandardWindowMenu within above block.
+
+endif
+
+    OLWI_focusExcl	FTVMCGrab <>
+    ; focusExcl is a "HierarhicalGrab" (defined in User/userFlow.asm).  It
+    ; contains an OD, a word of data which may be stored w/whomever has
+    ; grab.  THIS instance of a BasicGrab is for the object within the
+    ; window which currently has the focus (such as a text object or view).
+
+    OLWI_targetExcl	FTVMCGrab <>
+    ; targetExcl is also a "HierarchicalGrab", but is used to indicate which
+    ; object in the window has the target exclusive - the object which may have
+    ; the active target selection with which an application may perform an
+    ; operation on.
+
+    OLWI_defaultExcl	HierarchicalGrab <>
+    ; this is also a "HierarchicalGrab". Is used to indicate the GenTrigger
+    ; within the window which has the DEFAULT exclusive: the trigger which is
+    ; activated when ENTER or RETURN is pressed in the window.
+
+    OLWI_masterDefault	optr
+    ; This is the OD of the GenTrigger or GenItem in the window which,
+    ; by virtue of HINT_DEFAULT_DEFAULT_ACTION, has been appointed as the 
+    ; default trigger in the window, WHEN not overriden by OLWI_defaultExcl = 
+    ; OD of some other GenTrigger which has a temporary default exclusive.
+
+    ;Here we save some of this window's position, size, and state information
+    ;when it is MAXIMIZED. THESE MUST BE IN ORDER for OpenWinSwapState.
+    ;(Note: OLWI_prevWinBounds is also used for pinned menus: When the button
+    ;for a pinned menu is pressed on, the menu's pinned location is saved here
+    ;so that when the menu button is release, the menu can be restored
+    ;to the pinned state in its old location.)
+
+    OLWI_prevAttrs		OLWinAttr <>
+    OLWI_prevWinPosSizeFlags	WinPosSizeFlags <>
+    OLWI_prevWinPosSizeState	WinPosSizeState <>
+    OLWI_prevWinBounds		Rectangle <>
+
+    ;Grab info (OD, flags, methods) for object which had focus exclusive
+    ;in this window BEFORE we started navigating through the menu bar or
+    ;before a menu opened.
+
+    OLWI_prevFocusExcl		FTVMCGrab <>
+
+    OLWI_titleBarLeftGroup	optr
+    OLWI_titleBarRightGroup	optr
+
+if _HAS_LEGOS_LOOKS
+    OLWI_legosLook		byte
+endif
+
+OLWinClass	endc

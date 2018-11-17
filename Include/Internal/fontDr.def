@@ -1,0 +1,646 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Interface definition for Font drivers
+FILE:		fontDr.def
+
+AUTHOR:		Adam de Boor, Feb 18, 1991
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	2/18/91		Initial revision
+
+
+DESCRIPTION:
+	
+		
+	$Id: fontDr.def,v 1.1 97/04/04 14:15:15 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__FONTDR
+
+include driver.def
+include fontID.def	; for FontMaker
+include font.def
+include graphics.def
+include file.def
+include char.def
+
+StartKernel
+
+global GrCallFontDriver:far
+global GrCallFontDriverID:far
+global FontDrDeleteLRUChar:far
+global FontDrFindFontInfo:far
+global FontDrFindOutlineData:far
+global FontDrAddFont:far
+global FontDrAddFonts:far
+global FontDrDeleteFont:far
+global FontDrDeleteFonts:far
+global FontDrLockFont:far
+global FontDrUnlockFont:far
+global FontDrEnsureFontFileOpen:far
+global FontDrLockInfoBlock:far
+global FontDrUnlockInfoBlock:far
+if DBCS_PCGEOS
+global FontDrLockCharSet:far
+endif
+global FontDrFindFileName:far
+global FontDrGetFontIDFromFile:far
+
+if DBCS_PCGEOS
+
+;
+; Section of the Unicode char set that is in use.  These values are
+; approximate, as not all sections begin/end on boundaries of 256.
+; This is mostly for debugging purposes.
+;
+FontCharSet	etype	byte
+FCS_ASCII				enum	FontCharSet, 0x0
+FCS_EUROPEAN_LATIN			enum	FontCharSet, 0x1
+FCS_DIACRITICS				enum	FontCharSet, 0x3
+FCS_CYRILLIC				enum	FontCharSet, 0x4
+FCS_AMERNIAN				enum	FontCharSet, 0x5
+FCS_ARABIC				enum	FontCharSet, 0x6
+FCS_DEVANAGARI				enum	FontCharSet, 0x9
+FCS_GURMUKHI				enum	FontCharSet, 0xa
+FCS_ORIYA				enum	FontCharSet, 0xb
+FCS_TELUGU				enum	FontCharSet, 0xc
+FCS_MALAYALAM				enum	FontCharSet, 0xd
+FCS_THAI				enum	FontCharSet, 0xe
+FCS_TIBETAN				enum	FontCharSet, 0x10
+FCS_GENERAL_PUNCTUATION			enum	FontCharSet, 0x20
+FCS_LETTERLIKE_SYMBOLS			enum	FontCharSet, 0x21
+FCS_MATHEMATICAL_OPERATORS		enum	FontCharSet, 0x22
+FCS_MISCELLANEOUS_TECHNICAL		enum	FontCharSet, 0x23
+FCS_CONTROL_PICTURES			enum	FontCharSet, 0x24
+FCS_FORM_AND_CHART			enum	FontCharSet, 0x25
+FCS_MISCELLANEOUS_DINGBATS		enum	FontCharSet, 0x26
+FCS_ZAPF_DINGBATS			enum	FontCharSet, 0x27
+FCS_HIRAGANA				enum	FontCharSet, 0x30
+FCS_BOPOMOFO				enum	FontCharSet, 0x31
+FCS_ENCLOSED_CJK_LETTERS		enum	FontCharSet, 0x32
+FCS_CJK_SQUARED_WORDS			enum	FontCharSet, 0x33
+FCS_KOREAN_HANGUL_SYLLABLES		enum	FontCharSet, 0x34
+FCS_FULLWIDTH_VARIANTS			enum	FontCharSet, 0xff
+
+endif
+
+;------------------------------------------------------------------------------
+;	FontWeight values provided for backwards compatability with V1.X 
+;------------------------------------------------------------------------------
+FWE_ULTRA_LIGHT		enum FontWeight, 0
+FWE_EXTRA_LIGHT		enum FontWeight, 1
+FWE_LIGHT		enum FontWeight, 2
+FWE_BOOK		enum FontWeight, 3
+FWE_NORMAL		enum FontWeight, 4
+FWE_DEMI		enum FontWeight, 5
+FWE_BOLD		enum FontWeight, 6
+FWE_EXTRA_BOLD		enum FontWeight, 7
+FWE_ULTRA_BOLD		enum FontWeight, 8
+FWE_BLACK		enum FontWeight, 9
+
+;-------------------------------
+
+CHAR_NOT_EXIST		=	0		; char doesn't exist at all
+CHAR_NOT_LOADED		=	1		; char exists, but not loaded
+CHAR_NOT_BUILT		=	2		; char exists, but not built
+
+CHAR_MISSING		=	3		; <= is one of the above
+
+;
+; Following styles are implemented in the kernel, so ignore them
+; when finding bitmaps or outlines to use:
+;
+
+KERNEL_STYLES		=	mask TS_UNDERLINE or mask TS_STRIKE_THRU
+
+;
+; maximum size of a font before resize occurs:
+;
+MAX_FONT_SIZE	=	1024 * 10
+
+;
+; "Handle ID" of the font manager. Included here so the font
+; driver can do its own allocation of font blocks.
+;
+FONT_MAN_ID	= 0x20
+
+;------------------------------------------------------------------------------
+;	structure of bitmap character data
+;	DO NOT CHANGE THIS!  THE VIDEO DRIVER ASSUMES IT!
+;------------------------------------------------------------------------------
+
+CharData	struct
+    CD_pictureWidth	byte		;width of picture data in bits
+    CD_numRows		byte		;number of rows of data
+    CD_yoff		sbyte		;(signed) offset to first row
+    CD_xoff		sbyte		;(signed) offset to first column
+    CD_data		byte		;data for character
+CharData	ends
+
+SIZE_CHAR_HEADER	= (size CharData)-1
+
+;------------------------------------------------------------------------------
+;	structure of region character data
+;------------------------------------------------------------------------------
+
+RegionCharData	struct
+    RCD_yoff		sword		;(signed) offset to first row
+    RCD_xoff		sword		;(signed) offset to first column
+    RCD_size		word		;size of region (in bytes)
+if DBCS_PCGEOS
+    RCD_usage		word		;LRU count
+endif
+    RCD_bounds		Rectangle	;bounding box of region
+    RCD_data		word		;data for region
+RegionCharData	ends
+
+if DBCS_PCGEOS
+SIZE_REGION_HEADER	= (size RCD_yoff)+(size RCD_xoff)+\
+					(size RCD_usage)+(size RCD_size)
+else
+SIZE_REGION_HEADER	= (size RCD_yoff)+(size RCD_xoff)+(size RCD_size)
+endif
+.assert (SIZE_REGION_HEADER eq (offset RCD_bounds))
+
+;------------------------------------------------------------------------------
+;	structure of character table entries
+;------------------------------------------------------------------------------
+
+CharTableFlags	record
+	:1				;pad to a BYTE only
+	CTF_NEGATIVE_LSB:1		;TRUE if negative left-side bearing
+	CTF_ABOVE_ASCENT:1		;TRUE if very tall
+	CTF_BELOW_DESCENT:1		;TRUE if very low
+	CTF_NO_DATA:1			;TRUE if no data
+	CTF_IS_FIRST_KERN:1		;TRUE if first of a kern pair
+	CTF_IS_SECOND_KERN:1		;TRUE if second of a kern pair
+	CTF_NOT_VISIBLE:1		;TRUE if character normally invisible
+CharTableFlags	end
+.assert (offset CTF_NEGATIVE_LSB) eq (offset CI_NEGATIVE_LSB)
+.assert (offset CTF_ABOVE_ASCENT) eq (offset CI_ABOVE_ASCENT)
+.assert (offset CTF_BELOW_DESCENT) eq (offset CI_BELOW_DESCENT)
+.assert (offset CTF_NO_DATA) eq (offset CI_NO_DATA)
+.assert (offset CTF_IS_FIRST_KERN) eq (offset CI_IS_FIRST_KERN)
+.assert (offset CTF_IS_SECOND_KERN) eq (offset CI_IS_SECOND_KERN)
+
+CharTableEntry	struct
+    CTE_dataOffset	nptr.CharData	;Offset to data
+    CTE_width		WBFixed		;character width
+    CTE_flags		CharTableFlags	;flags
+if not DBCS_PCGEOS
+    CTE_usage		word		;LRU count
+endif
+CharTableEntry	ends
+
+;------------------------------------------------------------------------------
+;	macro to index into CharTableEntry
+;------------------------------------------------------------------------------
+FDIndexCharTable	macro	ptrreg, trashreg
+
+if DBCS_PCGEOS
+	shl	ptrreg, 1		;<- ptrreg*2
+	mov	trashreg, ptrreg
+	shl	ptrreg, 1		;<- ptrreg*4
+	add	ptrreg, trashreg	;<- ptrreg*6
+		CheckHack <(size CharTableEntry) eq 6>
+else
+	shl	ptrreg, 1		;<- ptrreg*2
+	shl	ptrreg, 1		;<- ptrreg*4
+	shl	ptrreg, 1		;<- ptrreg*8
+		CheckHack <(size CharTableEntry) eq 8>
+endif
+
+endm
+
+;------------------------------------------------------------------------------
+;	structure of a kerning pair
+;------------------------------------------------------------------------------
+
+KernPair	struct
+    KP_char1		char	;RIGHT character of kerning pair
+    KP_char2		char	;LEFT  character of kerning pair
+KernPair	ends
+
+;------------------------------------------------------------------------------
+;	special flags for font information
+;------------------------------------------------------------------------------
+FontBufFlags	record
+	FBF_DEFAULT_FONT:1	;TRUE if font is default (GState only)
+	FBF_MAPPED_FONT:1	;TRUE if font is substituted (GState only)
+	:1
+	FBF_IS_OUTLINE:1	;TRUE if generated from outline data
+	FBF_IS_REGION:1		;TRUE if character data stored as regions
+	FBF_IS_COMPLEX:1	;TRUE if complex transformation used
+	FBF_IS_INVALID:1	;TRUE if font is no longer avail
+	:1		;pad to a byte only
+FontBufFlags	end
+
+FONT_GS_FLAGS = mask FBF_DEFAULT_FONT or mask FBF_MAPPED_FONT
+
+;------------------------------------------------------------------------------
+;	structure of font header for each face in memory
+;------------------------------------------------------------------------------
+
+FontMatrix	struct
+    FM_11	WWFixed			;upper 2x2 of transformation matrix
+    FM_12	WWFixed
+    FM_21	WWFixed
+    FM_22	WWFixed
+FontMatrix	ends
+
+FontBuf		struct
+    FB_dataSize		word		; actual size of data (bytes)
+    FB_maker		FontMaker	; manufacturer ID
+    FB_avgwidth		WBFixed 	; average character width
+    FB_maxwidth		WBFixed		; width of widest character
+    FB_heightAdjust	WBFixed		; offset to top of font box
+    FB_height		WBFixed 	; height of characters
+    FB_accent		WBFixed 	; height of accent portion.
+    FB_mean		WBFixed 	; top of lower case character boxes.
+    FB_baseAdjust	WBFixed		; offset to top of ascent
+    FB_baselinePos	WBFixed 	; position of baseline from top of font
+    FB_descent		WBFixed 	; maximum descent (from baseline)
+    FB_extLeading	WBFixed 	; recommended external leading
+					;   line spacing = FB_height +
+					;		   FB_extLeading +
+					;		   FB_heightAdjust
+    FB_kernCount	word		; number of kerning pairs
+    FB_kernPairPtr	nptr.KernPair	; offset to kerning pair table
+    FB_kernValuePtr	nptr.BBFixed	; offset to kerning value table
+if DBCS_PCGEOS
+    FB_firstChar	Chars		; first char in section
+    FB_lastChar		Chars		; last char in section
+    FB_defaultChar	Chars		; default character
+else
+    FB_firstChar	byte		; first char defined
+    FB_lastChar		byte		; last char defined
+    FB_defaultChar	byte		; default character
+endif
+    FB_underPos		WBFixed		; underline position (from baseline)
+    FB_underThickness	WBFixed		; underline thickness
+    FB_strikePos	WBFixed		; position of the strike-thru
+    FB_aboveBox		WBFixed		; maximum above font box
+    FB_belowBox		WBFixed		; maximum below font box
+	; Bounds are signed integers, in device coords, and are
+	; measured from the upper left of the font box where
+	; character drawing starts from.
+    FB_minLSB		sword		; minimum left side bearing
+    FB_minTSB		sword		; minimum top side bound
+if not DBCS_PCGEOS
+    FB_maxBSB		sword		; maximum bottom side bound
+    FB_maxRSB		sword		; maximum right side bound
+endif
+    FB_pixHeight	word		; height of font (invalid for rotation)
+    FB_flags		FontBufFlags	; special flags
+    FB_heapCount	word		; usage counter for this font
+    FB_charTable	CharTableEntry <>
+FontBuf	ends
+
+;
+; This is the structure for each entry in FI_outlineTab, for searching
+; for the desired outline data and style.  Do not rearrange this, as
+; slightly hacked indexing is done through this by the kernel.
+;
+if DBCS_PCGEOS
+
+OutlineDataEntry struct
+    ODE_style		TextStyle		;style of face
+    ODE_weight		FontWeight		;font weight
+    ODE_extraData	word			;word of extra data, may be
+						;	handle of extra data
+						;	chunk
+OutlineDataEntry ends
+
+else
+OutlineEntry	struct
+    OE_offset	dword				;offset in file
+    OE_size	word				;size (in bytes)
+    OE_handle	hptr				;handle (if loaded)
+OutlineEntry	ends
+
+OutlineDataEntry struct
+    ODE_style		TextStyle		;style of face
+    ODE_weight		FontWeight		;font weight
+    ODE_header		OutlineEntry		;header
+    ODE_first		OutlineEntry		;first half
+    ODE_second		OutlineEntry		;second half
+OutlineDataEntry ends
+;
+; passed to GrLoadOutlineData to specify which part of outline data to load
+;
+
+OutlineDataFlag	etype	word, 0, size OutlineEntry
+ODF_HEADER	enum	OutlineDataFlag		;load outline header
+ODF_PART1	enum	OutlineDataFlag		;load first half
+ODF_PART2	enum	OutlineDataFlag		;load second half
+
+endif
+
+
+;------------------------------------------------------------------------------
+;	Font Info Structures
+;------------------------------------------------------------------------------
+
+;
+; A few variables in the font header
+;
+
+CheckHack <(size LMemBlockHeader AND 3) eq 0>	; these constants are the
+						;  actual lmem chunk handles
+						;  used, assuming the heap
+						;  begins immediately after
+						;  the regular header. Since
+						;  LMem aligns to dword
+						;  boundaries, this means the
+						;  size LMemBlockHeader must
+						;  be a multiple of 4 for this
+						;  to work...
+
+FONTS_AVAIL_HANDLE	=	(size LMemBlockHeader) + 0
+FONTS_IN_USE_HANDLE	=	(size LMemBlockHeader) + 2
+FONT_DRIVERS_HANDLE	=	(size LMemBlockHeader) + 4
+FONT_MOD_DATA_HANDLE	=	(size LMemBlockHeader) + 6
+;
+; NOTE: we reuse this because the two are not in use at the same time
+;
+FONT_FILE_CACHE_HANDLE	=	FONT_MOD_DATA_HANDLE
+
+;
+; This is the structure for each entry in FI_pointSizeTab, for searching
+; for a desired point size and style.
+;
+if DBCS_PCGEOS
+
+MAX_BITMAP_POINTSIZE	equ	128
+
+PointSizeEntry	struct
+    PSE_style		TextStyle		;style of face
+    PSE_pointSize	sbyte			;integer point size <128
+    PSE_charSet		FontCharSet		;characters in section
+    PSE_dataSize	word			;size of data
+    PSE_filePosLo	word			;position in file
+    PSE_filePosHi	word			;position in file
+PointSizeEntry	ends
+
+else
+
+PointSizeEntry	struct
+    PSE_style		TextStyle		;style of face
+    PSE_pointSize	WBFixed			;point size
+    PSE_dataSize	word			;size of data
+    PSE_filePosLo	word			;position in file
+    PSE_filePosHi	word			;position in file
+PointSizeEntry	ends
+
+endif
+
+;
+; The first chunk in the font header block will contain a list of what
+; fonts are available on disk.
+;
+
+FONT_FILE_LENGTH	=	FILE_LONGNAME_BUFFER_SIZE
+
+FontsAvailEntry	struct
+    FAE_fontID		FontID		;font ID
+if DBCS_PCGEOS
+    FAE_fileName	wchar FONT_FILE_LENGTH dup (?)
+else
+    FAE_fileName	char FONT_FILE_LENGTH dup (?)
+endif
+    FAE_infoHandle	lptr.FontInfo	;chunk handle of info
+FontsAvailEntry	ends
+
+;------------------------------------------------------------------------------
+;	FONT STRUCTURE (in memory)
+;------------------------------------------------------------------------------
+;
+; For each font file found, a chunk will be allocated to keep info about
+; the font, including which file handle is used for the font, its name, and
+; information about the different sizes.  The file handle is stored by the
+; init routine; the rest is read in from the font file.
+;
+
+if DBCS_PCGEOS
+
+FontInfo	struct
+    FI_fileHandle	word			;handle to the font file
+FI_RESIDENT	label	word
+    FI_fontID		FontID			;font ID
+    FI_maker		FontMaker		;font manufacturer ID
+    FI_family		FontAttrs		;font family, etc.
+    FI_faceName		wchar	FONT_NAME_LEN dup(?)	;typeface name
+    FI_pointSizeTab	nptr.PointSizeEntry	;start of table of point sizes
+    FI_pointSizeEnd	nptr			;end of bitmap faces
+    FI_outlineTab	nptr.OutlineEntry	;start of outline table
+    FI_outlineEnd	word			;end of outline faces
+    FI_firstChar	Chars			;first char included
+    FI_lastChar		Chars			;last char included
+FontInfo	ends
+
+else
+
+FontInfo	struct
+    FI_fileHandle	word			;handle to the font file
+FI_RESIDENT	label	word
+    FI_fontID		FontID			;font ID
+    FI_maker		FontMaker		;font manufacturer ID
+    FI_family		FontAttrs		;font family, etc.
+    FI_faceName		char	FONT_NAME_LEN dup(?)	;typeface name
+    FI_pointSizeTab	word		 	;start of table of point sizes
+    FI_pointSizeEnd	word			;end of bitmap faces
+    FI_outlineTab	word			;start of outline table
+    FI_outlineEnd	word			;end of outline faces
+FontInfo	ends
+
+endif
+
+;------------------------------------------------------------------------------
+;	constants and structures for FontDrAddFont & FontDrDeleteFont
+;------------------------------------------------------------------------------
+
+FontAddDeleteError	etype word, 0, 2
+FADE_TOO_MANY_FONTS		enum FontAddDeleteError
+; The system has the maximum number of fonts already installed.
+; (MAX_FONTS in font.def)
+FADE_FONT_ALREADY_EXISTS	enum FontAddDeleteError
+; A font with the same FontID value already exists in the system.
+FADE_FONT_IN_USE		enum FontAddDeleteError
+; The font in question is in use and cannot be deleted.  It may be the case
+; that the font in question *was* in use and the document it was in was closed,
+; but the font is still being reference some how so it cannot be used.
+FADE_NO_SUCH_FONT		enum FontAddDeleteError
+; The font in question cannot be deleted because it does not exist.
+FADE_DEFAULT_FONT		enum FontAddDeleteError
+; Tried to delete the default font
+
+
+;--------------------------------------------------------------------------
+;	Structure used for common font attributes
+;		These are the attributes that constitute a different 'font'
+;		in the system, in addition to changes in the GState and
+;		Window transformations.
+;
+;--------------------------------------------------------------------------
+
+FontCommonAttrs	struct
+    FCA_fontID		FontID			; font ID
+    FCA_pointsize	WBFixed			; pointsize
+    FCA_weight		FontWeight		FW_NORMAL
+    FCA_width		FontWidth		FWI_MEDIUM
+    FCA_superPos	SuperscriptPosition	SPP_DEFAULT
+    FCA_superSize	SuperscriptSize		SPS_DEFAULT
+    FCA_subPos		SubscriptPosition	SBP_DEFAULT
+    FCA_subSize		SubscriptSize		SBS_DEFAULT
+if DBCS_PCGEOS
+    FCA_charSet		FontCharSet
+endif
+    FCA_textStyle	TextStyle		; text style
+FontCommonAttrs	ends
+
+EndKernel
+
+;---
+
+StartDriver	font
+
+;
+; Protocol number for this interface. Adjust the final numbers, below, if the
+; interface is changed.
+;
+FONT_PROTO_MAJOR equ DRIVER_PROTO_MAJOR+1
+FONT_PROTO_MINOR equ DRIVER_PROTO_MINOR+0
+
+;------------------------------------------------------------------------------
+;	Font Driver functions
+;------------------------------------------------------------------------------
+
+FontFunction 		etype word, DriverFunction, 2
+
+DR_FONT_GEN_CHAR 	enum FontFunction
+;
+; Called to generate a bitmap or region for one character of a font at a
+; particular device resolution.
+;
+;CALLED BY:	Video Drivers
+;PASS:		dx - character to build (Chars)
+;		es - seg addr of FontBuf (locked)
+;		bp - seg addr of GState (locked)
+;			GS_fontHandle - handle of font
+;			GS_fontAttr - font attributes
+;		ds - seg addr of font info block
+;
+;RETURN:	es - seg addr of FontBuf (locked) (may have changed)
+;		carry - clear
+;
+
+DR_FONT_GEN_WIDTHS 	enum FontFunction
+;
+; Called to generate the header and width information for a font.
+;
+;CALLED BY:	Font Manager
+;PASS:		bx - 0 for new font; handle to rebuild old font (P'd)
+;		es - seg addr of GState (locked)
+;			GS_fontAttr - font attributes
+;		bp:cx - transformation matrix (TMatrix)
+;		ds - seg addr of font info block
+;RETURN:	bx - handle of FontBuf (locked)
+;		ax - seg addr of FontBuf (locked)
+;		carry - clear
+;
+
+DR_FONT_CHAR_METRICS	enum FontFunction
+;
+; Called to find the metrics for a single character
+;
+;CALLED BY:	GrCharMetrics()
+;PASS:		ds - seg addr of font info block
+;		es - seg addr of GState
+;			es:GS_fontAttr - font attributes
+;		dx - character to get metrics of (Chars)
+;		cx - info to return (GCM_info)
+;RETURN:	if GCMI_ROUNDED set:
+;			dx - information (rounded)
+;		else:
+;			dx.ah - information (WBFixed)
+;		carry - set if error (eg. data / font not available)
+;
+
+DR_FONT_INIT_FONTS	enum FontFunction
+;
+; Called to intialize non-PC/GEOS fonts for the driver
+;
+;CALLED BY:	Font Manager
+;PASS:		ds - seg addr of font info block
+;RETURN:	carry - set if error
+;
+
+DR_FONT_GEN_PATH	enum FontFunction
+;
+; Called to generate outline path description for a single character
+; The path is drawn relative to the current pen position.
+;
+;CALLED BY:	external
+;PASS:		ds - seg addr of font info block
+;		bx - handle of GState
+;		dx - character to generate (Chars)
+;		cl - FontGenPathFlags
+;			FGPF_POSTSCRIPT - transform for use as Postscript
+;						Type 1 or Type 3 font.
+;			FGPF_SAVE_STATE - do save/restore for GState
+;RETURN:	none
+;
+
+DR_FONT_GEN_IN_REGION	enum FontFunction
+;
+; Called to generate a region for a character in the passed RegionPath
+;
+;CALLED BY:	external
+;PASS:		ds - seg addr of font info block
+;		bx - handle of GState (locked)
+;		dx - character to generate (Chars)
+;		cx - RegionPath handle (locked)
+;
+;RETURN:	none
+;
+
+FontGenPathFlags	record
+    :6
+    FGPF_SAVE_STATE:1			;TRUE: do save/restore for GState
+    FGPF_POSTSCRIPT:1			;TRUE: transform for (0,0) at lower left
+FontGenPathFlags	end
+
+FontDriverInfoStruct struct
+    FDIS_common	DriverInfoStruct <>
+    FDIS_maker	FontMaker
+FontDriverInfoStruct ends
+
+;---------------------------------------------------------------------------
+;		font driver standard escapes
+;---------------------------------------------------------------------------
+
+	; codes from 0x8000-0x80ff are standard escape codes common
+	; to all drivers (see geode.def)
+
+	;     standard font escapes range from 0x8100 to 0xbfff
+	; user-defined font escapes range from 0xc000 to 0xffff
+
+FontEscCode 		etype word, 8100h, 1
+
+	;
+	; attributes capabilities	(0x8100 to 0x81ff)
+	;
+
+	;
+	; add/delete functions		(0x8200 to 0x82ff)
+	;
+FONT_ESC_ADD_FONT		enum FontEscCode, 0x8200
+FONT_ESC_DELETE_FONT		enum FontEscCode
+
+EndDriver	font

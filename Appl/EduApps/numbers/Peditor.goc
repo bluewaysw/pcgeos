@@ -1,0 +1,667 @@
+@include <stdapp.goh>
+#include <gstring.h>    /* needed for gstring moniker manipulations */
+#include <graphics.h>
+#include <ansi/string.h>
+@include "numbers.goh"
+
+word            fg_VMEcurrentPage = 0;
+
+@classdecl VMEEditorClass;
+@classdecl TextEnableClass;
+@classdecl TextModifiedClass;
+
+/* EditorResource */
+@extern object @VMETitleAndPageGroup;
+@extern object @VMEPage;
+@extern object @VMEPageCount;
+@extern object @VMEInputGroup;
+@extern object @VMEAddTrigger;
+@extern object @VMEDeleteTrigger;
+@extern object @VMEText1;
+@extern object @VMEText2;
+@extern object @VMEText3;
+@extern object @VMEText4;
+@extern object @VMEText5;
+@extern object @VMEText6;
+@extern object @VMEText7;
+@extern object @VMEDef1;
+@extern object @VMEDef2;
+@extern object @VMEDef3;
+@extern object @VMEDef4;
+@extern object @VMEDef5;
+@extern object @VMEDef6;
+@extern object @VMEDef7;
+@extern object @UserMsgBox;
+@extern object @TheMsg;
+@extern visMoniker @Moniker1;
+@extern visMoniker @Moniker2;
+@extern visMoniker @Moniker3;
+
+/* EditorCustomDialogResource */
+@extern chunk @CEFPromptText;
+@extern visMoniker @CEFSaveMoniker;
+@extern visMoniker CEFDiscardMoniker;
+@extern chunk @CNFPromptText;
+@extern visMoniker CNFSaveMoniker;
+@extern visMoniker CNFDiscardMoniker;
+@extern chunk @OWEFPromptText;
+@extern chunk @SFErrorText;
+@extern chunk @DFPromptText;
+@extern chunk @CFErrorText;
+@extern chunk @CFOErrorText;
+@extern chunk @CFSErrorText;
+
+/***********************************************************************
+ *      SetPageCount
+ ***********************************************************************
+ * SYNOPSIS:        Update the page count display.
+ *
+ * PARAMETERS:      word nCount
+ *
+ * SIDE EFFECTS:    Sets the maximum value for the page value.
+ *
+ ***********************************************************************/
+void SetPageCount(word nCount)
+{
+    char numString[11];
+
+    /* Set the page count text field. */
+    UtilHex32ToAscii(numString, (sdword) nCount, UHTAF_NULL_TERMINATE);
+    @call VMEPageCount::MSG_VIS_TEXT_REPLACE_ALL_PTR(numString, 0);
+
+    /* Set the maximum on the page selector. */
+    @send VMEPage::MSG_GEN_VALUE_SET_MAXIMUM(MakeWWFixed(nCount));
+}
+
+/***********************************************************************
+ *      MSG_VME_VALUE_APPLY for NumbersProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        called by page value
+ * PARAMETERS:      WWFixedAsDWord value,
+ *                  GenValueStateAsWord stateFlags
+ *
+ * SIDE EFFECTS:    get the GenValue value and send this to the load
+ *      page message.
+ *
+ * STRATEGY:    
+ *
+ * REVISION HISTORY:
+ *  Name    Date        Description
+ *  ----    ----        -----------
+ *
+ ***********************************************************************/
+@extern method NumbersProcessClass, MSG_VME_VALUE_APPLY
+{
+    /* Try saving the current page first. */
+    @call self::MSG_VME_SAVE_PAGE();
+    
+    /* Then load the new page. */
+	@send process::MSG_VME_LOAD_PAGE(value);
+}
+
+/***********************************************************************
+ *      MSG_VME_LOAD_PAGE for NumbersProcessClass
+ ***********************************************************************
+ * SYNOPSIS:    loads a page of words, called by GEN_OPEN_APPLICATION
+ *              and by MSG_VME_VALUE_APPLY
+ *
+ * PARAMETERS:  WWFixedAsDWord pagevalue
+ *
+ * SIDE EFFECTS:    What this should be doing, is to get the page of
+ *      data that corresponds to the GenValue setting.  It will have to
+ *      traverse the LL until the right page is found.
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *  Name    Date        Description
+ *  ----    ----        -----------
+ *
+ ***********************************************************************/
+@extern @method NumbersProcessClass, MSG_VME_LOAD_PAGE 
+{        
+	int                     i, intvalue, counter, three=3;
+	DBGroup                 ourgroup;
+	PageStruct              *ps;
+	ListNode                *tmp;
+	DBItem                  pageitem, tempitem;
+
+	intvalue = IntegerOf(pagevalue);
+	if (intvalue < 1){
+		return;  /* if trying to load page 0, quit, bogus number */
+	}
+	ps = (PageStruct *) DBLockMap(g_dbFileHan);
+	ourgroup = ps->VME_group;
+	pageitem = ps->VME_head;
+	counter = ps->VME_size;
+	DBUnlock(ps);
+	if(pageitem == 0){
+		tempitem = DBAlloc(g_dbFileHan, ourgroup, sizeof(ListNode));
+		tmp = DBLock(g_dbFileHan, ourgroup, tempitem);
+		tmp->LN_next = NULL;
+		DBDirty(tmp);
+		DBUnlock(tmp);
+		ps = (PageStruct *) DBLockMap(g_dbFileHan);
+		ps->VME_head = tempitem;
+		ps->VME_size = 1;
+		counter++;
+		pageitem = tempitem; /*need this for later in the method */
+		DBDirty(ps);
+		DBUnlock(ps);
+		tmp = DBLock(g_dbFileHan, ourgroup, pageitem);
+		tmp->word1[0] = '\0';
+		tmp->def1[0] = '\0';
+		tmp->word2[0] = '\0';
+		tmp->def2[0] = '\0';
+		tmp->word3[0] = '\0';
+		tmp->def3[0] = '\0';
+		tmp->word4[0] = '\0';
+		tmp->def4[0] = '\0';
+		tmp->word5[0] = '\0';
+		tmp->def5[0] = '\0';
+		tmp->word6[0] = '\0';
+		tmp->def6[0] = '\0';
+		tmp->word7[0] = '\0';
+		tmp->def7[0] = '\0';
+		DBDirty(tmp);
+		DBUnlock(tmp);
+		SetPageCount(counter);
+	}
+	else {
+		if (intvalue > counter){
+		      @send process::MSG_VME_SEND_A_MESSAGE(three);
+			return; /*trying to load a page beyond what is there */
+		}
+		for (i=1; i < intvalue; i++) { /* testing - i cannot be zero, especially
+the first time around, this has to fail immediately on app startup */
+			tmp = DBLock(g_dbFileHan, ourgroup, pageitem);
+			pageitem = tmp->LN_next;
+			DBUnlock(tmp);
+		}
+	}
+	/* either way, we got the right chunk, now re-lock the pageitem */
+	tmp = DBLock(g_dbFileHan, ourgroup, pageitem);
+	@call VMEText1::MSG_VIS_TEXT_REPLACE_ALL_PTR( tmp->word1, 0);
+	@call VMEText1::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+	@call VMEDef1::MSG_VIS_TEXT_REPLACE_ALL_PTR( tmp->def1, 0);
+	@call VMEDef1::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+	@call VMEText2::MSG_VIS_TEXT_REPLACE_ALL_PTR( tmp->word2, 0);
+	@call VMEText2::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+	@call VMEDef2::MSG_VIS_TEXT_REPLACE_ALL_PTR( tmp->def2, 0);
+	@call VMEDef2::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+	@call VMEText3::MSG_VIS_TEXT_REPLACE_ALL_PTR( tmp->word3, 0);
+	@call VMEText3::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+	@call VMEDef3::MSG_VIS_TEXT_REPLACE_ALL_PTR( tmp->def3, 0);
+	@call VMEDef3::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+	@call VMEText4::MSG_VIS_TEXT_REPLACE_ALL_PTR( tmp->word4, 0);
+	@call VMEText4::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+	@call VMEDef4::MSG_VIS_TEXT_REPLACE_ALL_PTR( tmp->def4, 0);
+	@call VMEDef4::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+	@call VMEText5::MSG_VIS_TEXT_REPLACE_ALL_PTR( tmp->word5, 0);
+	@call VMEText5::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+	@call VMEDef5::MSG_VIS_TEXT_REPLACE_ALL_PTR( tmp->def5, 0);
+	@call VMEDef5::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+	@call VMEText6::MSG_VIS_TEXT_REPLACE_ALL_PTR( tmp->word6, 0);
+	@call VMEText6::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+	@call VMEDef6::MSG_VIS_TEXT_REPLACE_ALL_PTR( tmp->def6, 0);
+	@call VMEDef6::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+	@call VMEText7::MSG_VIS_TEXT_REPLACE_ALL_PTR( tmp->word7, 0);
+	@call VMEText7::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+	@call VMEDef7::MSG_VIS_TEXT_REPLACE_ALL_PTR( tmp->def7, 0);
+	@call VMEDef7::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+	DBUnlock(tmp);
+	
+	fg_VMEcurrentPage = intvalue;
+} 
+
+/***********************************************************************
+ *      MSG_VME_ADD_PAGE for NumbersProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        called by a GenTrigger
+ * PARAMETERS:      
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:    
+ *
+ * REVISION HISTORY:
+ *  Name    Date        Description
+ *  ----    ----        -----------
+ *
+ ***********************************************************************/
+@extern @method NumbersProcessClass, MSG_VME_ADD_PAGE {
+
+	int                     counter;
+	DBGroup                 ourgroup;
+	DBItem                  pageitem, lastitem, tempitem;
+	PageStruct              *ps;
+	ListNode                *tmp, *newtmp;
+
+	ps = (PageStruct *) DBLockMap(g_dbFileHan);
+	ourgroup = ps->VME_group;
+	pageitem = ps->VME_head;
+	counter = ps->VME_size;
+	DBUnlock(ps);
+	
+	/* Make sure we don't exceed the page count limit. */
+	if (counter == MAX_PAGES)
+	{
+        @send process::MSG_VME_SEND_A_MESSAGE(1);
+	    return;
+	}
+	
+    /* Try saving the current page. */
+    @call self::MSG_VME_SAVE_PAGE();
+
+	if(pageitem == 0){ /* this is highly unlikely to happen */
+		tempitem = DBAlloc(g_dbFileHan, ourgroup, sizeof(ListNode));
+		tmp = DBLock(g_dbFileHan, ourgroup, tempitem);
+		tmp->LN_next = NULL;
+		DBDirty(tmp);
+		DBUnlock(tmp);
+		ps = (PageStruct *) DBLockMap(g_dbFileHan);
+		ps->VME_head = tempitem;
+		ps->VME_size = 1;
+		pageitem = tempitem; /*need this for later in the method */
+		DBDirty(ps);
+		DBUnlock(ps);
+	}
+	else {
+	    while (pageitem != 0)
+	    {
+    	    lastitem = pageitem;
+			tmp = DBLock(g_dbFileHan, ourgroup, pageitem);
+			pageitem = tmp->LN_next;
+			DBUnlock(tmp);
+		}
+		/* create a new page structure */
+		tempitem = DBAlloc(g_dbFileHan, ourgroup, sizeof(ListNode));
+		tmp = DBLock(g_dbFileHan, ourgroup, lastitem);
+		tmp->LN_next = tempitem;
+		DBDirty(tmp);
+		DBUnlock(tmp);
+		newtmp = DBLock(g_dbFileHan, ourgroup, tempitem);
+		newtmp->LN_next = 0;
+		DBDirty(newtmp);
+		DBUnlock(newtmp);
+		pageitem = tempitem; /*let's standardize on pageitem */
+	}
+	tmp = DBLock(g_dbFileHan, ourgroup, pageitem);
+	tmp->word1[0] = '\0';
+	tmp->def1[0] = '\0';
+	tmp->word2[0] = '\0';
+	tmp->def2[0] = '\0';
+	tmp->word3[0] = '\0';
+	tmp->def3[0] = '\0';
+	tmp->word4[0] = '\0';
+	tmp->def4[0] = '\0';
+	tmp->word5[0] = '\0';
+	tmp->def5[0] = '\0';
+	tmp->word6[0] = '\0';
+	tmp->def6[0] = '\0';
+	tmp->word7[0] = '\0';
+	tmp->def7[0] = '\0';
+	DBDirty(tmp);  /* do this now, just in case */
+	DBUnlock(tmp);
+
+	ps = (PageStruct *) DBLockMap(g_dbFileHan);
+	counter = ps->VME_size;
+	counter++;
+	ps->VME_size = counter;
+	DBDirty(ps);
+	DBUnlock(ps);
+    SetPageCount(counter);
+
+	@call VMEPage::MSG_GEN_VALUE_SET_INTEGER_VALUE(counter, 0);
+	 @call self::MSG_VME_LOAD_PAGE(MakeWWFixed(counter));
+
+    /* Grant focus to the first text field. */
+    @call VMEText1::MSG_META_GRAB_FOCUS_EXCL();
+
+}
+
+/***********************************************************************
+ *      MSG_VME_DELETE_PAGE for NumbersProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        this will delete a page (item)
+ * PARAMETERS:      
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:    This will use the pagevalue value to find the page to
+ *                      delete
+ *
+ * REVISION HISTORY:
+ *  Name    Date        Description
+ *  ----    ----        -----------
+ *
+ ***********************************************************************/
+@extern @method NumbersProcessClass, MSG_VME_DELETE_PAGE 
+{
+	PageStruct              *ps;
+	ListNode                *tmp, *beforetmp, *savetmp;
+	DBItem                  pageitem, previtem, saveitem;
+	DBGroup                 ourgroup;
+	WWFixedAsDWord          pagevalue;
+	int                     i, intvalue, counter, two=2, three=3;
+
+	pagevalue = @call VMEPage::MSG_GEN_VALUE_GET_VALUE();
+	intvalue = IntegerOf(pagevalue);
+	if (intvalue <= 1){
+		@call process::MSG_VME_SEND_A_MESSAGE(two);
+		return; /*cannot change page one, it is an anchor */
+	}
+	
+	ps = (PageStruct *) DBLockMap(g_dbFileHan);
+	ourgroup = ps->VME_group;
+	pageitem = ps->VME_head;
+	counter = ps->VME_size;
+	DBUnlock(ps);
+	/* secondary check to see that we are not out of bounds */
+	if(pageitem == 0){
+		return;  /*if no pages, get out of here, its pointless */
+	}
+	if (intvalue > counter){
+	      @call process::MSG_VME_SEND_A_MESSAGE(three);
+		return; /*trying to delete a page beyond what is there */
+	}
+
+	for (i=1; i < intvalue; i++) { /* i cannot be zero ?  */
+		previtem = pageitem;
+		tmp = DBLock(g_dbFileHan, ourgroup, pageitem);
+		pageitem = tmp->LN_next;
+		DBUnlock(tmp);
+	}
+	savetmp = DBLock(g_dbFileHan, ourgroup, pageitem);
+	saveitem = savetmp->LN_next;
+	DBUnlock(savetmp);
+
+	/* now we lock the previous pageitem and change the link */
+	beforetmp = DBLock(g_dbFileHan, ourgroup, previtem);
+	beforetmp->LN_next = saveitem;
+	DBDirty(beforetmp);
+	DBUnlock(beforetmp);
+
+	/* decrement the pages */
+	ps = (PageStruct *) DBLockMap(g_dbFileHan);
+	counter = ps->VME_size;
+	counter--;
+	ps->VME_size = counter;
+	if(counter == 0){
+		ps->VME_head = 0;  /* this will be a warning got 0 pages */
+	}
+	DBDirty(ps);
+	DBUnlock(ps);
+	SetPageCount(counter);
+
+    /* The page value has adjusted itself properly, so update the display. */
+    pagevalue = @call VMEPage::MSG_GEN_VALUE_GET_VALUE();
+    @call self::MSG_VME_LOAD_PAGE(pagevalue);
+
+	/* Now linked list is patched up, we merely need to delete item */
+	DBFree(g_dbFileHan, ourgroup, pageitem);
+
+}
+
+/***********************************************************************
+ *      MSG_VME_SAVE_PAGE for NumbersProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Called by routines before modifying the page linked
+ *                  list or before saving or closing the current file.
+ *
+ * PARAMETERS:      none
+ *
+ * SIDE EFFECTS:    Resets the modified states of the text fields.
+ *
+ * STRATEGY:        If any modifications have been made, save them and 
+ *                  dirty the DB.
+ *
+ * REVISION HISTORY:
+ *  Name    Date        Description
+ *  ----    ----        -----------
+ *
+ ***********************************************************************/
+@extern @method NumbersProcessClass, MSG_VME_SAVE_PAGE
+{
+	int                     i, intvalue, counter, three=3;
+	DBItem                  pageitem;
+	DBGroup                 ourgroup;
+	PageStruct              *ps;
+	ListNode                *tmp;
+
+	intvalue = fg_VMEcurrentPage;
+	
+	if (intvalue < 1){  /*bogus page being passed, exit */
+		return;
+	}
+
+    /* Check if any modifications have been made to the texts. */
+    if (!@call VMEText1::MSG_GEN_TEXT_IS_MODIFIED()
+      && !@call VMEText2::MSG_GEN_TEXT_IS_MODIFIED()
+      && !@call VMEText3::MSG_GEN_TEXT_IS_MODIFIED()
+      && !@call VMEText4::MSG_GEN_TEXT_IS_MODIFIED()
+      && !@call VMEText5::MSG_GEN_TEXT_IS_MODIFIED()
+      && !@call VMEText6::MSG_GEN_TEXT_IS_MODIFIED()
+      && !@call VMEText7::MSG_GEN_TEXT_IS_MODIFIED()
+      && !@call VMEDef1::MSG_GEN_TEXT_IS_MODIFIED()
+      && !@call VMEDef2::MSG_GEN_TEXT_IS_MODIFIED()
+      && !@call VMEDef3::MSG_GEN_TEXT_IS_MODIFIED()
+      && !@call VMEDef4::MSG_GEN_TEXT_IS_MODIFIED()
+      && !@call VMEDef5::MSG_GEN_TEXT_IS_MODIFIED()
+      && !@call VMEDef6::MSG_GEN_TEXT_IS_MODIFIED()
+      && !@call VMEDef7::MSG_GEN_TEXT_IS_MODIFIED())
+        /* Exit now if no changes. */
+        return;
+    
+	ps = (PageStruct *) DBLockMap(g_dbFileHan);
+	ourgroup = ps->VME_group;
+	pageitem = ps->VME_head;
+	counter = ps->VME_size;
+	DBUnlock(ps);
+	if (intvalue > counter){
+	      @send process::MSG_VME_SEND_A_MESSAGE(three);
+		return; /*trying to load a save beyond what is there */
+	}
+	for (i=1; i < intvalue; i++) {  /* i cannot be zero ?  */
+		tmp = DBLock(g_dbFileHan, ourgroup, pageitem);
+		pageitem = tmp->LN_next;
+		DBUnlock(tmp);
+	}
+	tmp = DBLock(g_dbFileHan, ourgroup, pageitem);
+	@call VMEText1::MSG_VIS_TEXT_GET_ALL_PTR(tmp->word1);
+	@call VMEText1::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+	@call VMEDef1::MSG_VIS_TEXT_GET_ALL_PTR(tmp->def1);
+	@call VMEDef1::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+	@call VMEText2::MSG_VIS_TEXT_GET_ALL_PTR(tmp->word2);
+	@call VMEText2::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+	@call VMEDef2::MSG_VIS_TEXT_GET_ALL_PTR(tmp->def2);
+	@call VMEDef2::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+	@call VMEText3::MSG_VIS_TEXT_GET_ALL_PTR(tmp->word3);
+	@call VMEText3::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+	@call VMEDef3::MSG_VIS_TEXT_GET_ALL_PTR(tmp->def3);
+	@call VMEDef3::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+	@call VMEText4::MSG_VIS_TEXT_GET_ALL_PTR(tmp->word4);
+	@call VMEText4::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+	@call VMEDef4::MSG_VIS_TEXT_GET_ALL_PTR(tmp->def4);
+	@call VMEDef4::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+	@call VMEText5::MSG_VIS_TEXT_GET_ALL_PTR(tmp->word5);
+	@call VMEText5::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+	@call VMEDef5::MSG_VIS_TEXT_GET_ALL_PTR(tmp->def5);
+	@call VMEDef5::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+	@call VMEText6::MSG_VIS_TEXT_GET_ALL_PTR(tmp->word6);
+	@call VMEText6::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+	@call VMEDef6::MSG_VIS_TEXT_GET_ALL_PTR(tmp->def6);
+	@call VMEDef6::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+	@call VMEText7::MSG_VIS_TEXT_GET_ALL_PTR(tmp->word7);
+	@call VMEText7::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+	@call VMEDef7::MSG_VIS_TEXT_GET_ALL_PTR(tmp->def7);
+	@call VMEDef7::MSG_GEN_TEXT_SET_MODIFIED_STATE(FALSE);
+
+  	DBDirty(tmp);
+	DBUnlock(tmp);
+}
+
+/***********************************************************************
+ *      MSG_VME_TEXT_STATUS for NumbersProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        Called by various text objects in the editor dialog
+ *                  which, when modified, should enable the "Save"
+ *                  trigger.
+ *
+ * PARAMETERS:      word stateFlags
+ *
+ * STRATEGY:        If the object state is modified, enable the trigger.
+ *
+ * REVISION HISTORY:
+ *  Name    Date        Description
+ *  ----    ----        -----------
+ *
+ ***********************************************************************/
+@extern method NumbersProcessClass, MSG_VME_TEXT_STATUS
+{
+/*    if (stateFlags & GTSF_MODIFIED)
+    {
+	   @send VMESaveTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    } */
+}    
+
+@method TextModifiedClass, MSG_META_TEXT_USER_MODIFIED
+{
+    @call self::MSG_GEN_TEXT_SEND_STATUS_MSG(TRUE);
+    @callsuper();
+}
+
+
+/***********************************************************************
+ *      VMELoadFileCommon
+ ***********************************************************************
+ * SYNOPSIS:    Common code to setup editor.
+ *
+ * PARAMETERS:  none
+ *
+ * STRATEGY:    Initialize the editor.
+ *              Load the first page.
+ *
+ ***********************************************************************/
+void VMELoadFileCommon(void)
+{
+PageStruct *ps;
+
+
+	/* Set the page count. */
+	ps = (PageStruct *) DBLockMap(g_dbFileHan);
+	SetPageCount(ps->VME_size);
+	DBUnlock(ps);
+
+    /* Enable the objects. */
+    @call VMEAddTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    @call VMEDeleteTrigger::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    @call VMETitleAndPageGroup::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    @call VMEInputGroup::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    
+    /* Grant focus to the first text field. */
+    @call VMEText1::MSG_META_GRAB_FOCUS_EXCL();
+    
+	/* Load the first page. */
+	fg_VMEcurrentPage = 0;
+	@call process::MSG_VME_LOAD_PAGE(MakeWWFixed(1));
+
+	@call VMEPage::MSG_GEN_VALUE_SET_INTEGER_VALUE(1, 0);
+
+}
+
+/***********************************************************************
+ *      MSG_VME_SEND_A_MESSAGE for NumbersProcessClass
+ ***********************************************************************
+ * SYNOPSIS:        get ready to send the user 1 of 3 possible messages 
+ * PARAMETERS:      int msgflag
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:    One of three things has just happend:
+ *                      1.  User has tried to add a page beyond the max allowed
+ *                      2.  User is trying to create a new #1 page (block)
+ *                      3.  User is trying to drop below the min of 5 pages
+ *      We will send an appropriate message based on what scenario is given
+ *
+ * REVISION HISTORY:
+ *  Name    Date        Description
+ *  ----    ----        -----------
+ *
+ ***********************************************************************/
+@extern @method NumbersProcessClass,   MSG_VME_SEND_A_MESSAGE  
+{
+	ChunkHandle newGlyphMoniker;
+
+	if(msgflag < 2){
+		newGlyphMoniker = ChunkOf(&Moniker1);
+		@call TheMsg::MSG_GEN_USE_VIS_MONIKER(newGlyphMoniker,
+					 VUM_DELAYED_VIA_APP_QUEUE);
+		@send UserMsgBox::MSG_GEN_INTERACTION_INITIATE();
+	}
+	else if(msgflag > 2){
+		newGlyphMoniker = ChunkOf(&Moniker3);
+		@call TheMsg::MSG_GEN_USE_VIS_MONIKER(newGlyphMoniker,
+					 VUM_DELAYED_VIA_APP_QUEUE);
+		@send UserMsgBox::MSG_GEN_INTERACTION_INITIATE();               
+	}
+	else {
+		newGlyphMoniker = ChunkOf(&Moniker2);
+		@call TheMsg::MSG_GEN_USE_VIS_MONIKER(newGlyphMoniker,
+					 VUM_DELAYED_VIA_APP_QUEUE);
+		@send UserMsgBox::MSG_GEN_INTERACTION_INITIATE();       
+	}
+}
+
+/***********************************************************************
+ *      MSG_GEN_GUP_INTERACTION_COMMAND for VMEEditorClass
+ ***********************************************************************
+ * SYNOPSIS:    Intercept message to close editor cleanly.
+ *
+ * PARAMETERS:  InteractionCommand command
+ *
+ * RETURNS:     TRUE if handled (stops upward query)
+ *
+ ***********************************************************************/
+@method VMEEditorClass, MSG_GEN_GUP_INTERACTION_COMMAND
+{
+word retval;
+optr content;
+    
+    if (command == IC_DISMISS)
+	  @send process::MSG_VME_SAVE_PAGE();
+
+	 ShufflePages();
+	 g_pageNumber = 0;
+	 @send process::MSG_PROCESS_GET_DB_INFO(TRUE);
+	 content = @call NumbersView::MSG_GEN_VIEW_GET_CONTENT();
+	 @send content::MSG_VIS_CONTENT_NEW_PAGE(FALSE); /*display this new record*/
+
+	 retval = @callsuper();
+    
+    return retval;
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_KBD_CHAR for TextEnableClass
+ *
+ *
+ *
+ ***********************************************************************/
+
+@method TextEnableClass, MSG_META_KBD_CHAR
+{
+ word		length;
+
+
+    @callsuper();
+
+    /* is there text? */
+    length = @call self::MSG_VIS_TEXT_GET_TEXT_SIZE();
+    if (length == 0) @send pself->TE_button::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+    else  @send pself->TE_button::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+}
+
+

@@ -1,0 +1,292 @@
+COMMENT @---------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1991 -- All rights reserved
+
+PROJECT:	
+MODULE:	
+FILE:		gameObjects.def
+
+AUTHOR:		Chris Boyke
+
+ROUTINES:
+	Name			Description
+	----			-----------
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+
+
+DESCRIPTION:	describe the objects and data for Amateur Night
+
+	$Id: amateurObjects.def,v 1.1 97/04/04 15:12:13 newdeal Exp $
+------------------------------------------------------------------------------@
+
+
+
+;------------------------------------------------------------------------------
+;			Class Definitions
+;------------------------------------------------------------------------------
+
+AmateurProcessClass	class	GenProcessClass
+
+MSG_SHOW_HIGH_SCORES	message
+
+AmateurProcessClass	endc
+
+
+
+;----------------------------------------------------------------------
+;	Class definition of Content Class
+;----------------------------------------------------------------------
+
+AmateurContentClass	class	VisContentClass
+	
+	
+MSG_TIMER_TICK 	message
+
+MSG_CONTENT_INITIALIZE  message
+
+MSG_CONTENT_START_GAME	message
+
+MSG_CONTENT_PAUSE_GAME	message
+
+MSG_CONTENT_CONTINUE_GAME	message
+
+MSG_CONTENT_ABORT_GAME	message
+
+MSG_CONTENT_GAME_OVER	message
+
+MSG_CONTENT_SET_START_ACT	message
+MSG_CONTENT_CANCEL_SET_START_ACT	message
+
+MSG_CONTENT_SET_SOUND	message
+
+MSG_CONTENT_START_ACT	message
+; Start the next act
+
+MSG_CONTENT_TEMP_PAUSE	message
+MSG_CONTENT_END_TEMP_PAUSE	message
+
+
+MSG_CONTENT_SET_JOKES	message
+; Turn JOKES on/off
+; PASS:	bp - LES_ACTUAL_EXCL if jokes are ON
+
+
+	ACI_status	AmateurGameStatus
+	ACI_timerHandle	hptr
+	ACI_timerID	word
+	ACI_actInfo	ActInfo
+
+	ACI_colorInfo	ColorInfo
+	ACI_clownsLeft	byte
+	ACI_array	word
+	ACI_callOnEnd	word
+
+	ACI_callOnNotEnd word
+	ACI_act	word
+	ACI_startAct	word
+	ACI_score	dword
+
+	ACI_scoreLastAct dword
+	ACI_display	DisplayFlags
+	ACI_sound	AmateurSoundType
+	ACI_screenPeanuts word
+
+	ACI_screenTomatoes word
+	ACI_mouse	Point
+	ACI_jokeHandle	hptr
+	ACI_bufferSize	word
+
+	ACI_jokeCount	word
+	ACI_gameAttrs	AmateurContentAttrs
+	ACI_blasterHeight	word
+
+	; pellet info
+	ACI_pellets	HandleStruct	MAX_PELLETS	dup (?)  
+	
+	; peanut info
+	ACI_peanuts	HandleStruct	MAX_PEANUTS 	dup (?)
+
+	; Smart peanuts
+	ACI_Tomatoes HandleStruct MAX_TOMATOES dup (?)
+
+	; Cloud info
+	ACI_clouds	HandleStruct	MAX_CLOUDS 	dup (?)
+
+
+
+AmateurContentClass	endc
+
+BitmapClass	class	VisClass
+
+MSG_BITMAP_DRAW_NORMAL	message
+MSG_BITMAP_DRAW_ALT		message
+MSG_BITMAP_CHECK_CLOUD	message
+MSG_BITMAP_DRAW_IF_NEEDED	message
+
+MSG_BITMAP_CHECK_PEANUT		message
+; 	See if the peanut/tomato hit this bitmap.
+;	Clowns will return carry if they're hit.  Blasters will never
+;	return carry, but will invalidate themselves if they need to
+;	be redrawn.
+;
+;	PASS:	cx, dx, - position of peanut
+; 	RETURN: carry set if (clown) hit.
+;	DESTROYED: nothing
+
+;-----------------------------------------------------------------------------
+;		
+;-----------------------------------------------------------------------------
+ 
+	BI_moniker	lptr
+	BI_altMoniker	lptr
+	BI_state	BitmapState
+
+BitmapClass	endc
+
+BlasterClass	class	BitmapClass
+
+MSG_BLASTER_DRAW_ALT_NEXT_TIME	message
+
+BlasterClass	endc
+
+
+
+ClownClass	class	BitmapClass
+
+MSG_CLOWN_SET_STATUS		message
+; PASS:	cl - status
+; 	RETURN: nothing
+;	DESTROYED: nothing
+
+MSG_CLOWN_GET_STATUS		message
+; 	PASS:	nothing 
+; 	RETURN: cl - status
+;	DESTROYED: nothing
+
+MSG_CLOWN_CHECK_HIT		message
+; 	See if the clown was hit by this peanut
+;	PASS:	cx, dx, - position of peanut
+; 	RETURN: carry set iff hit
+;	DESTROYED: nothing
+
+MSG_CLOWN_TALLY_SCORE		message
+;	PASS:	ss:bp - ClownScoreParams
+; 	RETURN: nothing
+;	DESTROYED: nothing
+
+MSG_CLOWN_SET_MONIKER		message
+;	PASS: - cx - moniker number
+; 	RETURN: nothing
+;	DESTROYED: dx,bp
+
+
+	CI_status	ClownStatus
+	CI_aliveMoniker	lptr
+	CI_deadMoniker	lptr
+
+ClownClass	endc
+
+
+;----------------------------------------------------------------------
+;	Movable objects (superclass for pellet, peanut, cloud)
+;----------------------------------------------------------------------
+MovableObjectClass	class  MetaClass
+
+MSG_MOVE_START	message
+
+MSG_UPDATE_POSN	message
+
+MSG_MOVE_END		message
+
+	MOI_curPos	PointWWFixed
+	MOI_incr	PointWWFixed
+	MOI_end		Point
+	MOI_deltas	Point
+
+MovableObjectClass	endc
+
+
+;----------------------------------------------------------------------
+;	Class definition for Pellet Class
+;----------------------------------------------------------------------
+
+AmateurPelletClass 	class	MovableObjectClass
+
+	API_numSteps	word
+	API_step	word
+	API_color	word
+
+AmateurPelletClass		endc
+
+;----------------------------------------------------------------------
+;	Peanut Class
+;----------------------------------------------------------------------
+
+PeanutStatus	record
+	MS_DEAD:1
+	MS_SMART:1
+	:6
+PeanutStatus	end
+
+AmateurPeanutClass	class	MovableObjectClass
+
+MSG_PEANUT_NOTIFY_CLOUD	message
+; Tell a peanut about an cloud.  If it has any brains, it'll try
+; to avoid it...
+;
+; 	PASS: 	cx, dx - position of cloud
+;		bp - size
+; 	RETURN: nothing
+;	DESTROYED: nothing
+
+	APNI_start	Point
+	APNI_trailColor	word
+	APNI_color	word
+	APNI_status	PeanutStatus
+	APNI_direction	DirectionType
+
+AmateurPeanutClass	endc
+
+TomatoClass	class	AmateurPeanutClass
+
+	; x and y deltas that peanut should move to avoid cloud
+
+	TI_move	Point
+	
+
+TomatoClass	endc
+
+;----------------------------------------------------------------------
+;	Cloud class
+;----------------------------------------------------------------------
+
+AmateurCloudClass	class	MovableObjectClass
+
+; 	Cloud class constants
+
+	EXPL_SIZE_MIN	= 0
+	EXPL_FREQ_MIN	= 60
+
+	EXPL_SIZE_INCR = 3
+	EXPL_FREQ_INCR = 5
+
+
+	EXPL_COUNT_MAX = 12
+	EXPL_MIDPOINT  = EXPL_COUNT_MAX / 2
+
+	EXPL_SIZE_MAX = EXPL_SIZE_MIN + EXPL_COUNT_MAX * EXPL_SIZE_INCR
+
+	ACLI_size	word	(?)
+	ACLI_count	byte	(?)
+	ACLI_freq	word	(?)
+AmateurCloudClass	endc
+	
+
+
+
+
+
+

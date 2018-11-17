@@ -1,0 +1,458 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		User Interface
+FILE:		MiscHowTo
+
+DESCRIPTION:
+
+	$Id: MiscHowTo.doc,v 1.2.34.1 97/03/29 03:36:58 canavese Exp $
+
+------------------------------------------------------------------------------@
+
+------------------------------------------------------------------------------
+	How to ensure that an app Online forces itself to come up maximized
+	when running stand-alone only:
+------------------------------------------------------------------------------
+
+	1. Remove the "genStates = default +maximized" override from the
+	   GenPrimary .ui declaration, so as to allow the UI to provide
+	   behavior for America Online consistent with all other
+	   PC/GEOS applications, in determining initial [non]-maximized state.
+	   (For MOTIF, current behavior is to come up not maximized)
+
+	2. In your Process handler for METHOD_UI_OPEN_APPLICATION, before the
+	   superclass is called,  test to see if running stand-alone or not
+	   (I believe you have a special flag in the .ini of your stand-alone
+	   verion to allow such detection).  If running stand-alone, send
+	   METHOD_GEN_SET_MAXIMIZED, with dl = VUM_NOW, to the GenPrimary.
+	   Since this happens before the primary is brought up on screen,
+	   there will be no flickering, & no wasted CPU time (All that happens
+	   is that the GS__MAXIMIZED bit is set for the primary).
+
+	3. The standard placement/size hint for PC/GEOS applications having
+	   large window areas is the following hint placed in GenPrimary:
+
+                HINT_SET_WIN_POS_SIZE_ATTR {
+                    dw  mask WPSF_POSITION_TYPE or mask WPSF_SIZE_TYPE
+                    dw  (WPT_AT_RATIO shl offset WPSF_POSITION_TYPE) or \
+                        (WST_EXTEND_NEAR_BOTTOM_RIGHT shl offset WPSF_SIZE_TYPE)
+                    SpecWinSizePair <   mask SWSS_RATIO or PCT_0, \
+                                        mask SWSS_RATIO or PCT_0   >
+                }
+
+	   This causes the app to stretch all the way from left to right,
+	   & from top to near the bottom (Just above the bottom row of icons).
+	   Eric indicated that America Online may need to be opened larger than
+	   this in order to be able to see the opening displays.  If this is
+	   true, & can't otherwise be corrected, a preferable solution to 
+	   coming up maximized would be to substitute the following constant
+	   for WST_EXTEND_NEAR_BOTTOM_RIGHT in the above hint:
+
+	   WST_EXTEND_TO_BOTTOM_RIGHT              enum    WinSizeType
+                ;This means size the window so that its bottom right corner is
+                ;at the same position on the screen as the bottom right corner
+                ;of the parent window.
+
+
+------------------------------------------------------------------------------
+	How to abort out of an application "before it comes up"
+------------------------------------------------------------------------------
+
+An application process may intercept MSG_GEN_PROCESS_OPEN_APPLICATION, call the
+superclass to bring its UI "alive", & then do whatever it wants to, including:
+
+	* UserDoDialog/UserStandardDialog to put up dialog boxes
+	* MSG_GEN_INITIATE_INTERACTION to bring up a primary/display/dialog
+	* Send MSG_META_DETACH(cx, dx, bp = 0) to the GenApplication object, to
+	  cause the application to start exiting.
+
+If you wish prevent a primary window from coming up automatically on startup,
+do not place it in the active list of the application object.  It may then
+be brought up later by sending it a MSG_GEN_INITIATE_INTERACTION.
+
+				-- Doug
+
+------------------------------------------------------------------------------
+	Playing w/window priorities in order to present a full-screen window
+	from an application
+------------------------------------------------------------------------------
+
+>> 1)  What is a "layer ID", and what is the proper value to use here?
+
+Windows in the same layer always come to the front & go to the back together.
+The UI makes all windows of the same app have the same Layer ID.  The actual
+value of the ID is meaningless, it just needs to be unique from other ID's.
+To accomplish this, the UI uses the handle of the process for each application
+as its ID.
+
+>> 2) If an app is creating a full-screen window, what window should be
+>> that window's "parent", and what is the proper way to get that
+>> window's handle?
+
+You'll want to get the screen window.  In V1.2, call
+METHOD_GUP_QUERY(cx = GUQT_SCREEN) on the GenApplication object to
+get the window handle of the screen (in bp)
+
+>> 3) How can I set up this window so that an independently-displayable
+>> dialog box can pop up in front of it?
+
+Well, if you give it the same layer ID as the other application windows,
+then other windows such as interactions would be free to appear in front
+of it, or behind it (Newly iniated windows, of course, appear in front).
+
+>> 4) I believe that when I am calling WinClose, there is something else
+>> I must do to remove it from the window tree, as I am getting errors of
+>> the form:
+
+>>>>>>
+    ILLEGAL_GSTATE
+    (ui:0) 33 => w
+    * 1: near geos::kcode::FatalError()
+      2:  far geos::kcode::ECCheckGStateHandle()
+      3: near geos::kcode::NearECCheckGStateHandle()
+      4: near geos::kcode::WinLockFromDI()
+      5:  far geos::kcode::WinGetInfo()
+      6:  far Common::CreateChunkArrayOfWindowsInLayerCallBack()
+      7: near geos::kcode::SysCallCallbackBP()
+      8:  far geos::kcode::WinForEach()
+      9:  far Common::GenFindTopModalWindow()
+     10:  far geos::kcode::ResourceCallInt()
+     11: near motif::AppCommon::AppFindTopWindow()
+<<<<<<<<
+
+>> Which occur long after this "big" window has been closed -- perhaps
+>> I'm not putting it in the proper place in the tree when it's first opened?
+
+Hmm...  Perhaps...
+The "InputOD" of your new window must either be null or an object
+run by the UI thread, or you will have problems.  I don't know if this
+is the problem or not, but it is something to check :)
+
+Doug
+
+------------------------------------------------------------------------------
+	Keeping kbd char flow synchronous when kbd chars themselves can
+	cause the focus to change
+------------------------------------------------------------------------------
+
+>> The only thing I can think of is to have
+>> the spreadsheet object track whether it has the focus, and if not,
+>> send keyboard presses to the edit bar.
+
+Won't work, since if for example, keystrokes 1->3 get sent to the spreadsheet
+object, & 4->6 get sent to the edit bar because the focus has switched,
+you could get strokes 2 & 3 ending up anywhere in the string, for example:
+
+145263
+
+I know of only two solutions:
+
+        1) You decide where keystrokes go in the UI thread.
+           You could do this by subclassing the View & Edit bar text object
+           (The latter you've probably already done), intercept keystrokes
+           coming in & decide whether or not to switch the focus & pass on
+           the keystroke.
+
+        2) You decide where keystrokes go in the App thread.
+           You do this by not giving the Edit bar the focus at all.
+           Keystrokes coming into the spreadsheet that aren't navigation
+           events are simply passed to the reply bar for processing; it
+           never actually gains the focus.
+
+Doug
+
+>> This seems like a really general problem that we ought to find a
+>> solution for. Do we not have any ideas for good ways to handle this
+>> sort of thing?
+
+I don't know of any way of just making this automatically work.  It really
+does come back to finding a solution based on:
+
+>> >    1) You decide where keystrokes go in the UI thread.
+>> >    2) You decide where keystrokes go in the App thread.
+
+Another possible implementation of (2) would be to subclass the reply bar,
+send all kbd events to the spreadsheet object, which would then send those
+it thought the reply bar should process back to it as MSG_REPLY_BAR_KBD_CHAR,
+whose handler moved ax with MSG_META_KBD_CHAR & called its superclass to get the
+text object to do the right thing.  The effect would be quite similar to
+having the reply bar being run by the app thread;  All kbd data would be
+synchronous to the app.
+
+There is actually one more way to solve the problem:
+
+        3) You hold up input flow to the UI until the app has decided where
+           the focus should go.
+
+In something like page-oriented GeoWrite, where you have no idea when a
+keystroke will cause the focus page to change, this would be a lousy solution,
+because it means you freeze the UI for every keystroke until the app can
+process it.  For GeoCalc, however, this might work out, since you know
+which kbd chars will cause the focus to shift.  You could work it like this:
+You subclass the view, intercept MSG_META_KBD_CHAR, & for any character that might
+possibly change the focus, you:
+
+        a) call MSG_GEN_APP_HOLD_UP_INPUT on your application object
+        b) call the superclass with the kbd char
+        c) call GenCallApplicationViaProcess with MSG_GEN_APP_RESUME_INPUT
+
+This sequence is exactly what adding
+"genAttributes = default + initiatesInputHoldUp" to the .ui of a GenTrigger
+does -- it holds up UI input until the app has a chance to change the UI --
+in most cases enabling/disabled UI gadgets, but in your case, changing the
+focus.  You might need to do something similar for the reply bar, for whatever
+character causes the focus to go back to the view (RETURN?).
+
+This is really the best I've come up with so far.  I would appreciate any
+idea you may have.
+
+Doug
+
+------------------------------------------------------------------------------
+So here's the situation again in a nutshell:
+        - I'm in a spreadsheet library routine.
+        - The spreadsheet is a child of a VisIsoContent that is contained
+          in a GenView that is a child of the GenDisplayControl (I think).
+        - I want to create an interaction and attach it *somewhere* that
+          is remotely appropriate to the situation.
+
+What is the simplest way to find a reasonable parent for my GenInteraction?
+
+Thanks,
+
+-wedge-
+
+Subject: Re:  How can I do this...
+Cc: hydrogen!uigroup@albert.geoworks.com
+
+You can, in V2.0, send messages to object up the visible tree using:
+
+MSG_VIS_VUP_CALL_OBJECT_OF_CLASS/MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS
+
+Both of these take a "ClassedEvent" in cx, which is an event recorded using
+ObjMessage's MF_RECORD option, with the twist that instead of passing a
+destination OD in bx:si, you pass the class of the object you want to
+receive the message.  The above messages will then go up the visible
+tree until they find an object of the appropriate class to deliver the
+message to.
+
+BUT... GenDisplayControl is not a legal parent for independently displayable
+GenInteractions (i.e. we don't have dialog/command windows that appear
+clipped to the MDI area).  You'll have to add it to the GenPrimary or
+GenApplication.  (If GenPrimary, you'll need to set GIA_NOT_USER_INITIATABLE)
+
+Doug
+
+------------------------------------------------------------------------------
+	Finding out if a message was handled
+------------------------------------------------------------------------------
+
+>> If you send a message with the MF_CALL flag set, how can you tell if
+>> there was no handler for the message (other than a lack of return
+>> values)?
+
+In general, you can't.  Since you need to know enough to avoid sending a
+message of the wrong class to an object anyway, this is generally not a problem.
+
+For cases where you're sending a MetaClass, or some other superclass's message
+to an object, & you don't know if the subclassing has a handler or not,
+the message itself must be defined in such a way as is returns info about
+whether it was handled or not.  As the only artifact left by ObjMessage when
+a message is not handled is the return of the carry flag clear, we often
+define the carry flag as returned set, if a handler is present for the
+message.  All handlers for that message are then responsible for setting
+the carry flag before returning, lest the caller think that the message
+wasn't handled.  For example:
+
+
+MSG_META_GET_TARGET_EXCL message MetaUIMessages
+;
+; May be sent to any visible or generic object which is a target node,
+; to get current target object directly below the node, if any,
+; regardless of whether current node is active (has the exclusive itself).
+; WARNING:  This is a bad way to go about sending a message to currently
+; active objects.  For example, if you call from the app thread to the UI
+; thread to find out which is the current target display, & then send a message
+; to it, it is possible for the active display to change between the two
+; calls.  Use MSG_META_SEND_CLASSED_EVENT for this type of operation if at
+; all possible.
+;
+; Target nodes in Generic UI library:   GenSystem
+;                                       GenField
+;                                       GenApplication
+;                                       GenPrimary
+;                                       GenDisplayControl
+;                                       GenDisplay
+;                                       GenView
+;                                       GenInteraction (Indep. displayable only)
+;                                       GenSummons
+;
+; Target nodes in Visible UI library:   VisIsoContent
+;
+;
+; Pass:         nothing
+; Return:       ^lcx:dx - target object below this object
+;               carry   - set to indicate message responded to (will be
+;                         clear if message was sent to an object which is
+;                         not a target node)
+;
+
+
+Having multiple return values, however, does not work out well for "C".
+A possible solution for this might be to define the "C" prototype as
+following:
+
+@message optr MSG_META_GET_TARGET_EXCL(optr object = cx:dx) = cx:dx;
+;
+; Pass:         optr
+; Return:       optr    - if object is a node, the optr returned will be the
+;                               target object below this object,
+;                         else optr returned will simply be the passed optr
+;                               (typically passed as NULL)
+;
+
+------------------------------------------------------------------------------
+	gentree, vistree, gup, vup
+------------------------------------------------------------------------------
+
+As user interface for applications is based entirely on generic trees, &
+the specific UI's implementation of that using visible tree, gentree &
+vistree are incredibly useful for:
+
+        * "Finding" a particular generic UI object that your application
+          uses, by using gentree (starting at either an object you've
+          already "found", or by using "gentree -i" to start at the windowed
+          object that the mouse is over.  gentree is able to show text
+          monikers for objects, making it easy to recognize objects.
+
+        * Checking out how how the UI has laid out your application
+          visually (vistree, which shows vis bounds of each object)
+
+        * Figuring out from a breakpoint within a method handler where the
+          object you're currently debugging is situated visually or in the
+          generic tree (vup/gup functions)
+
+        * Checking out generic or visible instance data for a number of objects
+          up or down a hierarchy all in one step.  For instance, within a
+          method handler, if you wanted to see if an object was fully usable
+          or not, you might type:
+
+          gup *ds:si GI_states
+
+          which would show you the record in which GS__USABLE sits for the
+          currently object & all those on up the generic tree (All, of course,
+          have to be set in order for an object to be fully USABLE)
+
+------------------------------------------------------------------------------
+	Alternatives to GenList
+------------------------------------------------------------------------------
+
+To: doug
+Subject: UI for multiple choice questions
+
+        There will be multiple choice questions in the registration
+Status: R
+
+program where people will provide information about themselves by
+typing letters that correspond with their choice. For example, the
+user might be faced with the situation below:
+
+----------------------------------------------------------------
+
+        Please fill in your network type         <----- INSTRUCTIONS
+
+        a. Novell            <--------
+        b. 3COM              <--------
+        c. LAN Manager       <--------   CHOICES FOR THIS QUESTION
+        d. Banyan VINES      <--------
+        e. LANtastic         <--------
+
+        ---
+        | |    <---------------- place where they type a letter for
+        ---                             the  choice
+
+----------------------------------------------------------------
+
+
+        I would like to get the following behavior: typing a letter
+will highlight the text it corresponds to. E.g. typing "a" in the box 
+would highlight the Novell text. Deleting the "a" would remove the
+highlight. 
+
+        It seems that I will need to be able to do the following:
+
+                Highlight/Unhighlight strings
+
+                process keyboard input as it is typed in the box
+
+                move the focus of input from one question to the other when
+                        the user hits return.
+
+
+        What objects should I use for this problem?
+
+        What Messages will I have to handle?
+
+        Can you think of an already existing application that does
+some of this?
+
+        Thanks
+        Josh
+
+Well, the standard UI gadget for selecting one item from a list is
+the GenList -- the graphical setup program already uses such lists
+for mouse, printer, & port selection, meaning that the user is familiar
+with their operation by the time they get to registration.  Is it
+imperative that the use see lettered options & have a type in field
+to enter the letter?  Or couldn't they just select the network they have,
+as they selected other installation options?
+
+Forgetting the impetus for going this direction for a moment, I'd say that
+a type-in field would be implemented as a GenText object which is
+subclassed, so that you can intercept/filter keyboard characters as they
+go by, & decide what to do with them.  The options area could be implemented
+using any of:
+
+        * GenList
+        * GenTrigger's
+        * Multiple GenGlyph's
+        * GenGadget
+        * GenView
+
+.. depending on whether you want the area to resemble other UI gadgetry, 
+or how else it should look, & whether it should be interactble with a mouse 
+or using keyboard navigation... in otherwords, I'd probably need to hear
+more about the application, & what we were trying to get out of the interface
+that GenList can't offer.
+
+Doug
+
+------------------------------------------------------------------------------
+	When to show selection in new "data" presentation objects
+------------------------------------------------------------------------------
+
+Spawned by a question from Gene about when to show the current selection
+in the spreadsheet object:
+
+The text object shows selection if it has the focus, or if it has the
+target;  I mean this quite literally, as in it keeps track of whether it
+has the focus, and whether it has the target, and then performs a boolean
+OR function to decide wether or not it should be displaying selection.  This
+is why text objects in documents (which are targetable) continue to show their
+selection even after they have lost the focus.
+
+If you don't yet have one, add a "TARGETABLE" attribute to the spreadsheet
+object.  Then, intercept MSG_META_GRAB_TARGET_EXCL, and swallow it if the
+spreadsheet is not targetable (otherwise send the message on to the superclass
+for handling).  This will mimic the approach used in the text object, & in
+the UI.  For the spreadsheet object, I'd have the default be for this bit to
+be set (i.e. set it in your INITIALIZE handler, & in your UIC definition of
+it)  Lunatics extending the GeoWrite "Goto" page dialog box with a spreadsheet
+object could then clear this bit to ensure that the GeoWrite document continues
+to show selection while page #'s are calculated.
+
+Doug
+

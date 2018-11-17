@@ -1,0 +1,103 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1994 -- All Rights Reserved
+
+PROJECT:	SPUI
+MODULE:		
+FILE:		olMenuItemGroupClass.def
+
+AUTHOR:		David Litwin, Oct  6, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	10/ 6/94		Initial revision
+
+
+DESCRIPTION:
+	Definition of OLMenuItemGroupClass.
+		
+	OLMenuItemGroupClass is used for GIV_SUB_GROUP GenInteractions
+	which are children of a GIV_POPUP GenInteraction (menu sub-
+	group), or for GIV_POPUP GenInteractions which are children
+	of a GIV_POPUP GenInteraction (sub-menu) when the specific UI
+	*DOES NOT* support sub-menus.
+
+	It allows us to display groups of menu items within the basic
+	menu window, separated with thin black lines. This is
+	essentially an OLCtrlClass subclass, which enforces vertical
+	geometry over its menu item kids, and draws separators above
+	and below if necessary.
+
+	$Id: olMenuItemGroupClass.def,v 1.1 97/04/04 14:12:05 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+OLMenuItemGroupClass	class	OLCtrlClass
+	uses	GenClass
+
+;------------------------------------------------------------------------------
+;			Attributes
+;------------------------------------------------------------------------------
+;These flags give us more information about how to draw this submenu.
+;They are set during Initialize -- we send a query to the previous and
+;next children of this generic object.
+
+OLMenuItemGroupSpecState	record
+
+    ;state flags used during MSG_SPEC_MENU_SEP_QUERY
+
+    OLMIGSS_ABOVE_SEP:1	 ;Copied from MSF_SEP when the query arrives at this
+			 ;composite. Restored when passing query on to next
+			 ;sibling, if this composite is not USABLE.
+
+    OLMIGSS_ABOVE_USABLE:1
+			 ;Copied from MSF_USABLE when the query arrives at this
+			 ;composite. Restored when passing query on to next
+			 ;sibling, if this composite is not USABLE.
+
+    OLMIGSS_HAS_USABLE_CHILD:1
+			 ;Set when the query is sent from the last child of
+			 ;this composite, with the MSF_USABLE flag set.
+			 ;Indicates that this composite has at least one
+			 ;usable child, a requirement for showing separators
+			 ;at all (this could be set via hint, to force
+			 ;separators when no kids are usable).
+
+    ;misc state flags for this group:
+
+    OLMIGSS_MENU_PINNED:1 ;set TRUE (OpenLook only) when the menu is PINNED.
+			  ;this affects the spacing between items.
+    :1
+
+    ;state flags for this group: (set by MSG_SPEC_MENU_SEP_QUERY)
+
+    OLMIGSS_TOP_SEP:1	 ;if this menu item group needs a separator
+			 ;drawn above it (the previous sibling is a menu item
+			 ;or other menu item group).
+
+    OLMIGSS_BOTTOM_SEP:1 ;if this menu item group needs a separator
+			 ;drawn below it (the next sibling is a menu item).
+
+    ;command flags for this group:
+
+    OLMIGSS_SEPARATORS:1 ;TRUE by default, FALSE if HINT_SAME_CATEGORY_AS_PARENT
+			 ;is present. Prevents separator lines from begin drawn.
+OLMenuItemGroupSpecState	end
+
+.assert (mask OLMIGSS_ABOVE_SEP eq mask MSF_SEP)
+.assert (mask OLMIGSS_ABOVE_USABLE eq mask MSF_USABLE)
+
+
+;------------------------------------------------------------------------------
+;			Instance Data
+;------------------------------------------------------------------------------
+
+    OLMIGI_specState	OLMenuItemGroupSpecState <>
+
+OLMenuItemGroupClass	endc

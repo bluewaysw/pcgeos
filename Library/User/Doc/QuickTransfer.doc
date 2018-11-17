@@ -1,0 +1,392 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		User Interface
+FILE:		Quick_Transfer
+
+DESCRIPTION:	Quick Transfer mechanism
+
+	$Id: QuickTransfer.doc,v 1.2.34.1 97/03/29 03:37:08 canavese Exp $
+
+------------------------------------------------------------------------------@
+
+About Quick Transfer
+--------------------
+The quick transfer mechanism allows data to be moved or copied between
+applications or different areas of the same application.  In particular,
+it allows clicking on a data item and dragging it to another location.
+Examples of items that can be manipulated are text, graphics, and file icons.
+
+
+Using Quick Transfer
+--------------------
+The data item may or may not need to be selected before it can be quick
+transfer'd.  If so, select the item.  Then click and hold the <MOVE-COPY>
+button on the item.  The mouse cursor changes shape to indicate that a quick
+transfer is in progress.  Drag the item to the destination and release the
+<MOVE-COPY> button.  As the item is being dragged, the object under the mouse
+location, if any, will determine if it can accept the data item or not.  This
+is indicated by the shape of the mouse cursor.  If the object under the mouse
+cannot accept the data item or if there is no object, the cursor will change
+to a <MODAL-CURSOR>.  If the object can accept the item, the cursor will change
+to a <MOVE-CURSOR> or a <COPY-CURSOR> to show that the item will be moved or
+copied.  This default move/copy behavior is determined by the destination
+object.  Generally, if the destination is the same "document" as the source,
+a move will be performed.  If the destination is a different "document" than
+the source, a copy will be performed.  The default behavior can be overridden
+by forcing a move or copy by pressing the <MOVE> key or the <COPY> key at any
+time during the click-drag and holding until the <MOVE-COPY> button is released
+over the destination.  If an override is used, the cursor is changed to reflect
+the desired operation.  When the item is released over the destination object,
+the mouse cursor is returned to the normal pointer shape and the quick-transfer
+item is moved or copied.
+
+
+Starting a Quick Transfer and Providing Initial Feedback
+--------------------------------------------------------
+When the user presses the <MOVE-COPY> button, a METHOD_START_MOVE_COPY is
+sent to the object under the mouse.  The general response by an object that
+can source a quick-transfer is to set the mouse pointer shape appropriately to
+signal to the user that a quick-transfer operation is in progress and then to
+register a quick-transfer item.  This feedback should continue until the
+pointer leaves the visible bounds of the object.
+
+The actual implementation is slightly different depending on the type of
+source object:
+    - UI-run gadget
+	When the gadget gets the METHOD_START_MOVE_COPY, it should grab the
+	mouse.  Then it may immediately start the quick-transfer or it may
+	await a METHOD_DRAG_MOVE_COPY.
+	In either case, UserStartQuickTransfer is called to inform the UI that
+	a quick-transfer is starting and to set the initial feedback cursor.
+	Then, register a quick-transfer item with UserRegisterTransfer and
+	TIF_QUICK (see Clipboard documentation).  Finally,
+	METHOD_VUP_ALLOW_GLOBAL_TRANSFER is sent to the object itself.  This
+	method will travel up to the first window object and OLWinClass will
+	handle this by releasing the window grab that it had taken on the
+	METHOD_START_MOVE_COPY.  The feedback begun with UserStartQuickTransfer
+	should continue on METHOD_PTRs (see feedback section below) until the
+	mouse leaves the visible bounds of the gadget.  This is signalled by
+	either a METHOD_PTR with the UIFA_IN bit cleared, or a
+	METHOD_LOST_GADGET_EXCL.  The latter occurs when the mouse wanders
+	into a window that is obscuring part of the gadget.  To stop the
+	feedback, the gadget should release the mouse and reset the cursor
+	with UserSetQuickTransferCursor, passing QTC_CLEAR.
+    - application-run OD under View
+	When the View sees the METHOD_START_MOVE_COPY, it takes the window
+	grab and the mouse grab, then sends the method on to the OD (all this
+	is done by the system).  When the OD receives the method, the
+	processing is similar to above:  call UserStartQuickTransfer to set
+	the initial feedback cursor, register a quick-transfer item, but send
+	METHOD_GEN_VIEW_ALLOW_GLOBAL_TRANSFER to the View so that it releases
+	its window grabs (mouse grab is maintained).  Again, feedback should
+	continue on METHOD_PTRs until the mouse leaves the visible bounds of
+	the View.  The OD will get a METHOD_VIS_LEAVE and/or a
+	METHOD_SUBVIEW_LOST_GADGET_EXCL when this happens.  To stop the
+	feedback, the OD resets the cursor with UserSetQuickTransferCursor
+	and QTC_CLEAR.
+    - application-run or UI-run object in Content object under View
+	This is handled in the same as the UI-run gadget, but internally, the
+	Content object handles the METHOD_VUP_ALLOW_GLOBAL_TRANSFER by sending
+	a METHOD_GEN_VIEW_ALLOW_GLOBAL_TRANSFER to the associated View.
+
+For the View cases, the View should have the "sendPtrEvents" and
+"grabWhileInPort" attributes set.  If the "grabWhilePressed" attributes is
+also set, then one additional thing needs to be done.  When, and if,
+METHOD_DRAG_MOVE_COPY comes in, METHOD_GEN_VIEW_ALLOW_GLOBAL_TRANSFER should
+be again sent to the View, because the View takes window grab for both
+METHOD_START_MOVE_COPY and METHOD_DRAG_MOVE_COPY if "grabWhileInPort" is set.
+
+In all cases, UserStartQuickTransfer can also be used to attach an XOR region
+to the mouse cursor.  This can provide the user with an indication as to what
+type of data is being moved.  Also, if the quick-transfer source has read-only
+data (e.g. GeoComm window or selectable-but-non-editable text object), it can
+specify this to UserStartQuickTransfer, and only quick-copying will be allowed
+(default behavior will always be <COPY> and the <MOVE> key cannot be used to
+override).
+
+
+Providing Destination Feedback
+------------------------------
+All quick transfer destination objects will get METHOD_PTRs as the quick
+transfer item is being dragged over them.  (Objects in a View should have
+the "sendPtrEvents" and "grabWhileInPort" attributes set for the View.)  When
+a METHOD_PTR is first received, the object should check the UIFA_MOVE_COPY bit.
+(This indicates that the <MOVE_COPY> button is being held down.)  If set, then
+call UserGetQuickTransferStatus to determine if a quick-transfer is in
+progress.  If so, the destination object needs to provide feedback until the
+mouse pointer leaves the visible bounds of the object.  To determine the
+correct feedback to give, the destination should call the UserQueryTransfer/
+UserTestTransferFormat/UserDoneWithTransfer routines (see Clipboard
+documentation) to check if the quick-transfer item contains formats that the
+object supports.  If so, the default move/copy behavior needs to be determined.
+The owner and 32-bit source ID fields of the quick-transfer item is used for
+this purpose.  The owner is returned by UserQueryTransfer and the 32-bit ID can
+be obtained with UserGetTransferItemInfo.  UserSetQuickTransferCursor sets
+either the move cursor or the copy cursor.  If the item is not supported by the
+object, UserSetQuickTransferCursor with QTC_CLEAR should be called to ensure
+the default quick-transfer <MODAL> cursor is set.  Stopping the feedback is as
+described in the "Starting a Quick Transfer and Providing Initial Feedback"
+section above.
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+	    ALSO -- As per documentation in flowClass.asm, METHOD_PTR handlers
+	    are obliged to return MouseReturnFlags in AX.  When releasing the
+	    mouse grab because the mouse is no longer over your gadget, the
+	    flag mask MRF_REPLAY should be returned, so that the PTR event
+	    is re-sent to whatever object is under the mouse	-- Doug
+
+When setting the move/copy cursor for feedback in METHOD_PTR handlers, the
+flags passed in bp to the handlers should be passed on to
+UserSetQuickTransferCursor.  It holds the UIFA_MOVE and UIFA_COPY bits which
+indicate that the user wishes to override the default move/copy behavior.
+UserSetQuickTransferCursor will resolve any user-override with the default
+behavior set by the object and any "copy-only" source request to produce the
+correct move/copy cursor.  If the destination is either "move-only"
+(e.g. GeoManager trash can) or "copy-only", it should clear any conflicting
+user-override (UIFA_MOVE for "copy-only" or UIFA_COPY for "move-only") in bp
+before calling UserSetQuickTransferCursor.  (How to handle "copy-only" source
+and "move-only" destination?)
+NOTE:  A quick-transfer destination needs to provide the correct feedback
+cursor on every METHOD_PTR (if UserGetQuickTransferStatus indicates that
+a quick-transfer is in progress) because the move/copy user-overrides are
+sent out as METHOD_PTRs.  Setting the cursor once when the mouse enters the
+object and clearing it when the mouse leaves is not enough.
+
+
+Ending a Quick Transfer
+-----------------------
+When the user releases the <MOVE-COPY> button over an object, the Flow object
+(IM?) checks to see if a quick-transfer is in progress (remember moving a
+window with the <MOVE-COPY> button).  If so, the Flow object (IM?) will reset
+the mouse cursor and clear any region attached to the mouse.  In either case,
+it then sends a METHOD_END_MOVE_COPY to the active grab.  If there is no active
+grab (there should be, if the object is an eligible quick-transfer destination),
+it sends a METHOD_END_OTHER to the implied grab (object under the mouse pointer)
+to avoid confusing the object with an unexpected mouse event.  When an object
+receives the METHOD_END_MOVE_COPY, it first releases any mouse grab
+(if mouse was grabbed for feedback) and window grab (using the
+*_ALLOW_GLOBAL_TRANSFER methods).   Then it calls UserQueryTransfer/
+UserRequestTransfer to get the appropriate format in the quick-transfer item.
+The same move/copy tests used for setting the feedback cursor should be done
+to determine the correct default move/copy operation.  If the UIFA_MOVE bit or
+the UIFA_COPY bit of bp-high is set, then the default behavior was overridden
+by the one of the <MOVE>/<COPY> keys.  If the quick-transfer source specified
+the "copy-only" option, the quick-transfer mechanism will force a copy-override
+by setting the UIFA_COPY bit.  As when providing feedback, if the destination
+is either "move-only" or "copy-only", it should ignore any conflicting
+user-override.  (How to handle "copy-only" source and "move-only" destination?)
+When finished with the item, UserDoneWithTransfer must be called to indicate
+that access to the item is finished.  Finally, one of QNF_MOVE, QNF_COPY, or
+QNF_NO_OPERATION is passed to UserEndQuickTransfer to tell the UI that the
+quick-transfer is finished and that the item was moved, copied or not accepted.
+
+
+Notification
+------------
+If the source of a quick-transfer needs to know that the item it has
+registered has been accepted or may be accepted by some destination, it can
+pass the QTF_NOTIFICATION flag and an OD to receive notification (in bx:di)
+to UserStartQuickTransfer.  When the quick-transfer item is being dragged over
+a potential destination providing feedback, the notification OD will be sent a
+METHOD_NOTIFY_QUICK_TRANSFER_FEEDBACK with the QuickTranserCursor value passed
+to UserSetQuickTransferCursor by the destination.  When the item is actually
+dropped over a destination, it processes the item then calls
+UserEndQuickTransfer (as described in the "Ending a Quick Transfer" section).
+This will cause a METHOD_NOTIFY_QUICK_TRANSFER_CONCLUDED with the
+QuickNotifyFlags to be sent to the notification OD.  A source that requests
+notification must also call UserClearQuickTransferNotification if it is going
+to be destroyed before the quick-transfer operation is completed (and thus will
+not be around to receive notification).  Otherwise, the notification OD is
+automatically cleared when the next quick-transfer item is registered.
+
+
+Routines
+--------
+
+(see Library/User/userQuick.asm and Library/User/userTransfer.asm for
+ up-to-date information)
+
+
+Methods
+-------
+
+METHOD_START_MOVE_COPY message MetaUIMessages
+METHOD_END_MOVE_COPY message MetaUIMessages
+METHOD_DRAG_MOVE_COPY message MetaUIMessages
+;
+; The above methods are the standard button functions generated by the UI
+; upon receiving METHOD_BUTTON events from the Input Manager.  These methods
+; are sent out to whatever object has the implied grab (whichever window the
+; mouse is over), until the mouse is "grabbed" by an object, after which the
+; methods go there until the mouse is released (ungrabbed). 
+; See file Spec/User/button.doc for more details.
+;
+; Pass:
+;		cx	- X position of mouse, in document coordinates of
+;			  receiving object
+;		dx	- X position of mouse, in document coordinates of
+;			  receiving object
+;
+;		bp low  - ButtonInfo		(In Include/mouse.def)
+;			  mask BI_PRESS		- set if press
+;			  mask BI_DOUBLE_PRESS	- set if double-press
+;			  mask BI_B3_DOWN	- state of button 3
+;			  mask BI_B2_DOWN	- state of button 2
+;			  mask BI_B1_DOWN	- state of button 1
+;			  mask BI_B0_DOWN	- state of button 0
+;			  mask BI_BUTTON	- for non-PTR events, is
+;						  physical button which has
+;						  caused this event to be
+;						  generated.
+;
+;		bp high - UIFunctionsActive	(In this file)
+;
+; Return:
+;		ax	- MouseReturnFlags	(In this file)
+; 			  mask MRF_PROCESSED - if event process (mouse in
+;					       gadget)   See def. below.
+;
+; 			  mask MRF_REPLAY    - causes a replay of the button
+;					       to the modified implied/active
+;					       grab.   See def. below.
+;
+;			  mask MRF_SET_POINTER_IMAGE - Causes the PIL_GADGET
+;						       level cursor to be
+;						       changed to cx:dx
+;
+;			  mask MRF_CLEAR_POINTER_IMAGE - Causes the PIL_GADGET
+;							 level cursor to be
+;							 reset to the default
+;
+
+METHOD_PTR message MetaInputMessages
+;	cx = pointer x position
+;	dx = pointer y position
+;	bp low = ButtonInfo
+;	bp high = UIFunctionsActive
+
+METHOD_VUP_ALLOW_GLOBAL_TRANSFER	method
+;
+;	This method allows quick transfer destinations to receive
+;	METHOD_PTRs.  It should be sent to the gadget itself when
+;	it starts a quick transfer.
+;
+;	Pass: nothing
+;	Return: nothing
+;
+
+METHOD_GEN_VIEW_ALLOW_GLOBAL_TRANSFER	method
+;
+;	This method allows quick transfer destinations to receive
+;	METHOD_PTRs.  It should be sent to the GenView when the
+;	GenView OD starts a quick transfer.
+;
+;	Pass: nothing
+;	Return: nothing
+;
+
+METHOD_NOTIFY_QUICK_TRANSFER_FEEDBACK message MetaUIMessages
+;
+;	This method is sent to the source of a quick transfer item when a
+;	potential destination provides feedback to the user indicating whether
+;	a move, a copy or no operation will occur.  The default behavior is
+;	determined by the destination, but the user may be able to override
+;	with the <MOVE> or <COPY> override keys.
+;
+;	pass:	bp - QuickTransferCursor
+;			(see UserSetQuickTransferCursor)
+;
+
+METHOD_NOTIFY_QUICK_TRANSFER_CONCLUDED message MetaUIMessages
+;
+;	This method is sent to the source of a quick transfer item when the
+;	operation is completed.  The QuickNotifyFlags are set by any
+;	METHOD_END_MOVE_COPY handler.  This is only sent out if the source
+;	requests notification with the QTF_NOTIFICATION flag passed to
+;	UserStartQuickTransfer.
+;
+;	pass:	bp - QuickNotifyFlags
+;
+
+
+Structures and Constants
+------------------------
+
+;
+; Structures for button information
+;
+UIFunctionsActive	record
+	UIFA_SELECT:1
+	; Basic mouse function
+
+	UIFA_MOVE_COPY:1
+	; Direct action (move/copy, "quick transfer" if between apps)
+
+	UIFA_FEATURES:1
+	; Popup menu, special UI capabilities
+
+	UIFA_CONSTRAIN:1
+	; Set if modifier(s) designated as "constrain" are pressed.  This
+	; flag will change with the state of the modifier.  Note that it
+	; may generally NOT be used when the target object can infer a
+	; meaning to "Extend" or "Toggle" selection.  (i.e. should only be
+	; used w/SELECT function on things like object control points)
+
+	UIFA_PREF_A:1
+	UIFA_PREF_B:1
+	UIFA_PREF_C:1
+	; User "preferences"  Meaning varies with active function.  NOTE:
+	; 1) requests followed by (D) are updated every event holding this
+	;    info (Dynamic)
+	;
+	;		A	B	C
+	; SELECT:	Toggle	Extend
+	;
+	; MOVE_COPY:	Move(D)	Copy(D)
+	;
+	; FEATURES:	Popup	Pan
+	;		menu	View
+	;
+
+	UIFA_IN:1
+	; Set if point (cx, dx) is inside the visual bounds of the object
+UIFunctionsActive	end
+
+
+; Equates to make the above easer to use
+;
+UIFA_ADJUST	equ <UIFA_PREF_A>
+UIFA_EXTEND	equ <UIFA_PREF_B>
+UIFA_MOVE	equ <UIFA_PREF_A>
+UIFA_COPY	equ <UIFA_PREF_B>
+UIFA_POPUP	equ <UIFA_PREF_A>
+UIFA_PAN	equ <UIFA_PREF_B>
+
+;
+; parameters to UserSetQuickTransferCursor
+;
+QuickTransferCursor	etype	word
+QTC_SET_DEFAULT				enum QuickTransferCursor
+	; sets default modal cursor (used internally)
+QTC_CLEAR_DEFAULT			enum QuickTransferCursor
+	; clears default modal cursor (used internally)
+QTC_MOVE				enum QuickTransferCursor
+	; sets move cursor
+QTC_COPY				enum QuickTransferCursor
+	; sets copy cursor
+QTC_CLEAR				enum QuickTransferCursor
+	; clears move/copy cursor
+
+TransferItemFlags	record	TIF_QUICK:1, TIF_UNUSED:15
+
+QuickNotifyFlags	record
+	QNF_ERROR:1,
+	QNF_SOURCE_EQUAL_DEST:1,
+	QNF_MOVE:1,
+	QNF_COPY:1,
+	QNF_NO_OPERATION:1,
+	QNF_UNUSED:11
+QuickNotifyFlags	end
+

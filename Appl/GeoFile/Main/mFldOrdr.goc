@@ -1,0 +1,528 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	GEOS
+MODULE:		GeoFile/Main
+FILE:		mFldOrdr.goc
+
+AUTHOR:		John D. Mitchell
+
+METHODS:
+
+Name			Description
+----			-----------
+
+FUNCTIONS:
+
+Scope	Name			Description
+-----	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.12.30	Initial version.
+
+DESCRIPTION:
+	This file contains message handlers that deal with field navigation
+	order in GeoFile.
+
+	$Id: mFldOrdr.goc,v 1.1 97/04/04 15:53:58 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Include Files
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>		/* PC/GEOS Standard Applications.	*/
+
+#include <Ansi/string.h>	/* Standard C.	*/
+
+@include <gcnlist.goh>		/* PC/GEOS Libraries.	*/
+@include <grobj.goh>
+@include <Objects/FlatFile/ffDbaseC.goh>
+#include <Objects/FlatFile/ffExBld.h>
+@include <Objects/FlatFile/ffFldPr.goh>
+@include <Objects/FlatFile/ffFldPrC.goh>
+@include <Objects/FlatFile/ffRecC.goh>
+@include <Objects/gDListC.goh>
+@include <Objects/gDocC.goh>
+@include <Objects/gViewCC.goh>
+
+@define	__GF_MAIN_FIELD_ORDER_GOC	/* Don't over-define.	*/
+@include <geofile.goh>			/* GeoFile Application.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Field Navigation Order
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_FIELD_NAVIGATION_ORDER_INITIATE
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Initiate the Field Navigation Order dialog box.   Perform
+		any and all initialization functions.
+
+PASS: 		Void.
+
+RETURN:		Void
+
+PSEUDO CODE/STRATEGY:
+	Initialize the field navigation order dynamic list.
+	Enable the various buttons appropriately.
+	Intiate the field navigation order dialog box.
+
+REQUIRES:	???
+
+ASSERTS:	???
+
+CHECKS:		None.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.08.10	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method GeoFileProcessClass, MSG_GF_FIELD_NAVIGATION_ORDER_INITIATE
+{
+    optr	databaseObject;
+    optr	fieldOrderList;
+    optr	priorityList;
+    optr	applyTrigger;
+    optr	resetTrigger;
+    word	numItems;
+
+    /*
+     *	This is a discardable dialog, so tell the interaction that we are
+     *  about to bring it onscreen, so it shouldn't allow itself to be
+     *  discarded.
+     */
+    @call GeodeGetOptrNS (@FieldNavigationOrderBox)::
+	    	    	MSG_GEN_INTERACTION_DISABLE_DISCARDING ();
+    
+    /* Get ahold of the current database.	*/
+    databaseObject = GetTargetDatabaseObject();
+
+    /* Save the current field navigation order context.	*/
+    @call databaseObject::MSG_FFD_FNO_INFO_SHADOW_SAVE ();
+
+    /* Initialize the field navigation order dynamic list.	*/
+    numItems = @call databaseObject::MSG_FFD_FNO_INFO_GET_NUM_ITEMS();
+    fieldOrderList = GeodeGetOptrNS (@FNOBFieldsInDBList);
+    @call fieldOrderList::MSG_GEN_DYNAMIC_LIST_INITIALIZE (numItems);
+
+    /* Any fields?	*/
+    applyTrigger = GeodeGetOptrNS (@FNOBApplyTrigger);
+    resetTrigger = GeodeGetOptrNS (@FNOBResetTrigger);
+    priorityList = GeodeGetOptrNS (@FNOBPriorityList);
+    if (numItems)
+	{
+	/* Yep.  Select the first item.	*/
+	@call fieldOrderList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+			(0, FALSE);
+
+	/* Enable the various field order buttons.	*/
+	@call priorityList::MSG_GEN_SET_ENABLED (VUM_NOW);
+	@call applyTrigger::MSG_GEN_SET_ENABLED (VUM_NOW);
+	@call resetTrigger::MSG_GEN_SET_ENABLED (VUM_NOW);
+	}
+    else	/* No items in FNO context.	*/
+	{
+	/* Disable the various field order buttons.	*/
+	@call priorityList::MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+	@call applyTrigger::MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+	@call resetTrigger::MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+	}
+
+    /* Initiate the the dialog box.	*/
+    @call GeodeGetOptrNS (@FieldNavigationOrderBox)::
+		MSG_GEN_INTERACTION_INITIATE (); 
+}	/* End of MSG_GF_FIELD_NAVIGATION_ORDER_INITIATE.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_FNO_FIELDS_LIST_QUERY
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Retrieve a moniker for the field navigation order dynamic
+		list.
+
+PASS:		optr	list	= List that is being requested for.
+ 		word	item	= Currently selected item.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Get ahold of the current database.
+	Request the moniker for the given item from the database.
+
+REQUIRES:	???
+
+ASSERTS:	???
+
+CHECKS:		None.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.08.11	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method GeoFileProcessClass, MSG_GF_FNO_FIELDS_LIST_QUERY
+{
+    optr databaseObject;
+
+    /* Get ahold of the current database.	*/
+    databaseObject = GetTargetDatabaseObject ();
+
+    /* Pass on the request to the database.	*/
+    @call databaseObject::MSG_FFD_FNO_INFO_LIST_MONIKER_QUERY (list, item);
+}	/* End of MSG_GF_FNO_FIELDS_LIST_QUERY.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_FNO_ITEM_SELECTED
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Update the Field Navigation Order dialog box in response to
+		the user selecting a field in the fields in database list.
+
+PASS: 		word	selection	= Currently selected item.
+		word	numSelections	= 1 if a selection, otherwise 0.
+		byte	stateFlags	= GenItemGroup state flags.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	(De)Activate the priority changing buttons as appropriate.
+
+CHECKS:		None.
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.08.10	Initial version.
+	JDM	93.01.04	Deactivation support.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method GeoFileProcessClass, MSG_GF_FNO_ITEM_SELECTED
+{
+    optr	incPriority;
+    optr	decPriority;
+
+    /* Anything selected?	*/
+    incPriority = GeodeGetOptrNS (@OBPLIncreasePriority);
+    decPriority = GeodeGetOptrNS (@OBPLDecreasePriority);
+    if (numSelections)
+	{
+	/* Activate the priority changing buttons.	*/
+	@call incPriority::MSG_GEN_SET_ENABLED (VUM_NOW);
+	@call decPriority::MSG_GEN_SET_ENABLED (VUM_NOW);
+	}
+    else
+	{
+	/* Deactivate the priority changing buttons.	*/
+	@call incPriority::MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+	@call decPriority::MSG_GEN_SET_NOT_ENABLED (VUM_NOW);
+	}
+}	/* End of MSG_GF_FNO_ITEM_SELECTED.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_FNO_INCREASE_PRIORITY
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Increase the relative field order priority of the currently
+		selected item in the field navigation order list.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	If there are items in the field navigation order list then
+		If there is a selected item then
+			If increasing it's priority moves the item in the
+			list then
+				Reset the monikers of the affected field
+				navigation order list items.
+				Select the appropriate list item.
+REQUIRES:	???
+
+ASSERTS:	???
+
+CHECKS:		None.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.08.10	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method GeoFileProcessClass, MSG_GF_FNO_INCREASE_PRIORITY
+{
+    optr databaseObject;
+    optr fieldOrderList;
+    word fieldOrderSelection;
+    word numItems;
+
+    /* Is anything in the sort key list?	*/
+    fieldOrderList = GeodeGetOptrNS (@FNOBFieldsInDBList);
+    numItems = @call fieldOrderList::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS ();
+    if ((0 < numItems) && (numItems <= MAX_NUM_FIELDS))
+	{
+	/* First, get ahold of the database handle.	*/
+	databaseObject = GetTargetDatabaseObject ();
+
+	/* Determine if there's a selection.	*/
+	fieldOrderSelection = @call fieldOrderList::
+			MSG_GEN_ITEM_GROUP_GET_SELECTION ();
+	if (GIGS_NONE != fieldOrderSelection)
+	    {
+	    /* Increase the item's priority (if possible).	*/
+	    if (@call databaseObject::
+			MSG_FFD_FNO_INFO_INCREASE_PRIORITY
+					(fieldOrderSelection))
+		{
+		/* Update the affected sort key list entries.	*/
+		@call databaseObject::MSG_FFD_FNO_INFO_LIST_MONIKER_QUERY
+				(fieldOrderList, fieldOrderSelection - 1);
+		@call databaseObject::MSG_FFD_FNO_INFO_LIST_MONIKER_QUERY
+				(fieldOrderList, fieldOrderSelection);
+
+		/* Item moved so update the selection.	*/
+		@call fieldOrderList::
+			MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+					(fieldOrderSelection - 1, FALSE);
+		}
+	    }
+	}
+}	/* End of MSG_GF_FNO_INCREASE_PRIORITY.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_FNO_DECREASE_PRIORITY
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Decrease the relative sort priority of the currently
+		selected item in the field navigation order list.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	If there are items in the field navigation order list then
+		If there is a selected item then
+			If decreasing it's priority moves the item in the
+			list then
+				Reset the monikers of the affected field
+				navigation order list items.
+				Select the appropriate list item.
+REQUIRES:	???
+
+ASSERTS:	???
+
+CHECKS:		None.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.08.10	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method GeoFileProcessClass, MSG_GF_FNO_DECREASE_PRIORITY
+{
+    optr	databaseObject;
+    optr	fieldOrderList;
+    word	fieldOrderSelection;
+    word	numItems;
+
+    /* Is anything in the sort key list?	*/
+    fieldOrderList = GeodeGetOptrNS (@FNOBFieldsInDBList);
+    numItems = @call fieldOrderList::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS ();
+    if ((0 < numItems) && (numItems <= MAX_NUM_FIELDS))
+	{
+	/* First, get ahold of the database handle.	*/
+	databaseObject = GetTargetDatabaseObject ();
+
+	/* Determine if there's a selection.	*/
+	fieldOrderSelection = @call fieldOrderList::
+			MSG_GEN_ITEM_GROUP_GET_SELECTION ();
+        if (GIGS_NONE != fieldOrderSelection)
+	    {
+	    /* Decrease the item's priority (if possible).	*/
+	    if (@call databaseObject::MSG_FFD_FNO_INFO_DECREASE_PRIORITY
+			(fieldOrderSelection))
+		{
+		/* Update the affected sort key list entries.	*/
+		@call databaseObject::MSG_FFD_FNO_INFO_LIST_MONIKER_QUERY
+				(fieldOrderList, fieldOrderSelection);
+		@call databaseObject::MSG_FFD_FNO_INFO_LIST_MONIKER_QUERY
+				(fieldOrderList, fieldOrderSelection + 1);
+
+		/* Item moved so update the selection.	*/
+		@call fieldOrderList::
+			MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+					(fieldOrderSelection + 1, FALSE);
+		}
+	    }
+	}
+}	/* End of MSG_GF_FNO_DECREASE_PRIORITY.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_FNO_APPLY
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Apply the user selected field navigation order to the
+		database.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+SIDE EFFECTS:
+	Requires:	???
+
+	Asserts:	The field navigation order dialog is dismissed.
+			The user specified field navigation order is in
+			effect.
+
+CHECKS:		None.
+
+PSEUDO CODE/STRATEGY:
+	Get rid of the saved shadow copy of the field navigation order
+	context.
+
+KNOWN DEFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	93.01.04	Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method GeoFileProcessClass, MSG_GF_FNO_APPLY
+{
+    /* Nuke the saved shadow copy of the FNO context.	*/
+    @call GetTargetDatabaseObject()::MSG_FFD_FNO_INFO_SHADOW_DELETE ();
+}	/* End of MSG_GF_FNO_APPLY.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_FNO_RESET
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Reset the current field navigation order context to the
+		order that was in force prior to the intiation of this
+		dialog with the user.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Restore the previously saved shadow copy of the field navigation
+	order list context and then save it again.
+	Initialize the field order dynamic list.
+
+REQUIRES:	???
+
+ASSERTS:	???
+
+CHECKS:		None.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.08.12	Initial version.
+	JDM	93.01.04	Real Cancel support.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method GeoFileProcessClass, MSG_GF_FNO_RESET
+{
+    optr	databaseObject;
+    optr	fieldOrderList;
+    word	numItems;
+
+    /* Get the current database.	*/
+    databaseObject = GetTargetDatabaseObject ();
+
+    /*
+     * Restore the saved field navigation order context.
+     * Save it again for possible future use.
+     */
+    @call databaseObject::MSG_FFD_FNO_INFO_SHADOW_RESTORE ();
+    @call databaseObject::MSG_FFD_FNO_INFO_SHADOW_SAVE ();
+
+    /* Initialize the field navigation order dynamic list.	*/
+    numItems = @call databaseObject::MSG_FFD_FNO_INFO_GET_NUM_ITEMS ();
+    fieldOrderList = GeodeGetOptrNS (@FNOBFieldsInDBList);
+    @call fieldOrderList::MSG_GEN_DYNAMIC_LIST_INITIALIZE (numItems);
+
+    /* Reset the selection to the first item.	*/
+    @call fieldOrderList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+		(0, FALSE);
+}	/* End of MSG_GF_FNO_RESET.	*/
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		MSG_GF_FNO_CANCEL
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+DESCRIPTION:	Get rid of the field navigation order dialog box.
+
+PASS: 		Void.
+
+RETURN:		Void.
+
+PSEUDO CODE/STRATEGY:
+	Restore the previously saved field navigation order context.
+	Dismiss the dialog box containing the field navigation order list.
+
+REQUIRES:	???
+
+ASSERTS:	The field navigation order dialog box is closed.
+		The field navigation order context is as it was before the
+		dialog with the user was initiated.
+
+CHECKS:		None.
+
+KNOWN DEFECTS/SIDE EFFECTS/CAVEATS/IDEAS:	???
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JDM	92.08.12	Initial version.
+	JDM	93.01.04	Real cancel support.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@extern method GeoFileProcessClass, MSG_GF_FNO_CANCEL
+{
+    /* Restore the previous field navigation order context.	*/
+    @call GetTargetDatabaseObject()::MSG_FFD_FNO_INFO_SHADOW_RESTORE ();
+}	/* End of MSG_GF_FNO_CANCEL.	*/

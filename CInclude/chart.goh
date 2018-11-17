@@ -1,0 +1,850 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1993 -- All Rights Reserved
+
+PROJECT:	
+MODULE:		
+FILE:		chart.goh
+
+AUTHOR:		Joon Song, Nov 16, 1993
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Joon	11/16/93   	Initial version.
+
+DESCRIPTION:
+	Definition of the chart object class.
+
+	$Id: chart.goh,v 1.1 97/04/04 15:57:50 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@optimize
+@deflib	chart
+
+#include <graphics.h>
+@include <grobj.goh>
+
+/* ----------------------------------------------------------------------------
+ * 	CONSTANTS, STRUCTURES, ETC.
+ * ----------------------------------------------------------------------------
+ */
+
+/*  Maximum number of series for any chart */
+#define MAX_SERIES_COUNT		(64)
+
+/*  Maximum number of categories. */
+#define MAX_CATEGORY_COUNT		(1024)
+
+
+/* ----------------------------------------------------------------------------
+ * 	Chart Type
+ * ----------------------------------------------------------------------------
+ * 
+ *  For a good visual guide to what I'm talking about here, take a look at
+ *  Microsoft Excel's "Gallery" in their chart editing mode.
+ */
+
+/* ----------------------------------------------------------------------------
+ * 	DO NOT CHANGE this ByteEnum without changing jump tables
+ * 	everywhere!
+ * ----------------------------------------------------------------------------
+ */
+
+typedef ByteEnum ChartType;
+#define CT_COLUMN			0x0
+/*
+ *  A column chart has series data plotted as vertical columns. The category
+ *  axis is horizontal and the value axis is vertical.
+ * 
+ *  The series-markers in the legend use a rectangle of color to identify
+ *  each series.
+ */
+
+#define CT_BAR				0x2
+/*
+ *  A bar chart is like a column chart but rotated 90 degrees. The category
+ *  axis is vertical and the value axis is horizontal. The series data is
+ *  represented by horizontal bars.
+ * 
+ *  The series-markers in the legend use a rectangle of color to identify
+ *  each series.
+ */
+
+#define CT_LINE				0x4
+/*
+ *  A line chart has a horizontal category axis and a vertical value axis.
+ *  The series data is represented by points. Each series has some unique
+ *  marker which is drawn at each data point. The points are connected by
+ *  lines. In general (with a single exception) the data for the first
+ *  category is lined up right on the left edge of the plottable area.
+ * 
+ *  The series markers in the legend use a picture of the data point markers
+ *  to identify each series.
+ */
+
+#define CT_AREA				0x6
+/*
+ *  An area chart is similar to a line chart except that rather than identifing
+ *  series by a unique marker plotted at each data point there are no marks
+ *  associated with the data points. Instead the lines which connect the points
+ *  combine with the category axis to form a polygon. This polygon is filled
+ *  with a color which uniquely identifies the series.
+ * 
+ *  The series-markers in the legend use a rectangle of color to identify
+ *  each series.
+ */
+
+#define CT_SCATTER			0x8
+/*
+ *  Scatter charts are unique in that there is no category axis. Scatter charts
+ *  plot pairs of points from two series together. The first series is used
+ *  for the horizontal axis and is the series against which all others are
+ *  plotted.
+ * 
+ *  Each pair of points (one from the main series, one from another series)
+ *  becomes an x/y coordinate and that coordinate is plotted.
+ * 
+ *  A single marker is used to identify every point associated with a given
+ *  series.
+ * 
+ *  The legend contains one entry for every series other than the first.
+ *  Each entry has the marker which is associated with that series.
+ */
+
+#define CT_PIE				0xa
+/*
+ *  Pie charts are also unique. There is no category axis or value axis.
+ *  Only a single series of data can be plotted as a pie chart. If the user
+ *  selects more than one series only the first series is used.
+ * 
+ *  A pie chart plots each entry in a series as a percentage of its
+ *  contribution to the whole. This means that plotting numbers like 1,2,3
+ *  would result in 3 pieces of pie representing:
+ * 	1/(1+2+3), 2/(1+2+3), 3/(1+2+3)
+ * 
+ *  The series-markers in the legend use a rectangle of color to identify
+ *  each series.
+ */
+
+#define CT_HIGH_LOW			0xc
+/*
+ *  High-low charts are the kind commonly used for stock market reports,
+ *  etc.  This chart expects data to be passed in the following form:
+ * 
+ * 	SERIES 1: Low (or high) value
+ * 	SERIES 2: High (or low) value
+ * 	SERIES 3: "Open" value -- line will be drawn off to the left
+ * 	SERIES 4: "Close" value -- line will be drawn off to the right
+ */
+
+
+/* ----------------------------------------------------------------------------
+ * 			      Chart Variations
+ * ----------------------------------------------------------------------------
+ * 
+ *  Column chart variations.
+ */
+typedef ByteEnum ChartColumnVariation;
+#define CCV_STANDARD			0x0
+/*
+ *  The standard column chart has one column for each series placed next to
+ *  each other with a small space between categories. Each series is assigned
+ *  a unique color. The height of each column corresponds to the value
+ *  of the series for that category. The gap between the categories is
+ *  specified in terms of a percentage of a column width and can therefore be
+ *  represented by a floating point number between zero and one.
+ */
+
+#define CCV_OVERLAPPED			0x2
+/*
+ *  This is similar to the standard variation except that the columns are all
+ *  overlapped slightly. The amount of overlap is some percentage of the column
+ *  width.
+ */
+
+#define CCV_STACKED			0x4
+/*
+ *  Stacked column charts are used to indicate how much each series entry
+ *  contributes to the total of all series for a given category. There is one
+ *  column for each series. The height of the column is the sum of all the
+ *  series values for that category. The column is broken up into as many
+ *  parts as there are series. Each part of the column is drawn in the color
+ *  for the series which is represented by that column piece.
+ */
+
+#define CCV_FULL_STACKED		0x6
+/*
+ *  This is similar to the stacked column chart except that the value axis
+ *  displays percentages (0..100). The columns represent the percentage that
+ *  each series contributes to the sum of the series values for a given
+ *  category.
+ */
+
+#define CCV_ONE_COLOR_WITH_VALUES	0x8
+/*
+ *  This is the same as the standard column chart except that all series are
+ *  assigned the same color. In addition the values associated with each series
+ *  value are drawn at the top of each column.
+ */
+
+#define CCV_ONE_COLOR_SQUISHED		0xa
+/*
+ *  This is the same as the standard column chart except that all series are
+ *  assigned the same color and the gap between the categories is set to 0.
+ */
+
+
+/*
+ *  Bar chart variations
+ */
+typedef ByteEnum ChartBarVariation;
+#define CBV_STANDARD			0x0
+#define CBV_OVERLAPPED			0x2
+#define CBV_STACKED			0x4
+#define CBV_FULL_STACKED		0x6
+#define CBV_ONE_COLOR_WITH_VALUES	0x8
+#define CBV_ONE_COLOR_SQUISHED		0xa
+/*
+ *  All of these are the same as their column chart counterparts.
+ */
+
+
+/*
+ *  Line chart variations.
+ */
+typedef ByteEnum ChartLineVariation;
+#define CLV_STANDARD			0x0
+/*
+ *  The standard line chart assigns the same marker to all series. A line is
+ *  drawn to connect all the points in a single series. The color of the line
+ *  and marker is unique to each series.
+ */
+
+#define CLV_LINES_ONLY			0x2
+/*
+ *  This is the same as the standard line chart except that no markers are drawn.
+ *  The legend changes to use rectangles of color to indicate the series markers.
+ */
+
+#define CLV_MARKERS_ONLY		0x4
+/*
+ *  This is the same as the standard line chart except that only the markers
+ *  are drawn. No lines are drawn.
+ */
+
+#define CLV_V_LINE_GROUPING		0x6
+/*
+ *  All series data points for a given category are drawn in a single
+ *  vertical line. The points are connected with a line drawn from the
+ *  maximum point to the minimum point.
+ */
+
+
+/*
+ *  Area chart variations.
+ */
+typedef ByteEnum ChartAreaVariation;
+#define CAV_STANDARD			0x0
+/*
+ *  The standard area chart consists of lines connecting all the series data
+ *  points. The lines segments combine with the category axis to create a
+ *  polygon. This polygon is assigned a color unique to the series. The plotted
+ *  points are actually computed:
+ * 	val   = Sum[n=0->seriesNum] (series#n[curCategory].dataPoint)
+ *  This provides a stack of polygons each one representing the sum of all the
+ *  series to that point.
+ */
+
+#define CAV_FULL			0x2
+/*
+ *  This is similar to the stacked column and bar charts. The value axis
+ *  displays percentages (0->100). The points which get plotted are
+ *  actually computed:
+ * 	total = Sum[n=0->maxSeries] (series#n[curCategory].dataPoint)
+ * 	point = val / total
+ */
+
+#define CAV_DROP_LINES			0x4
+/*
+ *  This is the standard area chart with vertical gridlines which extend from
+ *  the category axis at every major tick mark and stop when they hit the
+ *  top of the plotted area.
+ */
+
+#define CAV_SERIES_NAME			0x6
+/*
+ *  This is the standard area chart with the addition of the series names being
+ *  drawn over the areas that the series occupies on the chart.
+ */
+
+
+/*
+ *  Scatter chart variations.
+ */
+typedef ByteEnum ChartScatterVariation;
+#define CSV_STANDARD			0x0
+#define CSV_LINES_ONLY			0x2
+#define CSV_MARKERS_ONLY		0x4
+
+
+/*
+ *  Pie chart variations.
+ */
+typedef ByteEnum ChartPieVariation;
+#define CPV_STANDARD			0x0
+/*
+ *  The standard pie chart consists of one wedge for each series. Each series
+ *  is assigned a unique color and the wedge is colored appropriately.
+ */
+
+#define CPV_CATEGORY_TITLES		0x2
+/*
+ *  This is the standard pie chart with the addition of the  category
+ *  titles drawn near each wedge
+ */
+
+#define CPV_ONE_COLOR_CATEGORY_TITLES	0x4
+/*
+ *  This is the standard pie chart except all wedges are assigned the same
+ *  color. Each wedge has the category title drawn next to it.
+ */
+
+#define CPV_ONE_EXPLODED		0x6
+/*
+ *  This is the standard pie chart with a single wedge (the first series)
+ *  shifted out away from the others.
+ */
+
+#define CPV_ALL_EXPLODED		0x8
+/*
+ *  This is the standard pie chart with all the wedges moved out away from the
+ *  center of the pie.
+ */
+
+#define CPV_PERCENTAGES			0xa
+/*
+ *  This is the standard pie chart with the addition of percentages
+ *  printed in (or near) each pie wedge.
+ */
+
+
+typedef ByteEnum ChartHighLowVariation;
+#define CHLV_STANDARD			0x0
+/*  There ain't no others... */
+
+
+/* ----------------------------------------------------------------------------
+ * 	Variations that are specific to the type of chart	
+ * ----------------------------------------------------------------------------
+ */
+
+typedef union {
+    ChartColumnVariation	CV_column;
+    ChartBarVariation		CV_bar;
+    ChartLineVariation		CV_line;
+    ChartAreaVariation		CV_area;
+    ChartScatterVariation	CV_scatter;
+    ChartPieVariation		CV_pie;
+    ChartHighLowVariation	CV_highLow;
+} ChartVariation;
+
+
+/* ----------------------------------------------------------------------------
+ *  ChartFlags are used internally to set things based on the way the
+ *  ChartType and ChartVariation are set.  They are not settable directly.
+ * ----------------------------------------------------------------------------
+ */
+ 
+typedef WordFlags ChartFlags;
+	#define CF_STACKED			(0x8000)
+	/*
+	 *  Set if values are to be drawn on top of each-other.  This is
+	 *  always set for Area charts.
+	 */
+
+	#define CF_FULL				(0x4000)
+	/*
+	 *  Set if every category fills the entire range.  Only valid if
+	 *  CF_STACKED is set.
+	 */
+
+	#define CF_SERIES_TITLES		(0x2000)
+	/*
+	 *  Set if series titles are to be drawn -- position depends on
+	 *  type of chart.  Only used in area chart
+	 */
+
+	#define CF_CATEGORY_TITLES		(0x1000)
+	/*  Set if category titles are printed -- only used in Pie chart. */
+	
+	#define CF_VALUES			(0x0800)
+	/*  Set if values are to be printed on the chart. */
+
+	#define CF_SINGLE_SERIES		(0x0400)
+	/*
+	 *  Set if there's only one series.  If this is set in
+	 *  conjunction with "stacked", then the single series is
+	 *  stacked.
+	 */
+
+	#define CF_LINES			(0x0200)
+	/*
+	 *  Set if lines are drawn -- for LINE and SCATTER charts only.
+	 *  Is actually used for determining whether to draw the lines
+	 *  of the VisSpline object representing this particular
+	 *  line/scatter chart -- other lines may be drawn regardless of
+	 *  this flag.
+	 */
+
+	#define CF_MARKERS			(0x0100)
+	/*
+	 *  Set if markers are drawn at data points.  For LINE and
+	 *  SCATTER charts only
+	 */
+
+	#define CF_PERCENT			(0x0080)
+	/*  Set if chart is to display percentages. */
+
+	#define CF_SINGLE_COLOR			(0x0040)
+	/*  Set if all series are the same color. */
+
+	#define CF_CATEGORY_MARGIN		(0x0020)
+	/*  Set if there should be a gap (margin) between categories. */
+
+	#define CF_DROP_LINES			(0x0010)
+	/*  Set for line/area charts */
+
+	#define CF_ONE_SERIES_OBJECT_PER_CATEGORY (0x0008)
+	/*
+	 *  If set, then one series object is created for each category
+	 *  -- used for PIE and HIGH-LOW charts
+	 */
+
+	/* 3 bits unused */
+
+ 
+typedef ByteEnum ChartReturnType;
+	#define CRT_OK				0x0
+	/*  No errors encountered.  Chart has been created */
+
+	#define CRT_NO_SERIES			0x2
+	/*  No numeric data was found in the chart data block */
+
+	#define CRT_NEED_2_SERIES		0x4
+	/*  need 2 series (for scatter charts) */
+
+	#define CRT_NO_CATEGORIES		0x6
+	/*  No categories were detected in the data */
+
+	#define CRT_TOO_MANY_SERIES		0x8
+	/*  There are too many series to deal with */
+
+	#define CRT_TOO_MANY_CATEGORIES		0xa
+	/*  Ditto for categories */
+
+	#define CRT_OTHER_ERROR			0xc
+	/*
+	 *  A different error occurred. Can be used by the spreadsheet, or
+	 *  other clients of the chart library for any purpose.
+	 */
+
+
+/* ----------------------------------------------------------------------------
+ * 	CONTROLLERS
+ * ----------------------------------------------------------------------------
+ */
+
+/*
+ *  GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+ 
+@class  ChartGroupControlClass, GenControlClass;
+
+/* All of these messages are for internal use only */
+
+@message void MSG_CGC_SET_GROUP_FLAGS();
+@message void MSG_CGC_SET_LEGEND_FLAG();
+@message void MSG_CGC_SET_LEGEND_TYPE();
+@message void MSG_CGC_LEGEND_STATUS();
+@message void MSG_CGC_SET_TITLE_TEXT();
+@message void MSG_CGC_SET_X_AXIS_TEXT();
+@message void MSG_CGC_SET_Y_AXIS_TEXT();
+@message void MSG_CGC_TITLE_STATUS();
+
+@endc	/* ChartGroupControlClass */
+
+
+typedef ByteFlags ChartGroupControlFeatures;
+	/* 5 bits unused */
+	#define CGCF_TITLE_TEXT			(0x04)
+	#define CGCF_TITLE_ON_OFF		(0x02)
+	#define CGCF_LEGEND			(0x01)
+
+
+/* ----------------------------------------------------------------------------
+ * 	Grid Control		
+ * ----------------------------------------------------------------------------
+ * 
+ *  GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+
+@class  ChartGridControlClass, GenControlClass;
+
+@message void MSG_CGRC_SET_GRID_FLAGS();	/* INTERNAL */
+
+@endc	/* ChartGridControlClass */
+
+
+typedef ByteFlags ChartGridControlFeatures;
+	/* 4 bits unused */
+	#define CGRCF_MAJOR_X			(0x08)
+	#define CGRCF_MINOR_X			(0x04)
+	#define CGRCF_MAJOR_Y			(0x02)
+	#define CGRCF_MINOR_Y			(0x01)
+
+
+/* ----------------------------------------------------------------------------
+ * 	Type control		
+ * ----------------------------------------------------------------------------
+ * 
+ *  GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+ 
+@class  ChartTypeControlClass, GenControlClass;
+
+@message void MSG_CTC_TYPE_CHANGE(ChartType chartType = cl);
+/*
+ *  	PASS:	chartType	- ChartType
+ *	RETURN: nothing
+ */
+
+@message void MSG_CTC_VARIATION_CHANGE(ChartType chartType = cl,
+				       ChartVariation chartVariation = ch);
+/*
+ * 	PASS: 	chartType	- ChartType
+ * 		chartVariation	- ChartVariation
+ *  	RETURN: nothing
+ */
+
+@message void MSG_CTC_TYPE_TOOL_CHANGE(ChartType chartType = cl,
+				       ChartVariation chartVariation = ch);
+/*
+ *	PASS:	chartType	- ChartType
+ * 		chartVariation	- ChartVariation
+ *	RETURN:	nothing
+ */
+
+@endc	/* ChartTypeControlClass */
+
+
+typedef ByteFlags ChartTypeControlFeatures;
+	/* 1 bit unused */
+	#define CTCF_COLUMN			(0x40)
+	#define CTCF_BAR			(0x20)
+	#define CTCF_LINE			(0x10)
+	#define CTCF_AREA			(0x08)
+	#define CTCF_SCATTER			(0x04)
+	#define CTCF_PIE			(0x02)
+	#define CTCF_HIGH_LOW			(0x01)
+
+
+typedef ByteFlags ChartTypeControlToolboxFeatures;
+	/* 1 bit unused */
+	#define CTCTF_COLUMN			(0x40)
+	#define CTCTF_BAR			(0x20)
+	#define CTCTF_LINE			(0x10)
+	#define CTCTF_AREA			(0x08)
+	#define CTCTF_SCATTER			(0x04)
+	#define CTCTF_PIE			(0x02)
+	#define CTCTF_HIGH_LOW			(0x01)
+
+#define CTC_DEFAULT_TOOLBOX_FEATURES \
+		(CTCTF_COLUMN | CTCTF_BAR | CTCTF_LINE | CTCTF_AREA | \
+		 CTCTF_SCATTER | CTCTF_PIE | CTCTF_HIGH_LOW)
+
+
+/* ----------------------------------------------------------------------------
+ * 	Axis control
+ * ----------------------------------------------------------------------------
+ * 
+ *  GenApplication GCN lists to be placed on:
+ * 	GAGCNLT_SELF_LOAD_OPTIONS
+ */
+ 
+@class  ChartAxisControlClass, GenControlClass;
+
+@message void MSG_CAC_SET_MIN(word value = cx);
+@message void MSG_CAC_SET_MAX(word value = cx);
+@message void MSG_CAC_SET_MAJOR_TICK_UNIT(word value = cx);
+@message void MSG_CAC_SET_MINOR_TICK_UNIT(word value = cx);
+/*
+ *	PASS:	value
+ *	RETURN:	nothing
+ */
+
+@message void MSG_CAC_SET_X_AXIS_TICK_ATTRIBUTES();
+@message void MSG_CAC_SET_Y_AXIS_TICK_ATTRIBUTES();
+/*
+ *	PASS:	nothing
+ *	RETURN:	nothing
+ */
+
+@endc	/* ChartAxisControlClass */
+
+
+typedef ByteFlags ChartAxisControlFeatures;
+	/* 3 bits unused */
+	#define CACF_MIN			(0x10)
+	#define CACF_MAX			(0x08)
+	#define CACF_MAJOR_TICK			(0x04)
+	#define CACF_MINOR_TICK			(0x02)
+	#define CACF_TICK_ATTRIBUTES		(0x01)
+ 
+
+/* ----------------------------------------------------------------------------
+ * 		Class definition
+ * ----------------------------------------------------------------------------
+ */
+ 
+@class  ChartBodyClass, GrObjBodyClass;
+
+/*
+ *  The ChartBody is the object that controls all charts created in a
+ *  document.  It keeps the current chart settings, as well as the OD of
+ *  the graphic body through which chart objects are realized.  It is
+ *  also responsible for communicating with the chart UI controllers.
+ * 
+ *  The chart body doesn't control any of the visual aspects of charts
+ *  -- those are all controlled via the grobj body.
+ */
+
+/* ----------------------------------------------------------------------------
+ * 	EXTERNAL MESSAGES
+ * ----------------------------------------------------------------------------
+ */
+
+@message void MSG_CHART_BODY_CREATE_CHART();
+/*
+ *  Create a new chart.
+ *
+ *  WARNING: THIS MESSAGE CAN NOT BE SENT FROM GOC.
+ *
+ *  Use the function MsgChartBodyCreateChart() to send this message.
+ */
+
+@message ChartReturnType MSG_CHART_BODY_UPDATE_CHART(word updateBlock = cx,
+						     word newBlock = dx) = ax;
+/*
+ *  Update a chart with new data
+ * 	PASS:	updateBlock	- VM block handle of chart to update
+ * 		newBlock	- VM block handle of new chart data
+ * 	RETURN:	ChartReturnType
+ */
+
+@message void MSG_CHART_BODY_ATTACH(optr notificationOD = cx:dx,
+				    Message message = bp);
+/*
+ *  Attaches the chart body to the application.  This message will
+ *  increment the in-use count for the chart body, so
+ *  MSG_CHART_BODY_DETACH *must* be sent when detaching.  The purpose of
+ *  this message is to set the to which notification is sent when a
+ *  chart is deleted. When a chart is deleted, the message is sent to
+ *  that OD, with the following parameters:
+ * 
+ * 		VM block handle of chart being deleted
+ * 
+ *  PASS:	notificationOD	- OD that will receive the message
+ * 		message		- message to send
+ *  RETURN:	nothing
+ */
+
+@message void MSG_CHART_BODY_DETACH();
+/*
+ *  Sent to the chart body when the document is being closed.
+ *  Decrements the in-use count of the chart body.
+ * 
+ *  PASS:	nothing
+ *  RETURN: 	nothing
+ */
+
+@message word MSG_CHART_BODY_GET_SUSPEND_COUNT() = ax;
+/*
+ *  Return the current suspend count for the body.  Count = 0 means
+ *  not suspended.
+ * 
+ *  PASS:	nothing 
+ *  RETURN:	suspend count
+ */
+
+/* ----------------------------------------------------------------------------
+ * 	INTERNAL MESSAGES		
+ * ----------------------------------------------------------------------------
+ */
+ 
+typedef ByteFlags ChartUpdateUIFlags;
+	/* 5 bits unused */
+	#define CUUIF_AXIS			(0x04)
+	#define CUUIF_GROUP_FLAGS		(0x02)
+	#define CUUIF_CHART_TYPE		(0x01)
+
+#define CHART_UPDATE_ALL_UI (ChartUpdateUIFlags)
+
+
+typedef WordFlags ChartBodyUnSuspendFlags;
+	/* 13 bits unused */
+	#define CBUSF_UPDATE_UI			(0x0004 | 0x0002 | 0x0001)
+	#define CBUSF_UPDATE_UI_OFFSET		0
+
+
+@message void MSG_CHART_BODY_UPDATE_UI();		/* INTERNAL */
+@message void MSG_CHART_BODY_NOTIFY_CHART_DELETED();	/* INTERNAL */
+@message void MSG_CHART_BODY_GET_GOAM_TEXT();		/* INTERNAL */
+@message void MSG_CHART_BODY_FIND_GROBJ_BY_NUMBER();	/* INTERNAL */
+@message void MSG_CHART_BODY_GET_GROBJ_FILE_STATUS();	/* INTERNAL */
+
+
+/* ----------------------------------------------------------------------------
+ * 	Instance data		
+ * ----------------------------------------------------------------------------
+ */
+
+@instance CompPart			CBI_comp;
+/*  linkage for all charts in the document */
+
+@instance word				CBI_selection;
+/*
+ *  Number of selected charts.  If count drops to zero, then
+ *  chart body sends NULL notifications to controllers.
+ */
+
+@instance ChartBodyUnSuspendFlags	CBI_unSuspendFlags;
+/*  Things to put off doing until suspend count reaches zero. */
+
+@instance dword				CBI_notificationOD;
+/*
+ *  object that will be notified when a chart is deleted. Not
+ *  normally relocated, as it's usually an object in the
+ *  application, not in the file.
+ */
+
+@instance word				CBI_notificationMessage;
+/*  Message to send to the notification OD.   */
+
+@endc	/* ChartBodyClass */
+
+
+/* ----------------------------------------------------------------------------
+ * 			   Data Block
+ * ----------------------------------------------------------------------------
+ */
+
+/*
+ *  This is the definition of the data block of data passed to the
+ *  charting routines.
+ */
+
+
+/*
+ *  ChartData is the block header and comes right at the start of the
+ *  block.
+ */
+typedef struct {
+	word	CD_endOfData;		/*  Offset to end of data */
+	word	CD_nRows;		/*  Number of rows */
+	word	CD_nColumns;		/*  Number of columns */
+} ChartData;
+
+	/*
+	 *  This header is followed by an array of pointers, one pointer for 
+	 *  each cell (nRows*nColumns). The pointers give offsets to the cell
+	 *  data for quick access. The pointers are arranged row-first.
+	 *  A 2 row by 3 column range of data would have pointers organized:
+	 * 	Pointer for r1, c1
+	 * 	Pointer for r1, c2
+	 * 	Pointer for r1, c3
+	 * 	Pointer for r2, c1
+	 * 	Pointer for r2, c2
+	 * 	Pointer for r2, c3
+	 */
+#define CD_cellOffsets			(sizeof(ChartData))
+
+	/*
+	 *  This is followed by a series of structures of the form:
+	 * 	Type byte
+	 * 	Data
+	 */
+
+typedef ByteEnum ChartDataCellType;
+#define CDCT_EMPTY			0x0
+	/*
+	 *  Followed by nothing
+	 */
+
+#define CDCT_TEXT			0x1
+	/*
+	 *  Followed by a null terminated text string
+	 */
+
+#define CHART_PARAMETER_MAX_TEXT_LENGTH	256
+
+#define CDCT_NUMBER			0x2
+	/*
+	 *  Followed by a FloatNum <>
+	 */
+
+/* ----------------------------------------------------------------------------
+ * 			Library routines
+ * ----------------------------------------------------------------------------
+ */
+
+typedef struct {
+	PointDWord	CCP_position;
+	/*  Position of chart relative to the document it's in. */
+
+	Point		CCP_size;
+	/*  Size of the chart */
+
+	word		CCP_data;
+	/*  VM handle of chart's data block */
+
+	ChartType	CCP_type;
+	ChartVariation	CCP_variation;
+} ChartCreateParameters;
+
+typedef struct {
+	ChartReturnType	CCRP_type;
+	/* ChartReturnType */
+
+	word		CCRP_chart;
+	/* VM block handle of new chart */
+} ChartCreateReturnParameters;
+
+extern void
+    _pascal MsgChartBodyCreateChart(ChartCreateReturnParameters *retValue,
+				    optr chartObj,
+				    ChartCreateParameters *params);
+/*
+ *  @call chartObj::MSG_CHART_BODY_CREATE_CHART();
+ *
+ *  Pass:	retValue = ChartCreateReturnParameters
+ *		chartObj = optr of obj to send MSG_CHART_BODY_CREATE_CHART to
+ *		params	 = ChartCreateParameters
+ *  Return:	*retValue filled with return values.
+ */
+
+
+#ifdef __HIGHC__
+
+pragma Alias(MsgChartBodyCreateChart, "MSGCHARTBODYCREATECHART");
+
+#endif
+
+@endlib

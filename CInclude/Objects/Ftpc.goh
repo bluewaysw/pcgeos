@@ -1,0 +1,405 @@
+/*************************************************************************
+
+                Copyright (c) Breadbox Computer Company 1998
+                         -- All Rights Reserved --
+
+  PROJECT:      FTP Client
+  MODULE:       FTP Library
+  FILE:         ftpC.goh
+
+  AUTHOR:       Gerd Boerrigter
+
+  $Id: ftpc.goh 1.2 1998/12/22 22:57:42 gerdb Exp $
+
+  DESCRIPTION:
+    FtpClass is a class implementing a simple FTP client as described in
+    {{REF:RFC959}}.
+    This file provides wrappers for a subset of the {{REF:RFC959}}
+    commands.
+*************************************************************************/
+
+@deflib ftplib
+
+@include <socket.goh>
+#include <sockmisc.h>
+
+#define FTP_DOMAIN          "TCPIP"
+#define FTP_MAX_HOST_NAME   255
+
+/* The maximum size for some temporary string buffers. */
+#define FTP_MAX_STRING_SIZE 250
+
+/*
+ * Some types to make handling TCP/IP addresses more convenient.
+ */
+typedef struct {
+     TcpAccPntExtendedAddress UTA_link;
+     TCHAR                    UTA_ip[ MAX_IP_ADDR_STRING_LENGTH ];
+} UnresolvedTCPAddress;
+
+typedef struct {
+     SocketAddress            RTA_sock;
+     TcpAccPntResolvedAddress RTA_addr;
+} ResolvedTCPAddress;
+
+
+/**
+ * A '\0' terminated string containing the FTP reply code.
+ */
+typedef dword FtpReplyCode;
+
+/** A macro to construct the dword of a FTP reply code. */
+#ifndef MAKEFOURCC
+#define MAKEFOURCC(a,b,c,d) ( ((dword)a)      | (((dword)b)<< 8) | \
+                             (((dword)c)<<16) | (((dword)d)<<24) )
+#endif
+
+/**
+ * The status of the FTP connection.
+ */
+typedef enum {
+    FS_UNCONNECTED = 0,
+    FS_UNCONNECTING,
+    FS_RESOLVING,
+    FS_CONNECTING,
+    FS_CONNECTED,
+
+    FS_FTP_INIT,
+    FS_SEND_USERNAME,
+    FS_SEND_PASSWORD,
+    FS_SEND_ACCOUNT,
+    FS_TRY_OTHER_USERPWD,
+    FS_SEND_TYPE,
+    FS_SEND_PORT,
+    FS_SEND_RETRIEVE,
+    FS_SEND_LIST,
+    FS_RETRIEVE_DATA,
+    FS_SEND_DATA
+} FtpStates;
+
+
+@class FtpClass, MetaClass;
+
+typedef enum {
+    FTTT_COMMAND = 0,
+    FTTT_RESPONSE
+} FtpTransferTextType;
+
+/**
+ * The type of the message used for the status message.
+ *
+ * @param type      A FtpTransferTextType giving the type of the text.
+ * @param block     A MemHandle to a block containing all thge text.
+ * @param textLen   A word giving the lenght of all the text in the block.
+ */
+@prototype void FTP_TRANSFER_TEXT_MSG( FtpTransferTextType type,
+                                       MemHandle block, word textLen );
+
+/**
+ * The type of the message used for the status message.
+ *
+ */
+@prototype Boolean FTP_STATUS_TEXT_MSG( optr msgText,
+                                     long progress,
+                                     long total,
+                                     dword token );
+
+
+word SocketPrintf( optr logDest, FileHandle logFileHan, Socket sock, const char* format, ... );
+
+
+/** Prints the string to the current control connection.
+
+    @param format   A character string controls how the arguments are
+                    converted, formated and printed.
+    @param ...      The arguments printed to the socket.
+
+    @return The C<FtpReplyCode>, or just '\0' if a transmission
+            error occured.
+*/
+@message FtpReplyCode MSG_FTP_SEND_COMMAND( const char* format, const char* param );
+
+
+
+/** Get a single line.  Used by MSG_FTP_GET_REPLY.
+
+    @param sock    The Socket from which to receive the data.
+    @param buffer  A pointer to a buffer for the read characters.
+    @param len     A integer giving the size of the buffer.
+    @param timeout A integer giving the timeout value for the socket.
+
+    @return Number of characters in the line.  The final '\0' is not
+            counted.
+*/
+int SocketGetLine( optr logDest, FileHandle logFileHandle, Socket sock, char* buffer, int len, int timeout );
+
+
+
+/** Receives the reply code from the control connection.
+    This method only returns the reply code.  The whole message can be
+    received, by defining C<FI_destination> and C<FI_statusMsg>.
+    It is possible that a multi-line reply is returned.  All end-of-line
+    codes are translated to the GEOS code '\r'.
+
+    @return The C<FtpReplyCode>, or just '\0' if a transmission
+            error occured.
+*/
+@message FtpReplyCode MSG_FTP_GET_REPLY();
+
+
+/** Takes care of the login procedure.  Opens the connection to the server
+    and sends the username and password.
+
+    @param  statusText  An optr to the status text to use.
+*/
+@message void MSG_FTP_SET_STATUS_TEXT( const optr statusText );
+
+
+/** Takes care of the login procedure.  Opens the connection to the server
+    and sends the username and password.
+
+    @param  host        A Telnet string giving the name of the remote
+                        host to which a FTP connection is required.
+    @param  user        A Telnet string identifying the user.
+    @param  password    A Telnet string specifying the user's password.
+
+    @return The C<FtpReplyCode>.  If '332' is returned, the server is
+            expection the account information.
+*/
+@message FtpReplyCode MSG_FTP_LOGIN(
+    const char* host,
+    const char* user,
+    const char* password
+    );
+
+
+
+/** Opens the connection to the FTP server.
+
+    @param  host A Telnet string giving the name of the remote host
+                 to which a FTP connection is required.
+
+    @return The C<FtpReplyCode>, if just '\0' is returned,
+            a transmission error occured.  ThreadGetError()
+            will return the reason.
+*/
+@message FtpReplyCode MSG_FTP_OPEN_CONNECTION(
+    const char* host
+    );
+
+@message void MSG_FTP_CLOSE_CONNECTION();
+
+/*
+ * access control commands
+ */
+
+
+/** Transmit the user identification to the FTP server for
+    access to its file system.
+
+    @param  user        A Telnet string identifying the user.
+
+    @return
+*/
+@message FtpReplyCode MSG_FTP_SEND_USER(
+    const char* user
+    );
+
+
+/** Transmit the user's password to the FTP server for
+    access to its file system.
+
+    This command must be immediately preceded by the user name command,
+    and, for some sites, completes the user's identification for
+    access control.
+
+    @param  password    A Telnet string specifying the user's password.
+
+    @return
+*/
+@message FtpReplyCode MSG_FTP_SEND_PASS(
+    const char* password
+    );
+
+
+/** Transmit the user's account to the FTP server for
+    access to its file system.
+
+    The command is not necessarily related to the USER command, as
+    some sites may require an account for login and others only for
+    specific access, such as storing files.  In the latter case the
+    command may arrive at any time.
+
+    @param  account     A Telnet string identifying the user's account.
+
+    @return
+*/
+@message FtpReplyCode MSG_FTP_SEND_ACCT(
+    const char* account
+    );
+
+
+
+/** This command allows the user to work with a different
+    directory or dataset for file storage or retrieval without
+    altering his login or accounting information.  Transfer
+    parameters are similarly unchanged.
+
+    @param pathname A string specifying a directory or other system
+                    dependent file group designator.
+
+    @return
+*/
+@message FtpReplyCode MSG_FTP_SEND_CWD(
+    const char* pathname
+    );
+
+
+/** This command is a special case of CWD, and is included to
+    simplify the implementation of programs for transferring
+    directory trees between operating systems having different
+    syntaxes for naming the parent directory.  The reply codes
+    shall be identical to the reply codes of CWD.  See
+    {{REF:RFC959}} Appendix II for further details.
+
+    {{Optional}}
+
+    @return
+*/
+@message FtpReplyCode MSG_FTP_SEND_CDUP();
+
+
+
+
+@message FtpReplyCode MSG_FTP_GET_WORKING_DIR(
+    MemHandle* pathHandle
+    );
+
+@message FtpReplyCode MSG_FTP_SEND_MKD(
+    const char* pathname
+    );
+
+@message FtpReplyCode MSG_FTP_DELETE_DIR(
+    const char* pathname
+    );
+
+@message FtpReplyCode MSG_FTP_DELETE_FILE(
+    const char *pathname
+    ) ;
+
+@message FtpReplyCode MSG_FTP_RENAME_FILE(
+    const char *pathname,
+    const char *newname
+    ) ;
+
+@message FtpReplyCode MSG_FTP_DOWNLOAD_FILE(
+    const char* pathname,
+    const FileHandle file
+    );
+
+@message FtpReplyCode MSG_FTP_DOWNLOAD_DIRECTORY(
+    const char* pathname,
+    const FileHandle file
+    );
+
+@message FtpReplyCode MSG_FTP_START_DATA_SOCKET(
+    const char* command,
+	 const FileHandle file/*,
+    char* response,
+    int   len */
+    );
+
+@message void MSG_FTP_STOP_DATA_SOCKET();
+
+/* added the Boolean return - TRUE if user cancelled */
+@message Boolean MSG_FTP_RECEIVE_FILE(
+    const FileHandle file,
+    const long totalLength
+    );
+
+@message FtpReplyCode MSG_FTP_UPLOAD_FILE(
+    const char* pathname,
+    const FileHandle file
+    );
+
+/* added the Boolean return - TRUE if user cancelled */
+@message Boolean MSG_FTP_SEND_FILE(
+    const FileHandle file,
+    const long totalLength
+    );
+
+
+/**
+ * Sets a new destination object, as specified in FI_destination.
+ * Apply messages and status messags are sent out to this object.
+ *
+ * @param dest destination object
+ */
+@message void MSG_FTP_SET_STATUS_DESTINATION( optr dest );
+@message void MSG_FTP_SET_STATUS_MESSAGE( Message statusMsg );
+
+@message void MSG_FTP_SET_LOGGING_DESTINATION( optr dest );
+
+@message word MSG_FTP_GET_SOCKET_ERROR();
+
+@message MemHandle MSG_FTP_GET_LAST_MESSAGE() ;
+
+@message void MSG_FTP_REPORT_LAST_ERROR_IF_ANY() ;
+
+@message void MSG_FTP_SEND_PASV();
+
+/**
+ * Destination object for the log messages.  Should be able to handle
+ * MSG_VIS_TEXT_APPEND_... messages.
+ */
+@instance optr              FI_logDest = 0;
+
+/**
+ * Destination object for the status message.
+ */
+@instance optr              FI_statusDest;
+
+/**
+ * Status message send to the destination object.  Message must be of type
+ * C<FTP_STATUS_TEXT_MSG>.
+ */
+@instance Message           FI_statusMsg = 0;
+
+/**
+ * The socket of the FTP control connection.
+ */
+@instance Socket            FI_controlSock = 0;
+@instance FtpStates         FI_ftpState = FS_UNCONNECTED;
+
+/**
+ * The socket of the FTP data connection.
+ */
+@instance Socket            FI_listenSock = 0;
+@instance SocketPort        FI_listenPort = { 0x5000, MANUFACTURER_ID_SOCKET_16BIT_PORT };
+
+
+/**
+ * The socket of the FTP data connection.
+ */
+@instance Socket            FI_dataSock = 0;
+
+/**
+ * The timeout value used in C<Socket...> functions.
+ */
+@instance int               FI_timeout = 3600;
+
+@instance UnresolvedTCPAddress  FI_hostname;
+@instance ResolvedTCPAddress    FI_hostaddr;
+
+@instance MemHandle         FI_lastMessage = NullHandle ;
+
+@instance Boolean         FI_isPasv = FALSE ;
+
+@instance FileHandle         FI_logFileHan = 0 ;
+
+@endc /* FtpClass */
+
+@endlib /* ftplib */
+
+/* ftpC.goc */
+

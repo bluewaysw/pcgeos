@@ -1,0 +1,457 @@
+#!/usr/public/perl
+# -*- perl -*-
+##############################################################################
+#
+#       Copyright (c) Geoworks 1995 -- All Rights Reserved
+#	GEOWORKS CONFIDENTIAL
+#
+# PROJECT:      Spock
+# MODULE:       Tools/scripts/perl -- auto-uploader
+# FILE:         spock-upload
+# AUTHOR:       Chris Hawley-Ruppel
+#
+# REVISION HISTORY:
+#       Name    Date            Description
+#       ----    ----            -----------
+#       JAG     1/19/95         Initial Revision
+#	CBH	10/7/96		Stolen from Jedi
+#	reza	11/6/97		added -i flag
+#	cthomas	1/13/98		added -s flag, removed filename dosification
+#
+#
+# DESCRIPTION:
+#       Uploads certain libraries to isv ftp site.
+#
+# USAGE:
+#	Run "spock-upload" with no arguments for help.
+#
+#       $Id: spock-upload,v 1.14 98/04/06 12:05:51 cthomas Exp $
+#
+###############################################################################
+
+require("newgetopt.pl");
+
+$0 =~ s,.*/([^/]+),\1,;		# munge argv[0]
+
+&NGetOpt("p=s", "m=s", "b=s", "f=s", "i=s@", "h", "s=s", "d", "k") || &usage;
+
+$login =  getlogin || (getpwuid($<))[0]  || "Somebody";
+$opt_todd = 1 if ($login eq "todd");
+
+@pwent = getpwuid($<);
+$fullname = $pwent[6] || "Somebody";
+$fullname =~ s/,.*$//g;
+
+## If they don't have a .netrc, we won't be able to do the ftp correctly.
+unless ($opt_todd) {
+    -e "$ENV{HOME}/.netrc" || 
+	die <<EOM;
+You must have a ~/.netrc.\nSee Chris for details.
+EOM
+}
+
+$DEF_BRANCH	= "Responder";
+$DEF_MAILTO	= $login;
+$DEF_FTP_HOST	= "tech-ftp";
+$DEF_PRODUCT	= "spock";
+
+$ftp_host = $opt_h || $DEF_FTP_HOST;
+$mailto = $opt_m || $DEF_MAILTO;
+$branch = $opt_b || $DEF_BRANCH;
+$product = $opt_p || $DEF_PRODUCT;
+# pre-spock products used the DOS sdk, so it needs to be dosified.
+$dosify = ($product ne 'spock') || $opt_d;
+@ifiles = @opt_i;
+
+if ($opt_h) {
+    &usage;
+}
+
+if (($product ne "winter") && ($product ne "lizzy") && ($product ne "spock")) {
+    die "$product is not valid.  Please select winter, lizzy or spock";
+}
+
+#
+# Winter or Lizzy isn't valid anymore, for now.
+#
+
+#  why not?
+#if ($product ne "spock") {
+#    die "Ha! Only spock product is valid.";
+#}
+
+$UNIX_DIR	= "/n/seattle/resp/gw_mini/$product";
+$LAST_UPLOAD    = "spock-last-upload";
+$TMPTOP		= "/tmp/spockup.$$";
+$LISTING	= "$TMPTOP/ll.$$";
+$FTP_DIR	= "$product/gw_mini";
+
+$pathbranch = $branch . "/";
+
+if ($branch eq "trunk") {
+	$branch = ".";
+	$pathbranch = "";
+}
+
+
+$PREFIX		= "/staff/pcgeos/$branch";
+
+$SOURCETREE	= $opt_s || "$PREFIX/Installed";
+$SUBDESTTREE	= ($opt_k) ? "" : "Installed/";
+
+($#ARGV == 0) || &usage;
+$geode = $ARGV[0];
+
+## Make sure we're dealing with a library we know about.
+$path = `grep "	$geode)" $PREFIX/Installed/send`;
+
+if (! $path) {
+	$path = `grep "files $geode" $PREFIX/Installed/send | head -1`;
+}
+
+$path || die "$geode does not exist in $PREFIX/Installed/send,";
+
+
+chop($path);
+
+# A hack to guarantee there's always a semicolon at the end, for the final
+# substitution.
+$path = $path . ";";   
+
+$path =~ s/^.*$files //;
+$path =~ s#@##;
+$path =~ s#\.##;
+$path =~ s#\"##;
+$path =~ s#\_##;
+$path =~ s#/[a-zA-Z0-9]*;*$##;
+
+print "PATH: $path\n";
+
+# Now let's also clean up $geode to be a nice-looking dirname and zipfile
+# name.
+
+($uploadDir = $geode) =~ s#^.*/##;
+$uploadDir =~ tr/A-Z/a-z/;
+
+$zipName = $opt_f || $uploadDir;
+
+$TMPDIR		= "$TMPTOP/$uploadDir";
+$INF		= "$TMPTOP/$uploadDir.inf";
+
+## Get list of files to upload.
+
+## Read last-upload file so we can generate bug report.
+if (!$opt_d && -r $LAST_UPLOAD) {
+    open(LAST, "<$LAST_UPLOAD") || die "$0: can't open $LAST_UPLOAD\n";
+    $opt_d = <LAST>;
+    close LAST;
+}
+
+## Copy files over to temp directory.
+ &system("mkdir -p $TMPDIR");
+$SIG{'INT'} = 'cleandie';	# after this point, need to nuke dir on error
+
+## Copy some files over.
+
+chdir("$SOURCETREE/$path") || &cleandie("can't cd to $SOURCETREE/$path");
+
+&system("mkdir -p $TMPDIR/pcgeos/$pathbranch$SUBDESTTREE$path");
+
+# Copy non-Responder specific geodes over.
+
+opendir(DIR,'.') || &cleandie("can't open $SOURCETREE/$path");
+local(@filenames) = readdir(DIR);
+closedir(DIR);
+
+for (@filenames) {
+	$file = $_;
+	if (/geo$/ || /sym$/ || /vm$/) {
+		&system("cp $SOURCETREE/$path/$file $TMPDIR/pcgeos/$pathbranch$SUBDESTTREE$path");
+	}
+}
+
+# Now do the Responder-specific geodes, if there are any.
+
+@respDirs = (
+	"RESPONDER",
+	"RESPXIP",
+	"RESPDEMO",
+	"RESPDEMOXIP",
+	"RESPG2",
+	"RESPG2XIP",
+	"XIP",
+	"GSMXIP",
+	"RESPONDER_SF",
+	"RESPXIP_SF",
+	"RESPXIPDBG",
+	"SPOCK",
+	"SPOCKXIP",
+);
+
+if ($dosify) {
+    #
+    # at some point we need to handle the following directories:
+    #   "RESPDEMO_WIN32",
+    #   "RESPDEMOTHAI_WIN32",
+    #   "RESPDEMOXIP_WIN32",
+    #
+    @respPCDirs = (
+		   "responde",
+		   "respxip",
+		   "respdemo",
+		   "rspdemox",
+		   "respg2",
+		   "respg2xi",
+		   "xip",
+		   "gsmxip",
+		   "resp",
+		   "respxip_",
+		   "respxipd",
+		   "spock",
+		   "spockxip",
+		   );
+} else {
+
+    #
+    # There could potentially be WIN32 variations of all the
+    # "regular" products, so add them to the list.
+    #
+    @win32Dirs = ("WIN32");
+    foreach $prod (@respDirs) {
+	push(@win32Dirs,
+	     $prod, 
+	     $prod . "_WIN32", 
+	     $prod . "WIN32");
+    }
+    @respDirs = @win32Dirs;
+
+    #
+    # Names of product dirs in the NT SDK are the same as the Unix SDK.
+    #
+    @respPCDirs = @respDirs;
+}
+
+$index = 0;
+foreach $specpath (@respDirs) {
+
+    $specpcpath = @respPCDirs[$index];
+
+    if (-d "$SOURCETREE/$path/$specpath") {
+	&system("mkdir -p $TMPDIR/pcgeos/$pathbranch$SUBDESTTREE$path/$specpcpath");
+
+	chdir("$SOURCETREE/$path/$specpath") || &cleandie("can't cd to $SOURCETREE/$path/$specpath");
+	opendir(DIR,'.') || &cleandie("can't open $SOURCETREE/$path/$specpath");
+	local(@filenames) = readdir(DIR);
+	closedir(DIR);
+
+	for (@filenames) {
+	    $file = $_;
+	    if (/geo$/ || /sym$/ || /vm$/) {
+		&system("cp $SOURCETREE/$path/$specpath/$file $TMPDIR/pcgeos/$pathbranch$SUBDESTTREE$path/$specpcpath/");
+	    }
+        }
+    }
+    $index++;
+}
+
+## Copy any additionally specified files over
+foreach $file (@ifiles) {
+
+    # stuff to extract the directory path from the full pathname
+   
+    $path = $file . ";";   
+    $path =~ s/^.*$file //;
+    $path =~ s#@##;
+    $path =~ s#\.##;
+    $path =~ s#\"##;
+    $path =~ s#\_##;
+    $path =~ s#/[a-zA-Z0-9]*;*$##;
+
+    &system("mkdir -p $TMPDIR/pcgeos/$pathbranch$path");
+    &system("cp $PREFIX/$file $TMPDIR/pcgeos/$pathbranch$file");
+}
+
+## Convert all files to 8.3.
+if ($dosify) {
+    chdir("$TMPTOP/$uploadDir") || &cleandie("can't cd to $TMPTOP/$uploadDir");
+    &system("dosify", 1);
+}
+
+## Make the .zip file
+chdir("$TMPTOP/$uploadDir") || &cleandie("can't cd to $TMPTOP/$uploadDir");
+&system("zip -r $zipName pcgeos", 1);
+&cleandie("couldn't create .zip file\n") unless -s "$zipName.zip";
+
+## Copy it to the Unix archive
+&system("cp $zipName.zip $UNIX_DIR", 1);
+&cleandie("couldn't update $UNIX_DIR\n") unless -s "$UNIX_DIR/$zipName.zip";
+
+## Now upload everything.
+open(FTP, "|-") || exec "ftp -i $ftp_host";
+#&cleandie("couldn't start ftp") unless defined($pid);
+if ($opt_todd) {
+    &ftp("responder");
+}
+&ftp("binary");
+&ftp("hash");
+&ftp("cd $FTP_DIR");
+&ftp("put $zipName.zip");
+&ftp("bye");
+print "Please wait for ftp to finish...\n";
+close FTP;
+
+## Add some useful info to the .inf file before we mail it off.
+if (open(INF, ">>$INF")) {
+
+    ## Try to get a file listing.  Don't care if it doesn't work.
+    if (chdir($TMPDIR)) {
+	&system("ls -lC > $LISTING");
+    }
+
+    print INF <<EOM;
+
+1. Feature/Function Updated/Changed/Missing
+
+>>> FILL THIS IN <<<
+
+EOM
+
+    if (!$opt_d) {
+	print INF <<EOM;
+
+2. Distribution Information
+
+   The new version of $uploadDir is now on $ftp_host in the directory 
+   $FTP_DIR.  The new files are:
+
+   $zipName.zip: PKZIP file containing all needed geodes (contains a full
+	         path to the geodes from PCGEOS).
+ 
+3. Others (optional)
+
+>>> FILL THIS IN (IF YOU WANT) <<<
+
+==========================================================================
+
+Regards,
+
+
+$fullname
+EOM
+    close INF;
+
+    $editor = $ENV{"EDITOR"} || $ENV{"VISUAL"} || "vi";
+    print <<EOM;
+
+Invoking \'$editor\' on mail message.  Please replace all lines beginning 
+with ">>>" with meaningful information.  
+
+Hit <RETURN> to start editing.
+EOM
+    <STDIN>;
+
+    system("$editor $INF");
+    
+    while (!&edited($INF)) {
+	print <<EOM;
+You didn\'t replace all the lines that began with ">>>"!  Try again.
+
+Hit <RETURN> to start editing.
+EOM
+	<STDIN>;
+	system("$editor $INF");
+    }
+}
+
+## Mail pleasant notification to everybody.
+print("Upload successful.  Sending mail...\n");
+system("mail -s 'New version of $uploadDir uploaded to $ftp_host in $FTP_DIR' '$mailto' < $INF");
+
+&cleanup;
+
+## Update up last-upload file with today's date.
+($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+open(LAST, ">$LAST_UPLOAD") || die "$0: can't open $LAST_UPLOAD\n";
+print LAST "$mday/$mon/$year";
+close LAST;
+
+}
+
+## Special version that prints what it's about to do.
+sub system {
+    local($command,$noerror) = @_;
+
+    print $command, "\n";
+    system($command) && (!$noerror) && 
+	&cleandie("$0: preceding command failed");
+}
+
+## Send command to ftp process.
+sub ftp {
+    local($command) = @_;
+
+    $command =~ s/([^\n])$/\1\n/; # tack newline on end, if one isn't there
+
+    print "ftp> $command";
+    print FTP $command;
+}
+
+## Do normal die + clean up stuff;
+sub cleandie {
+    local($msg) = @_;
+
+    $SIG{'INT'} = 'IGNORE';	# don't allow ^C
+    $msg = "interrupt" unless $msg; # if no msg, we must be in INT handler
+    $msg =~ s/([^\n])$/\1\n/;	# tack newline on end, if one isn't there
+    print STDERR "$0: $msg\n";
+
+    &cleanup;
+    exit -1;
+}
+
+## Clean up temporary files.
+sub cleanup {
+    $SIG{'INT'} = 'IGNORE';	# don't allow ^C
+    chdir("/tmp");
+    &system("rm -rf $TMPTOP") &&
+	die "$0: couldn't remove temp dir '$TMPTOP'\n";
+}
+
+sub edited {
+    local($file) = @_;
+    local($okay) = 1;
+
+    open(DUH, "<$file") || die "$0: can't open $file\n";
+    while (<DUH>) {
+	$okay = 0 if /^\>\>\>/;
+	last if !$okay;
+    }
+    close DUH;
+    return $okay;
+}
+
+sub usage {
+	print <<EOM;
+usage: $0 [-h] [-p product] [-m address] [-b branch] [-f zipfile]
+       [-i file]+ send-keyword
+
+	    send-keyword is either a path from Installed, or an argument
+	    to the send script.
+
+	    -h          - gives you this help
+	    -p product  - product this build is part of (winter/lizzy/spock)
+			  (spock is the only valid product for now)
+	    -m address  - mail to address instead of $DEF_MAILTO
+	    -b branch   - branch to use instead of $DEF_BRANCH or 'trunk'
+	    -f zipfile  - zip file name to use (don't append .zip!)
+            -i file     - additional header file to include,
+                          path is relative from /staff/pcgeos/$DEF_BRANCH
+                          (this argument can be repeated)
+            -s path     - pcgeos tree from which to copy files
+                          (default = /staff/pcgeos/$DEF_BRANCH/Installed)
+            -d          - transform product subdir to be 8.3 compliant
+            -k          - do not add 'Installed' to target paths.
+EOM
+
+    exit -1;
+}

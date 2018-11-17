@@ -1,0 +1,323 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Communication Driver
+FILE:		CommConstant.def
+
+AUTHOR:		In Sik Rhee, July 30, 1992
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ISR	7/30/92		Initial revision
+
+
+DESCRIPTION:
+	Constants defined here
+		
+	$Id: commConstant.def,v 1.1 97/04/18 11:48:48 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SERVER_THREAD_PRIORITY		equ PRIORITY_UI
+
+DELETED_PORT_NUMBER		equ 255
+DELETED_SOCKET_NUMBER		equ 255
+
+INIT_TIME_OUT_VALUE		equ 60*3	; 3 seconds
+MAX_RETRY_VALUE			equ 4		; Retry each packet upto 4x
+
+SERVER_THREAD_STACK_SIZE	equ 1024	; 1K stack needed
+SERVER_NAME_SIZE		equ 9		; 8 characters max
+MAX_PACKET_SIZE			equ 1024 	; 1/2 stream buffer size
+INPUT_STREAM_BUFFER_SIZE		equ MAX_PACKET_SIZE*2+40	;
+	;Enough to hold a packet of ESC_CHARS, plus some overflow
+
+OUTPUT_STREAM_BUFFER_SIZE		equ 500
+
+PacketChars	etype	byte
+BEGIN_CHAR	enum	PacketChars, 0xbf
+END_CHAR	enum	PacketChars, 0xc0
+ESC_CHAR	enum	PacketChars, 0xdb
+ESC_END		enum	PacketChars, 0xdc
+ESC_ESC		enum	PacketChars, 0xdd
+
+PType	etype	byte
+START_PACKET	enum	PType	; standard packet
+MID_PACKET	enum	PType	; Packet in the middle of a stream
+END_PACKET	enum	PType	; denotes end of a stream
+SINGLE_PACKET	enum	PType	; denotes single-packet stream
+ACK_PACKET	enum	PType, 0x0f	;These guys are equated to be as
+NAK_PACKET	enum	PType, 0xf0	; different from each other as 
+ERR_PACKET	enum	PType, 0xff	; possible, to minimize the chance of
+					; errors.
+FIRST_DATA_PACKET_ID	equ	START_PACKET
+LAST_DATA_PACKET_ID	equ	SINGLE_PACKET
+
+if ERROR_CHECK
+ERROR_COMM_COULD_NOT_CREATE_SERVER_THREAD	enum FatalErrors
+ERROR_COMM_NO_SERIAL_DRIVER			enum FatalErrors
+ERROR_COMM_INVALID_FUNCTION			enum FatalErrors
+
+COMM_ILLEGAL_SEMAPHORE				enum FatalErrors
+; A handle that was supposed to be a semaphore was not.
+
+COMM_SHORT_SERIAL_WRITE				enum FatalErrors
+; DR_STREAM_WRITE in the serial driver did not write all the bytes passed.
+
+COMM_BAD_PORT_STRUCT				enum FatalErrors
+; What was supposed to be a PortStruct wasn't.
+
+COMM_BAD_PACKET_ID				enum FatalErrors
+INVALID_PORT_NUMBER				enum FatalErrors
+; The SPI_portNumber passed in to CommOpenPort was invalid
+STREAM_LENGTH_DOES_NOT_MATCH_DATA_RECEIVED	enum FatalErrors
+
+PACKET_TOO_LARGE				enum FatalErrors
+; A single packet had more than MAX_PACKET_SIZE bytes in it.
+
+SINGLE_PACKET_DATA_LEN_MUST_MATCH_STREAM_DATA_LEN enum FatalErrors
+; The stream consists of a single packet, and the size of the data in
+; the packet did not match the size of the stream.
+
+INTERMEDIATE_PACKET_BAD_SIZE			enum FatalErrors
+; If the stream spans multiple packets, all the packets but the last one
+; must have MAX_PACKET_SIZE bytes in them. This error occurs if one of 
+; the packets didn't have MAX_PACKET_SIZE bytes in it (CX = actual # bytes)
+
+TOO_MANY_BYTES_RECEIVED				enum FatalErrors
+; More bytes were received for a packet than should have been.
+
+BAD_PACKET_TYPE					enum FatalErrors
+; Tried to send a packet with an invalid PType
+
+BAD_REPLY_PACKET_TYPE				enum FatalErrors
+; Tried to reply with a value other than NAK, ERR, or ACK.
+
+CANNOT_UNREGISTER_DOMAIN			enum FatalErrors
+; Tried to unregister the port as a domain
+
+PORT_DELETED_BEFORE_THREAD_EXITED		enum FatalErrors
+; The port was marked as deleted before the server thread could exit
+
+NON_ZERO_FLUSH_SEM				enum FatalErrors
+; The output stream was marked as being empty more than once.
+
+BAD_PACKET_IN_MIDDLE_OF_STREAM			enum Warnings
+; After a START_PACKET, only MID_PACKET and END_PACKET packets are allowed
+
+COMM_UNSUPPORTED_FUNCTION			enum Warnings
+
+PORT_EXISTS_WITH_DIFFERENT_BAUD_RATE		enum Warnings
+PORT_COUNT_INCR					enum Warnings
+PORT_INITIALIZED				enum Warnings
+PORT_CLOSED					enum Warnings
+PORT_NOT_FOUND					enum Warnings
+
+DUPLICATE_SOCKET_ID				enum Warnings
+SOCKET_OPENED					enum Warnings
+SOCKET_WAS_DESTROYED				enum Warnings
+INVALID_SOCKET_NUMBER				enum Warnings
+INVALID_SOCKET_ID_RECEIVED			enum Warnings
+
+PACKET_SEND_ERROR				enum Warnings
+RECEIVED_ACK_FOR_DIFFERENT_PACKET		enum Warnings
+NAK_PACKET_RECEIVED				enum Warnings
+ERR_PACKET_RECEIVED				enum Warnings
+CORRUPT_PACKET_RECEIVED				enum Warnings
+FRESH_CONNECTION				enum Warnings
+REMATCH_PACKET_NUMBER				enum Warnings
+REPEAT_PACKET_RECEIVED				enum Warnings
+CLOSING_INPUT_STREAM				enum Warnings
+UNKNOWN_PACKET_TYPE				enum Warnings
+
+RESENDING_AFTER_TIMEOUT				enum Warnings
+
+GARBLED_REPLY					enum Warnings
+; The reply was garbled
+
+OUT_OF_SEQUENCE_PACKET				enum Warnings
+; A packet that was not the previous packet was received
+
+SYNCHRONIZING_PORT				enum Warnings
+; The first packet (w/ID=0) is being sent from the port
+
+ERROR_IN_MIDDLE_OF_STREAM			enum Warnings
+; There was an error sending a multi-packet stream
+
+MISMATCHED_REPLY_CRC				enum Warnings
+; The CRC for the reply packet did not match the CRC for the current packet
+
+PACKET_ID_WRAPPED				enum Warnings
+; The Packet ID wrapped from 255 -> 1. This isn't a problem, just an odd case
+; that I'd like to know about.
+
+
+COMM_INVALID_PORT				enum Warnings
+; A request was made to open a serial port that doesn't exist.
+
+endif
+
+;----------------------------------------------------------------------------
+; 	Structure definitions
+;----------------------------------------------------------------------------
+
+idata 	segment
+
+DriverTable	DriverInfoStruct <
+	CommStrategy,
+	<>,
+	DRIVER_TYPE_NETWORK
+>
+
+ForceRef DriverTable
+
+idata	ends
+
+; The Debug Structure is used to help pinpoint bugs and errors during EC 
+; debugging.
+
+if ERROR_CHECK
+CommDebugStruct	struct
+	DS_packetSent	word		; = ack+nak+TO
+	DS_ackError	word		; client received bad ACK back
+	DS_ackPacket	word 		; ack packets received
+	DS_nakPacket	word		; nak packets received
+	DS_errPacket	word		; nak packets received
+	DS_ackSent	word		; ack sent to remote client
+	DS_nakSent	word		; nak sent to remote client
+	DS_errSent	word		; err sent to remote client
+	DS_packetTO	word		; packets timed-out
+	DS_packetFail	word		; failed send attempts
+	DS_packetLost	word		; server side received bad packet
+	DS_packetRepeat	word		; server side received repeat packet
+CommDebugStruct	ends
+endif
+
+; The port struct resides in the port chunkarray.  it holds all vital info
+; for a port
+
+PortStruct	struct
+	PS_number	SerialPortNum	; COM port designation
+	PS_baudRate	SerialBaud	; baud rate of connection
+	PS_sendSem	hptr		; send semaphore handle
+	; Semaphore so that only one thing can call SlipSend at a time
+
+	PS_ackSem	hptr		; ack semaphore handle
+	; Timed semaphore that SlipSend Ps while waiting for an ACK
+
+	PS_sendPacketSem	hptr
+	; Semaphore that SlipSend and SlipReceive use to ensure exclusive 
+	; access to the Comm port while sending packets.
+
+	PS_exitAckQueue		hptr	;
+	; The handle of the queue that the server thread sends an ACK to
+	; when it is exiting. This is used so we don't return from 
+	; CommClosePort before the thread exits.
+	PS_socketArray	lptr		; offset to socket array
+	PS_driverHandle	hptr		; Handle of the Serial Driver
+	PS_serDrvr	fptr.far	; Strategy routine of Serial Driver
+	PS_strToken	word		; stream token
+	PS_refCount	word		; reference count (0 if port unused)
+	PS_packetID	word		; offset in packet ID Table
+	PS_maxTimeout	word		; max timeout value of any socket ever
+					;  opened for the port
+	PS_serverPtr	fptr.ServerStruct ; local vars for server thread
+PortStruct	ends
+
+; The socket structure resides in the socket chunkarray.  it holds all info
+; for a socket.  To access the socket chunkarray, one must first open the
+; port chunkarray and look up the PS_socketArray field to get the pointer
+; to the socket chunkarray
+
+SocketStruct	struct
+	SS_socketID	SocketID	; socket ID
+	SS_destID	SocketID	; destination socket ID
+	SS_portNum	word		; port chunkarray element #
+	SS_callback	fptr.far	; callback for server routine
+	SS_timeOut	word		; timeout value for packets (in 1/60 s)
+	SS_cbData	word		; callback data
+SocketStruct	ends
+
+; The PacketHeader follows the BEGIN_CHAR and preceeds the packet. 
+
+PacketHeader 	struct
+	PH_type		PType		; packet type
+	PH_ID		byte		; packet ID
+	PH_destSocket	word		; destination socket #
+	PH_strLen	word		; stream length (not counting the
+					; PacketHeader)
+	PH_dataLen	word		; Actual length of data in this 
+					; packet (since the stream may be
+					; broken up over many packets).
+	PH_extraData	word		;Extra data to be passed to callback
+	PH_data		label	word
+PacketHeader 	ends
+
+; The StreamVars is a local variable data struct used during the remote
+; call functions.  
+
+StreamVars	struct
+	SV_destID	SocketID	; socket ID of destination
+	SV_timeOut	word		; timeOut value
+	SV_strToken	word		; stream token
+	SV_serDrvr	fptr.far	; serial driver
+	SV_sendSem	hptr		; send semaphore
+	; Semaphore so that only one thing can call SlipSend at a time
+
+	SV_ackSem	hptr		; ack semaphore
+	; Timed semaphore that SlipSend Ps while waiting for an ACK
+
+	SV_sendPacketSem	hptr
+	; Semaphore that SlipSend and SlipReceive use to ensure exclusive 
+	; access to the Comm port while sending packets.
+
+	SV_extraData	word		;Extra data to be passed on to
+					; remote machine
+
+	SV_packetID	word		; offset in PacketID table
+	SV_header	PacketHeader <>	;The header for the data being sent
+	SV_data		fptr.byte	;Ptr to data to send
+StreamVars	ends
+
+; The ServerStruct is a local variable data struct used by the server routines
+	
+ServerStruct	struct
+	SE_serDrvr	fptr.far	; pointer to serial driver
+	SE_callback	fptr.far	; callback routine
+	SE_portToken	word		; token of the port we are talking
+					; to.
+	SE_strToken	word		; stream token
+	SE_socketArray	lptr		; offset to socket array
+	SE_ackSem	hptr		; ack semaphore
+	SE_sendPacketSem	hptr	; ack semaphore
+	SE_size		word		; size of stream
+					; (not counting the PacketHeader)
+	SE_dataPacketHan	hptr	;Handle of the data packet
+	SE_ackQueue	hptr		; handle of queue to send ack to when
+					; server thread exits
+	SE_packetID	word		; offset in Packet ID Table
+	;
+	; The following two variables are used on closing the port.
+	; SE_packetCount tracks the number of new data packets seen, while
+	; while SE_okPacketCount tracks the number of data packets received
+	; that passed the CRC. The idea is we wait in ClosePortAndAwaitAck so
+	; long as SE_okPacketCount keeps incrementing, until SE_packetCount
+	; changes, which means the sender has gotten our ACK of the previous
+	; packet.
+	;
+	SE_packetCount	word		; packet counter, for detecting
+					;  activity on close
+	SE_okPacketCount word		; count of structurally valid packets
+					;  received
+ServerStruct	ends
+
+; used by dgroup variable packetReply
+
+PacketReply	struct
+	PR_type		PType		; packet type
+	PR_ID		byte		; packet ID
+	PR_CRC		word		; CRC of packet we are replying to
+PacketReply	ends
+

@@ -1,0 +1,1739 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1988 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		termConstant.def
+
+AUTHOR:		Dennis Chow September 5, 1989
+
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dc	9/05/89		Initial revision
+
+
+DESCRIPTION:
+	Constant file used by all modules of the term appl.
+		
+	$Id: termConstant.def,v 1.1 97/04/04 16:56:23 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+; NOTE:  Turning on the BULLET flag means that the changes to GeoComm
+; 	 for Bullet will be compiled, otherwise the regular GeoComm will
+;	 be made.   
+;	 To turn on the BULLET flag, do:
+;	 pmake XASMFLAGS=-DBULLET XUICFLAGS=-DBULLET
+;
+	_BULLET = 0
+
+;
+; For Telnet appl specific codes
+;
+ifdef 	TELNET
+	_TELNET = TRUE
+else
+	_TELNET = FALSE
+endif	; ifdef TELNET
+
+
+;
+;	For Dove Network appl specific codes
+;
+
+	_DOVE = FALSE
+	_SCRIPT_VARIABLE = FALSE
+
+
+
+; LOGIN_SERVER	= includes code which allows GeoComm to act as a manual
+;		  login server for serial communication protocols
+;		  (namely PPP).  Developed & tested for Responder,
+;		  but largely works in in Ensemble as well.
+;
+; Responder product only feature sets:
+; CHAR_SET	= having alternate character set appearing on the screen
+; SPEICAL_KEY	= Provide a list of special keys to be inserted as regular
+; 		  character if not found in conventional keyboard or there is
+; 		  a special byte sequence.
+; ACCESS_POINT	= use the access point database
+; MODEM_STATUS	= Display modem connection status dialog and report any error
+; 		  during connection. The user can terminate the connection at
+; 		  any time. Currently, it uses the data supplied by
+; 		  ACCESS_POINT feature. So _ACCESS_POINT flag has to be
+; 		  enabled.
+; VSER		= Use Virtual Serial driver instead of regular serial driver
+; DYNAMIC_BUF	= Use dynamically allocated buffer to store incoming data
+; 		  rather than a variable in dgroup.
+; CAPTURE_CLEAN_TEXT 
+;		= During text capture, it has been capturing all escape
+;		  codes. With this flag set, the code will produce the
+;		  captured text only appearing on screen, but not all escape
+;		  and control codes. (except LF/CR)
+; CLEAR_SCR_BUF	= allow scroll buffer and screen to be cleared
+;
+;
+; Note:
+;
+; If _SPECIAL_KEY is to be enabled for other products, please also modify the
+; UI components. The codes is conditionally compiled for _SPECIAL_KEY
+; condition so as to allow easier modification to enable this feature.
+;
+; Similarly, _ACCESS_POINT is not currently meaningful without _RESPONDER
+;
+; _MODEM_STATUS has not been fully tested with non-RESPONDER product, yet the
+; basic structure has been written for any product.
+;
+; _CAPTURE_CLEAN_TEXT is not set for all products because it has been
+; determined if this is a generally desired feature.
+;
+
+	_RESPONDER	= FALSE
+	_CHAR_SET	= FALSE	
+	_SPECIAL_KEY	= FALSE
+	_ACCESS_POINT	= FALSE
+	_MODEM_STATUS	= FALSE
+	_VSER		= FALSE
+	_RESP_FONT	= FALSE
+	_DYNAMIC_BUF	= FALSE
+	_CAPTURE_CLEAN_TEXT = FALSE
+	_CLEAR_SCR_BUF	= FALSE
+	if	_TELNET
+	_LOGIN_SERVER	= FALSE
+	else
+	_LOGIN_SERVER	= FALSE
+	endif
+
+;
+; input-output mapping grabbed from 1.X for international versions of 20X
+; - brianc 4/25/94
+;
+; (also update termui.ui)
+;
+SBCS <INPUT_OUTPUT_MAPPING = -1						>
+;doesn't work for DBCS because of larger character set
+DBCS <INPUT_OUTPUT_MAPPING = 0						>
+
+if PZ_PCGEOS
+USE_FEP = -1
+;
+; HALF_AND_FULL_WIDTH set to support font with half- and full-width characters
+;
+HALF_AND_FULL_WIDTH = -1
+;
+; CURSOR set if doing new halfwidth/fullwidth cursor handling
+;
+; (change matching constant in termui.ui)
+;
+CURSOR = -1
+else
+USE_FEP = 0
+HALF_AND_FULL_WIDTH = 0
+CURSOR = 0
+endif
+
+CUR		macro	line
+if	CURSOR
+		line
+endif
+		endm
+
+NCUR		macro	line
+ife	CURSOR
+		line
+endif
+		endm
+;
+; Class and method definitions.
+;
+TermApplicationClass	class	GenApplicationClass
+
+;
+; subclassed so that we can intercept MSG_META_LOST_FULL_SCREEN_EXCL
+;
+	
+if	_TELNET
+MSG_TERM_APPLICATION_CANCEL_CONNECTION	message
+; 	  
+; SYNOPSIS:	User cancels connection when system is establishing
+; 		connection 
+; 
+; PASS:		nothing
+; RETURN:	nothing
+; DESTROYED:	ax, cx, dx, bp
+; 	  
+
+MSG_TERM_APPLICATION_CONNECTION_TIMEOUT	message
+; 	  
+; SYNOPSIS:	Telnet connection interval timeout handler
+; 
+; PASS:		nothing
+; RETURN:	nothing
+; DESTROYED:	ax, cx, dx, bp
+; 	  
+
+endif	; _TELNET
+
+TermApplicationClass	endc
+
+if _VSER
+TermClass	class		VpClientClass
+else
+
+if	_TELNET
+TermClass	class		GTelnetClass
+else
+TermClass	class		GenProcessClass
+endif	; _TELNET
+
+endif	; _VSER
+MSG_TERM_SET_PORT			message
+MSG_TERM_SET_BAUD			message
+MSG_TERM_SET_TERMINAL			message
+MSG_TERM_SET_DUPLEX			message
+MSG_TERM_ADJUST_FORMAT1			message
+MSG_TERM_ADJUST_FORMAT2			message
+MSG_TERM_ADJUST_FORMAT3			message
+MSG_TERM_ADJUST_USER_FORMAT		message
+MSG_TIMEOUT				message
+MSG_SERIAL_STATUS			message
+MSG_SERIAL_RESET			message
+MSG_MODEM_STATUS			message
+MSG_TERM_SET_DIAL			message
+MSG_MODEM_SPEAKER			message
+MSG_MODEM_VOLUME			message
+MSG_SEND_CHAT				message
+MSG_TERM_SET_FLOW			message
+MSG_TERM_SET_USER_FLOW			message
+MSG_TERM_DORKED				message
+MSG_TERM_QUICK_DIAL			message
+MSG_TERM_QUICK_ABORT			message
+MSG_ASCII_SEND_SELECT			message
+MSG_XMODEM_SEND_SELECT			message
+MSG_SEND_ASCII_PACKET			message
+MSG_XMODEM_SEND_START			message
+MSG_ASCII_SEND_START			message
+MSG_XMODEM_RECV_START			message
+MSG_ASCII_RECV_START			message
+MSG_FILE_RECV_STOP			message
+
+
+MSG_FILE_SEND_STOP			message
+MSG_ASCII_RECV_SUMMONS			message
+MSG_XMODEM_RECV_SUMMONS			message
+MSG_SAVE_BUF_SUMMONS			message
+MSG_QUICK_DIAL_SUMMONS			message
+MSG_HANG_UP				message
+
+if	_TELNET
+MSG_TERM_HANG_UP_DONE			message
+;
+; SYNOPSIS:	Clean up after really hanging up
+;
+; Pass:		nothing
+; Return:	nothing
+; Destroyed:	ax, cx, dx, bp
+;
+
+endif	; _TELNET
+	
+MSG_REALLY_HANG_UP			message
+MSG_TERM_STOP_REMOTE_SIGNAL		message
+MSG_TERM_USER_STOP_REMOTE_SIGNAL	message
+MSG_TERM_STOP_LOCAL_SIGNAL		message
+MSG_UPDATE_SERIAL_ERRORS		message
+MSG_DONE_PROTOCOL_INTERACTION 		message
+MSG_BUFFERED_SEND			message
+MSG_TERM_SET_CODE_PAGE			message
+MSG_TERM_BRING_UP_CODE_PAGE_BOX		message
+MSG_TERM_TERM_RESET			message
+MSG_TERM_MODEM_RESET			message
+
+;script-related messages:
+
+MSG_TERM_SCRIPT_FILE_SELECTED message		;MSG_MACRO_SELECT
+;	This method is sent by the UI when user double-clicks on the
+;	name of a script file.
+
+MSG_TERM_SCRIPT_RUN		message		;MSG_MACRO_OPEN
+;	This method is sent by the UI when user clicks on the "Run" trigger
+;	in the dialog box containing the list of script files.
+
+MSG_TERM_SCRIPT_DISPLAY_CLOSED message	;MSG_CLOSE_SCRIPT
+;	This method is sent by the UI when the "Script Display" dialog box
+;	is closed using the Close trigger.
+
+MSG_TERM_SCRIPT_ABORTED	message		;MSG_ABORT_SCRIPT
+;	This method is sent by the UI when the "Script Display" dialog box
+;	is closed using the Close trigger.
+
+MSG_TERM_SCRIPT_EXECUTE_NEXT_LINE	message	;MSG_SCRIPT_NEXT
+;	The Term thread sends this method to itself after it has executed
+;	one line of the script file. When this method arrives, we execute
+;	the next line of the script file, and send this method to ourself.
+
+MSG_TERM_FOUND_MATCH_CONTINUE_SCRIPT message
+;	This method is sent by the Serial thread (term:1), when
+;	it encounters a MATCH in the input stream. It is telling us
+;	to continue executing the script, starting with an offset
+;	of CX into the script. The serial thread has already suspended
+;	input from the host, so we don't have to worry about dropping
+;	characters while executing the script.
+
+if	_SPECIAL_KEY
+MSG_TERM_DISPLAY_SPECIAL_KEYS_LIST	message
+;
+; 	It is the query message for what to display in GenDynamicList
+; 	of Special Key List dialog.
+;
+
+endif	; if _SPECIAL_KEY
+
+
+if	_ACCESS_POINT
+	
+MSG_TERM_EDIT_CONNECTION		message
+; Edit the connection whose ID is in cx
+
+MSG_TERM_MAKE_CONNECTION		message
+; 	  
+; SYNOPSIS:	Make connection from defined access point
+; 
+; PASS:		nothing
+; RETURN:	nothing
+; DESTROYED:	nothing
+; SIDE EFFECTS:	
+; 	  
+	
+if not _TELNET
+
+MSG_TERM_SAVE_STOP_BITS			message
+;
+; SYNOPSIS:	Save stop bits setting.
+; PASS:		cx 	= selection
+; RETURN:	nothing
+; DESTROYED:	ax, cx, dx, bp
+
+MSG_TERM_SAVE_PARITY			message
+;
+; SYNOPSIS:	Save parity setting.
+; PASS:		cx 	= selection
+; RETURN:	nothing
+; DESTROYED:	ax, cx, dx, bp
+
+MSG_TERM_SERIAL_NOT_BLOCKING		message
+;
+; Sent from the serial thread in response to MSG_SERIAL_STOP_BLOCKING.
+; After this message is received, it is safe for the process
+; to call the serial thread.
+;
+; PASS:		nothing
+; RETURN:	nothing
+; DESTROYED:	ax, cx, dx, bp
+
+if	_VSER
+
+MSG_TERM_SEND_ECI_CALL_RELEASE_AFTER_CANCEL	message
+;
+; SYNOPSIS:	Send ECI_CALL_RELEASE after user cancels connection
+;
+; Pass:		nothing
+; Return:	nothing
+; Destroyed:	ax, cx, dx
+;
+
+MSG_TERM_RETRY_ANSWERING_DATA_CALL		message
+;
+; SYNOPSIS:	Try to answer an incoming call after already having
+;		tried to do so unsuccessfuly.
+;
+; Pass:		^hcx = ECI message data block
+; Return:	nothing
+; Destroyed:	ax, cx, dx, bp
+;
+
+endif	; _VSER
+		
+endif	; !_TELNET
+
+
+endif	; if _ACCESS_POINT
+
+if _LOGIN_SERVER
+
+MSG_TERM_LOGIN_INIT				message
+;
+; SYNOPSIS:	Prepares terminal emulator to serve as a manual
+;		login for PPP
+; Pass:		^hbp = LoginInitInfo (login.def)
+; Return:	nothing
+; Destroyed:	ax, cx, dx, bp
+
+MSG_TERM_ATTACH_TO_PORT				message
+;
+; SYNOPSIS:	invokes terminal emulator on a port already opened by an
+;		external communications protocol, like PPP.
+;
+; Pass:		^hbp	= LoginAttachInfo (Internal/login.def)
+; Return:	nothing
+; Destroyed:	ax, cx, dx, bp
+;
+
+MSG_TERM_DETACH_FROM_PORT			message
+;
+; SYNOPSIS:	ends a terminal session at any point in the login process
+;
+; Pass:		bp = connection token passed in MSG_TERM_LOGIN_INIT
+; Return:	nothing
+; Destroyed:	ax, cx, dx, bp
+
+MSG_TERM_DETACH_FROM_PORT_INTERNAL		message
+;
+; SYNOPSIS:	ends a terminal session started with MSG_TERM_ATTACH_TO_PORT.
+;
+; Pass:		cx = LoginResponse to send off to PPP, if needed.
+; Return:	nothing
+; Destroyed:	ax, cx, dx, bp
+
+endif ; _LOGIN_SERVER		
+
+;if _SCRIPT_VARIABLE
+
+;MSG_TERM_GET_VARIABLE	message
+;
+;SYNOPSIS:	given the variable text, returns pointer to text that should
+;be outputted in its place.
+;
+;CALLED BY:	MSG_TERM_GET_VARIABLE
+;PASS:		*ds:si	= TermClass object
+;		ds:di	= TermClass instance data
+;		ds:bx	= TermClass object (same as *ds:si)
+;		es 	= segment of TermClass
+;		ax	= message #
+;		cx:dx	= pointer to variable indicator string (past first
+;			  '$')
+;		bp	= length of string (characters)
+;RETURN:			
+;	 - proper variable
+;		cx:dx	= string to output
+;		bp	= length of this string (characters)
+	
+;	 - improper variable
+;		cx:dx	= trashed
+;		bp	= 0
+;DESTROYED:	see above
+
+;endif ; _SCRIPT_VARIABLE
+
+
+
+TermClass	endc
+
+
+							
+ScreenClass	class	 	MetaClass			
+	
+
+;
+;  TERMINAL EMULATION CAPABILITIES
+;
+
+MSG_SCR_DATA			message	
+MSG_SCR_BISON_9_OR_12		message	
+MSG_SCR_AUTO_LINEFEED_AND_WRAP	message
+MSG_SCR_SOUND_BELL		message
+MSG_SCR_CURSOR_LEFT		message
+MSG_SCR_CURSOR_RIGHT		message
+MSG_SCR_CURSOR_UP_UNCONSTRAINED	message
+MSG_SCR_CURSOR_UP		message
+MSG_SCR_CURSOR_DOWN		message
+MSG_SCR_TAB			message
+MSG_SCR_CR			message
+MSG_SCR_LF			message
+MSG_SCR_NEXT_LINE		message
+MSG_SCR_SCROLL_DOWN		message
+MSG_SCR_UP_ARROW		message
+MSG_SCR_DOWN_ARROW		message
+MSG_SCR_LEFT_ARROW		message
+MSG_SCR_RIGHT_ARROW		message
+MSG_SCR_FUNC_1		message
+MSG_SCR_FUNC_2		message
+MSG_SCR_FUNC_3		message
+MSG_SCR_FUNC_4		message
+MSG_SCR_CLEAR_HOME_CURSOR	message
+MSG_SCR_APPLICATION_KEYPAD	message
+MSG_SCR_NUMERIC_KEYPAD		message
+MSG_SCR_CHANGE_SCROLLREG	message
+MSG_SCR_RESET_SCROLLREG		message
+MSG_SCR_REL_CURSOR_MOVE	message
+MSG_SCR_BOLD_ON		message
+MSG_SCR_UNDERSCORE_ON	message	
+MSG_SCR_BLINK_ON		message
+MSG_SCR_REV_ON		message
+MSG_SCR_HOME_CURSOR		message
+MSG_SCR_CLEAR_TO_END_LINE	message
+MSG_SCR_CLEAR_TO_END_DISP	message
+MSG_SCR_CLEAR_TO_BEG_LINE	message
+MSG_SCR_CLEAR_TO_BEG_DISP	message
+MSG_SCR_CLEAR_LINE		message
+MSG_SCR_NORMAL_MODE		message
+MSG_SCR_SAVE_CURSOR		message
+MSG_SCR_RESTORE_CURSOR	message
+MSG_SCR_INS_LINE		message
+MSG_SCR_BACK_TAB		message
+MSG_SCR_DEL_LINE		message
+MSG_SCR_DEL_CHAR		message
+MSG_SCR_INS_CHAR		message
+MSG_SCR_GO_STATUS_COL	message
+MSG_SCR_ENTER_INS_MODE	message
+MSG_SCR_EXIT_INS_MODE	message
+MSG_SCR_SCROLL_UP		message
+MSG_SCR_TERM_INIT		message
+MSG_SCR_SANE_RESET		message
+MSG_SCR_EXIT			message
+MSG_SCR_SCROLLBUF_EMPTY	message
+MSG_SCR_GRAPHICS_ON		message
+MSG_SCR_MACRO_1		message
+MSG_SCR_MACRO_2		message
+MSG_SCR_MACRO_3		message
+MSG_SCR_MACRO_4		message
+MSG_SCR_MACRO_5		message
+MSG_SCR_MACRO_6		message
+MSG_SCR_MACRO_7		message
+MSG_SCR_MACRO_8		message
+MSG_SCR_REVERSE_VIDEO	message
+MSG_SCR_SET_BELL		message
+MSG_SCR_VISUAL_BELL		message
+MSG_SCR_SET_ROW		message
+MSG_SCR_SET_COL		message
+MSG_SCR_UNDERSCORE_OFF	message
+MSG_SCR_REV_OFF		message
+MSG_SCR_SET_XN		message
+MSG_SCR_SET_TAB		message
+MSG_SCR_CLEAR_TAB		message
+MSG_SCR_CURSOR_DOWN_OR_SCROLL	message
+MSG_SCR_CURSOR_DOWN_OR_SCROLL_N	message
+MSG_SCR_CURSOR_UP_OR_SCROLL	message
+MSG_SCR_SET_WIN_COLS		message
+MSG_SCR_SET_WIN_LINES	message
+MSG_SCR_RECORD_ON		message
+MSG_SCR_CURSOR_DOWN_N	message
+MSG_SCR_CURSOR_LEFT_N	message
+MSG_SCR_CURSOR_RIGHT_N	message
+MSG_SCR_CURSOR_UP_N		message
+MSG_SCR_CURSOR_UP_N_UNCONSTRAINED		message
+MSG_SCR_CURSOR_OFF		message
+MSG_SCR_CURSOR_ON		message
+if USE_FEP
+MSG_SCR_GET_FEP_TEMP_TEXT_ATTR	message
+;
+; pass:
+;	cx:dx = FepTempTextAttr to fill in
+; return:
+;	cx:dx = FepTempTextAttr filled in
+;	carry set if info not available
+;
+MSG_SCR_GET_FEP_TEMP_TEXT_BOUNDS	message
+;
+; pass:
+;	?
+; return:
+;	?
+;
+endif
+
+;
+; handler for unsupported escape codes
+;
+MSG_SCR_IGNORE_ESC_SEQ		message
+
+MSG_SCR_RENEW_GRAPHICS_ON	message
+;
+; SYNOPSIS:	Reset graphics attributes and then set the new ones
+;
+; Pass:		nothing
+; Return:	nothing
+; Destroyed:	ax, cx, dx, bp
+;
+
+MSG_SCR_RENEW_SCROLL_REG_BOTTOM	message
+;
+; SYNOPSIS:	Reset scroll region top and set new scroll region bottom line
+;
+; Pass:		nothing
+; Return:	nothing
+; Destroyed:	ax, cx, dx, bp
+;
+
+MSG_SCR_RESET_MODE	message
+;
+; SYNOPSIS:	To reset the modes like ANSI/VT52, Cursor key mode, etc
+;
+; Pass:		nothing
+; Return:	nothing
+; Destroyed:	nothing
+;
+
+MSG_SCR_SET_MODE	message
+;
+; SYNOPSIS:	To set the modes like ANSI/VT52, Cursor key mode, etc
+;
+; Pass:		nothing
+; Return:	nothing
+; Destroyed:	nothing
+;
+
+
+
+if	_SPECIAL_KEY
+MSG_SCR_SPECIAL_KEY_INSERT	message
+endif
+
+MSG_SCR_RESPOND_WHAT_ARE_YOU	message
+MSG_SCR_RESPOND_CURSOR_POSITION	message
+MSG_SCR_RESPOND_STATUS		message
+
+if	_CHAR_SET
+MSG_SCR_SELECT_G0		message
+MSG_SCR_SELECT_G1		message
+MSG_SCR_G0_SELECT_USASCII	message
+MSG_SCR_G0_SELECT_GRAPHICS	message
+MSG_SCR_G1_SELECT_USASCII	message
+MSG_SCR_G1_SELECT_GRAPHICS	message
+endif	; CHAR_SET
+
+if	_CLEAR_SCR_BUF
+MSG_SCR_CLEAR_SCREEN_AND_SCROLL_BUF	message
+;
+; Synopsis:	Clear screen and scroll buffer
+;
+; Context:	Screen buffer management
+; Source:	No restrictions
+; Destination:  a Screen object
+; Interception: not typically intercepted
+;
+; Pass:		nothing
+;			
+; Return:	nothing
+;
+; Destroyed:	ax, cx, dx, bp
+;
+endif	; _CLEAR_SCR_BUF
+	
+;----------------------------------------
+; 	ScreenClass Instance Data
+;----------------------------------------
+SI_fontColor	Color		
+SI_gState	hptr.GState	;handle to our GState
+	noreloc SI_gState
+SI_winHandle	dw	(?)	;handle to window we're attached to
+SI_lineHeight	dw	(?)	;height of line  (should be a byte)
+SI_leading	dw	(?)
+SI_charWidth	dw	(?)
+SI_backColor	Color
+SI_cursorDrawn	db	(?)	;flag if cursor visible
+SI_lastCursorX	dw	(?)	;(Doc coord) X of last cursor drawn
+SI_lastCursorY	dw	(?)	;(Doc coord) y of last cursor drawn
+SI_scrollHandle	hptr	(?)	;handle to buffer
+SI_scrollLines	dw	(?)	;place to insert in scroll buffer
+SI_scrollTop	dw	(?)	;top line in scroll buffer
+SI_screenBuf	sptr	(?)	;screen buffer segment
+SI_screenHandle	hptr	(?)	;screen buffer handle
+SI_curLine	dw	(?)	;line in window cursor is on
+SI_curChar	dw	(?)	;col  in window cursor is on
+CUR <SI_curPos	dw	(?)	;actual cursor position			>
+SI_winTopLine	dw	(?)	;line in buffer at top of the window
+SI_saveCursorX	dw	(?)	;saved cursor position (termcap feature)
+SI_saveCursorY	dw	(?)	;
+SI_scrollRegTop	dw	(?)	;top of scroll region
+SI_scrollRegBot	dw	(?)	;bottom of scroll region
+SI_insertMode	db	(?)	;is terminal in insert mode
+SI_wrap	 	db	(?)	;flag if we've wrapped around scroll buf
+SI_inScroll	db	(?)	;flag if user scrolled away from window
+SI_attributes	db	(?)	;character attributes
+SI_reverseVideo	db	(?)	;true if screen in reverse video
+SI_autoWrap	db	(?)	;true if text should autowrap
+SI_autoLinefeed	db	(?)	;true if text should append LF after CR
+SI_visualBell	db	(?)	;true if visual bell should be used
+SI_ignoreNL	db	(?)	;true if should ignore newlines after 80 cols. 
+SI_gotFocus	db	(?)	;true if we've got the focus
+SI_docWidth	dw	(?)	;document width
+SI_docHeight	dw	(?)	;document height
+SI_winWidth	dw	(?)	;width of window
+SI_winHeight	dw	(?)	;height of window
+SI_cacheHandle	hptr	(?)	;buffer handle for data to save to disk
+SI_cacheSize	dw	(?)	;size of cache
+SI_winBottom	dw	(?)	;bottom of the view (in doc coords) 
+SI_capHandle	dw	(?)	;handle of capture file
+SI_maxLines	db	(?)	;max #lines our screen can display
+SI_maxCols	db	(?)	;max #cols our screen can display
+SI_iconified	db	(?)	;true if we're iconified
+
+ScreenInternalFlags	record
+	SIF_IN_VIEW:1,		; set if mouse pointer in View
+	SIF_FEEDBACK_ON:1	; set if doing feedback for quick-transfer
+ScreenInternalFlags	end
+
+SI_intFlags	ScreenInternalFlags
+
+;
+; The flags to describe what modes we are in. This is useful to VT100 and
+; maybe to other term types as well.
+;
+; The flag is set when it receives escape code to Set.
+; The flag is clear when it receives escape code to Reset.
+;
+ScreenVTModeFlags	record
+	SVTMF_LF_NEWLINE:1
+	; set if lf->new line mode; unset if line feed mode
+	SVTMF_CURSOR_KEY:1
+	; set if application mode; unset if cursor mode
+	SVTMF_ANSI_VT52:1
+	; set if ANSI mode; unset if VT52 mode
+	SVTMF_COLUMN:1
+	; set if 132 column mode; unset if 80 column mode
+	SVTMF_SCROLLING:1
+	; set if smooth scroll mode; unset if jump scroll mode
+	SVTMF_SCREEN:1
+	; set if reverse screen mode; unset if normal screen mode
+	SVTMF_ORIGIN:1
+	; set if relative origin mode; unset if absolute origin mode
+
+	; SVTMF_WRAPAROUND:1
+	; set if wrap around mode
+	;  (SI_autoWrap already does this)
+
+	SVTMF_AUTO_REPEAT:1
+	; set if auto repeat mode
+	SVTMF_INTERLACE:1
+	; set if interlace mode
+	SVTMF_GRAPHICS_PROC_OPT:1
+	; set if graphic proc. opt mode
+	SVTMF_KEYPAD:1
+	; set if application keypad mode; unset if numeric keypad mode
+ScreenVTModeFlags	end
+
+SCREEN_VT_MODE_DEFAULT_FLAGS	equ \
+				(mask SVTMF_ANSI_VT52 or mask SVTMF_AUTO_REPEAT)
+		
+SI_modeFlags	ScreenVTModeFlags
+
+
+if	_CHAR_SET
+
+CharSetDesignator	etype	byte
+CSD_G0			enum	CharSetDesignator
+CSD_G1			enum	CharSetDesignator
+
+DEFAULT_CHAR_SET_DESIGNATOR \
+			equ	CSD_G0
+
+TermCharacterSet	etype	byte
+TCS_UK			enum	TermCharacterSet
+TCS_USASCII		enum	TermCharacterSet
+TCS_GRAPHICS		enum	TermCharacterSet
+TCS_ROM			enum	TermCharacterSet
+TCS_ROM_GRAPHICS	enum	TermCharacterSet
+
+DEFAULT_CHARACTER_SET	equ	TCS_USASCII
+
+;
+; Instance data for alternate character set
+;
+SI_charSetDesignator	CharSetDesignator	DEFAULT_CHAR_SET_DESIGNATOR
+				; Which chararacter set designator G0 or G1?
+SI_G0CharSet		TermCharacterSet	DEFAULT_CHARACTER_SET
+				; what chararacter set is G0 holding?
+SI_G1CharSet		TermCharacterSet	DEFAULT_CHARACTER_SET
+				; what character set if G1 holding
+endif	; if _CHAR_SET
+
+ScreenClass		endc
+
+if	not _TELNET
+SerialReaderClass  class	ProcessClass 
+MSG_READ_DATA	message
+MSG_READ_CHAR	message
+MSG_READ_BUFFER	message
+MSG_READ_BLOCK	message
+MSG_NUKE_FSM		message
+MSG_REALLY_NUKE_FSM	message
+if	not _MODEM_STATUS
+MSG_READ_SET_TERMINAL message
+;	PASS:	cl	= terminal type to use
+;	RETURN:	nothing
+;
+;	Creates a new FSM given the terminal type to use.
+endif	; if !_MODEM_STATUS
+
+;methods for scripts:
+
+MSG_SERIAL_ENTER_SCRIPT_MODE		message
+MSG_SERIAL_ENTER_SCRIPT_SUSPEND_MODE	message
+MSG_SERIAL_EXIT_SCRIPT_MODE		message
+MSG_SERIAL_ENTER_SCRIPT_PROMPT_MODE	message
+MSG_SERIAL_ENTER_SCRIPT_PAUSE_MODE	message
+
+if	_MODEM_STATUS
+MSG_SERIAL_CHECK_MODEM_STATUS_START	message
+;
+; Begin checking modem status. Alloc buffer to capture modem response 
+;
+; PASS:		nothing
+; RETURN:	carry set if error
+; DESTROYED:	ax, cx
+;
+
+MSG_SERIAL_CHECK_MODEM_STATUS_END	message
+;
+; Clean up checking modem status
+;
+; PASS:		dgroup:[responseBufHandle] = hptr to block hold modem
+;		response
+; RETURN:	nothing
+; DESTROYED:	nothing
+;
+
+MSG_SERIAL_SEND_INTERNAL_MODEM_COMMAND	message
+;
+; Send internal preset modem command
+;
+; PASS:		dl	= TermInternalModemInitString
+; RETURN:	carry set if connection error
+; DESTROYED:	ax, cx, dx, bp
+;
+
+MSG_SERIAL_SEND_CUSTOM_MODEM_COMMAND	message
+;
+; Send custom modem command
+;
+; PASS:		ch	= timeout value:
+;			  if 0:	TERM_LONG_REPLY_TIMEOUT 
+;			  if 1: TERM_SHORT_REPLY_TIMEOUT
+;		cl	= number of characters to send
+;		dx:bp	= fptr of custom command string w/o CR character
+; RETURN:	carry set if connection error
+; DESTROYED:	ax, cx, dx, bp
+;
+
+MSG_SERIAL_SEND_DIAL_MODEM_COMMAND	message
+;
+; Send dial modem command
+;
+; PASS:		cl	= number of characters to send
+;		dx:bp	= fptr of custom command string w/o CR character
+; RETURN:	carry set if connection error
+; DESTROYED:	ax, cx, dx, bp
+;
+
+MSG_SERIAL_MODEM_RESPONSE_TIMEOUT	message
+;
+; Timeout waiting for modem response
+;
+; PASS:		nothing
+; RETURN:	nothing
+; DESTROYED:	nothing
+;
+
+MSG_SERIAL_CANCEL_CONNECTION            message
+;
+; Cancel dial-up connection. It should be sent when the connection is
+; being made. It kills and re-establishes the com port.
+;
+; PASS:         nothing
+; RETURN:       nothing
+; DESTROYED:    nothing
+;
+
+MSG_SERIAL_OK_TO_BLOCK			message
+;
+; Tells the serial thread that it may perform operations that
+; block on the process thread.
+;
+; PASS:		nothing
+; RETURN:	nothing
+; DESTROYED:	ax, cx, dx, bp
+;
+
+MSG_SERIAL_STOP_BLOCKING		message
+;
+; A Request to the serial thread to stop blocking, so that it
+; may be called from other threads.  The sender (the process) must wait
+; for a MSG_TERM_SERIAL_NOT_BLOCKING response.
+;
+; PASS:		nothing
+; RETURN:	nothing
+; DESTROYED:	ax, cx, dx, bp
+
+endif	; if _MODEM_STATUS
+
+
+SerialReaderClass  endc	
+endif	; !_TELNET
+
+;
+; to help deal with Protocol box interaction
+;
+ProtocolInteractionClass	class	GenInteractionClass
+
+MSG_PROTOCOL_INTERACTION_STORE_SETTINGS	message
+
+PII_comListState	word
+PII_baudListState	word
+PII_dataListState	word
+PII_parityListState	word
+PII_stopListState	word
+PII_flowListState	word
+PII_stopRemoteListState	word
+PII_stopLocalListState	word
+ProtocolInteractionClass	endc
+	
+
+
+; define our geoComm puke errors
+
+BAD_READ_DATA_PARAM	enum	FatalErrors
+
+;-----------------------------------------------------------------------------
+;                TermTimedDialogClass
+;-----------------------------------------------------------------------------
+
+MINIMUM_DIALOG_VISIBILITY	equ 3	; dialogs should stay up for 3 secs
+
+TermTimedDialogState	record
+	TTDS_DISMISSED:1
+	TTDS_TIMED_OUT:1
+	:6
+TermTimedDialogState	end
+
+TermTimedDialogClass	class	GenInteractionClass
+	MSG_TERM_TIMED_DIALOG_TIMEOUT	message
+	; sent by the timer when it expires
+
+	TTDI_minVisibility	byte	MINIMUM_DIALOG_VISIBILITY
+	; minimum number of seconds the dialog should remain on screen
+
+	; everything below this point is internal use only
+
+	TTDI_state		TermTimedDialogState	0
+	; which events we've received
+
+TermTimedDialogClass	endc
+
+;-----------------------------------------------------------------------------
+;		TermSettingsContentClass
+;-----------------------------------------------------------------------------
+if _ACCESS_POINT
+TermSettingsContentClass	class	GenContentClass
+;
+; subclassed to intercept MSG_GEN_NAVIGATE_TO_NEXT_FIELD
+;
+TermSettingsContentClass	endc
+endif
+
+;------------------------------------------------------------------------------
+;			Constants
+;------------------------------------------------------------------------------
+
+
+MAX_LINES		equ	24	; max # of lines we display
+
+if PZ_PCGEOS
+INIT_LINE_CHARS	equ	75
+else
+INIT_LINE_CHARS	equ	80
+endif
+MAX_LINE_CHARS	equ	80		;max # chars user can see
+
+SBCS <LINE_LENGTH	equ	128		;# of chars in each line>
+DBCS <LINE_LENGTH	equ	256		;# of chars in each line>
+SBCS <LINE_DATA       equ     LINE_LENGTH - MAX_LINE_CHARS		>
+DBCS <LINE_DATA       equ     LINE_LENGTH - MAX_LINE_CHARS*(size wchar)	>
+
+		
+; Scroll buffer constants 
+;
+SBCS <DOC_LINES	equ	200		;# lines in document		>
+DBCS <DOC_LINES	equ	100		;# lines in document		>
+SCROLL_LINES	equ	DOC_LINES - MAX_LINES	;186 line scroll buffer
+SCROLL_BUF_SIZE	equ	SCROLL_LINES * LINE_LENGTH
+
+	;
+	; There are many places having assumption on the number of characters
+	; being 80. For example, when they calculate offset of buffer to
+	; start of line, it calculates with assumption of 128 bytes per line.
+	;
+CheckHack<MAX_LINE_CHARS eq 80>
+	
+; font constants
+;
+if PZ_PCGEOS
+TERM_FONT	equ	FID_PIZZA_KANJI
+TERM_FONT_9	equ	16
+TERM_FONT_12	equ	16
+
+BISON_9_WIDTH   equ     8
+BISON_9_LEADING	equ	1
+BISON_9_HEIGHT  equ     16 + BISON_9_LEADING
+else
+
+
+	DEF_POINT_SIZE	equ	9
+	TERM_FONT	equ	FID_BISON
+	TERM_FONT_9	equ	9
+	TERM_FONT_12	equ	13
+
+
+	
+
+BISON_9_WIDTH   equ     6			;bison 9 character width
+BISON_9_LEADING	equ	2			; spacing between lines
+BISON_9_HEIGHT  equ     9 + BISON_9_LEADING	;bison 9 character height
+
+
+
+endif	; if _RESPONDER <-- wrong, should be PZ_GEOS
+
+		
+BISON_9_DOC_WIDTH	equ	(MAX_LINE_CHARS * BISON_9_WIDTH)
+BISON_9_DOC_HEIGHT	equ	(DOC_LINES * BISON_9_HEIGHT)
+
+if PZ_PCGEOS
+BISON_12_WIDTH  	equ     8
+BISON_12_LEADING	equ	1
+BISON_12_HEIGHT 	equ     16 + BISON_12_LEADING
+else
+	
+	BISON_12_WIDTH  equ     7               ;bison 12 character width
+	BISON_12_LEADING equ	5		; spacing between lines
+	BISON_12_HEIGHT equ     12 + BISON_12_LEADING ;bison 12 character
+						      ;height
+
+	
+endif	; if PZ_PCGEOS
+
+;if _DOVE
+;TERM
+;endif ; DOVE
+
+
+BISON_12_DOC_WIDTH	equ	(MAX_LINE_CHARS * BISON_12_WIDTH)
+BISON_12_DOC_HEIGHT	equ	(DOC_LINES * BISON_12_HEIGHT)
+
+DEF_FONT_WIDTH	equ	BISON_9_WIDTH	
+DEF_FONT_HEIGHT	equ	BISON_9_HEIGHT
+DEF_FONT_LEADING equ	BISON_9_LEADING
+
+LINE_HEIGHT	equ	DEF_FONT_HEIGHT ; height of line 
+	
+; screen constants
+;
+SCREEN_SIZE	equ	(MAX_LINES * LINE_LENGTH) ;screen buffer size
+
+INIT_HEIGHT	equ	(MAX_LINES	* LINE_HEIGHT)
+MAX_HEIGHT	equ	(DOC_LINES 	* LINE_HEIGHT)
+
+INIT_WIDTH	equ	(INIT_LINE_CHARS	* DEF_FONT_WIDTH)
+MAX_WIDTH	equ 	(MAX_LINE_CHARS	* DEF_FONT_WIDTH)	; maximum width
+
+SERIAL_IN_SIZE	equ	1024		;initial input buffer size
+SERIAL_OUT_SIZE	equ	1024		;initial output buffer size
+
+AUX_BUF_SIZE	equ	SERIAL_IN_SIZE	;auxilary buffer same size as input buf
+
+; keyboard constants
+;
+NOT_CHAR_PRESS	equ	11111011b	;not a key press
+CHAR_PRESS	equ	00000100b	;char press
+CHAR_RELEASE	equ	00000001b	;char release
+CHAR_CTRL_FLAG	equ	0ffh		;ascii control flag
+
+; Character constants
+;
+CHAR_NULL	equ	0		;
+CHAR_BELL	equ	07h		;bell sound
+CHAR_BS		equ	08h		;back space
+CHAR_TAB	equ	09h		;
+CHAR_LF		equ	0ah		;line feed
+CHAR_NL		equ	0ah		;new line
+CHAR_VT		equ	0bh		;vertical tab
+CHAR_FF		equ	0ch		;form feed
+CHAR_CR		equ	0dh		;carriage return
+CHAR_XON	equ	11h		;transmit on
+CHAR_XOFF	equ	13h		;transmit off
+CHAR_SPACE	equ	020h		;ascii space
+CHAR_PRINT	equ	020h		;first printable ASCII character
+CHAR_CTRL	equ	'^'		;ascii control character
+CHAR_ESC	equ	01bh		;escape char
+CTRL_MASK	equ	00011111b	;use five bits to make control chars
+
+CHAR_TONE       equ     'T'                     ;char for tone dialing
+CHAR_PULSE      equ     'P'                     ;char for pulse dialing
+DIAL_PREFIX_LEN equ     3                       ;length of 'ATD' string
+
+COMMENT_FLAG	equ	';'		;start of comment line
+
+; Misc constants
+;
+BOGUS_VAL	equ	0ffffh		;bogus flag
+FILE_APPEND	equ	0		;flag if append to existing files
+FILE_OVERWRITE	equ	0ffh		;flag if overwrite existing files
+
+;
+; default character to use when mapping between code pages
+;
+MAPPING_DEFAULT_CHAR	equ	'.'
+FILE_MAPPING_DEFAULT_CHAR	equ	'_'
+
+;
+; Max number chars passed on stack
+;
+MAX_NUM_CHARS_PASSED_ON_STACK	equ	20	;ObjMessage will require two
+						;handles to pass this on stack.
+
+;
+; Protocol Types 
+; 
+Protocol 	etype	byte
+NONE		enum 	Protocol
+XMODEM		enum 	Protocol
+
+;
+; Terminal types 
+;
+; This list must match TermEntries (Utils/utilsMain.asm),
+;	TermTable (Script/scriptLocal.asm),
+;	termcapTable (Main/mainVariable.def)
+;	vtModeTables (Screen/screenMain.asm)
+;
+Terminals 	etype	byte
+TTY 		enum	Terminals
+VT52		enum 	Terminals
+VT100 		enum 	Terminals
+WYSE50 		enum 	Terminals
+ANSI 		enum 	Terminals
+IBM3101 	enum 	Terminals
+TVI950		enum 	Terminals
+
+;
+; Types of different modes of emulation that uses the syntax "\E[?%dh" or
+; "\E[?%dl". 
+;
+; This is useful for VT100 and maybe useful for other term types as well.
+; (although other term types might use different actual values for their
+;  modes)
+;
+TermVTModeType	etype	byte, 1
+TVTMT_CURSOR_KEY	enum	TermVTModeType
+TVTMT_ANSI_VT52		enum	TermVTModeType
+TVTMT_COLUMN		enum	TermVTModeType
+TVTMT_SCROLLING		enum	TermVTModeType
+TVTMT_SCREEN		enum	TermVTModeType
+TVTMT_ORIGIN		enum	TermVTModeType
+TVTMT_WRAPAROUND	enum	TermVTModeType
+TVTMT_AUTO_REPEAT	enum	TermVTModeType
+TVTMT_INTERLACE		enum	TermVTModeType
+TVTMT_LINEFEED		enum	TermVTModeType, 20
+;
+; File Transfer types
+; 
+XMODEM_128 	equ	0
+XMODEM_1K 	equ	1
+
+XMODEM_CHECK	equ	0
+XMODEM_CRC 	equ	1
+
+		
+NO_PORT	equ	0ffh			;flag if no com port opened
+
+TermMode 	etype byte
+OFF_LINE 	enum TermMode		;terminal offline 
+ON_LINE		enum TermMode		;terminal online mode	
+FILE_SEND	enum TermMode		;terminal sending file
+FILE_RECV	enum TermMode		;terminal receiving file
+IN_SCRIPT	enum TermMode		;terminal executing script file
+DORKED		enum TermMode		;terminal is dorked no memory - abort
+
+
+if _LOGIN_SERVER
+
+LoginPhase	etype	word, 0, 2
+
+	LP_NONE		enum	LoginPhase
+	LP_INIT		enum	LoginPhase
+	LP_WAITING	enum	LoginPhase
+	LP_ACTIVE	enum	LoginPhase
+
+endif ; _LOGIN_SERVER
+	
+;
+; Error Strings
+;
+ErrorString 		etype byte
+ERR_DISK_WRITE		enum ErrorString	;error writing to disk
+ERR_NO_HOST		enum ErrorString	;can't contact host
+ERR_NO_PORT		enum ErrorString	;no com port selected
+ERR_TERMCAP_NOT_FOUND	enum ErrorString	;termcap file not found
+ERR_NO_REMOTE		enum ErrorString	;remote is dorked
+ERR_SEND_ABORT		enum ErrorString	;send abort
+ERR_RESP_COMPLETE	enum ErrorString	;no response for send complete
+ERR_NO_FILE		enum ErrorString	;no file specified
+ERR_MAKE_TERM_DIR	enum ErrorString	;couldn't make TERM subdirectory
+ERR_FILE_TOO_BIG	enum ErrorString	;file too big, can't get memory
+ERR_GENERAL_FILE_OPEN	enum ErrorString	;error open file (general)
+ERR_SCRIPT_FILE_OPEN	enum ErrorString	;error open file (script)
+ERR_FTRANS_FILE_OPEN	enum ErrorString	;error open file (file trans)
+ERR_CREATE_FILE		enum ErrorString	;error creating file
+ERR_CURSOR_MOVE		enum ErrorString	;error moving cursor
+ERR_UNDEF_MACRO		enum ErrorString	;undefined macro
+ERR_UNDEF_BAUD		enum ErrorString	;undefined baud rate
+ERR_UNDEF_DATA		enum ErrorString	;undefined data bits
+ERR_UNDEF_PARITY	enum ErrorString	;undefined parity
+ERR_UNDEF_STOP		enum ErrorString	;undefined stop
+ERR_UNDEF_DUPLEX	enum ErrorString	;undefined duplex
+ERR_UNDEF_TERM		enum ErrorString	;undefined terminal
+ERR_UNDEF_PORT		enum ErrorString	;undefined port
+
+ERR_UNDEF_STR		enum ErrorString	;undefined string
+						;(missing ending quote,
+						;or contains bad character)
+
+ERR_UNDEF_NUM		enum ErrorString	;undefined number
+
+ERR_UNDEF_CHAR		enum ErrorString	;undefined character expression
+
+ERR_UNDEF_LABEL		enum ErrorString	;undefined label
+
+ERR_NO_GOTO		enum ErrorString	;no GOTO label after MATCH cmd
+ERR_NO_MEM_ABORT	enum ErrorString	;abort term cauz no memory
+ERR_NO_MEM_TRANS_OBJ	enum ErrorString	;abort transfer object
+ERR_NO_MEM_FSM		enum ErrorString	;can't create terminal FSM
+ERR_NO_MEM_FTRANS	enum ErrorString	;no memory for file transfer
+ERR_COM_OPEN		enum ErrorString	;couldn't open com port
+ERR_COM_MISSING		enum ErrorString	;couldn't find com port
+ERR_NO_COM		enum ErrorString	;no com port error
+ERR_NO_LABEL		enum ErrorString	;no label for goto command
+ERR_USE_SERIAL_DR	enum ErrorString	; cannot load serial driver
+
+ERR_MISSING_STR		enum ErrorString	;missing string argument for
+						;DIAL, MATCH, etc.
+
+ERR_BAD_SCRIPT_MACRO	enum ErrorString	;bad unrecognizable macro cmd
+ERR_MATCH_TABLE_FULL	enum ErrorString	;match table full
+
+ERR_FILE_OPEN_SHARING_DENIED enum ErrorString
+ERR_FILE_NEW_WRITE_PROTECTED enum ErrorString
+
+if INPUT_OUTPUT_MAPPING
+ERR_INPUT_OUTPUT_MAP_ERROR enum ErrorString	;error reading input/output map
+endif
+
+ERR_REMOTE_CAN		enum ErrorString	;remote system cancelled file
+						;	transfer
+
+if	_MODEM_STATUS
+ERR_CONNECT_MODEM_INIT_ERROR \
+			enum ErrorString	; error in modem init string
+ERR_CONNECT_DATAREC_INIT_ERROR \
+			enum ErrorString	; error in datarec modem init
+						; string 
+ERR_CONNECT_NO_PHONE_NUM \
+			enum ErrorString	; missing phone number
+ERR_CONNECT_TEMP_ERROR	enum ErrorString	; temporary failure
+	
+if	_TELNET
+ERR_CONNECT_PROVIDER_ERROR \
+			enum ErrorString	; set up problem, provider err
+ERR_RESOLVE_ADDR_ERROR	enum ErrorString	; unable to resolve host address
+else
+ERR_CONNECT_BUSY	enum ErrorString	; line is busy
+
+endif	; _TELNET
+
+ERR_CONNECT_RING	enum ErrorString	; phone is ringing
+ERR_CONNECT_NOT_CONNECT enum ErrorString	; cannot connect
+ERR_CONNECT_GENERAL_ERROR \
+			enum ErrorString	; general connection error
+ERR_CONNECT_TIMEOUT	enum ErrorString	; timeout and no connection
+endif	; _MODEM_STATUS
+
+if	_TELNET
+ERR_IP_ADDR		enum ErrorString	; incorrect IP addr 
+ERR_NO_INTERNET_ACCESS	enum ErrorString	; no internet access defined
+ERR_NO_USERNAME		enum ErrorString	; no username for access point
+						;  and password prompting needed
+ERR_AUTH_FAILED		enum ErrorString	; authentication failed
+ERR_LINE_BUSY		enum ErrorString	
+ERR_NO_ANSWER		enum ErrorString	
+ERR_DIAL_ERROR		enum ErrorString
+ERR_CONNECT_REFUSED	enum ErrorString	; connection refused
+
+endif	; _TELNET
+
+
+if _TELNET
+ERR_CLOSE_DOMAIN_FAILED	enum ErrorString	
+endif
+
+;
+; Flags for DisplayErrorMessage
+;
+DisplayErrorFlags	record
+	DEF_SYS_MODAL:1
+	; Makes error dialog sys modal if set
+	; (only meaningful in versions where error dialog is non-blocking,
+	;  like Responder)
+
+	:7
+
+	DEF_ERROR_NUM	ErrorString:8
+	; The ErrorString to display
+
+DisplayErrorFlags	end
+
+
+
+
+;misc constants
+
+if ERROR_CHECK
+EC_TRACE_BUFFER		equ	FALSE		;set TRUE in EC code to enable
+else						;use of SW trace buffer (hack!)
+EC_TRACE_BUFFER		equ	FALSE
+endif
+
+FILE_SIZE_MAX		equ	8192		;figure 8K is too big
+TIMER_EVENT		equ     0ffffh          ;flag timer event
+
+PACKET_128              equ     128             ;128 byte packets
+PACKET_1K               equ     1024            ;1K byte packets
+PACKET_4K               equ     4096            ;4K byte packets
+
+ONE_SECOND		equ	60		;one second length
+TWO_SECOND		equ	2*ONE_SECOND	;two second length
+THREE_SECOND		equ	3*ONE_SECOND	;three second length
+FIVE_SECOND		equ	5*ONE_SECOND	;five second length
+TEN_SECOND		equ	10*ONE_SECOND	;ten second length
+ONE_MINUTE		equ	60*ONE_SECOND	;one minute
+
+ERROR_FLAG		equ	0ffh	
+
+OCTAL			equ	0		;numbers in octal	
+DECIMAL			equ	1		;numbers in decimal	
+HEX			equ	2		;numbers in hex	
+
+OCTAL_BASE		equ	8
+DECIMAL_BASE		equ	10
+HEX_BASE		equ	16
+
+DISP_BUF_SIZE		equ	6		;size of buffer to display vars
+
+MY_SERIAL_COM1		equ	1		;using my own constants for 
+MY_SERIAL_COM2		equ	3		;serial ports because the
+MY_SERIAL_COM3		equ	5		;genList passes 0 if no entries
+MY_SERIAL_COM4		equ	7		;are selected and don't want
+						;to confuse 0 with valid comport 
+;
+; terminal table constants
+;
+TERM_TABLE_HEADER_SIZE	equ	2	;#byte of terminal table header
+MAX_TERM_ENTRIES	equ	5	;max #of term entries	
+
+TermTableEntryStruct	struct
+	TTE_termType	Terminals
+	TTE_termSeg	dw	(?)	;segment of term FSM
+	TTE_termHandle	dw	(?)	;handle of Lmem segment
+TermTableEntryStruct	ends
+
+TERM_TABLE_ENTRY_SIZE	equ	5	;#bytes in a terminal table entry
+					;#bytes to hold all the terminals
+TERMINAL_BYTES		equ	TERM_TABLE_ENTRY_SIZE * MAX_TERM_ENTRIES
+
+TermTableStruct	struct
+	TTS_numEntries	db	(?)	;number  of entries in table
+	TTS_maxEntries	db	(?)	;max num of entries 
+	TTS_terminals	TermTableEntryStruct MAX_TERM_ENTRIES dup (<>)
+TermTableStruct	ends
+
+;
+; maximum number of phone number characters in Quick Dial box, or
+; in access point settings on Responder
+;
+MAX_PHONE_NUMBER_CHARS	equ	20
+
+;
+; maximum number of characters to send when sending a buffered (delayed)
+; buffer
+;
+MAX_NUM_BUFFERED_SEND_CHARS	equ	80
+	
+;
+; Default value for arguments in variable "argArray".
+;
+DEFAULT_ARGARRAY_ARG_VALUE	equ	0
+	
+;
+; Max number of arguments passed to an emulation function
+;
+MAX_EMULATION_ARG		equ	4
+
+;
+;	FatalErrors
+;
+TERM_USING_UNLOCKED_SCREEN_BUF			enum FatalErrors
+TERM_ERROR_INPUT_LINE_BUFFER_OVERFLOW_OH_SHIT	enum FatalErrors
+TERM_ERROR_RECD_CHARS_WHILE_EXEC_SCRIPT		enum FatalErrors
+TERM_ERROR_DS_NOT_DGROUP_SEGMENT		enum FatalErrors
+TERM_ERROR_ES_NOT_DGROUP_SEGMENT		enum FatalErrors
+TERM_ERROR_NOT_RUNNING_IN_SERIAL_THREAD		enum FatalErrors
+TERM_ERROR					enum FatalErrors
+TERM_ERROR_NO_MODEM_NAME			enum FatalErrors
+TERM_ERROR_INVALID_CURSOR_POSITION		enum FatalErrors
+; The cursor position does not retain on the screen. 
+;
+
+TERM_TOO_MANY_ARGS_TO_FUNCTIONS			enum FatalErrors
+; There are too many arguments for a function to process than
+; what we can hold in the storage.	
+;
+		
+TERM_INVALID_SAVED_STATE_HEADER			enum FatalErrors
+; The SavedStateHeader is containing invalid information. Possibly someone
+; else has trashed its memory.
+;
+
+TERM_RESPONSE_ARGUMENT_TOO_LONG			enum FatalErrors
+;
+; The ASCII representation of a numeric argument in a terminal
+; code is too long for its buffer
+;
+
+if	not _TELNET
+
+TERM_INVALID_MODEM_RESPONSE_ERR_STRING_TABLE_INDEX enum FatalErrors
+; The index to modem response error string table is incorrect.
+;
+
+endif	; !_TELNET
+	
+		
+if	_CHAR_SET
+TERM_INVALID_CHARACTER_SET			enum FatalErrors
+endif
+
+if	_SPECIAL_KEY
+TERM_INVALID_SPECIAL_KEY_SELECTION		enum FatalErrors 
+;
+; Special key selection from GenDynamicList is invalid
+;
+endif
+
+if 	_ACCESS_POINT
+TERM_CONNECTION_DEFINITION_FAILED		enum	FatalErrors
+;
+; Couldn't update the init file with information about a connection
+;
+endif
+
+if	_VSER
+UNEXPECTED_ECI_MESSAGE				enum	FatalErrors
+;
+; An ECI message was received which there is no code to handle
+;
+	
+TERM_DATAREC_MODEM_INIT_STRING_TOO_LONG		enum	FatalErrors
+TERM_INVALID_ECI_CALL_DATA_CALL_COMING_DATA_BITS enum   FatalErrors
+TERM_INVALID_ECI_CALL_DATA_CALL_COMING_STOP_BITS enum	FatalErrors	
+
+;
+; Terminal must be using an access point or at least have a phone
+; number to make a connection.
+;
+TERM_NO_ACCPNT_NAME_NOR_NUMBER			enum	FatalErrors
+
+endif
+
+
+if	_MODEM_STATUS
+
+TERM_CANNOT_SEND_EMPTY_CUSTOM_MODEM_COMMAND	enum FatalErrors
+; The modem custom init string to send should not be empty. If it is
+; empty, it should not be asked to send at all.
+
+endif	; _MODEM_STATUS
+	
+TERM_INVALID_TOP_LINE_NUMBER			enum Warnings
+TERM_SAVED_STATE_TABLE_FULL			enum Warnings
+TERM_MORE_THAN_TWO_MATCHES_IN_BACKTRACK_STATE	enum Warnings
+; It is very unusual for more than 2 same chars entered in a single state
+; char table   
+; 
+TERM_INVALID_SET_RESET_MODE_TYPE		enum Warnings
+; The type of mode to set or reset is invalid
+
+TERM_FUNCTION_NOT_SUPPORTED			enum Warnings
+;
+; This is a valid terminal function, but it isn't fully supported.
+;
+TERM_ASCII_SEND_FAIL				enum Warnings
+; The communications routine SendBuffer cannot send the chunk of data during
+; ASCII uploading. However, it is not because of network problem. Probably it
+; is because the send queue is full.
+; 
+	
+
+if	_VSER
+
+TERM_CANNOT_REGISTER_ECI			enum Warnings
+TERM_CANNOT_UNREGISTER_ECI			enum Warnings
+TERM_SEND_ECI_CALL_RELEASE			enum Warnings
+TERM_RESEND_ECI_CALL_RELEASE			enum Warnings
+TERM_IGNORE_ECI_CALL_RELEASE			enum Warnings
+
+TERM_CANNOT_LOG_CALL_START			enum Warnings
+TERM_CANNOT_LOG_CALL_END			enum Warnings
+
+endif	; _VSER
+
+if _LOGIN_SERVER
+
+TERM_NOT_IN_LOGIN_MODE				enum Warnings
+
+TERM_ALREADY_IN_LOGIN_MODE			enum Warnings
+
+TERM_LOGIN_PHASE_NOT_CORRECT			enum Warnings
+
+endif ; _LOGIN_SERVER
+
+CUR_LINE_ADJUSTED				enum Warnings
+DBCS <KBD_CONVERSION_ERROR			enum Warnings		>
+DBCS <FSM_CONVERSION_ERROR			enum Warnings		>
+DBCS <XFER_IN_CONVERSION_ERROR			enum Warnings		>
+DBCS <XFER_OUT_CONVERSION_ERROR			enum Warnings		>
+DBCS <SEND_CONVERSION_ERROR			enum Warnings		>
+DBCS <SCRIPT_MATCH_CONVERSION_ERROR		enum Warnings		>
+DBCS <BUFFER_OVERFLOW				enum Warnings		>
+DBCS <DBCS_BAD_BUFFER_BOUNDARY			enum Warnings		>
+;buffer sizes
+
+MATCH_STR_SIZE	equ	15		;est. max size (11 chars + null + 3)
+NUM_MATCH_STR	equ	10		;est. # of match strings
+
+						;size of match table
+SBCS <MATCH_TABLE_SIZE	equ	MATCH_STR_SIZE * NUM_MATCH_STR		>
+DBCS <MATCH_TABLE_SIZE	equ	MATCH_STR_SIZE * NUM_MATCH_STR * (size wchar)>
+MATCH_DATA_BYTES	equ	2		;num of info bytes for MATCH cmd
+SBCS <MATCH_INFO_OFFSET	equ	2		;offset from null to info>
+DBCS <MATCH_INFO_OFFSET	equ	3		;offset from null to info>
+	
+;
+; ticks till next sending of MSG_UPDATE_SERIAL_ERRORS
+;
+UPDATE_SERIAL_ERRORS_THRESHOLD_TICKS	equ	20
+
+;
+; General GenItem/GenBoolean hacks
+;
+FakeFlowBits	record
+	:4
+	FFB_NONE:1
+	:3
+FakeFlowBits	end
+
+LinefeedAndWrap	record
+	LAW_LINEFEED:1
+	LAW_WRAP:1
+LinefeedAndWrap	end
+
+ModemSpeakerSetting	etype	word
+MODEM_SPEAKER_CARRIER	enum	ModemSpeakerSetting
+MODEM_SPEAKER_ON	enum	ModemSpeakerSetting
+MODEM_SPEAKER_OFF	enum	ModemSpeakerSetting
+MODEM_SPEAKER_DIALING	enum	ModemSpeakerSetting
+
+ModemVolumeSetting	etype	word
+MODEM_VOLUME_HI		enum	ModemVolumeSetting
+MODEM_VOLUME_MED	enum	ModemVolumeSetting
+MODEM_VOLUME_LO		enum	ModemVolumeSetting
+
+if	_MODEM_STATUS
+
+
+TermModemResponseType	etype	word,	0, 2
+	TMRT_OK			enum	TermModemResponseType
+	TMRT_CONNECT		enum	TermModemResponseType
+	TMRT_ERROR		enum	TermModemResponseType
+	TMRT_DATAREC_INIT_ERROR	enum	TermModemResponseType
+	TMRT_BUSY		enum	TermModemResponseType
+	TMRT_NOCARRIER		enum	TermModemResponseType
+	TMRT_NODIALTONE		enum	TermModemResponseType
+	TMRT_NOANSWER		enum	TermModemResponseType
+	TMRT_RING		enum	TermModemResponseType
+	TMRT_UNEXPECTED_RESPONSE enum	TermModemResponseType
+	TMRT_USER_CANCEL	enum	TermModemResponseType
+
+
+TERM_LONG_REPLY_TIMEOUT		equ	90 * ONE_SECOND	
+; Time to wait for modem responding to dialing commands or answer call
+		
+TERM_SHORT_REPLY_TIMEOUT	equ	10 * ONE_SECOND
+; Time to wait for modem responding to non-dialing commands
+		
+endif	; if _MODEM_STATUS
+		
+TextSendFlags	record
+	TSF_STRIP_LINEFEED:1
+TextSendFlags	end
+
+TextRecvFlags	record
+	TRF_CONVERT_CR:1
+TextRecvFlags	end
+
+RecvType	etype	word
+RECV_BINARY	enum	RecvType
+RECV_TEXT	enum	RecvType
+
+RecvProto	etype	word
+RECV_CHECKSUM	enum	RecvProto
+RECV_CRC	enum	RecvProto
+
+CaptureScreenOptions	etype	word
+CSO_SCREEN	enum	CaptureScreenOptions
+CSO_SCROLL_BACK	enum	CaptureScreenOptions
+CSO_BOTH	enum	CaptureScreenOptions
+
+StopBitsOptions	etype	word
+SBO_ONE		enum	StopBitsOptions
+SBO_ONEANDHALF	enum	StopBitsOptions
+SBO_TWO		enum	StopBitsOptions
+
+;
+; room for pseudo-in-place Unicode<->DOS conversion
+;
+DBCS <CONVERT_OFFSET	equ	10					>
+
+;
+; JIS escape codes
+;
+if DBCS_PCGEOS
+JIS_ESCAPE_TO_SINGLE_1	equ	0x1b	; <ESC> ( J
+JIS_ESCAPE_TO_SINGLE_2	equ	0x28
+JIS_ESCAPE_TO_SINGLE_3	equ	0x4a
+JIS_ESCAPE_TO_DOUBLE_1	equ	0x1b	; <ESC> $ B
+JIS_ESCAPE_TO_DOUBLE_2	equ	0x24
+JIS_ESCAPE_TO_DOUBLE_3	equ	0x42
+endif
+
+if 	_SPECIAL_KEY
+;
+; Special keys related constants
+;
+SPECIAL_KEY_DEFAULT_SELECTION	equ	0
+
+;
+; This has to be equal to the number of entries defined in
+; SpecialKeyEntryStringsTable. See termui.ui
+;
+if _TELNET
+NUM_SPECIAL_KEYS		equ	26
+else
+NUM_SPECIAL_KEYS		equ	23
+endif ; _TELNET
+
+;
+; In application mode, escape codes are generated for keypad
+; keys. The codes are generally divided to 4 categories:
+; Enter		ESC O M
+; PF1-4		ESC O P-S
+; 0-9		ESC O p-y
+; ,-.		ESC O l-n
+;
+; So, we index the last character by first getting the category and
+; then index within the category. The followings are the characters beginning
+; in each of the four categories.
+;
+
+;
+; this won't be DBCS'ed since this is part of the escape code to be
+; sent out.
+;
+KeypadOutMapBeginChar	etype	byte
+KOMBC_ENTER		enum	KeypadOutMapBeginChar, C_CAP_M	; Enter
+KOMBC_PF		enum	KeypadOutMapBeginChar, C_CAP_P	; PF1-4
+KOMBC_NUMBER		enum	KeypadOutMapBeginChar, C_SMALL_P; 0-9
+KOMBC_COMMA		enum	KeypadOutMapBeginChar, C_SMALL_L; ,
+KOMBC_DOT		enum	KeypadOutMapBeginChar, C_SMALL_N; .
+KOMBC_MINUS		enum	KeypadOutMapBeginChar, C_SMALL_M; -
+
+;
+; Beginning character of each category (Enter, 0-9, comma to dot) from keypad
+; in numeric mode. PF does not belong to this type because it sends out the
+; same escape code whehter keypad is in numeric or application mode.
+;
+DBCS <KeypadOutNumMapBeginChar etype	word				>
+SBCS <KeypadOutNumMapBeginChar etype	byte				>
+KONMBC_ENTER		enum	KeypadOutNumMapBeginChar, C_ENTER
+DBCS <KONMBC_NUMBER	enum	KeypadOutNumMapBeginChar, C_DIGIT_ZERO	; 0-9 >
+SBCS <KONMBC_NUMBER	enum	KeypadOutNumMapBeginChar, C_ZERO	; 0-9 >
+KONMBC_COMMA		enum	KeypadOutNumMapBeginChar, C_COMMA	; ,
+KONMBC_DOT		enum	KeypadOutNumMapBeginChar, C_PERIOD	; .
+DBCS <KONMBC_MINUS	enum	KeypadOutNumMapBeginChar, C_HYPHEN_MINUS ; - >
+SBCS <KONMBC_MINUS	enum	KeypadOutNumMapBeginChar, C_MINUS	 ; - >
+
+if	_TELNET
+;
+; Available TelnetCommands to send
+;
+SpecialKeyTelnetCommand	etype	byte
+SKTC_IP			enum	SpecialKeyTelnetCommand
+SKTC_AO			enum	SpecialKeyTelnetCommand
+SKTC_AYT		enum	SpecialKeyTelnetCommand
+                                
+endif	; _TELNET
+
+;
+; The corresponding index from GenDynamicList
+;
+if	_TELNET
+	
+KeypadOutMapBeginIndex	etype	byte
+KOMBI_TELNET_CMD	enum	KeypadOutMapBeginIndex, 0	; IP,AO,AYT
+KOMBI_PF		enum	KeypadOutMapBeginIndex, 3	; PF1-4
+KOMBI_ENTER		enum	KeypadOutMapBeginIndex, 7	; Enter
+KOMBI_COMMA		enum	KeypadOutMapBeginIndex, 8	; ,
+KOMBI_DOT		enum	KeypadOutMapBeginIndex, 9	; .
+KOMBI_NUMBER		enum	KeypadOutMapBeginIndex, 10	; 0-9
+KOMBI_MINUS		enum	KeypadOutMapBeginIndex, 20	; -
+KOMBI_RESET		enum	KeypadOutMapBeginIndex, 21	; Reset
+KOMBI_CTRL28		enum	KeypadOutMapBeginIndex, 22      ; FS,GS,RS,US
+	; These keys can't be generated on the Responder keyboard,
+	; so here they are
+	
+	;*****************************************************
+	; Remeber to update NUM_SPECIAL_KEY if you add/remove
+	; KeypadOutMapBeginIndex items or special keys.
+	;*****************************************************
+else
+	
+KeypadOutMapBeginIndex	etype	byte
+KOMBI_PF		enum	KeypadOutMapBeginIndex, 0	; PF1-4
+KOMBI_ENTER		enum	KeypadOutMapBeginIndex, 4	; Enter
+KOMBI_COMMA		enum	KeypadOutMapBeginIndex, 5	; ,
+KOMBI_DOT		enum	KeypadOutMapBeginIndex, 6	; .
+KOMBI_NUMBER		enum	KeypadOutMapBeginIndex, 7	; 0-9
+KOMBI_MINUS		enum	KeypadOutMapBeginIndex, 17	; -
+KOMBI_RESET		enum	KeypadOutMapBeginIndex, 18	; Reset
+KOMBI_CTRL28		enum	KeypadOutMapBeginIndex, 19      ; FS,GS,RS,US
+	; These keys can't be generated on the Responder keyboard,
+	; so here they are.
+	
+	;*****************************************************
+	; Remeber to update NUM_SPECIAL_KEY if you add/remove
+	; KeypadOutMapBeginIndex items or special keys.
+	;*****************************************************
+endif	; _TELNET
+
+endif	; if _SPECIAL_KEY
+

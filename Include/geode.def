@@ -1,0 +1,547 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+FILE:		geode.def
+
+DECLARER:	Kernel
+
+DESCRIPTION:
+	This file defines geode structures and routines.
+
+	$Id: geode.def,v 1.1 97/04/04 14:23:36 newdeal Exp $
+------------------------------------------------------------------------------@
+
+SetDef	__GEODE
+
+StartKernel
+
+; Load/Unload functions
+global GeodeLoad:far
+global GeodeAddReference:far
+global GeodeRemoveReference:far
+
+; Geode location functions
+global GeodeFind:far
+global GeodeFindResource:far		; Find resource in Geode file
+global GeodeSnatchResource:far		; Load a resource without
+					; loading geode.
+
+; Functions to examine a geode's state
+global GeodeGetInfo:far			; General info
+global GeodeGetProcessHandle:far	; Process/Geode handle of current thread
+global GeodeGetAppObject:far		; Application object for process
+global GeodeGetUIData:far		; Data stored for UI for process
+
+global GeodeSetUIData:far		; Set data for UI
+
+global ProcInfo:far			; First thread of a process
+
+; Event queue manipulation
+global GeodeAllocQueue:far
+global GeodeFreeQueue:far
+global GeodeInfoQueue:far
+global GeodeFlushQueue:far
+global QueueGetMessage:far
+global QueuePostMessage:far
+
+;Private data manipulation
+global GeodePrivAlloc:far
+global GeodePrivFree:far
+global GeodePrivRead:far
+global GeodePrivWrite:far
+
+global GeodeGetResourceID:far
+
+global GeodeRequestSpace:far
+global GeodeReturnSpace:far
+
+;Patching routines
+
+global GeodeSetLanguageStandardPath:far
+
+global GEODEGETPROCESSHANDLE:far
+global GEODELOAD:far
+global GEODEFIND:far
+global GEODEFINDRESOURCE:far
+global GEODEGETINFO:far
+global GEODEGETAPPOBJECT:far
+global GEODEGETUIDATA:far
+global GEODESETUIDATA:far
+global PROCINFO:far
+global GEODEALLOCQUEUE:far
+global GEODEFREEQUEUE:far
+global GEODEINFOQUEUE:far
+global GEODEFLUSHQUEUE:far
+global GEODEGETCODEPROCESSHANDLE:far
+global GEODEPRIVALLOC:far
+global GEODEPRIVFREE:far
+global GEODEPRIVREAD_OLD:far
+global GEODEPRIVWRITE_OLD:far
+global GEODEPRIVREAD:far
+global GEODEPRIVWRITE:far
+global GEODEADDREFERENCE:far
+global GEODEREMOVEREFERENCE:far
+global GEODESETLANGUAGEPATCHPATH:far
+global GEODESETLANGUAGESTANDARDPATH:far
+global GEODESETGENERALPATCHPATH:far
+global GEODESNATCHRESOURCE:far
+global ISMULTILANGUAGEMODEON:far
+global QUEUEPOSTMESSAGE:far
+global QUEUEGETMESSAGE:far
+global GEODEGETRESOURCEID:far
+
+global GEODEREQUESTSPACE:far
+global GEODERETURNSPACE:far
+;--------------------------------------------------------------------------
+;		Constants for Geodes
+;--------------------------------------------------------------------------
+
+;	Sizes
+
+GEODE_NAME_SIZE		=	8
+GEODE_NAME_EXT_SIZE	=	4
+
+
+;	Geode file attributes
+
+GeodeAttrs	record
+	GA_PROCESS:1			; Has initial thread
+	GA_LIBRARY:1			; Exports routines
+	GA_DRIVER:1			; Has DriverTable
+	GA_KEEP_FILE_OPEN:1		; .geo file must stay open (resource(s)
+					;  discardable or initially discarded)
+	GA_SYSTEM:1			; Compiled into kernel
+	GA_MULTI_LAUNCHABLE:1		; May be loaded more than once
+	GA_APPLICATION:1		; A user-launched application
+	GA_DRIVER_INITIALIZED:1		; If DRIVER aspect initialized (DR_INIT
+					;  sent to strategy routine)
+	GA_LIBRARY_INITIALIZED:1	; If LIBRARY aspect initialized
+					;  (library entry point called)
+	GA_GEODE_INITIALIZED:1		; If all aspects initialized.
+	GA_USES_COPROC:1		; Uses coprocessor if available
+	GA_REQUIRES_COPROC:1		; Requires coprocessor/emulator to run
+	GA_HAS_GENERAL_CONSUMER_MODE:1	; Can be run in GCM mode
+	GA_ENTRY_POINTS_IN_C:1		; Library/driver entry point in C
+	GA_XIP:1			; Is an XIP geode (set by xiptool)
+	:1
+GeodeAttrs	end
+
+;--------------------------------------------------------------------------
+;		Errors returned by GeodeLoad
+;--------------------------------------------------------------------------
+
+GeodeLoadError 		etype word
+GLE_PROTOCOL_IMPORTER_TOO_RECENT enum GeodeLoadError
+GLE_PROTOCOL_IMPORTER_TOO_OLD 	enum GeodeLoadError
+GLE_FILE_NOT_FOUND 		enum GeodeLoadError
+GLE_LIBRARY_NOT_FOUND 		enum GeodeLoadError
+GLE_FILE_READ_ERROR 		enum GeodeLoadError
+GLE_NOT_GEOS_FILE 		enum GeodeLoadError
+GLE_NOT_GEOS_EXECUTABLE_FILE 	enum GeodeLoadError
+GLE_ATTRIBUTE_MISMATCH 		enum GeodeLoadError
+GLE_MEMORY_ALLOCATION_ERROR 	enum GeodeLoadError
+GLE_NOT_MULTI_LAUNCHABLE 	enum GeodeLoadError
+GLE_LIBRARY_PROTOCOL_ERROR 	enum GeodeLoadError
+GLE_LIBRARY_LOAD_ERROR 		enum GeodeLoadError
+GLE_DRIVER_INIT_ERROR 		enum GeodeLoadError
+GLE_LIBRARY_INIT_ERROR 		enum GeodeLoadError
+GLE_DISK_TOO_FULL 		enum GeodeLoadError
+GLE_FIELD_DETACHING		enum GeodeLoadError
+GLE_INSUFFICIENT_HEAP_SPACE	enum GeodeLoadError
+
+;--------------------------------------------------------------------------
+;		Values passed to GeodeGetInfo
+;--------------------------------------------------------------------------
+
+GeodeGetInfoType	etype	word, 0, 2
+GGIT_ATTRIBUTES		enum	GeodeGetInfoType
+GGIT_TYPE		enum	GeodeGetInfoType
+GGIT_GEODE_RELEASE	enum	GeodeGetInfoType
+GGIT_GEODE_PROTOCOL	enum	GeodeGetInfoType
+GGIT_TOKEN_ID		enum	GeodeGetInfoType
+GGIT_PERM_NAME_AND_EXT	enum	GeodeGetInfoType
+GGIT_PERM_NAME_ONLY	enum	GeodeGetInfoType
+if DBCS_PCGEOS
+;
+; These are the same as their SBCS counterparts except the strings they
+; return are DBCS.  The SBCS versions are useful for GEOS.INI categories,
+; and the DBCS versions are helpful for filenames.  Both of course are
+; frequently based on the permanent name of a geode.
+;
+GGIT_PERM_NAME_AND_EXT_DBCS	enum	GeodeGetInfoType
+GGIT_PERM_NAME_ONLY_DBCS	enum	GeodeGetInfoType
+endif
+GGIT_GEODE_REF_COUNT	enum	GeodeGetInfoType
+
+;--------------------------------------------------------------------------
+;		Tokens
+;--------------------------------------------------------------------------
+
+TOKEN_CHARS_LENGTH = 4			; four bytes of token characters
+TokenChars	type	TOKEN_CHARS_LENGTH dup (char)
+
+; manufacturer's id in token
+
+ManufacturerID	etype	word
+MANUFACTURER_ID_GEOWORKS			enum	ManufacturerID	; 0
+MANUFACTURER_ID_APP_LOCAL			enum	ManufacturerID	; 1
+MANUFACTURER_ID_PALM_COMPUTING			enum	ManufacturerID	; 2
+MANUFACTURER_ID_WIZARD				enum	ManufacturerID	; 3
+MANUFACTURER_ID_CREATIVE_LABS			enum	ManufacturerID	; 4
+MANUFACTURER_ID_DOS_LAUNCHER			enum	ManufacturerID	; 5
+MANUFACTURER_ID_AMERICA_ONLINE			enum	ManufacturerID	; 6
+MANUFACTURER_ID_INTUIT				enum	ManufacturerID	; 7
+MANUFACTURER_ID_SDK				enum	ManufacturerID	; 8
+MANUFACTURER_ID_SHAREWARE			enum	ManufacturerID	; 9
+MANUFACTURER_ID_GENERIC				enum	ManufacturerID	; 10
+MANUFACTURER_ID_NOKIA				enum	ManufacturerID	; 11
+MANUFACTURER_ID_SOCKET_16BIT_PORT		enum	ManufacturerID	; 12
+MANUFACTURER_ID_LEGOS				enum	ManufacturerID	; superstitious?
+MANUFACTURER_ID_TLC				enum	ManufacturerID	; 14
+MANUFACTURER_ID_CENDANT				enum	ManufacturerID	; 15
+MANUFACTURER_ID_NEW_DEAL			enum	ManufacturerID	; 16
+MANUFACTURER_ID_GLOBAL_PC			enum	ManufacturerID	; 17
+MANUFACTURER_ID_PENNY_PRESS			enum	ManufacturerID	; 18
+
+; As of 10/29/93, Manufacturer ID's will be assigned automatically by
+; database, in the range indicated by the equates below.
+;
+MANUFACTURER_ID_DATABASE_FIRST		equ	4000h
+MANUFACTURER_ID_DATABASE_LAST		equ	7fffh
+
+; This is here to allow backward compatability.
+;
+MANUFACTURER_ID_TBD 			equ 	MANUFACTURER_ID_NOKIA
+
+GeodeToken	struct
+	GT_chars	TokenChars
+	GT_manufID	ManufacturerID
+GeodeToken	ends
+
+;-----------------------------------------------------------------------------
+;		Version control
+;-----------------------------------------------------------------------------
+
+ReleaseNumber	struct
+    RN_major		word
+    RN_minor		word
+    RN_change		word
+    RN_engineering	word
+ReleaseNumber	ends
+
+ProtocolNumber	struct
+    PN_major		word
+    PN_minor		word
+ProtocolNumber	ends
+
+;--------------------
+
+NumString	macro	str, const
+const	equ	&str
+endm
+
+DecodeNum	macro	str, pos, const
+
+dotpos	instr		<&str>, <.>
+slen	sizestr		<&str>
+
+if	(dotpos eq 0)
+if	(pos eq 0)
+const	=	&str
+else
+.err2
+endif
+
+else
+
+if	(pos ne 0)
+strtail	substr		<&str>, dotpos+1, slen-dotpos
+DecodeNum	%strtail, pos-1, const
+else
+strhead	substr		<&str>, 1, dotpos-1
+NumString	%strhead, const
+endif
+
+endif
+
+endm
+
+;-------
+
+DecodeRelease	macro
+
+DecodeNum	%REL, 0, REL_MAJOR
+DecodeNum	%REL, 1, REL_MINOR
+DecodeNum	%REL, 2, REL_CHANGE
+DecodeNum	%REL, 3, REL_ENGINEERING
+
+endm
+
+DecodeProtocol	macro
+
+DecodeNum	%PROTO, 0, PROTO_MAJOR
+DecodeNum	%PROTO, 1, PROTO_MINOR
+
+endm
+
+
+;-----------------------------------------------------------------------------
+;		Heap usage
+;-----------------------------------------------------------------------------
+
+GeodeHeapVars	struc
+    GHV_heapSpace		word
+    ;
+    ; Heap space requirement, as copied from EFH_heapSpace from the 
+    ; ExecutableFileHeader of applications.  Roughly, the amount of space
+    ; on the heap that this application uses, in paragraphs.  The system
+    ; sums the total of all "heapSpace" requirements when trying to decide
+    ; whether to let another app load or not.	-- Doug 3/10/93
+
+GeodeHeapVars	ends
+
+
+COMMENT @-------------------------------------------------------------------
+		movtok
+----------------------------------------------------------------------------
+
+SYNOPSIS:	Move a GeodeToken
+
+PASS:		dest - memory or register pair for destination
+		source - memory or register pair for source
+		[trashreg] - re'qd if moving memory to memory
+
+PSEUDO CODE/STRATEGY:
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	12/15/92	Initial version
+
+----------------------------------------------------------------------------@
+movtok	macro	dest, source, trashreg
+	local	drf, drl, drh, srf, srl, srh, regargs
+
+regargs = 0
+_CheckDWFixedTwoArg	<dest>, <source>, <movdwf>
+_ParseGeodeToken	<dest>, drf, drl, drh, regargs, <movdwf>
+_ParseGeodeToken	<source>, srf, srl, srh, regargs, <movdwf>
+
+if (regargs gt 0)
+	mov	drh, srh
+	mov	drl, srl
+	mov	drf, srf
+elseifnb <trashreg>
+	mov	trashreg, srh
+	mov	drh, trashreg
+	mov	trashreg, srl
+	mov	drl, trashreg
+	mov	trashreg, srf
+	mov	drf, trashreg
+else
+	ErrMessage <movdwf : need trash register to move mem, mem>
+endif
+
+endm
+
+
+COMMENT @-------------------------------------------------------------------
+		cmptok
+----------------------------------------------------------------------------
+
+SYNOPSIS:	Compares two GeodeTokens for equality.
+
+PASS:		dest - memory or register pair for destination
+		source - memory or register pair for source
+		[trashreg] - re'qd if moving memory to memory
+
+PSEUDO CODE/STRATEGY:
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	12/15/92	Initial version
+
+----------------------------------------------------------------------------@
+cmptok	macro	dest, source, trashreg
+	local	drf, drl, drh, srf, srl, srh, regargs
+
+regargs = 0
+_CheckDWFixedTwoArg	<dest>, <source>, <cmpdwf>
+_ParseGeodeToken	<dest>, drf, drl, drh, regargs, <cmpdwf>
+_ParseGeodeToken	<source>, srf, srl, srh, regargs, <cmpdwf>
+
+if (regargs gt 0)
+	cmp	drh, srh
+	jne	foo
+	cmp	drl, srl
+	jne	foo
+	cmp	drf, srf
+elseifnb <trashreg>
+	mov	trashreg, drh
+	cmp	trashreg, srh
+	jne	foo
+	mov	trashreg, drl
+	cmp	trashreg, srl
+	jne	foo
+	mov	trashreg, drf
+	cmp	trashreg, srf
+else
+	ErrMessage <cmpdwf : need trash register to compare mem, mem>
+endif
+
+foo:
+
+endm
+
+
+COMMENT @-------------------------------------------------------------------
+		_ParseGeodeToken
+----------------------------------------------------------------------------
+
+SYNOPSIS:	
+
+PASS:		
+
+PSEUDO CODE/STRATEGY:
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	12/15/92	Initial version
+
+----------------------------------------------------------------------------@
+_ParseGeodeToken		macro
+		endm
+_ParseGeodeToken	macro	arg, rf, rl, rh, regcount, op
+
+alen	sizestr	<&arg>
+
+ifnb <arg>
+
+if (4 AND .TYPE (arg))
+    ErrMessage <op : ParseDWFixedArg doesn't deal with constants>
+    regcount=regcount+1
+else
+    if (alen eq 6)
+	rh substr <arg>, 1, 2
+	rl substr <arg>, 3, 2
+	rf substr <arg>, 5, 2
+	regcount=regcount+1
+    else
+        rh catstr <{word}>, <arg>, <[GT_chars]>
+        rl catstr <{word}>, <arg>, <[GT_chars][2]>
+	rf catstr <arg>, <[GT_manufID]>
+    endif
+endif
+
+else
+    ErrMessage <op : missing argument>
+endif
+endm
+
+
+
+
+COMMENT @-------------------------------------------------------------------
+		movtchr
+----------------------------------------------------------------------------
+
+SYNOPSIS:	Move a set of TokenChars
+
+PASS:		dest - memory or register pair for destination
+		source - memory or register pair for source
+		[trashreg] - re'qd if moving memory to memory
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	12/17/92	Initial version
+
+----------------------------------------------------------------------------@
+movtchr	macro	dest, source, trashreg
+	local	drl, drh, srl, srh, regargs
+
+regargs = 0
+_CheckDWordTwoArg	<dest>, <source>, <movdw>
+_ParseTokenChar		<dest>, drl, drh, regargs, <movdw>
+_ParseTokenChar		<source>, srl, srh, regargs, <movdw>
+
+if (regargs gt 0)
+	mov	drh, srh
+	mov	drl, srl
+elseifnb <trashreg>
+	mov	trashreg, srh
+	mov	drh, trashreg
+	mov	trashreg, srl
+	mov	drl, trashreg
+else
+	ErrMessage <movdw : need trash register to move mem, mem>
+endif
+
+endm
+
+
+
+
+COMMENT @-------------------------------------------------------------------
+		_ParseTokenChar
+----------------------------------------------------------------------------
+
+SYNOPSIS:	
+
+PASS:		
+
+PSEUDO CODE/STRATEGY:
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	12/17/92	Initial version
+
+----------------------------------------------------------------------------@
+_ParseTokenChar	macro	arg, rl, rh, regcount, op
+
+alen	sizestr	<&arg>
+
+ifnb <arg>
+
+if (4 AND .TYPE (arg))
+    ; => is constant
+    rh catstr <((arg) SHR 16)>
+    rl catstr <((arg) AND 0xffff)>
+    regcount=regcount+1
+else
+    if (alen eq 4)
+	rh substr <arg>, 1, 2
+	rl substr <arg>, 3, 2
+
+	if (16 and .type (rl)) and (16 and .type (rh))
+	    regcount=regcount+1
+	else
+	    ; one of the pair isn't actually a register, so assume arg is var.
+	        rh catstr <{word}>, <arg>, <[GT_chars]>
+	        rl catstr <{word}>, <arg>, <[GT_chars][2]>
+	endif
+    else
+        rh catstr <{word}>, <arg>, <[GT_chars]>
+        rl catstr <{word}>, <arg>, <[GT_chars][2]>
+    endif
+endif
+
+else
+    ErrMessage <op : missing argument>
+endif
+
+endm
+
+EndKernel
+
+
+

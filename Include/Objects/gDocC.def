@@ -1,0 +1,1080 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+FILE:		Objects/gDocC.def
+
+DECLARER:	UI
+
+DESCRIPTION:
+	This file defines GenViewClass
+
+	$Id: gDocC.def,v 1.1 97/04/04 14:17:51 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__GDOCC
+
+StartLibrary	ui
+
+GenDocumentClass	class	GenContentClass
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+GenDocumentAttrs	record
+
+	; These bits reflect permanent attributes of the document
+
+    GDA_READ_ONLY:1			;File is opened read-only
+    GDA_READ_WRITE:1			;File is opened read-write
+    GDA_FORCE_DENY_WRITE:1		;File is opened "force deny write"
+    GDA_SHARED_MULTIPLE:1		;File opened "shared multiple"
+    GDA_SHARED_SINGLE:1			;File opened "shared single"
+
+	; These bits reflect temporary states of the document -- set
+	; by document control
+
+    GDA_UNTITLED:1			;File does not have a real (user) name
+    GDA_DIRTY:1				;File has been modified
+    GDA_CLOSING:1			;File is being closed
+    GDA_ATTACH_TO_DIRTY_FILE:1		;Attached to dirty file
+    GDA_SAVE_FAILED:1			;"Save" failed, revert is not possible
+    GDA_OPENING:1			;Document is being opened
+    GDA_AUTO_SAVE_STOPPED:1		;Auto-save has been stopped
+    GDA_MODEL:1				;Document has the model exclusive
+    GDA_ON_WRITABLE_MEDIA:1
+    GDA_BACKUP_EXISTS:1
+
+	; These bits reflect temporary states of the document -- set
+	; by application
+
+    GDA_PREVENT_AUTO_SAVE:1		;Do not auto save (temporary state set
+					;by the application)
+GenDocumentAttrs	end
+
+GenDocumentType	etype	word
+GDT_NORMAL		enum	GenDocumentType
+GDT_READ_ONLY		enum	GenDocumentType
+GDT_TEMPLATE		enum	GenDocumentType
+GDT_READ_ONLY_TEMPLATE	enum	GenDocumentType
+GDT_PUBLIC		enum	GenDocumentType
+GDT_MULTI_USER		enum	GenDocumentType
+
+; States for a document
+
+GenDocumentOperation	etype	word
+GDO_NORMAL		enum	GenDocumentOperation
+GDO_SAVE_AS		enum	GenDocumentOperation
+GDO_REVERT		enum	GenDocumentOperation
+GDO_REVERT_QUICK	enum	GenDocumentOperation
+GDO_ATTACH		enum	GenDocumentOperation
+GDO_DETACH		enum	GenDocumentOperation
+GDO_NEW			enum	GenDocumentOperation
+GDO_OPEN		enum	GenDocumentOperation
+GDO_SAVE		enum	GenDocumentOperation
+GDO_CLOSE		enum	GenDocumentOperation
+GDO_AUTO_SAVE		enum	GenDocumentOperation
+GDO_REVERT_TO_AUTO_SAVE	enum	GenDocumentOperation
+
+;-----------------------------------------------------------------------------
+;		Methods sent from GenDocumentControl
+;
+;	These messages are intended to be sub-classed by applications
+;-----------------------------------------------------------------------------
+
+MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE	message
+;
+;	Sent when the application should set the document file to the
+;	empty document state.
+;
+; Pass:
+;	none
+; Return:
+;	carry - set if error
+;	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_IMPORT			message
+;
+;	Notification that the user has imported a file
+;
+; Pass:
+;	ss:bp - GenTranslationParams
+; Return:
+;	carry - set if error
+;	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_CREATE_UI_FOR_DOCUMENT	message
+;
+;	Notification that a file has been opened.  Sent when the
+;	application should construct (or enable) the UI components
+;	used to	display the document.
+;
+; Pass:
+;	none
+; Return:
+;	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_DESTROY_UI_FOR_DOCUMENT	message
+;
+;	Notification that a file is about to be closed.  Sent when the
+;	application should destroy (or disable) the UI components used
+;	to display the document.
+;
+; Pass:
+;	none
+; Return:
+;	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT	message
+;
+;	Notification that a document has been opened and UI has been
+;	created for it and that it needs to be displayed.
+;
+; Pass:
+;	none
+; Return:
+;	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT	message
+;
+;	Notification that a document is about to be closed and that
+;	the UI used to display the file must be detached from the file.
+;
+; Pass:
+;	none
+; Return:
+;	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_EXPORT			message
+;
+;	Export the current document
+;
+; Pass:
+;	ss:bp - GenTranslationParams
+; Return:
+;	none
+
+;--- Messages needed when VM/DB file based-app caches data
+
+MSG_GEN_DOCUMENT_READ_CACHED_DATA_FROM_FILE	message
+;
+;	Notification that the application must update its cached
+;	information from the file.
+;
+; Pass:
+;	none
+; Return:
+;	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_WRITE_CACHED_DATA_TO_FILE	message
+;
+;	Notification that the document file needs to be up to date for
+;	an action that is about to take place.  This message is not
+;	sent to documents that are not modified (clean).
+;
+; Pass:
+;	cx - non-zero if document is being saved; 0 if just being updated
+;	     (aka auto-saved)
+; Return:
+;	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_DOCUMENT_HAS_CHANGED	message
+;
+;	Notification that the document has changed.
+;
+; Pass:
+;	none
+; Return:
+;	ax, cx, dx, bp - destroyed
+
+;--- Messages needed for DOS file based apps
+
+MSG_GEN_DOCUMENT_PHYSICAL_SAVE	message
+;
+;	Really save the file.
+;
+; Pass:
+;	none
+; Return:
+;	carry - set if error
+;	ax - error code (if error)
+;	cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_PHYSICAL_UPDATE	message
+;
+;	Update the file.  This is called on auto-save (if the document control
+;	is set up to support auto-save), on detach to save changes to the file
+;	and as part of the close/re-open mechanism.
+;
+; Pass:
+;	none
+; Return:
+;	carry - set if error
+;	ax - error code (if error)
+;	cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_PHYSICAL_SAVE_AS	message
+;
+;	Really "save as" the file.
+;
+; Pass:
+;	ss:bp - DocumentCommonParams
+;	thread's current path set to directory in which DCP_name should be
+;	created
+; Return:
+;	carry - set if error
+;	ax - file handle (if no error) or error code (if error)
+;	bp - unchanged
+;	cx, dx - destroyed
+
+MSG_GEN_DOCUMENT_PHYSICAL_SAVE_AS_FILE_HANDLE	message
+;
+;	This message is sent by the default MSG_META_DOC_OUTPUT_PHYSICAL_SAVE_AS
+;	handler after opening the new DOS file.
+;
+; Pass:
+;	cx - new file handle
+; Return:
+;	carry - set if error
+;	ax - error code (if error)
+;	cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_PHYSICAL_REVERT	message
+;
+;	Really revert the file.
+;
+; Pass:
+;	none
+; Return:
+;	carry - set if error
+;	ax - error code (if error)
+;	cx, dx, bp - destroyed
+
+;--- Messages needed for handling documents of different protocols
+
+MSG_GEN_DOCUMENT_UPDATE_EARLIER_COMPATIBLE_DOCUMENT	message
+;
+;	Handle updating of an earlier protocol file that is compatible with
+;	the protocol of the document control.  Applications must handle this
+;	and return carry clear even if no changes are to be made.
+;
+; Pass:
+;	none
+; Return:
+;	carry - set if error
+;	ax - non-zero to update document's protocol
+;	cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_UPDATE_EARLIER_INCOMPATIBLE_DOCUMENT	message
+;
+;	Handle updating of an earlier protocol file that is not compatible with
+;	the protocol of the document control..  Applications must handle this
+;	and return carry set if documents cannot be upgraded, or carry
+;	clear if the document has been successfully upgraded.
+;
+; Pass:
+;	none
+; Return:
+;	carry - set if error
+;	ax - non-zero to update document's protocol
+;	cx, dx, bp - destroyed
+
+;--- Messages only needed in special cases.
+
+MSG_GEN_DOCUMENT_PHYSICAL_CREATE	message
+;
+;	Really create the file.
+;
+; Pass:
+;	ss:bp - DocumentCommonParams
+;	thread's current path set to directory in which DCP_name should be
+; Return:
+;	carry - set if error
+;	ax - file handle (if no error) or error code (if error)
+;	bp - unchanged
+;	cx, dx - destroyed
+
+MSG_GEN_DOCUMENT_PHYSICAL_OPEN	message
+;
+;	Really open the file.
+;
+; Pass:
+;	ss:bp - DocumentCommonParams
+;	thread's current path set to directory in which DCP_name should be
+; Return:
+;	carry - set if error
+;	ax - file handle (if no error) or error code (if error)
+;	cx - non-zero if template document opened
+;	dx - non-zero if a new file was created
+;	bp - unchanged
+
+MSG_GEN_DOCUMENT_PHYSICAL_CLOSE	message
+;
+;	Really close the file.
+;
+; Pass:
+;	none
+; Return:
+;	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_PHYSICAL_DELETE	message
+;
+;	Really delete the file.
+;
+; Pass:
+;	none
+; Return:
+;	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_PHYSICAL_CHECK_FOR_MODIFICATIONS	message
+;
+;	Really check for modifications (for shared multiple file)
+;
+; Pass:
+;	none
+; Return:
+;	carry - set if file modified
+;	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_PHYSICAL_COPY_TEMPLATE	message
+;
+;	Copy file to an untitled file
+;
+; Pass:
+;	none
+; Return:
+;	carry - set if error
+;	ax - file handle (if success) or error code (if error)
+;	cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_SAVE_AS_COMPLETED	message
+;
+;	Notification that a "Save As" has been completed for the
+;	document.
+;
+; Pass:
+;	none
+; Return:
+;	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_ATTACH_FAILED	message
+;
+;	Notification that upon restarting from a state file the
+;	document file could not be re-opened.
+;
+; Pass:
+;	none
+; Return:
+;	ax, cx, dx, bp - destroyed
+
+;-----------------------------------------------------------------------------
+;	These messages are occasionally useful to subclass
+;-----------------------------------------------------------------------------
+
+MSG_GEN_DOCUMENT_MARK_DIRTY	message
+;
+; Mark a document as dirty.  This makes this document "save"able and
+; "revert"able
+;
+; Pass:
+;	nothing
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_GENERATE_NAME_FOR_NEW	message
+;
+; Create a name for a new document
+;
+; Pass:
+; 	dx:bp - DocumentCommonParams buffer
+;	cx - number of times that this method has been called trying to
+;	     generate a unique name (from 0)
+;     	generate a unique name (from 0)
+; Return:
+;	cx - GEN_DOCUMENT_GENERATE_NAME_ERROR if error,
+;	     GEN_DOCUMENT_GENERATE_NAME_CANCEL to cancel, else unchanged
+;	dx:bp - new name in appropriate fields
+;	ax - destroyed
+
+GEN_DOCUMENT_GENERATE_NAME_ERROR	=	0xffff
+GEN_DOCUMENT_GENERATE_NAME_CANCEL	=	0xfffe
+
+MSG_GEN_DOCUMENT_SAVE_AS_CANCELLED	message
+;
+; Notification that Save As has been cancelled
+;
+; Pass:
+; 	nothing
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_COMPUTE_ACCESS_FLAGS	message
+;
+; Compute the VMAccessFlags or FileAccessFlags to pass to VMOpen, VMOpen,
+; FileCreate or FileOpen.
+;
+; Pass:
+; 	ss:bp - DocumentCommonParams
+; Return:
+;	al - VMAccessFlags or FileAccessFlags
+;	ah - destroyed
+;	cx, dx, bp - unchanged
+
+;-----------------------------------------------------------------------------
+;		Methods sent to GenDocumentControl
+;
+;	These messages are generally useful for applications to call.  They
+;	are normally not subclassed.
+;-----------------------------------------------------------------------------
+
+MSG_GEN_DOCUMENT_GET_ATTRS	message
+;
+; Get the GenDocumentAttrs for the document
+;
+; Pass:
+; 	nothing
+; Return:
+;	ax - GenDocumentAttrs
+;	cx, dx, bp - unchanged
+
+MSG_GEN_DOCUMENT_ENABLE_AUTO_SAVE	message
+;
+; Enable auto-save (after it has been temporarily disabled)
+;
+; Pass:
+;	none
+; Return:
+;	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_DISABLE_AUTO_SAVE	message
+;
+; Temporarily disable auto-save
+;
+; Pass:
+;	none
+; Return:
+;	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_GET_FILE_NAME	message
+;
+; Get the file name of the document
+;
+; Pass:
+; 	cx:dx - buffer for name (FileLongName)
+; Return:
+;	cx, dx, bp - unchanged
+;	ax - destroyed
+
+;MSG_GEN_PATH_GET	message
+;
+; Get the path name of the document (not just directory it's in, but the
+; full path of the file itself)
+;
+; Use MSG_GEN_DOCUMENT_GET_FILE_NAME to get the file name of the document.
+;
+; Pass:
+;	dx:bp - address to which to copy. if dx is 0, the path is
+;		copied to a block allocated on the global heap and
+;		cx is ignored.
+;	cx - size of buffer (may be zero)
+; Return:
+;	carry set if error (path won't fit in the passed buffer or is
+;		invalid):
+;		ax - number of bytes required (0 => path is invalid)
+;		cx - disk handle of path
+;	carry clear if ok:
+;		if dx:bp passed as far pointer:
+;			dx:bp - filled with path (fptr preserved)
+;		if dx 0:
+;			dx - handle of block containing the path
+;		cx - disk handle of path
+
+MSG_GEN_DOCUMENT_GET_FILE_HANDLE	message
+;
+; Get the file handle of the document
+;
+; Pass:
+; 	nothing
+; Return:
+;	ax - file handle
+;	cx, dx, bp - unchanged
+
+MSG_GEN_DOCUMENT_GET_OPERATION	message
+;
+; Get the operation state stored in the document.  This is occasionally
+; useful when handling a message such as
+; MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT when the application wants to
+; know what the context is.
+;
+; Pass:
+; 	nothing
+; Return:
+;	ax - GenDocumentOperation
+;	cx, dx, bp - unchanged
+
+MSG_GEN_DOCUMENT_GET_DISPLAY	message
+;
+; Get the handle of the associated display
+;
+; Pass:
+; 	nothing
+; Return:
+;	cx:dx - display
+;	ax, bp - unchanged
+
+;-----------------------------------------------------------------------------
+;		Methods sent from GenDocumentControl
+;
+;	These messages are not intended to be sub-classed by applications
+;	unless the higher level messages in the group above do not suffice.
+;-----------------------------------------------------------------------------
+
+MSG_GEN_DOCUMENT_NEW	message
+;
+; Create a new document.
+;
+; Pass:
+;	dx - size DocumentCommonParams
+;	ss:bp - DocumentCommonParams (if called remotely)
+; Return:
+;	carry - set if error
+;	ax - file handle
+;	bp - unchanged
+;	cx, dx - destroyed
+
+MSG_GEN_DOCUMENT_OPEN	message
+;
+; Open a document. If DCP_connection is non-zero, MSG_META_IACP_DOC_OPEN is
+; sent to the client of the connection.
+;
+; Pass:
+;	dx - size DocumentCommonParams
+;	ss:bp - DocumentCommonParams
+; Return:
+;	carry - set if error
+;	ax - file handle
+;	bp - unchanged
+;	cx, dx - destroyed
+
+MSG_GEN_DOCUMENT_CLOSE	message
+;
+; Close this document.
+;
+; Pass:
+;	bp - IACP connection requesting the close (0 if user)
+; Return:
+;	cx - DocQuitStatus
+;	ax, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_QUICK_BACKUP	message
+;
+; Backup this document.
+;
+; Pass:
+;	nothing
+; Return:
+;	nothing
+
+MSG_GEN_DOCUMENT_RECOVER_QUICK_BACKUP	message
+;
+; Backup this document.
+;
+; Pass:
+;	nothing
+; Return:
+;	nothing
+
+MSG_GEN_DOCUMENT_SAVE	message
+;
+; Save this document (copy the "active" version to the "backup" version).
+;
+; Pass:
+;	nothing
+; Return:
+;	carry - set if error
+;	cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_SAVE_AS	message
+;
+; Save this document with a new name.
+;
+; Pass:
+;	dx - size DocumentCommonParams
+;	ss:bp - DocumentCommonParams
+; Return:
+;	carry - set if error
+;	ax - (new) file handle
+;	bp - unchanged
+;	cx, dx - destroyed
+
+MSG_GEN_DOCUMENT_SAVE_AS_TEMPLATE	message
+;
+; Save this document as a template
+;
+; Pass:
+;	dx - size DocumentCommonParams
+;	ss:bp - DocumentCommonParams
+; Return:
+;	carry - set if error
+;	ax - (new) file handle
+;	bp - unchanged
+;	cx, dx - destroyed
+
+MSG_GEN_DOCUMENT_COPY_TO	message
+;
+; Make a copy of this document
+;
+; Pass:
+;	dx - size DocumentCommonParams
+;	ss:bp - DocumentCommonParams
+; Return:
+;	carry - set if error
+;	bp - unchanged
+;	cx, dx - destroyed
+
+MSG_GEN_DOCUMENT_REVERT	message
+;
+; Revert to the backup version of this document.
+;
+; Pass:
+;	nothing
+; Return:
+;	carry - set if error
+;	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_EDIT_USER_NOTES	message
+;
+; Edit the user notes of this document
+;
+; Pass: 	none
+; Return:	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_CHANGE_TYPE	message
+;
+; Change the type of this document
+;
+; Pass: 	cx - GenDocumentType
+; Return:	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_CHANGE_PASSWORD	message
+;
+; Change the password for this document
+;
+; Pass: 	ss:bp - GenDocumentChangePasswordParams
+; Return:	ax, cx, dx, bp - destroyed
+
+GenDocumentChangePasswordParams	struct
+if DBCS_PCGEOS
+    GDCPP_password	wchar	(MAX_PASSWORD_SOURCE_LENGTH+1) dup (?)
+else
+    GDCPP_password	char	(MAX_PASSWORD_SOURCE_SIZE+2) dup (?)
+endif
+GenDocumentChangePasswordParams	ends
+
+MSG_GEN_DOCUMENT_RENAME	message
+;
+; Rename this document
+;
+; Pass: 	none
+; Return:	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_SET_EMPTY	message
+;
+; Save this document as the empty document
+;
+; Pass: 	none
+; Return:	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_CLEAR_EMPTY	message
+;
+; Clear the empty document
+;
+; Pass: 	none
+; Return:	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_SET_DEFAULT	message
+;
+; Save this document as the default document
+;
+; Pass: 	none
+; Return:	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_CLEAR_DEFAULT	message
+;
+; Clear the default document
+;
+; Pass: 	none
+; Return:	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_CLOSE_IF_CLEAN_UNNAMED	message
+;
+; Close document if cleanand unnamed
+;
+; Pass:
+; 	nothing
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_SEARCH_FOR_DOC	message
+;
+; Search for the given document and bring it to the front if it exists.
+; If DCP_connection is non-zero, MSG_META_IACP_DOC_OPEN is sent to the client
+; of the connection.
+;
+; Pass:
+; 	ss:bp - DocumentCommonParams
+; Return:
+;	carry - set if match found
+;	ax, cx, dx - destroyed
+
+MSG_GEN_DOCUMENT_TEST_FOR_FILE	message
+;
+; Test to see if this document has the given file handle open.
+;
+; Pass:
+; 	cx - file handle against which to compare.
+;	dx:bp - address of buffer to store optr
+; Return:
+;	carry set if document marked dirty
+;	cx, dx, bp - unmodified
+;	ax - destroyed
+
+MSG_GEN_DOCUMENT_AUTO_SAVE	message
+;
+; Auto-save the document
+;
+; Pass:
+; 	nothing
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_UPDATE	message
+;
+; Update the document by flushing all data to the file (the default handler
+; calls VMUpdate for VM files).
+;
+; Pass:
+; 	nothing
+; Return:
+;	carry - set if error
+;	ax - error code
+;	cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_CHECK_FOR_MODIFICATIONS	message
+;
+; Check for document modifications
+;
+; Pass:
+; 	nothing
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_CLOSE_FILE	message
+;
+; Close the file associated with the document without removing the document
+; object.  This is done as a temporary measure so that the file can be
+; moved/copied/renamed/...
+;
+; Pass:
+;	bp - IACPConnection requesting the close (0 if user-initiated)
+; Return:
+;	nonthing
+;	ax, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_REOPEN_FILE	message
+;
+; Re-open the fileassociated with the document without removing the document
+; object (after MSG_GEN_DOCUMENT_CLOSE_FILE has been called).
+;
+; Pass:
+;	nothing
+; Return:
+;	nonthing
+;	ax, dx, bp - destroyed
+
+;-----------------------------------------------------------------------------
+;		Messages for general status information
+;-----------------------------------------------------------------------------
+
+MSG_GEN_DOCUMENT_GET_VARIABLE	message
+;
+; Get a piece of information about the document.  This is used primarily by
+; the text object to implement variable graphics.
+;
+; Pass:
+;	ss:bp - GenDocumentGetVariableParams
+; Return:
+;	nothing
+
+GEN_DOCUMENT_GET_VARIABLE_BUFFER_SIZE	=	100
+
+GenDocumentGetVariableParams	struct
+    GDGVP_position	PointDWord		;object position
+    GDGVP_buffer	fptr.char		;buffer for result
+    GDGVP_graphic	fptr.VisTextGraphic	;graphic
+    GDGVP_object	optr			;source object
+GenDocumentGetVariableParams	ends
+
+;-------------
+
+MSG_GEN_DOCUMENT_REVERT_NO_PROMPT	message
+;
+; Revert to the backup version of this document *without* prompting the
+; user.
+;
+; Pass:
+;	nothing
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+
+;-------------
+
+MSG_GEN_DOCUMENT_FILE_CHANGED_REINITIALIZE_CREATED_UI	message
+;
+; Notification that the file has been changed for the document control.
+; Applications that store cached document data in the created UI should reload
+; that data on this message.
+;
+; Pass:
+;	nothing
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_CLOSE_IF_OPEN_FOR_IACP_ONLY		message
+; 
+; Close doc if is open on screen not for the user, but rather only for
+; an app-mode IACP connection.
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+protominor UINewFor21
+
+MSG_GEN_DOCUMENT_MOVE_TO	message
+;
+; Move this document to another drive/directory/filename.
+;
+; Pass:
+;	dx - size DocumentCommonParams
+;	ss:bp - DocumentCommonParams
+; Return:
+;	carry - set if error
+;	bp - unchanged
+;	cx, dx - destroyed
+
+MSG_GEN_DOCUMENT_REVERT_TO_AUTO_SAVE	message
+;
+; Revert to the last auto-saved version of this document.
+;
+; NOTE: No warning is displayed by the default handler for this
+; 	message. You must provide your own, and you MUST call
+;	superclass.
+;
+; Pass:
+;	nothing
+; Return:
+;	carry - set if error
+;	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_PHYSICAL_REVERT_TO_AUTO_SAVE	message
+;
+;	Really revert the file.
+;
+; Pass:
+;	none
+; Return:
+;	carry - set if error
+;	ax - error code (if error)
+;	cx, dx, bp - destroyed
+
+protoreset
+
+protominor UINewForDove_2
+
+MSG_GEN_DOCUMENT_DUPLICATE		message
+;
+; Duplicate this document.  Asks user for name.
+;
+; Pass: 	none
+; Return:	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_DELETE			message
+;
+; Close and delete this document.
+;
+; Pass: 	none
+; Return:	ax, cx, dx, bp - destroyed
+
+MSG_GEN_DOCUMENT_USE_TEMPLATE		message
+;
+; Close this file and selected a template.
+;
+; Pass: 	none
+; Return:	ax, cx, dx, bp - destroyed
+
+protoreset
+
+protominor UIDocumentTemplateWizard
+
+MSG_GEN_DOCUMENT_INITIATE_TEMPLATE_WIZARD	message
+;
+; Initiate template wizard.  Default behavior is to do nothing.
+; Entire functionality must be implemented in the application.
+;
+; Pass:		ss:bp	= DocumentCommonParams
+;		dx	= size DocumentCommonParams
+; Return:	nothing
+; Destroyed:	ax, cx, dx, bp
+;
+
+protoreset
+
+;-----------------------------------------------------------------------------
+;		Messages sent to the output of the document control
+;-----------------------------------------------------------------------------
+
+;MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE	message	MetaUIMessages
+;MSG_META_DOC_OUTPUT_CREATE_UI_FOR_DOCUMENT	message	MetaUIMessages
+;MSG_META_DOC_OUTPUT_DESTROY_UI_FOR_DOCUMENT	message	MetaUIMessages
+;MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT	message	MetaUIMessages
+;MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT	message	MetaUIMessages
+;MSG_META_DOC_OUTPUT_IMPORT_FILE		method	MetaUIMessages
+;MSG_META_DOC_OUTPUT_EXPORT_FILE		method	MetaUIMessages
+;
+; see documentation in ui.def
+;
+
+;--- Messages needed when VM/DB file based-app caches data
+
+;MSG_META_DOC_OUTPUT_READ_CACHED_DATA_FROM_FILE	message	MetaUIMessages
+;MSG_META_DOC_OUTPUT_WRITE_CACHED_DATA_TO_FILE	message	MetaUIMessages
+;MSG_META_DOC_OUTPUT_DOCUMENT_HAS_CHANGED	message	MetaUIMessages
+;
+; see documentation in ui.def
+;
+
+;--- Messages needed for DOS file based apps
+
+;MSG_META_DOC_OUTPUT_PHYSICAL_SAVE	message	MetaUIMessages
+;MSG_META_DOC_OUTPUT_PHYSICAL_UPDATE	message	MetaUIMessages
+;MSG_META_DOC_OUTPUT_PHYSICAL_SAVE_AS_FILE_HANDLE	message	MetaUIMessages
+;MSG_META_DOC_OUTPUT_PHYSICAL_REVERT	message	MetaUIMessages
+;MSG_META_DOC_OUTPUT_PHYSICAL_REVERT_TO_AUTO_SAVE	message	MetaUIMessages
+;
+; see documentation in ui.def
+;
+
+;--- Messages needed for handling documents of different protocols
+
+;MSG_META_DOC_OUTPUT_UPDATE_EARLIER_COMPATIBLE_DOCUMENT	message	MetaUIMessages
+;MSG_META_DOC_OUTPUT_UPDATE_EARLIER_INCOMPATIBLE_DOCUMENT	message	MetaUIMessages
+;
+; see documentation in ui.def
+;
+
+;---
+
+;MSG_META_DOC_OUTPUT_SAVE_AS_COMPLETED	message	MetaUIMessages
+;MSG_META_DOC_OUTPUT_ATTACH_FAILED	message	MetaUIMessages
+;
+; see documentation in ui.def
+;
+
+;-----------------------------------------------------------------------------
+;		Constants and Structures
+;-----------------------------------------------------------------------------
+
+DocumentOpenFlags	record
+
+	; *** Flags used for OPEN
+
+    DOF_CREATE_FILE_IF_FILE_DOES_NOT_EXIST:1
+	; This bit controls behavior when the file to open does not exist.
+	; Setting this bit causes a new file to be created if this case.
+
+    DOF_FORCE_TEMPLATE_BEHAVIOR:1
+	; Force the document to be treated as a template
+
+	; *** Flags used for SAVE AS
+
+    DOF_SAVE_AS_OVERWRITE_EXISTING_FILE:1
+	; This bit controls behavior when the file to be saveas'd to exists.
+	; Setting this bit causes the file to be overwritten
+
+    DOF_REOPEN:1
+	; We are re-opening the file
+
+	; *** Flags used for SEARCH_FOR_DOC
+
+    DOF_RAISE_APP_AND_DOC:1
+	; Raise the application & document to the top, too, regardless of
+	; non-zero nature of DCP_connection.
+
+    DOF_NAME_HOLDS_FILE_ID:1
+        ; DCP_name actually holds a FileID to use, rather than a name.
+	; DCP_diskHandle is the handle of the file in question.
+
+	; *** Flags for NEW
+
+    DOF_FORCE_REAL_EMPTY_DOCUMENT:1
+
+    DOF_OPEN_FOR_IACP_ONLY:1
+	; Could be read as "NOT_OPEN_FOR_USER".  Set if document is being
+	; opened on screen for IACP use only (currently for remote printing)
+
+    DOF_NO_ERROR_DIALOG:1
+	; Used internally, currently only in the Redwood -- should stay undoc'ed
+	; Don't put up a dialog box if there's an error, just return.
+
+    DOF_NO_DOC_SEARCH:1
+	; Used internally on special ram-disk save-as, doesn't do a document
+	; search on an open.
+    :6
+DocumentOpenFlags	end
+
+; Not all of the following flags are always needed, but they are all in one
+; structure to simplify passing the structure around
+
+DocumentCommonParams	struct
+    DCP_name		FileLongName
+    DCP_diskHandle	word
+    DCP_path		PathName
+    DCP_docAttrs	GenDocumentAttrs
+    DCP_flags		DocumentOpenFlags
+    DCP_connection	IACPConnection	; OPEN_DOC & SEARCH_FOR_DOC only: IACP
+					;  connection that requested the open.
+					;  0 if open requested by the user.
+DocumentCommonParams	ends
+
+;-----------------------------------------------------------------------------
+;		Hints
+;-----------------------------------------------------------------------------
+
+ATTR_GEN_DOCUMENT_OPEN_FOR_IACP_ONLY	vardata
+; Marker kept on document objects opened with DOF_OPEN_FOR_IACP_ONLY bit. 
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+    GDI_attrs		GenDocumentAttrs
+    GDI_type		GenDocumentType
+    GDI_operation	GenDocumentOperation
+    GDI_fileHandle	word		;file handle
+    GDI_fileName	FileLongName	;name of the file
+    GDI_display		hptr		;handle of duplicated display
+GenDocumentClass	endc
+
+EndLibrary	ui

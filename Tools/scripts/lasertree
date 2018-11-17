@@ -1,0 +1,76 @@
+#!/bin/sh -
+#
+# lasertree
+#
+# A script for generating a graphical (character based) representation of
+# a directory tree and outputing it to the LaserWriter. The directory tree
+# is traversed starting in the current directory.
+#
+# The following are valid switches:
+#
+#  -h	suppress pathname header, default = header
+#  -i	invert print order of files and dirs, default = files on top
+#  -r	rotate page (print in landscape mode), default =  normal
+#  -s	specify pointsize (e.g., -s7 for 7 point font), default = 10
+#  -P	use different printer, default = -Plw
+#  -R	ignore RCS directories, default = don't ignore
+#  -F	don't put files in tree (only directories), default = use files
+#  -X	suppress laser output; send output to stdio instead
+#
+# Examples:
+#
+#  lasertree -s6 -R		/* use 6 point font and ignore RCS dirs */
+#  lasertree -F			/* directories only */
+#  lasertree -h			/* put date, time, and page # in header
+#				   instead of path */
+#
+#	$Id: lasertree,v 1.5 89/07/26 15:15:21 matt Exp $
+#
+
+# Set an explicit path because this is a system script
+PATH=/usr/public:/usr/ucb:/bin:/usr/bin
+export PATH
+
+cwd=`pwd`
+
+args="$*"
+
+# defaults
+header="-b $cwd"
+rotatepage=""
+font=""
+printer="-Plw"
+rcsflag=""
+filesflag="-a"
+orderflag="-f"
+suppressOutput=""
+
+#
+# check for args, do the right thing
+#
+for i in $args; do
+    case $i in
+	-h) header="" ;;
+	-r) rotatepage="-r" ;;
+	-s*) 
+	    font="-f Courier`echo $i | sed -e s/-s//`" ;;
+	-P*)
+	    printer=$i ;;
+	-R)
+	    rcsflag="-R" ;;
+	-F)
+	   filesflag="" ;;
+	-i)
+	   orderflag="" ;;
+	-X)
+	   suppressOutput="true" ;;
+   esac
+done
+
+# If Laser output is suppressed, don't send to enscript
+if [ "$suppressOutput" ]; then 
+	dtree $rcsflag $filesflag $orderflag -V
+else
+# Create the tree and output it to the LaserWriter
+	dtree $rcsflag $filesflag $orderflag -V | enscript $rotatepage $header $font $printer
+fi

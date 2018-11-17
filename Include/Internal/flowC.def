@@ -1,0 +1,296 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Include/Objects
+FILE:		Internal/flowC.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	doug	1/92		Initial version
+
+DESCRIPTION:
+	Object definitions for UI's internal FlowClass object
+
+	$Id: flowC.def,v 1.1 97/04/04 14:15:13 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__FLOWC
+
+include	ui.def
+
+StartLibrary	ui
+
+FlowClass	class	MetaClass
+		uses	VisContentClass	; XXX
+
+;------------------------------------------------------------------------------
+; Messages declared in FlowClass
+;------------------------------------------------------------------------------
+
+MSG_FLOW_SET_SCREEN		message
+;
+; This message is used only internally and should not be called by anyone
+; but the UI, as there are various other things that need to be done in the IM
+; to make this all work.
+;
+;	Pass:	cx:dx - strategy routine of new video driver
+;	Return: - nothing
+;
+
+MSG_FLOW_INK_REPLY		message
+;
+; This message is sent to the flow object by the application object after it
+; has processed a MSG_META_QUERY_IF_PRESS_IS_INK. This message should not be called
+; by anyone except the UI.
+;
+;	Pass: cx - InkReturnValue
+;		if AX = IRV_DESIRES_INK or IRV_INK_WITH_STANDARD_OVERRIDE,
+;				BP - handle of block with InkDestinationInfo
+;					- or -
+;				BP - 0
+;
+; Return: nothing	
+; Destroyed: ax,cx,dx,bp
+
+MSG_FLOW_INK_PRESS_AND_HOLD_TIMEOUT	message	private
+;
+; This message is sent as a timed event to the flow object, depending upon
+; whether or not the user has held the button down a certain length of time.
+;
+; Pass: bp - timer ID
+; Return: nothing
+; Destroyed: ax, cx, dx, bp
+;
+
+MSG_FLOW_RELEASE_MOUSE_IF_GRABBED	message
+; Pass:	^lcx:dx - optr to check
+;
+
+MSG_FLOW_GRAB_MOUSE			message
+MSG_FLOW_RELEASE_MOUSE			message
+MSG_FLOW_ALLOW_GLOBAL_TRANSFER			message
+
+MSG_FLOW_SET_MODAL_GEODE			message
+; Pass:		cx:dx	- optr of GenApplication object of app with current
+;			  sys modal exclusive.
+
+MSG_FLOW_TEST_WIN_INTERACTIBILITY		message
+;
+; Query to see whether mouse can interact with passed window on an implied
+; basis.  Called by flow object itself on various transitions, to decided
+; whether implied app should be the app owning the window that the mouse is
+; over, or NULL.
+; 
+; Pass:		cx:dx	- InputOD of Window to test
+; 		bp	- handle of Window to test
+; Return:	carry	- clear if mouse allowed to interact on an implied
+;			  basis, set if not.
+
+
+MSG_FLOW_GET_MODAL_GEODE		message
+; Used by system obj, since it needs instance data over here.  Fetches 
+; current modal geode, if any
+;
+; Pass:		nothing
+; Return:	cx:dx	- Input obj of modal geode, if any (else 0)
+;		bp	- modal geode, if any (else 0)
+;
+
+MSG_FLOW_REGISTER_NO_INK_WIN		message
+; This message can be sent by anyone to tell the flow object that a certain
+; window never accepts ink input.  MSG_META_QUERY_IF_PRESS_IS_INK is not
+; sent if the mouse click is intended for this window.  Useful for speed
+; improvement because MSG_META_START_SELECT gets to the app object faster.
+;
+; If the list (MAX_NO_INK_WIN slots) is full, any add request will be ignored.
+; This means that ui object that adds it's window to the no-ink list may still
+; receive MSG_META_QUERY_IF_PRESS_IS_INK, and should reply accordingly.
+; Windows should be removed from the list before they're destroyed.
+;
+; Pass:		cx	- non-zero to add window to no-ink list, zero to remove
+;		bp	- handle of window to add/remove
+; Return:	nothing
+; Destroyed:	ax, cx, dx, bp
+;
+
+
+;------------------------------------------------------------------------------
+; FlowFlags
+;------------------------------------------------------------------------------
+
+FlowFlags	record
+	FF_IGNORE_PTR_EVENTS_WHEN_USING_IMPLIED_GRAB:1
+	; Set to prevent ptr events from being sent to the implied mouse
+	; grab.  This flag is update whenever the implied mouse grab changes
+	; the ptr sending characteristics.  When an active mouse grab is
+	; released, this flag is checked in order to determine whether
+	; the ptr sending mode should be restored to be sending ptr events
+	; or not.
+
+	FF_WIN_CHANGE_SINCE_LAST_MSG_META_BUTTON:1
+	; Set anytime the mouse changes windows, cleared every button event.
+	; If this flag is set, the double-click flag in the button event is
+	; cleared, as a change in windows voids the criteria necessary for
+	; a double-click.
+
+	FF_PROCESSING_INK:1
+	; Set if we are processing ink, so we want to eat all mouse events
+	; until a MSG_META_NOTIFY_WITH_DATA_BLOCK w/GWNT_INK is received.
+
+	FF_LAST_PRESS_WAS_NOT_INK:1
+	; Set if the last press was not ink, so we want to let the associated
+	; MSG_META_START_SELECT through.
+
+	FF_HAS_INK_OVERRIDE:1
+	; Set if the user has overridden the default ink behavior in a text
+	; object. The standard ways are when the "press and hold" timer has
+	; expired, and the user still hasn't moved the mouse, or if the user
+	; has clicked and released the mouse quickly.
+
+	FF_AWAITING_PRESS_AND_HOLD_TIMER:1
+	; Set if we are waiting for the "press and hold" timer to expire
+	; before determining whether we have ink or not yet.
+
+	FF_MOUSE_DOWN:1
+	; Used by GenerateFlowLayerGrabRelease to keep track of button up/
+	; down transitions
+
+	:1
+FlowFlags	end
+
+
+
+
+;------------------------------------------------------------------------------
+; Instance data for flow object
+;------------------------------------------------------------------------------
+;
+; There may only be one instatiated flow object in the system.  This is owned
+; by the UI process.  It is a real object, in that it has an OD which can
+; be sent messages.  This is used to allow the IM to directly send mouse & kbd
+; data to this object.  There are also a number of UI library calls which
+; operate on this object, simulating a method call by locking the instance
+; block & saving registers, etc.
+;
+    FI_activeKbdGrab		KbdGrab <>
+    ; First object down focus hierarchy that is either a GenApplication object,
+    ; or is an object not run by the main UI thread.  Set by System & Field
+    ; objects in their MSG_META_MUP_ALTER_FTVMC_EXCL handlers.
+
+    FI_prevPriority		byte	(?)
+    ; prevPriority is the priority of the first thread of the geode owning
+    ; the object having the kbd exclusive within the system, BEFORE we
+    ; modified it to be at level "FOCUS", when the geode became the focus
+    ; geode.  It is stored here so that the old priority may be restored
+    ; when the geode loses the exclusive.
+
+    FI_prevUIPriority		byte	(?)
+    ; prevUIPriority is the priority of the ui thread of the geode owning
+    ; the object having the kbd exclusive within the system, BEFORE we
+    ; modified it to be at level "UI", when the geode became the focus
+    ; geode.  It is stored here so that the old priority may be restored
+    ; when the geode loses the exclusive.
+
+    FI_impliedWin		MouseGrab<>
+    ; The window, & InputOD of that window, which the mouse is currently over,
+    ; REGARDLESS of grabs, modal windows, etc.
+
+    FI_impliedMouseGrab		GeodeGrab <>
+    ; Owning geode, & InputObj thereof, of the FI_impliedWin IF the mouse
+    ; is currently allowed in that window per advice of 
+    ; MSG_FLOW_TEST_WIN_INTERACTIBILITY, else will be NULL.  Mouse is
+    ; currently "allowed in" only if there is no system modal window nor
+    ; active mouse grab, or if the FI_impliedWin is owned by the geode
+    ; that has these exclusives.
+
+    FI_activeMouseGrab		GeodeGrab <>
+    ; Geode, & InputObj thereof, if mouse is "grabbed" by a geode.  This 
+    ; currently only happens as part of the "autograb" mechanism, in which
+    ; the mouse is grabbed for the current FI_impliedMouseGrab when any
+    ; button of the mouse is pressed, until all buttons are released, or 
+    ; MSG_FLOW_ALLOW_GLOBAL_TRANSFER is called on the flow object.
+
+    FI_modalGeode		GeodeGrab<>
+    ; Owning geode, & InputObj thereof, of the top-most system modal window
+    ; on the default screen.  Will be 0 if there are no system modal windows
+    ; on-screen.
+
+    FI_flowFlags		FlowFlags
+
+    FI_holdUpInputQueue	hptr	; Handle of queue used to hold held-up input
+    FI_holdUpInputFlags	HoldUpInputFlags
+    FI_holdUpInputCount	word	; Number of requestors that wish for UI input
+				; to be held up -- if non-zero, request is
+				; granted.
+
+    FI_mouseBump		XYOffset <>
+
+    FI_activeMouseButton	byte
+	; Number of mouse button which generated current MouseFunction:
+	;	0	Button 0
+	;	1	Button 1
+	;	2	Buton 2
+	;	-1	NONE
+
+    FI_activeMouseFunction	word
+	; Current UI mouse function in progress (START message stored here,
+	; regardless of START/DRAG/END variation that is active mouse message)
+	; 	MSG_META_START_SELECT
+	;	MSG_META_START_MOVE_COPY
+	;	MSG_META_START_FEATURES
+	;	0	- No function active (If any buttons are still down,
+	;		  then MSG_OTHER_* mssages will be sent out for
+	;		  them)
+	; 
+
+    FI_activeMouseMethod	word
+	; Current button message being processed
+	; (MSG_START/DRAG/END_SELECT/MOVE_COPY/FEATURES/OTHER, etc.)
+
+    FI_activeMouseButtonInfo	ButtonInfo
+	; Current ButtonInfo (passed in bp low in mouse messages)
+
+    FI_activeMouseUIFunctionsActive	UIFunctionsActive
+	; Current UIFunctionsActive (passed in bp high in mouse messages)
+
+    FI_curVideoStrategy		fptr.far
+
+    FI_inkDestination		InkGrab <>
+    FI_inkBrushSize		word	(?)
+	; Width/height of ink brush to pass off to IM. Is settable via 
+	; InkDestinationInfo
+    FI_inkGestureCallback	dword	(?)
+	; Gesture callback to pass off to IM. Is settable via 
+	; InkDestinationInfo
+
+    FI_inkPressHoldTimerHan	hptr	(?)
+    FI_inkPressHoldTimerID	word	(?)	
+	; This is the handle/ID of the timer used to determine if the
+	; user has held the mouse button down a certain length of time.
+	; This is used to determine whether a mouse press should be ink
+	; or not in text objects.
+	; NOTE: This is only non-zero while we are waiting to find out
+	; if the user is press-holding... It is never non-zero unless we
+	; are in pen mode.	
+
+    FI_inkStartPoint		Point<>
+	;This is the screen position of the beginning of the current start
+	; select. This is used in the press-hold code to determine if the
+	; user has moved the mouse too far.
+
+MAX_NO_INK_WIN	equ	16		; # of slots in no-ink window list
+
+    FI_numNoInkWin		word	(?)
+	; current # of windows in no-ink window list
+
+    FI_noInkWin			hptr.Window	MAX_NO_INK_WIN	dup (?)
+    noreloc	FI_noInkWin
+	; no-ink window list.
+
+FlowClass	endc
+
+EndLibrary	ui

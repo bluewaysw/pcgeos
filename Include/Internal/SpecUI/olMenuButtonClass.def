@@ -1,0 +1,187 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1994 -- All Rights Reserved
+
+PROJECT:	SPUI
+MODULE:		
+FILE:		olMenuButtonClass.def
+
+AUTHOR:		David Litwin, Oct  6, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	10/ 6/94		Initial revision
+
+
+DESCRIPTION:
+	Definition of OLMenuButtonClass.
+		
+	OLMenuButton is a button object which drives a popup window,
+	such as a menu.  This class is very similar to its superclass,
+	OLButtonClass, except the mouse pointer and button events are
+	handled differently, and we have some extensions to support
+	"stay-up-mode" for menus.
+
+	$Id: olMenuButtonClass.def,v 1.1 97/04/04 14:11:39 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+OLMenuButtonClass	class	OLButtonClass
+	uses	GenClass
+
+
+;------------------------------------------------------------------------------
+;			Method Declarations
+;------------------------------------------------------------------------------
+
+MSG_MO_MB_LEAVE_STAY_UP_MODE	message
+;	Sent by our OLMenuWin object when it leaves stay-up mode.
+; Regardless of what they are pressing on, we want to set CLOSING = TRUE.
+;
+;	Pass:		nothing
+;	Returns:	cx = TRUE if mouse pointer over this menu button
+
+MSG_OL_MENU_BUTTON_SET_IS_SYS_MENU_ICON	message
+;	Sent by Motif/CUA after the menu button has been created for the
+; system menu. We set a flag in the button so that double-clicks are detected.
+
+MSG_OL_MENU_BUTTON_KBD_ACTIVATE		message
+;	This method is sent by OLMenuWinDismissMenuAndCallButton, when the
+;user has a menu open, and presses the left or right arrow.
+
+MSG_OL_MENU_BUTTON_SEND_RIGHT_ARROW_TO_PARENT_MENU	message
+;	This method is sent by the sub-menu which this button opens, when
+; the RIGHT arrow is pressed in that menu. We want to close the sub-menu
+; and the menu in which this button is located, and open the next top-level
+; menu.
+
+MSG_OL_MENU_BUTTON_NOTIFY_MENU_DISMISSED	message
+;	This method is sent by the menu that this button drives, when that
+; menu is DISMISSed.
+;	Pass:		nothing
+;	Returns:	nothing
+
+MSG_OL_MENU_BUTTON_CLOSE_MENU		message
+;	This method is sent by other menu buttons with the same vis parent
+; when they get MSG_OL_MENU_BUTTON_KBD_ACTIVATE.  It causes any sibling
+; menus to close when a menu is opened.
+;	Pass:		nothing
+;	Returns:	nothing
+
+MSG_OL_MENU_BUTTON_INIT_POPUP_ORIENTATION	message
+;	Gets the orientation correct for popup lists.
+; 	Pass:		nothing
+;	Return:		carry set if horizontal orientation for popup lists.
+;
+
+;-------------------------------------------------------------------------------
+;	Specific State information
+;-------------------------------------------------------------------------------
+
+OLMenuButtonSpecState	record
+    OLMBSS_MENU_FUNCTION_PENDING:1
+			;set when a menu function is in progress. Means that
+			;the correct mouse button is pressed, and the menu
+			;is displayed or will be displayed shortly.
+			;THIS MUST MATCH UIFA_SELECT in UIFunctionsActive.
+
+    OLMBSS_OPENS_POPUP_LIST:1
+			;Set when a menu button opens a popup list.
+    OLMBSS_DEFAULT_FUNCTION_PENDING:1
+			;set when a default function is in progress. Means that
+			;the correct mouse button is pressed, and the default
+			;button moniker is displayed in the menu button.
+			;THIS MUST MATCH UIFA_FEATURES in UIFunctionsActive.
+
+    OLMBSS_ORIENT_POPUP_HORIZONTALLY:1
+			;Usually popups are vertical.  Popup lists currently
+			;can be made horizontal if this button is in a vertical
+			;composite.
+    OLMBSS_POPUP_OPEN:1	;set if menu is opened and visible on screen.
+    OLMBSS_CLOSING_MENU:1
+			;for stay-up-mode support: this is set when a MENU
+			;function ends, and the window is displayed.
+
+    OLMBSS_CLOSE_MENU_ON_LOST_GADGET_EXCL:1
+			;set when GAIN gadget exclusive. If we lose the gadget
+			;exclusive, and this is set, we close our menu.
+			;If our menu passes a SVQT_REMOTE_GRAB_GADGET_EXCL
+			;through this menu, we clear this flag, so that
+			;we don't drop our menu as we lose the gadget excl.
+    OLMBSS_SYS_MENU_ICON:1
+			;set if is Motif system menu icon, so that a double-
+			;click operation causes the window to be dismissed.
+OLMenuButtonSpecState	end
+
+.assert (mask OLMBSS_MENU_FUNCTION_PENDING eq mask UIFA_SELECT), \
+		"ERROR: OLMenuButtonSpecState must match UIFunctionsActive"
+.assert (mask OLMBSS_DEFAULT_FUNCTION_PENDING eq mask UIFA_FEATURES), \
+		"ERROR: OLMenuButtonSpecState must match UIFunctionsActive"
+
+;This structure is used internally as a generic way to express whether the
+;user is pressing on the mouse buttons which represent MENU and DEFAULT
+;for this specific UI.
+
+OLMenuButtonFunctionsActive	record
+    OLMBFA_MENU:1	;set when the MENU button is pressed (SELECT button
+			;in CUA, can be either SELECT or FEATURES in OpenLook)
+			;THIS MUST MATCH UIFA_SELECT in UIFunctionsActive.
+    :1
+    OLMBFA_DEFAULT:1	;set when the DEFAULT button is pressed (can be
+			;either SELECT or FEATURES buttons in OpenLook)
+			;THIS MUST MATCH UIFA_FEATURES in UIFunctionsActive.
+    :4
+    OLMBFA_IN_BOUNDS:1	;set when mouse pointer is in menu button bounds
+OLMenuButtonFunctionsActive	end
+
+.assert (mask OLMBFA_MENU eq mask UIFA_SELECT), \
+	"ERROR: OLMenuButtonFunctionsActive must match UIFunctionsActive"
+.assert (mask OLMBFA_DEFAULT eq mask UIFA_FEATURES), \
+	"ERROR: OLMenuButtonFunctionsActive must match UIFunctionsActive"
+.assert (mask OLMBFA_IN_BOUNDS eq mask UIFA_IN), \
+	"ERROR: OLMenuButtonFunctionsActive must match UIFunctionsActive"
+
+; A record of flags used for selection boxes.
+;
+if	SELECTION_BOX
+OLMenuButtonOdieFlags		record
+    OLMBOF_IS_SELECTION_BOX:1			; selection box ?
+    OLMBOF_BORDERED_SELECTION_BOX:1		; 3-D border ?
+    OLMBOF_VERTICAL_SELECTION_BOX:1		; vertical/horizontal ?
+    OLMBOF_NON_WRAPPING_SELECTION_BOX:1		; wrapping/non-wrapping list
+    OLMBOF_SELECTION_BOX_PREV_DISABLED:1	; next trigger disabled
+    OLMBOF_SELECTION_BOX_NEXT_DISABLED:1	; previous trigger disabled
+    OLMBOF_PREV_ARROW_DOWN:1			; previous trigger pressed ?
+    OLMBOF_NEXT_ARROW_DOWN:1			; next trigger pressed ?
+OLMenuButtonOdieFlags		end
+
+OLMenuButtonMoreOdieFlags		record
+	:6
+	OLMBOF_PENDING_END_SELECT:1		; for non-wrapping lists
+	OLMBOF_TIMER_PENDING:1			; repeat press timer pending ?
+OLMenuButtonMoreOdieFlags		end
+
+endif	; if SELECTION_BOX
+
+
+;-------------------------------------------------------------------------------
+;	Instance Data
+;-------------------------------------------------------------------------------
+
+OLS <	OLMBI_menuTimer	dword	(?)	;time at menu start select	>
+	OLMBI_popupType	OLWinType <>
+	OLMBI_specState	OLMenuButtonSpecState <>
+
+SBOX <	OLMBI_odieFlags	OLMenuButtonOdieFlags <>			>
+SBOX <	OLMBI_moreOdieFlags	OLMenuButtonMoreOdieFlags <>		>
+
+OLMenuButtonClass	endc
+
+
+
+

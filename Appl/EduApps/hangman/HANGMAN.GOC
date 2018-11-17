@@ -1,0 +1,272 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Breadbox Computer Company LLC 2001 -- All Rights Reserved
+
+PROJECT:	Educational Applications
+MODULE:	HangMan application
+FILE:		hangman.goc
+
+AUTHOR:		John Howard 11/1/01
+
+DESCRIPTION:	This a simple hang man game
+					It uses the word list from WordMatcher
+
+REVISION HISTORY:
+	Name	Date			Description
+	----	----			-----------
+	jfh	11/01/01 	Initial version.
+			11/02/01		Adding word grabbing
+			11/03/01  	Randomizing
+			11/06/01  	Added keyboard letter selection
+			07/02/02		Split out files
+         07/02/02		Added custom word list stuff
+
+***********************************************************************/
+
+/***********************************************************************
+ *		Include files
+ ***********************************************************************/
+@include "hangman.goh"
+@include "bboxreg.goh"
+@include "hmicon.goh"
+
+
+/***********************************************************************
+ *		The Application Object
+ ***********************************************************************/
+
+@start	AppResource;
+
+@object GenApplicationClass HangManApp = {
+	GI_visMoniker = list { @HangManLCMoniker,
+								  @HangManTinyMoniker,
+								  @HangManTextMoniker }
+	GI_comp = @HangManPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @HangManPrimary;
+	ATTR_GEN_HELP_FILE = "HM Help";
+}
+
+@visMoniker HangManTextMoniker = "Hang Man";
+
+@end	AppResource;
+
+
+
+@start	Interface;
+
+@object GenPrimaryClass HangManPrimary  = {
+	GI_comp = @HangManFileMenu, @HangManOptionsMenu, @HangManView,
+				 @HMButtonGroup, @HMImportDialog;
+	HINT_SIZE_WINDOW_AS_DESIRED;
+	ATTR_GEN_HELP_CONTEXT = "TOC";
+}
+
+@object GenInteractionClass HangManFileMenu = {
+	GI_comp = @HangManNewTrigger, @AboutGroup;
+	GII_visibility = GIV_POPUP;
+	ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+}
+
+@object GenTriggerClass HangManNewTrigger = {
+	GI_visMoniker = 'N', "New Game";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_HANGMAN_NEW_GAME;
+}
+
+@object GenInteractionClass AboutGroup = {
+	 GI_comp = @AboutDBox;
+	 GII_visibility = GIV_SUB_GROUP;
+}
+
+@object GenInteractionClass AboutDBox = {
+	 GI_visMoniker = 't', "About";
+    GI_comp = @AppName, @Beta, @By, @BreadBoxLogo, @Visit,
+		    @Web, @Copyright;
+    GII_visibility = GIV_DIALOG;
+    GII_type = GIT_NOTIFICATION;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTextClass AppName = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_text = "Hang Man";
+	 ATTR_GEN_TEXT_CHAR_ATTR = (ChunkHandle) @AppNameCharAttrs;
+}
+
+@chunk VisTextCharAttr AppNameCharAttrs =
+	CHAR_ATTR_FONT_SIZE_STYLE(
+		FID_DTC_URW_SANS, 24, TS_BOLD);
+
+@object GenGlyphClass Beta = {
+  GI_visMoniker = "An Educational Product";
+}
+
+@object GenGlyphClass By = {
+  GI_visMoniker = "from";
+}
+
+@object GenGlyphClass BreadBoxLogo = {
+  GI_visMoniker = list { @BreadboxLogoMoniker}
+}
+
+@object GenGlyphClass Copyright = {
+  GI_visMoniker = "Copyright 1994-2001 Breadbox Computer Company LLC";
+}
+
+@object GenGlyphClass Visit = {
+  GI_visMoniker = "Visit us at...";
+}
+
+@object GenGlyphClass Web = {
+  GI_visMoniker = "www.breadbox.com";
+}
+
+@object GenInteractionClass HangManOptionsMenu = {
+	GI_visMoniker = 'O', "Options";
+	GI_comp = @HMWordListGroup, @HMDifficultyMenu, @HMSoundMenu;
+	GII_visibility = GIV_POPUP;
+}
+
+@object GenInteractionClass HMDifficultyMenu = {
+	GI_visMoniker = 'D', "Difficulty";
+	GI_comp = @HMDifficultyGroup;
+	GII_visibility = GIV_POPUP;
+}
+
+@object GenItemGroupClass HMDifficultyGroup = {
+	GI_comp = @HMDEasyItem, @HMDHarderItem;
+	GIGI_selection = APPENDAGES;
+	GIGI_destination = process;
+	GIGI_applyMsg = MSG_HANGMAN_DIFFICULTY_APPLY;
+}
+
+@object GenItemClass HMDEasyItem = {
+	GI_visMoniker = 'E', "Easy";
+	GII_identifier = APPENDAGES;
+}
+
+@object GenItemClass HMDHarderItem = {
+	GI_visMoniker = 'H', "Harder";
+	GII_identifier = LIMBS;
+}
+
+@object GenInteractionClass HMSoundMenu = {
+	GI_visMoniker = 'S', "Sound";
+	GI_comp = @HMSoundGroup;
+	GII_visibility = GIV_POPUP;
+}
+
+@object GenItemGroupClass HMSoundGroup = {
+	GI_comp = @HMSOnItem, @HMSOffItem;
+	GIGI_selection = SOUND_ON;
+	GIGI_destination = process;
+	GIGI_applyMsg = MSG_HANGMAN_SOUND_APPLY;
+}
+
+@object GenItemClass HMSOnItem = {
+	GI_visMoniker = 'O', "Sound On";
+	GII_identifier = SOUND_ON;
+}
+
+@object GenItemClass HMSOffItem = {
+	GI_visMoniker = 'f', "Sound Off";
+	GII_identifier = SOUND_OFF;
+}
+
+@object GenBooleanGroupClass HMWordListGroup = {
+	GI_comp = @HMCustomListItem;
+	GBGI_destination = process;
+	GBGI_applyMsg = MSG_HM_CUSTOM_LIST_GROUP_APPLY;
+}
+
+@object GenBooleanClass HMCustomListItem = {
+	GI_visMoniker = "Custom Word List";
+	GBI_identifier = CUSTOM_LIST;
+}
+
+
+/* -------------------------------------------------------------- */
+@object GenInteractionClass HMImportDialog = {
+	 GI_visMoniker = "Custom Word List";
+	 GI_comp = @HMImpFileSel, @HMImportButton, @HMImpCanx;
+	 GII_visibility = GIV_DIALOG;
+	 GII_attrs = GIA_NOT_USER_INITIATABLE;
+    ATTR_GEN_HELP_CONTEXT = "ImpDB";
+}
+
+@object GenFileSelectorClass HMImpFileSel = {
+    GFSI_fileCriteria = FSFC_MASK_CASE_INSENSITIVE |
+				    FSFC_DIRS |
+				    FSFC_NON_GEOS_FILES;
+	 GFSI_destination = process;
+	 GFSI_notificationMsg = MSG_HM_IMPORT_SELECTOR_ACTION;
+	 ATTR_GEN_PATH_DATA = {SP_DOCUMENT, "."};
+	 HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 8;
+	 HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 40;
+}
+
+@object GenTriggerClass HMImportButton = {
+	 GI_visMoniker = "Read";
+	 GI_states = @default & ~GS_ENABLED;
+	 GTI_destination = process;
+	 GTI_actionMsg = MSG_HM_IMPORT_WORD_LIST;
+	 HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass HMImpCanx = {
+	 GI_visMoniker = "Cancel";
+	 GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	 GTI_destination = process;
+	 GTI_actionMsg = MSG_HM_CANCEL_IMPORT_WORD_LIST;
+	 HINT_SEEK_REPLY_BAR;
+}
+
+/* -------------------------------------------------------------- */
+@object HangManViewClass HangManView = {
+	GVI_content = process;
+	GVI_docBounds = {0, 0, BOARD_WIDTH, BOARD_HEIGHT};
+	GVI_horizAttrs = @default	| GVDA_NO_LARGER_THAN_CONTENT
+				| GVDA_NO_SMALLER_THAN_CONTENT;
+	GVI_vertAttrs = @default	| GVDA_NO_LARGER_THAN_CONTENT
+				| GVDA_NO_SMALLER_THAN_CONTENT
+				| GVDA_KEEP_ASPECT_RATIO;
+	HINT_DEFAULT_FOCUS;
+	HINT_DEFAULT_TARGET;
+}
+
+@object GenInteractionClass HMButtonGroup = {
+	GI_comp = @HMNewButton;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_RIGHT_JUSTIFY_CHILDREN;
+ }
+
+@object GenTriggerClass HMNewButton = {
+	GI_visMoniker = 'N', "New Game";
+	GTI_destination = process;
+	GTI_actionMsg = MSG_HANGMAN_NEW_GAME;
+}
+
+@end	Interface;
+
+@start Strings;
+@chunk char	OpenMsg[] = "Help Me!!";
+@chunk char	WinMsg[] = "Thank You!!";
+@chunk char	LoseMsg[] = "Gaaccckkkk!!";
+@chunk char RestartWarningMsg[] = "Changing the Difficulty will end this game and start a new one.  Do you want to change?";
+/*@chunk char WordTooShortMsg[] = "The word \"\001\" needs to be at least four letters long.";
+@chunk char WordTooLongMsg[] = "The word \"\001\" needs to be less than 11 letters long.";
+@chunk char WordInvalidCharMsg[] = "The word \"\001\" can have letters only.";
+*/@chunk char ListTooLongMsg[] = "You may have only 250 words in the list.";
+@chunk char ImpOpenErrMsg[] = "There was an error opening the word list file.";
+@chunk char ImpBadTypeErrMsg[] = "Not a valid word list file.";
+@chunk char ImpCloseErrMsg[] = "There was an error closing the word list file.";
+@chunk char ImpReadErrMsg[] = "There was an error reading the word list file.";
+@chunk char ImpCompleteMsg[] = "There were \001 words read into your custom word list.  There were \002 words which could not be added to the custom list.  Please see the help file for the word list requirements.";
+
+@end Strings;
+
+
+

@@ -1,0 +1,501 @@
+/***********************************************************************
+ *
+ *      Copyright (c) GeoWorks 1992 -- All Rights Reserved
+ *
+ * PROJECT:       PC/GEOS
+ * MODULE:        ffDbase.goh
+ * FILE:          ffDbase.goh
+ *
+ * AUTHOR:        Jeremy Dashe: Apr 16, 1992
+ *
+ * REVISION HISTORY:
+ *      Date      Name      Description
+ *      ----      ----      -----------
+ *      4/16/92   jeremy    Initial version
+ *
+ * DESCRIPTION:
+ *      This file contains type definitions for the flat file database.
+ *
+ *      $Id: ffDbase.goh,v 1.1 97/04/04 15:50:36 newdeal Exp $
+ *
+ ***********************************************************************/
+@optimize
+@include <ffile.goh>
+@include <spool.goh>
+
+/*
+ * Define in which row the field information is kept.
+ */
+#define FIELD_TYPE_ROW          (LARGEST_VISIBLE_ROW + 1)       /* == 4000h */
+#define FIELD_DEFAULT_VALUE_ROW (FIELD_TYPE_ROW + 1)
+#define TEMP_DATA_ROW           (FIELD_DEFAULT_VALUE_ROW + 1)
+#define RECORD_LAYOUT_ROW       (TEMP_DATA_ROW + 1)
+#define MULTI_RECORD_LAYOUT_ROW (RECORD_LAYOUT_ROW + 1)
+#define MISCELLANEOUS_INFO_ROW  (MULTI_RECORD_LAYOUT_ROW + 1)
+#define TEMP_DATA_ROW_FOR_VISUAL_UPDATES        (MISCELLANEOUS_INFO_ROW + 1)
+
+/*
+ * Define the column in RECORD_LAYOUT_ROW that holds the list of 
+ * sorted name arrays
+ */
+#define LAYOUT_NAME_ARRAY_COLUMN 0
+
+/*
+ * Flags to track which attributes are legal for each data type
+ */
+typedef ByteFlags       FFD_attributes;
+#define FFD_ATTRIBUTES_DEFAULT          0x01
+#define FFD_ATTRIBUTES_MAX_TEXT_LENGTH  0x02
+#define FFD_ATTRIBUTES_MIN_VALUE        0x04
+#define FFD_ATTRIBUTES_MAX_VALUE        0x08
+
+/* so far, min/max will always be enabled/disabled together so: */
+
+#define FFD_ATTRIBUTES_MIN_MAX_VALUE    (FFD_ATTRIBUTES_MIN_VALUE | \
+					 FFD_ATTRIBUTES_MAX_VALUE)
+
+/*
+ * Field range checking defines:
+ */
+typedef ByteEnum FieldRangeCheck;
+#define FIELD_IN_RANGE      0
+#define FIELD_BELOW_MIN     1
+#define FIELD_ABOVE_MAX     2
+
+/*
+ * Structures used for general text and formula use:
+ */
+typedef struct {
+    CellText cellTextStruct;
+    TCHAR string[MAX_TEXT_FIELD_LENGTH + 1];
+} TextCellStruct;
+
+typedef struct {
+    CellFormula cf;
+    byte formula[MAX_TOKEN_STREAM_SIZE];
+    TCHAR data[MAX_EXPRESSION_STRING_LENGTH];
+} FormulaCellStruct;
+
+/*
+ * Structures used for layout and page dimensions:
+ */
+typedef struct {
+    sdword LS_height;
+    sdword LS_width;
+} LayoutSize;
+
+    
+/* Data Type & Attribute info is stored in a row in the additional
+   block of data (after the cell data). The attributes for field n 
+   are stored in column n of the sparse array. */
+
+/*
+ * Common Field Data Types attributes 
+ */
+
+/* This constant defines the offset of FDA_type within the common
+   FieldDataAttrs structure. Code in several places needs to know where
+   to find it, so if you change this structure, update this constant
+   as well! */
+#define FDA_TYPE_POSITION       0
+
+typedef struct {
+    FieldDataType       FDA_type;
+    FieldDataTypesFlags FDA_flags;      /* from FieldDataTypesFlags */
+    word                FDA_nameToken;  /* token for field name */
+} FieldDataAttrs;
+
+/*
+ * Computed/default field token stream attributes.
+ */
+typedef struct {
+    word                TSA_size;       /* Number of tokens in stream. */
+} TokenStreamAttrs;
+
+/*
+ * Text Field Data Type attributes
+ */
+typedef struct {
+    FieldDataAttrs      TFDA_common;
+    word                TFDA_maxLength;         /* max # chars in text
+						   field; user-defined */
+} TextFieldDataAttrs;
+
+/*
+ * Value Field Data Type attributes
+ */
+typedef struct {
+    FieldDataAttrs      VFDA_common;
+    FloatNum            VFDA_min;
+    FloatNum            VFDA_max;
+
+} ValueFieldDataAttrs;
+
+typedef struct {
+    FieldDataAttrs      DFDA_common;
+    FloatNum            DFDA_min;
+    FloatNum            DFDA_max;
+} DateFieldDataAttrs;
+
+typedef struct {
+    FieldDataAttrs      CFDA_common;
+
+} ComputedFieldDataAttrs;
+
+#define MAX_TOTAL_NAME_LENGTH   (60)
+
+typedef struct {
+    TCHAR                TASA_name[MAX_TOTAL_NAME_LENGTH];
+    TCHAR                *TASA_formula;          
+} SubsetAttrs;
+
+/*
+ * Mode Types
+ */
+typedef ByteEnum ModeType;
+#define MT_CURRENT              0x0     
+#define MT_DESIGN               0x01    
+#define MT_DATA_ENTRY           0x02
+
+/*
+ * Layout Types
+ */
+typedef ByteEnum LayoutType;
+#define LT_NO_LAYOUT_TYPE       0x0
+#define LT_SINGLE_RECORD        0x01
+#define LT_MULTI_RECORD         0x02
+#define LT_REPORT               0x04
+
+/*
+ * CommitRecord Types; used by MSG_FFD_COMMIT_TEMP_DATA_ROW_TO_DATABASE
+ */
+typedef ByteEnum CommitRecordType;
+#define CRT_REGULAR_COMMIT       0x01
+#define CRT_VISUAL_UPDATE_COMMIT 0x02
+#define CRT_SAVE_FILE_COMMIT     0x03
+
+/*
+ * NewRecordTypes; used by MSG_FFD_EDIT_NEW_RECORD
+ */
+typedef ByteEnum NewRecordType;
+#define NRT_REGULAR     0x01
+#define NRT_LOAD_FROM_TEMP_VISUAL_UPDATE_ROW    0x02
+
+/*
+ * EditRecordTypes; used by MSG_FFD_EDIT_EXISTING_RECORD
+ */
+typedef ByteEnum EditRecordType;
+#define ERT_REGULAR     0x01
+#define ERT_LOAD_FROM_TEMP_VISUAL_UPDATE_ROW    0x02
+
+/*
+ * Field edge drawing flags:
+ */
+typedef ByteFlags FieldEdgeFlags;
+#define FEF_TOP                 0x01
+#define FEF_LEFT                0x02
+#define FEF_RIGHT               0x04
+#define FEF_BOTTOM              0x08
+#define FEF_FIRST_FIELD_FLAG    0x80   /* <- always the MSB, and not an edge! */
+#define FEF_LEAVE_EDGES_ALONE   0x80   /* <- always the MSB, and not an edge! */
+
+#define FEF_ALL_EDGES          (FEF_TOP | FEF_BOTTOM | FEF_LEFT | FEF_RIGHT)
+
+/*
+ * MinOrMaxValue is used as a parameter to 
+ * FFD_GET_COLUMN_MIN_OR_MAX_STRING
+ */
+typedef ByteEnum MinOrMaxValue;
+#define MIN     0
+#define MAX     1
+
+/*
+ * Record Order: Top->Bottom & Left->Right, or Left->Right & Top->Bottom
+ */
+
+typedef ByteEnum RecordOrderOption; 
+#define ROO_LEFT_TO_RIGHT 0
+#define ROO_TOP_TO_BOTTOM 1
+
+
+/*
+ * InsertResult is used as the return parameter to 
+ * FFD_COMMIT_TEMP_ROW_TO_DATABASE
+ */
+typedef ByteEnum InsertResult;
+#define INSERT_OK       0
+#define NO_INSERT_DONE  1
+#define INSERT_FAILED   2
+
+typedef ByteEnum FFLayoutNameInsertionResult;
+#define FFD_NO_ERROR    0
+#define FFD_DUPLICATE_LAYOUT_NAME 1
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Field Navigation Order
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*
+ * FieldOrderMovementCommand is used to convey the desired style of
+ * 'movement' action.
+ *
+ * See the FieldOrderInfoGetField() for more information.
+ */
+typedef enum
+{
+    FOMC_FIRST_FIELD,
+    FOMC_PREVIOUS_FIELD,
+    FOMC_NEXT_FIELD,
+    FOMC_LAST_FIELD
+} FieldOrderMovementCommand;
+
+
+typedef struct
+{
+    /*
+     * lastItemIndex contains the index of the last valid item in the
+     * fieldsList. It contains 0xffff if nothing is set.
+     */
+    sword               FNOI_lastItemIndex;
+
+    /*
+     * fieldsList defines the sort keys in decreasing order of primacy.
+     * Each layout contains it's own sort order.
+     */
+     FieldID    FNOI_fieldOrderList [MAX_NUM_FIELDS];
+} FFDBFieldNavigationOrderInfo;
+
+/*
+ * Chunk array constants/structures for storing record layouts
+ */
+
+#define MAX_LAYOUT_NAME_LENGTH  40
+#ifdef DO_DBCS
+#define MAX_LAYOUT_NOTES_LENGTH 127
+#else
+#define MAX_LAYOUT_NOTES_LENGTH 255
+#endif
+#define MAX_NUM_LAYOUTS         255
+#define MAX_LENGTH_TREASURE_CHEST_MONIKER 60
+#define MAX_LENGTH_RECORD_CONTROL_PANEL_MONIKER 40
+
+typedef struct {
+     VMBlockHandle    LC_grObjBodyVMBlock;
+     ChunkHandle      LC_grObjBodyChunk;
+} LayoutCommon;
+
+typedef struct {
+    ChunkArrayHeader    RLCAH_standardChunkArrayHeader;
+    LayoutCommon        RLCAH_layoutCommon;
+    TCHAR               RLCAH_layoutName[MAX_LAYOUT_NAME_LENGTH];
+    dword               RLCAH_lastFieldYPosition;
+    byte                RLCAH_layoutSortedFieldList[MAX_NUM_FIELDS];
+    byte                RLCAH_numFieldsInLayout;
+    TCHAR               RLCAH_layoutNotes[MAX_LAYOUT_NOTES_LENGTH];
+    ModeType            RLCAH_layoutMode;       /* indicates which mode 
+						   the GrObjects are 
+						   set up for */
+    LayoutType          RLCAH_layoutType;       /* Since every layout
+						   has at least a record
+						   layout, we store the
+						   type here */
+    LayoutSize          RLCAH_singleRecordSize;
+    FFDBFieldNavigationOrderInfo
+			RLCAH_fieldOrderInfo;
+} RecordLayoutChunkArrayHeader;
+
+/*
+ * Structure for multi-record layouts
+ */
+typedef struct {
+    VMBlockHandle       MRLS_mrBoundaryVMBlock;
+    ChunkHandle         MRLS_mrBoundaryChunk;
+    LayoutCommon        MRLS_layoutCommon;
+    ModeType            MRLS_layoutMode;
+    PageSizeReport      MRLS_pageReport;        /* Page size and paper
+						   type. */
+    RecordOrderOption   MRLS_recordOrder;
+} MultiRecordLayoutStruct;
+
+typedef struct {
+    VMBlockHandle       GOEOP_grObjectVMBlock;
+    ChunkHandle         GOEOP_grObjectChunk;
+} GrObjElementObjPtr;
+
+typedef GrObjElementObjPtr RecordLayoutChunkArrayElement;
+
+/*
+ * The NameLockTokenStream structure is used by the eval code to pass
+ * a field's name token info to the library evaluation code.  It simply
+ * keeps the mem block's handle in the first word and passes the address
+ * after.  When the address is passed back to be freed, the handle is one
+ * word before the passed address.  A signature word is kept for error
+ * checking purposes.
+ */
+#define NLTS_SIGNATURE 0xf0ba       /* Signature: foobar! */
+
+typedef struct {
+    word        NLTS_signature;
+    MemHandle   NLTS_handle;
+} NameLockTokenStreamWithData;
+
+/*
+ * Constants for default placement of fields and labels
+ */
+
+#define DEFAULT_FIELD_X_POSITION            100
+#define FIRST_FIELD_Y_POSITION              20
+#define DEFAULT_FIELD_WIDTH                 600
+#define DEFAULT_IMPORT_FIELD_WIDTH          432
+#define DEFAULT_FIELD_HEIGHT                20
+#define DEFAULT_Y_DISTANCE_BETWEEN_FIELDS   10
+#define A_BIT_EXTRA_TO_LOOK_NICE            5
+#define MIN_FIELD_WIDTH                     (72 / 2)    /* <- 1/2 an inch */
+
+#define DEFAULT_LABEL_WIDTH                 75
+#define DEFAULT_LABEL_X_POSITION            10
+
+#define DEFAULT_PAGE_NUMBER_WIDTH           60
+
+#define PAGE_NUMBER_SYMBOL                  "#"
+
+/*
+ * Constants and structures for record/multi-record layout boundary
+ */
+#define DEFAULT_RECORD_BOUNDARY_X_POSITION 0
+#define DEFAULT_RECORD_BOUNDARY_Y_POSITION 0
+#define DEFAULT_RECORD_BOUNDARY_WIDTH 250
+#define DEFAULT_RECORD_BOUNDARY_HEIGHT 300
+#define DEFAULT_RECORD_BOUNDARY_LINE_WIDTH 1
+#define DEFAULT_MULTI_RECORD_BOUNDARY_LINE_WIDTH 2
+
+typedef struct {
+	WWFixedAsDWord  RWWF_left;      
+	WWFixedAsDWord  RWWF_top;       
+	WWFixedAsDWord  RWWF_right;     
+	WWFixedAsDWord  RWWF_bottom;    
+} RectWWFixedAsDWord;
+
+/*
+ * Constants used for some routines indicating whether ro draw
+ * or not
+ */
+typedef ByteEnum ffDrawFlags;
+#define DRAW 0
+#define DONT_DRAW 1
+
+typedef ByteEnum LayoutBoundaryDrawFlags;
+#define LBDF_SPRITE 0
+#define LBDF_OBJECT 1
+
+/*
+ * Structure for FlatFile map block
+ */
+
+typedef struct {
+    byte        FFMB_columnsTaken[COLUMNS_TAKEN_ARRAY_SIZE];
+    byte        FFMB_currentMode;
+    byte        FFMB_currentLayout;
+    byte        FFMB_numLayouts;
+    byte        FFMB_numRecords;
+    byte        FFMB_numFields;
+    FieldID     FFMB_databaseNameList[MAX_NUM_FIELDS];
+    byte        FFMB_numInNotInLayoutNameList;
+    FieldID     FFMB_notInLayoutNameList[MAX_NUM_FIELDS];
+    byte        FFMB_numInLayoutNameList;
+    FieldID     FFMB_layoutNameList[MAX_NUM_FIELDS];
+    byte        FFMB_highestLayoutNumber;
+    byte        FFMB_currentLayoutType;
+} FlatFileMapBlock;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Sorting Information
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+/*
+ * FFDSortOptions indicates which things we should or shouldn't take into
+ * account when sorting the data.
+ */
+typedef WordFlags FFDSortOptions;
+@define FFDSO_IGNORE_CASE_AND_ACCENTS           (0x01)
+@define FFDSO_IGNORE_SPACES_AND_PUNCTUATION     (0x02)
+
+@define FFDSO_NO_OPTIONS        (0)
+@define FFDSO_ALL_OPTIONS       (@FFDSO_IGNORE_CASE_AND_ACCENTS | \
+				 @FFDSO_IGNORE_SPACES_AND_PUNCTUATION)
+
+
+/* SortInfoAscentFlags indicates the sort order for each of the keys.   */
+typedef ByteFlags SortInfoAscentFlags;
+#define SIAF_ALL_ASCENDING      (63)
+#define SIAF_ALL_DESCENDING     (0)
+
+typedef struct
+{
+    /*
+     * lastItemIndex contains the index of the last valid item in the
+     * sortKeyList. It contains 0xff if nothing is set.
+     */
+    sbyte       SIS_lastItemIndex;
+
+    /*
+     * ascentFlags is a bit vector specifying whether the corresponding
+     * position in the sortKeyList should be sorted in ascending (set, 1) or
+     * descending (clear, 0).
+     */
+    SortInfoAscentFlags SIS_ascentFlags;
+
+    /*
+     * sortOptions contains the current sorting options.
+     */
+    FFDSortOptions      SIS_sortOptions;
+
+    /*
+     * sortKeyList defines the sort keys in decreasing order of primacy.
+     * Each layout contains it's own sort order.
+     */
+    FieldID     SIS_sortKeyList [MAX_SORT_KEYS_AND_SUB_TOTAL_FIELDS];
+} FFDBSortInfo;
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Subset Information
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+typedef ByteEnum SubsetEvalResult;
+#define SER_FALSE           0
+#define SER_TRUE            1
+#define SER_BOGUS           2
+
+typedef ByteEnum SubsetMarkModification;
+#define SMM_SET_MARK_FLAG       0
+#define SMM_UNSET_MARK_FLAG     1
+#define SMM_INVERT_MARK_FLAG    3
+
+/*
+ * Column flags for marked records.
+ * NOTE:  These MUST be in the low 4 bits of the byte.  If not, really awful
+ *        things can happen.
+ */
+#define MARKED_RECORD       0x01        /* 0000 0001 */
+#define UNMARKED_RECORD     0x00
+
+/*
+ * The column in which the marked record flags live.
+ */
+#define MARKED_RECORD_COLUMN    0
+
+
+/*
+ * The value which means "this is not an available record."
+ */
+#define NOT_A_RECORD        0xffff
+
+
+typedef enum
+{
+	FFDSOI_SHOW_ONLY_MARKED         = 0x01,
+	FFDSOI_AUTO_APPLY_MARK          = 0x02,
+	FFDSOI_CLEAR_MARKS_FIRST        = 0x04
+} FFDSubsetOptionsInfo;

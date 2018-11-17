@@ -1,0 +1,630 @@
+/********************************************************************
+ *
+ *	Copyright (c) Geoworks 1991-92 -- All Rights Reserved.
+ *
+ * PROJECT:	Sample Applications
+ * MODULE:	GString test
+ * FILE:	gstest.goc
+ *
+ * AUTHOR:	Josh Putnam, 6/92
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      josh    6/92            Initial version
+ *
+ * DESCRIPTION:
+ *	This application tests the gstring opcodes (graphics commands)
+ *	used in the construction of graphics strings in visual monikers.
+ *
+ *	A full discussion of gstrings within the context of an
+ *	object's visual moniker is within [Obj 2.3.1]. The Graphics
+ *	chapter [Con 23] and the Shapes chapter [Con 24] contain a
+ *	wealth of information on the use of graphics commands and
+ *	concepts; it should be read thoroughly if anyhting is unclear
+ *	within this sample application.
+ *
+ *	(Throughout this file you will see references like this:
+ *      [Con 7.2.1]. This is a reference to chapter 7, section 7.2.1
+ *      of the Concepts manual. [Obj 7.2.1] is a reference to
+ *      chapter 7, section 7.2.1 of the Objects manual. You should
+ *      use these references to locate further information about the
+ *      topic being discussed if anything is unclear.)
+ *
+ * RCS STAMP:
+ *	$Id: gstest.goc,v 1.1 97/04/04 16:38:42 newdeal Exp $
+ *
+ *******************************************************************/
+
+/********************************************************************
+ *		Include files
+ *******************************************************************/
+    @include <stdapp.goh>
+    #include <gstring.h>  /* needed for gstring moniker manipulations */
+
+/********************************************************************
+ *		Class Definitions
+ *******************************************************************/
+    @class GstestProcessClass, GenProcessClass;
+    @endc;
+
+/********************************************************************
+ *		Class Declarations
+ *******************************************************************/
+    @classdecl GstestProcessClass, neverSaved;
+
+/********************************************************************
+ *		Static Object Resources
+ *******************************************************************/
+
+/********************************************************************
+ *		AppResource Resource
+ *******************************************************************/
+@start AppResource;
+
+@object GenApplicationClass GstestApp = {
+    GI_visMoniker = list { @GstestTextMoniker };
+    GI_comp = @GstestPrimary;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) =
+        @GstestPrimary;
+}
+
+@visMoniker GstestTextMoniker = "C Gstest Sample Application";
+
+@end AppResource;
+
+/********************************************************************
+ *		Interface Resource
+ *******************************************************************/
+@start Interface;
+
+@object GenPrimaryClass GstestPrimary = {
+    GI_comp = @GstestTriggerGroup;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+}
+
+  /*
+   * Trigger grouping object
+   */
+@object GenInteractionClass GstestTriggerGroup = {
+    GI_comp = @TrigSubGroupA,
+              @TrigSubGroupB;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass TrigSubGroupA = {
+    GI_comp = @Trig1,
+              @Trig2,
+              @Trig3,
+              @Trig4,
+              @Trig5,
+              @Trig6;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_ALLOW_CHILDREN_TO_WRAP;
+}
+
+@object GenInteractionClass TrigSubGroupB = {
+    GI_comp = @Trig7,
+              @Trig8,
+              @Trig9,
+              @Trig10,
+              @Trig11;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_CENTER_CHILDREN_VERTICALLY;
+    HINT_ALLOW_CHILDREN_TO_WRAP;
+}
+
+@object GenTriggerClass Trig1 = {
+    GI_visMoniker = {
+        /* size = { tiny, standard, large, huge }
+         *
+         * This setting is the display size that this moniker is
+         * intended for. It has nothing to do with the actual size
+         * of the moniker, which is stored in cachedSize. Each
+         * size corresponds to a display type's resolution level
+         * (See below). [Obj 2.3.1]
+         *
+         * tiny	    - tiny screens: CGA, 256x320
+         * standard - standard screens: EGA, VGA, HGC, MCGA
+         * large    - large screens: 800x600 SVGA
+         * huge	    - huge screens
+         *
+         * You should not use monikers whose sizes are larger
+         * than their intended display type. (E.g. using 'huge'
+         * sized monikers on VGA screens.) You may use smaller
+         * monikers on larger screens, however.
+         *
+         * In this case, our graphic string visual moniker is
+         * 'tiny'. It should fit on any possible screen.
+         */
+	size = tiny;
+
+        /* color = { gray1, gray2, gray4, gray8, color2, color4,
+         *           colorRGB }
+         *
+         * This setting is the color capability of the display
+         * that this moniker is intended for. Each setting
+         * corresponds to a color display class (See below).
+         * [Obj 2.3.1]
+         *
+         * gray1    - 1 bit/pixel gray scale
+         * gray2    - 2 bit/pixel gray scale
+         * gray4    - 4 bit/pixel gray scale
+         * gray8    - 8 bit/pixel gray scale
+         * color2   - 2 bit/pixel color index
+         * color4   - 4 bit/pixel color index
+         * colorRGB - color with RGB values
+         *
+         * In this case, a display that uses 4 bit/pixel color
+         * representation (16 colors) is the intended display.
+         * Note that the system will translate from any of these
+         * color representations to any other, so a color4 moniker
+         * is not restricted to only drawing on a color4 display,
+         * even if the moniker contains a bitmap or two.
+         */
+	color = color4;
+
+        /* aspectRatio = { normal, squished, verySquished }
+         *
+         * This is the aspect ratio of the display that this
+         * moniker is intended for (See below.) [Obj 2.3.1]
+         *
+         * normal	VGA, MCGA
+         * squished	EGA, HGC (normal usually used)
+         * verySquished	CGA
+         *
+         * "squished" and "verySquished" refer to the height of
+         * a pixel versus its width.
+         *
+         * In this case, the aspect ratio is expected to be normal.
+         */
+	aspectRatio = normal;
+
+        /* cachedSize = X, Y
+         *
+         * This sets the pixel by pixel dimensions of the moniker.
+         * If you do not set this, the system will figure out for
+         * itself how big your moniker is.
+         *
+         * In this case, a 15 by 15 pixel moniker is created.
+         */
+	cachedSize = 15, 15;
+
+        /* gstring { <GString OpCodes> }
+         *
+         * This stores the GString OpCodes used to draw the visual
+         * moniker. These OpCodes are in the form of a list of
+         * Graphics commands. [Con 23]
+         *
+         * The moniker is drawn in its own coordinate space (origin
+         * is upper-left of area staked out for the moniker). The
+         * graphics state used to draw it is saved and restored
+         * around the call to GrDrawGString, so you may use any
+         * graphic operation you desire within the moniker's GString.
+         */
+	gstring {
+            GSNullOp(),	      /* GSNullOp performs no action. It
+                               * is a dummy opcode used to show that
+                               * no drawing will actually take place
+                               * within this moniker. */
+            GSSaveState(),    /* GSSaveState stores the gstate for
+                               * this moniker.*/
+            GSNullOp(),	      /* Again, another dummy operation. */
+            GSRestoreState(), /* GSRestoreState restores the gstate
+                               * saved with GSSaveState */
+            GSEndString()     /* Mark the end of the gstring. */
+	}
+    }
+}
+
+@object GenTriggerClass Trig2 = {
+    GI_visMoniker = {
+	size = tiny;
+	color = color4;
+	aspectRatio = normal;
+	gstring {
+            /*
+             * GSSaveTransform saves the transformation matrix for
+             * this GState. This is more efficient than using
+             * GSSaveState which saves the entire gstate.
+             * Coordinate transformations are dealt with in
+             * [Con 23.5.2].
+             */
+            GSSaveTransform(),
+            /*
+             * Rotate the GState 45 degrees in a counter-clockwise
+             * direction. [Con 23.5.2.1]
+             */
+            GSApplyRotation( 45 ),
+            /*
+             * Fill a graphics ellipse bounded by the coordinates
+             * 0,0 (x1, y1) and 10, 15 (x2, y2). Remember, these
+             * coordinates are within the new transformation
+             * matrix, so the ellipse will be drawn at a 45 degree
+             * angle. [Con 24.2.4]
+             */
+            GSFillEllipse( 0, 0, 10, 15 ),
+            /*
+             * Restore the saved transformation matrix.
+             */
+            GSRestoreTransform(),
+            /*
+             * Draw a graphics Ellipse bounded by the coordinates
+             * 0,0 (x1, y1) and 10, 15 (x2, y2). These coordinates
+             * are within the normal transformation matrix. Draw
+             * commands (as opposed to Fill commands) draw the
+             * outline but do not fill the region. [Con 24.2.4]
+             */
+            GSDrawEllipse( 0, 0, 10, 15 ),
+            GSEndString()
+	}
+    }
+}
+
+@object GenTriggerClass Trig3 = {
+    GI_visMoniker = {
+	size = tiny;
+	color = color4;
+	aspectRatio = normal;
+	gstring {
+            GSSaveTransform(),
+            /*
+             * Resize the coordinate space of the GState by
+             * multiplying both the x and y dimensions by a factor
+             * of 2. This doubles the size of anything drawn in
+             * the x and y dimensions.
+             */
+            GSApplyScale( 2, 2 ),
+            GSApplyRotation( 45 ),
+            /* Fill the ellipse bounded by the coordinates 0,0 and
+             * 5,10. Because the scale of this gstate has been
+             * doubled, this effectively draws an ellipse with the
+             * coordinates 0,0 and 10,20 (at an angle of 45
+             * degrees).
+             */
+            GSFillEllipse( 0, 0, 5, 10 ),
+            /*
+             * Restore our original ordinary GState.
+             */
+            GSRestoreTransform(),
+            /*
+             * Shift the coordinate system 15.5 coordinates in the
+             * x direction and 20.5 coordinates in the y
+             * direction. [Con 23.5.2.1]
+             */
+            GSApplyTranslation( 15.5, 20.5 ),
+            /*
+             * Draw an ellipse bounded by 0,0 and 10,15 in the new
+             * translated coordinate system.
+             */
+            GSDrawEllipse( 0, 0, 10, 15 ),
+            /*
+             * Draw a rectangle bounded by the same coordinates as
+             * the ellipse above. [Con 24.2.3]
+             */
+            GSDrawRect( 0, 0, 15, 20 ),
+            /*
+             * Fill a rectangle bounded by the coordinates 15,20
+             * and 30,35. [Con 24.2.3]
+             */
+            GSFillRect( 15, 20, 30, 35 ),
+            GSEndString()
+	}
+    }
+}
+
+@object GenTriggerClass Trig4 = {
+    GI_visMoniker = {
+	size = tiny;
+	color = color4;
+	aspectRatio = normal;
+	gstring {
+            /*
+             * Set the font to draw text in to URW Roman with a
+             * point size of 10. [Con 24.2.13.2]
+             */
+            GSSetFont( FID_DTC_URW_SANS, 10.0 ),
+            /*
+             * Draw the text "foo" starting at the position 10,10.
+             * Note that the text must immediately follow the
+             * command. [Con 24.2.13.1]
+             */
+            GSDrawText( 10, 10 ), "foo",
+            /*
+             * Draw the text "bar" at the current position. Again
+             * the text must follow the command. [Con 24.2.13.1]
+             */
+            GSDrawTextAtCP(), "bar",
+            GSEndString()
+	}
+    }
+}
+
+@object GenTriggerClass Trig5 = {
+    GI_visMoniker = {
+	size = tiny;
+	color = color4;
+	aspectRatio = normal;
+	gstring {
+             /*
+              * Fill a rectangle from the current position (upper-left corner
+              * of the moniker) to the coordinates 10,10.  [Con 24.2.3]
+              */
+             GSFillRectTo( 10, 10 ),
+             /*
+              * Draw a rectangle from the current position to the
+              * coordinates 15,15. [Con 24.2.3]
+              */
+             GSDrawRectTo( 15, 15 ),
+             GSSetFont( FID_DTC_URW_SANS, 10.0 ),
+             GSDrawText( 10, 10 ), "foo",
+             GSApplyScale( 2, 2 ),
+             /*
+              * Draw the text " bar" starting at 5,5 (10,10 in the
+              * old coordinates).
+              */
+             GSDrawText( 5, 5 ), " bar",
+             GSEndString()
+	}
+    }
+}
+
+@object GenTriggerClass Trig6 = {
+    GI_visMoniker = {
+	size = tiny;
+	color = color4;
+	aspectRatio = normal;
+	gstring{
+            GSSetFont( FID_DTC_URW_SANS, 10.0 ),
+            /*
+             * Draw the character 'a' starting at the position
+             * 1,1. [Con 24.2.13.1]
+             */
+            GSDrawChar( 'a', 1, 1 ),
+            /*
+             * Draw the character 'A' starting at the current
+             * position.
+             */
+            GSDrawCharAtCP( 'A' ),
+            /*
+             * Move the current position 0 coordinates in the x
+             * direction and 10 units in the y direction. This is
+             * a relative move of the current pen position.
+             * [Con 23.5.6]
+             */
+            GSRelMoveTo( 0, 10 ),
+            GSDrawCharAtCP( 'B' ),
+            /*
+             * Move the current position to 20, 10. This is not a
+             * relative move. [Con 24.2.13.1]
+             */
+            GSMoveTo( 20, 10 ),
+            GSDrawCharAtCP( 'C' ),
+            GSEndString()
+	}
+    }
+}
+
+@object GenTriggerClass Trig7 = {
+    GI_visMoniker = {
+        size = tiny;
+        color = color4;
+        aspectRatio = normal;
+        gstring {
+                /*
+                 * Draw a polyline that contains five points (and
+                 * therefore four distinct lines). An array of points
+                 * must follow this command. [Con 24.2.8]
+                 */
+                GSDrawPolyline(5),
+                /*
+                 * An "array" of points must follow the command
+                 * GSDrawPolyline. Each point is properly encoded using
+                 * the GOC_POINT macro. This polyline begins
+                 * and ends at the same point, but it need not.
+                 */
+                GOC_POINT( 0, 0 ),
+                GOC_POINT( 10, 40 ),
+                GOC_POINT( 30, 20 ),
+                GOC_POINT( 5, 30 ),
+                GOC_POINT( 0, 0 ),
+                GSEndString()
+        }
+    }
+}
+
+@object GenTriggerClass Trig8 = {
+    GI_visMoniker = {
+        size = tiny;
+        color = color4;
+        aspectRatio = normal;
+        gstring {
+            /*
+             * Fill a polygon of 10 points according to the
+             * default fill rule (odd/even). An array of ten
+             * points must follow this command. [Con 24.2.8]
+             */
+            GSFillPolygon( 10, 0 ),
+            /*
+             * This array of points specifies the path along which
+             * to draw the polygon and then fill it. The first and
+             * last coordinates need not match, as they do in this
+             * example; the graphics system will automatically
+             * connect them.
+             */
+            GOC_POINT( 0, 0 ),
+            GOC_POINT( 10, 40 ),
+            GOC_POINT( 30, 20 ),
+            GOC_POINT( 5, 30 ),
+            GOC_POINT( 40, 0 ),
+            GOC_POINT( 45, 30 ),
+            GOC_POINT( 30, 10 ),
+            GOC_POINT( 45, 40 ),
+            GOC_POINT( 30, 38 ),
+            GOC_POINT( 0, 0 ),
+            GSEndString()
+        }
+    }
+}
+
+@object GenTriggerClass Trig9 = {
+    GI_visMoniker = {
+        size = tiny;
+        color = color4;
+        aspectRatio = normal;
+        gstring {
+            /*
+             * These commands draw the same text in gradually
+             * inceasing point sizes at various points within the
+             * gstring.
+             */
+            GSSetFont( FID_DTC_URW_SANS, 10.0 ),
+            GSDrawText( 10, 10 ), "Foo",
+            GSSetFont( FID_DTC_URW_SANS, 10.5 ),
+            GSDrawText( 30, 10 ), "Foo",
+            GSSetFont( FID_DTC_URW_SANS, 11 ),
+            GSDrawText( 10, 20 ), "Foo",
+            GSSetFont( FID_DTC_URW_SANS, 11.5 ),
+            GSDrawText( 30, 20 ), "Foo",
+            GSSetFont( FID_DTC_URW_SANS, 12 ),
+            GSDrawText( 10, 30 ), "Foo",
+            GSSetFont( FID_DTC_URW_SANS, 12.5 ),
+            GSDrawText( 30, 30 ), "Foo",
+            GSSetFont( FID_DTC_URW_SANS, 13 ),
+            GSDrawText( 10, 40 ), "Foo",
+            GSSetFont( FID_DTC_URW_SANS, 13.5 ),
+            GSDrawText( 30, 40 ), "Foo",
+            GSEndString()
+        }
+    }
+}
+
+@object GenTriggerClass Trig10 = {
+    GI_visMoniker = {
+        size = tiny;
+        color = color4;
+        aspectRatio = normal;
+        gstring {
+            /*
+             * Shift the coordinate system to the center of the
+             * gstring (30,30).
+             */
+            GSApplyTranslation( 30, 30 ),
+            GSSetFont( FID_DTC_URW_SANS, 10.0 ),
+            /*
+             * Draw the text "Foo" at position 10,10 as we
+             * gradually rotate around the center of the gstring.
+             */
+            GSDrawText( 10, 10 ), "Foo",
+            GSApplyRotation( 7.5 ),
+            GSDrawText( 10, 10 ), "Foo",
+            GSApplyRotation( 7.5 ),
+            GSDrawText( 10, 10 ), "Foo",
+            GSApplyRotation( 7.5 ),
+            GSDrawText( 10, 10 ), "Foo",
+            GSApplyRotation( 7.5 ),
+            GSDrawText( 10, 10 ), "Foo",
+            GSApplyRotation( 7.5 ),
+            GSDrawText( 10, 10 ), "Foo",
+            GSApplyRotation( 7.5 ),
+            GSDrawText( 10, 10 ), "Foo",
+            GSApplyRotation( 7.5 ),
+            GSDrawText( 10, 10 ), "Foo",
+            GSApplyRotation( 7.5 ),
+            GSDrawText( 10, 10 ), "Foo",
+            GSApplyRotation( 7.5 ),
+            GSDrawText( 10, 10 ), "Foo",
+            GSApplyRotation( 7.5 ),
+            GSDrawText( 10, 10 ), "Foo",
+            GSApplyRotation( 7.5 ),
+            GSDrawText( 10, 10 ), "Foo",
+            GSApplyRotation( 7.5 ),
+            GSDrawText( 10, 10 ), "Foo",
+            GSApplyRotation( 7.5 ),
+            GSDrawText( 10, 10 ), "Foo",
+            GSApplyRotation( 7.5 ),
+            GSDrawText( 10, 10 ), "Foo",
+            GSApplyRotation( 7.5 ),
+            GSDrawText( 10, 10 ), "Foo",
+            GSApplyRotation( 7.5 ),
+            GSDrawText( 10, 10 ), "Foo",
+            GSApplyRotation( 7.5 ),
+            GSEndString()
+	}
+    }
+}
+
+@object GenTriggerClass Trig11 = {
+    GI_visMoniker = {
+	size = tiny;
+	color = color4;
+	aspectRatio = normal;
+	gstring {
+            GSSaveState(),
+            /*
+             * Apply a scale where every unit is one-millionth
+             * of a normal unit.
+             */
+            GSApplyScale( 0.000001, 0.000001 ),
+            GSSetFont( FID_DTC_URW_SANS, 10 ),
+            /*
+             * Apply a translation of ten million units (in the
+             * new coordinate system) the x and y dimensions. We
+             * need to use GSApplyTranslationDWord because the
+             * translation (10 million) cannot fit in an ordinary
+             * word-length piece of data. [Con 23.5.5]
+             */
+            GSApplyTranslationDWord( 10000000, 10000000 ),
+            GSDrawText( 0, 0 ), "a",
+            GSApplyTranslationDWord( 20000000, 20000000 ),
+            GSDrawTextAtCP(), "b",
+            GSApplyTranslationDWord( -30000000, -30000000 ),
+            GSDrawTextAtCP(), "c",
+            GSApplyTranslationDWord( 40000000, 40000000 ),
+            GSDrawTextAtCP(), "d",
+            /*
+             * Restore the previous unaltered state.
+             */
+            GSRestoreState(),
+            GSDrawText( 10, 10 ), "this",
+            /*
+             * Draw a regular arc. An arc is formed from the
+             * outline of the ellipse it is based on. (This
+             * ellipse is formed from a rectangle as in the above
+             * examples.) The section of that ellipse to draw as
+             * an arc is specified by two angles that mark two
+             * points along the ellipse's path. In this example,
+             * an arc is formed from the ellipse built on the
+             * rectangle 10,10 and 50,50. The part of that ellipse
+             * to show as the arc is between the angles 33 degrees
+             * and 58 degrees (0 degrees being high noon). This
+             * arc will be drawn as in a pie chart by connecting
+             * the two outer arc points with the center of the
+             * ellipse. [Con 24.2.5]
+             */
+        /* XXX - Doesn't work on 2.0.
+            GSDrawArc( ACT_PIE, 10, 10, 50, 50, 33, 58 ),
+         */
+            /*
+             * Draw a three point arc. This arc is formed from a
+             * continuous curve that passes between the three
+             * points 10,10 9,11 and 20,20. This arc is also
+             * drawn as a pie chart. [Con 24.2.6]
+             */
+            GSDrawArc3Point( ACT_PIE, 10, 30, 9, 31, 20, 40 ),
+            /*
+             * This arc will be filled in. [Con 24.2.5]
+             */
+        /* XXX - Doesn't work on 2.0.
+            GSFillArc( ACT_PIE, 30, 30, 50, 50, 90, 180 ),
+         */
+            GSEndString()
+        }
+    }
+}
+
+@end Interface;
+

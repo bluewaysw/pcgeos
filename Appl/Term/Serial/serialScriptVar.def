@@ -1,0 +1,79 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1990 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Serial
+FILE:		serialScriptVariable.def
+
+AUTHOR:		Eric E. Del Sesto
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	eric	10/90		initial version
+
+
+DESCRIPTION:
+	This file contains definitions for variables which are local
+	to the script code which is run by the Serial thread.
+	See Serial/serialScript.asm.
+
+	$Id: serialScriptVar.def,v 1.1 97/04/04 16:55:36 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+udata	segment
+
+;This buffer is used to hold an entire line of input that has been copied
+;from the raw "auxBuf" buffer that is filled by the device driver.
+
+inputLine	db MAX_LINE_CHARS dup 	(?)
+
+if ERROR_CHECK
+inputLineSafety	db			(?)	;make sure this is not altered!
+INPUT_LINE_BUFFER_SAFETY_BYTE	equ	0xcc
+endif
+
+inputHead	dw 	(?)	;offset into dgroup to the end of the current
+				;line in the [inputLine] buffer. This pointer
+				;is used to append characters to the line.
+
+;flags related to the [inputLine] buffer:
+
+resetInput	db	(?)	;TRUE when [inputLine] contains an entire
+				;line of text, which can be discarded once
+				;it is compared to [matchTable].
+
+checkInputLineForMatch db (?)	;TRUE when [inputLine] contains an entire line,
+				;or when it contains the first 128 chars of
+				;a very long line. We want to compare the
+				;inputLine buffer against the match table.
+
+inputLineTooLong db	(?)	;TRUE when we scanned a portion of a very long
+				;line into [inputLine], filling that buffer up.
+				;This flag indicates that we want to continue
+				;scanning input until we get a CR, without
+				;checking for matches.
+
+;misc flags:
+
+restartFlag	db	(?)	;TRUE when we find a match in the matchTable,
+				;and want to restart the script at the
+				;"GOTO foo" text which is pointed to by the
+				;match string.
+
+
+;misc variables:
+
+if EC_TRACE_BUFFER
+
+SIZE_DORK_BUFFER	equ	1024
+
+dorkPtr		dw	(?)
+
+dorkBuffer	db	SIZE_DORK_BUFFER dup (?)
+
+endif
+
+udata	ends

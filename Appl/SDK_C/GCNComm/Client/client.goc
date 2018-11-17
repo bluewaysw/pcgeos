@@ -1,0 +1,179 @@
+/********************************************************************
+ *
+ *      Copyright (c) Geoworks, Inc. 1996 -- All Rights Reserved.
+ *
+ * PROJECT:     GEOS Sample Applications
+ * MODULE:      GCNComm/Client App
+ * FILE:        client.goc
+ *
+ * AUTHOR:      Nathan Fiedler: December 13, 1996
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      NF      12/13/96        Initial version
+ *
+ * DESCRIPTION:
+ *      This sample application demonstrates how to use GCN lists
+ *      to establish a way to communicate between two applications.
+ *      For a complete description of this sample, see the
+ *      gcncomm.h file.
+ *
+ * RCS STAMP:
+ *      $Id: client.goc,v 1.1 97/04/04 16:41:47 newdeal Exp $
+ *
+ *******************************************************************/
+
+/********************************************************************
+ *              Headers
+ *******************************************************************/
+    @include <stdapp.goh>
+    #include <Ansi/stdio.h>
+    #include "../gcncomm.h"
+
+/********************************************************************
+ *              Class Definitions
+ *******************************************************************/
+    @class ClientProcessClass, GenProcessClass;
+    @message void MSG_CLIENT_PROCESS_SEND_NOTIFICATION();
+    @endc;
+
+/********************************************************************
+ *              Class Definitions
+ *******************************************************************/
+    @classdecl ClientProcessClass, neverSaved;
+
+/********************************************************************
+ *              UI Object Resources
+ *******************************************************************/
+
+/********************************************************************
+ *              AppResource Resource
+ *******************************************************************/
+@start AppResource;
+
+@object GenApplicationClass ClientApp = {
+    GI_visMoniker = list { @ClientTextMoniker };
+    GI_comp = @ClientPrimary;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) =
+        @ClientPrimary;
+}
+
+@visMoniker ClientTextMoniker = "GCNComm Client";
+
+@end AppResource;
+
+/********************************************************************
+ *              Interface Resource
+ *******************************************************************/
+@start Interface;
+
+@object GenPrimaryClass ClientPrimary = {
+    GI_comp = @ClientAboutText,
+              @ClientSendTrigger;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+@object GenTextClass ClientAboutText = {
+    GI_attrs = @default | GA_READ_ONLY;
+    GTXI_text = "This program is the client that sends GCN \
+notifications to the server program. Click on the Send trigger \
+to have a notification message sent to the running Server app.";
+}
+
+  /*
+   * This trigger activates the code that sends the
+   * GCN notification to the server application, if
+   * it is running.
+   */
+@object GenTriggerClass ClientSendTrigger = {
+    GI_visMoniker = "Send";
+    GTI_actionMsg = MSG_CLIENT_PROCESS_SEND_NOTIFICATION;
+    GTI_destination = process;
+}
+
+@end Interface;
+
+/********************************************************************
+ *              Strings Resource
+ *******************************************************************/
+@start Strings, data;
+
+@chunk char ClientNoServerRunningMsg[] = "Server not running. Start \
+Server application before using Send.";
+
+@end Strings;
+
+/********************************************************************
+ *              Code for ClientProcessClass
+ *******************************************************************/
+
+/********************************************************************
+ *              MSG_CLIENT_PROCESS_SEND_NOTIFICATION
+ ********************************************************************
+ * SYNOPSIS:     Send the notification message to the server app.
+ * CALLED BY:    ClientSendTrigger
+ * PARAMETERS:   void
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Record a notification event and send it to the
+ *               process object of the server, via the system GCN
+ *               list that the Server created. If the Server isn't
+ *               running then nothing will happen because the
+ *               Server won't be on the GCN list to receive the
+ *               notification message.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      NF      12/13/96        Initial version
+ *******************************************************************/
+@method ClientProcessClass, MSG_CLIENT_PROCESS_SEND_NOTIFICATION
+{
+      /*
+       * event       - Notification event handle.
+       * notifyBlock - Notification data block handle.
+       */
+    EventHandle event;
+    MemHandle   notifyBlock;
+
+      /*
+       * First allocate a data block to send along with the
+       * notification. Note that we're not going to do anything
+       * with the data block, just show that it can be passed along.
+       *
+       * Send the MSG_GEN_PROCESS_SEND_TO_APP_GCN_LIST message
+       * to the server process object. This message will handle
+       * sending our notification event to the correct GCN list
+       * in the server app.
+       */
+    notifyBlock = MemAlloc( 15, HF_SHARABLE | HF_SWAPABLE, 0 );
+EC( ECCheckMemHandle( notifyBlock ); )
+
+      /*
+       * Make sure the block doesn't go away until
+       * it is handled by the GCN list mechanism. Set the
+       * reference count to the number of GCN lists that
+       * will receive this notification. In our sample,
+       * only one list will be sent the notification.
+       */
+    MemInitRefCount( notifyBlock, 1 );
+    event = @record null::MSG_META_NOTIFY_WITH_DATA_BLOCK(
+        MANUFACTURER_ID_MY_COMPANY,
+        MY_COMPANY_NT_SAMPLE_NOTIFICATION,
+        notifyBlock );
+EC( ECCheckEventHandle( event ); )
+
+      /*
+       * Send the notification to the server (actually, this goes
+       * out globally, but only the server process object is on
+       * the list). Pass the event handle, the notification block
+       * handle, and the manufacturer ID and list number to send
+       * the notification to.
+       */
+    GCNListSend( MANUFACTURER_ID_MY_COMPANY,
+                 MY_COMPANY_GCNLT_SAMPLE_LIST,
+                 event,
+                 notifyBlock,
+                 0 );
+} /* MSG_CLIENT_PROCESS_SEND_NOTIFICATION */
+

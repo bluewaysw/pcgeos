@@ -1,0 +1,12 @@
+ScanFunc EmitSuperSub;
+ScanFunc MultiplyByExtra;
+ScanFunc EmitJustification;
+ScanFunc EmitLeftAndParaMargins;
+ScanFunc LookupColor;
+ScanFunc EmitCharBG;
+ScanFunc EmitParaBG;
+ScanFunc EmitFontID;
+ScanFunc ColumnRule;
+ScanFunc EmitTabs;
+ScanFunc EmitBorders;
+ScanFunc OutputButtonStyle;

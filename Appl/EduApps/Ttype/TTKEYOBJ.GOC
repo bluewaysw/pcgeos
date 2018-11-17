@@ -1,0 +1,299 @@
+/***************************************************************************
+ *  FILE:  TTkeyobj.GOC  (Keyboard object drawn on the screen)
+ ***************************************************************************/
+
+@include <stdapp.goh>
+#include <Ansi\string.h>
+#include <Ansi\stdio.h>
+@include "ttclass.goh"
+@include "ttdefs.goh"
+@include "externs.goh"
+@include "options.goh"
+
+/*=========================================================================*
+ *  METHODS FOR CLASS:  KeyVisClass
+ *=========================================================================*/
+
+@classdecl KeyVisClass ;
+
+/*-------------------------------------------------------------------------
+ | Method:  KeyVisClass::MSG_VIS_DRAW
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Draw the keyboard on the screen showing selected keys.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    PV   ??/??/??  Created.
+ |    jfh  10/21/99  replaced one instance of G_exerciseString[G_inputPosition]
+ |                   with G_currentKey
+ |    jfh  10/29/99  found it doesn't hilite shifted chars... which means that
+ |                   after a shifted char is covered and uncovered it isn't
+ |                   hilited - also a prob in lesson 9 which starts with
+ |                   shifted characters.
+ |    jfh  11/01/99  fixed it!
+ |
+ *-----------------------------------------------------------------------*/
+
+@method KeyVisClass, MSG_VIS_DRAW
+{
+    Rectangle *p_rect = &pself->VI_bounds ;
+    word left, right, top, bottom, row, position ;
+    Color rectcolor, linecolor, charcolor ;
+    char lchar[13] ;
+    Boolean drewShifted = FALSE;
+
+
+    /* Color of the edge of the keys */
+    linecolor = C_BLACK ;
+
+    GrSaveState(gstate) ;
+
+    /* Draw the outside edge */
+    GrSetLineWidth(gstate, MakeWWFixed(3)) ;
+    GrDrawRect(gstate, 39, 45, 127, 67) ;
+    GrDrawRect(gstate, 171, 45, 259, 67) ;
+
+    /* Draw all the keys either black on white or white on black */
+    for (row = 0; row < 4; row++)  {
+        strcpy (lchar, &G_keyboardLayout[row]) ;
+        for (position = 0;
+                 position < strlen(G_keyboardLayout[row]);
+                     position++)  {
+            top = p_rect->R_top + 2 + (row * 22) ;
+            bottom = top + 20 ;
+            left = p_rect->R_left + G_leftPositions[row] + (position * 22) ;
+            right = left + 20 ;
+		  if (G_currentKey == lchar[position])  {
+			 charcolor = C_WHITE ;
+                rectcolor = C_BLACK ;
+            } else  {
+                charcolor = C_BLACK ;
+                rectcolor = C_WHITE ;
+            }
+            if (row > 3)
+                row = row - 4 ;
+            DrawButton(
+                gstate,
+                left,
+                top,
+                right,
+                bottom,
+                lchar[position],
+                rectcolor,
+                linecolor,
+                charcolor) ;
+	   }  /* end of position for loop */
+    }  /* end of row for loop */
+
+
+    if (G_shiftState)  { /* draw a shifted char */
+    for (row = 4; row < 8; row++)  {
+        strcpy (lchar, &G_keyboardLayout[row]) ;
+        for (position = 0;
+                 position < strlen(G_keyboardLayout[row]);
+                     position++)  {
+		  if (G_currentKey == lchar[position])  {
+			 charcolor = C_WHITE ;
+			 rectcolor = C_BLACK ;
+
+			 top = p_rect->R_top + 2 + ((row-4) * 22) ;
+			 bottom = top + 20 ;
+			 left = p_rect->R_left + G_leftPositions[row-4] + (position * 22) ;
+			 right = left + 20 ;
+			 DrawButton(
+				 gstate,
+				 left,
+				 top,
+				 right,
+				 bottom,
+				 lchar[position],
+				 rectcolor,
+				 linecolor,
+				 charcolor) ;
+			  drewShifted = TRUE;
+			  }
+		       if (drewShifted) break;
+	   }  /* end of position for loop */
+	   if (drewShifted) break;
+    }  /* end of row for loop */
+    }  /* end of shifted char if */
+
+
+    /* Draw the special keys */
+
+	 MemLock(OptrToHandle(@BackspaceKey));
+	 /* Backspace key */
+    top = p_rect->R_top + 2 ;
+    bottom = top + 20 ;
+    left = p_rect->R_left + 2 + (13 * 22) ;
+    right = left + 30 ;
+    DrawSpecialButton(
+        gstate,
+        left, top,
+        right, bottom,
+		  LMemDeref(@BackspaceKey),
+	   C_WHITE, linecolor, C_BLACK) ;
+
+    /* Tab key */
+    top = p_rect->R_top + 2 + 22 ;
+    bottom = top + 20 ;
+    left = p_rect->R_left + 2 ;
+    right = left + 30 ;
+    DrawSpecialButton(
+        gstate,
+        left, top,
+        right, bottom,
+		  LMemDeref(@TabKey),
+	   C_WHITE, linecolor, C_BLACK) ;
+
+    /* CapsLock key */
+    top = p_rect->R_top + 2 + (2 * 22) ;
+    bottom = top + 20 ;
+    left = p_rect->R_left + 2 ;
+    right = left + 36 ;
+    DrawSpecialButton(
+        gstate,
+        left, top,
+        right, bottom,
+		LMemDeref(@CapsKey), C_WHITE,
+	   linecolor, C_BLACK) ;
+
+    /* Enter key */
+    top = p_rect->R_top + 2 + (2 * 22) ;
+    bottom = top + 20 ;
+    left = p_rect->R_left + 2 + (11 * 22) + 38 ;
+    right = left + 36 ;
+    if (G_currentKey == C_ENTER)
+        DrawSpecialButton(
+            gstate,
+            left, top,
+            right, bottom,
+            LMemDeref(@EnterKey),
+            C_BLACK, C_BLACK, C_WHITE) ;
+    else
+        DrawSpecialButton(
+				gstate,
+            left, top,
+            right, bottom,
+				LMemDeref(@EnterKey),
+            C_WHITE, C_BLACK, C_BLACK) ;
+
+    /* LeftShift key */
+    top = p_rect->R_top + 2 + (3 * 22) ;
+    bottom = top + 20 ;
+    left = p_rect->R_left + 2 ;
+    right = left + 47 ;
+
+    if (G_shiftState == TT_SHIFT_STATE_LEFT )  {
+        rectcolor = C_BLACK ;
+        charcolor = C_WHITE ;
+	 } else {
+        rectcolor = C_WHITE ;
+        charcolor = C_BLACK ;
+    }
+    DrawSpecialButton(
+        gstate,
+        left, top,
+        right, bottom,
+		  LMemDeref(@ShiftKey),
+        rectcolor, linecolor, charcolor) ;
+
+    /* RightShift key */
+    top = 68 ;
+    bottom = top + 20 ;
+    left = 271 ;
+    right = left + 47 ;
+    if (G_shiftState == TT_SHIFT_STATE_RIGHT )  {
+        rectcolor = C_BLACK ;
+        charcolor = C_WHITE ;
+    } else {
+        rectcolor = C_WHITE ;
+        charcolor = C_BLACK ;
+    }
+    DrawSpecialButton(
+        gstate,
+        left, top,
+        right, bottom,
+		  LMemDeref(@ShiftKey),
+        rectcolor, linecolor, charcolor) ;
+
+    /* LeftControl key */
+    top = p_rect->R_top + 2 + (4 * 22) ;
+    bottom = top + 20 ;
+    left = p_rect->R_left + 2 ;
+    right = left + 31 ;
+    DrawSpecialButton(
+        gstate,
+        left, top,
+        right, bottom,
+		  LMemDeref(@CtrlKey),
+	   C_WHITE, linecolor, C_BLACK) ;
+
+    /* LeftAlt key */
+    top = p_rect->R_top + 2 + (4 * 22) ;
+    bottom = top + 20 ;
+    left = p_rect->R_left + 2 + 22 + 22 + 5 ;
+    right = left + 31 ;
+
+    DrawSpecialButton(
+        gstate,
+        left, top,
+        right, bottom,
+		  (G_isGeoBook)?LMemDeref(@MenuKey):LMemDeref(@AltKey),
+	   C_WHITE, linecolor, C_BLACK) ;
+
+    /* Spacebar key */
+    top = p_rect->R_top + 2 + (4 * 22) ;
+    bottom = top + 20 ;
+    left = p_rect->R_left + 2 + 22 + 22 + 5 + 33 ;
+    right = left + (7 * 22) - 2 ;
+    if (G_currentKey == C_SPACE)
+        DrawSpecialButton(
+            gstate,
+            left, top,
+            right, bottom,
+            "",
+            C_BLACK, C_BLACK, C_WHITE) ;
+    else
+        DrawSpecialButton(
+            gstate,
+            left, top,
+            right, bottom,
+            "",
+		  C_WHITE, C_BLACK, C_BLACK) ;
+
+    /* Right Alt key */
+    rectcolor = C_WHITE ;
+    top = p_rect->R_top + 2 + (4 * 22) ;
+    bottom = top + 20 ;
+    left = p_rect->R_left + 2 + 22 + 22 + 5 + 33 + (7 * 22) ;
+    right = left + 31 ;
+    DrawSpecialButton(
+        gstate,
+        left, top,
+        right, bottom,
+        (G_isGeoBook)?LMemDeref(@NumKey):"",
+	   C_WHITE, linecolor, C_BLACK) ;
+	 MemUnlock(OptrToHandle(@BackspaceKey));
+
+    GrRestoreState(gstate) ;
+}
+
+@method KeyVisClass, MSG_VIS_GET_SIZE
+{
+    return MAKE_SIZE_DWORD(334, 114) ;
+}
+
+@method KeyVisClass, MSG_VIS_RECALC_SIZE
+{
+    return MAKE_SIZE_DWORD(334, 114) ;
+}
+
+/***************************************************************************
+ *  END OF FILE:  TTkeyobj.GOC  (Keyboard object drawn on the screen)
+ ***************************************************************************/
+
+

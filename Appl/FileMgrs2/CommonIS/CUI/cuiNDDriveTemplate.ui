@@ -1,0 +1,430 @@
+/*
+*
+* Project:    PC GEOS
+* Module:    desktop
+* File:    CUI/cuiNDDriveTemplate.ui
+*
+* Author:    Dave Litwin
+*
+*    This File contains the user Interface description for the Drive
+*    folder/object
+*
+*    $Id: cuiNDDriveTemplate.ui,v 1.4 98/06/03 13:16:34 joon Exp $
+*
+*/
+
+#if _NEWDESKBA
+
+#define DRIVE_HINTS \
+    hints = {    \
+        ATTR_FOLDER_HELP_CONTEXT { char "oFloppy", 0 },    \
+        ATTR_SHELL_OBJECT_RESTRICT_TRANSFERS {    \
+            word WOT_STUDENT_HOME_TVIEW    \
+        }    \
+    }
+#else
+#define DRIVE_HINTS \
+    hints = {    \
+        ATTR_FOLDER_HELP_CONTEXT { char "oFloppy", 0 }    \
+    }
+#endif
+
+
+
+start NDDriveObjectTemplate;
+NDDriveObject = NDDrive {
+#if _NEWDESKBA
+    shellObjectAttrs = default -movable, -copyable, -deletable;
+#else
+    shellObjectAttrs = default -movable, -deletable;
+#endif
+    ndObjType = "WOT_DRIVE";
+    popUpType = WPUT_SELECTION;
+    DRIVE_HINTS
+}
+end NDDriveObjectTemplate;
+
+start NDDriveDummyResource;
+NDDriveDummy = NDDrive {
+/*#if _NEWDESKBA*/
+    shellObjectAttrs = default -movable, -deletable;
+/*#endif*/
+    ndObjType = "WOT_DRIVE";
+    popUpType = WPUT_SELECTION;
+    /* ATTR_FOLDER_HELP_CONTEXT is set dynamically */
+}
+end NDDriveDummyResource;
+
+start NDDriveWindowTemplate;
+NDDriveWindow = NEWDESK_PRIMARY {
+#if _NEWDESKBA
+    children = NDDriveView, NDDriveInfo, NDDriveMenu,
+           NDDriveButtonGroup1, NDDriveButtonGroup2;
+#else
+    children = NDDriveView, NDDriveInfo, NDDriveMenu;
+#endif
+    genStates = default -usable;
+    hints = {
+#if _NEWDESKBA
+        ENTRY_LEVEL_HINTS,
+        HINT_EL_EXCLUSIVE,
+        ATTR_EL_HELP_CONTEXT { char "aDrive", 0 },
+#endif
+        HINT_SIZE_WINDOW_AS_DESIRED,
+        HINT_PRIMARY_NO_FILE_MENU,
+        HINT_PRIMARY_NO_EXPRESS_MENU,
+                ATTR_GEN_WINDOW_CUSTOM_LAYER_ID {
+            word 0
+        }
+    }
+}
+
+
+NDDriveView = DesktopView {
+    viewAttributes = focusable, dragScrolling;
+    vertAttributes = scrollable;
+    horizAttributes = scrollable;
+    docRight = FOLDER_PANE_HORIZ_DOC;
+    docBottom = FOLDER_PANE_VERT_DOC;
+    genAttributes = default +initiatesBusyState, +targetable;
+    hints = {
+        HINT_DEFAULT_TARGET,
+        HINT_DEFAULT_FOCUS,
+        HINT_VIEW_REMOVE_SCROLLERS_WHEN_NOT_SCROLLABLE,
+        HINT_INITIAL_SIZE {
+            word    FOLDER_PANE_HORIZ_OPEN
+            word    FOLDER_PANE_VERT_OPEN
+        },
+        HINT_MINIMUM_SIZE {
+            word    0
+            word    FOLDER_PANE_VERT_MIN
+        }
+    }
+}
+
+
+NDDriveInfo = GenText {
+    genAttributes = readOnly;
+    textDisplayAttributes = DESK_SINGLE_LINE_DISPLAY_ATTRIBUTES,
+                    allowTextOffEnd, singleLineText;
+    hints = {
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+        HINT_TEXT_FRAME
+    }
+}
+
+
+NDDriveMenu = NDSortViewPopupMenu {
+    moniker = 'F', "File";
+    sortViewParent = NDDriveMenuOther;
+    visibility = popup;
+    children = NDDriveMenuOpenHelp,
+           NDDriveMenuFolderOptions,
+           NDDriveMenuDrive,
+           NDDriveMenuFile,
+           NDDriveMenuOther,
+           NDDriveMenuClose;
+    hints = {
+        HINT_INFREQUENTLY_USED            /* not pinnable */
+    }
+}
+
+/*---- NDDriveMenuOpenHelp ---*/
+NDDriveMenuOpenHelp = GenInteraction {
+    children =    NDDriveMenuOpen,
+            NDDriveMenuHelp;
+}
+
+NDDriveMenuOpen = GenTrigger  {
+    moniker = 'O', "Open";
+    action = MSG_ND_FOLDER_SEND_AS_SELECTED_ITEMS, "TO_OBJ_BLOCK_OUTPUT";
+    hints = {
+        ATTR_GEN_TRIGGER_ACTION_DATA {
+            word    MSG_OPEN_SELECT_LIST
+            word    0
+            word    ERROR_NO_SELECTION
+        }
+    }
+}
+
+NDDriveMenuHelp = GenTrigger  {
+    action = MSG_ND_FOLDER_HELP, "TO_OBJ_BLOCK_OUTPUT";
+    hints = {
+        ATTR_GEN_DEFAULT_MONIKER {
+            word GDMT_HELP
+        }
+    }
+}
+
+/*---- NDDriveMenuFolderOptions ----*/
+NDDriveMenuFolderOptions = GenInteraction {
+    children = NDDriveMenuOptions;
+}
+
+NDDriveMenuOptions = GenInteraction {
+    moniker = 'p', "Options";
+    children =    NDDriveMenuGetInfo,
+            NDDriveMenuAttributes;
+    visibility = popup;
+    hints = {
+        HINT_INFREQUENTLY_USED
+    }
+}
+
+NDDriveMenuGetInfo = GenTrigger {
+    moniker = 'G', "Get Info";
+    action = MSG_ND_FOLDER_SEND_AS_SELECTED_ITEMS, "TO_OBJ_BLOCK_OUTPUT";
+    hints = {
+        HINT_TRIGGER_BRINGS_UP_WINDOW,
+        ATTR_GEN_TRIGGER_ACTION_DATA {
+            word    MSG_FM_GET_INFO
+            word    0
+            word    ERROR_NO_SELECTION
+        }
+    }
+}
+
+NDDriveMenuAttributes = GenTrigger {
+    moniker = 'A', "Attributes";
+    action = MSG_ND_FOLDER_SEND_AS_SELECTED_ITEMS, "TO_OBJ_BLOCK_OUTPUT";
+    hints = {
+        HINT_TRIGGER_BRINGS_UP_WINDOW,
+        ATTR_GEN_TRIGGER_ACTION_DATA {
+            word    MSG_FM_START_CHANGE_ATTR
+            word    0
+            word    ERROR_NO_SELECTION
+        }
+    }
+}
+
+/*---- NDDriveMenuDrive ---*/
+NDDriveMenuDrive = GenInteraction {
+    children = NDDriveMenuRenameDisk,
+           NDDriveMenuCopyDisk,
+           NDDriveMenuFormatDisk,
+           NDDriveMenuDriveRescanDrive;
+}
+
+NDDriveMenuRenameDisk = GenTrigger  {
+    moniker = 'a', "Rename Disk";
+    action = MSG_ND_FOLDER_SEND_AS_WHITESPACE, "TO_OBJ_BLOCK_OUTPUT";
+    hints = {
+        HINT_TRIGGER_BRINGS_UP_WINDOW,
+        ATTR_GEN_TRIGGER_ACTION_DATA {
+            word    MSG_ND_DRIVE_RENAME
+        }
+    }
+}
+
+NDDriveMenuCopyDisk = GenTrigger  {
+    moniker = 'D', "Copy Disk";
+    action = MSG_ND_FOLDER_SEND_AS_WHITESPACE, "TO_OBJ_BLOCK_OUTPUT";
+    hints = {
+        HINT_TRIGGER_BRINGS_UP_WINDOW,
+        ATTR_GEN_TRIGGER_ACTION_DATA {
+            word    MSG_ND_DRIVE_COPY
+        }
+    }
+}
+
+NDDriveMenuFormatDisk = GenTrigger  {
+    moniker = 'r', "Format Disk";
+    action = MSG_ND_FOLDER_SEND_AS_WHITESPACE, "TO_OBJ_BLOCK_OUTPUT";
+    hints = {
+        HINT_TRIGGER_BRINGS_UP_WINDOW,
+        ATTR_GEN_TRIGGER_ACTION_DATA {
+            word    MSG_ND_DRIVE_FORMAT
+        }
+    }
+}
+
+NDDriveMenuDriveRescanDrive = GenTrigger  {
+    moniker = 'n', "Rescan Drive";
+    action = MSG_WINDOWS_REFRESH_ALL, process;
+}
+
+/*---- NDDriveMenuFile ----*/
+NDDriveMenuFile = GenInteraction {
+    children =    NDDriveMenuCopy,
+            NDDriveMenuMove,
+            NDDriveMenuRename,
+            NDDriveMenuThrowAway;
+}
+
+NDDriveMenuCopy = GenTrigger {
+    moniker = 'y', "Copy";
+    action = MSG_ND_FOLDER_SEND_AS_SELECTED_ITEMS, "TO_OBJ_BLOCK_OUTPUT";
+    hints = {
+        HINT_TRIGGER_BRINGS_UP_WINDOW,
+        ATTR_GEN_TRIGGER_ACTION_DATA {
+            word    MSG_FM_START_COPY
+            word    0
+            word    ERROR_NO_SELECTION
+        }
+    }
+}
+
+NDDriveMenuMove = GenTrigger {
+    moniker = 'M', "Move";
+    action = MSG_ND_FOLDER_SEND_AS_SELECTED_ITEMS, "TO_OBJ_BLOCK_OUTPUT";
+    hints = {
+        HINT_TRIGGER_BRINGS_UP_WINDOW,
+        ATTR_GEN_TRIGGER_ACTION_DATA {
+            word    MSG_FM_START_MOVE
+            word    0
+            word    ERROR_NO_SELECTION
+        }
+    }
+}
+
+NDDriveMenuRename = GenTrigger {
+    moniker = 'n', "Rename";
+    action = MSG_ND_FOLDER_SEND_AS_SELECTED_ITEMS, "TO_OBJ_BLOCK_OUTPUT";
+    hints = {
+        HINT_TRIGGER_BRINGS_UP_WINDOW,
+        ATTR_GEN_TRIGGER_ACTION_DATA {
+            word    MSG_FM_START_RENAME
+            word    0
+            word    ERROR_NO_SELECTION
+        }
+    }
+}
+
+NDDriveMenuThrowAway = GenTrigger {
+    moniker = 'r', "Throw Away";
+    action = MSG_ND_FOLDER_SEND_AS_SELECTED_ITEMS, "TO_OBJ_BLOCK_OUTPUT";
+    hints = {
+        ATTR_GEN_TRIGGER_ACTION_DATA {
+            word    MSG_FM_START_THROW_AWAY
+            word    0
+            word    ERROR_NO_SELECTION
+        }
+    }
+}
+
+/*---- NDDriveMenuOther ---*/
+NDDriveMenuOther = GenInteraction {
+    children =    NDDriveMenuSelectAll,
+            NDDriveMenuCreateFolder;
+}
+
+NDDriveMenuSelectAll = GenTrigger  {
+    moniker = 'S', "Select All";
+    action = MSG_ND_FOLDER_SEND_AS_WHITESPACE, "TO_OBJ_BLOCK_OUTPUT";
+    hints = {
+        ATTR_GEN_TRIGGER_ACTION_DATA {
+            word    MSG_SELECT_ALL
+        }
+    }
+}
+
+
+/*---- NDDriveMenuCreateFolder ----*/
+NDDriveMenuCreateFolder = GenTrigger  {
+    moniker = 'F', "Create Folder";
+    action = MSG_ND_FOLDER_SEND_AS_WHITESPACE, "TO_OBJ_BLOCK_OUTPUT";
+    hints = {
+        HINT_TRIGGER_BRINGS_UP_WINDOW,
+        ATTR_GEN_TRIGGER_ACTION_DATA {
+            word    MSG_FM_START_CREATE_DIR
+        }
+    }
+}
+
+/*---- NDDriveMenuClose ---*/
+NDDriveMenuClose = GenTrigger  {
+    moniker = 'C', "Close";
+    action = MSG_ND_FOLDER_SEND_AS_WHITESPACE, "TO_OBJ_BLOCK_OUTPUT";
+    hints = {
+        ATTR_GEN_TRIGGER_ACTION_DATA {
+            word    MSG_FOLDER_CLOSE
+        }
+    }
+}
+
+
+#if _NEWDESKBA
+/* Assistance Buttons for NDDrive */
+NDDriveButtonGroup1 = GenInteraction {
+    children = NDDriveOpenItemButton, NDDriveRemoveItemButton,
+           NDDriveCopyItemButton, NDDriveRescanDriveButton;
+    hints = {
+        HINT_ORIENT_CHILDREN_HORIZONTALLY,
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+        HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+        HINT_INCLUDE_ENDS_IN_CHILD_SPACING
+    }
+}
+
+NDDriveOpenItemButton = GenTrigger {
+    moniker = 'O', "Open Item";
+    action = MSG_ND_FOLDER_SEND_AS_SINGLE_SELECTION, "TO_OBJ_BLOCK_OUTPUT";
+    hints = {
+        ATTR_GEN_TRIGGER_ACTION_DATA {
+            word    MSG_OPEN_SELECT_LIST
+            word    0
+            word    ERROR_OPEN_INCORRECT_SELECTION
+        }
+    }
+}
+
+NDDriveRemoveItemButton = GenTrigger {
+    moniker = 'R', "Remove Item";
+    action = MSG_ND_FOLDER_SEND_AS_SELECTED_ITEMS, "TO_OBJ_BLOCK_OUTPUT";
+    hints = {
+        ATTR_GEN_TRIGGER_ACTION_DATA {
+            word    MSG_FM_START_THROW_AWAY
+            word    0
+            word    ERROR_THROW_AWAY_NO_SELECTION
+        }
+    }
+}
+
+NDDriveCopyItemButton = GenTrigger {
+    moniker = 'p', "Copy Item";
+    action = MSG_ND_FOLDER_SEND_AS_SELECTED_ITEMS, "TO_OBJ_BLOCK_OUTPUT";
+    hints = {
+        ATTR_GEN_TRIGGER_ACTION_DATA {
+            word    MSG_FM_START_COPY
+            word    0
+            word    ERROR_COPY_NO_SELECTION
+        }
+    }
+}
+
+NDDriveRescanDriveButton = GenTrigger {
+    moniker = 's', "Rescan";
+    action = MSG_WINDOWS_REFRESH_ALL, process;
+}
+
+NDDriveButtonGroup2 = GenInteraction {
+    children = NDDriveCloseButton, NDDriveHelpButton;
+    hints = {
+        HINT_ORIENT_CHILDREN_HORIZONTALLY,
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+        HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+        HINT_INCLUDE_ENDS_IN_CHILD_SPACING
+    }
+}
+
+NDDriveCloseButton = GenTrigger {
+    moniker = 'C', "Close";
+    action = MSG_ND_FOLDER_SEND_AS_WHITESPACE, "TO_OBJ_BLOCK_OUTPUT";
+    hints = {
+        ATTR_GEN_TRIGGER_ACTION_DATA {
+            word    MSG_FOLDER_CLOSE
+        }
+    }
+}
+
+NDDriveHelpButton = GenTrigger {
+    action = MSG_ND_FOLDER_HELP, "TO_OBJ_BLOCK_OUTPUT";
+    hints = {
+        ATTR_GEN_DEFAULT_MONIKER {
+            word GDMT_HELP
+        }
+    }
+}
+#endif        /* #if _NEWDESKBA */
+end NDDriveWindowTemplate;
+

@@ -1,0 +1,1443 @@
+;------------------------------------------------------------------------------
+;
+;	GenClass 	(A PARTIAL LISTING OF genC.def)
+;
+;------------------------------------------------------------------------------
+
+GenClass	class	VisClass, master, variant
+
+;
+; Some GOLDEN RULES regarding generic trees:
+;
+;	1. If a generic object is specifically built (As in variant specific
+; 	   class has been determined), then all generic parents of the object
+;	   must be specifically built as well.  This allows us to optimally
+;	   search a tree in order to find all specifically-grown generic
+;	   objects within a branch.
+;
+;	2. An object is considered FULLY USABLE if it is marked as GS_USABLE,
+;	   AND all generic parents of the object are marked as GS_USABLE.
+;	   An object which is not fully USABLE is not considered to be part
+;	   of the interface of the application, & may not appear on-screen.
+;	   When an object becomes fully USABLE, its instance data is first
+;	   shrunk back so that it is not specifically grown, to ensure that
+;	   as it is rebuilt & incorporated into the UI of the application,
+;	   ONLY the generic instance data & position in the generic tree is
+;	   used to determine what specific class it should become, & what its
+;	   attributes will be
+;
+;	3. Any generic branch which is NOT FULLY USABLE must NOT be visibly
+;	   built.  This rule is temporarily ignored within the handling of
+;	   MSG_GEN_SET_NOT_USABLE, where the object is marked as NOT_USABLE,
+;	   and THEN visibly closed & unbuilt.  This is the only allowed
+;	   exception.
+;
+;				-- Doug
+;
+
+
+
+;------------------------------------------------------------------------------
+;	Methods
+;------------------------------------------------------------------------------
+
+;-------------------------------------------------
+;		State query and setting
+;-------------------------------------------------
+;
+; GENERAL:
+;
+; All state setting methods first call the specific UI.  If the specific
+; UI wants to implement the method, it does so and returns the carry set.
+; The generic action is generally to set the given state and send a
+; MSG_VIS_DRAW or MSG_VIS_VUP_UPDATE_WIN_GROUP to the object.
+
+MSG_GEN_SET_ENABLED				message
+;
+; Enables a generic object, so that the user may interact with it.
+; Objects are enabled by default, until they receive a
+; MSG_GEN_SET_NOT_ENABLED.  Disabled object do not respond to the mouse, 
+; & are typically drawn "grayed out" by the specific UI.
+;
+; This method is guaranteed NOT to force the specific building of any object
+;
+; Context:	Utility message sent to set GenClass object enabled
+; Source:	Anyone
+; Destination:	Any GenClass object
+; Interception:	Generally not intercepted, though the specific UI may have
+;		a handler.  However, custom gadgets may handle.  In this
+;		case, call superclass if supplementing default functionality
+;		else no need to call superclass if replacing default
+;		functionality.
+;
+; Pass:		dl - VisUpdateMode
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_GEN_SET_NOT_ENABLED			message
+;
+; Disables a generic object, so that the user may NOT interact with it.
+; Objects are enabled by default, until they receive a
+; MSG_GEN_SET_NOT_ENABLED.  Disabled object do not respond to the mouse, 
+; & are typically drawn "grayed out" by the specific UI.
+;
+; This method is guaranteed NOT to force the specific building of any object
+;
+; Context:	Utility message sent to get or set GenClass object not enabled
+; Source:	Anyone
+; Destination:	Any GenClass object
+; Interception:	Generally not intercepted, though the specific UI may have
+;		a handler.  However, custom gadgets may handle.  In this
+;		case, call superclass if supplementing default functionality
+;		else no need to call superclass if replacing default
+;		functionality.
+;
+; Pass:		dl - VisUpdateMode
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_GEN_GET_ENABLED		message
+;
+; Checks the enabled state of a generic object.  See MSG_GEN_SET_ENABLED and
+; MSG_GEN_SET_NOT_ENABLED.
+;
+; This method is guaranteed NOT to force the specific building of any object
+;
+; Context:	Utility message sent to get GenClass object's enabled state
+; Source:	Anyone
+; Destination:	Any GenClass object
+; Interception: Generally not intercepted.  However, custom gadgets may
+;		handle.  In this case, superclass will not need to be
+;		called as default functionality is replaced.
+;
+; Pass:		nothing
+; Return:	carry set if enabled
+;		carry clear if not enabled
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_GEN_SET_USABLE		message
+;
+; A general-purpose methods for setting objects as "USABLE".
+; Objects which are not USABLE, or have any generic parents which are
+; NOT_USABLE, will not appear as part of the interface for an application.
+; Objects may be set USABLE only after they are attached to the system-wide
+; generic tree, at which point the object becomes part of the interface for the
+; application.  If the window on which the object lies is realized,
+; the object will be visually built & updated.
+;
+; Note that in theory, when a top object of a branch which otherwise
+; consists of USABLE object is itself set USABLE, all objects within that
+; branch suddenly become USABLE.  This is true for GenPrimarys and GenDisplays.
+; However, all dialog GenInteractions will NOT immediately come up on screen,
+; but are simply now available to be brought up by the application, using
+; MSG_GEN_INTERACTION_INITIATE.  This explains why ALL windows of an
+; application don't suddenly pop up on screen when the application object is
+; set USABLE on being ATTACHED.  Windows which are in the application object's
+; ACTIVE LIST, will, however be made immediately visible by the specific UI
+; when the application is ATTACHED.  Thus, any windows you want to be initially
+; visible should be listed in the ACTIVE LIST of the app object.
+;
+; This is a very high-level function, for ALL generic objects except
+; GenApplication, GenField, & GenSystem.  The latter three are controlled
+; at the highest level using MSG_META_ATTACH & MSG_META_DETACH
+; (MSG_GEN_SET_USABLE should NOT be sent to those objects, unless you
+; are implementing MSG_META_ATTACH for them in the generic or specific UI)
+;
+; INSIDER'S NOTE:  The active list concept replaces the simpler, but 
+; performance damaging alternative of notifying ALL objects in a branch
+; when they become totally USABLE.  You can see that this would be a bad
+; idea as the entire interface for an application would have to be loaded
+; in on start up, when the top application object is set USABLE as part
+; of being ATTACHED.  Of course, this does mean that an object won't be
+; informed when it becomes usable, unless it is the top object becoming
+; usable.  This works fine for our visual generic objects within a single 
+; window, as the MSG_SPEC_BUILD_BRANCH gets sent recursively down the
+; tree, informing all objects to become visible, & this suffices to let the
+; objects know that they are coming alive.  It also doesn't hurt windowed
+; generic objects below this point, for their first need of the knowledge
+; that they are USABLE is when they receive the
+; MSG_GEN_INTERACTION_INITIATE.   Should new, non-visual generic object types
+; be created which need to know when they are USABLE, some equivalent 
+; mechanism to the SPEC_BUILD one will have to be created for the groups
+; which they are in.
+;
+; This method DOES force the specific building of the object, but ONLY in the
+; case that all generic parents up the tree are also marked as USABLE.
+;
+; Context:	Utility message sent to set GenClass object usable.  This is
+;		the primary mechanism for activating generic objects that have
+;		been added or are already part of your application's generic
+;		object tree.
+; Source:	Anyone
+; Destination:	Any GenClass object EXCEPT GenApplication, GenField, and
+;		GenSystem (these are controlled by MSG_META_ATTACH and MSG_META_DETACH)
+; Interception:	Generally not intercepted, though the specific UI may have
+;		a handler.  However, custom gadgets may handle.  In this
+;		case, call superclass if supplementing default functionality
+;		else no need to call superclass if replacing default
+;		functionality.
+; 
+; Pass:		dl - VisUpdateMode
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_GEN_SET_NOT_USABLE			message
+;
+; Set object as being not usable.  If hooked into generic tree
+; that is visualized, will have to be visually unbuilt & updated
+;
+; This is a very high-level function, for ALL generic objects
+; except GenApplication, GenField, & GenSystem.  The latter
+; three are controlled at the highest level using MSG_META_ATTACH
+; & MSG_META_DETACH (MSG_GEN_SET_NOT_USABLE should NOT be sent
+; to those objects, unless you are implementing part of
+; MSG_META_DETACH for them)
+;
+; This method DOES force the specific building of the object, but ONLY in the
+; case that the object & all generic parents up the tree were marked as
+; USABLE before this method call (i.e. the object was FULLY USABLE).
+;
+; WHO CAN USE:	Application, Specific UI only for gen objects it creates.
+; 		The single exception is for the Application object, which
+; 		the specific UI controls with this routine
+;
+; Context:	Utility message sent to set GenClass object not usable
+; Source:	Anyone
+; Destination:	Any GenClass object EXCEPT GenApplication, GenField, and
+;		GenSystem (these are controlled by MSG_META_ATTACH and MSG_META_DETACH)
+; Interception:	Generally not intercepted, though the specific UI may have
+;		a handler.  However, custom gadgets may handle.  In this
+;		case, call superclass if supplementing default functionality
+;		else no need to call superclass if replacing default
+;		functionality.
+;
+; Pass:		dl - VisUpdateMode (VUM_MANUAL NOT ALLOWED)
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+;
+; VUM_MANUAL has been outlawed with a FATAL_ERROR for the same reason that there
+; is a warning in MSG_GEN_UPDATE_VISUAL about needing to send a
+; MSG_GEN_UPDATE_VISUAL to EVERY generic object you've marked as needing
+; visual updating via VUM_MANUAL.  The problem is this:
+; An application should make no assumption
+; about the visual construction of a generic tree; in other words, if you
+; mark two triggers as IMAGE_INVALID, you shouldn't assume that you can
+; just update the display that they are on, since the buttons may visually
+; be placed on some window other than the display.  This problem is solved
+; by having the MSG_GEN_UPDATE_VISUAL, since the specific UI can implement
+; this method by invalidating all visual aspects of the object wherever
+; (as in whatever window they're in) they may be.  Whew!
+;
+; So, how does this relate to VUM_MANUAL & MSG_GEN_SET_NOT_USABLE?  Well,
+; when an object is marked not usable, it is visually torn down, & may actually
+; have the visible instance data discarded.  In this state,
+; MSG_GEN_UPDATE_VISUAL does nothing, since the object isn't specifically built.
+; 
+; How to get around this?  I'd recommend using one of the
+; VUM_DELAYED_VIA_??_QUEUE modes for these calls, if you're trying to avoid
+; flickering of your display in bringing down UI components.  Note that
+; calling multiple MSG_GEN_SET_NOT_USABLE's w/ a DELAYED update mode only
+; generates one method which goes through the queue to perform the udpate later.
+
+MSG_GEN_GET_USABLE		message
+;
+; Checks the usable state of a generic object.  See MSG_GEN_SET_USABLE and
+; MSG_GEN_SET_NOT_USABLE.
+;
+; This method is guaranteed NOT to force the specific building of any object
+;
+; Context:	Utility message sent to get GenClass object's usable state
+; Source:	Anyone
+; Destination:	Any GenClass object EXCEPT GenApplication, GenField, and
+;		GenSystem (these are controlled by MSG_META_ATTACH and MSG_META_DETACH)
+; Interception: Generally not intercepted.  However, custom gadgets may
+;		handle.  In this case, superclass will not need to be
+;		called as default functionality is replaced.
+;
+; Pass:		nothing
+; Return:	carry set if usable
+;		carry clear if not usable
+;		ax, cx, dx, bp - destroyed
+;
+
+;-------------------------------------------------
+;		Visual monikers
+;-------------------------------------------------
+;
+; GENERAL:
+;
+; A visual moniker is the visual representation of an object.  A visual moniker
+; is either a text string of a graphics string (while a text string can be a
+; type of graphics string, it is useful to make the distinction between the
+; two).  See Include/Objects/visC.def for more information about visual
+; monikers.
+;
+; GenClass provides storage of an object's visual moniker and several methods
+; to manipulate visual monikers.
+
+MSG_GEN_GET_VIS_MONIKER			message
+;
+; Fetches the moniker from a generic object. Returns the chunk handle
+; of the current visual moniker in use.
+;
+; This method is guaranteed NOT to force the specific building of any object.
+;
+; Context:	Utility message sent to get GenClass object's visual moniker
+;		chunk
+; Source:	Anyone
+; Destination:	Any GenClass object
+; Interception: Generally not intercepted.  However, custom gadgets may
+;		handle.  In this case, superclass will not need to be
+;		called as default functionality is replaced.
+;
+; Pass:		nothing
+; Return:	ax - chunk handle of VisMoniker in use
+;		cx, dx, bp - destroyed
+;
+
+MSG_GEN_USE_VIS_MONIKER			message
+;
+; MSG_GEN_USE_VIS_MONIKER is called to switch the moniker being
+; used for this generic object.  The moniker itself must already exist in
+; the same block as the object.  Use MSG_GEN_USE_VIS_MONIKER if the moniker
+; already exists in the same block as the object.  Use
+; MSG_GEN_REPLACE_VIS_MONIKER to create a new moniker from some other
+; source.  Visual updates as specified.
+;
+; This method is guaranteed NOT to force the specific building of any object.
+;
+; Context:	Utility message sent to set GenClass object's visual moniker
+;		to an existing moniker chunk
+; Source:	Anyone
+; Destination:	Any GenClass object
+; Interception: Generally not intercepted.  However, custom gadgets may
+;		handle.  In this case, call superclass if supplementing
+;		default functionality else no need to call superclass if
+;		replacing default functionality.
+;
+; Pass:		cx - chunk handle of new moniker to use.
+;		dl - VisUpdateMode
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_GEN_REPLACE_VIS_MONIKER			message
+;
+; Replaces the visual moniker of an object.  New visual moniker is created from
+; either a complete visual moniker, a visual moniker list, a text string, a
+; graphics string, or a token.db token.  The source may be referenced by either
+; a far pointer, a global heap block handle, or an optr.
+;
+; MSG_GEN_REPLACE_VIS_MONIKER always creates a new Visual Moniker chunk and
+; points the GI_visMoniker field at the new moniker.  Because the old visual
+; moniker is overwritten, the object is visually updated.  The VisUpdateMode
+; passed determines how this visual update occurs.
+;
+; When a text string or a gstring is passed, a visual moniker structure will be
+; created for the text string or gstring.
+;
+; Both the object and visual moniker chunk are marked as dirty (ObjSetFlags may
+; be used to undo, if necessary).
+;
+; If a moniker list is passed to this message, and the destination object is
+; specifically resolved, the appropriate moniker based on the DisplayScheme of
+; the application object and specific UI preferences will be set for the object.
+; If the object is not specifically resolved yet, the source moniker list will
+; replace the object's current visual moniker.  A moniker is selected from the
+; moniker list when the object is specifically resolved.  You must ensure that
+; the monikers in the moniker list will exist at that time.  (If some specific
+; moniker in the list is desired, the moniker list can be resolved manually
+; with the GenFindMoniker or VisFindMoniker routines.)  When passing a moniker
+; list, you must ensure that the moniker list will be relocated when the
+; moniker list is resolved.  This can be done with either having the moniker
+; list be the moniker for an object that will be relocated, or by relocating
+; the moniker list manually with MSG_GEN_RELOC_MONIKER_LIST (or
+; GenRelocMonikerList for assembly).
+;
+; If VMDT_TOKEN is passed to indicate that the source is a GeodeToken, the
+; destination object must be usable, as it is the Specific UI who must decide
+; which moniker to choose from the moniker list in the Token Database.  It
+; chooses based on the current video mode and its internal preferences.  If the
+; destination object is not usable, its moniker will be cleared.  Since any
+; moniker set via VMDT_TOKEN may be based on video mode, it must not be saved
+; and restored to and from state file, as the video mode could be changed
+; during that time.  Alternately, the moniker can be reset at each startup.
+;
+; This method is guaranteed NOT to force the specific building of any object.
+;
+; Context:	Utility message sent to replace a GenClass object's visual
+;		moniker.
+; Source:	Anyone
+; Destination:	Any GenClass object
+; Interception: Generally not intercepted.  However, custom gadgets may
+;		handle.  In this case, call superclass if supplementing
+;		default functionality else no need to call superclass if
+;		replacing default functionality.
+;
+; Pass:		ss:bp - ptr to ReplaceVisMonikerFrame
+;			ReplaceVisMonikerFrame	struct
+;				RVMF_source	dword
+;				RVMF_sourceType	VisMonikerSourceType
+;				RVMF_dataType	VisMonikerDataType
+;				RVMF_length	word
+;				RVMF_width	word
+;				RVMF_height	word
+;				RVMF_updateMode	VisUpdateMode
+;			ReplaceVisMonikerFrame	ends
+;		dx - size of ReplaceVisMonikerFrame
+; Return:	ax - chunk handle of object's visual moniker
+;		cx, dx, bp - destroyed
+;
+
+MSG_GEN_REPLACE_VIS_MONIKER_OPTR		message
+MSG_GEN_REPLACE_VIS_MONIKER_TEXT		message
+;
+; Simplified messages for replacing objects current visual moniker.
+;
+; This method is guaranteed NOT to force the specific building of any object.
+;
+; Context:	Simplified messages for replacing objects current visual
+;		moniker.
+; Source:	Anyone
+; Destination:	Any GenClass object
+; Interception: No need to intercept.  Uses MSG_GEN_REPLACE_VIS_MONIKER, so
+;		intercepting that is sufficient.
+;
+; Pass:		MSG_GEN_REPLACE_VIS_MONIKER_OPTR
+;		^lcx:dx - source VisMoniker
+;		bp - VisUpdateMode
+;		MSG_GEN_REPLACE_VIS_MONIKER_TEXT
+;		cx:dx - fptr to source null-terminated text string
+;		bp - VisUpdateMode
+; Return:	ax - chunk handle of object's visual moniker
+;		cx, dx, bp - destroyed
+
+MSG_GEN_CREATE_VIS_MONIKER			message
+;
+; Creates a visual moniker chunk.  New visual moniker is created from
+; either a complete visual moniker, a visual moniker list, a text string, a
+; graphics string, or a token.db token.  The source may be referenced by either
+; a far pointer, a global heap block handle, or an optr.
+; MSG_GEN_CREATE_VIS_MONIKER creates a new Visual Moniker chunk in the resource
+; block of the object MSG_GEN_CREATE_VIS_MONIKER is sent to.  When a text
+; string or a gstring is passed, a visual moniker structure will be create for
+; the text string or gstring.  The new visual moniker chunk is marked as dirty
+; or ignore dirty according to the CVMF_DIRTY flag passed.  If a moniker list
+; is passed to this message, it will be copied into the destination object's
+; block.  You must ensure that the monikers in the moniker will exists when the
+; list is used.  (If some specific moniker in the list is desired, the moniker
+; list can be resolved manually with the GenLookupMoniker routine.)
+;
+; This method is guaranteed NOT to force the specific building of any object.
+;
+; Context:	Utility message sent to create a visual moniker in the
+;		destination object's resource block.
+; Source:	Anyone
+; Destination:	Any GenClass object
+; Interception: Generally not intercepted.  However, custom gadgets may
+;		handle.  In this case, call superclass if supplementing
+;		default functionality else no need to call superclass if
+;		replacing default functionality.
+;
+; Pass:		ss:bp - ptr to CreateVisMonikerFrame
+;			CreateVisMonikerFrame	struct
+;				CVMF_source	dword
+;				CVMF_sourceType	VisMonikerSourceType
+;				CVMF_dataType	VisMonikerDataType
+;				CVMF_length	word
+;				CVMF_width	word
+;				CVMF_height	word
+;				CVMF_flags	CreateVisMonikerFlags
+;			CreateVisMonikerFrame	ends
+;		dx - size of CreateVisMonikerFrame
+; Return:	ax - chunk handle of new visual moniker
+;		cx, dx, bp - destroyed
+;
+
+MSG_GEN_DRAW_MONIKER				message
+;
+; Draws a moniker for the object.  This message will primarily be used
+; in C.  Assembly language programmers can use GenDrawMoniker.  See
+; that library routine for information about parameters.
+;
+; This method forces specific building of object, & therefore shouldn't
+; be done prior to setting up pre-specifically built hints, attributes,
+; & for some objects, tree location.
+;
+; Context:	Utility message sent to draw generic object's visual moniker
+; Source:	Anyone
+; Destination:	Any USABLE GenClass object
+; Interception:	Generally not intercepted.  However, custom gadgets may
+;		handle.  In this case, call superclass if supplementing
+;		default functionality else no need to call superclass if
+;		replacing default functionality.
+;
+; Pass:		ss:bp - GenMonikerMessageFrame
+;		dx - size GenMonikerMessageFrame
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+;-------------------------------------------------
+;		Generic Composite Operations
+;-------------------------------------------------
+
+MSG_GEN_ADD_CHILD			message
+;
+; Adds a new child under this object in the generic tree.  The child must
+; be NOT_USABLE in order to be added.
+;
+; This method is guaranteed NOT to force the specific building of any object
+;
+; Context:	Utility message to add generic child
+; Source:	Anyone
+; Destination:	Any GenClass object
+; Interception: Generally not intercepted.  However, custom gadgets may
+;		handle.  In this case, call superclass if supplementing
+;		default functionality else no need to call superclass if
+;		replacing default functionality.
+;
+; Pass:		^lcx:dx - child object to add
+;		bp - flags for how to add child (CompChildFlags)
+; Return:	nothing
+;		cx, dx - unchanged
+;		ax, bp - destroyed
+;
+
+MSG_GEN_REMOVE_CHILD			message
+;
+; Removes a child from this object in the generic tree.  The child must be
+; NOT_USABLE in order to be removed.
+;
+; This method is guaranteed NOT to force the specific building of any object
+;
+; Context:	Utility message to remove generic child
+; Source:	Anyone
+; Destination:	Any GenClass object (parent object)
+; Interception: Generally not intercepted.  However, custom gadgets may
+;		handle.  In this case, call superclass if supplementing
+;		default functionality else no need to call superclass if
+;		replacing default functionality.
+;
+; Pass:		^lcx:dx - child object to remove
+;		bp - mask CCF_MARK_DIRTY if we want to mark the links as dirty
+; Return:	nothing
+;		cx, dx - unchanged
+;		ax, bp - destroyed
+;
+
+;MSG_META_SEND_CLASSED_EVENT	message	(MetaClass)
+;
+; This method is defined in MetaClass, & augmented by any class that wishes
+; to do so, by the addition of new TravelOption types.  MetaClass provides
+; TO_NULL & TO_SELF.
+;
+; GenClass extends TravelOption options to include a way to send a method
+; up the generic tree to an object of a certain class, & a way to send
+; a method down the focus, target, & model hierarchies.  Special
+; note:  Passing a ClassedEvent with a class of null results in the event
+; being passed all the way to the leaf of the hierarchy specified.
+;
+; Context:	This is THE way to get a message delivered to an object
+;		whose optr is unkown, but it is know to be currently
+;		actively within one of the hierarchies listed in the
+;		"TravelOption" enumeration.
+; Source:	no restrictions
+; Destination:	Any object may receive this message, though usefullness will
+;		depend to TravelOption type.  See "TravelOption" enumeration
+;		declarations for info on where the message may usefully be sent.
+; Interception:	Intercepted by Focus, Target, or Model nodes,
+;		or any object defining a new "TravelOption" level, in order
+;		to implement requests for sending to that destination.  If
+;		the TravelOption passed does not match the type your handler
+;		is redirecting, the request should be passed on to the 
+;		superclass.
+; Pass:		^hcx	- ClassedEvent
+;		dx	- TravelOption
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+;		(event handle freed)
+
+TO_GEN_PARENT			enum TravelOption, first GenMessages
+; Destination:  Any generic object
+; Object is first generic parent of the class specified.
+
+
+TO_FOCUS			enum TravelOption
+; Destination:  Any focus node
+; Object is the active focus below this point in the generic tree, or, if a
+; specific class is specified, the first object down the active focus
+; hierarchy belonging to that class.
+
+TO_TARGET			enum TravelOption
+; Destination:  Any target node
+; Object is the active target below this point in the generic tree, or, if a
+; specific class is specified, the first object down the active target
+; hierarchy belonging to that class.
+
+TO_MODEL			enum TravelOption
+; Destination:  Any model or target node
+; Object is the active data model object below this point in generic tree, or,
+; if a specific class is specified, the first object down the active model
+; hierarchy belonging to that class.
+
+TO_APP_FOCUS			enum TravelOption
+; Destination:	Any visible or generic object
+; Object is the active focus object within the application, or, if a
+; specific class is specified, the first object down the active focus
+; hierarchy belonging to that class.  This request is converted to "TO_FOCUS"
+; & send to the GenApplication object for the requesting app.
+
+TO_APP_TARGET			enum TravelOption
+; Destination:	Any visible or generic object
+; Object is the active target object within the application, or, if a
+; specific class is specified, the first object down the active target
+; hierarchy belonging to that class.  This request is converted to "TO_TARGET"
+; & send to the GenApplication object for the requesting app.
+
+TO_APP_MODEL			enum TravelOption
+; Destination:	Any visible or generic object
+; Object is the active data model object within the application, or, if a 
+; specific class is specified, the first object down the active model
+; hierarchy belonging to that class. This request is converted to
+; "TO_MODEL" & sent to the GenApplication object for the requesting app.
+
+TO_SYS_FOCUS			enum TravelOption
+; Destination:	Any visible or generic object
+; Object is the active focus object within the system, or, if a specific
+; class is specified, the first object down the active focus hierarchy
+; belonging to that class.   This request is converted to a "TO_FOCUS"
+; request & send to the GenSystem object internally.
+
+TO_SYS_TARGET			enum TravelOption
+; Destination:	Any visible or generic object
+; Object is the active target object within the system, or, if a specific
+; class is specified, the first object down the active target hierarchy
+; belonging to that class.   This request is converted to a "TO_TARGET"
+; request & send to the GenSystem object internally.
+
+TO_SYS_MODEL			enum TravelOption
+; Destination:	Any visible or generic object
+; Object is the active data model object within the system, or, if a 
+; specific class is specified, the first object down the active model
+; hierarchy belonging to that class. This request is converted to a
+; "TO_MODEL" request & send to the GenSystem object internally.
+
+
+;Sample Code/Programming Tips
+;----------------------------
+; The following example routine will change any selection made in the
+; currently selected data text object to be 18 points in size:
+;
+; SetTargetTextTo18Point	proc	near
+;	; Documentation for GetTextSet18PointSizeClassedEvent is in the
+;	; Sample Code section for "ClassedEvent", in Include/Objects/metaC.def.
+;	;
+; 	call	GetTextSet18PointSizeClassedEvent
+;
+;	; ^hdi = ClassedEvent
+;
+;	mov	cx, di			; Pass handle of ClassedEvent in cx
+;	mov	ax, MSG_META_SEND_CLASSED_EVENT
+;	mov	dx, TO_APP_ACTIVE_MODEL
+;	call	UserCallApplication
+;	ret
+; SetTargetTextTo18Point	endp
+;
+
+MSG_GEN_SEND_TO_PROCESS				message
+;
+; This method simply delivers a message to the process which owns the
+; object which receives this message.  Since this may need to cross over
+; to a different thread, return values cannot be returned.
+;
+; Context:	Utility message to send message to process which owns
+;		this object
+; Source:	Anyone
+; Destination:	Any GenClass object
+; Interception: Generally not intercepted.  However, custom gadgets may
+;		handle.  In this case, call superclass if supplementing
+;		default functionality else no need to call superclass if
+;		replacing default functionality.
+;
+; Pass:		^hcx - Event to send to process (NOT a ClassedEvent --
+;		       "destination" field is ignored)
+; Return:	none
+;		ax, cx, dx, bp - destroyed
+;		(event handle freed)
+;
+
+;-------------------------------------------------
+;		Generic Branch Construction/Destruction
+;-------------------------------------------------
+
+MSG_GEN_COPY_TREE			message
+;
+; MSG_GEN_COPY_TREE may be used to copy a generic object tree, starting at the
+; object first called.  GenClass provides the default behavior of broadcasting
+; the method down the tree, plus making a copy of itself, as far as it can
+; know how to do -- it creates a chunk the size of the chunk that it is in,
+; copies over the entire contents of that chunk (which includes both the fixed
+; & variable portions of the instance data), & plus creates & copies a 
+; chunk for the VisualMoniker, if any.   As it doesn't know about, & therefore
+; can't copy any chunks of memory referenced by instance data of subclasses,
+; each subclass is responsible for allocated, copying over, and updating the
+; reference to, any chunk or other type of data stored outside the object chunk
+; itself.
+;
+; This method is guaranteed NOT to force the specific building of any object
+;
+; Context:	Utility message for generic tree construction
+; Source:	Anyone
+; Destination:	Any GenClass object
+; Interception: Handled by all generic objects that reference lmem chunks as
+;		part of their instance data.  Handlers should first call their
+;		superclass, then must allocate space for, copy over, & update
+;		the instance reference to, any lmem chunks that are referenced
+;		in the new subclass's instance data.
+;
+; Pass:		cx - block to copy tree into (CANNOT BE SAME AS SOURCE BLOCK!)
+;		dx - 0 to copy tree w/no parent, else is chunk handle of
+;		     generic object in destination block to add onto
+;		bp - CompChildFlags
+;			if CCF_MARK_DIRTY is set, created generic object tree
+;				is marked dirty (so will be saved to state file)
+;			if CCF_MARK_DIRTY is clear, created generic object tree
+;				is marked IGNORE_DIRTY (so that it will be
+;				tossed out at DETACH time, & not saved to
+;				state file).  If this option is used, you must
+;				be careful to make sure that no references to
+;				this new generic object tree are stored in
+;				structures that ARE being saved out to the state
+;				file, for at re-attach time, those references
+;				will be invalid.  One such reference to watch
+;				out for that is non-obvious is the linkage
+;				between objects; for instance, if you add
+;				an IGNORE_DIRTY child to a dirty generic parent,
+;				then the downward link from the parent to the
+;				child will be invalid if the application is
+;				stored to state & then re-attached later.  The
+;				solution is to either disconnect these before
+;				detach time, or to add the child with a
+;				one-way, i.e. upward link.  (See
+;				GenAddChildUpwardLinkOnly)
+;		     The full CompChildFlags are also passed on to
+;		     MSG_GEN_ADD_CHILD in the case that the new generic
+;		     tree is to be added onto a parent generic object (the
+;		     case if dx is non-zero)
+;				
+; Return: 	^lcx:dx	- new object created
+;		ax, bp	- destroyed
+;
+
+MSG_GEN_DESTROY		message
+;
+; Sets object branch NOT_USABLE, removes it from the generic tree,
+; & destroys it, including any chunks associated with the objects, 
+; including hints, monikers, active list chunks, text, etc.  Leave the
+; block(s) that the objects lie in intact.  Any chunks coming from resources
+; are marked dirty & resized to zero.
+;
+; Context:	Utility message for generic tree destruction
+; Source:	Anyone
+; Destination:	Any GenClass object
+; Interception: Generally not intercepted, as GenClass does the job.  Objects
+;		having references to chunks or other data outside of the
+;		object chunk should subclass MSG_META_FINAL_FREE, however,
+;		to nuke those resources.
+;
+; Pass:		dl	- VisUpdateMode to use when updating parent
+;		bp	- mask CCF_MARK_DIRTY if we want to mark the parent
+;			  as dirty
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+;
+ 
+;------------------------------------------------------------------------------	
+;				Hints
+;------------------------------------------------------------------------------	
+
+;	Hints for a GenClass object
+
+HINT_DEFAULT_DEFAULT_ACTION	vardata
+			;this marks the button as being the default button
+			;for this window. Pressing ENTER will trigger the
+			;default button, even if the selection cursor is on
+			;another trigger in the window. In OpenLook, also
+			;used on settings.
+			;NOTE:  This may be used for GenTriggers or dialog
+			;GenInteractions activated by a specific-UI provided
+			;trigger.
+
+;
+; Structures for HINT_FIXED_SIZE, HINT_MINIMUM_SIZE, HINT_MAXIMUM_SIZE and
+; HINT_INITIAL_SIZE:
+;
+;
+CompSizeHintArgs	struct
+    CSHA_width		SpecWidth <>		;Width of the composite
+    CSHA_height		SpecHeight <>		;Height of each child
+    CSHA_count		sword			;# children of a composite
+CompSizeHintArgs	ends
+		
+GadgetSizeHintArgs	struct
+    GSHA_width		SpecWidth <>		;Width of the composite
+    GSHA_height		SpecHeight <>		;Height of each child
+GadgetSizeHintArgs	ends
+		
+
+;
+; 	Geometry and moniker hints.
+;
+HINT_ALLOW_CHILDREN_TO_WRAP		vardata
+	;Let children wrap if the generic composite is too long to fit its
+	;children inside its generic parent, typically as a result of a user
+	;resize, desired size specification by the programmer, or an effort
+	;by the UI to keep a window fully onscreen.
+	
+HINT_BOTTOM_JUSTIFY_CHILDREN		vardata
+	;Bottom justifies an object's children.  In a horizontal composite,
+	;causes an objects children to line up their bottom edges.  In a 
+	;vertical composite, this positions the children at the bottom of the
+	;composite, usually in conjunction with HINT_EXPAND_HEIGHT_TO_FIT_
+	;PARENT.
+	
+HINT_CENTER_CHILDREN_HORIZONTALLY	vardata
+	;Centers a composite's children between the composite's left and right 
+	;edges. Works for both vertical and horizontal composites.  In a 
+	;horizontal composite, usually used in conjunction with HINT_EXPAND_
+	;WIDTH_TO_FIT_PARENT.
+	
+HINT_CENTER_CHILDREN_ON_MONIKERS	vardata
+	;A special centering hint for a vertical composite that contains two
+	;or more GenLists or other groups of settings that have their monikers
+	;placed on the left side.  Centers children so that right edges of its
+	;children's monikers and left edges of its children's first children
+	;line up vertically, i.e.:
+	;
+	;		Fonts:  Mono  Roman  Sans
+	;	   Dimensions:  Small  Medium  Large
+	;    Save on Shutdown:	Yes  No
+	;
+	
+HINT_CENTER_CHILDREN_VERTICALLY		vardata
+	;Centers a composite's children between the composite's top and bottom
+	;edges. Works for both vertical and horizontal composites.  In a 
+	;vertical composite, usually used in conjunction with HINT_EXPAND_
+	;HEIGHT_TO_FIT_PARENT.
+					
+HINT_CENTER_MONIKER			vardata
+	;Directs the UI to center the object's moniker, if applicable.  Often
+	;used with GenInteractions in conjunction with HINT_PLACE_MONIKER_
+	;ABOVE.  Also can be used in GenTriggers, GenItems, GenBooleans, and
+	;GenGlyphs in conjunction with HINT_EXPAND_WIDTH_TO_FIT_PARENT.
+	
+HINT_CUSTOM_CHILD_SPACING		vardata	SpecSizeSpec
+	;For composites, suggest a custom amount of spacing between children.
+	;Takes one argument of type SpecSizeSpec.  For example, to have 1 pixel 
+	;spacing between children:
+	;
+	;	HINT_CUSTOM_CHILD_SPACING {
+	;		SST_PIXELS | 1
+	;	}
+	;	
+	;To have zero length spacing:	
+	;
+	;	HINT_CUSTOM_CHILD_SPACING {
+	;		SST_PIXELS | 0
+	;	}
+	;	
+	;As with most hints, the specific UI reserves the right to ignore the
+	;suggested spacing.
+	;
+	
+HINT_DONT_ALLOW_CHILDREN_TO_WRAP	vardata
+	;For objects that might wrap as default behavior, turns off the 
+	;behavior so that composites must fit all their children on a single
+	;line whether there is room or not.
+					
+HINT_DONT_FULL_JUSTIFY_CHILDREN		vardata
+	;Turns off any full justification that may exist as default behavior
+	;for this object.
+					
+HINT_DONT_INCLUDE_ENDS_IN_CHILD_SPACING	vardata
+	;Turns off the use of ends in full justification that may exist as
+	;default behavior.
+	
+HINT_DO_NOT_USE_MONIKER			vardata
+	;Suggests that the object's moniker not be displayed, even if it exists.
+	;May or may not be supported by a particular UI object, though is 
+	;guaranteed to be supported for GenInteraction & GenText classes.
+	
+HINT_DRAW_IN_BOX			vardata
+	;Suggests that the given composite have a border drawn around it, as
+	;determined by the specific UI.
+	
+HINT_EXPAND_HEIGHT_TO_FIT_PARENT	vardata
+	;Directs an object to, if possible, expand its height to fill up any	
+	;vertical space available in its parent.  Most often used by vertical
+	;composites when it is desirable to center, bottom justify, or full
+	;justify its children in the available space.  Can also be used in
+	;GenTextDisplays or GenTextEdits to expand the object to fill the 
+	;available vertical space.
+					
+HINT_EXPAND_WIDTH_TO_FIT_PARENT		vardata
+	;Directs an object to, if possible, expand its width to fill up any	
+	;horizontal space available in its parent.  Often used by horizontal
+	;composites when it is desirable to center, right justify, or full
+	;justify its children in the available space.  Also can be used in
+	;GenTriggers, GenListEntries, scrolling GenLists, GenTextDisplays,
+	;GenTextEdits, or GenFileSelectors to expand the object to fill the
+	;available horizontal space.
+	
+HINT_FIXED_SIZE				vardata	; XXX
+	;Sets a fixed size for a composite or non-composite object.
+	;This is most often used to allocate a pre-determined size for an
+	;object or group of objects that would otherwise change size often 
+	;while onscreen due to moniker changes, children removed or added, etc.
+	;The advantage of keeping an object's size fixed is it prevents 
+	;the recalculation and redrawing of windows that is required when 
+	;various objects change size in the window
+	;
+	;For non-composites, requires a width argument of type SpecWidth,
+	;and an optional height argument of type SpecHeight.  If either 
+	;argument is zero, it is ignored. Composite objects require that a third
+	;argument of type word also be included for the number of children to 
+	;be included in in the composite's size calculations.   The SpecWidth
+	;and SpecHeight attributes are either specified in terms of the size
+	;of the objects moniker (or the sum of the children's monikers), or
+	;a percentage of the size of the screen.
+	;
+	;For example, to force a GenTrigger to keep a width of 12 average 
+	;width characters, you could specify:
+	;
+	;	HINT_FIXED_SIZE {
+	;		SpecWidth <SST_AVG_CHAR_WIDTHS, 12>
+	;		SpecHeight <>
+	;	}
+	;
+	;To direct a horizontal GenInteraction to be sized so that the sum
+	;of its 5 children's widths can be up to 55 maximum width characters
+	;and still fit, you could specify:
+	;
+	;	HINT_FIXED_SIZE {
+	;		SpecWidth <SST_WIDE_CHAR_WIDTHS, 55>
+	;		SpecHeight <>
+	;		word	5
+	;	}
+	;
+	;Similarly, for a vertical composite to reserve room for 4 GenTriggers:
+	;
+	;	HINT_FIXED_SIZE {
+	;		SpecWidth <>
+	;		SpecHeight <SST_LINES_OF_TEXT, 4>
+	;		word	4
+	;	}
+					
+HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY	vardata
+	;Allows a horizontal composite to full justify its children.  Does
+	;nothing in a vertical composite.  Nearly always used in conjunction
+	;with HINT_EXPAND_WIDTH_TO_FIT_PARENT.
+	
+HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY	vardata
+	;Allows a vertical composite to full justify its children.  Does
+	;nothing in a horizontal composite.  Nearly always used in conjunction
+	;with HINT_EXPAND_HEIGHT_TO_FIT_PARENT.
+	
+HINT_INCLUDE_ENDS_IN_CHILD_SPACING	vardata
+	;Always used in conjunction with one of the full justify hints.
+	;Usually in full justification the available space is divided up and
+	;put between the children only.  Adding this hint allows for space
+	;to be added before the first child and after the last child as well.
+	;Works for both horizontal and vertical composites.
+					
+HINT_INITIAL_SIZE			vardata	; XXX
+	;Specifies an initial size for an object, usually only for when the
+	;object appears for the first time, and then only if its possible
+	;given other geometry requirements of the object's window.
+	;This size will only keep in effect until the window is resized or
+	;something else causes the object to be resized.  Arguments are the 
+	;same as for HINT_FIXED_SIZE.
+					
+HINT_LEFT_JUSTIFY_CHILDREN		vardata
+	;Left justifies an object's children.  In a vertical composite,
+	;causes an objects children to line up their left edges.  In a 
+	;horizontal composite, this positions the children towards the left 
+	;edge of the composite.  This is typically the default justification of
+	;a composite anyway.
+					
+HINT_LEFT_JUSTIFY_MONIKERS		vardata
+	;Used in conjunction with HINT_CENTER_CHILDREN_ON_MONIKERS, allows
+	;the children's left monikers to be left justified rather than the
+	;default right justification.  An example:
+	;
+	;Center-on-monikers only:		With both hints:
+	;	
+	;         Spacing: 1 2 3 4		Spacing:          1 2 3 4
+	;Forced Expanding: Yes No		Forced Expanding: Yes No
+	;          Center: Vertically		Center:		  Vertically
+	;	           Horizontally				  Horizontally
+	;
+	
+HINT_MAKE_REPLY_BAR			vardata
+	;Instructs the specific UI to use the appropriate geometry for a
+	;reply bar.  Typically for GenInteractions at the bottom of dialog
+	;boxes that have buttons like OK, Cancel, etc.
+	;
+	;NOTE: Normally, reply bars are created automatically by using
+	;HINT_SEEK_REPLY_BAR on the object to be placed in the reply bar.
+	;If your own reply bar is supplied with HINT_MAKE_REPLY_BAR, all
+	;reply bar gadgets must be children of that reply bar.  You cannot
+	;have children of the GenInteraction that use HINT_SEEK_REPLY_BAR to
+	;place themselves in the reply bar and expect things to work completely
+	;correctly (specifically there will be problems with setting your reply
+	;bar not usable and usable).
+	
+HINT_MAXIMUM_SIZE			vardata	; XXX
+	;Specifies a desired maximum size for an object.  Most useful for 
+	;objects like GenView, GenTextDisplay, and GenText objects,
+	;where it can be useful to assign a range of sizes for the 
+	;object.  Arguments are the same as for HINT_FIXED_SIZE.
+	
+HINT_MINIMUM_SIZE			vardata	; XXX
+	;Specifies a desired minimum size for an object.  Most useful for 
+	;objects like GenView, GenTextDisplay, and GenText objects,
+	;where it can be useful to assign a range of sizes for the 
+	;object.  Arguments are the same as for HINT_FIXED_SIZE.
+	
+HINT_NO_TALLER_THAN_CHILDREN_REQUIRE	vardata
+	;Designed to turn off any expand-height-to-fit-parent default behavior
+	;in an object, if there is any.    The object will only be as high as
+	;needed to hold the children, plus the margins.
+					
+HINT_NO_WIDER_THAN_CHILDREN_REQUIRE	vardata
+	;Designed to turn off any expand-width-to-fit-parent default behavior
+	;in an object, if there is any.  The object will only be as wide as 
+	;needed to hold the children, plus the margins.
+					
+HINT_ORIENT_CHILDREN_HORIZONTALLY	vardata
+	;Orients a composite's children horizontally.  Children are placed from
+	;left to right.
+	
+HINT_ORIENT_CHILDREN_VERTICALLY		vardata
+	;Orients a composite's children vertically.  Children are placed from
+	;top to bottom.
+	
+HINT_PLACE_MONIKER_ABOVE		vardata
+	;Directs the specific UI to place this object's moniker above the 
+	;object's contents, if possible.  Used primarily with plain
+	;GenInteractions.  
+	
+HINT_ALIGN_LEFT_MONIKER_EDGE_WITH_CHILD	vardata		
+	;Can be used in tandem with HINT_PLACE_MONIKER_ABOVE to align the
+	;the moniker's left edge with that of the first generic child of the
+	;object.  This is default behavior in motif, and can be circumvented
+	;with any of HINT_PLACE_MONIKER_TO_LEFT, HINT_PLACE_MONIKER_TO_RIGHT,
+	;and HINT_CENTER_MONIKER.
+	
+HINT_PLACE_MONIKER_TO_LEFT		vardata
+	;Directs the specific UI to place this object's moniker to the left of
+	;the object's contents, if possible.  
+	
+HINT_PLACE_MONIKER_TO_RIGHT		vardata
+	;Directs the specific UI to place this object's moniker to the right of
+	;the object's contents, if possible.  
+	
+HINT_RIGHT_JUSTIFY_CHILDREN		vardata
+	;Right justifies a composite's children.  Works for both vertical and 
+	;horizontal composites.  In a horizontal composite, will position the 
+	;children as close to the composite's right edge as possible, and is
+	;almost always used in conjunction with HINT_EXPAND_WIDTH_TO_FIT_PARENT.
+	;In a vertical composite, aligns the children's right edges.
+	
+HINT_TOP_JUSTIFY_CHILDREN		vardata
+	;Top justifies an object's children.  In a horizontal composite,
+	;causes an objects children to line up their top edges.  In a 
+	;vertical composite, this positions the children towards the top
+	;edge of the composite.  This is typically the default justification
+	;of a composite, anyway.
+	
+HINT_WRAP_AFTER_CHILD_COUNT		vardata		word
+	;When used with HINT_ALLOW_CHILDREN_TO_WRAP, directs a certain number
+	;of initial children to go through before forcing the composite to wrap.
+	;
+	; An example:
+	;	HINT_WRAP_AFTER_CHILD_COUNT {
+	;		word	3
+	;	}
+	;	
+
+HINT_DIVIDE_WIDTH_EQUALLY		vardata
+	;Instructs a composite object to divide any space it gets for the width
+	;equally among the usable children.  Can only suggest the size to the
+	;children -- they will decide whether they can expand to fill the
+	;suggested space.  Typical children that do well under this hint are
+	;GenViews and generic objects that have HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	;set.    Has no effect if the composite is vertically oriented.
+
+HINT_DIVIDE_HEIGHT_EQUALLY		vardata
+	;Instructs a composite object to divide any space it gets for the height
+	;equally among the usable children.  Can only suggest the size to the
+	;children -- they will decide whether they can expand to fill the
+	;suggested space.  Typical children that do well under this hint are
+	;GenViews and generic objects that have HINT_EXPAND_HEIGHT_TO_FIT_PARENT
+	;set.  Has no effect if the composite is horizontally oriented.
+
+;
+; Various positioning and sizing hints for objects that become windows only
+;  (things like  GenSummons, undependently-displayable GenInteractions,
+;  GenPrimarys, and GenDisplays.)
+;
+HINT_USE_INITIAL_BOUNDS_WHEN_RESTORED		vardata
+		;Window's bounds will be reset to their original values for 
+		;when the window originally came up, rather than saving the
+		;window's state and restoring it, as is usual.
+	
+HINT_KEEP_INITIALLY_ONSCREEN	vardata
+		;The window's initial bounds will be adjusted, as necessary, to
+		;fit entirely in its parent window.  Most windows should know 
+		;how to come up entirely onscreen; however, this is not default
+		;behavior in Motif for optimization reasons.
+						
+HINT_DONT_KEEP_INITIALLY_ONSCREEN	vardata
+		;The window's initial size will not be adjusted to make it
+		;fit entirely in its parent window.
+						
+HINT_KEEP_PARTIALLY_ONSCREEN			vardata
+		;Window will be kept partially visible when the user moves it.
+		;In motif this means part of the title bar will be kept
+		;onscreen.
+		
+HINT_KEEP_ENTIRELY_ONSCREEN			vardata
+		;Window will be kept entirely visible when the user moves it.
+		
+HINT_KEEP_ENTIRELY_ONSCREEN_WITH_MARGIN		vardata
+		;Window will be kept entirely visible when the user moves it,
+		;with some specific-UI designated margin around it as well.
+		
+HINT_DONT_KEEP_PARTIALLY_ONSCREEN		vardata
+		;User can move the window anywhere onscreen, even if the window
+		;becomes completely obscured under its parent.
+		
+HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT		vardata	SpecWinSizePair
+		;Window will be position relative to the origin of its parent
+		;window, as a ratio of the parent's size.  For instance,
+		;positioning the window at SS_PERCENT0 will cause it be in
+		;the upper left corner of the parent window area.  
+		;SS_PERCENT100 will position it at the bottom right corner.
+		;(The parent window of most windowed objects is the screen.)
+		;
+		;Example, for putting window origin at center of parent window:
+		;
+		; HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT {
+	     	;      SpecWinSizePair < mask SWSS_RATIO or PCT_50, \
+		;			 mask SWSS_RATIO or PCT_50>
+		;
+		;The first value is the x position, and the second is the y
+		;position.
+		
+HINT_STAGGER_WINDOW				vardata
+		;Stagger the window's position to the right and below the
+		;last staggered window.
+		
+HINT_CENTER_WINDOW				vardata
+		;Center the window in its parent window.
+		
+HINT_TILE_WINDOW				vardata
+		;Tile the window.  In motif, this is not currently supported.
+		
+HINT_POSITION_WINDOW_AT_MOUSE			vardata
+		;Position the window's origin at the current position of the 
+		;mouse.
+		
+HINT_EXTEND_WINDOW_TO_BOTTOM_RIGHT		vardata
+		;Extend the window's bounds so its lower right corner extends
+		;to the bottom right corner of its parent window.
+		
+HINT_EXTEND_WINDOW_NEAR_BOTTOM_RIGHT		vardata
+		;Extend the window's bounds so its lower right corner extends
+		;near the bottom right corner of its parent window, leaving
+		;room for any icon area that might be present.  Most major
+		;application's primary's will utilize this.
+		
+HINT_SIZE_WINDOW_AS_DESIRED			vardata
+		;Let the window size itself according to the sizes of its
+		;children.
+		
+HINT_SIZE_WINDOW_AS_RATIO_OF_PARENT		vardata	SpecWinSizePair
+		;Let the window size itself to be a certain percentage of
+		;its parent's window's size. (The parent window for most dialogs
+		;is the field.)
+		;
+		;Example, for making the window half the size of its parent
+		;window:
+		;
+		; HINT_SIZE_WINDOW_AS_RATIO_OF_PARENT {
+	     	;      SpecWinSizePair < mask SWSS_RATIO or PCT_50, \
+		;			 mask SWSS_RATIO or PCT_50>
+		;
+		;The first value is the height, second is the width.
+		;
+		
+HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD		vardata	SpecWinSizePair
+		;Let the window size itself to be a certain percentage of
+		;the field's size.
+		;
+		;Example, for making the window half the size of the field:
+		;
+		; HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD {
+	     	;      SpecWinSizePair < mask SWSS_RATIO or PCT_50, \
+		;			 mask SWSS_RATIO or PCT_50>
+		;
+		;The first value is the height, second is the width.
+		;
+
+	
+	
+HINT_POSITION_ICON_AS_RATIO_OF_FIELD		vardata
+		;Not currently used.
+					
+; These should be moved into geometry section...
+  
+HINT_SAME_ORIENTATION_AS_PARENT		vardata
+; For objects with generic children, directs it to initially take the same 
+; orientation of its children that its visual parent has, if possible.
+
+
+; new Hints (move before installing)
+
+HINT_SEEK_REPLY_BAR			vardata
+	; This indicates that this object (usually GenTrigger) is a reply bar
+	; trigger.
+	;
+	; Motif will place the trigger in the reply bar of the first
+	; non-GIT_ORGANIZATIONAL GenInteraction that is a window (either a
+	; GIV_DIALOG or a GIV_CONTROL_GROUP that becomes a dialog).
+	;
+	; When finding the visible parent for a GenTrigger or group,
+	; this forces the BUILD_INFO query to place the trigger
+	; in the parent interaction's reply bar
+
+;------------------------------------------------------------------------------	
+;			Constants & Structures
+;------------------------------------------------------------------------------	
+
+;
+; Parameters passed to MSG_GEN_REPLACE_VIS_MONIKER
+;
+ReplaceVisMonikerFrame	struct
+	RVMF_source	dword
+			; an optr, hptr, or fptr, depending on RVMF_sourceType
+
+	RVMF_sourceType	VisMonikerSourceType
+			;RVMF_source is optr, hptr, or fptr
+
+	even		; word align for C
+
+	RVMF_dataType	VisMonikerDataType
+			; source is VisMoniker, text string, graphics string,
+			; or GeodeToken
+
+	even		; word align for C
+
+	RVMF_length	word
+			; byte-size of source; not used for VMST_OPTR; if
+			; VMDT_TEXT and RVMF_length is 0, text is
+			; assumed to be null-terminated; if VMDT_GSTRING
+			; and RVMF_length is 0, length of gstring is computed
+			; by scanning gstring
+
+	RVMF_width	word
+			; for VMDT_GSTRING, width of graphics string; if 0,
+			; width of gstring is computed by scanning gstring
+
+	RVMF_height	word
+			; for VMDT_GSTRING, height of graphics string; if 0,
+			; height of gstring is computed by scanning gstring
+
+	RVMF_updateMode	VisUpdateMode
+			; update mode for showing new moniker
+
+	even		; word align for C
+ReplaceVisMonikerFrame	ends
+
+;
+; Passing parameters for MSG_GEN_DRAW_MONIKER, MSG_GEN_GET_MONIKER_POS
+;
+GenMonikerMessageFrame	struct
+	GMMF_xInset		word
+	; The x inset to the start of where to draw the moniker, if top or
+	; bottom justifying.
+
+	GMMF_yInset		word
+	; The y inset to the start of where to draw the moniker, if left or
+	; right justifying.
+
+	GMMF_xMaximum		word
+	GMMF_yMaximum		word
+	; The maximum size of the moniker, if VMF_CLIP_TO_MAXIMUM_WIDTH
+	; is set in the GMFP_monikerFlags.  Moniker will be clipped to that
+	; width.
+
+	GMMF_gState		hptr.GState
+	; GState to use to draw the moniker.
+
+	GMMF_textHeight		word
+	; If we happen to know the height of the system text, we should pass
+	; it here for speed, or else pass 0.
+
+	GMMF_monikerFlags	DrawMonikerFlags
+	; Various justification and miscellaneous flags for drawing the moniker.
+
+GenMonikerMessageFrame	ends
+
+
+
+; Structure of a help chunk (not quite defined yet)
+
+HelpEntry	struct
+    HE_string		byte
+HelpEntry	ends
+
+		
+;
+; Structure of Generic Attributes
+;
+GenAttrs	record	
+	GA_SIGNAL_INTERACTION_COMPLETE:1
+	; Set to indicate that this GenTrigger completes user interaction
+	; with the associated GenInteraction when activated.  This causes a
+	; MSG_GEN_GUP_INTERACTION_COMMAND with IC_INTERACTION_COMPLETE to be
+	; sent to the GenTrigger itself (eventually making its way up to the
+	; associated GenInteraction) after the trigger's action message is
+	; sent out.  The specific UI (in MSG_GEN_GUP_INTERACTION_COMMAND
+	; handler) will then determine whether this dialog should be dismissed
+	; or not.
+	;
+	; This should be set for any ATTR_GEN_TRIGGER_INTERACTION_COMMAND
+	; trigger with IC_APPLY, IC_OK, IC_YES, IC_NO, or IC_STOP (this should
+	; not be set for IC_RESET triggers, as their usefullness depends on the
+	; dialog staying on-screen after their activation), and for any other
+	; HINT_SEEK_REPLY_BAR triggers that should dismiss the dialog after
+	; usage.
+	;
+	; This should not be used for GIA_INITIATED_VIA_USER_DO_DIALOG
+	; GenInteractions as the command triggers in those dialogs, by
+	; definition, signal interaction completion.
+	;
+	GA_INITIATES_BUSY_STATE:1
+	; Set for gadgets whose invocation starts a long enough operation
+	; that we'd like to change the cursor to show busy.
+	; Results in a MSG_GEN_APPLICATION_MARK_BUSY being sent to the app object,
+	; followed by a MSG_GEN_APPLICATION_MARK_NOT_BUSY being sent to the same
+	; object but via the app's queue.
+	;
+	GA_INITIATES_INPUT_HOLD_UP:1
+	; Set for gadgets whose invocation results in the application thread
+	; modifying the UI gadgtry slightly (typically enabling & disabling
+	; options).  This cause input to be held up until the application
+	; has completed whatever its response is, so that the user can't
+	; click twice on something that the app will disable after processing
+	; the first click.
+	;
+	; NOTE:  This functions stops input from being processed for ALL
+	; applications, so when using this bit, be sure that the gadget's
+	; application method handler is quick, or at least does not go off
+	; doing any prolonged operation (this would prevent the user from
+	; using any other apps until your app finishes its task)
+	;
+	; Results in a MSG_GEN_APPLICATION_HOLD_UP_INPUT being sent to the app object,
+	; followed by a MSG_GEN_APPLICATION_RESUME_INPUT being sent to the same object
+	; but via the app's queue.
+	;
+	GA_INITIATES_INPUT_IGNORE:1
+	; Set for gadgets whose invocation starts a long enough operation
+	; that we want to change the cursor to show that the app is busy &
+	; can't take input.  Enters the application modal state even if there
+	; isn't an app-modal box up (i.e. an button activity is eaten with
+	; a beep)
+	; Results in a MSG_GEN_APPLICATION_IGNORE_INPUT being sent to the app object,
+	; followed by a MSG_GEN_APPLICATION_ACCEPT_INPUT being sent to the same object
+	; but via the app's queue.
+	;
+
+	GA_READ_ONLY:1
+	; If set, the generic object is presumed to be a read-only version
+	; of the gadget (i.e. a text object that is not editable, a scrolling
+	; list whose items cannot be selected, a non-editable GenRange, without
+	; up/down arrows, etc.  
+
+	GA_KBD_SEARCH_PATH:1
+	; set if there is reason to look for keyboard accelerators along
+	; this section of the generic tree.
+	;
+	GA_TARGETABLE:1
+	; set if this object is a target of some sort, & can receive the
+	; "Target" exclusive within its target level.  If set, most specific
+	; UI's will automatically grab the Target for the object whenever the
+	; user interacts with it in some way, such as clicking on.
+
+	GA_NOTIFY_VISIBILITY:1
+	; Set if this object should send notification when it becomes
+	; visible and not visible.  See the documentation with
+	; ATTR_GEN_VISIBILITY_DATA for more details
+
+GenAttrs	end
+
+			
+;	Warning: GenStateChanged depends on the order of these bits
+
+GenStates	record	
+
+	GS_USABLE:1				; usable
+	; This flag is setable by the application & indicates whether the
+	; entire generic branch starting with this object should be
+	; considered part of the application's user interface at this
+	; time.  If this bit is clear, then the object nor any of its
+	; children will appear or may be interacted with.  The specific
+	; & visual state of any object which is made NOT_USABLE will
+	; be destroyed, & the object treated as if it were in generic
+	; form only.
+
+	GS_ENABLED:1				; enabled
+	; Indicates if object will allow user to
+	; interact with it or not. Used in gadgets
+	; to show options as not available, which
+	; is typically represented by "greying out"
+	; the gadget.
+
+	:6
+
+GenStates	end
+		
+
+;------------------------------------------------------------------------------
+;			Instance data
+;------------------------------------------------------------------------------
+
+;
+; All instance data are private until we decide otherwise...
+;
+    GI_link		LinkPart <>				; 4
+    GI_comp		CompPart <>				; 4
+    ; Linkage, so that this object may be placed in a generic
+    ; tree & have generic children.
+
+    GI_visMoniker	lptr					; 2
+    ; Contains the VisMoniker to use, or the VisMonikerList
+    ; structure which contains several VisMonikers to use.
+    ; During SPEC_BUILD, this list chunk will be replaced with the actual
+    ; moniker to use (handle # will not change).
+
+    GI_kbdAccelerator	KeyboardShortcut <>			; 2
+    ; Shortcut for object
+
+    GI_attrs		GenAttrs			; 1
+    GI_states		GenStates (mask GS_USABLE or \
+					mask GS_ENABLED)	; 1
+
+GenClass	endc

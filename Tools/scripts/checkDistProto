@@ -1,0 +1,94 @@
+#!/usr/public/perl
+##############################################################################
+#
+# 	Copyright (c) Geoworks 1995 -- All Rights Reserved
+#	Geoworks Confidential
+#
+# FILE: 	checkDistProto
+# AUTHOR: 	Jon Witort
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	jon	8 jul 95	Initial Revision
+#
+# DESCRIPTION:
+#       When run from the root directory of a GEOS distribution, checks
+#	all geodes therein for protocol mismatches.
+#
+#	$Id: checkDistProto,v 1.1 95/07/08 00:51:44 jon Exp $
+#
+###############################################################################
+
+open(GEODES, "find . -name \"*.geo\" -print |") || die "Couldn't run find: $!\n";
+
+while (<GEODES>) {
+    chop;
+    /^[\.\/]*.*\/([^\/]+)\.geo$/;
+
+    if ($1 =~ /^(.*)ec$/) {
+	$filename = $1;
+    } else {
+	$filename = substr($1, 0, 7);
+    }
+
+    $fullpath{$filename} = $_;
+
+    open(DUMPGEO, "dumpgeo $_ |") || die "Couldn't run dumpgeo: $!\n";
+    while (<DUMPGEO>) {
+	chop;
+
+	#
+	# If this's the line with the geode's protocol numbers,
+	# suck 'em up.
+	#
+	if (/Release:.*Protocol: ([0-9]+)\.([0-9]*)$/) {
+	    $majors{$filename} = $1;
+	    $minors{$filename} = $2;
+	}
+
+	#
+	# Check whether this is the last line before all the
+	# dependencies are spewed out, and cut to the next loop
+	# if so.
+	#
+	if (/^Name.*Protocol$/) {
+	    last;
+	}
+    }
+
+    #
+    # All the rest should be dependency lines
+    
+    while (<DUMPGEO>) {
+	chop;
+	/^(\S+)\s+\S+\s+\S+\s+([0-9]+\.[0-9]+)$/;
+	$dependencies{$filename} .= $1 . ":" . $2 . ";";
+    }
+}
+
+foreach $x (sort keys(%majors)) {
+    @deps = split(/;/,$dependencies{$x});
+
+    $numerror = 0;
+    while (@deps) {
+	$dep = shift @deps;
+	($depgeode, $depmajor, $depminor) = $dep =~ /^(.*):([0-9]+)\.([0-9]+)/;
+	$actualmajor = $majors{$depgeode};
+	$actualminor = $minors{$depgeode};
+
+	if ($actualmajor eq "") {
+	    print "error: $fullpath{$x} depends on $depgeode $depmajor.$depminor, but couldn't find $depgeode.\n";
+	    $numerror += 1;
+	} elsif ($actualmajor != $depmajor) {
+	    print "major error: $fullpath{$x} depends on $depgeode $depmajor.$depminor, but $fullpath{$depgeode} is $actualmajor.$actualminor\n";
+	    $numerror += 1;
+	} elsif ($actualminor < $depminor) {
+	    print "minor error: $fullpath{$x} depends on $depgeode $depmajor.$depminor, but $fullpath{$depgeode} is $actualmajor.$actualminor\n";
+	    $numerror += 1;
+	}
+    }
+    if ($numerror == 0) {
+	print "$fullpath{$x} checks out ok.\n";
+    }
+}

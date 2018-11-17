@@ -1,0 +1,1249 @@
+/***********************************************************************
+ *
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+ * PROJECT:       HTMLPars
+ * FILE:          parstags.goc
+ *
+ * AUTHOR:        Marcus Gr”ber
+ *
+ * NOTE:          To compile properly, this file requires the INCLUDE
+ *                files from the OmniGo SDK or later, because the
+ *                VisTextParaAttr structure is declared incorrectly in
+ *                earlier versions.
+ *
+ ***********************************************************************/
+
+/**************************************************************************
+ *      Include files
+ **************************************************************************/
+
+@include <stdapp.goh>
+#include <chunkarr.h>
+#include <resource.h>
+
+#include <Ansi\string.h>
+#include <Ansi\stdio.h>
+#include <Ansi\stdlib.h>
+#include <Ansi\ctype.h>
+#include <geomisc.h>
+@include <initfile.h>
+
+@include <fixes.goh>
+@include "options.goh"
+@include <html4par.goh>
+
+#include "internal.h"
+
+void LOCAL PopStyle(word n) ;
+
+/* For access to data defined in htmlsty.goh (included from htmlpars.goc): */
+@extern chunk HTMLStylesChunk;
+
+/***************************************************************************
+ *              Style constants
+ ***************************************************************************/
+
+const CharStyleDelta vcdImage = {CSD_COLOR,0,0,{C_DARK_GRAY,CF_INDEX,0,0},0,0};
+
+/* Character used to represent an embedded graphic, in string-ized form... */
+@ifdef DO_DBCS
+const char c_graphic[] = {C_SUBSTITUTE, 0};
+/* Same for Form Feed character */
+const char c_ff[] = {C_FORM_FEED, 0};
+@else
+const char c_graphic[] = {C_GRAPHIC, 0};
+/* Same for Form Feed character */
+const char c_ff[] = {C_FF, 0};
+@endif
+
+/**************************************************************************
+ *              Quote symbols for <Q>..</Q> element
+ **************************************************************************/
+
+/* Different types of quote characters for the various levels. Note that
+   in both cases, the array is index by the number of open quotes on the
+   stack when the tag is encountered, which is why the quoteClose marks
+   are shifted by one with respect to the quoteOpen array. */
+
+/* quoteOpen[] currently moved to opentags.goc. */
+const char quoteClose[] = {' ', 34, 39, 0};
+
+
+/***************************************************************************
+ *              Variables used during loading of the document
+ ***************************************************************************/
+/* (These variables may eventually go into a session-specific state block.) */
+
+/* Form status variables (no form nesting is allowed, so no stack */
+word formCount;
+word currentMenu;                       /* Element index of last <SELECT> */
+
+optr tagStackO, tableStackO;
+word tagStackPtr;
+
+
+word insertCellTableIndex ;
+
+/***************************************************************************
+ *              Utility functions
+ ***************************************************************************/
+
+char * GetParamValue(optr array,char *par)
+{
+    word i,size;
+    char *p = NULL,*q;
+    word n ;
+
+    if(!array) return NULL;             /* return NULL for non-array */
+
+    /* Priority is left to right mainly because if an attribute such as */
+    /* WIDTH is found, we need to take the first one on the left */
+    /* In theory, we should not have a duplicate, but I tell 'em the */
+    /* way I see 'em */
+    n = ChunkArrayGetCount(array) ;
+    for(i=0; i<n; i++)
+    {
+      q = ChunkArrayElementToPtr(array,i,&size);
+      if(STRCMPSB(par,q)==0)              /* found parameter? */
+      {
+        p = q+STRLENSB(q)+1;              /* set p to point after param name */
+        break;                          /* we can stop searching */
+      }
+    }
+    return p;
+}
+
+/***************************************************************************
+ *              Stack Handling
+ ***************************************************************************/
+
+word EnclosingCount(SpecialTagType spec, word *top)
+{
+    TagStackElement *tagStack;
+    word i,n;
+
+    n = 0;                              /* no tags found yet */
+    tagStack = LMemDeref(tagStackO);
+    for(i=0; i<tagStackPtr; i++)
+      if(tagStack[i].spec == spec)      /* found requested element? */
+      {
+        n++;                            /* increase nesting level */
+        if(top)                         /* also requested topmost element? */
+          *top = i;                     /* pass back current one */
+      }
+
+    return n;                           /* return count */
+}
+
+/*
+ * Requires localHeap to be locked.
+ */
+void GetCurrentStyles(void)
+{
+    sword p;
+    TagStackElement *tagStack;
+
+    GetCharacterBase(&currentCS);
+    GetParagraphBase(&currentS);
+    currentFlags = 0;
+
+    tagStack = LMemDeref(tagStackO);
+    for(p=0; p<tagStackPtr; p++,tagStack++)
+    {
+      if((HTMLext->HE_options & HTML_READ_FAST) && (tagStack->spec != SPEC_A))
+        continue;                       /* fast: ignore everything but links */
+
+      ApplyCharacterDelta( &currentCS, &(tagStack->charDelta) );
+
+      if(tagStack->delta.PSD_which & PSD_RESET)
+      {
+        GetParagraphBase(&currentS);
+      }
+      else
+      {
+        if(tagStack->delta.PSD_which & PSD_MARGINS_ADD)
+        {
+          currentS.VTPA_rightMargin += tagStack->delta.PSD_rightMargin;
+          currentS.VTPA_leftMargin += tagStack->delta.PSD_leftMargin;
+          currentS.VTPA_paraMargin =
+            currentS.VTPA_leftMargin + tagStack->delta.PSD_paraMargin;
+        }
+        else if(tagStack->delta.PSD_which & PSD_MARGINS)
+        {
+          currentS.VTPA_leftMargin = tagStack->delta.PSD_leftMargin;
+          currentS.VTPA_rightMargin = tagStack->delta.PSD_rightMargin;
+          currentS.VTPA_paraMargin = tagStack->delta.PSD_paraMargin;
+        }
+
+        if(tagStack->delta.PSD_which & PSD_JUSTIFY)
+          currentS.VTPA_attributes &= ~VTPAA_JUSTIFICATION;
+
+        if(tagStack->delta.PSD_which & PSD_SPACING)
+        {                               /* modify vertical spacing flags */
+          currentFlags &= ~TAG_PAR_SPACING;
+          currentFlags |= (tagStack->flags & TAG_PAR_SPACING);
+                                          /* set spacing to specified values */
+        }
+
+        currentS.VTPA_attributes |= tagStack->delta.PSD_attributes;
+
+        if( tagStack->flags & TAG_IS_PAR_STYLE)
+        {
+          if( tagStack->flags & TAG_NO_FORMATTING )
+                                          /* is this a non-formatting tag? */
+            currentFlags |= (tagStack->flags & TAG_CUMULATIVE_FLAGS);
+                                          /* only update cumulative flags */
+          else
+          {
+            currentFlags &= TAG_CUMULATIVE_FLAGS | TAG_PAR_SPACING |
+              ((tagStack->flags & TAG_PREPEND_MAYBE)? TAG_PREPEND:0);
+                                          /* reset non-cumulative flags */
+            currentFlags |= tagStack->flags;
+                                          /* update all flags */
+          }
+        }
+      }
+    }
+}
+
+/*
+ * Fix start positions of tag runs starting at the end of the
+ * previous paragraph to not include the end-of-paragraph mark and
+ * the prepended text, if any.
+ */
+void FixupStartPos(dword pos)
+{
+    word i;
+    TagStackElement *tagStack;
+
+    tagStack = LMemDeref(tagStackO);
+    for(i=0; i<tagStackPtr; i++)
+      if( tagStack[i].startPos==pos )   /* started right before end of para? */
+        tagStack[i].startPos = textpos; /* advnace to real start of text */
+}
+
+
+/***************************************************************************
+ *              Opening / Closing of special tags
+ ***************************************************************************/
+
+word G_cellLimit =0;
+word G_cellCount = 0;
+
+void LOCAL EnsureCellLimit(void)
+{
+    if (G_cellLimit==0)
+        if (InitFileReadInteger("HTMLView", "celllimit", &G_cellLimit) == TRUE)
+            G_cellLimit = DEFAULT_CELL_LIMIT ;
+}
+
+
+Boolean AddCellRecord(void)
+{
+     word elm;
+     TableStackElement *insertCellTable;
+
+     /* Don't add a cell unless we can */
+     EnsureCellLimit() ;
+
+     /* If we went over the limit, note that we've reached the limit, */
+     /* but go ahead and keep processing (because we still might have */
+     /* a few cells we just GOT to have).  But it will at least flag */
+     /* down any more incoming data. */
+     if (G_cellCount >= G_cellLimit)
+         G_hitAllocLimit = TRUE ;
+
+     G_cellCount++ ;
+
+     /* add cell record to array */
+     elm = AppendToHypertextArrayCell(&insertCellData);
+
+     /* possibly link table to first cell */
+     insertCellTable = LMemDeref(tableStackO);
+     insertCellTable += insertCellTableIndex ;
+     if(insertCellTable->tableData.HTD_firstCell==CA_NULL_ELEMENT)
+       insertCellTable->tableData.HTD_firstCell = elm;      
+
+     insertCell = TRUE;                 /* create cell break in text */
+
+     return TRUE ;
+}
+
+word AddFormElement(HTMLformData *fd)
+{
+    word element;
+    VisTextGraphic vtg;
+    VisTextCharAttr vcaImage;
+
+    if ((fd->HFD_itemType != HTML_FORM_HEADER) && 
+            (fd->HFD_itemType != HTML_FORM_HIDDEN))
+        AddParaCond();                  /* flush pending para end */
+                                        /* But only if visible item */
+
+
+    fd->HFD_formNumber = formCount;     /* associate element with form */
+
+    if(fd->HFD_itemType<=HTML_FORM_LAST_EMBED)
+    {                                   /* embed variable graphic? */
+      GetCharacterBase(&vcaImage);      /* image style based on default */
+      ApplyCharacterDelta(&vcaImage, &vcdImage);
+                                        /* create image style */
+
+      fd->HFD_pos = AddText(&vcaImage, c_graphic);
+                                        /* embed placeholder character */
+
+      element = AppendToHypertextArray(HTA_FORM_ARRAY, fd);
+                                        /* add form record to array */
+
+      memset(&vtg, 0, sizeof(vtg));     /* default graphic data structure */
+
+      vtg.VTG_type = VTGT_VARIABLE;     /* embed a variable graphic */
+      vtg.VTG_data.VTGD_variable.VTGV_manufacturerID = HTML_VARGRAPH_MFGID;
+      vtg.VTG_data.VTGD_variable.VTGV_type = HTML_VARGRAPH_TYPE_FORM;
+                                        /* identify variable graphic type */
+
+      ((HTMLformGraphicVariable *)
+        &vtg.VTG_data.VTGD_variable.VTGV_privateData)->
+          HFGV_formElementIndex = element;
+                                        /* link graphic to array element */
+
+      AddAttrRun(ttbh->TTBH_graphicElements, ttbh->TTBH_graphicRuns,
+        &vtg, fd->HFD_pos);             /* create graphic record for position */
+
+      c2 = '.';                         /* treat as character */
+    }
+    else
+    {
+      fd->HFD_pos = GetTextpos();       /* position of form element */
+      element = AppendToHypertextArray(HTA_FORM_ARRAY, fd);
+                                        /* add form record to array */
+    }
+
+    return element;
+}
+
+void AddQuote(char *quoteList)
+{
+    char quote[2];
+    word level;
+
+    if(currentFlags & TAG_FLUSH_TEXT)   /* abort if supposed to ignore text */
+      return;
+
+    level = EnclosingCount(SPEC_Q, NULL);
+    if(level >= STRLENSB(quoteList))
+      level = STRLENSB(quoteList)-1;      /* limit nesting depth */
+
+    quote[0] = quoteList[level];        /* make it a string... */
+    quote[1] = 0;
+
+    AddParaCond();                      /* flush pending para end */
+    AddText(&currentCS, quote);         /* Add text in current style */
+    c2 = '.';                           /* treat as a character */
+}
+
+word ParseHREF(optr paramArray, dword pos, WordFlags flags)
+{
+    HTMLanchorData ad;
+    word element;
+    char *p;
+
+    p = GetParamValue(paramArray, "HREF");
+    if(p)
+    {
+      while (*p == ' ') p++;            /* skip leading spaces */
+      ad.linkOrName = NamePoolTokenizeDOS(NamePool, p, FALSE);
+                                        /* token of link destination */
+
+      ad.len = (word)(textpos - pos);   /* length of link */
+      ad.pos = pos;                     /* store position of anchor, if any */
+      ad.target = NAME_POOL_NONE;       /* default: no target specified */
+      ad.flags = flags;                 /* type of link */
+
+      p = GetParamValue(paramArray, "TARGET");
+      if(p && *p)                       /* store target frame, if any */
+        ad.target = NamePoolTokenizeDOS(NamePool, p, TRUE);
+
+      element = AppendToHypertextArray(HTA_ANCHOR_ARRAY, &ad);
+                                        /* add anchor record to array */
+    }
+    else
+      element = CA_NULL_ELEMENT;
+
+    return element;
+}
+
+/*
+ * Close all open style tags of the specified type, if any.
+ * This can be used to make sure that a certain element (e.g. an anchor)
+ * will never be nested, so any new occurance terminates the previous one.
+ *
+ * If upTo is not equal to SPEC_DONT_MATCH, it specifies a tag that is
+ * not crossed in search for a match (e.g. <td> is only closed inside its
+ * <table>)
+ */
+void ForceCloseStyle(SpecialTagType spec, SpecialTagType upTo)
+{
+    TagStackElement *tagStack;
+    word i;
+    Boolean found;
+    void LOCAL PopStyle(word n);
+
+    tagStack = LMemDeref(tagStackO);
+
+    do {
+      found = FALSE;
+      for(i=tagStackPtr-1; (int)i>=0; i--)
+        if(tagStack[i].spec == spec)
+        {
+          found = TRUE;
+          PopStyle(i);
+          break;
+        }
+        else if(tagStack[i].spec == upTo)
+          break;
+    } while(found);
+}
+
+void LOCAL EndTableRow(TableStackElement *tableStack)
+{
+    int i;
+
+    if((tableStack->currentCol) || (tableStack->currentRow &&
+       (tableStack->flags & TABLE_STACK_HAS_RECEIVED_TR_TAG)))
+                                        /* Only create empty rows if necessary */
+    {
+      tableStack->currentRow++;
+      if((tableStack->lastCol+1) > tableStack->tableData.HTD_cols)
+        tableStack->tableData.HTD_cols = tableStack->lastCol+1;
+      for(i=0; i<TABLE_MAX_COLUMNS; i++)
+        if(tableStack->col[i].remainingRowSpan)
+          tableStack->col[i].remainingRowSpan--;
+                                        /* count down occupied rows/columns */
+      tableStack->currentCol = 0;       /* back to square one */
+      tableStack->flags &= (~TABLE_STACK_HAS_RECEIVED_TR_TAG) ;
+    }
+}
+
+void Close_TABLE(word n)
+{
+    int level;
+    TableStackElement *tableStack;
+
+    /* close any pending table cell */
+    ForceCloseStyle(SPEC_TD, SPEC_TABLE);
+
+    AddCellRecord() ;
+
+    while(tagStackPtr-1 > n)        /* close other things opened within */
+      PopStyle(tagStackPtr-1);
+
+    tableStack = LMemDeref(tableStackO);
+    level = EnclosingCount(SPEC_TABLE, NULL)-1;
+
+    if(level < HTML_MAXTABLE-1)
+    {
+      tableStack += level+1;        /* point to closed entry */
+      EndTableRow(tableStack);      /* advance last table row */
+
+      tableStack->tableData.HTD_rows = tableStack->currentRow;
+
+      ModifyHypertextArrayTable(&tableStack->tableData, tableStack->element) ;
+
+      tableStack--;                 /* go to enclosing entry and re-open */
+      insertCellData = tableStack->lastCellData;
+      insertCellTableIndex = tableStack - LMemDeref(tableStackO);
+
+
+      insertCellData.HCD_flags |= HTML_CELL_CONTINUE;
+                                    /* continues interrupted cell */
+      insertCellData.HCD_width = insertCellData.HCD_height =
+        HTML_LEN_VARIABLE;          /* do not contribute to width/height */
+
+      c2 = '.';                     /* always create a paragraph break */
+    }
+}
+
+void LOCAL PopStyle(word n)
+{
+    TagStackElement *tagStack;
+    SpecialTagType spec;
+    optr paramArray;
+    dword pos;
+    WordFlags flags;
+
+    tagStack = LMemDeref(tagStackO);
+
+    spec = tagStack[n].spec;
+    paramArray = tagStack[n].param;
+    pos = tagStack[n].startPos;         /* start of item */
+    flags = tagStack[n].flags;
+
+    switch(spec)
+    {
+    /*------------------------------------------------------------------------*/
+    case SPEC_TITLE:
+      if(htbh->HTBH_other.HTBHO_documentTitle != NAME_POOL_NONE)
+        NamePoolReleaseToken(NamePool, htbh->HTBH_other.HTBHO_documentTitle);
+                                        /* release old title */
+      htbh->HTBH_other.HTBHO_documentTitle = storedContent;
+                                        /* store token for new title */
+      storedContent = NAME_POOL_NONE;   /* content has been dealt with */
+      break;
+
+    /*------------------------------------------------------------------------*/
+    case SPEC_TEXTAREA:
+      {
+        HTMLformData fd;
+        char *p;
+	word element;
+
+        memset(&fd, 0, sizeof(fd));     /* set form record to default */
+
+        p = GetParamValue(paramArray, "ROWS");
+        if(p)
+          fd.HFD_var.textarea.rows = ATOISB(p);
+        p = GetParamValue(paramArray, "COLS");
+        if(p)
+          fd.HFD_var.textarea.cols = ATOISB(p);
+@ifdef COMPILE_OPTION_TEXT_PROMPT
+    p = GetParamValue(paramArray, "ALT");
+    if(p)
+        fd.HFD_prompt = NamePoolTokenizeDOS(NamePool, p, FALSE);
+@endif
+
+        p = GetParamValue(paramArray, "NAME");
+        if(p && *p)
+          fd.HFD_name = NamePoolTokenizeDOS(NamePool, p, FALSE);
+        fd.HFD_value = storedContent;   /* content is default value */
+        storedContent = NAME_POOL_NONE;
+                                        /* content has been dealt with */
+
+	if (GetParamValue(paramArray, "READONLY")) {
+	    fd.HFD_var.textarea.flags |= HTML_TEXTAREA_READONLY;
+	}
+
+        fd.HFD_itemType = HTML_FORM_TEXTAREA;
+
+@ifdef IN_PLACE_TEXT_ENTRY
+        fd.HFD_var.textarea.selStart = 0xffff;
+        fd.HFD_var.textarea.selEnd = 0xffff;
+	fd.HFD_var.textarea.lines = 0;
+@endif
+
+        element = AddFormElement(&fd);            /* embed form element into text */
+
+        ParseEvents(paramArray, HTML_EVENT_OBJECT_ELEMENT, element);
+      }
+      break;
+
+    /*------------------------------------------------------------------------*/
+    case SPEC_OPTION:
+      {
+        HTMLformData fd;
+        char *p;
+
+        if(currentMenu==CA_NULL_ELEMENT)
+          break;                        /* ignore unconnected options */
+
+        memset(&fd, 0, sizeof(fd));     /* set form record to default */
+
+        fd.HFD_value = storedContent;   /* content is displayed name */
+        storedContent = NAME_POOL_NONE; /* content has been dealt with */
+
+        p = GetParamValue(paramArray, "VALUE");
+        if (p /*&& *p*/)  {  /* allow null string for OPTION VALUE */
+            fd.HFD_name = NamePoolTokenizeDOS(NamePool, p, FALSE);
+        } else  {
+            fd.HFD_name = NAME_POOL_NONE;
+        }
+
+        fd.HFD_itemType = HTML_FORM_OPTION;
+
+        fd.HFD_var.option.menuElement = currentMenu;
+        if(GetParamValue(paramArray, "SELECTED"))
+          fd.HFD_var.option.flags |= HTML_OPTION_SELECTED;
+
+        AddFormElement(&fd);            /* embed form element into text */
+      }
+      break;
+
+    /*------------------------------------------------------------------------*/
+    case SPEC_SELECT:
+      ForceCloseStyle(SPEC_OPTION, SPEC_DONT_MATCH);
+      break;
+
+    /*------------------------------------------------------------------------*/
+    case SPEC_TABLE:
+      {
+        Close_TABLE(n) ;
+      }
+      break;
+
+    /*------------------------------------------------------------------------*/
+    case SPEC_TD:                       /* closing table cell */
+      while(tagStackPtr-1 > n)          /* close all things opened within */
+        PopStyle(tagStackPtr-1);
+      break;
+
+    /*------------------------------------------------------------------------*/
+    case SPEC_DIV:
+      EndLine("");                      /* simulate line break */
+      break;
+
+    /*------------------------------------------------------------------------*/
+    case SPEC_A:                        /* closing hyperlink or anchor name */
+      {
+        HTMLanchorData ad;
+        char *p;
+        word link;
+
+        if( paramArray && (HTMLext->HE_options & HTML_ADD_HYPERLINKS) )
+        {
+          p = GetParamValue(paramArray, "NAME");
+          if(p && *p)
+          {
+            ad.pos = pos;               /* store position of anchor, if any */
+            ad.target = NAME_POOL_NONE; /* default: no target specified */
+
+            ad.linkOrName = NamePoolTokenizeDOS(NamePool, p, FALSE);
+                                        /* token of name */
+            ad.len = 0;
+            ad.flags = HTML_ADF_NAME;   /* this is a name */
+            AppendToHypertextArray(HTA_ANCHOR_ARRAY, &ad);
+                                        /* add anchor record to array */
+          }
+
+          link = ParseHREF(paramArray, pos, 0);
+                                        /* handle HREF / TARGET parameters */
+
+          if(link != CA_NULL_ELEMENT)
+            ParseEvents(paramArray, HTML_EVENT_OBJECT_LINK, link);
+        }
+      }
+      break;
+
+    /*------------------------------------------------------------------------*/
+    case SPEC_Q:
+      AddQuote(quoteClose);             /* Insert closing quote char */
+      break;
+
+    /*------------------------------------------------------------------------*/
+    case SPEC_DL:
+      /* Close any pending DT/DD tags */
+      ForceCloseStyle(SPEC_DTDD, SPEC_DL);
+      GetCurrentStyles();
+      break;
+
+    /*------------------------------------------------------------------------*/
+    case SPEC_OL:
+    case SPEC_UL:
+      ForceCloseStyle(SPEC_LI, spec);
+      GetCurrentStyles();
+      break;
+
+    /*------------------------------------------------------------------------*/
+    }
+
+    for(; n<tagStackPtr-1; n++)         /* shift styles above current one */
+      tagStack[n] = tagStack[n+1];
+
+    tagStackPtr--;                      /* we've removed one element */
+
+    if( (flags & (TAG_NO_FORMATTING | TAG_IS_PAR_STYLE)) == TAG_IS_PAR_STYLE )
+      EndParagraph("");
+
+    if(spec==SPEC_TD)                   /* special marker for closing of cell */
+      EndCell();
+
+    if(paramArray)                      /* if anything was allocated: */
+      LMemFree(paramArray);             /* release memory for link parameters */
+}
+
+@extern object vcdNone ;
+@extern object vpdNone ;
+
+TagOpenHandler Open_TABLE
+{
+    word border, level;
+    TableStackElement *tableStack;
+    TableStackElement *parentTable;
+    char *p;
+    static HTMLStylesTable tabletrEntry = {
+            "TR",
+            OptrToChunk(@vcdNone),
+            OptrToChunk(@vpdNone),
+            SPEC_TR,
+            0
+        } ;
+    static HTMLStylesTable tabletdEntry = {
+            "TD",
+            OptrToChunk(@vcdNone),
+            OptrToChunk(@vpdNone),
+            SPEC_TD,
+            /*TAG_PAR_SPACING|*/TAG_IS_PAR_STYLE
+        } ;
+    VisTextParaAttr oldStyle ;
+    HTMLimageData id;
+    NameToken tok;
+
+    tableStack = LMemDeref(tableStackO);
+    level = EnclosingCount(SPEC_TABLE, NULL) + 1;
+
+    if(level < HTML_MAXTABLE)       /* nesting depth not exceeded? */
+    {
+      AddParaCondBeforeTable();     /* flush pending para end */
+
+      parentTable = tableStack + (level-1) ;
+      tableStack += level;          /* point to actual entry */
+
+      /* If the parent table is empty and we are adding another table, */
+      /* then put in a special row and column. Do this only if there is */
+      /* actually a table around us, but not for the outermost table layer. */
+      if ((level>1) && 
+          (parentTable->currentCol==0) && (parentTable->currentRow==0))  {
+          oldStyle = currentS ;
+          OpenTag(SPEC_TR, &tabletrEntry, NULL) ;
+          OpenTag(SPEC_TD, &tabletdEntry, NULL) ;
+          currentS = oldStyle ;
+      }
+
+      /* store cell info in case cell is split by an embedded table */
+      tableStack->lastCellData = insertCellData;
+
+      memset(tableStack, 0, sizeof(TableStackElement));
+                                    /* initialize table stack entry */
+
+      tableStack->tableData.HTD_flags = (level << HTML_TABLE_LEVEL_OFFSET);
+                                    /* Set table depth */
+
+      tableStack->tableData.HTD_flags |=
+        ((currentS.VTPA_attributes & VTPAA_JUSTIFICATION) >>
+          VTPAA_JUSTIFICATION_OFFSET) << HTML_TABLE_JUSTIFY_OFFSET;
+      if (currentS.VTPA_leftMargin > currentS.VTPA_paraMargin)
+          tableStack->tableData.HTD_insetAmount = currentS.VTPA_leftMargin/8 ;
+      else
+          tableStack->tableData.HTD_insetAmount = currentS.VTPA_paraMargin/8 ;
+
+      tableStack->tableData.HTD_firstCell = CA_NULL_ELEMENT;
+
+      tableStack->tableData.HTD_backgroundImage = HTML_IMAGE_INDEX_NONE ;
+      if( (HTMLext->HE_options & HTML_NO_BACKGROUND)==0 )
+      {
+          p = GetParamValue(arg->paramArray,"BACKGROUND");
+          if(p && *p)                     /* background image name */
+          {
+            tok = NamePoolTokenizeDOS(NamePool, p, FALSE);
+
+            memset(&id, 0, sizeof(id));   /* default graphic data structure */
+            id.pos = HTML_IMAGE_POS_TABLE_OR_CELL_BACKGROUND ;
+                                          /* this is a background image */
+            id.imageURL = tok;            /* store URL of image */
+            tableStack->tableData.HTD_backgroundImage = MergeIntoHypertextArrayImage(&id) ;
+                                          /* add image record to array */
+          }
+      }
+
+      p = GetParamValue(arg->paramArray, "ALIGN");
+      if (p)
+      {
+          if (0==STRCMPISB(p, "LEFT"))  {
+              tableStack->tableData.HTD_flags |= (HTML_ALIGN_LEFT << HTML_TABLE_ALIGN_OFFSET) ;
+              tableStack->tableData.HTD_insetAmount = 0 ;
+          } else if (0==STRCMPISB(p, "RIGHT"))  {
+              tableStack->tableData.HTD_flags |= (HTML_ALIGN_RIGHT << HTML_TABLE_ALIGN_OFFSET) ;
+              tableStack->tableData.HTD_insetAmount = 0 ;
+          } else if ((0==STRCMPISB(p, "CENTER")) || (0==STRCMPISB(p, "MIDDLE")))  {
+              /* Force to be a centered table */
+              tableStack->tableData.HTD_flags &= ~HTML_TABLE_JUSTIFY_MASK ;
+              tableStack->tableData.HTD_flags |= (J_CENTER << HTML_TABLE_JUSTIFY_OFFSET) ;
+          }
+      }
+
+      p = GetParamValue(arg->paramArray, "BORDER");
+      if(p)
+      {
+        if(isdigit(*p))             /* non-digit values invoke default */
+        {
+          border = ATOISB(p);
+          if(border > HTML_TABLE_MAX_BORDER)
+            border = HTML_TABLE_MAX_BORDER;
+        }
+        else
+          border = 1;               /* if specified, defaults to 1 */
+
+        tableStack->tableData.HTD_flags |=
+          (border << HTML_TABLE_BORDER_OFFSET);
+      } else {
+        border = 1 ;
+      }
+
+      if( (HTMLext->HE_options & HTML_MONOCHROME)==0 )
+      {
+        p = GetParamValue(arg->paramArray, "BGCOLOR");
+        if(p && *p)                 /* background color */
+        {
+          if (TranslateColor(p, &(tableStack->tableData.HTD_backColor)))
+              tableStack->tableData.HTD_flags |= HTML_TABLE_BACK_COLOR;
+        }
+      }
+
+      p = GetParamValue(arg->paramArray, "WIDTH");
+      tableStack->tableData.HTD_width = ParseMultiLength(p, 0);
+      p = GetParamValue(arg->paramArray, "HEIGHT");
+      tableStack->tableData.HTD_height = ParseMultiLength(p, 0);
+
+      p = GetParamValue(arg->paramArray, "CELLPADDING");
+      if(p && *p)
+        tableStack->tableData.HTD_cellpadding = ParseMultiLength(p, 0);
+      else
+        tableStack->tableData.HTD_cellpadding = 
+            (DEFAULT_TABLE_CELLPADDING | HTML_LEN_PIXEL);
+
+      p = GetParamValue(arg->paramArray, "CELLSPACING");
+      if(p && *p)
+        tableStack->tableData.HTD_cellspacing = ParseMultiLength(p, 0);
+      else
+        tableStack->tableData.HTD_cellspacing = 
+            (DEFAULT_TABLE_CELLSPACING | HTML_LEN_PIXEL);
+
+      /* push preliminary table entry onto stack, so we have a reference */
+      tableStack->element = AppendToHypertextArrayTable(&tableStack->tableData);
+    }
+}
+
+TagOpenHandler Open_TR
+{
+    int level;
+    TableStackElement *tableStack;
+
+    /* <TR> implicitly closes a table cell */
+    ForceCloseStyle(SPEC_TD, SPEC_TABLE);
+
+    tableStack = LMemDeref(tableStackO);
+    level = EnclosingCount(SPEC_TABLE, NULL);
+
+    if(level > 0 && level < HTML_MAXTABLE)
+    {
+      tableStack += level;          /* point to actual entry */
+
+      /* forget about old row defaults */
+      tableStack->cellFlagMask &=
+        ~(HTML_CELL_BACK_COLOR | HTML_CELL_VALIGN_MASK);
+
+      /* modify default flags according to BGCOLOR and VALIGN attributes */
+      if(ParseBGCOLOR(arg->paramArray, &(tableStack->cellFlagValue),
+        &(tableStack->rowBackColor)))
+      {
+        tableStack->cellFlagMask |= HTML_CELL_BACK_COLOR;
+      }
+      if(ParseVALIGN(arg->paramArray, &(tableStack->cellFlagValue)))
+        tableStack->cellFlagMask |= HTML_CELL_VALIGN_MASK;
+
+      EndTableRow(tableStack);      /* advance table row */
+      tableStack->flags |= TABLE_STACK_HAS_RECEIVED_TR_TAG ;
+    }
+}
+
+TagOpenHandler Open_TD
+{
+    word i;
+    char *p;
+    int lev;
+    TableStackElement *tableStack;
+    HTMLimageData id;
+    NameToken tok ;
+
+    /* don't nest table cells - unclosed <TD> starts new cell */
+    ForceCloseStyle(SPEC_TD, SPEC_TABLE);
+
+    tableStack = LMemDeref(tableStackO);
+
+    EnsureCellLimit() ;
+
+    lev = EnclosingCount(SPEC_TABLE, NULL);
+
+    if ((lev > 0 && lev < HTML_MAXTABLE))
+    {
+      tableStack += lev;            /* point to actual entry */
+
+      AddCellRecord();              /* flush record for previous cell */
+
+      memset(&insertCellData, 0, sizeof(HTMLcellData));
+
+      while(tableStack->currentCol<TABLE_MAX_COLUMNS &&
+            tableStack->col[tableStack->currentCol].remainingRowSpan)
+        tableStack->currentCol++;   /* skip over occupied columns */
+
+      /* Implement non-wrapping cells through an inherited character style */
+      if(GetParamValue(arg->paramArray, "NOWRAP"))
+        arg->ca.CSD_extendedStyles |= VTES_NOWRAP;
+
+      insertCellData.HCD_row = tableStack->currentRow;
+      insertCellData.HCD_col = tableStack->currentCol;
+
+      /* Record the column that the last column was on */
+      tableStack->lastCol = tableStack->currentCol ;
+
+      p = GetParamValue(arg->paramArray, "ROWSPAN");
+      if(p && *p)  {
+        insertCellData.HCD_rowspan = ATOISB(p);
+        if (insertCellData.HCD_rowspan == 0)
+            insertCellData.HCD_rowspan = 1 ;
+      } else  {
+        insertCellData.HCD_rowspan = 1;
+      }
+
+      p = GetParamValue(arg->paramArray, "COLSPAN");
+      if(p && *p)  {
+        insertCellData.HCD_colspan = ATOISB(p);
+        if (insertCellData.HCD_colspan == 0) 
+            insertCellData.HCD_colspan = 1 ;
+      } else  {
+        insertCellData.HCD_colspan = 1;
+      }
+
+      p = GetParamValue(arg->paramArray, "WIDTH");
+      insertCellData.HCD_width = ParseMultiLength(p, 0);
+
+      p = GetParamValue(arg->paramArray, "HEIGHT");
+      insertCellData.HCD_height = ParseMultiLength(p, 0);
+
+      /* Does this cell have a background image? */
+      insertCellData.HCD_backgroundImage = HTML_IMAGE_INDEX_NONE ;
+      if( (HTMLext->HE_options & HTML_NO_BACKGROUND)==0 )
+      {
+          p = GetParamValue(arg->paramArray,"BACKGROUND");
+          if(p && *p)                     /* background image name */
+          {
+            tok = NamePoolTokenizeDOS(NamePool, p, FALSE);
+
+            memset(&id, 0, sizeof(id));   /* default graphic data structure */
+            id.pos = HTML_IMAGE_POS_TABLE_OR_CELL_BACKGROUND ;
+                                          /* this is a background image */
+            id.imageURL = tok;            /* store URL of image */
+            insertCellData.HCD_backgroundImage = MergeIntoHypertextArrayImage(&id) ;
+                                          /* add image record to array */
+          }
+      }
+
+      /* default values for attribute flags */
+      insertCellData.HCD_flags |= HTML_CELL_VALIGN_CENTER ;
+
+      /* inherit flags and row background from parent row in our table */
+      insertCellData.HCD_flags &= ~tableStack->cellFlagMask;
+      insertCellData.HCD_flags |=
+        (tableStack->cellFlagValue & tableStack->cellFlagMask);
+      insertCellData.HCD_backColor = tableStack->rowBackColor;
+
+      /* modify cell flags according to BGCOLOR and VALIGN attributes */
+      ParseBGCOLOR(arg->paramArray, &insertCellData.HCD_flags,
+        &insertCellData.HCD_backColor);
+      ParseVALIGN(arg->paramArray, &insertCellData.HCD_flags);
+
+      /* Grab the current justification */
+      if (arg->pa.PSD_which & PSD_JUSTIFY)  {
+          /* Left justify */
+          insertCellData.HCD_flags2 |= 
+              ((arg->pa.PSD_attributes & VTPAA_JUSTIFICATION)>>VTPAA_JUSTIFICATION_OFFSET) 
+                 << HTML_CELL_JUSTIFY_OFFSET ;
+      } else {
+          /* Default is centered */
+          insertCellData.HCD_flags2 |=
+              (J_CENTER << HTML_CELL_JUSTIFY_OFFSET) ;
+      }
+
+      /* link cell to its table */
+      insertCellData.HCD_table = tableStack->element;
+      insertCellTableIndex = tableStack - LMemDeref(tableStackO);
+
+      /* store cell info in case cell is split by an embedded table */
+      tableStack->lastCellData = insertCellData;
+
+      for(i = insertCellData.HCD_colspan; i>0; i--)
+      {
+        /* refresh occupation of grid positions if not already occuppied */
+        if(tableStack->currentCol < TABLE_MAX_COLUMNS && 
+           tableStack->col[tableStack->currentCol].remainingRowSpan < 
+             insertCellData.HCD_rowspan)
+        {
+          tableStack->col[tableStack->currentCol].remainingRowSpan =
+            insertCellData.HCD_rowspan;
+        }
+        tableStack->currentCol++;   /* occupy all spanned rows */
+      }
+
+      c2 = '.';                     /* always create a paragraph break */
+    }
+}
+
+/*
+ *  Handle common style attributes (like ALIGN) which may appear with
+ *  virtually all tags and convert them to paragraph and character
+ *  attribute "delta" structures.
+ *
+ *  Later, this will be the place to handle ID, CLASS, LANG as well.
+ */
+void LOCAL ParseStyle(optr paramArray, ParaStyleDelta *psd, CharStyleDelta *csd)
+{
+    char *p;
+
+    if( ParseALIGN(paramArray, &(psd->PSD_attributes)) )
+      psd->PSD_which |= PSD_JUSTIFY;    /* change justifcation */
+
+    /* Transfer contents of STYLE tag into attributes for this elements */
+    p = GetParamValue(paramArray, "STYLE") ;
+    if(p && *p)
+      InterpretCSS(p, psd, csd);
+}
+
+void OpenTag(word tagStyle, HTMLStylesTable *tagStyleEntry, optr paramArray)
+{
+    TagOpenArguments arg;
+    word i;
+
+    MemLock( OptrToHandle(@HTMLStylesChunk) );
+    memcpy( &arg.ca, LMemDerefHandles( OptrToHandle(@HTMLStylesChunk),
+      tagStyleEntry->ca ), sizeof(arg.ca) );
+    memcpy( &arg.pa, LMemDerefHandles( OptrToHandle(@HTMLStylesChunk),
+      tagStyleEntry->pa ), sizeof(arg.pa) );
+    MemUnlock( OptrToHandle(@HTMLStylesChunk) );
+
+    /* Parse generic style attributes */
+    ParseStyle(paramArray, &arg.pa, &arg.ca);
+
+    /* Initialize arguments for tag handler */
+    arg.spec = tagStyleEntry->spec;
+    arg.paramArray = paramArray;
+    arg.tagStack = LMemDeref(tagStackO);
+    arg.preserveParams = FALSE;
+    arg.countStart = 1;
+    arg.flags = tagStyleEntry->flags;   /* allow tag handler to modify flags */
+
+    /* Deal with special tag types */
+    for(i=0; OpenHandlers[i].spec != SPEC_NONE; i++)
+      if(OpenHandlers[i].spec == arg.spec)
+      {
+        ((pcfm_TagOpenHandler *)ProcCallFixedOrMovable_pascal)
+          (&arg, OpenHandlers[i].proc);
+	/* If changed, propogate arg.flags back to tagStyleEntry->flags. */
+	if (arg.flags != tagStyleEntry->flags)
+	    tagStyleEntry->flags = arg.flags;
+        break;
+      }
+
+    /*
+     * Handle implicitly terminated paragraph formatting tags,
+     * which do not require a corresponding </...> tag:
+     * Here, they are terminated by another paragraph tag
+     */
+    if( (arg.flags & TAG_IS_PAR_STYLE) &&
+        tagStackPtr &&
+        (arg.tagStack[tagStackPtr-1].flags & TAG_IMPLICIT_TERM) )
+    {
+      PopStyle(tagStackPtr-1);          /* drop old tag */
+    }
+
+    /* opening a tag to be pushed onto the stack */
+    if( (arg.flags & (TAG_IS_PAR_STYLE | TAG_IS_CHAR_STYLE)) &&
+        tagStackPtr<HTML_MAXSTACK )
+    {
+      arg.tagStack[tagStackPtr].style = tagStyle;
+      arg.tagStack[tagStackPtr].param = arg.preserveParams? arg.paramArray : 0;
+      arg.tagStack[tagStackPtr].delta = arg.pa;
+      arg.tagStack[tagStackPtr].charDelta = arg.ca;
+      arg.tagStack[tagStackPtr].flags = arg.flags;
+      arg.tagStack[tagStackPtr].spec = arg.spec;
+      arg.tagStack[tagStackPtr].count = arg.countStart;
+      arg.tagStack[tagStackPtr].startPos = textpos;
+
+      if(arg.flags & TAG_IS_PAR_STYLE)  /* handling for paragraph tags */
+      {
+        if( !(arg.flags & TAG_NO_FORMATTING) )
+          EndParagraph("");
+      }
+
+      tagStackPtr++;
+    }
+
+    GetCurrentStyles();                 /* refresh cached style data */
+    if(paramArray && !arg.preserveParams)
+                                        /* if there is one to be released... */
+      LMemFree(paramArray);             /* forget array with parameters */
+}
+
+void CloseTag(word tagStyle, HTMLStylesTable *tagStyleEntry, optr paramArray)
+{
+    int i;
+    TagStackElement *tagStack;
+    SpecialTagType spec = tagStyleEntry->spec;
+    word flags = tagStyleEntry->flags;
+    TableStackElement *tableStack;
+    word level;
+
+    tagStack = LMemDeref(tagStackO);
+
+    if(paramArray)                      /* if there is one to be released... */
+      LMemFree(paramArray);             /* ignore closing tag parameters */
+
+    if(tagStyle)
+    {
+      if( (flags & TAG_IS_PAR_STYLE) &&
+          tagStackPtr>1 &&
+          (tagStack[tagStackPtr-1].flags & TAG_IMPLICIT_TERM) )
+      {
+        PopStyle(tagStackPtr-1);
+      }
+
+      for(i=tagStackPtr-1; i>=0; i--)
+      {
+        if(tagStack[i].style==tagStyle)
+        {
+          PopStyle(i);
+          break;
+        }
+
+        /* Rules for handling improperly nested HTML that avoid closing
+           tags too far above the current nesting level.
+
+           E.g. ...<table>...<td>...<table><tr></td>...
+             would incorrectly close the outer table cell.
+
+           This should eventually be handled in a more generic way by
+           using table-driven parsing.
+         */
+        if((tagStack[i].spec==SPEC_TD && spec != SPEC_TABLE) ||
+           tagStack[i].spec==SPEC_TABLE)
+          break;                        /* don't go past tables */
+      }
+
+      if(spec==SPEC_TR)                 /* table row delimited by </TR> alone */
+      {
+        tableStack = LMemDeref(tableStackO);
+        level = EnclosingCount(SPEC_TABLE, NULL);
+        if(level > 0 && level < HTML_MAXTABLE)
+        {
+          tableStack += level;          /* point to actual entry */
+          EndTableRow(tableStack);
+        }
+      }
+    }
+
+    GetCurrentStyles();                 /* refresh all cached style data */
+}
+
+void InitTagStacks(MemHandle localHeap)
+{
+    TableStackElement *tableStack;
+
+    tagStackO = ConstructOptr( localHeap,
+      LMemAlloc(localHeap, sizeof(TagStackElement)*HTML_MAXSTACK) );
+    tableStackO = ConstructOptr( localHeap,
+      LMemAlloc(localHeap, sizeof(TableStackElement)*HTML_MAXTABLE) );
+
+    formCount = 0;                      /* no forms encountered yet */
+    currentMenu = CA_NULL_ELEMENT;      /* no menu encountered yet */
+
+    tagStackPtr = 0;                    /* no tags read yet */
+
+    /* create a pseudo 1-by-1 table enclosing the entire text */
+
+    tableStack = LMemDeref(tableStackO);
+    memset(tableStack, 0, sizeof(TableStackElement));
+    tableStack->tableData.HTD_rows = 1;
+    tableStack->tableData.HTD_cols = 1;
+    tableStack->tableData.HTD_backgroundImage = HTML_IMAGE_INDEX_NONE ;
+
+    tableStack->lastCellData.HCD_rowspan = 1;
+    tableStack->lastCellData.HCD_colspan = 1;
+    tableStack->lastCellData.HCD_width = HTML_LEN_VARIABLE;
+    tableStack->lastCellData.HCD_height = HTML_LEN_VARIABLE;
+    tableStack->lastCellData.HCD_backgroundImage = HTML_IMAGE_INDEX_NONE ;
+
+    /* we may not store the "not empty" flag with the table's cell prototype,
+       because otherwise any continuation cell would be assumed to be
+       non-empty regardless of its actual content. */
+
+    insertCellData = tableStack->lastCellData;
+    insertCellData.HCD_flags |= HTML_CELL_NOT_EMPTY;
+    insertCellTableIndex = tableStack - LMemDeref(tableStackO);
+
+    /* push pseudo table entry onto stack */
+    tableStack->element = AppendToHypertextArrayTable(&tableStack->tableData) ;
+}
+
+void EmptyStacks(void)
+{
+    /* pop pending styles */
+    while(tagStackPtr)
+    {
+      PopStyle(tagStackPtr-1);
+    }
+}
+
+void PopStyleFar(word n)
+{
+    PopStyle(n) ;
+}
+
+TagOpenHandler Open_BR
+{
+    int level;
+    TableStackElement *tableStack;
+    word breakType = HTML_CELL_BREAK_NONE ;
+    char *p ;
+
+    /* Determine the type of break we have */
+    p = GetParamValue(arg->paramArray, "CLEAR") ;
+    if (p && *p)  {
+        if (0==STRCMPISB(p, "left"))  {
+            breakType = HTML_CELL_BREAK_LEFT ;
+        } else if (0==STRCMPISB(p, "right"))  {
+            breakType = HTML_CELL_BREAK_RIGHT ;
+        } else if (0==STRCMPISB(p, "all"))  {
+            breakType = HTML_CELL_BREAK_BOTH ;
+        }
+    }
+
+    /* If break type, split another cell */
+    if (breakType)  {
+        AddParaCond() ;
+        AddCellRecord() ;
+        EndLine("") ;
+
+        tableStack = LMemDeref(tableStackO);
+        level = EnclosingCount(SPEC_TABLE, NULL)-1;
+
+        if(level < HTML_MAXTABLE-1)
+        {
+          tableStack += level+1;        /* point to closed entry */
+
+          insertCellData = tableStack->lastCellData;
+          insertCellTableIndex = tableStack - LMemDeref(tableStackO);
+
+          insertCellData.HCD_flags |= HTML_CELL_CONTINUE;
+                                        /* continues interrupted cell */
+          insertCellData.HCD_flags2 =
+              (insertCellData.HCD_flags2 & HTML_CELL_BREAK_MASK) |
+                  breakType ;
+          insertCellData.HCD_width = insertCellData.HCD_height =
+            HTML_LEN_VARIABLE;          /* do not contribute to width/height */
+
+          c2 = '.';                     /* always create a paragraph break */
+        }
+    } else {
+        EndLine("") ;
+    }
+}
+
+
+ 

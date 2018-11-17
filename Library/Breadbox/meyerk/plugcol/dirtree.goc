@@ -1,0 +1,157 @@
+@include <MEYERK\dirtree.goh>
+
+/*------------------------------------------------------------------------------
+ ListFiles
+ whatFiles: FESF_NON_GEOS
+            FESF_GEOS_EXECS
+            FESF_GEOS_NON_EXECS
+            FESF_DIRS
+            FILE_ENUM_ALL_FILE_TYPES (but no directories)
+ ------------------------------------------------------------------------------*/
+MemHandle _pascal _export dirtreeListFiles(word* numOfFiles,
+														 FileEnumSearchFlags whatFiles,
+														 word skip,
+														 word returnAtMost) /*numOfFiles returned*/
+{
+  FileEnumParams  fileEnumParams;
+  word            filesNotHandled;
+  MemHandle       FilesToReturn;
+
+  fileEnumParams.FEP_searchFlags = whatFiles;
+  fileEnumParams.FEP_returnAttrs = (void*) FESRT_NAME;  /*Return the file's Geos filename.*/
+  fileEnumParams.FEP_returnSize = FILE_LONGNAME_BUFFER_SIZE;
+  fileEnumParams.FEP_bufSize = returnAtMost; /* number of entries; */
+  fileEnumParams.FEP_matchAttrs = NULL;  /* Set matchAttrs to zero so it will match anything.*/
+  fileEnumParams.FEP_skipCount = skip;   /* Skip files ?*/
+  fileEnumParams.FEP_callback = NULL; /*(void*) FESC_WILDCARD*/
+  fileEnumParams.FEP_cbData1 = NULL;
+  fileEnumParams.FEP_cbData2 = NULL; /* case-sensitive search */
+  fileEnumParams.FEP_callbackAttrs = NULL;
+
+  (*numOfFiles) = FileEnum(&fileEnumParams,
+                           &FilesToReturn,
+                           &filesNotHandled);
+
+  if ((*numOfFiles) && FilesToReturn)
+  {
+    return(FilesToReturn);
+  }
+  else
+  {
+    return(0);
+  }
+}
+
+/*------------------------------------------------------------------------------
+ Stores files and folders in the HugeArray
+ ------------------------------------------------------------------------------*/
+void _pascal _export dirtreeStoreFiles(VMBlockHandle vmbh,
+													FileEnumSearchFlags whatFiles,
+													StorageFlags sf)
+{
+  /* jfh3 - you can save some processing by not initializing variables that
+	  you know will be initialized (or filled in) later in this routine */
+MemHandle              fileHan = NULL;
+char*                  filePtr = NULL;
+word                   numOfFiles = NULL;
+char                   root[PATH_BUFFER_SIZE] = "";
+char                   file[PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE] = "";
+FileHandle             fh = NULL;
+word                   i;
+
+  (void) FileGetCurrentPath(root, PATH_BUFFER_SIZE);
+
+  if (sf & SF_FOLDERS)
+  {
+    (void) easyarrAppendEntry(vmbh, root);
+  }
+
+  fileHan = dirtreeListFiles(&numOfFiles, whatFiles, 0, FE_BUFSIZE_UNLIMITED);
+
+  if ((numOfFiles) && (fileHan))
+  {
+    filePtr = (char*) MemLock(fileHan);
+
+    i = numOfFiles;
+    while(i--)
+    {
+      memset(file, 0, (PATH_BUFFER_SIZE + FILE_LONGNAME_BUFFER_SIZE));
+
+      if ((sf & SF_FILES) || (sf & SF_FILES_WITH_PATH))
+      {
+        if (sf & SF_FILES_WITH_PATH)
+        {
+          strcpy(file, root);
+          strcat(file, "\\");
+        }
+        strcat(file, filePtr);
+
+        FilePushDir();
+        FileSetStandardPath(SP_TOP);
+        fh = FileCreate("debug.txt", ((FCF_NATIVE | FILE_CREATE_NO_TRUNCATE) | (FILE_ACCESS_W | FILE_DENY_W)), FA_ARCHIVE);
+        (void) FilePos(fh, 0, FILE_POS_END);
+        (void) FileWrite(fh, file, strlen(file), 1);
+        (void) FileWrite(fh, "\r\n", 2, 1);
+        FileCommit(fh, 1);
+        FileClose(fh, 1);
+        FilePopDir();
+
+		  /* jfh9 - this was commented out when you sent it to me.  But it works
+           just fine. */
+		  easyarrAppendEntry(vmbh, file);
+      }
+
+      filePtr += FILE_LONGNAME_BUFFER_SIZE;
+    }
+
+    MemUnlock(fileHan);
+    MemFree(fileHan);
+    fileHan = NULL;
+  }
+}
+
+/*------------------------------------------------------------------------------
+ Scan the directory tree
+
+ called by ChangeAttrs
+ ------------------------------------------------------------------------------*/
+void _pascal _export dirtreeListTree (VMBlockHandle vmbh,
+												  FileEnumSearchFlags whatFiles,
+												  StorageFlags sf)
+{
+  /* jfh3 - you can save some processing by not initializing variables that
+	  you know will be initialized (or filled in) later in this routine */
+MemHandle              folderHan;
+char*                  folderPtr;
+word                   numOfFolders = NULL;
+word                   dummy = NULL;
+word                   i;
+
+  folderHan = dirtreeListFiles(&numOfFolders, FESF_DIRS, 0, FE_BUFSIZE_UNLIMITED);
+
+  /* Recurse all subfolders */
+  if ((numOfFolders) && (folderHan))
+  {
+    MemFree(folderHan);
+    folderHan = NULL;
+
+    for (i = 0; i < numOfFolders; i++)
+    {
+      folderHan = dirtreeListFiles(&dummy, FESF_DIRS, i, 1);
+		if ((folderHan) && (dummy == 1))
+      {
+        folderPtr = (char*) MemLock(folderHan);
+        FilePushDir();
+        FileSetCurrentPath(0, folderPtr);
+        MemUnlock(folderHan);
+        MemFree(folderHan);
+        folderHan = NULL;
+
+        dirtreeListTree(vmbh, whatFiles, sf);
+        FilePopDir();
+      }
+    }
+  }
+  /* Store files in current directory */
+  dirtreeStoreFiles(vmbh, whatFiles, sf);
+}

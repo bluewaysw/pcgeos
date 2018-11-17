@@ -1,0 +1,2172 @@
+/***************************************************************************
+ *                                                                         *
+ *  Four in a Row                                                          *
+ *                                                                         *
+ *  Copyright 1993 & 1994 LesInk Productions                               *
+ *  all rights reserved.                                                   *
+ *                                                                         *
+ ***************************************************************************/
+
+
+/***************************************************************************
+ *		Include files
+ ***************************************************************************/
+
+@include <stdapp.goh>
+@include <Objects/gViewCC.goh>
+#include <gstring.h>
+@include <Objects/clipbrd.goh>
+#include <thread.h>
+@include "pics.goh"
+@include "icons.goh"
+#include <initfile.h>
+#include <ansi/stdio.h>
+#include <sound.h>
+
+/*
+@define ROW4_DEBUG TRUE
+*/
+
+void mycopy(void *s, void *t, word size) ;
+Boolean CheckIfNoMoreMoves(void) ;
+word MinMove(void) ;
+word MaxMove(void) ;
+void DrawBoard(void) ;
+void prefix(void) ;
+word DoComputer(word valuePassed) ;
+void StopComputer(void) ;
+
+word RateBoard(byte player) ;
+Boolean IsWinner(byte player) ;
+Boolean IsWinnerAt(sword x, sword y) ;
+void ReplacePiece(byte column, byte old_piece) ;
+void ShowRatingsAndColumns(word *ratings, word *columns, int n) ;
+word MyRandom(void) ;
+
+extern ThreadHandle _pascal ThreadCreate_Old(word priority,
+           word valueToPass,
+           word (*startRoutine)(word valuePassed),
+           word stackSize,
+           GeodeHandle owner) ;
+
+/*
+#define swap(a,b) temp=(a); (a)=(b); (b)=temp
+*/
+
+#define INITIAL_SIZE 8
+
+#define ROW4_TYPE_BLANK     0
+#define ROW4_TYPE_ARROW     1
+#define ROW4_TYPE_PLAYER_1  2
+#define ROW4_TYPE_PLAYER_2  3
+
+#define ROW4_TWO_PLAYER_GAME        0
+#define ROW4_COMPUTER_PLAYER_GAME   1
+
+#define SHOW_ON_STARTUP   1
+
+/* I'll define my bit-in-word value for the GenBooleanClass I'll be
+   using. */
+byte row4_field[64] ;
+byte row4_field_work[64] ;
+byte game_mode            = 0 ;
+byte player_turn          = ROW4_TYPE_PLAYER_1 ;
+byte row4_height[8] ;
+byte last_choice ;
+byte level = 0 ;
+byte last_max_level ;
+byte max_level = 4 ;
+byte computer_option = ROW4_TWO_PLAYER_GAME ;
+byte final_setup = 0 ;
+ThreadHandle computerThread ;
+Boolean is_computing = FALSE ;
+Boolean request_stop = FALSE ;
+Boolean showWinner = FALSE;
+
+@ifdef ROW4_DEBUG
+FileHandle debugFile ;
+@endif
+
+char row4_state_file[25] = "Four in a Row Prefs" ;
+
+char row4_path[20] = "Game" ;
+char row4_relativePath[] = "." ;
+word row4_drive = SP_USER_DATA ;
+
+sword dirx[8] = { 0, 1, 1, 1, 0, -1, -1, -1 } ;
+sword diry[8] = { -1, -1, 0, 1, 1, 1, 0, -1 } ;
+word winx[4] = { 0, 0, 0, 0 } ;
+word winy[4] = { 0, 0, 0, 0 } ;
+
+#define SQUARE_SIZE           30
+
+#define quick_row4(posx, posy)  ((posx)+((posy)*8))
+
+#define DOC_WIDTH             INITIAL_SIZE*SQUARE_SIZE
+#define DOC_HEIGHT            DOC_WIDTH
+
+
+optr Pictures[6] = {
+    NullHandle,
+    @ArrowPicture,
+    @OnePicture,
+    @TwoPicture,
+    @num1_hi,
+    @num2_hi
+} ;
+
+#define SOUND_ON 1
+#define SOUND_OFF 2
+#define SOUND_SYSTEM 3
+
+const word winSoundBuf[] = {     /* from blackjack win sound */
+	SSE_CHANGE,             0, IP_ACOUSTIC_GRAND_PIANO, IT_STANDARD_TABLE,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, MIDDLE_C, DYNAMIC_F,
+	SSDTT_TICKS,            10,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, MIDDLE_E, DYNAMIC_F,
+	SSDTT_TICKS,            10,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, MIDDLE_G, DYNAMIC_F,
+	SSDTT_TICKS,            10,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, HIGH_C, DYNAMIC_F,
+	SSDTT_TICKS,            15,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, MIDDLE_G, DYNAMIC_F,
+	SSDTT_TICKS,            8,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, HIGH_C, DYNAMIC_F,
+	SSDTT_TICKS,            25,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_GENERAL,            GE_END_OF_SONG};
+
+const word loseSoundBuf[] = {     /* from blackjack lose sound */
+	SSE_CHANGE,             0, IP_ACOUSTIC_GRAND_PIANO, IT_STANDARD_TABLE,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, LOW_D, DYNAMIC_F,
+	SSDTT_TICKS,            20,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            1,
+	SSE_VOICE_ON,           0, LOW_D, DYNAMIC_F,
+	SSDTT_TICKS,            20,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            1,
+	SSE_VOICE_ON,           0, LOW_D, DYNAMIC_F,
+	SSDTT_TICKS,            7,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            1,
+	SSE_VOICE_ON,           0, LOW_D, DYNAMIC_F,
+	SSDTT_TICKS,            20,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, LOW_F, DYNAMIC_F,
+	SSDTT_TICKS,            20,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, LOW_E, DYNAMIC_F,
+	SSDTT_TICKS,            7,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            1,
+	SSE_VOICE_ON,           0, LOW_E, DYNAMIC_F,
+	SSDTT_TICKS,            20,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, LOW_D, DYNAMIC_F,
+	SSDTT_TICKS,            7,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            1,
+	SSE_VOICE_ON,           0, LOW_D, DYNAMIC_F,
+	SSDTT_TICKS,            20,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, LOW_D_b, DYNAMIC_F,
+	SSDTT_TICKS,            7,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_VOICE_ON,           0, LOW_D, DYNAMIC_F,
+	SSDTT_TICKS,            20,
+	SSE_VOICE_OFF,          0,
+	SSDTT_TICKS,            0,
+	SSE_GENERAL,            GE_END_OF_SONG};
+
+const word tieSoundBuf[] = {     /* from poker lost hand sound */
+	SSE_GENERAL,				GE_SET_TEMPO, 8,
+	SSE_GENERAL,            GE_SET_PRIORITY, SP_GAME,
+	SSE_VOICE_ON,           0, LOW_G/2, DYNAMIC_F,
+	SSDTT_TICKS,            QUARTER,
+	SSE_VOICE_OFF,          0,
+	SSE_VOICE_ON,           0, LOW_G/2, DYNAMIC_F,
+	SSDTT_TICKS,            EIGHTH,
+	SSE_VOICE_OFF,          0,
+	SSE_VOICE_ON,           0, LOW_C, DYNAMIC_F,
+	SSDTT_TICKS,            WHOLE,
+	SSE_VOICE_OFF,          0,
+	SSE_GENERAL,            GE_END_OF_SONG};
+
+const word play2SoundBuf[] = {     /* from concen match made sound */
+	SSE_CHANGE,             0, IP_TINKLE_BELL, IT_STANDARD_TABLE,
+	SSE_GENERAL,            GE_SET_PRIORITY, SP_GAME,
+	SSE_GENERAL,            GE_SET_TEMPO, 16,
+	SSE_VOICE_ON,           0, LOW_A, DYNAMIC_MF,
+	SSDTT_TICKS,            SIXTEENTH,
+	SSE_VOICE_OFF,          0,
+	SSE_VOICE_ON,           0, MIDDLE_A, DYNAMIC_MF,
+	SSDTT_TICKS,            SIXTEENTH,
+	SSE_VOICE_OFF,          0,
+	SSE_VOICE_ON,           0, HIGH_A, DYNAMIC_MF,
+	SSDTT_TICKS,            SIXTEENTH,
+	SSE_VOICE_OFF,          0,
+	SSE_GENERAL,            GE_END_OF_SONG};
+
+MemHandle	winSound, loseSound, tieSound, play2Sound;
+word	g_sound;
+
+
+/***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************/
+
+    /*---------------------------------------------------------------------*/
+    @class Row4ProcessClass, GenProcessClass ;
+        @message void MSG_VIEW_INVALIDATE() ;
+        @message void MSG_VIEW_ROW4_NEW() ;
+        @message void MSG_ROW4_COMPLETED() ;
+        @message void MSG_ROW4_COMPLETED2() ;
+        @message void MSG_ROW4_REDRAW_SQUARE(sword pos_x, sword pos_y) ;
+        @message void MSG_ROW4_REDRAW_SQUARE_POS(word pos) ;
+        @message void MSG_ROW4_DID_NOT_WIN() ;
+        @message void MSG_ROW4_UPDATE_TURN_HEADER() ;
+        @message void MSG_ROW4_NEXT_PLAYER() ;
+        @message void MSG_ROW4_COMPUTER_MOVE() ;
+		  @message void MSG_ROW4_COMPUTER_MADE_MOVE() ;
+		  @message void MSG_ROW4_CHANGE_LEVEL_TEXT() ;
+		  @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_ROW4_CHANGE_PLAYER_OR_COMPUTER ;
+        @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_ROW4_COMPUTER_CHANGE_LEVEL ;
+		  @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_ROW4_SOUND_CHANGED;
+	 @endc
+
+    @classdecl Row4ProcessClass, neverSaved ;
+    /*---------------------------------------------------------------------*/
+
+    /*---------------------------------------------------------------------*/
+    @class Row4ViewClass, GenViewClass ;
+    @endc
+
+    @classdecl Row4ViewClass;
+    /*---------------------------------------------------------------------*/
+
+    /*---------------------------------------------------------------------*/
+    @class Row4ContentClass, VisContentClass ;
+    @endc
+
+    @classdecl Row4ContentClass ;
+    /*---------------------------------------------------------------------*/
+
+/***************************************************************************
+ *		UI Objects
+ ***************************************************************************/
+
+@start	AppResource ;
+    /*---------------------------------------------------------------------*/
+    @object GenApplicationClass Row4App = {
+        GI_visMoniker = list { @Row4TextMoniker,
+                               @Moniker0,
+                               @Moniker1,
+                               @Moniker4 }
+		GI_comp       = @Row4Primary;
+        gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS)
+                      = @Row4Primary;
+	 }
+    /*---------------------------------------------------------------------*/
+    @visMoniker Row4TextMoniker =
+        "Four in a Row" ;
+    /*---------------------------------------------------------------------*/
+@end	AppResource
+
+
+
+/*=========================================================================*/
+
+
+
+@start	Interface		/* this resource is for misc UI objects */ ; ;
+    /*---------------------------------------------------------------------*/
+    @object GenPrimaryClass Row4Primary  = {
+		  GI_comp             = @Row4GameMenu,
+										@Row4EditMenu,
+										@Row4OptionsMenu,
+										@Row4ViewGroup,
+										@Row4Dialogs,
+										@QTipsDialogBox ;
+		  ATTR_GEN_HELP_CONTEXT = "TOC";
+		  HINT_SIZE_WINDOW_AS_DESIRED ;
+		  HINT_CENTER_WINDOW;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+        HINT_PRIMARY_NO_FILE_MENU ;
+    }
+
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass Row4GameMenu = {
+		GI_comp = @Row4GameSubGroup;
+		  GI_visMoniker = 'G', "Game" ;
+		  GII_visibility = GIV_POPUP ;
+		  ATTR_GEN_INTERACTION_GROUP_TYPE
+							  = (GIGT_FILE_MENU) ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass Row4GameSubGroup = {
+		GI_comp = @Row4NewOption,
+						@Row4QTipsTrigger ;
+		  GII_visibility = GIV_SUB_GROUP ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenTriggerClass Row4NewOption = {
+		  GI_visMoniker   = 'N', "New Game" ;
+		  GTI_destination = process ;
+		  GTI_actionMsg   = MSG_VIEW_ROW4_NEW ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenTriggerClass Row4QTipsTrigger = {
+		  GI_visMoniker   = 'Q', "Quick Tips" ;
+		  GTI_destination = @QTipsDialogBox ;
+		  GTI_actionMsg   = MSG_GEN_INTERACTION_INITIATE ;
+		  HINT_TRIGGER_BRINGS_UP_WINDOW;
+	 }
+
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass Row4EditMenu = {
+		  GI_comp        = @Row4CopyToClipboard ;
+		  GII_visibility = GIV_POPUP ;
+		  ATTR_GEN_INTERACTION_GROUP_TYPE
+							  = (GIGT_EDIT_MENU) ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenTriggerClass Row4CopyToClipboard = {
+		  GI_visMoniker   = 'C', "Copy Game" ;
+		  GTI_destination = process ;
+		  GTI_actionMsg   = MSG_META_CLIPBOARD_COPY ;
+	 }
+
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass Row4OptionsMenu = {
+		  GI_visMoniker  = 'O', "Options" ;
+		  GI_comp        = @Row4SoundOpt,
+								 @Row4ComputerOption,
+								 @Row4ComputerLevel;
+		  GII_visibility = GIV_POPUP ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass Row4SoundOpt = {
+		  GI_visMoniker = 'S', "Sound" ;
+		  GI_comp = @SoundGroup;
+		  GII_visibility = GIV_POPUP;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenItemGroupClass SoundGroup = {
+		  GI_comp          = @SoundOn,
+									@SoundOff,
+									@SystemPref ;
+		  GIGI_selection   = SOUND_SYSTEM ;
+        GIGI_destination = process ;
+		  GIGI_applyMsg = MSG_ROW4_SOUND_CHANGED ;
+    }
+    /*---------------------------------------------------------------------*/
+	 @object GenItemClass SoundOn = {
+		  GI_visMoniker = 'S', "Sound On" ;
+		  GII_identifier = SOUND_ON ;
+    }
+	 /*---------------------------------------------------------------------*/
+	 @object GenItemClass SoundOff = {
+		  GI_visMoniker = 'O', "Sound Off" ;
+		  GII_identifier = SOUND_OFF ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenItemClass SystemPref = {
+		  GI_visMoniker = 'P', "Use System Preference" ;
+		  GII_identifier = SOUND_SYSTEM ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass Row4ComputerOption = {
+        GI_comp = @Row4_2PlayerOrComputer ;
+        GII_visibility = GIV_SUB_GROUP ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemGroupClass Row4_2PlayerOrComputer = {
+        GI_comp = @Row4_2Player, @Row4_Computer ;
+        GIGI_destination = process ;
+        GIGI_applyMsg = MSG_ROW4_CHANGE_PLAYER_OR_COMPUTER ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass Row4_2Player = {
+        GI_visMoniker = 'T', "Two Player Game" ;
+        GII_identifier = ROW4_TWO_PLAYER_GAME ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass Row4_Computer = {
+        GI_visMoniker = 'p', "Computer Player Game" ;
+        GII_identifier = ROW4_COMPUTER_PLAYER_GAME ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass Row4ComputerLevel = {
+        GI_visMoniker = 'L', "Level" ;
+        GI_comp = @Row4ComputerLevelGroup ;
+        GII_visibility = GIV_POPUP ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemGroupClass Row4ComputerLevelGroup = {
+        GI_comp          = @Row4ComputerLevel1,
+                           @Row4ComputerLevel2,
+                           @Row4ComputerLevel3,
+                           @Row4ComputerLevel4,
+                           @Row4ComputerLevel5,
+									@Row4ComputerLevel6;
+        GIGI_selection   = 4 ;
+        GIGI_destination = process ;
+        GIGI_applyMsg = MSG_ROW4_COMPUTER_CHANGE_LEVEL ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass Row4ComputerLevel1 = {
+        GI_visMoniker = '1', "Level 1" ;
+        GII_identifier = 1 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass Row4ComputerLevel2 = {
+        GI_visMoniker = '2', "Level 2" ;
+        GII_identifier = 2 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass Row4ComputerLevel3 = {
+        GI_visMoniker = '3', "Level 3" ;
+        GII_identifier = 3 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass Row4ComputerLevel4 = {
+        GI_visMoniker = '4', "Level 4" ;
+        GII_identifier = 4 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass Row4ComputerLevel5 = {
+        GI_visMoniker = '5', "Level 5" ;
+        GII_identifier = 5 ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass Row4ComputerLevel6 = {
+        GI_visMoniker = '6', "Level 6" ;
+        GII_identifier = 6 ;
+    }
+
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass Row4ViewGroup = {
+		  GI_comp = @Row4ViewGroupHolder;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY ;
+		  HINT_CENTER_CHILDREN_VERTICALLY ;
+		  HINT_MINIMUM_SIZE = {SST_PIXELS | DOC_WIDTH + 30, 0,0};
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass Row4ViewGroupHolder = {
+		  GI_comp = @Row4Top, @Row4View, @Row4Bottom;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY ;
+		  HINT_CENTER_CHILDREN_VERTICALLY ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass Row4Top = {
+		  GI_comp = @Row4FastNew, @Row4TurnHeader;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+		  HINT_CENTER_CHILDREN_VERTICALLY;
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+		  HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenTriggerClass Row4FastNew = {
+		  GI_visMoniker   = 'N', "New" ;
+		  GTI_destination = process ;
+		  GTI_actionMsg   = MSG_VIEW_ROW4_NEW ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenGlyphClass Row4TurnHeader = {
+		  GI_visMoniker = "Turn:  Player 1" ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass Row4Bottom = {
+		  GI_comp = @Row4BottomText;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY ;
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object GenGlyphClass Row4BottomText = {
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @object Row4ViewClass Row4View = {
+		  GVI_attrs      = @default |
+								 GVA_CONTROLLED |
+                         GVA_SAME_COLOR_AS_PARENT_WIN ;
+        GVI_horizAttrs   = @default |
+                           /* GVDA_SCROLLABLE | */
+					  GVDA_NO_SMALLER_THAN_CONTENT |
+					  GVDA_NO_LARGER_THAN_CONTENT ;
+        GVI_vertAttrs    = @default |
+				    //   GVDA_SCROLLABLE |
+					  GVDA_NO_SMALLER_THAN_CONTENT |
+					  GVDA_NO_LARGER_THAN_CONTENT ;
+        GVI_content      = @Row4Content;
+        GVI_docBounds    = {0, 0, DOC_WIDTH, DOC_HEIGHT};
+        HINT_DEFAULT_TARGET;
+        HINT_DEFAULT_FOCUS;
+	  //   HINT_VIEW_REMOVE_SCROLLERS_WHEN_NOT_SCROLLABLE ;
+	 }
+	 /*---------------------------------------------------------------------*/
+    @object Row4ContentClass Row4Content = {
+        VCNI_view         = Row4View ;
+        VCNI_attrs        = @default |
+                            VCNA_SAME_WIDTH_AS_VIEW |
+                            VCNA_SAME_HEIGHT_AS_VIEW |
+                            VCNA_LARGE_DOCUMENT_MODEL |
+                            VCNA_ACTIVE_MOUSE_GRAB_REQUIRES_LARGE_EVENTS ;
+    }
+
+	 /*---------------------------------------------------------------------*/
+	 @object GenInteractionClass Row4Dialogs = {
+		  GI_comp = @Row4Win1Box,
+						@Row4Win2Box,
+						@Row4WinCBox,
+						@Row4TieBox ;
+		  GII_type = GIT_ORGANIZATIONAL ;
+		  GII_visibility = GIV_DIALOG ;
+		  GII_attrs = @default | GIA_NOT_USER_INITIATABLE ;
+	 }
+	 /*---------------------------------------------------------------------*/
+	 @chunk char Row4NewGameMsg[] = "Changing this option will end the current game and begin a new one.  Are you sure you want to do this?" ;
+	 @chunk char Row4LevelText[] = "Computer at level " ;
+	 /*---------------------------------------------------------------------*/
+@end Interface
+
+
+
+/*=========================================================================*/
+
+
+
+@start InterfaceWin1 ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass Row4Win1Box = {
+        GI_visMoniker   = "We have a winner!" ;
+        GII_visibility  = GIV_DIALOG ;
+        GII_type        = GIT_NOTIFICATION ;
+        GII_attrs       = @default                         |
+                          GIA_INITIATED_VIA_USER_DO_DIALOG |
+                          GIA_MODAL                        |
+                          GIA_NOT_USER_INITIATABLE         ;
+        GI_comp         = @Win1Glyph ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass Win1Glyph = {
+        GI_comp = @Win1Glyph1,
+                  @Win1Picture,
+                  @Win1Glyph2 ;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass Win1Glyph1 = {
+        GI_visMoniker = "CONGRATULATIONS!" ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass Win1Picture = {
+        GI_visMoniker = list { @Win1Moniker } ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass Win1Glyph2 = {
+        GI_visMoniker = "Player #1 wins!" ;
+    }
+    /*---------------------------------------------------------------------*/
+@end InterfaceWin1
+
+
+
+/*=========================================================================*/
+
+
+
+@start InterfaceWin2 ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass Row4Win2Box = {
+        GI_visMoniker   = "We have a winner!" ;
+        GII_visibility  = GIV_DIALOG ;
+        GII_type        = GIT_NOTIFICATION ;
+        GII_attrs       = @default                         |
+                          GIA_INITIATED_VIA_USER_DO_DIALOG |
+                          GIA_MODAL                        |
+                          GIA_NOT_USER_INITIATABLE         ;
+        GI_comp         = @Win2Glyph ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass Win2Glyph = {
+        GI_comp = @Win2Glyph1,
+                  @Win2Picture,
+                  @Win2Glyph2 ;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass Win2Glyph1 = {
+        GI_visMoniker = "CONGRATULATIONS!" ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass Win2Picture = {
+        GI_visMoniker = list { @Win2Moniker } ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass Win2Glyph2 = {
+        GI_visMoniker = "Player #2 wins!" ;
+    }
+    /*---------------------------------------------------------------------*/
+@end InterfaceWin2
+
+
+
+/*=========================================================================*/
+
+
+
+@start InterfaceTie ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass Row4TieBox = {
+        GI_visMoniker   = "Tie!" ;
+        GII_visibility  = GIV_DIALOG ;
+        GII_type        = GIT_NOTIFICATION ;
+        GII_attrs       = @default                         |
+                          GIA_INITIATED_VIA_USER_DO_DIALOG |
+                          GIA_MODAL                        |
+                          GIA_NOT_USER_INITIATABLE         ;
+        GI_comp         = @TieGlyph ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass TieGlyph = {
+        GI_comp = @TieGlyph1,
+                  @TieGlyph2 ;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass TieGlyph1 = {
+        GI_visMoniker = list { @TieMoniker } ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass TieGlyph2 = {
+        GI_visMoniker = "Sorry, nobody wins." ;
+    }
+    /*---------------------------------------------------------------------*/
+@end InterfaceTie
+
+
+
+/*=========================================================================*/
+
+
+
+@start InterfaceWinC ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass Row4WinCBox = {
+        GI_visMoniker   = "Oh Oh!" ;
+        GII_visibility  = GIV_DIALOG ;
+        GII_type        = GIT_NOTIFICATION ;
+        GII_attrs       = @default                         |
+                          GIA_INITIATED_VIA_USER_DO_DIALOG |
+                          GIA_MODAL                        |
+                          GIA_NOT_USER_INITIATABLE         ;
+        GI_comp         = @WinCGlyph ;
+        HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+        HINT_CENTER_CHILDREN_VERTICALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass WinCGlyph = {
+        GI_comp = @WinCGlyph1,
+                  @WinCPicture,
+                  @WinCGlyph2 ;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass WinCGlyph1 = {
+        GI_visMoniker = "Looks like the" ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass WinCPicture = {
+        GI_visMoniker = list { @WinCMoniker } ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass WinCGlyph2 = {
+        GI_visMoniker = "computer wins!" ;
+    }
+    /*---------------------------------------------------------------------*/
+@end InterfaceWinC
+
+
+/*=========================================================================*/
+
+
+@start QTipsResource;
+@include "art/QTip1.goh"
+
+	 @object GenInteractionClass QTipsDialogBox = {
+		  GI_visMoniker = "Four in a Row Quick Tips";
+		  GI_comp = @GoalText,
+						@QuickTipsGroup,
+						@ShowOnStartupGroup,
+						@OKTipsButton;
+		  GII_visibility = GIV_DIALOG ;
+		  GII_attrs = @default | GIA_MODAL | GIA_NOT_USER_INITIATABLE;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY ;
+		  ATTR_GEN_HELP_CONTEXT = "TOC";
+	 }
+
+
+	 @object GenTextClass GoalText = {
+		  GI_attrs = @default | GA_READ_ONLY;
+		  GTXI_text = "The goal of the game is to align 4 playing pieces in the same vertical, horizontal, or diagonal line.";
+		  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+	 }
+
+	 @object GenBooleanGroupClass ShowOnStartupGroup = {
+		  GI_comp = @ShowOnStartupBoolean;
+	 }
+
+	 @object GenBooleanClass ShowOnStartupBoolean = {
+		  GI_visMoniker = 'S', "Show this Dialog box when Four in a Row starts";
+		  GBI_identifier = SHOW_ON_STARTUP;
+	 }
+
+	 @object GenTriggerClass OKTipsButton = {
+		  GI_visMoniker   = 'O', "OK";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+		  HINT_SEEK_REPLY_BAR;
+		  HINT_DEFAULT_DEFAULT_ACTION;
+	 }
+
+	 @object GenInteractionClass QuickTipsGroup = {
+		  GI_comp = @QTip1;
+	 }
+
+	 @object GenInteractionClass QTip1 = {
+		  GI_comp = @QTip1GlyphHolder, @QTip1Text ;
+		  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+		  HINT_CENTER_CHILDREN_VERTICALLY;
+	 }
+
+	 @object GenInteractionClass QTip1GlyphHolder = {
+		  GI_comp = @QTip1Glyph;
+		  HINT_CENTER_CHILDREN_HORIZONTALLY;
+		  HINT_CENTER_CHILDREN_VERTICALLY;
+		  HINT_FIXED_SIZE = {SST_PIXELS | 60, 0,0};
+        /* ^^^ is based on the width of the widest icon */
+	 }
+
+	 @object GenGlyphClass QTip1Glyph = {
+		  GI_visMoniker = list { @QTip1Moniker };
+	 }
+
+	 @object GenTextClass QTip1Text = {
+		  GI_attrs = @default | GA_READ_ONLY;
+		  GTXI_text = "Click on an arrow, and your piece is inserted at the position of the arrow.";
+		  ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+		  HINT_MINIMUM_SIZE = {SST_PIXELS | 325, 0, 0};
+	 }
+
+
+@end QTipsResource
+
+
+/*=========================================================================*/
+
+
+//@start StringsResource ;
+@start Interface ;
+    /*---------------------------------------------------------------------*/
+    @visMoniker StringTurnPlayer1 = "Player 1" ;
+    @visMoniker StringTurnPlayer2 = "Player 2" ;
+    @visMoniker StringTurnComputer = "Computer ... Thinking" ;
+    @visMoniker StringGameOver = "Game Over" ;
+    /*---------------------------------------------------------------------*/
+@end Interface ;
+
+
+/*=========================================================================*/
+
+
+
+
+/*=========================================================================*/
+
+
+
+/* size_x and size_y must be odd values */
+
+void Row4Make(byte* row4_field)
+{
+    word pos = 64;
+
+    @send Row4App::MSG_GEN_APPLICATION_MARK_BUSY() ;
+
+    for (pos--; pos!=(word)(-1); pos--)
+        row4_field[pos] = ROW4_TYPE_BLANK ;
+
+    for (pos=7*8; pos<64; pos++)  {
+        row4_field[pos] = ROW4_TYPE_ARROW ;
+        row4_height[pos&0x07] = pos ;
+    }
+
+    mycopy(row4_field_work, row4_field, 64) ;
+
+    @send Row4App::MSG_GEN_APPLICATION_MARK_NOT_BUSY() ;
+}
+/*-------------------------------------------------------------------------*/
+void Row4Draw(GStateHandle gstate)
+{
+    word x, y ;
+    word pos ;
+    word x_at, y_at ;
+    byte value ;
+    Bitmap *pic ;
+
+    GrSetLineWidth(gstate, MakeWWFixed(0.0)) ;
+    GrSetLineColor(gstate, CF_INDEX, C_WHITE, 0, 0) ;
+    for (x=1; x<8; x++)
+        GrDrawVLine(gstate, x*SQUARE_SIZE-1, 0, 1+8*SQUARE_SIZE) ;
+    GrSetLineColor(gstate, CF_INDEX, C_DARK_GRAY, 0, 0) ;
+    for (x=1; x<8; x++)
+        GrDrawVLine(gstate, x*SQUARE_SIZE, 0, 1+8*SQUARE_SIZE) ;
+    for (y_at=y=0; y<8; y++, y_at += SQUARE_SIZE)  {
+        pos = quick_row4(0, y) ;
+        for (x_at=x=0; x<8; x++, x_at += SQUARE_SIZE, pos++)  {
+            if ((value=row4_field_work[pos])!=0)  {
+                if (value)  {
+				MemLock(OptrToHandle(Pictures[value])) ;
+				/* draw hilited if winner */
+				if(showWinner) {
+				   if (  ((winx[0] == x) && (winy[0] == y)) ||
+					    ((winx[1] == x) && (winy[1] == y)) ||
+					    ((winx[2] == x) && (winy[2] == y)) ||
+					    ((winx[3] == x) && (winy[3] == y)) )
+					 pic = (Bitmap *)LMemDeref(Pictures[value + 2]);
+				   else pic = (Bitmap *)LMemDeref(Pictures[value]) ;
+				   }
+				else
+				   pic = (Bitmap *)LMemDeref(Pictures[value]) ;
+
+				GrDrawBitmap(gstate,
+                                 x_at,
+                                 y_at,
+                                 pic,
+                                 NULL) ;
+                    MemUnlock(OptrToHandle(Pictures[value])) ;
+                }
+            }
+        }
+    }
+}
+
+/*-------------------------------------------------------------------------*/
+void Row4PlaySound(MemHandle soundHandle)
+{
+ word 		tempo = 8;
+
+
+	 if (g_sound == SOUND_SYSTEM)
+		 /* this routine abides by syst sound setting */
+		 UserStandardSound(SST_CUSTOM_SOUND, soundHandle, 1);
+	 else if (g_sound == SOUND_OFF)  return;
+	 else {
+		 /* this routine doesn't check syst sound setting -
+		  * but we need to supply the tempo */
+		 SoundPlayMusic(soundHandle, SP_GAME, tempo, EOSF_UNLOCK);
+		 }
+}
+
+/*-------------------------------------------------------------------------*/
+@method Row4ProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{                                                                   
+FileHandle fhandle ;
+Boolean		initError, tips;
+
+
+	 FilePushDir() ;
+    FileSetCurrentPath(row4_drive,row4_relativePath) ;
+    FileCreateDir(row4_path) ;
+    FileSetCurrentPath(row4_drive,row4_path) ;
+
+    fhandle = FileOpen(row4_state_file, FILE_ACCESS_R|FILE_DENY_W) ;
+
+    if (fhandle!=NullHandle)  {
+        /* Make sure file at beginning */
+        FilePos(fhandle, 0, FILE_POS_START) ;
+        FileRead(fhandle, row4_field, sizeof(byte)*64, FALSE) ;
+        FileRead(fhandle, row4_height, sizeof(byte)*8, FALSE) ;
+        FileRead(fhandle, &game_mode, sizeof(byte), FALSE) ;
+        FileRead(fhandle, &player_turn, sizeof(byte), FALSE) ;
+        FileRead(fhandle, &max_level, sizeof(byte), FALSE) ;
+        last_max_level = max_level ;
+        FileRead(fhandle, &computer_option, sizeof(byte), FALSE) ;
+        FileClose(fhandle, FALSE) ;
+		  mycopy(row4_field_work, row4_field, 64) ;
+    } /*else  { */
+    /* always start a new game */
+        @send process::MSG_VIEW_ROW4_NEW() ;
+ //   }
+    FilePopDir() ;
+
+    @call Row4ComputerLevelGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+							max_level,
+                                 FALSE) ;
+
+	 @call Row4_2PlayerOrComputer::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+                                  computer_option,
+                                  FALSE) ;
+
+	 @call process::MSG_ROW4_CHANGE_LEVEL_TEXT();
+
+	 @callsuper() ;
+
+    @call Row4App::MSG_GEN_APPLICATION_INSTALL_TOKEN();
+
+	 SoundAllocMusic(winSoundBuf, 1, &winSound);
+	 SoundAllocMusic(loseSoundBuf, 1, &loseSound);
+	 SoundAllocMusic(tieSoundBuf, 1, &tieSound);
+	 SoundAllocMusic(play2SoundBuf, 1, &play2Sound);
+
+	 /* check for quick tips */
+	 initError = InitFileReadBoolean("Row4", "showTips", &tips);
+	 if (initError) tips = TRUE;
+	 if (tips) {
+		 @send ShowOnStartupGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+														 SHOW_ON_STARTUP,
+														 TRUE);
+		 @send QTipsDialogBox::MSG_GEN_INTERACTION_INITIATE();
+		 }
+	 else
+		 @send ShowOnStartupGroup::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(
+														 SHOW_ON_STARTUP,
+														 FALSE);
+
+	 /* check for sound */
+	 initError = InitFileReadInteger("Row4", "sound", &g_sound);
+	 if (initError) g_sound = SOUND_SYSTEM;
+	 @call SoundGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(g_sound, FALSE) ;
+
+
+
+@ifdef ROW4_DEBUG
+        FilePushDir() ;
+        FileSetCurrentPath(SP_DOCUMENT,".") ;
+        FileDelete("row4.txt") ;
+        debugFile = FileCreate("row4.txt", FILE_CREATE_TRUNCATE|FCF_NATIVE, FILE_ATTR_NORMAL) ;
+        FilePopDir() ;
+@endif
+    @send process::MSG_ROW4_UPDATE_TURN_HEADER() ;
+}
+/*-------------------------------------------------------------------------*/
+@method Row4ProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+FileHandle fhandle ;
+Boolean		tips;
+
+
+    if (is_computing)  {
+        game_mode = 2 ;
+        StopComputer() ;
+    }
+
+	 SoundStopMusic(winSound);
+	 SoundFreeMusic(winSound);
+	 SoundStopMusic(loseSound);
+	 SoundFreeMusic(loseSound);
+	 SoundStopMusic(tieSound);
+	 SoundFreeMusic(tieSound);
+	 SoundStopMusic(play2Sound);
+	 SoundFreeMusic(play2Sound);
+
+	 FilePushDir() ;
+    FileSetCurrentPath(row4_drive, row4_relativePath) ;
+    FileCreateDir(row4_path) ;
+    FileSetCurrentPath(row4_drive, row4_path) ;
+    FileDelete(row4_state_file) ;
+
+    fhandle = FileCreate(row4_state_file,
+              FILE_CREATE_TRUNCATE |
+              FILE_ACCESS_RW |
+              FILE_DENY_NONE,
+              FILE_ATTR_NORMAL) ;
+
+    if (fhandle!=NullHandle)  {
+        /* Make sure file at beginning */
+        FilePos(fhandle, 0, FILE_POS_START) ;
+        FileWrite(fhandle, row4_field, 64, FALSE) ;
+        FileWrite(fhandle, row4_height, 8, FALSE) ;
+        FileWrite(fhandle, &game_mode, sizeof(byte), FALSE) ;
+        FileWrite(fhandle, &player_turn, sizeof(byte), FALSE) ;
+        FileWrite(fhandle, &max_level, sizeof(byte), FALSE) ;
+        FileWrite(fhandle, &computer_option, sizeof(byte), FALSE) ;
+        FileClose(fhandle, FALSE) ;
+    }
+    FilePopDir() ;
+
+	 /* set the quick tips if not default */
+	 tips = @call ShowOnStartupGroup::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(
+																	 SHOW_ON_STARTUP);
+	 InitFileWriteBoolean("Row4", "showTips", tips);
+	 InitFileWriteInteger("Row4", "sound", g_sound);
+
+@ifdef ROW4_DEBUG
+        FileClose(debugFile, FALSE) ;
+@endif
+
+    return (@callsuper()) ;
+}
+
+/*-------------------------------------------------------------------------*/
+@method Row4ProcessClass, MSG_ROW4_SOUND_CHANGED
+{
+	 g_sound = selection ;
+}
+
+/*-------------------------------------------------------------------------*/
+@method Row4ContentClass, MSG_META_EXPOSED
+{
+    GStateHandle gstate;
+
+    gstate = GrCreateState(win);
+    GrBeginUpdate(gstate);
+
+    Row4Draw(gstate);
+
+    GrEndUpdate(gstate);
+    GrDestroyState(gstate);
+}
+/*-------------------------------------------------------------------------*/
+@method Row4ProcessClass, MSG_VIEW_INVALIDATE
+{
+    WindowHandle win ;
+    GStateHandle gstate ;
+
+    win = @call Row4View::MSG_GEN_VIEW_GET_WINDOW() ;
+    gstate = GrCreateState(win) ;
+    GrInvalRect(gstate, 0, 0, 65, 65) ;
+    GrDestroyState(gstate) ;
+    @call Row4Content::MSG_VIS_INVALIDATE();
+}
+/*-------------------------------------------------------------------------*/
+@method Row4ProcessClass, MSG_VIEW_ROW4_NEW
+{
+    showWinner = FALSE;
+    game_mode = 0 ;
+    StopComputer() ;
+    Row4Make(row4_field) ;
+    mycopy(row4_field_work, row4_field, 64) ;
+    player_turn = ROW4_TYPE_PLAYER_1 ;
+    game_mode = 0 ;
+    @call process::MSG_VIEW_INVALIDATE() ;
+    @call Row4View::MSG_GEN_UPDATE_VISUAL(VUM_NOW) ;
+    @call process::MSG_ROW4_UPDATE_TURN_HEADER() ;
+}
+/*-------------------------------------------------------------------------*/
+@method Row4ContentClass, MSG_META_START_SELECT
+{
+    word pos ;
+
+    xPosition /= SQUARE_SIZE ;
+    yPosition /= SQUARE_SIZE ;
+
+    if (!is_computing)  {
+        if ((game_mode==0) && (xPosition >= 0) && (yPosition >= 0) &&
+            (xPosition < 8) && (yPosition < 8))  {
+            if ((computer_option != ROW4_COMPUTER_PLAYER_GAME) ||
+					 (player_turn != ROW4_TYPE_PLAYER_2))  {
+                pos = quick_row4(xPosition, yPosition) ;
+                if (row4_field[pos]==ROW4_TYPE_ARROW)  {
+						  row4_field[pos] = player_turn ;
+                    /* make the appropriate sound */
+						  if (player_turn == ROW4_TYPE_PLAYER_1) {
+							  if (g_sound == SOUND_SYSTEM)
+								  UserStandardSound(SST_NOTIFY);
+							  else if (g_sound == SOUND_ON)
+								  UserStandardSound(SST_NOTIFY | SST_IGNORE_SOUND_OFF);
+							  }
+						  else if (player_turn == ROW4_TYPE_PLAYER_2) {
+							  Row4PlaySound(play2Sound);
+					  /*		  if (g_sound == SOUND_SYSTEM)
+								  UserStandardSound(SST_ERROR);
+							  else if (g_sound == SOUND_ON)
+								  UserStandardSound(SST_ERROR | SST_IGNORE_SOUND_OFF);
+					  */		  }
+
+                    @call process::MSG_ROW4_REDRAW_SQUARE(xPosition, yPosition) ;
+                    if (yPosition != 0)  {
+                        pos = quick_row4(xPosition, --yPosition) ;
+                        row4_field[pos] = ROW4_TYPE_ARROW ;
+                        @call process::MSG_ROW4_REDRAW_SQUARE(xPosition, yPosition++) ;
+                        row4_height[xPosition] -= 8 ;
+                    } else {
+                        row4_height[xPosition] = 0x7F ;
+                    }
+                    @send process::MSG_ROW4_NEXT_PLAYER() ;
+                }
+            }
+        }
+    }
+    retVal->flags = MRF_PROCESSED ;
+}
+/*-------------------------------------------------------------------------*/
+@method Row4ProcessClass, MSG_META_CLIPBOARD_COPY
+{
+    ClipboardItemHeader *headerMem ;
+    MemHandle           headerMemHandle ;
+    VMFileHandle        transferVMFile ;
+    VMBlockHandle       dataVMBlock ;
+    VMBlockHandle       headerVMBlock ;
+    GStateHandle        gstate;
+
+    @send Row4App::MSG_GEN_APPLICATION_MARK_BUSY() ;
+    transferVMFile = ClipboardGetClipboardFile() ;
+
+    gstate = GrCreateGString(transferVMFile, GST_VMEM, &dataVMBlock);
+    Row4Draw(gstate);
+    GrEndGString(gstate);
+
+    headerVMBlock = VMAlloc(transferVMFile, sizeof(ClipboardItemHeader), 1111) ;
+    headerMem = (ClipboardItemHeader *)VMLock(
+                 transferVMFile, headerVMBlock, &headerMemHandle) ;
+    headerMem->CIH_owner = ConstructOptr(GeodeGetProcessHandle(), 0) ;
+    headerMem->CIH_flags = 0 ;
+    headerMem->CIH_name[0] = 'R' ;
+    headerMem->CIH_name[1] = 'o' ;
+    headerMem->CIH_name[2] = 'w' ;
+    headerMem->CIH_name[3] = '4' ;
+    headerMem->CIH_name[4] = '\0' ;
+    headerMem->CIH_formatCount = 1;
+    headerMem->CIH_sourceID = 0 ;
+    headerMem->CIH_formats[0].CIFI_format =
+        FormatIDFromManufacturerAndType(
+             MANUFACTURER_ID_GEOWORKS,
+             CIF_GRAPHICS_STRING) ;
+    headerMem->CIH_formats[0].CIFI_vmChain =
+        (VMChain)(((dword)(dataVMBlock))<<16L) ;
+    headerMem->CIH_formats[0].CIFI_extra1 = 0 ;
+    headerMem->CIH_formats[0].CIFI_extra2 = 0 ;
+    VMUnlock(headerMemHandle) ;
+    ClipboardRegisterItem(BlockIDFromFileAndBlock(transferVMFile,
+        headerVMBlock),
+        0) ;
+    @send Row4App::MSG_GEN_APPLICATION_MARK_NOT_BUSY() ;
+}
+/*-------------------------------------------------------------------------*/
+@method Row4ProcessClass, MSG_ROW4_COMPLETED
+{
+/*
+    char names[3][20] = { "Player 1 Wins!",
+                      "Player 2 Wins!",
+                      "Computer Wins!" } ;
+*/
+    word i ;
+
+    /* let's try and show the winning pieces */
+    showWinner = TRUE;
+    @call process::MSG_VIEW_INVALIDATE() ;
+    @call Row4View::MSG_GEN_UPDATE_VISUAL(VUM_NOW) ;
+
+
+
+    game_mode = 2 ;
+    if (player_turn == ROW4_TYPE_PLAYER_1)
+        i = 0 ;
+    else if (computer_option == ROW4_COMPUTER_PLAYER_GAME)
+        i = 2 ;
+    else
+        i = 1 ;
+
+/*
+    @call WinnerGlyph2::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(names[i], VUM_NOW) ;
+*/
+    final_setup = i ;
+    TimerStart(
+        TIMER_EVENT_ONE_SHOT,
+        oself,
+        5,
+        MSG_ROW4_COMPLETED2,
+        0,
+        &i) ;
+}
+/*-------------------------------------------------------------------------*/
+@method Row4ProcessClass, MSG_ROW4_COMPLETED2
+{
+    switch (final_setup)  {
+        case 0:
+				Row4PlaySound(winSound);
+				UserDoDialog(@Row4Win1Box) ;
+            break ;
+        case 1:
+				Row4PlaySound(winSound);
+				UserDoDialog(@Row4Win2Box) ;
+            break ;
+        case 2:
+				Row4PlaySound(loseSound);
+				UserDoDialog(@Row4WinCBox) ;
+            break ;
+    }
+    @call process::MSG_ROW4_UPDATE_TURN_HEADER() ;
+}
+/*-------------------------------------------------------------------------*/
+@method Row4ProcessClass, MSG_ROW4_REDRAW_SQUARE
+{
+    WindowHandle win ;
+    GStateHandle gstate ;
+    RectDWord    rect = {0,0,2000,2000} ;
+
+    rect.RD_left = SQUARE_SIZE*pos_x ;
+    rect.RD_top = SQUARE_SIZE*pos_y ;
+    rect.RD_right = SQUARE_SIZE*(pos_x+1) ;
+    rect.RD_bottom = SQUARE_SIZE*(pos_y+1) ;
+
+    win = @call Row4View::MSG_GEN_VIEW_GET_WINDOW() ;
+    gstate = GrCreateState(win) ;
+    GrInvalRectDWord(gstate, &rect) ;
+    GrDestroyState(gstate) ;
+}
+/*-------------------------------------------------------------------------*/
+@method Row4ProcessClass, MSG_ROW4_REDRAW_SQUARE_POS
+{
+    @send process::MSG_ROW4_REDRAW_SQUARE(pos&7, pos>>3) ;
+}
+/*-------------------------------------------------------------------------*/
+void mycopy(void *s, void *t, word size)
+{
+    char *ss ;
+    char *tt ;
+
+    ss = s ;
+    tt = t ;
+
+    for (; size; size--)
+        *(ss++) = *(tt++) ;
+}
+/*-------------------------------------------------------------------------*/
+@method Row4ProcessClass, MSG_ROW4_DID_NOT_WIN
+{
+    @call process::MSG_ROW4_UPDATE_TURN_HEADER() ;
+	 Row4PlaySound(tieSound);
+	 UserDoDialog(@Row4TieBox) ;
+    game_mode = 2 ;
+}
+/*-------------------------------------------------------------------------*/
+Boolean CheckIfNoMoreMoves()
+{
+    word pos ;
+
+    for (pos=0; pos<64; pos++)
+        if (row4_field[pos] == ROW4_TYPE_ARROW)
+            break ;
+    if (pos==64)
+        return TRUE ;
+/*
+       @call process::MSG_ROW4_DID_NOT_WIN() ;
+*/
+    return FALSE ;
+}
+/*-------------------------------------------------------------------------*/
+@method Row4ProcessClass, MSG_ROW4_UPDATE_TURN_HEADER
+{
+    static optr names[4] = {
+             @StringTurnPlayer1,
+             @StringTurnPlayer2,
+             @StringTurnComputer,
+             @StringGameOver
+    } ;
+
+    word i ;
+
+    if (game_mode == 2)
+        i = 3 ;
+    else if (player_turn == ROW4_TYPE_PLAYER_1)
+        i = 0 ;
+    else if (computer_option == ROW4_COMPUTER_PLAYER_GAME)
+        i = 2 ;
+    else
+        i = 1 ;
+
+    @call Row4TurnHeader::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(names[i], VUM_NOW) ;
+}
+/*-------------------------------------------------------------------------*/
+void ReplacePiece(byte column, byte old_piece)
+{
+    word pos ;
+
+    if (old_piece != 0x7F)  {
+        pos = row4_height[column] ;
+        if (pos==0x7F)
+            pos = column ;
+        else
+            pos += 8 ;
+        row4_field[pos] = old_piece ;
+        row4_height[column] = pos ;
+    }
+}
+/*-------------------------------------------------------------------------*/
+@ifdef ROW4_DEBUG
+void prefix()
+{
+    static byte spaces[40] = "                                        " ;
+
+    FileWrite(debugFile, spaces, 4*level, FALSE) ;
+}
+/*-------------------------------------------------------------------------*/
+void DrawBoard()
+{
+    word y,x,pos ;
+    byte four_types[4] = " .12" ;
+
+    prefix() ;
+    FileWrite(debugFile, "**********\r\n", 12, FALSE) ;
+    for (y=pos=0; y<8; y++)  {
+        prefix() ;
+        FileWrite(debugFile,"*", 1, FALSE) ;
+        for (x=0; x<8; x++, pos++)
+            FileWrite(debugFile, four_types+row4_field[pos], 1, FALSE) ;
+        FileWrite(debugFile,"*\r\n", 3, FALSE) ;
+    }
+    prefix() ;
+    FileWrite(debugFile, "**********\r\n\r\n", 14, FALSE) ;
+}
+/*-------------------------------------------------------------------------*/
+void ShowRatings(word *ratings, int n)
+{
+    word i ;
+    char hex[17] = "0123456789ABCDEF" ;
+    byte buffer2[8] = "XXXX\r\n" ;
+    word convert ;
+
+    for (i=0; i<n; i++)  {
+        prefix() ;
+        FileWrite(debugFile, "Rating ", 7, FALSE) ;
+        FileWrite(debugFile, hex+i, 1, FALSE) ;
+        FileWrite(debugFile, "=", 1, FALSE) ;
+        convert = ratings[i] ;
+        buffer2[0] = hex[(convert>>12)&0x0F] ;
+        buffer2[1] = hex[(convert>>8)&0x0F] ;
+        buffer2[2] = hex[(convert>>4)&0x0F] ;
+        buffer2[3] = hex[convert&0x0F] ;
+        FileWrite(debugFile, buffer2, 6, FALSE) ;
+    }
+}
+/*-------------------------------------------------------------------------*/
+void ShowRatingsAndColumns(word *ratings, word *columns, int n)
+{
+    word i ;
+    char hex[17] = "0123456789ABCDEF" ;
+    byte buffer2[12] = "XXXX (X)\r\n" ;
+    word convert ;
+
+    for (i=0; i<n; i++)  {
+        prefix() ;
+        FileWrite(debugFile, "Rating ", 7, FALSE) ;
+        FileWrite(debugFile, hex+i, 1, FALSE) ;
+        FileWrite(debugFile, "=", 1, FALSE) ;
+        convert = ratings[i] ;
+        buffer2[0] = hex[(convert>>12)&0x0F] ;
+        buffer2[1] = hex[(convert>>8)&0x0F] ;
+        buffer2[2] = hex[(convert>>4)&0x0F] ;
+        buffer2[3] = hex[convert&0x0F] ;
+        buffer2[6] = hex[columns[i]] ;
+        FileWrite(debugFile, buffer2, 10, FALSE) ;
+    }
+}
+@endif
+/*-------------------------------------------------------------------------*/
+byte PlacePiece(byte column, byte player)
+{
+    word pos ;
+    byte old = 0x7F ;
+
+    if ((pos = row4_height[column]) != 0x7F)  {
+        old = row4_field[pos] ;
+        row4_field[pos] = player ;
+        if (pos>=8)  {
+            row4_height[column]-=8 ;
+        } else {
+            row4_height[column] = 0x7F ;
+        }
+    }
+
+    return old ;
+}
+/*-------------------------------------------------------------------------*/
+/*
+word RateColumn(byte column, byte player)
+{
+    sword pos ;
+    sword dirs[8] = { -8, -7, 1, 9, 8, 7, -1, -9 } ;
+    word i, j ;
+    sword work_pos ;
+    word rating = 1;
+
+    pos = row4_height[column] ;
+    if (pos==0x7F)
+        pos = column ;
+    else
+        pos += 8 ;
+    for (i=0; i<8; i++)  {
+        work_pos = pos ;
+        for (j=0; j<3; j++)  {
+            work_pos += dirs[i] ;
+            if ((((((work_pos&7)+1)==(pos&7)) ||
+                ((work_pos&7)==((pos&7)+1))) &&
+                (work_pos < 64) && (work_pos>=0)) &&
+                (row4_field[work_pos] == player)) {
+                rating+=2 ;
+            } else {
+                break ;
+            }
+        }
+    }
+    return rating ;
+}
+*/
+/*-------------------------------------------------------------------------*/
+Boolean IsWinnerAt(sword x, sword y)
+{
+    word i,j ;                    /* Temporary direction and step count */
+    sword work_x, work_y ;        /* Temporary coordinates */
+    word value ;                  /* Value read off board */
+
+    /* Get the current square off the board, this is the player that
+       we are checking the win for */
+    value = row4_field[quick_row4(x, y)] ;
+    /* Check all 8 directions from this square */
+    for (i=0; i<8; i++)  {
+        /* Make a copy of the coordinates to step with */
+        work_x = x ;
+	   work_y = y ;
+	   /* and fill i for a potential win */
+	   winx[0] = x;
+	   winy[0] = y;
+        /* Check three steps away and see if there are matches */
+        for (j=0; j<3; j++)  {
+            /* Step the x,y coordinates in the currect "facing" direction */
+            work_x += dirx[i] ;
+		  work_y += diry[i] ;
+		  winx[j+1] = work_x;
+		  winy[j+1] = work_y;
+            /* Make sure still on the board */
+            if ((work_x < 0) || (work_x >= 8) ||
+                (work_y < 0) || (work_y >= 8))
+                /* If not on board, stop stepping -- at end */
+                break ;
+            /* If the stepped direction does not have a matching player
+               piece, then quit looping */
+            if (row4_field[quick_row4(work_x, work_y)] != value)
+                break ;
+        }
+        /* If we managed to go three steps without being broken out of,
+           then we much have a winner! */
+        if (j==3)
+            return TRUE ;
+    }
+    /* If we go through all eight directions and NEVER find a winner,
+       then there must be no winner at this spot. */
+    return FALSE ;
+}
+/*-------------------------------------------------------------------------*/
+Boolean IsWinner(byte player)
+{
+    sword x, y ;                  /* Temporary coordinates */
+
+    /* Check all squares */
+    for (y=0; y<8; y++)
+        for (x=0; x<8; x++)
+            /* Check if this square is the same square as the player */
+            if (row4_field[quick_row4(x,y)] == player)
+                /* Check if a winner at that square */
+                if (IsWinnerAt(x,y))
+                    /* If a winner, quit and return TRUE */
+                    return TRUE ;
+    /* If never found a winner, return FALSE */
+    return FALSE ;
+}
+/*-------------------------------------------------------------------------*/
+word RateBoard(byte player)
+{
+    sword pos ;                   /* Variable for temporary indexing */
+    word i, j ;                   /* Looping variables */
+    sword x,y ;                   /* Current x and y looping coordinates */
+    sword work_x ;                /* Working x coordinate */
+    sword work_y ;                /* Working y coordinate */
+    word rating = 1;              /* Rating of the board, start at 1 */
+    word count ;                  /* Count of points for each square */
+    byte value ;                  /* Value read off of board */
+    byte opponent ;               /* Opponent piece */
+
+    /* Find out who the opponent is */
+    opponent = player ^ (ROW4_TYPE_PLAYER_1^ROW4_TYPE_PLAYER_2) ;
+
+    /* Check if already a winner */
+    if (IsWinner(player))
+        /* If so, then return best value */
+        return 0xFFFF ;
+
+    /* Check if the opponent is already a winner */
+    if (IsWinner(opponent))
+        /* If so, return worse value */
+        return 0 ;
+
+    /* Go through all the rows */
+    for (y=0; y<8; y++)  {
+        /* Go through all column entries in a row */
+        for (x=0; x<8; x++)  {
+            /* See if this is one of "our" pieces */
+            if (row4_field[quick_row4(x, y)] == player)  {
+                /* Check the eight directions */
+                for (i=0; i<8; i++)  {
+                    /* Copy the x and y location to a working x,y
+                       for when we step through one of the eight
+                       directions */
+                    work_x = x ;
+                    work_y = y ;
+                    /* Score starts at 5 and represents we are
+                       looking for player pieces.  If it is a one,
+                       we are looking for blank spaces. */
+                    count = 5 ;
+                    /* OK, we are now going to step up to three
+                       steps away from the current piece.  Each
+                       iteration will change the score and count
+                       variable accordingly */
+                    for (j=0; j<3; j++)  {
+                        /* Step x and y in the corresponding direction */
+                        work_x += dirx[i] ;
+                        work_y += diry[i] ;
+                        /* Check if that coordinate is still on the board */
+                        if ((work_x>=0) && (work_x<=8) &&
+                            (work_y>=0) && (work_y<=8))  {
+                            /* Find the position of the current item */
+                            pos = quick_row4(work_x, work_y) ;
+                            /* Get the item at that square */
+                            value = row4_field[pos] ;
+                            /* Now, depending on the value of count,
+                               we will do two different things */
+                            /* First, check if 5.  This means we are
+                               on a row of player pieces (opposed to
+                               blanks).  */
+                            if (count==5)  {
+                                /* If the next piece is no longer a player
+                                   piece, then decrement count for a score
+                                   additive of one point */
+                                if (value != player)
+                                    count = 0 ;
+                                /* If the found piece is the opponent,
+                                   then stop the 'j' loop and consider
+                                   the score for this line ended */
+                                if (value == opponent)
+                                    break ;
+                                /* If we had a player piece or a blank,
+                                   then add an additive amount of 1 or 2 */
+                                rating += count ;
+                            } else {
+                                /* We have been hitting blanks, so we
+                                   are mainly concerned with more blanks. */
+                                /* If we hit an opponent piece, then stop
+                                   this line of checking */
+                                if (value == opponent)
+                                    break ;
+                                /* If we hit our own player piece, then
+                                   let's go back into player piece
+                                   scores.  Blanks in the middle doesn't
+                                   matter when you have a line of view */
+                                if (value == player)
+                                    count = 5 ;
+                                /* In either case, we go ahead and add
+                                   in the current count to the rating */
+                                rating += count ;
+                            }
+                        } else {   /* Coordinate outside, stop looping */
+                            break ;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return rating ;
+}
+/*-------------------------------------------------------------------------*/
+word MaxMove(/*word valuePassed*/void)
+{
+    word ratings[8] = {0,0,0,0,0,0,0,0};
+    word i ;
+    byte old_piece ;
+/*
+    word best3[3] = { 0, 0, 0 };
+    word best3_column[3] = { 0, 0, 0} ;
+*/
+    word best_value ;
+/*
+    byte opponent ;
+*/
+
+    /* Find out who the opponent is */
+/*
+    opponent = player_turn ^ (ROW4_TYPE_PLAYER_1^ROW4_TYPE_PLAYER_2) ;
+*/
+
+    if (request_stop==TRUE)
+        return 0 ;
+
+@ifdef ROW4_DEBUG
+    prefix() ;
+@endif
+
+    /* We're working on the next level of the tree */
+    level++ ;
+
+@ifdef ROW4_DEBUG
+    FileWrite(debugFile, "{MAX\r\n", 6, FALSE) ;
+    DrawBoard() ;
+@endif
+
+    /* Rate the 8 different moves */
+    for (i=0; (i<8); i++)  {
+        if (row4_height[i] != 0x7F)  {
+            old_piece = PlacePiece(i, player_turn) ;
+            if ((ratings[i] = RateBoard(player_turn)) == 0xFFFF)  {
+                /* BOOM! Found the highest possible, might as well
+                   quit with this choice */
+                ReplacePiece(i, old_piece) ;
+                last_choice = i ;
+                best_value = 0xFFFF ;
+@ifdef ROW4_DEBUG
+                prefix() ;
+                FileWrite(debugFile, "Quick exit!!!\r\n", 15, FALSE) ;
+@endif
+                goto quit_exit ;
+            }
+            ReplacePiece(i, old_piece) ;
+        } else {
+            ratings[i] = 0 ;
+        }
+    }
+
+@ifdef ROW4_DEBUG
+    prefix() ;
+    FileWrite(debugFile, "-- Initial ratings --\r\n", 23, FALSE) ;
+    ShowRatings(ratings, 8) ;
+@endif
+
+    /* Find best of 3 moves */
+/*
+    for (i=0; i<8; i++)  {
+        if (ratings[i] >= best3[2])  {
+             best3[2] = ratings[i] ;
+             best3_column[2] = i ;
+             if (best3[2] >= best3[1])  {
+                 swap(best3[2], best3[1]) ;
+                 swap(best3_column[2], best3_column[1]) ;
+                 if (best3[1] >= best3[0])  {
+                     swap(best3[1], best3[0]) ;
+                     swap(best3_column[1], best3_column[0]) ;
+                 }
+             }
+        }
+    }
+
+    prefix() ;
+    FileWrite(debugFile, "-- Best three -------\r\n", 23, FALSE) ;
+    ShowRatingsAndColumns(best3, best3_column, 3) ;
+*/
+
+    /* "Fill out" the three best moves, if not too deep */
+/*
+    if (level < max_level)  {
+        for (i=0; i<3; i++)  {
+            old_piece = PlacePiece(best3_column[i], player_turn) ;
+            best3[i] = MinMove() ;
+            ReplacePiece(best3_column[i], old_piece) ;
+        }
+    }
+*/
+
+    /* "Fill out" the eight moves, if not too deep */
+    if (level < max_level)  {
+        for (i=0; ((i<8)&&(request_stop==FALSE)); i++)  {
+            old_piece = PlacePiece(i, player_turn) ;
+            ratings[i] = MinMove() ;
+            ReplacePiece(i, old_piece) ;
+        }
+    }
+@ifdef ROW4_DEBUG
+    prefix() ;
+    FileWrite(debugFile, "-- Filled out -------\r\n", 23, FALSE) ;
+
+/*
+    ShowRatingsAndColumns(best3, best3_column, 3) ;
+*/
+    ShowRatings(ratings, 8) ;
+@endif
+
+    /* Now that we have 3 values, find the best of the three */
+/*
+    best_value = 0 ;
+    last_choice = best3_column[0] ;
+
+    for (i=0; i<3; i++)  {
+        if (best3[i] > best_value)  {
+            best_value = best3[i] ;
+            last_choice = best3_column[i] ;
+        }
+    }
+*/
+
+    best_value = 0 ;
+    last_choice = 0 ;
+
+    for (i=0; i<8; i++)  {
+        if ((ratings[i] > best_value) ||
+            ((level==1) && (ratings[i] == best_value) &&
+             (MyRandom()&0x0008)))  {
+            best_value = ratings[i] ;
+            last_choice = i ;
+        }
+    }
+@ifdef ROW4_DEBUG
+    prefix() ;
+    FileWrite(debugFile, "last choice: ", 13, FALSE) ;
+    FileWrite(debugFile, "0123456789"+last_choice, 1, FALSE) ;
+    FileWrite(debugFile, "\r\n", 2, FALSE) ;
+@endif
+
+quit_exit:
+    /* Going back up the tree */
+    level-- ;
+
+@ifdef ROW4_DEBUG
+    prefix() ;
+    FileWrite(debugFile, "MAX}\r\n", 6, FALSE) ;
+@endif
+
+/*
+    if (level==0)  {
+         @send process::MSG_ROW4_COMPUTER_MADE_MOVE() ;
+         for (;;) ;
+    }
+*/
+
+    return best_value ;
+}
+/*-------------------------------------------------------------------------*/
+word MinMove()
+{
+    word ratings[8] = {0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF,0xFFFF} ;
+    word i ;
+    byte old_piece ;
+/*
+    word best3[3] = { 0xFFFF, 0xFFFF, 0xFFFF };
+    word best3_column[3] = { 0,0,0 } ;
+*/
+    word best_value ;
+    byte opponent ;
+
+    /* Can I do this? */
+    if (request_stop==TRUE)
+        return 0 ;
+
+    /* Find out who the opponent is */
+    opponent = player_turn ^ (ROW4_TYPE_PLAYER_1^ROW4_TYPE_PLAYER_2) ;
+
+@ifdef ROW4_DEBUG
+    prefix() ;
+@endif
+
+    /* We're working on the next level of the tree */
+    level++ ;
+
+@ifdef ROW4_DEBUG
+    FileWrite(debugFile, "{MIN\r\n", 6, FALSE) ;
+    DrawBoard() ;
+@endif
+
+    /* Rate the 8 different moves */
+    for (i=0; i<8; i++)  {
+        if (row4_height[i] != 0x7F)  {
+            old_piece = PlacePiece(i, opponent) ;
+            if ((ratings[i] = RateBoard(player_turn))==0)  {
+                /* BOOM! Found the lowest possible, might as well
+                   quit with this choice */
+                ReplacePiece(i, old_piece) ;
+                last_choice = i ;
+                best_value = 0 ;
+@ifdef ROW4_DEBUG
+                prefix() ;
+                FileWrite(debugFile, "Quick exit!!!\r\n", 15, FALSE) ;
+@endif
+                goto quit_exit ;
+            }
+            ReplacePiece(i, old_piece) ;
+        } else {
+            ratings[i] = 0xFFFF ;
+        }
+    }
+
+@ifdef ROW4_DEBUG
+    prefix() ;
+    FileWrite(debugFile, "-- Initial ratings --\r\n", 23, FALSE) ;
+    ShowRatings(ratings, 8) ;
+@endif
+
+    /* Find best of 3 moves */
+/*
+    for (i=0; i<8; i++)  {
+        if (ratings[i] <= best3[2])  {
+             best3[2] = ratings[i] ;
+             best3_column[2] = i ;
+             if (best3[2] <= best3[1])  {
+                 swap(best3[2], best3[1]) ;
+                 swap(best3_column[2], best3_column[1]) ;
+                 if (best3[1] <= best3[0])  {
+                     swap(best3[1], best3[0]) ;
+                     swap(best3_column[1], best3_column[0]) ;
+                 }
+             }
+        }
+    }
+
+    prefix() ;
+    FileWrite(debugFile, "-- Best three -------\r\n", 23, FALSE) ;
+    ShowRatingsAndColumns(best3, best3_column, 3) ;
+*/
+
+    /* "Fill out" the three best moves, if were not too deep */
+/*
+    if (level < max_level)  {
+        for (i=0; i<3; i++)  {
+            old_piece = PlacePiece(best3_column[i], opponent) ;
+            best3[i] = MaxMove() ;
+            ReplacePiece(best3_column[i], old_piece) ;
+        }
+    }
+*/
+
+    /* "Fill out" the eight moves, if were not too deep */
+    if (level < max_level)  {
+        for (i=0; ((i<8)&&(request_stop==FALSE)); i++)  {
+            old_piece = PlacePiece(i, opponent) ;
+            ratings[i] = MaxMove(/*0*/) ;
+            ReplacePiece(i, old_piece) ;
+        }
+    }
+@ifdef ROW4_DEBUG
+    prefix() ;
+    FileWrite(debugFile, "-- Filled out -------\r\n", 23, FALSE) ;
+/*
+    ShowRatingsAndColumns(best3, best3_column, 3) ;
+*/
+    ShowRatings(ratings, 3) ;
+@endif
+
+    /* Now that we have 3 values, find the best of the three */
+/*
+    best_value = 0xFFFF ;
+    last_choice = best3_column[0] ;
+
+    for (i=0; i<3; i++)  {
+        if (best3[i] <= best_value)  {
+            best_value = best3[i] ;
+            last_choice = best3_column[i] ;
+        }
+    }
+*/
+
+    best_value = 0xFFFF ;
+    last_choice = 0 ;
+
+    for (i=0; i<8; i++)  {
+        if ((ratings[i] < best_value) ||
+            ((ratings[i] == best_value) && (MyRandom()&0x0008)))  {
+            best_value = ratings[i] ;
+            last_choice = i ;
+        }
+    }
+
+@ifdef ROW4_DEBUG
+    prefix() ;
+    FileWrite(debugFile, "last choice: ", 13, FALSE) ;
+    FileWrite(debugFile, "0123456789"+last_choice, 1, FALSE) ;
+    FileWrite(debugFile, "\r\n", 2, FALSE) ;
+@endif
+
+quit_exit:
+    /* Going back up the tree */
+    level-- ;
+
+@ifdef ROW4_DEBUG
+    prefix() ;
+    FileWrite(debugFile, "MIN}\r\n", 6, FALSE) ;
+@endif
+
+    return best_value ;
+}
+/*-------------------------------------------------------------------------*/
+@method Row4ProcessClass, MSG_ROW4_NEXT_PLAYER
+{
+    word id ;
+
+    mycopy(row4_field_work, row4_field, 64) ;
+    if (IsWinner(player_turn))  {
+        @send process::MSG_ROW4_COMPLETED() ;
+    } else {
+        if (CheckIfNoMoreMoves())  {
+            @send process::MSG_ROW4_DID_NOT_WIN() ;
+        } else {
+            player_turn ^= (ROW4_TYPE_PLAYER_1^ROW4_TYPE_PLAYER_2) ;
+            @call process::MSG_ROW4_UPDATE_TURN_HEADER() ;
+            if ((player_turn == ROW4_TYPE_PLAYER_2) &&
+                (computer_option == ROW4_COMPUTER_PLAYER_GAME))  {
+                TimerStart(TIMER_EVENT_ONE_SHOT,
+                           oself,
+                           10,
+                           MSG_ROW4_COMPUTER_MOVE,
+                           0,
+                           &id) ;
+            }
+        }
+    }
+}
+/*-------------------------------------------------------------------------*/
+word DoComputer(word valuePassed)
+{
+    if (valuePassed != 0xFFFF)
+        MaxMove(/*valuePassed*/) ;
+    if (request_stop==FALSE)
+        @send process::MSG_ROW4_COMPUTER_MADE_MOVE() ;
+    is_computing = FALSE ;
+
+    return 0 ;
+}
+/*-------------------------------------------------------------------------*/
+void StopComputer()
+{
+    int old_max ;
+
+    while (is_computing)  {
+        old_max = max_level ;
+        max_level = 0 ;
+        request_stop = TRUE ;
+        max_level = old_max ;
+    }
+    level = 0 ;
+    request_stop = FALSE ;
+    game_mode = 2 ;
+    @call process::MSG_ROW4_UPDATE_TURN_HEADER() ;
+}
+/*-------------------------------------------------------------------------*/
+@method Row4ProcessClass, MSG_ROW4_COMPUTER_MOVE
+{
+    byte opponent ;
+    word i ;
+    byte old_piece ;
+    word value ;
+
+    /* Find out who the opponent is */
+    opponent = player_turn ^ (ROW4_TYPE_PLAYER_1^ROW4_TYPE_PLAYER_2) ;
+
+@ifdef ROW4_DEBUG
+    FileWrite(debugFile, "\r\n\r\n>---<\r\n\r\n", 13, FALSE) ;
+@endif
+    for (i=0; i<8; i++)  {
+        old_piece = PlacePiece(i, player_turn) ;
+        value = RateBoard(player_turn) ;
+        ReplacePiece(i, old_piece) ;
+        if (value == 0xFFFF)  {
+            last_choice = i ;
+            break ;
+        }
+    }
+
+    if (i==8)
+        for (i=0; i<8; i++)  {
+            old_piece = PlacePiece(i, opponent) ;
+            value = RateBoard(player_turn) ;
+            ReplacePiece(i, old_piece) ;
+            if (value == 0)  {
+                last_choice = i ;
+                break ;
+            }
+        }
+
+    if (i==8)  {
+        is_computing = TRUE ;
+        level = 0 ;
+        asm {
+            push si
+        }
+        computerThread = ThreadCreate_Old(PRIORITY_STANDARD,
+                                      0,
+                                      DoComputer,
+                                      4000,
+                                      GeodeGetProcessHandle()) ;
+        asm {
+            pop si
+        }
+
+/*
+        MaxMove() ;
+        @send process::MSG_ROW4_COMPUTER_MADE_MOVE() ;
+*/
+    } else {
+        computerThread = NullHandle ;
+        @send process::MSG_ROW4_COMPUTER_MADE_MOVE() ;
+    }
+}
+/*-------------------------------------------------------------------------*/
+@method Row4ProcessClass, MSG_ROW4_COMPUTER_MADE_MOVE
+{
+/*
+    if (computerThread != NullHandle)
+        ThreadDestroy(0, oself, 0) ;
+*/
+	 Row4PlaySound(play2Sound);
+/*	 if (g_sound == SOUND_SYSTEM)
+		 UserStandardSound(SST_ERROR);
+	 else if (g_sound == SOUND_ON)
+		 UserStandardSound(SST_ERROR | SST_IGNORE_SOUND_OFF);
+*/
+	 PlacePiece(last_choice, player_turn) ;
+    mycopy(row4_field_work, row4_field, 64) ;
+
+    if (row4_height[last_choice] != 0x7F)  {
+        row4_field[row4_height[last_choice]] = ROW4_TYPE_ARROW ;
+        @call process::MSG_ROW4_REDRAW_SQUARE_POS(row4_height[last_choice]) ;
+        @call process::MSG_ROW4_REDRAW_SQUARE_POS(row4_height[last_choice]+8) ;
+    } else {
+        @call process::MSG_ROW4_REDRAW_SQUARE_POS(last_choice) ;
+    }
+    @send process::MSG_ROW4_NEXT_PLAYER() ;
+}
+/*-------------------------------------------------------------------------*/
+@method Row4ProcessClass, MSG_ROW4_COMPUTER_CHANGE_LEVEL
+{
+	 word answer ;
+
+    answer = IC_YES ;
+    if (game_mode != 2)  {
+        answer = UserStandardDialogOptr(
+            NullOptr,
+            NullOptr,
+            NullOptr,
+            NullOptr,
+		    @Row4NewGameMsg,
+		    (CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
+		    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET));
+    }
+    if (answer == IC_YES)  {
+        game_mode = 2 ;
+        StopComputer() ;
+        max_level = selection ;
+        last_max_level = selection ;
+        @send process::MSG_VIEW_ROW4_NEW() ;
+		  @call process::MSG_ROW4_CHANGE_LEVEL_TEXT();
+	 } else {
+        @send Row4ComputerLevelGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(last_max_level, FALSE) ;
+    }
+}
+/*-------------------------------------------------------------------------*/
+@method Row4ProcessClass, MSG_ROW4_CHANGE_LEVEL_TEXT
+{
+char			levStr[25];
+
+	 if (computer_option == ROW4_TWO_PLAYER_GAME) {
+		@call Row4ComputerLevel::MSG_GEN_SET_NOT_ENABLED(VUM_NOW) ;
+		@call Row4BottomText::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+												  "", VUM_NOW) ;
+		}
+	 else {
+		@call Row4ComputerLevel::MSG_GEN_SET_ENABLED(VUM_NOW) ;
+		MemLock(OptrToHandle(@Row4LevelText));
+		sprintf(levStr, "%s%d", LMemDeref(@Row4LevelText), max_level);
+		MemUnlock(OptrToHandle(@Row4LevelText));
+		@call Row4BottomText::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+												  levStr, VUM_NOW) ;
+		}
+
+
+}
+/*-------------------------------------------------------------------------*/
+@method Row4ProcessClass, MSG_ROW4_CHANGE_PLAYER_OR_COMPUTER
+{
+    word answer ;
+
+    answer = IC_YES ;
+    if (game_mode != 2)  {
+        answer = UserStandardDialogOptr(
+            NullOptr,
+            NullOptr,
+            NullOptr,
+            NullOptr,
+		    @Row4NewGameMsg,
+		    (CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) |
+		    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET));
+    }
+    if (answer == IC_YES)  {
+        game_mode = 2 ;
+        StopComputer() ;
+        computer_option = selection ;
+        if (selection == ROW4_TWO_PLAYER_GAME)
+            @call Row4ComputerLevel::MSG_GEN_SET_NOT_ENABLED(VUM_NOW) ;
+        else
+            @call Row4ComputerLevel::MSG_GEN_SET_ENABLED(VUM_NOW) ;
+        @send process::MSG_VIEW_ROW4_NEW() ;
+    } else {
+        if (selection == ROW4_TWO_PLAYER_GAME)
+            selection = ROW4_COMPUTER_PLAYER_GAME ;
+        else
+            selection = ROW4_TWO_PLAYER_GAME ;
+        @call Row4_2PlayerOrComputer::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(selection, FALSE) ;
+	 }
+
+	 @call process::MSG_ROW4_CHANGE_LEVEL_TEXT();
+}
+/*-------------------------------------------------------------------------*/
+word MyRandom()
+{
+    static word rand1 = 0xf32d ;
+    static word rand2 = 0x0103 ;
+    static word rand3 = 0x4326 ;
+    static word rand4 = 0x4878 ;
+    TimerDateAndTime dateAndTime ;
+    word old ;
+
+    TimerGetDateAndTime(&dateAndTime) ;
+    old = rand1 ;
+    rand1 = rand2 ;
+    rand2 = rand3 ;
+    rand3 = rand4 ;
+/*
+    rand4 += dateAndTime.TDAT_minutes + dateAndTime.TDAT_minutes +
+             dateAndTime.TDAT_hours + dateAndTime.TDAT_day ;
+*/
+    rand4 ^= old^rand1^rand2^rand3 ;
+    rand3 += rand1+rand2+rand4 ;
+    rand4 += TimerGetCount() ;
+    return old ;
+}
+/*-------------------------------------------------------------------------*/
+

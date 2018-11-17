@@ -1,0 +1,319 @@
+* Header info
+** PROJECT:	PC SDK
+** MODULE:	Sample Library -- Mandelbrot Set Library
+** FILE:	mset.todo
+** AUTHOR:	Paul DuBois, Sep 18, 1993
+** REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dubois	9/18/93   	Initial version.
+	
+** DESCRIPTION:
+	This file contains the to-do list for the mset library.
+
+	$Id: mset.todo,v 1.4.4.1 97/03/29 05:28:18 canavese Exp $
+
+* Using outline-mode
+    
+    C-c C-h: hide subtree
+    C-c C-s: show subtree
+    M-x hide-body is also useful for getting the big picture
+    An ellipsis means there's something in that node.
+    Help-m for more detailed info
+
+* Conventions
+    
+** Numbers  	
+    
+    The numbers attached to some nodes are meant to indicate roughly how
+    much time/work might be needed to implement that feature.  Take them
+    with a grain of salt -- some programmers and designs are better than
+    others!
+
+    1: an hour, max
+    2: a few hours
+    3: design needed + a few hours
+    etc.
+    
+** Tags
+    
+    Some entries have SDK tags on them -- these are to be considered
+    "priority" items.  The rest is LNAL material.
+    
+
+* Controllers
+    
+** Zoom controller
+    
+    Should be able to select the next operation that double-clicking will
+    perform.  Currently, zooming is implemented with hard-coded triggers in
+    the Benoit application, and MSG_MSET_ZOOM caches the last zoom command
+    for use in MSG_META_START_SELECT.
+	
+** Dwell controller
+    
+    Change the maximum dwell.  Currently, this is hard-coded at 200 or so.
+    To do this, one must add a MSG_MSET_CHANGE_MAX_DWELL message.  See "New
+    Features::Maximum displayed dwell".
+		
+** Algorithm controller
+    
+    A new algorithm would be nice, especially a divide-and-conquer or a
+    pseudo-random fill in.  The drawing-update system would probably have to
+    be tweaked (or re-done; portions are pretty hack-ish).  See
+    Optimizaions::Divide and conquer.
+    
+
+* Code cleanups (SDK)
+    
+    A lot of the stuff that follows should have been done for the first SDK
+    release...
+    
+** Checking for MSI_initialized
+    
+    Nearly every message handled by MSetClass is prefaced by a check to see
+    if it's been initialized.  This seems really ugly -- is there a way
+    around it?
+    
+** Setting size in MSET_INITIALIZE
+    
+    MSG_MSET_INITIALIZE calls MSG_VIS_SET_SIZE -- it should probably only do
+    this if it isn't a new MSet; that is, if it's initializing itself from a
+    pre-created parameters block as opposed to allocating a new one for
+    itself.  If it is allocating a new, default params block, it should
+    honor the sizing already given it.
+    
+** Indication of true state
+    
+    Currently, the state of the calculation thread is reflected in
+    MSP_initialized -- TRUE if the thread exists, FALSE if not.  It might
+    be useful and/or cleaner to create a real state variable for the thread,
+    possible values being: None, Calculating, Paused/Done.  See next entry
+    "Paramter setting"
+
+** Parameter setting
+   
+   Many of the MSG_MSET_SET... messages pause the calculation thread and
+   send a MSG_MSET_CONTINUE_CALCULATION when they're done.  Instead, they
+   should only send the continue if the thread was calculating to begin
+   with.  If it wasn't, they should leave it paused.
+    
+** Robustness of error-handling
+    
+    I actually don't know what to do to make the library more graceful in
+    this respect.  Currently, the calculation thread just stops when
+    MemAlloc returns NULL, and sends a warning message to the MSet object.
+    Perhaps this is good enough.
+    
+
+* Optimizations (speed and/or space)
+    
+** 2: Joon's 48-bit multiply code
+    
+    Joon says that his 48-bit multiply code is better than Adam's.  It
+    should be a relatively simple task to port his math routines and have
+    three "precisions" -- 16-bit, 48-bit-adam, 48-bit-joon.
+   
+** 2: Handle symmetry
+    
+    The Mandelbrot set is symmetric about the X axis -- this should be
+    exploited properly.
+    
+** 2: Port drawing code to assembly
+    
+    Basically, all the drawing routines (MSET_DRAW, MSetDrawLine,
+    SetLineColor) seem like they would do well in assembly, either because
+    of tight loops (the first two) or table-lookup (the latter).  They're
+    used fairly often, and drawing is kind of pokey right now...
+    
+** 3: Decrease memory usage by limiting maxDwell
+    
+    If maxDwell < 256, then we only need one byte per point.
+    This should be tranparent to the user.  Routines that would have to
+    be modified (they depend on words being stored):
+       MSG_MSET_DRAW
+       MSetDrawLine
+       MSG_MSC_CALCULATE
+       MSLineBasedDoLine
+    
+** 4: Decrease memory usage by chopping dwell values
+    
+    This gets a four because it requires some careful design.
+
+    This is a slightly different approach.  Since almost all of the
+    colorsets are palette-based, most people wouldn't notice if only the
+    lower 4 or 8 bits of dwell were stored.  Those zoomer people sure
+    wouldn't!
+
+    Things to consider:
+    When chopping off the high bits, what happens to dwells that are
+    truncated to zero?  How about those that are now == the truncated
+    maxDwell?  Should we store maxDwell as 0xf or 0xff then?
+    
+    We don't really want to store 0 for any dwell values, for efficiency
+    reasons.  The calc thread takes 0 as meaning "not calculated yet"; if we
+    just truncated the top bits, the calc thread would re-do a bunch of
+    points every time it stopped and started again.  However, this only
+    happens on saves, so it might not be that bad.
+    
+    We also don't want any points to be congruent with maxDwell, because
+    then you wouldn't have a unique color for points inside the MSet.
+    
+    The divide-and-conquer algorithm wouldn't be able to assume anything
+    about already-calculated points; it wants to know if two dwells are
+    equal, not congruent.  This is merely annoying.
+	
+    So, we end up with n-2 different dwell values, with the other two being
+    "not calculated" and ">= maxDwell".  (n = 16 or 256)
+    
+** 2: Fractally compressed files
+    
+    A nifty way to cut down on disk usage would be to toss all the
+    calculated points and save only the MSetParameters struct.
+    
+** 3: Zooming and moving
+    
+    All the data are thrown away when zooming and moving.  A lot of it can
+    probably be saved; you just need to take the time to massage the data
+    into the proper place.
+    
+** 3: Floating point support
+    
+    Either write float <-> FixNum conversion routines, or make top, left,
+    hRes, vRes unions of FixNums and floats, and modify zooming routines to
+    be able to deal with this.  I prefer the latter solution, because
+    otherwise you're still limited by the resolution of hRes and vRes.
+    There is already an "MSetNum" union set up for just this purpose.
+
+    Note that MSG_MSET_ZOOM is currently the only routine that examines or
+    modifies top, left, hRes, vRes. (besides the calculation routines which
+    are either precision-independent or totally precision-dependent)
+    
+** 4: Divide and conquer
+   
+*** Basis
+    
+    There's a theorem that goes something like: "Dwell bands are connected",
+    meaning that you can't have islands of dwell.  This allows a nice little
+    optimization: if all the points in some closed loop have the same
+    dwell, then the interior of that loop does also.
+    
+    Theoretically, you
+    might miss some little ribbon that passes between two of your points,
+    that then expands into something large enough to discern on the screen.
+    In practice, however, the algorithm works just fine.
+    
+*** Pseudocode -- the Marinari-Silver "Eat my dust" algorithm
+    
+doSquare(top left bottom right)
+{
+  if (four corners have same dwell &&
+      four sides have same dwell)
+  {
+    interior is homogenous;
+  }
+  else
+  {
+    doSquare(top left subsquare);
+    doSquare(top right subsquare);
+    ... etc.
+  }
+  if (square area > threshold)
+    Add rect to update region  
+}
+    
+
+* SDK features
+** PDA-specific issues
+    
+*** ?: Non-transparently detachable while running in back (SDK)
+    
+    See SDK_Asm/Abort
+    
+*** ?: Setting of "heapspace" in .gp
+    
+*** ?: Any screen-size issues
+    
+*** ?: Defaults
+    
+    Nuking of default menu, no floating keyboard, etc.
+    
+*** ?: Dynamic adaptation to B&W display
+    
+    ie color controller removes some settings.
+    
+** ?: Custom gadget using GenView
+    
+    Likely in some controller dialog
+    
+** ?: Marching-ants and copy/paste/quick-transfer
+
+* New features
+    
+** 1: Automatic precision change to 48 bits
+    
+    When you zoom in so much that the high word of hRes and vRes is 0x0000,
+    all you get is a big blotch on your screen.  The zoom code should detect
+    when this is happening and automatically switch to 48-bit precision.
+    
+** 1: Colorsets have a color for "not calculated"
+   
+    There's already a check for ">= maxDwell"; there might as well be one
+    for "== 0".  Use dark grey or some such; black if using B&W color set.
+    
+** 1: A _good_ dithered colorset for black and white machines.
+    
+    Not much more to say here.  The current "greyscale" colorset stinks;
+    even the color ones look better on the zoomer.  It should be re-done.
+    
+** 1: Support for temp. vm files
+    
+    Right now, one is required to pass in a VM File handle when initializing
+    an MSet.  It should be possible to pass in NULL, whereupon the MSet
+    would create a temporary vm file and nuke it when it gets a
+    STOP_CALCULATION.
+	
+** 1: Maximum displayed dwell
+    
+    When exploring, sometimes you might want to limit the maximum dwell
+    value that is displayed on screen, as opposed to the maximum number of
+    iterations the calculation routines will perform.  You would be able to
+    chop the dwell down to remove some "fuzz", and get it back without
+    having to go and recalculate the image.
+
+    Trivial to implement; just make MSG_MSET_DRAW pass a different value to
+    MSetDrawLine.  One might also want to make sure 
+	
+** 2: Ability to change maxiumum dwell
+    
+    Should be intelligent enough not to clear out the data and make the
+    thread start from scratch.  All we really have to do when changing
+    maxDwell is to zero any "potentially incorrect" points:
+
+    When increasing maxDwell
+	set all points == oldMaxDwell to zero (not calculated yet)
+	NOTE that points >= MaxDwell are still correct.
+    
+    When decreasing maxDwell
+	don't do anything -- points above newMaxDwell will show up as black.
+	If maxDwell is ever increased again, we'll get those points back for
+	"free".
+	
+** 3: Floating point support (see Optimizations)
+** ?: Copy and Paste
+    
+    Support for copying for later paste into Draw or Write.
+    
+** ?: Quick-transfer
+    
+    Support for copy/quick transfer to another MSet object; allowing one to
+    clone an MSet if two spots look interesting.  Not really necessary
+    because you can just do a save-as, but it would be a nifty (and
+    hopefully simple) example of how to support quick transfer.
+    
+
+* Locals
+** Local Variables:
+** mode:indented-text
+** eval:(if (fboundp 'outline-minor-mode) (outline-minor-mode) (outline-mode))
+** End:

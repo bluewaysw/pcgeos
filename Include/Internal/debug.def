@@ -1,0 +1,195 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+FILE:		debug.def
+
+DECLARER:	Kernel
+
+DESCRIPTION:
+	This file defines debugger structures and routines.
+
+	$Id: debug.def,v 1.1 97/04/04 14:14:52 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__DEBUG
+
+StartKernel
+
+;--------------------------------------------------------------------------
+;		Constants for debugging
+;--------------------------------------------------------------------------
+
+;	See Spec/debug.doc for details
+
+;	Values sent to DebugMemory
+
+DebugMemoryFunction etype byte
+DEBUG_REALLOC		enum DebugMemoryFunction
+;	Pass:	bx	= handle being resized
+;		dx	= segment of block, if HM_addr is 0
+;		ds	= kdata
+
+DEBUG_DISCARD		enum DebugMemoryFunction
+;	Pass:	bx	= handle being discarded
+;		ds	= kdata
+
+DEBUG_SWAPOUT		enum DebugMemoryFunction
+;	Pass:	bx	= handle being swapped
+;		ds	= kdata
+
+DEBUG_SWAPIN		enum DebugMemoryFunction
+;	Pass:	bx	= handle being swapped in
+;		dx	= new segment of same
+;		ds	= kdata
+
+DEBUG_MOVE		enum DebugMemoryFunction
+;	Pass:	bx	= handle being moved
+;		ds	= kdata
+;		es	= new segment for block
+
+DEBUG_FREE		enum DebugMemoryFunction
+;	Pass:	bx	= handle being freed
+;		ds	= kdata
+
+DEBUG_MODIFY		enum DebugMemoryFunction
+;	Pass:	bx	= handle whose flags were changed
+;		ds	= kdata
+
+DEBUG_OWNER_CHANGE	enum DebugMemoryFunction
+;	Pass:	bx	= handle whose owner changed
+;		ds	= kdata
+
+DEBUG_BANK_PAGE		enum DebugMemoryFunction
+;	Pass:	bx	= XIP page banked in
+;		ds	= kdata
+
+;	Values sent to DebugProcess
+
+DebugProcessFunction etype byte
+DEBUG_EXIT_THREAD	enum DebugProcessFunction
+;	Pass:	bx	= dead thread handle
+;		dx	= exit code
+
+DEBUG_EXIT_GEODE	enum DebugProcessFunction
+;	Pass:	bx	= dead geode handle
+
+DEBUG_CREATE_THREAD	enum DebugProcessFunction
+;	Pass:	bx	= new thread handle
+
+DEBUG_LOAD_DRIVER	enum DebugProcessFunction
+;	Pass:	bx	= new driver handle
+;		ds	= driver core block
+
+DEBUG_LOAD_LIBRARY	enum DebugProcessFunction
+;	Pass:	bx	= new library handle
+;		ds	= library core block
+
+DEBUG_RESTART_SYSTEM	enum DebugProcessFunction
+;	Pass:	nothing
+
+DEBUG_SYSTEM_EXITING	enum DebugProcessFunction
+;	Pass:	nothing
+
+;	Values sent to hook in loader
+DebugLoaderFunction 	etype byte
+DEBUG_LOADER_MOVED	enum DebugLoaderFunction
+DEBUG_KERNEL_LOADED	enum DebugLoaderFunction
+
+
+KernelVersion		etype	byte
+KV_PRE_SDK		enum	KernelVersion
+; no vector table within the kernel itself, not full-xip
+
+KV_HAS_TABLE		enum	KernelVersion
+
+KV_FULL_XIP		enum	KernelVersion
+
+KV_AFTER_EXCEPTION_CHANGE enum	KernelVersion
+; This version came about after we moved all the exception handlers out of
+; ThreadPrivateData.  This wouldn't be a problem except that the swat stub
+; used one of the exception handlers (TPD_breakPoint) to store a word
+; indicating to some EC code in SysLockCommon that the function was being
+; called from the swat stub and not the kernel.  Since TPD_breakPoint no
+; longer exists, we have the EC code in SysLockCommon check TPD_callVector
+; instead.  And to make the swat stub backwards compatible, we have it
+; check the KernelVersion.  If the KernelVersion is before
+; KV_AFTER_EXCEPTION_CHANGE, it uses TPD_breakPoint.  If it's after
+; KV_AFTER_EXCEPTION_CHANGE, it uses TPD_callVector.
+
+
+; this is a table of offsets in kdata and kcode for various internal
+; routines and variables used by swat
+SwatVectorTable	struct
+	;
+	; Version 1
+	; 
+	SVT_currentThread			nptr
+	SVT_geodeListPtr			nptr  
+	SVT_threadListPtr			nptr
+	SVT_biosLock				nptr
+	SVT_heapSem				nptr
+	SVT_DebugLoadResource			nptr
+	SVT_DebugMemory				nptr
+	SVT_DebugProcess			nptr
+	SVT_MemLock				nptr
+	SVT_EndGeos				nptr
+	SVT_BlockOnLongQueue			nptr
+	SVT_FileReadFar				nptr
+	SVT_FilePosFar				nptr
+	SVT_sysECBlock				nptr
+	SVT_sysECCheckSum			nptr
+	SVT_sysECLevel				nptr
+	SVT_systemCounter			nptr
+	SVT_errorFlag				nptr
+	SVT_ResourceCallInt			nptr
+	SVT_ResourceCallInt_end			nptr
+	SVT_FatalError				nptr
+	SVT_FatalError_end			nptr
+	SVT_SendMessage				nptr
+	SVT_SendMessage_end			nptr
+	SVT_CallFixed				nptr
+	SVT_CallFixed_end			nptr
+	SVT_ObjCallMethodTable			nptr
+	SVT_ObjCallMethodTable_end		nptr
+	SVT_CallMethodCommonLoadESDI		nptr
+	SVT_CallMethodCommonLoadESDI_end	nptr
+	SVT_ObjCallMethodTableSaveBXSI		nptr
+	SVT_ObjCallMethodTableSaveBXSI_end	nptr
+	SVT_CallMethodCommon			nptr
+	SVT_CallMethodCommon_end		nptr
+	SVT_MesageDispatchDefaultCallBack	nptr
+	SVT_MesageDispatchDefaultCallBack_end	nptr
+	SVT_MessageProcess			nptr
+	SVT_MessageProcess_end			nptr
+	SVT_OCCC_callInstanceCommon		nptr
+	SVT_OCCC_callInstanceCommon_end		nptr
+	SVT_OCCC_no_save_no_test		nptr
+	SVT_OCCC_no_save_no_test_end		nptr
+	SVT_OCCC_save_no_test			nptr
+	SVT_OCCC_save_no_test_end		nptr
+	SVT_Idle				nptr
+	SVT_Idle_end				nptr
+	;
+	; Version 2
+	; 
+	SVT_curXIPPage				nptr
+	SVT_MapXIPPageFar			nptr
+	SVT_MAPPING_PAGE_SIZE			word
+SwatVectorTable			ends
+
+;
+; This is the structure found two bytes after the start of the kernel's
+; library entry routine, if the kernel has the vector table.
+; 
+SWAT_VECTOR_SIG		equ	'jl'
+SwatVectorDesc		struct
+    SVD_signature	char SWAT_VECTOR_SIG
+    SVD_version		KernelVersion		KV_HAS_TABLE
+    SVD_tableSize	word			size SwatVectorTable
+    SVD_table		nptr.SwatVectorTable	0
+SwatVectorDesc		ends
+
+EndKernel

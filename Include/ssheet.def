@@ -1,0 +1,2117 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		GeoCalc
+FILE:		spreadsheet.def
+
+AUTHOR:		Gene Anderson, Feb 12, 1991
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	eca	2/12/91		Initial revision
+
+DESCRIPTION:
+	Definition for Spreadsheet Library
+
+	Note:  Under DBCS, 2*MAX_NAME_LENGTH in
+		SpreadsheetNameParameters.SNP_definition results in
+		stack overflow, uses "4+MAX_NAME_LENGTH" instead.
+
+	$Id: ssheet.def,v 1.1 97/04/04 14:23:11 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef  __SSHEET
+
+StartLibrary    ssheet
+
+;
+; Necessary include files
+;
+UseLib	ruler.def
+UseLib	Objects/vTextC.def
+UseLib	parse.def
+UseLib	math.def
+
+;
+; We set the flag here for cell protection
+;
+ifndef _PROTECT_CELL
+	_PROTECT_CELL	equ	FALSE
+endif
+
+;-----------------------------------------------------------------------------
+;		Setup data for spreadsheet
+;-----------------------------------------------------------------------------
+
+SpreadsheetSetupData	struct
+	SSD_chartBody	optr			; OD of chart body
+SpreadsheetSetupData	ends
+
+SpreadsheetClass	class	VisCompClass, master
+
+;-----------------------------------------------------------------------------
+;		Methods
+;-----------------------------------------------------------------------------
+
+MSG_SPREADSHEET_READ_CACHED_DATA	message
+;
+; Force read of data cached in spreadsheet object from file
+;
+;	PASS:	dx - VM file handle
+;		cx - VM handle of spreadsheet map block
+;	RETURN:	none
+;
+MSG_SPREADSHEET_WRITE_CACHED_DATA	message
+;
+; Force write of data cached in spreadsheet object to file
+;
+;	PASS:	dx - VM file handle
+;	RETURN:	none
+;
+MSG_SPREADSHEET_ATTACH_UI		message
+;
+; Attach UI, non-visual data to spreadsheet object
+;
+;	PASS:	cx - handle of SpreadsheetSetupData block
+;		dx - VM file handle
+;	RETURN:	none
+;
+MSG_SPREADSHEET_ATTACH_FILE		message
+;
+; Attach file to spreadsheet object
+;
+;	PASS:	dx - VM file handle
+;		cx - VM handle of spreadsheet map block
+;	RETURN:	none
+;
+MSG_SPREADSHEET_MOVE_ACTIVE_CELL	message
+;
+; Move the active cell
+;
+;	PASS:	(bp,cx) - cell to move to (r,c)
+;	RETURN:	none
+;
+MSG_SPREADSHEET_GOTO_CELL		message
+;
+; Goto cell entered in the active cell edit/display
+;
+;	PASS:	dx - handle of text block
+;		cx - length of text (w/o NULL)
+;	RETURN:	none
+;
+; NOTE: the block is free'd
+;
+MSG_SPREADSHEET_ENTER_DATA		message
+;
+; Enter data from the edit bar into the active cell.  Spreadsheet will
+; grab the focus if the data is entered correctly.
+;
+;	PASS:	dx - handle of text block
+;		cx - length of text (w/o NULL)
+;	RETURN:	none
+;
+; NOTE: the block is free'd
+;
+MSG_SPREADSHEET_SET_ROW_HEIGHT		message
+;
+; Set the row height of current selection
+;
+;	PASS:	cx - height of rows
+;		ROW_HEIGHT_AUTOMATIC - OR'ed for automatic height
+;		dx - SPREADSHEET_ADDRESS_USE_SELECTION or row #
+;
+MSG_SPREADSHEET_SET_COLUMN_WIDTH		message
+;
+; Set the column width of current selection
+;
+; NOTE: you will get ~33% better performance if you limit column widths
+; to being byte multiples (ie. multiples of 8), as bit blits are faster.
+;
+;	PASS:	cx - width of columns (points)
+;		COLUMN_WIDTH_BEST_FIT - OR'ed for best fit
+;		dx - SPREADSHEET_ADDRESS_USE_SELECTION or column #
+;
+MSG_SPREADSHEET_GET_ROW_HEIGHT			message
+;
+; Get the height of a row
+;
+;	PASS:	cx - row #
+;	RETURN:	dx - row height
+;		   - -1 if no such row
+;
+MSG_SPREADSHEET_GET_COLUMN_WIDTH		message
+;
+; Get the width of a column
+;
+;	PASS:	cx - column #
+;	RETURN:	dx - column width
+;		   - -1 if no such column
+;
+SpreadsheetMessages = SpreadsheetMessages + 1
+
+MSG_SPREADSHEET_MAKE_FOCUS			message
+;
+; Make the spreadsheet the current focus object
+;	PASS:	none
+;	RETURN:	none
+;
+
+MSG_SPREADSHEET_ADD_NAME_WITH_PARAM_BLK		message
+;
+; For the case when the SpreadsheetNameParameters cannot be passed on the
+; stack, this routine is used. SpreadsheetNameParameters is passed in as
+; a memory block. Used by the define name controller.
+;
+;	PASS:	cx:dx - OD of controller
+;		bp - mem han of blk containing SpreadsheetNameParameters
+;	RETURN:	mem block freed
+;
+
+MSG_SPREADSHEET_ADD_NAME			message
+;
+; Add a name to the spreadsheet name list
+; NOTE: this message must be called from the same thread, with the
+; arguments on the stack (dx=ss)
+;	PASS:	dx:bp - Pointer to SpreadsheetNameParameters
+;			with these fields filled in:
+;				SNP_textLength
+;				SNP_text
+;				SNP_defLength
+;				SNP_definition
+;	RETURN:	cx - Entry number in the defined name list
+;		dx - # of defined names in the name list
+;		bp - # of undefined names in the name list
+;		If there was an error in the name definition then
+;		    cx = -1
+;		    dl = ParserScannerEvaluatorError code
+;
+MSG_SPREADSHEET_VALIDATE_NAME			message
+;
+; Make sure a name can be added to the spreadsheet name list
+; NOTE: this message must be called from the same thread, with the
+; arguments on the stack (dx=ss)
+;	PASS:	dx:bp - Pointer to SpreadsheetNameParameters
+;			with these fields filled in:
+;				SNP_textLength
+;				SNP_text
+;	RETURN:	If there was an error in the name definition then
+;		    cx = -1
+;		    dl = ParserScannerEvaluatorError code
+;		Else,
+;		    cx != -1, and the name can be added to the spreadsheet
+;			    name list.		    
+;				 
+;
+
+MSG_SPREADSHEET_DELETE_NAME_WITH_LIST_ENTRY	message
+;
+; Delete a name given the list entry number. Used by the define name controller.
+;	PASS:	cx:dx - controller OD
+;		bp - list entry
+;	RETURN:	nothing
+;
+
+MSG_SPREADSHEET_DELETE_NAME			message
+;
+; Remove a name from the spreadsheet name list
+; NOTE: this message must be called from the same thread, with the
+; arguments on the stack (dx=ss)
+;	PASS:	dx:bp - Pointer to SpreadsheetNameParameters
+;			with these fields filled in:
+;				SNP_listEntry
+;	RETURN:	cx - Token of the deleted name
+;		dx - # of defined names in the name list
+;		bp - # of undefined names in the name list
+;
+
+MSG_SPREADSHEET_CHANGE_NAME_WITH_PARAM_BLK	message
+;
+; For the case when the SpreadsheetNameParameters cannot be passed on the stack,
+; this routine is used. SpreadsheetNameParameters is passed in as a memory
+; block. Used by the define name controller.
+;
+;	PASS:	cx:dx - OD of controller
+;		bp - mem han of blk containing SpreadsheetNameParameters
+;	RETURN:	mem block freed
+
+MSG_SPREADSHEET_CHANGE_NAME			message
+;
+; Remove a name from the spreadsheet name list
+; NOTE: this message must be called from the same thread, with the
+; arguments on the stack (dx=ss)
+;	PASS:	dx:bp - Pointer to SpreadsheetNameParameters
+;			with these fields filled in:
+;				SNP_flags
+;				SNP_listEntry
+;				SNP_textLength
+;				SNP_text
+;				SNP_defLength
+;				SNP_definition
+;	RETURN:	cx - Entry number in the defined name list
+;		dx - # of defined names in the name list
+;		bp - # of undefined names in the name list
+;		If there was an error in the name definition then
+;		    cx = -1
+;		    dl = ParserScannerEvaluatorError code
+;
+MSG_SPREADSHEET_GET_NAME_COUNT		message
+;
+; Get the number of names in the spreadsheet name list
+;	RETURN:	dx - # of defined names in the name list
+;		bp - # of undefined names in the name list
+;
+
+MSG_SPREADSHEET_GET_NAME_INFO		message
+;
+; Get information about a name in the name list
+; NOTE: this message must be called from the same thread, with the
+; arguments on the stack (dx=ss)
+;	PASS:	dx:bp - Pointer to SpreadsheetNameParameters
+;			with these fields filled in:
+;				SNP_flags
+;				SNP_listEntry
+;	RETURN:	SpreadsheetNameParameters with the fields filled in
+;
+MSG_SPREADSHEET_FORMAT_EXPRESSION		message
+;
+; Format an expression of parser-tokens.
+;	PASS:	ss:bp	= Pointer to SpreadsheetFormatParameters with:
+;				SFP_expression
+;				SFP_text
+;				SFP_length
+;		dx	= Size of SpreadsheetFormatParameters
+;			  (if called remotely)
+;	RETURN:	*SFP_text  = The formatted text (null terminated)
+;		SFP_length = Length of the formatted text
+;
+MSG_SPREADSHEET_PARSE_EXPRESSION		message
+;
+; Parse an expression. No new name references are allowed.
+;	PASS:	ss:bp	= Pointer to SpreadsheetParserParameters with:
+;				SPP_text
+;				SPP_expression
+;				SPP_exprLength
+;				SPP_parserParams.PP_flags
+;		dx	= Size of SpreadsheetParserParameters
+;			  (if called remotely)
+;	RETURN: al	= ParserScannerEvaluatorError
+;		al	= -1 otherwise
+;		SPP_expression = Parsed data
+;
+MSG_SPREADSHEET_EVAL_EXPRESSION		message
+;
+; Evaluate an expression
+;	PASS:	ss:bp	= Pointer to SpreadsheetEvalParameters with:
+;				SEP_expression
+;		cl	= EvalFlags
+;		dx	= Size of SpreadsheetFormatParameters
+;			  (if called remotely)
+;	RETURN: al	= ParserScannerEvaluatorError if a serious error
+;			  was encountered.
+;		al	= -1 otherwise
+;		SEP_result = Result of the evaluation
+;
+MSG_SPREADSHEET_ERROR			message
+;
+; Notify the user about some error that the spreadsheet has encountered
+;	PASS:	dl	= ParserScannerEvaluatorError
+;
+MSG_SPREADSHEET_SET_NOTE			message
+;
+; Add/modify/remove a note for a given cell.
+;	PASS:	cx	= Handle of the block containing the text of the note.
+;			  Text must be null terminated.
+;			= 0 if there is no text (or a single NULL)
+;		dx/bp	= Row/Column of the cell whose note needs modification.
+;
+MSG_SPREADSHEET_SET_NOTE_FOR_ACTIVE_CELL	message
+;
+; Add/modify/remove a note for a given cell.
+;	PASS:	cx	= Handle of the block containing the text of the note.
+;			  Text must be null terminated.
+;			= 0 if there is no text
+;		The block will be free'd before returning
+;
+MSG_SPREADSHEET_GET_NOTE			message
+;
+; Add/modify/remove a note for a given cell.
+;	PASS:	dx/bp	= Row/Column of the cell whose note we want.
+;	RETURN:	cx	= Size of the text of the note (w/o NULL)
+;			= 0 if there is no text (a single NULL)
+;		dx	= Block handle of the block containing the note text.
+;			NOTE: the block will always be returned
+;
+
+MSG_SPREADSHEET_GET_NOTE_FOR_ACTIVE_CELL	message
+;
+; Add/modify/remove a note for a given cell.
+;	PASS:	nothing
+;	RETURN:	cx	= Size of the text of the note (w/o NULL)
+;			= 0 if there is no text (a single NULL)
+;		dx	= Block handle of the block containing the note text.
+;			NOTE: the block will always be returned
+;
+
+SpreadsheetDoubleClickFlags	record
+    SDCF_MOUSE_CLICK:1			;TRUE: message from mouse click
+    SDCF_NOTE_EXISTS:1			;TRUE: cell has notes
+    SDCF_CELL_EXISTS:1			;TRUE: cell has data
+SpreadsheetDoubleClickFlags	end
+
+MSG_SPREADSHEET_DISPLAY_NOTE			message
+;
+; Display the note. This is intended to be handled by the subclass of the
+; spreadsheet. It is sent by the spreadsheet when the user double-clicks
+; on a cell that contains a note. That cell will be the active cell when this
+; message arrives.
+;	PASS:	dl - SpreadsheetDoubleClickFlags
+;		dh - CellType (if cell exists set)
+;
+
+MSG_SPREADSHEET_CHANGE_RECALC_PARAMS		message
+;
+; Change the recalculation parameters
+;	PASS:	ss:bp	= Pointer to SpreadsheetRecalcParams
+;		dx	= Size of SpreadsheetRecalcParams (if called remotely)
+;
+
+;
+; Various spreadsheet related flags. Some of these are saved with the
+; spreadsheet file... Some aren't. If the flags that you add are zero by
+; default then they will be initialized automatically in the SpreadsheetNew()
+; function. Otherwise you will need to initialize them there yourself.
+;
+SpreadsheetFlags	record
+    SF_MANUAL_RECALC:1		; Set: Do manual recalc
+    SF_ALLOW_ITERATION:1	; Set: Allow iteration in recalculating
+    SF_SUPPRESS_REDRAW:1	; Set: Don't redraw cell
+    SF_APPLICATION_FUNCTIONS:1	; Set: Application defines functions
+    SF_QUICK_TRANS_IN_PROGRESS:1; Set: Quick-transfer in progress
+    SF_DOING_FEEDBACK:1		; Set: Doing feedback during a "quick" operation
+    SF_IN_VIEW:1		; Set: "In view" during quick-transfer feedback
+    SF_NONZERO_DOC_ORIGIN:1	; If set, spreadsheet has
+				; TEMP_SPREADSHEET_DOC_ORIGIN vardata
+
+    :4				; Unused bits
+    SF_IS_SYS_TARGET:1		; Set: We have the system target (keep w/target)
+    SF_HAVE_GRAB:1		; Set: We have the gadget exclusive
+    SF_IS_APP_TARGET:1		; Set: We have the app target (keep w/focus)
+    SF_IS_SYS_FOCUS:1		; Set: We have the system focus (keep w/target)
+SpreadsheetFlags	end
+
+;
+; The set of flags that we care about in MSG_SPREADSHEET_CHANGE_RECALC_PARAMS
+;
+SRP_FLAGS	=	mask SF_MANUAL_RECALC or mask SF_ALLOW_ITERATION
+
+SpreadsheetRecalcParams	struct
+    SRP_flags		SpreadsheetFlags	; appropriate flags set/cleared
+    SRP_circCount	word			; Iteration count
+    SRP_converge	FloatNum		; Convergence value
+SpreadsheetRecalcParams	ends
+
+MSG_SPREADSHEET_GET_RECALC_PARAMS		message
+;
+; Get the recalculation parameters.
+;	PASS:	ss:bp	= Pointer to SpreadsheetRecalcParams
+;		dx	= Size of SpreadsheetRecalcParams (if called remotely)
+;	RETURN:	Parameters filled in.
+;		bp unchanged
+;
+
+MSG_SPREADSHEET_RECALC			message
+;
+; Recalculate the spreadsheet.
+;
+
+MSG_SPREADSHEET_CLEAR_SELECTED			message
+;
+; Clear space in a spreadsheet.
+;	PASS:	cx	= SpreadsheetClearFlags
+;
+SpreadsheetClearFlags	record
+	SCF_CLEAR_ATTRIBUTES:1		; Set: clear attributes
+	SCF_CLEAR_DATA:1		; Set: clear data (value or formula)
+	SCF_CLEAR_NOTES:1		; Set: clear notes
+	:5
+SpreadsheetClearFlags	end
+
+MSG_SPREADSHEET_INSERT_SPACE			message
+;
+; Insert or delete space in a spreadsheet.  In ENGINE mode, this
+; message will NOT recalculate the spreadsheet, on the assumption that
+; the caller may want to delete several different ranges before doing
+; a recalc.
+;
+;	PASS:	cx	= SpreadsheetInsertFlags
+;
+SpreadsheetInsertFlags	record
+    SIF_COLUMNS:1		; Set: Insert/Delete columns not rows
+    SIF_COMPLETE:1		; Set: Insert/Delete complete rows/columns
+    SIF_DELETE:1		; Set: Delete, not insert
+    :5
+SpreadsheetInsertFlags	end
+
+MSG_SPREADSHEET_SET_NUM_FORMAT		message
+;
+; Set the number format for the current selection
+;
+;	PASS:	cx - format token
+;	RETURN:	none
+;
+
+MSG_SPREADSHEET_DRAW_RANGE			message
+;
+; Draw a range... used for printing.
+;	PASS:	ss:bp - Pointer to SpreadsheetDrawParams
+;		dx - Size of SpreadsheetDrawParams if called remotely
+;
+
+SpreadsheetDrawFlags	record
+    :11
+    SDF_SHOW_FORMULAS:1		; Set: Show formulas, not values
+    SDF_DRAW_GRAPHICS:1		; Set: Draw graphics
+    SDF_DRAW_NOTE_BUTTON:1	; Set: Draw the note indicators
+    SDF_DRAW_HEADER_FOOTER_BUTTON:1	; Set: Draw header/footer indicators
+    SDF_DRAW_GRID:1		; Set: Draw the grid
+SpreadsheetDrawFlags	end
+
+SpreadsheetPrintFlags	record
+    :1
+    ;
+    ; This flag causes certain spreadsheet printing routines to adjust
+    ; for printing to the screen rather then a hardcopy device.
+    ; Initially this flag is only set in GeoCalcDocumentDrawRange
+    ;
+    SPF_PRINT_TO_SCREEN:1       ; Set: Print to screen
+    SPF_PRINT_SIDEWAYS:1	; Set: Print sideways
+    SPF_SCALE_TO_FIT:1		; Set: Scale range to a given area
+    SPF_PRINT_ROW_COLUMN_TITLES:1	; Set: Print the column tities
+    SPF_SKIP_DRAW:1		; Set: Don't actually do the drawing.
+				;    Set this if you are just computing where
+				;    the pages lie.
+    SPF_CENTER_VERTICALLY:1	; Set: Center vertically inside the page
+    SPF_CENTER_HORIZONTALLY:1	; Set: Center horizontally inside the page
+    ;
+    ; If the 'continuous' bit is set and one of the 'draw header' or
+    ; 'draw footer' bits is set then the code which draws stuff will
+    ; scale the column positions by the value stored in the CL_columnScale
+    ; field of the CellLocals.
+    ;
+    SPF_CONTINUOUS:1		; Set: Draw one big page
+    SPF_PRINT_HEADER:1		; Set: print the header
+    SPF_PRINT_FOOTER:1		; Set: print the footer
+    ;
+    ; These are just here because it might be convenient for the
+    ; caller. They are never modified or checked by the spreadsheet.
+    ;
+    SPF_PRINT_DOCUMENT:1	; Set: Draw the document body
+    SPF_PRINT_NOTES:1		; Set: Draw the notes
+    SPF_PRINT_GRAPHICS:1	; Set: Print graphics
+    ;
+    ; Returned by the spreadsheet:
+    ;
+    SPF_DONE:1			; Set: The last part of the range is done
+    ;
+    ; Print grid lines
+    ;
+    SPF_PRINT_GRID:1		; Set: Print grid lines
+SpreadsheetPrintFlags	end
+
+SpreadsheetDrawParams	struct
+	;
+	; Passed in by the application.
+	;
+    SDP_printFlags	SpreadsheetPrintFlags
+    SDP_gstate		hptr.GState		; GState to draw with
+    SDP_topLeft		CellReference		; Top/left of area to draw
+	;
+	; This is the area on the output document to draw at.
+	; The spreadsheet does whatever transformations it needs in order to
+	; map the range it's drawing to the top left of this area. This puts
+	; the output in the right place.
+	;
+	; These two MUST be in this order, there is code which depends on it.
+	;
+    SDP_drawArea	RectDWord		; Area to draw to
+    SDP_limit		CellRange		; Total range we're drawing
+
+	;
+	; This is the top and left margins that are enforced by the printer.
+	;
+    SDP_margins		Point			; Top/Left page margins
+
+	;
+	; This space is used temporarily by the spreadsheet. It willbe
+	; returned from each call to MSG_SPREADSHEET_DRAW_RANGE.
+	;
+    SDP_translation	PointDWord		; The translation
+    SDP_titleTrans	PointDWord		; Translation for the titles
+    SDP_scale		WWFixed			; Amount of scaling to do
+    SDP_range		CellRange		; Actual range drawn
+    SDP_rangeArea	RectDWord		; Actual area drawn
+    align	word
+SpreadsheetDrawParams	ends
+
+MSG_SPREADSHEET_GET_EXTENT			message
+;
+; Get the extent of the spreadsheet.
+;	PASS:	cx - SpreadsheetExtentType
+;	RETURN:	ax/cx - Row/Column of first cell in extent
+;		dx/bp - Row/Column of last cell in extent
+;		ax = -1 if there is no data in the spreadsheet
+;
+
+SpreadsheetExtentType	etype	word, 0, 2
+SET_ENTIRE_SHEET		enum	SpreadsheetExtentType
+SET_NO_EMPTY_CELLS		enum	SpreadsheetExtentType
+SET_NO_EMPTY_CELLS_NO_HDR_FTR	enum	SpreadsheetExtentType
+; following are internal only:
+SET_NEXT_DATA_CELL		enum	SpreadsheetExtentType
+SET_LAST_DATA_CELL		enum	SpreadsheetExtentType
+SET_PREV_DATA_CELL		enum	SpreadsheetExtentType
+SET_FIRST_DATA_CELL		enum	SpreadsheetExtentType
+
+; OR this flag with the SpreadsheetExtentType to ignore any locked
+; cells that may prevent us from accessing the true extent of the
+; Spreadsheet. Use this carefully...
+;
+SET_IGNORE_NONZERO_ORIGIN	equ	0x01
+
+MSG_SPREADSHEET_GET_RANGE_BOUNDS		message
+;
+; Get the bounds around a given range.
+;	PASS:	dx:bp	= Pointer to CellRange
+;		dx:cx	= Pointer to RectDWord to fill in
+;	RETURN:	RectDWord contains the bounds of the range
+;
+
+MSG_SPREADSHEET_SET_HEADER_RANGE		message
+MSG_SPREADSHEET_SET_FOOTER_RANGE		message
+;
+; Set the range that is the header/footer.
+;	PASS:	cx = 0 if we want to use the currently selected range
+;		cx = non-zero to remove the header completely
+;
+
+MSG_SPREADSHEET_GET_HEADER_RANGE		message
+MSG_SPREADSHEET_GET_FOOTER_RANGE		message
+;
+; Get the range that is the header/footer.
+;	RETURN:	ax/cx	= Row/Column of first cell in header/footer range.
+;		dx/bp	= Row/Column of last  cell in header/footer range.
+;		ax	= -1 indicates that there is no header/footer
+;
+
+MSG_SPREADSHEET_COMPLETE_REDRAW		message
+;
+; Force the entire spreadsheet (and related objects) to redraw.
+;
+
+MSG_SPREADSHEET_NOTES_ENUM		message
+;
+; Enumerate the cells in the spreadsheet. Applications can use this to
+; examine the cell data. They should not modify the cell data in any way.
+;	PASS:	cx:dx	= Callback routine
+;		bp	= Parameters to pass to the callback. Note: The
+;			  caller must be run in the same thread as the
+;			  spreadsheet object.
+;	RETURN:	nothing
+;
+;	Callback:
+;		PASS:	ax,cx	= Row,Column of the cell
+;			ss:bp	= Stack frame that was passed in
+;			*es:di	= Pointer to notes text
+;			^ldx:si	= Spreadsheet object
+;		RETURN:	carry set to abort enum
+;		DESTROYED: nothing
+;
+
+MSG_SPREADSHEET_ALTER_DRAW_FLAGS	message
+;
+; Change the SpreadsheetDrawFlags associated with the spreadsheet.
+;	PASS:	cx	= Bits to set
+;		dx	= Bits to clear
+;
+
+MSG_SPREADSHEET_GET_DRAW_FLAGS	message
+;
+; Return the titleStyles and drawFlags for a spreadsheet.
+;	RETURN:	dx	= SSI_drawFlags
+;
+
+MSG_SPREADSHEET_HANDLE_SPECIAL_FUNCTION	message
+;
+; Handle one of the special functions from the parser.
+; This method must be handled by the subclass since there is no default
+; action associated with the spreadsheet object.
+;
+;	PASS:	cx	= Special function
+;			SF_FILENAME:
+;				ss:dx	= Pointer to the buffer to fill
+;	RETURN: SF_FILENAME:
+;			cx	= Length of the text in the buffer
+;		SF_PAGE:
+;			cx	= Current page number
+;		SF_PAGES:
+;			cx	= Total number of pages
+;
+
+MSG_SPREADSHEET_CHANGE_COLUMN_WIDTH	message
+;
+; Make the selected columns wider or narrow
+;	PASS:	cx - amount to change column widths by
+;		dx - SPREADSHEET_ADDRESS_USE_SELECTION or column #
+;
+MSG_SPREADSHEET_CHANGE_ROW_HEIGHT	message
+;
+; Make the selected rows taller or shorter
+;	PASS:	cx - amount to change row heights by
+;		dx - SPREADSHEET_ADDRESS_USE_SELECTION or row #
+;
+
+SpreadsheetSearchArea	record
+    SSA_SEARCH_FORMULAS:1			; Set: Search in formulas
+    SSA_SEARCH_VALUES:1				; Set: Search in values
+    SSA_SEARCH_NOTES:1				; Set: Search in notes
+    SSA_SEARCH_TEXT_OBJECTS:1			; Set: Search in text objects
+SpreadsheetSearchArea	end
+
+MSG_SPREADSHEET_GET_FILE		message
+;
+; Get the file associated with a given spreadsheet
+;	RETURN:	cx	= File handle
+;
+
+MSG_SPREADSHEET_SORT_RANGE		message
+;
+; Sort a range of the file
+;	PASS:	cl	= RangeSortFlags (see cell.def)
+;	RETURN:	cx	= 0 if we sorted
+;		cx	= RangeSortError if we didn't
+;
+
+MSG_SPREADSHEET_FUNCTION_TO_TOKEN	message
+;
+; Convert an application defined function into a token that can be used
+; to identify the function later.
+;
+; This message is intended to be handled by all instances of the spreadsheet
+; object that have the SF_APPLICATION_FUNCTIONS bit set in the SSI_flags
+; field of its instance data. There is no handler for this message in the
+; spreadsheet object. The sub-class MUST handle this messge if it has this bit
+; set.
+;
+;	PASS:	dx:bp	= Pointer to the text of the identifier
+;		cx	= Length of the string
+;	RETURN:	carry set if the string is a function
+;		di	= Function ID
+;
+
+MSG_SPREADSHEET_FUNCTION_TO_CELL	message
+;
+; Convert an application defined function into a cell so that dependencies
+; can be added to the function.
+;
+; This message is intended to be handled by all instances of the spreadsheet
+; object that have the SF_APPLICATION_FUNCTIONS bit set in the SSI_flags
+; field of its instance data. There is no handler for this message in the
+; spreadsheet object. The sub-class MUST handle this messge if it has this bit
+; set.
+;
+;	PASS:	cx	= FunctionID
+;		ss:bp	= EvalParameters
+;	RETURN:	dx	= Row (0 means no dependency required)
+;		cx	= Column
+;		carry set on error
+;		al	= Error code
+;
+
+MSG_SPREADSHEET_FORMAT_FUNCTION		message
+;
+; Convert an application defined function into a cell so that dependencies
+; can be added to the function.
+;
+; This message is intended to be handled by all instances of the spreadsheet
+; object that have the SF_APPLICATION_FUNCTIONS bit set in the SSI_flags
+; field of its instance data. There is no handler for this message in the
+; spreadsheet object. The sub-class MUST handle this messge if it has this bit
+; set.
+;
+;	PASS:	ss:bp	= Pointer to a 256 char/wchar buffer
+;		cx	= Function id
+;	RETURN:	ss:bp	= Filled in with the data
+;		cx	= # of characters written
+;
+
+MSG_SPREADSHEET_EVAL_FUNCTION		message
+;
+; Evaluate an application defined function.
+;
+; This message is intended to be handled by all instances of the spreadsheet
+; object that have the SF_APPLICATION_FUNCTIONS bit set in the SSI_flags
+; field of its instance data. There is no handler for this message in the
+; spreadsheet object. The sub-class MUST handle this messge if it has this bit
+; set.
+;
+;	PASS:	ss:bp	= Pointer to SpreadsheetEvalFuncParameters
+;	RETURN:	carry set on error
+;		al	= Error code
+;
+SpreadsheetEvalFuncParameters	struct
+    SEFP_stacksSeg	word		; Operator/argument stack
+    SEFP_opStackPtr	word		; Operator stack pointer
+    SEFP_argStackPtr	word		; Argument stack pointer
+    SEFP_funcID		word		; Function id
+    SEFP_nArgs		word		; Number of arguments
+SpreadsheetEvalFuncParameters	ends
+
+SpreadsheetChartReturnType	etype	byte, 0, 2
+SCRT_TOO_MANY_CHARTS		enum SpreadsheetChartReturnType
+SCRT_INSUFFICIENT_MEMORY	enum SpreadsheetChartReturnType
+SCRT_NO_DATA			enum SpreadsheetChartReturnType
+
+MSG_SPREADSHEET_CHART_RANGE	message
+;
+; Create a chart of the currently selected range
+;
+; Pass:		cl - ChartType, 
+;		ch - ChartVariation
+;			
+; Return:	al - ChartReturnType
+;		if CRT_OTHER_ERROR
+;			ah - SpreadsheetChartReturnType
+;
+; Destroyed:	nothing 
+;
+
+MSG_SPREADSHEET_DELETE_CHART	message
+;
+; Sent by the chart body when a chart is being deleted.  To get this
+; behavior, the spreadsheet sends
+; MSG_CHART_BODY_SET_ACTION_NOTIFICATION_OUTPUT to the chart body on
+; AttachUI, passing this message as the notification message
+;
+;	PASS:	cx - VM block handle of chart being deleted
+;
+;	RETURN:
+;
+
+MSG_SPREADSHEET_START_MOVE_COPY	message
+;
+; Message sent by the document object when it gets a MSG_META_START_MOVE_COPY
+;
+;	PASS:	nothing
+;
+
+MSG_SPREADSHEET_END_MOVE_COPY	message
+;
+; Message sent by the document object when it gets a MSG_META_END_MOVE_COPY
+;
+;	PASS:	nothing
+;
+
+MSG_SSHEET_INIT_FOR_EXPORT	message
+;
+; Prepare a transfer item for the export translation library.
+;
+;	PASS:	nothing
+;
+
+
+SpreadsheetAddress	etype	word
+;
+; For use in SRP_active:
+;
+SPREADSHEET_ADDRESS_ON_SCREEN		enum SpreadsheetAddress, 0xf000
+SPREADSHEET_ADDRESS_IN_SELECTION	enum SpreadsheetAddress, 0xf001
+;
+; For use in SRP_selection:
+;
+SPREADSHEET_ADDRESS_DATA_AREA		enum SpreadsheetAddress, 0xf100
+SPREADSHEET_ADDRESS_PAST_END		enum SpreadsheetAddress, 0xf101
+;
+; Various messages:
+;
+SPREADSHEET_ADDRESS_USE_SELECTION	enum SpreadsheetAddress, 0xf200
+;
+; A placeholder:
+;
+SPREADSHEET_ADDRESS_NIL			enum SpreadsheetAddress, 0xffff
+
+SpreadsheetRangeParams	struct
+    SRP_selection	CellRange	;(r,c),(r,c) of selection
+    SRP_active		CellReference	;(r,c) for active cell
+SpreadsheetRangeParams	ends
+
+MSG_SPREADSHEET_SET_SELECTION	message
+;
+; Set the selected range for the spreadsheet
+;
+;	PASS:	ss:bp - SpreadsheetRangeParams
+;	RETURN:	none
+
+MSG_SPREADSHEET_EXTEND_CONTRACT_SELECTION	message
+;
+; Extend or contract the selected range to include the specified range
+;
+;	PASS:	ss:bp - SpreadsheetRangeParams
+;			(SRP_active ignored)
+;	RETURN:	none
+;
+
+MSG_SPREADSHEET_GET_SELECTION	message
+;
+; Get the selected range for the spreadsheet
+;
+;	PASS:	ss:bp - SpreadsheetRangeParams
+;		dx - size of SpreadsheetRangeParams (if called remotely)
+;	RETURN:	ss:bp - SpreadsheetRangeParams filled in
+;			SRP_selection - selected range
+;			SRP_active - active cell within range
+;
+
+;
+; Various ui-related attributes.
+; These can be configured in the .ui file but are not saved to the data file
+; These must correspond to the entries in the .uih file.
+;
+SpreadsheetAttributes record
+	SA_TARGETABLE:1		;TRUE: object can get target
+	SA_ENGINE_MODE:1	;TRUE: don't draw, interact with mouse, etc.
+	SA_SSHEET_IS_LAYER:1	;TRUE: spreadsheet is a layer in a vistree
+ 	:5
+SpreadsheetAttributes	end
+
+MSG_SSHEET_PASTE_FROM_DATA_FILE	message
+
+MSG_SSHEET_EXPORT_FROM_DATA_FILE	message
+
+;-----------------------------------------------------------------------------
+
+MSG_SPREADSHEET_INIT_NAME_LIST	message
+;
+; Sent up the Name controllers to have the spreadsheet set the number
+; of names up.
+;	PASS:	cx:dx - OD of DefineNameList
+;	RETURN:	nothing
+;
+
+MSG_SPREADSHEET_INIT_CHOOSE_NAME_LIST	message
+;
+; Sent up the Choose Name controller to have the spreadsheet set the number
+; of names up.
+;	PASS:	cx:dx - OD of ChooseNameList
+;	RETURN:	nothing
+;
+
+MSG_SPREADSHEET_NAME_REQUEST_ENTRY_MONIKER	message
+;
+; Sent up the Name controllers to have the spreadsheet provide a name
+; for the ChooseNameList.
+;	PASS:	cx:dx - OD of ChooseNameList
+;		bp - entry #
+;	RETURN:	nothing
+;
+
+MSG_SPREADSHEET_NAME_UPDATE_DEFINITION	message
+;
+; Sent up the Name controllers to have the spreadsheet update the name defintion
+; text object given.
+;	PASS:	cx:dx - OD of text object
+;		bp - entry #
+;	RETURN:	nothing
+;
+
+MSG_SPREADSHEET_NAME_UPDATE_NAME	message
+;
+; Given the OD to a text object and a list entry, stuff the name into the
+; text object. Used by the define name controller.
+;	PASS:	cx:dx - OD of name definition text object
+;		bp - entry number
+;
+
+MSG_SPREADSHEET_GET_NAME_WITH_LIST_ENTRY	message
+;
+; Called upon to return a block containing the name for the given list entry.
+; Used by the define name controller.
+;	PASS:	cx - memory block containing SSDNCommand structure with these
+;		fields filled in:
+;		SSDNC_listEntry
+;		SSDNC_controllerOD
+;		SSDNC_msgToSendBack
+;	RETURN:	SSDNC_msgToSendBack sent to SSDNC_controllerOD with
+;		    cx = SSDNCommand struct han
+;		SSDNC_dataBlk = handle of me block containing name
+;
+
+
+;-----------------------------------------------------------------------------
+;		Meta Messages
+;-----------------------------------------------------------------------------
+
+;
+; Used by some of the controllers to relay info to other controllers.
+; For example, the Choose Function controller uses this to update the
+; Edit Bar.
+;
+MSG_SPREADSHEET_REPLACE_TEXT_SELECTION	method	MetaSpreadsheetMessages
+;
+; Set text in the edit bar or similiar spreadsheet object
+;
+; PASS:		cx - length of text (0 for NULL-terminated)
+;		^hdx - handle of text
+;		dx - 0, indicates append nothing, and do not change selection
+;		bp.low - offset to new cursor position
+;			When the text is replaced, the cursor will be
+;		     positioned at the end of the new text, so the
+;		     offset will have to be 0 or less.
+;			A value > 0 means to select the new text.
+;		bp.high - UIFunctionsActive:
+;			UIFA_EXTEND - extend modifier down
+;			UIFA_ADJUST - adjust modifier down
+; RETURN:	dx - handle freed
+;
+
+;-----------------------------------------------------------------------------
+
+MSG_SPREADSHEET_GET_ROW_AT_POSITION			message
+;
+; Get the row at the specified position
+;	PASS:	dx:cx - 32-bit y position
+;	RETURN:	ax - row #
+;		cx - distance to row bottom edge (<=0)
+;		dx - distance to row top edge (>=0)
+;
+MSG_SPREADSHEET_GET_COLUMN_AT_POSITION			message
+;
+; Get the column at the specified position
+;	PASS:	dx:cx - 32-bit x position
+;	RETURN:	ax - column #
+;		cx - distance to column right edge (<=0)
+;		dx - distance to column left edge (>=0)
+;
+MSG_SPREADSHEET_SET_CELL_BORDERS			message
+;
+; Set cell borders for the current selection
+;	PASS:	cl - CellBorderInfo to set
+;
+MSG_SPREADSHEET_SET_CELL_BORDER_COLOR			message
+;
+; Set color for borders for the current selection
+;	PASS:	ch - ColorFlag
+;		CF_INDEX:
+;			cl - Color
+;		CF_RGB:
+;			cl - red
+;			dl - green
+;			dh - blue
+;
+MSG_SPREADSHEET_SET_CELL_BORDER_GRAY_SCREEN		message
+;
+; Set draw mask for borders for the current selection
+;	PASS:	cl - SysDrawMask
+;
+MSG_SPREADSHEET_SET_CELL_BORDER_PATTERN			message
+;
+; Set pattern for borders for the current selection
+;	PASS:	cx - GraphicPattern
+;
+
+SpreadsheetSeriesFillType	etype	byte, 0, 2
+SSFT_NUMBER			enum SpreadsheetSeriesFillType
+SSFT_DAY			enum SpreadsheetSeriesFillType
+SSFT_WEEKDAY			enum SpreadsheetSeriesFillType
+SSFT_MONTH			enum SpreadsheetSeriesFillType
+SSFT_YEAR			enum SpreadsheetSeriesFillType
+
+SpreadsheetSeriesFillFlags	record
+    :6
+    SSFF_ROWS:1			;TRUE: fill down, FALSE: fill right
+    SSFF_GEOMETRIC:1		;TRUE: geometric series, FALSE: linear series
+SpreadsheetSeriesFillFlags	end
+
+SpreadsheetSeriesFillParams	struct
+    SSFP_type		SpreadsheetSeriesFillType
+    SSFP_flags		SpreadsheetSeriesFillFlags
+    SSFP_stepValue	FloatNum
+SpreadsheetSeriesFillParams	ends
+
+SpreadsheetFillError		etype	byte, 0, 2
+SFE_NO_ERROR			enum SpreadsheetFillError
+SFE_NOT_DATE_NUMBER		enum SpreadsheetFillError
+SFE_DATE_STEP_TOO_LARGE		enum SpreadsheetFillError
+
+SPREADSHEET_MAX_DATE_FILL_STEP		equ	90
+SPREADSHEET_MIN_DATE_FILL_STEP		equ	-90
+
+MSG_SPREADSHEET_FILL_SERIES				message
+;
+; Fill a range with values, either linear step or geometric step
+;
+;	PASS:	ss:bp - SpreadsheetSeriesFillParams
+;		dx - size SpreadsheetSeriesFillParams (if called remotely)
+;	RETURN:	al - SpreadsheetFillError
+;
+; The SSFF_ROWS flag should match the shape of the selection -- eg. if there
+; is only one row selected, SSFF_ROWS should not be passed.
+;
+MSG_SPREADSHEET_FILL_RANGE				message
+;
+; Fill a range with values copied from the first row/column
+;
+;	PASS:	cl - SpreadsheetSeriesFillFlags
+;
+
+SpreadsheetFormatParseRangeParams	struc
+SBCS<    SFPRP_text	char  MAX_RANGE_REF_SIZE dup (?)		>
+DBCS<    SFPRP_text	wchar MAX_RANGE_REF_SIZE/(size wchar) dup (?)	>
+    SFPRP_range		CellRange
+SpreadsheetFormatParseRangeParams	ends
+
+MSG_SPREADSHEET_PARSE_RANGE_REFERENCE			message
+;
+; Parse a cell reference into a range, if possible
+;
+;	PASS:	ss:bp - ptr to SpreadsheetFormatParseRangeParams
+;		    ss:bp.SFPRP_text - text (NULL terminated)
+;	RETURN:	carry - set for error
+;		else:
+;		    ss:bp.SFPRP_range - CellRange
+;
+MSG_SPREADSHEET_FORMAT_RANGE_REFERENCE			message
+;
+; Format a range reference
+;	PASS:	ss:bp - ptr to SpreadsheetFormatParseRangeParams
+;		    ss:bp.SFPRP_range - CellRange to format
+;	RETURN:	ss:bp.SFPRP_text - formatted text
+;
+
+MSG_SPREADSHEET_ENTER_DATA_WITH_EVENT			message
+;
+; Enter data from the edit bar into the active cell.  If the data is
+; valid, then process the event passed in bp, otherwise free the event. 
+;
+;	PASS:	dx - handle of text block
+;		cx - length of text (w/o NULL)
+;		bp - event handle, or 0 if none.
+;
+;	RETURN:	none
+;	SEE ALSO: MSG_SPREADSHEET_ENTER_DATA
+
+protominor	SSheetNewForRedwood
+
+MSG_SPREADSHEET_CHECK_INSERT_SPACE			message
+;
+; Check to see if an insert/delete would delete any data cells.
+;
+;	PASS:	cx - SpreadsheetInsertFlags
+;	RETURN:	al - SpreadsheetInsertError
+;	SEE ALSO: MSG_SPREADSHEET_INSERT_SPACE
+
+MSG_SPREADSHEET_INVERT_RANGE_LAST			message
+;
+; Forces the redrawing of the inverted range to be last, so
+; that it can be handled after all the grobj's have been drawn
+; This is to fix bug #19095 in GeoCalc.  This message needs to
+; be sent to the spreadsheet object if the SA_SPREADSHEET_IS_LAYER
+; attribute is set.  If instead that attribute is not set, the
+; spreadsheet will invert the selected range itself.
+;
+;	PASS:	bp - gstate
+;	RETURN: nothing
+
+SpreadsheetInsertSpaceError	etype	byte
+SISE_NO_ERROR			enum SpreadsheetInsertSpaceError
+SISE_TOO_MANY_ROWS		enum SpreadsheetInsertSpaceError
+SISE_TOO_MANY_COLUMNS		enum SpreadsheetInsertSpaceError
+SISE_DELETE_ROW_DATA		enum SpreadsheetInsertSpaceError
+SISE_DELETE_COLUMN_DATA		enum SpreadsheetInsertSpaceError
+
+MSG_SPREADSHEET_SET_DOC_ORIGIN			message
+;
+; Set the document origin.  The spreadsheet won't be scrollable above
+; or to the left of this origin.
+;
+;	PASS:	ss:bp - PointDWord
+;		dx    - size PointDWord
+;	RETURN:	nothing
+;	DESTROYED: ax, cx, dx, bp
+
+if _PROTECT_CELL
+;
+; This type is used to tell whether the user wants to protect/unprotect the
+; selected cells or the entire spreadsheet.
+;
+SpreadsheetProtectionOptions	etype	byte, 0, 2
+SPO_SELECTED_CELLS		enum	SpreadsheetProtectionOptions
+SPO_ALL_CELLS			enum	SpreadsheetProtectionOptions
+
+endif
+
+MSG_SPREADSHEET_PROTECT_RANGE		message
+;
+; Protect the cells from being modified.
+;
+;	PASS:	cl = SpreadsheetProtectionOptions
+;	RETURN:	nothing
+;
+;	Destroy: ax
+;
+;
+
+MSG_SPREADSHEET_UNPROTECT_RANGE		message
+;
+; Unprotect the range cells so that they can be modified again.
+;
+;	PASS:	cl = SpreadsheetProtectionOptions
+;	RETURN:	nothing
+;
+;	Destroy: ax
+
+MSG_SPREADSHEET_LOCKED_CELL_RECALC	message
+;
+; A cell in the locked ranged has been recalculated and needs to be
+; redrawn. Sent by the spreadsheet to itself, no default handler.
+;
+;	PASS:	dx, cx - row, column
+;	RETURN:	nothing
+;
+;	Destroy: can destroy ax,cx,dx,bp
+
+MSG_SPREADSHEET_CHECK_PROTECTED_CELLS	message
+; 
+; Check to see if the given range of the cells is protected.
+;
+; Pass:		ss:bp	= CellRange
+;		dx	= size of CellRange (called remotely)
+; Return:	carry	= set -- containing protected cell(s)
+;			  clear -- no protected cell in the range
+;
+
+protominor	ModifyNumFormat
+
+MSG_SPREADSHEET_MODIFY_NUM_FORMAT	message
+;
+; Modify the number format for the current selection
+;
+; Pass:		cx = FloatModifyFormatFlags
+; Return:	nothing
+;
+
+protoreset
+		
+;-----------------------------------------------------------------------------
+;		Constants and Structures
+;-----------------------------------------------------------------------------
+
+SSRefCountAndFlags	record
+    SSRCAF_TRANSFORM_VALID:1		;TRUE: transform in GState is ours
+    SSRCAF_REF_COUNT:7			;reference count
+SSRefCountAndFlags	end
+
+MAX_GSTATE_REF_COUNT	equ mask SSRCAF_REF_COUNT	;max GState ref count
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+	;
+	; The cell params MUST be the first thing in the instance data.
+	; There is code which depends on this fact.
+	;
+	; This allows us to treat a pointer to a spreadsheet as a
+	; pointer to CellFunctionParameters.
+	;
+	SSI_cellParams	CellFunctionParameters	;file handle and row-block info
+	;
+	; OK... You can do whatever you want now :-)
+	;
+
+	SSI_chunk	word			;our chunk
+	SSI_chartBody   optr			;OD of chart body object.
+		noreloc SSI_chartBody
+
+	SSI_mapBlock	word			;VM handle of map block
+	SSI_styleArray	word			;VM handle of style array
+	SSI_rowArray	word			;VM handle of row/column array
+	SSI_formatArray	word			;VM handle of format array
+	SSI_nameArray	word			;VM handle of name array
+	;
+	; SSI_maxRow and SSI_maxCol are the last row and column that
+	; can be navigated to.  Any areas of the spreadsheet which are
+	; for data storage only should not be included in these values.
+	;
+	SSI_maxRow	word			;maximum row
+	SSI_maxCol	word			;maximum column
+
+	SSI_offset	PointDWord		;offset to (r,c) of visible
+	SSI_visible	CellRange		;row, column bounds visible
+
+	SSI_active	CellReference		;active cell
+
+	SSI_quickSource	CellRange		;row, column bounds of the
+						; quick move/copy source
+	SSI_selected	CellRange		;row, column bounds selected
+	SSI_curAttrs	word			;current style token ID
+	SSI_gstate	hptr.GState		;cached GState for drawing
+		noreloc SSI_gstate
+	SSI_gsRefCount	SSRefCountAndFlags	;reference count for GState
+
+	SSI_flags	SpreadsheetFlags	;various flags
+	SSI_drawFlags	SpreadsheetDrawFlags	;drawing flags
+	SSI_attributes	SpreadsheetAttributes	;definable attributes
+
+	;
+	; Please keep the header and footer as consecutive entries.
+	; The initialization and update code depend on it.
+	;
+	SSI_header	CellRange		;the header range
+	SSI_footer	CellRange		;the footer range
+
+	;
+	; This is the number of times that circular references should be
+	; followed. It is nested, which is to say that each circularity will
+	; be followed this many times.
+	;
+	; A value of 0 means that circular references should be flagged as
+	; errors.
+	;
+	SSI_circCount	word			;# of trips through circs.
+	;
+	; This is the number that we want formula cells to converge to.
+	; If we are allowing circular references and the difference between
+	; the new value of a cell differs by less than this amount from the
+	; old value of the cell, then we can stop looping around in that
+	; circularity.
+	;
+	; Actually, that's not completely true, every cell in the circularity
+	; must change by less than this amount.
+	;
+	; A value of 0 means that we should continue looping around for
+	; as many times as are specified in the SSI_circCount variable.
+	;
+	SSI_converge	FloatNum <>		;minimum difference
+	;
+	; The spreadsheet has 3 blocks that are cached in order to speed up
+	; recalculation. These blocks correspond to the 3 lists required
+	; to generate the recalc lists. They are:
+	;	ancestorList
+	;	childList
+	;	finalList
+	; These fields contain zero until the first time a recalculation
+	; is done. At that point the handles for the first blocks of the
+	; lists are kept here. The blocks are marked discardable so that
+	; if memory becomes scarce the heap manager can use this space.
+	;
+	; Adding these fields requires that the application notify the
+	; spreadsheet object before it goes away. If this isn't done
+	; the cached blocks never get free'd.
+	;
+	; See MSG_VIS_CLOSE for more information.
+	;
+	SSI_ancestorList	hptr		;cached ancestor list
+	SSI_childList		hptr		;cached child list
+	SSI_finalList		hptr		;cached final list
+	SSI_ruler		optr
+	;
+	; bounds of spreadsheet size
+	;
+	SSI_bounds		RectDWord
+	;
+	; number formats
+	;
+;----------------------------------------------------------------------
+;	VARIABLE DATA
+;----------------------------------------------------------------------
+SpreadsheetDocOrigin	struct
+    SDO_rowCol	CellReference
+SpreadsheetDocOrigin	ends
+
+	TEMP_SPREADSHEET_DOC_ORIGIN	vardata	SpreadsheetDocOrigin
+	; contains the document origin if it's nonzero.  Used for
+	; "locking rows and columns" 
+
+    
+
+SpreadsheetClass	endc
+
+;-----------------------------------------------------------------------------
+;		Library routines
+;-----------------------------------------------------------------------------
+SpreadsheetInitFileData	struct
+    SIFD_file		hptr			;file handle
+    SIFD_numRows	word			;number of rows
+    SIFD_numCols	word			;number of columns
+    SIFD_drawFlags	SpreadsheetDrawFlags	;draw flags
+SpreadsheetInitFileData	ends
+
+global	SpreadsheetInitFile:far
+;
+;	PASS:	ss:bp - ptr to SpreadsheetInitFileData
+;	RETURN:	ax - VM handle of spreadsheet map
+;
+;	This routine is to initialize a spreadsheet file, and does not
+;	require a spreadsheet object.
+;
+global SpreadsheetCheckShortcut:far
+;
+;	PASS:	ax - MSG_META_KBD_CHAR:
+;			cl - Character		(Chars or VChar)
+;			ch - CharacterSet	(CS_BSW or CS_CONTROL)
+;			dl - CharFlags
+;			dh - ShiftState		(left from conversion)
+;			bp low - ToggleState
+;			bp high - scan code
+;	RETURN:	carry - set if shortcut
+;
+;	Checks to see if a keypress is a keyboard shortcut.  Does not
+;	require a spreadsheet object.
+;
+
+;
+; See spreadsheetStyleToken.asm for more information on these routines.
+;
+global SpreadsheetGetTokenByStyle:far
+;
+;	PASS:	ds:si - ptr to SpreadsheetInstance
+;		es:di - ptr to CellAttrs
+;	RETURN:	ax - token for style
+;
+;	Returns a style token which represents the passed CellAttrs.
+;	This routine is intended for use by subclasses of the spreadsheet
+;	object only.
+;
+global SpreadsheetDeleteStyleByToken:far
+;
+;	PASS:	ds:si - ptr to SpreadsheetInstance
+;		ax - token for style
+;	RETURN:	none
+;
+;	Deletes a reference to a style token.  This routine is intended for
+;	use by subclasses of the spreadsheet object only.
+;
+global SpreadsheetGetStyleByToken:far
+;
+;	PASS:	ds:si - ptr to SpreadsheetInstance
+;		es:di - ptr to CellAttrs buffer to fill
+;		ax - token for style
+;	RETURN:	es:di - buffer filled in
+;
+;	Return corresponding CellAttrs for a given style token.  This routine
+;	is intended for use by subclasses of the spreadsheet object only.
+;
+global SpreadsheetGetAttrByToken:far
+;
+;	PASS:	ds:si - ptr to SpreadsheetInstance
+;		ax - token for style
+;		bx - offset of CellAttrs field to retrieve
+;	RETURN:	ax - attribute
+;
+;	Return word-sized field of corresponding CellAttrs for a given style
+;	token.  Note that this can be used for a byte-sized field, but will
+;	return the following byte as well.  This routine is intended for use
+;	by subclasses of the spreadsheet object only.
+
+;
+;	C interface
+;
+
+global SPREADSHEETINITFILE:far
+;
+;	This routine is to initialize a spreadsheet file, and does not
+;	require a spreadsheet object.
+;
+
+global SPREADSHEETPARSENAMETOTOKEN:far
+;
+;	This function is a C stub to call PC_NameToToken, which handles
+;	when the Parse library's eval code wants to convert a string to
+;	a name token, and possibly create a new cell (when creating
+;	dependencies, for example).
+;
+
+global SPREADSHEETPARSECREATECELL:far
+;
+;	This function is a C stub to call PC_CreateCell, which handles
+;	when the Parse library's eval code wants to create a new cell
+;	(when creating dependencies, for example).
+;
+
+global SPREADSHEETPARSEEMPTYCELL:far
+;
+;	This function is a C stub to call PC_EmptyCell, which handles
+;	when the Parse library's eval code wants to remove a cell that
+;	no longer has any dependents.  Obviously, this routine
+;	is only called when removing dependencies.
+;
+
+global SPREADSHEETPARSEDEREFCELL:far
+;
+;	This function is a C stub to call PC_DerefCell, which handles
+;	when the Parse library's eval code wants to dereference a
+;	cell.
+;
+
+global SPREADSHEETNAMETEXTFROMTOKEN:far
+;
+;	This is a C stub for the Spreadsheet library's
+;	NameTextFromToken routine.
+;	It should be used only by sub-classes of SpreadsheetClass.
+;
+
+global SPREADSHEETNAMETOKENFROMTEXT:far
+;
+;	This is a C stub for the Spreadsheet library's
+;	NameTokenFromText routine.
+;	It should be used only by sub-classes of SpreadsheetClass.
+;
+
+global SPREADSHEETNAMELOCKDEFINITION:far
+;
+;	This is a C stub for the Spreadsheet library's
+;	NameLockDefinition routine.
+;	It should be used only by sub-classes of SpreadsheetClass.
+;
+
+global SPREADSHEETCELLADDREMOVEDEPS:far
+;
+;	This is a C stub for the Spreadsheet library's
+;	CellAddRemoveDeps routine.
+;	It should be used only by sub-classes of SpreadsheetClass.
+
+global SPREADSHEETRECALCDEPENDENTS:far
+;
+;	This is a C stub for the Spreadsheet library's
+;	RecalcDependentsWithRedrawCallback routine.
+;	It should be used only by sub-classes of SpreadsheetClass.
+
+global SpreadsheetClearRange:far
+;
+;  	Clears a range of cells (data, notes and/or attributes)
+;  	Does not update any UI.
+;
+;  	PASS:	ds:si = SpreadsheetClass instance data
+;   		ss:bp = CellRange
+;   		cx    = SpreadsheetClearFlags
+;  	RETURN:	nothing
+
+;-----------------------------------------------------------------------------
+;		visual cell attributes
+;-----------------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+; Color/Mask Info:
+;
+
+AreaInfo	struct
+	AI_color	ColorQuad		;RGB or index
+	AI_grayScreen	SystemDrawMask		;gray screen
+AreaInfo	ends
+
+;------------------------------------------------------------------------------
+; Border Info:
+;
+MAX_CELL_BORDER_WIDTH = 1
+
+CellBorderInfo	record
+	CBI_OUTLINE:1		;TRUE: outline range
+	:3
+	CBI_LEFT:1		;TRUE: border on left
+	CBI_TOP:1		;TRUE: border on top
+	CBI_RIGHT:1		;TRUE: border on right
+	CBI_BOTTOM:1		;TRUE: border on bottom
+CellBorderInfo	end
+
+;------------------------------------------------------------------------------
+
+J_GENERAL	=	J_FULL			;general justification
+
+;------------------------------------------------------------------------------
+; Common Cell Attributes:
+;
+CellAttrs	struct
+	CA_refCount	RefElementHeader	;reference count for array
+	CA_textAttrs	AreaInfo		;text color/mask
+	CA_bgAttrs	AreaInfo		;background color/mask
+	CA_font		FontID			;font ID
+	CA_pointsize	word			;pointsize * 8
+	CA_style	TextStyle		;style
+	CA_border	CellBorderInfo		;border sides/thickness
+	CA_borderAttrs	AreaInfo		;border color/mask
+	CA_justification Justification		;left/center/right/general
+	CA_format	word			;numeric format
+	CA_trackKern	BBFixed			;track kerning
+	CA_fontWeight	FontWeight		;font weight
+	CA_fontWidth	FontWidth		;font width
+	CA_reserved	byte 9 dup (?)		;reserved for future use
+CellAttrs	ends
+
+.assert ((size CellAttrs) and 1) eq 0		;assert word aligned
+
+;-----------------------------------------------------------------------------
+;-----------------------------------------------------------------------------
+
+; If this bit is set, the row height is computed automatically based
+; on the pointsize.
+;
+ROW_HEIGHT_AUTOMATIC	equ 0x8000
+;
+; If this bit is set, the column width is computed based on the width
+; of the data in the column.  Unlike ROW_HEIGHT_AUTOMATIC, this is a
+; one-shot deal -- it is not recalculated when the data changes.
+;
+COLUMN_WIDTH_BEST_FIT	equ 0x8000
+
+;
+; Minimum row & column # (0 or 1 based)
+;
+MIN_ROW = 0
+;
+; min and max column widths
+; (0 for hiding columns)
+;
+COLUMN_WIDTH_MIN =	0
+COLUMN_WIDTH_MAX =	512
+COLUMN_WIDTH_INC =	8
+
+;
+; min and max row heights
+; (0 for hiding rows)
+;
+ROW_HEIGHT_MIN = 	0
+ROW_HEIGHT_MAX =	792*5/4
+
+;
+; This is the header of the name vm-block.
+;
+NameHeader	struct
+    NH_blockSize	word		; Current size of this block
+    NH_definedCount	word		; Number of defined names
+    NH_undefinedCount	word		; Number of undefined names
+    NH_nextToken	word		; Next token
+NameHeader	ends
+
+;
+; One of these structures is kept for each name in the name-database.
+; After the end of the structure comes the text of the name.
+;
+NameFlags	record
+    NF_UNDEFINED:1			; Set if the name is not defined yet
+    :7
+NameFlags	end
+
+NameStruct	struct
+    NS_flags	NameFlags	; Flags associated with this name
+    NS_token	word		; Token associated with the name
+    NS_length	word		; Length of the text of the name
+NameStruct	ends
+
+;
+; Maximum number of names that we can possibly define.
+;	(reduced for DBCS to fit MAX_NAME_BLOCK_SIZE under $ADEB bytes)
+;
+SBCS< MAX_NAMES	=	255					>
+DBCS< MAX_NAMES	=	170					>
+DBCS< PrintMessage< Which is more important, Names or Length? > >
+;
+; The maximum char count we will allow a name to get
+;
+MAX_NAME_LENGTH	=	128
+
+;
+; Keep in mind that the maximum size of the name-list will be:
+;	size NameHeader + (MAX_NAMES * (size NameStruct + MAX_NAME_LENGTH))
+; This assertion makes sure that this falls below some maximum block size
+; that we establish
+;
+if DBCS_PCGEOS
+MAX_NAME_BLOCK_SIZE	=	size NameHeader + \
+				(MAX_NAMES * (size NameStruct + \
+					      (size wchar)*MAX_NAME_LENGTH))
+else
+MAX_NAME_BLOCK_SIZE	=	size NameHeader + \
+				(MAX_NAMES * (size NameStruct + MAX_NAME_LENGTH))
+endif
+
+SBCS<	.assert	(MAX_NAME_BLOCK_SIZE lt 34000)			>
+DBCS<	.assert	(MAX_NAME_BLOCK_SIZE lt 48000)	; below $ADEB	>
+
+;
+; The maximum char count we will allow a name definition to get
+;
+SBCS <	MAX_NAME_DEF_LENGTH =	512				>
+DBCS <	MAX_NAME_DEF_LENGTH =	280				>
+
+;
+; Flags which tell the name "get-info" method what stuff we want to get
+; The token is always returned (because it's sooo easy to get).
+;
+NameAccessFlags	record
+    NAF_NAME:1				; Set: Return the text of the name
+    NAF_DEFINITION:1			; Set: Return the text of the definition
+    NAF_BY_TOKEN:1			; Set: Get data by token instead of list
+					;	entry.
+    NAF_TOKEN_DEFINITION:1		; Modifies NAF_DEFINITION.
+					; Set: Return not the text but the
+					;    tokenized definition.
+    :4
+NameAccessFlags	end
+;
+; Definitions of parameter structures which are passed to the spreadsheet
+; object in order to get, set, or modify information about names.
+;
+; Please see the method definition to determine which of these fields you
+; actually need to fill in.
+;
+SpreadsheetNameParameters	struct
+    SNP_flags		NameAccessFlags	; Flags to tell us what to get
+    SNP_listEntry	word		; The entry # in the defined list
+    SNP_textLength	word		; Length of the text of the name
+SBCS<    SNP_text	char  MAX_NAME_LENGTH dup (?)			>
+DBCS<    SNP_text	wchar MAX_NAME_LENGTH dup (?)			>
+    SNP_defLength	word		; The length of the definition text
+SBCS<    SNP_definition	char  2 * MAX_NAME_DEF_LENGTH dup (?)		>
+DBCS<    SNP_definition	wchar 4 + MAX_NAME_DEF_LENGTH dup (?)		>
+					; DBCS: 2*MAX --> stack overflow!
+					; The text of the definition
+    SNP_token		word		; The token of the name
+    SNP_nameFlags	NameFlags	; Flags for this name
+	;
+	; Must pass NAF_DEFINITION to get the flags.
+	;
+    align	word
+SpreadsheetNameParameters	ends
+
+;
+; This structure is passed to MSG_SPREADSHEET_FORMAT_EXPRESSION.
+;
+SpreadsheetFormatParameters	struct
+    SFP_formatParams	FormatParameters <>
+    SFP_expression	dword		; Pointer to the expression
+    SFP_text		dword		; Pointer to destination buffer
+    SFP_length		word		; Length of the formatted text
+SpreadsheetFormatParameters	ends
+
+;
+; This structure is passed to MSG_SPREADSHEET_PARSE_EXPRESSION.
+;
+SpreadsheetParserParameters	struct
+    SPP_parserParams	ParserParameters <>
+    SPP_text		dword		; Pointer to the text
+    SPP_expression	dword		; Pointer to destination buffer
+    SPP_exprLength	word		; Size of the expression buffer
+SpreadsheetParserParameters	ends
+
+;
+; This structure is passed to MSG_SPREADSHEET_EVAL_EXPRESSION.
+;
+SpreadsheetEvalParameters	struct
+    SEP_evalParams	EvalParameters <>
+    SEP_expression	dword		; Pointer to the expresssion
+    SEP_result		ArgumentStackElement <>
+SpreadsheetEvalParameters	ends
+
+;
+; The rows of the spreadsheet where name definitions are kept. This should
+; be outside the visible area.
+;
+; Since there are only 256 columns per row we allocate several rows for
+; the names.
+;
+NAME_ROW	=	LARGEST_ROW - 4
+
+CHART_ROW	=	LARGEST_ROW - 3
+
+;
+; The maximum size of a formatted range
+;	$ABCDE:$12345
+;
+SBCS< FORMATTED_RANGE_BUFFER_SIZE	= 14	; Includes the NULL terminator	>
+DBCS< FORMATTED_RANGE_BUFFER_SIZE	= 14*(size wchar)
+
+;
+; Largest formatted expression.
+;
+
+;
+; Our error start with the first application error.
+; Applications can depend on the order in which these constants are defined
+; so you cannot change this ordering unless you know exactly what you are
+; doing.
+;
+
+;
+; PSEE_RESULT_SHOULD_BE_CELL_OR_RANGE
+;	This error is generated when the user enters data into the goto-cell
+;	object and the data that was entered doesn't resolve to a cell or
+;	a range.
+;
+PSEE_RESULT_SHOULD_BE_CELL_OR_RANGE	enum	ParserScannerEvaluatorError, PSEE_FIRST_APPLICATION_ERROR
+;
+; PSEE_NO_NAME_GIVEN
+;	No name was supplied to the "AddName" method. This really means that
+;	the user didn't give a name in the dialog box which requests one as
+;	part of defining a name.
+;
+PSEE_NO_NAME_GIVEN			enum	ParserScannerEvaluatorError
+
+;
+; PSEE_NO_DEFINITION_GIVEN
+;	No definition was given for a name.
+;
+PSEE_NO_DEFINITION_GIVEN		enum	ParserScannerEvaluatorError
+
+;
+; PSEE_NAME_ALREADY_DEFINED
+;	The name the program/user attempted to add is already defined.
+;
+PSEE_NAME_ALREADY_DEFINED		enum	ParserScannerEvaluatorError
+
+;
+; PSEE_BAD_NAME_DEFINITION
+;	The definition for the name didn't parse.
+;
+PSEE_BAD_NAME_DEFINITION		enum	ParserScannerEvaluatorError
+
+;
+; PSEE_REALLOC_FAILED
+;	The recalculation code was unable to allocate its recalc-list.
+;	We're out of memory or else the recalc list went over 64K.
+;
+PSEE_REALLOC_FAILED			enum	ParserScannerEvaluatorError
+
+;
+; PSEE_CELL_OR_RANGE_IS_LOCKED
+;	This error is generated when the user enters data into the goto-cell
+;	object and the data that was entered doesn't resolve to a cell 
+;	in the unlocked portion of the spreadsheet.  
+;
+PSEE_CELL_OR_RANGE_IS_LOCKED		enum	ParserScannerEvaluatorError
+		
+PSEE_LAST_SPREADSHEET_ERROR		enum	ParserScannerEvaluatorError, 230
+
+;
+; Name list for the scrap stuff.
+;
+NameListHeader	struct
+    NLH_endOfData	word	; Offset to the end of the data
+    NLH_blockSize	word	; Offset to the end of the block
+NameListHeader	ends
+
+;
+; The order of the data is counted on by at least one routine in the
+; spreadsheet code: AddNameToNameList()
+;
+NameListEntry	struct
+    NLE_token		word	; Name token
+    NLE_flags		NameFlags
+		align	word
+    NLE_textLength	word	; Size of text
+    NLE_defLength	word	; Size of the definition
+NameListEntry	ends
+	;
+	; Followed by:
+	;	Text (w/o NULL)
+	;	Definition
+	;
+
+NAME_LIST_INCREMENT	=	2048
+
+SpreadsheetFormatErrors	etype byte, 0
+SPREADSHEET_FORMAT_NO_ERROR		enum	SpreadsheetFormatErrors
+SPREADSHEET_FORMAT_TOO_MANY_FORMATS	enum	SpreadsheetFormatErrors
+SPREADSHEET_FORMAT_CANNOT_ALLOC		enum	SpreadsheetFormatErrors
+
+;
+; picked with FORMAT_ID_PREDEF in mind 
+;
+SPREADSHEET_FORMAT_NAME_NOT_FOUND	=	7fffh
+SPREADSHEET_FORMAT_PARAMS_MATCH		=	TRUE
+SPREADSHEET_FORMAT_PARAMS_DONT_MATCH	=	FALSE
+
+;
+; The maximum size of text, formula cells, and the size of the buffers
+;
+MAX_CELL_GOTO_TEXT_LENGTH	equ	15	;maximum text for current cell
+MAX_CELL_FORMULA_LENGTH		equ	512	;max formula length
+SBCS< MAX_CELL_TEXT_LENGTH		equ	511	>
+DBCS< MAX_CELL_TEXT_LENGTH		equ	254	>
+
+; Byte counts used to store above:
+;
+if DBCS_PCGEOS
+MAX_CELL_GOTO_TEXT_SIZE	equ	MAX_CELL_GOTO_TEXT_LENGTH*(size wchar)
+MAX_CELL_TEXT_SIZE	equ	MAX_CELL_TEXT_LENGTH*(size wchar)
+MAX_CELL_FORMULA_SIZE	equ	MAX_CELL_FORMULA_LENGTH*(size wchar)
+else
+MAX_CELL_GOTO_TEXT_SIZE	equ	MAX_CELL_GOTO_TEXT_LENGTH*(size char)
+MAX_CELL_TEXT_SIZE	equ	MAX_CELL_TEXT_LENGTH*(size char)
+MAX_CELL_FORMULA_SIZE	equ	MAX_CELL_FORMULA_LENGTH*(size char)
+endif
+
+CELL_TEXT_BUFFER_SIZE 	equ (MAX_CELL_TEXT_SIZE + size CellText)
+CELL_FORMULA_BUFFER_SIZE equ (MAX_CELL_FORMULA_SIZE + size CellFormula)
+
+;
+; Make sure that our string length is something the parse library
+; can deal with.
+;
+CheckHack <MAX_CELL_TEXT_LENGTH le MAX_STRING_LENGTH>			>
+
+;
+; Definition of spreadsheet library functions.
+;
+FUNCTION_ID_FIRST_SPREADSHEET_FUNCTION	equ	FunctionID
+
+FUNCTION_ID_SPREADSHEET_CELL		enum	FunctionID
+FUNCTION_ID_LAST_SPREADSHEET_FUNCTION	enum	FunctionID, 0xa000
+	;
+	; Applications can start defining functions after this point.
+	;
+
+;-----------------------------------------------------------------------------
+;		Spreadsheet's subclasses of VisRuler
+;-----------------------------------------------------------------------------
+
+SpreadsheetRulerFlags	record
+    :4
+    SRF_SSHEET_IS_FOCUS:1	;TRUE: connected spreadsheet has focus
+    SRF_NO_INTERACTIVE_RESIZE:1	;TRUE: don't allow interactive resize
+    SRF_SSHEET_IS_TARGET:1	;TRUE: connected spreadsheet has target
+    SRF_HAVE_GRAB:1		;TRUE: have mouse grab
+SpreadsheetRulerFlags	end
+
+SPREADSHEET_RULER_WIDTH		= 40
+SPREADSHEET_RULER_HEIGHT	= 12
+
+SpreadsheetRulerClass	class VisRulerClass
+;-----------------------------------------------------------------------------
+;		Methods
+;-----------------------------------------------------------------------------
+MSG_SPREADSHEET_RULER_DRAW_RANGE		message
+;
+; Draw a range of of a spreadsheet ruler
+;
+;	PASS:	ss:bp - ptr to SpreadsheetDrawParams
+;	RETURN:	none
+;
+
+MSG_SPREADSHEET_RULER_SET_FLAGS		message
+;
+; Set the flags for a spreadsheet ruler
+;
+;	PASS:	dl - SpreadsheetRulerFlags to set
+;		dh - SpreadsheetRulerFlags to clear
+;	RETURN:	none
+;
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+    SRI_flags		SpreadsheetRulerFlags
+    SRI_spreadsheet	optr		;OD of associated spreadsheet
+    SRI_resizeRC	word		;row/column being resized
+    SRI_startRCPos	dword		;start position of row/column resize
+SpreadsheetRulerClass	endc
+
+;-----------------------------------------------------------------------------
+;		Cell types and structures
+;-----------------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+; Error values:
+;
+CellError	etype	byte
+CE_NO_ERROR		enum CellError	;no error
+CE_TOO_COMPLEX		enum CellError	;Expression too complex
+CE_REF_OUT_OF_RANGE	enum CellError	;Relative reference out of bounds
+CE_NAME			enum CellError	;Name or function doesn't exist
+CE_ARG_COUNT		enum CellError	;Wrong number of arguments
+CE_TYPE			enum CellError	;Wrong argument type
+CE_DIVIDE_BY_ZERO	enum CellError	;Divide by zero
+CE_CIRCULAR_REF		enum CellError	;References a cell that is part of a
+					;  circular dependency loop
+CE_GEN_ERR		enum CellError	;Generic error
+CE_NA			enum CellError	;NA error
+CE_FLOAT_POS_INF	enum CellError ;Positive infinity
+CE_FLOAT_NEG_INF	enum CellError ;Negative infinity
+CE_FLOAT_GEN_ERR	enum CellError ;Float generic error
+CE_CIRC_NAME_REF	enum CellError ;References a name that is defined
+					; circularly with another name.
+CE_CIRC_DEPEND		enum CellError	;Part of a circular dependency list
+CE_NUM_OUT_OF_RANGE	enum CellError	;Number argument out of range
+
+;------------------------------------------------------------------------------
+; Cell types:  If this etype changes, please update GetCellDataAndSize
+; in Library/Spreadsheet/Spreadsheet/spreadsheetChart.asm
+
+CellType	etype	byte, 0, 2
+CT_TEXT			enum CellType		;text string
+CT_CONSTANT		enum CellType		;numeric constant
+CT_FORMULA		enum CellType		;formula
+CT_NAME			enum CellType		;name definition
+CT_CHART		enum CellType		;chart definition
+CT_EMPTY		enum CellType		;dependencies/format only
+CT_DISPLAY_FORMULA	enum CellType		;formula for display only
+						; same data as CT_FORMULA
+
+;------------------------------------------------------------------------------
+; Cell recalc flags:
+;
+;
+if _PROTECT_CELL
+CellRecalcFlags	record
+    CRF_IN_PARENT_LIST:1	; Set: Cell is already in the parent list
+    CRF_IN_FINAL_LIST:1		; Set: Cell is already in the final list
+    :5
+    CRF_PROTECTION:1		; Set: Cell is protected.
+CellRecalcFlags	end
+else
+CellRecalcFlags	record
+    CRF_IN_PARENT_LIST:1	; Set: Cell is already in the parent list
+    CRF_IN_FINAL_LIST:1		; Set: Cell is already in the final list
+    :5
+    CRF_RESERVED:1		; Not used in non-protection version
+CellRecalcFlags	end
+endif
+
+;------------------------------------------------------------------------------
+; Common cell attributes:
+;	(at start of cell data)
+;
+; ******** Important ********
+;
+; There are places where the cell structure is used directly. If you change
+; this structure you must update those as well. They are in:
+;	spreadsheetUtils.asm	- emptyCell
+;	spreadsheetParse.asm	- emptyNameCell
+;
+CellCommon	struct
+	;
+	; The dependency list dword must come first. The code in the parse
+	; library requires it.
+	;
+	CC_dependencies	dword			;db-item containing dependencies
+	CC_type		CellType		;type of cell
+	CC_recalcFlags	CellRecalcFlags		;flags for recalculation
+	CC_attrs	word			;attribute token ID
+	CC_notes	dword			;dbase item containing notes
+CellCommon	ends
+
+;------------------------------------------------------------------------------
+; Structure of CT_TEXT
+;	data:		NULL-terminated string follows
+;	dependencies:	cells that reference this cell
+;
+; Please read the notes associated with changing cell data structures. They
+; are located above the definition for CellCommon <>.
+;
+CellText	struct
+	CT_common	CellCommon <0,CT_TEXT>
+	CT_text		label	char
+CellText	ends
+
+;------------------------------------------------------------------------------
+; Structure of CT_CONSTANT
+;	data:		current value only
+;	dependencies:	cells that reference this cell
+;
+; Please read the notes associated with changing cell data structures. They
+; are located above the definition for CellCommon <>.
+;
+CellConstant	struct
+	CC_common	CellCommon <0,CT_CONSTANT>
+	CC_current	FloatNum		;constant value
+CellConstant	ends
+
+;------------------------------------------------------------------------------
+; Return types for formulas
+;
+ReturnType	etype	byte
+RT_VALUE	enum ReturnType
+RT_TEXT		enum ReturnType
+RT_ERROR	enum ReturnType
+
+ReturnValue	union
+    RV_VALUE	FloatNum	;value
+    RV_TEXT	word		;Size of the string (stored after the formula)
+    RV_ERROR	CellError	;error value
+ReturnValue	end
+
+;------------------------------------------------------------------------------
+; Structure of CT_FORMULA and CT_DISPLAY_FORMULA
+;	data:		formula follows
+;	dependencies:	cells that reference this cell
+;
+; For the CT_DISPLAY_FORMULA the current value and return values are ignored.
+; That type of cell cannot be referenced by other cells.
+;
+; Please read the notes associated with changing cell data structures. They
+; are located above the definition for CellCommon <>.
+;
+CellFormula	struct
+	CF_common	CellCommon <0,CT_FORMULA>
+	CF_return	ReturnType		;return type
+	CF_current	ReturnValue		;return value/string/error
+	CF_formulaSize	word			;length of the formula
+	CF_formula	label	byte
+CellFormula	ends
+
+;------------------------------------------------------------------------------
+; Structure of CT_NAME
+;	data:		formula follows
+;	dependencies:	cells that reference the name
+;
+; Please read the notes associated with changing cell data structures. They
+; are located above the definition for CellCommon <>.
+;
+CellName	struct
+	CN_common	CellCommon <0,CT_NAME>
+	CN_formula	label	byte
+CellName	ends
+
+;------------------------------------------------------------------------------
+; Structure of CT_CHART
+;
+; Since nothing can depend on a chart we use the CC_dependencies field to hold
+; the VM block handle of the chart parameters.
+; 
+; Please read the notes associated with changing cell data structures. They
+; are located above the definition for CellCommon <>.
+;
+CellChart	struct
+	CG_formula	CellFormula <0,CT_CHART>
+CellChart	ends
+
+;  UpdateReferences relies on the following fact:
+.assert (size CellChart eq size CellFormula)
+
+;------------------------------------------------------------------------------
+; Structure of CT_USER_FUNCTION
+;	data:		formula follows
+;	dependencies:	cells that use this formula
+;
+; Please read the notes associated with changing cell data structures. They
+; are located above the definition for CellCommon <>.
+;
+CellUserFunction	struct
+	CUF_common	CellCommon <0,CT_USER_FUNCTION>
+CellUserFunction	ends
+
+;------------------------------------------------------------------------------
+; Structure of CT_EMPTY
+;	data:		no data
+;	dependencies:	cells that reference this cell
+;
+; Please read the notes associated with changing cell data structures. They
+; are located above the definition for CellCommon <>.
+;
+CellEmpty	struct
+	CE_common	CellCommon <0,CT_EMPTY>
+CellEmpty	ends
+
+EndLibrary	ssheet

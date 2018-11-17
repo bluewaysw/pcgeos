@@ -1,0 +1,1095 @@
+/********************************************************************
+ *      Copyright (c)1994-97 Clemens Kochinke -- All Rights Reserved
+ *      Portions: Copyright 1991-94 Geoworks -- Permission granted
+ *      Project:        Startbar
+ *      Module:         static objects
+ *      Filename:       SBARUI.goc
+ *      Author:         Clemens Kochinke
+ *  REVISION HISTORY:
+ *   Name   Date     Description
+ *   ----   ----     -----------
+ *   CK    8/19/94   Sample App setup with dual sides
+ *   CK    1/19/96   Split files.
+ *   CK    3/26/96   Changed to Jupiter QB with IACP
+ *   CK    12/21/97  Changed to Startbar for NDO
+ *   LES   02/02/98  Cleaned up code and reorganized
+ *   LES   02/09/98  Support correct button buttoms and express menu
+ *                THIS IS THE STATIC UI FILE
+ *******************************************************************/
+
+/********************************************************************
+ *      Include Files
+ *******************************************************************/
+
+@include <stdapp.goh>
+@include <system.h>  
+@include <initfile.h>
+@include "Sbarapp.goh"  
+@include "Art/ndstart.goh"
+@include "Art/nd-ico.goh"
+@include <objects/text/tcommon.h>
+@include <timedate.h>
+@include <Ansi/stdio.h>
+@include <launchp.h>
+@include <resource.h>
+@include <library.h>
+@include <Objects/sbarutil.goh>
+
+/* @define ALLOW_PROPERTY_STARTBAR_AUTO_LOAD */
+@define COMPILE_OPTION_START_BUTTON_OPENS_EXPRESS_MENU
+/* @define COMPILE_OPTION_USE_CASCADE_MENU */
+
+#define STARTBAR_DEFAULT_WIDTH_OF_APP_FIELD 90
+#define STARTBAR_SPACER_WIDTH               5
+#define MAX_STARTBAR_MODULES                20
+
+#define STARTBAR_MODULE_ENTRY_GET_UI_HEAD   0
+#define STARTBAR_MODULE_ENTRY_INITIALIZE    1
+#define STARTBAR_MODULE_ENTRY_DEINITIALIZE  2
+
+word G_widthOfAppField = STARTBAR_DEFAULT_WIDTH_OF_APP_FIELD ;
+
+/********************************************************************
+ *      Prototypes:
+ *******************************************************************/
+
+static void checkGeosIni(void) ;
+void LoadStartbarModules(void) ;
+void UnloadStartbarModules(void) ;
+void LoadSingleStartbarModule(FileLongName *p_name) ;
+
+
+#define STARTBAR_PROPERTY_AUTO_LOAD_ON           0
+#define STARTBAR_PROPERTY_AUTO_LOAD_OFF          1
+#define STARTBAR_PROPERTY_SHOW_DISPLAY_ON        2
+#define STARTBAR_PROPERTY_SHOW_DISPLAY_OFF       3
+#define STARTBAR_PROPERTY_AUTO_HIDE_ON           4
+#define STARTBAR_PROPERTY_AUTO_HIDE_OFF          5
+
+/********************************************************************
+ *      Globals:
+ *******************************************************************/
+
+Boolean G_autohideOn = TRUE ;
+TimerHandle G_timeTimerAutoHide = NullHandle ;
+word G_timeIdAutoHide ;
+Boolean G_barIsShowing = FALSE ;
+word G_numModules = 0 ;
+GeodeHandle G_modules[MAX_STARTBAR_MODULES] ;
+optr G_moduleParents[MAX_STARTBAR_MODULES] ;
+
+/********************************************************************
+ *      Class
+ *******************************************************************/
+@classdecl StartBarProcessClass, neverSaved;
+@extern method StartBarProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION;
+@extern method StartBarProcessClass, MSG_STARTBAR_OPEN_PREF;
+@extern method StartBarProcessClass, MSG_STARTBAR_PROPERTIES;
+@extern method StartBarProcessClass, MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE ;
+
+/*---------------------------------*/
+@classdecl StartBarAppClass;
+@classdecl StartBarPrimaryClass;
+@extern method StartBarPrimaryClass, MSG_META_RAW_UNIV_ENTER;
+@extern method StartBarPrimaryClass, MSG_META_RAW_UNIV_LEAVE;
+@extern method StartBarPrimaryClass, MSG_STARTBAR_PRIMARY_SHOW;
+@extern method StartBarPrimaryClass, MSG_STARTBAR_PRIMARY_HIDE;
+@classdecl StartBarInteractionClass;
+@classdecl StartBarIconInteractionClass;
+@classdecl StartBarRightInteractionClass;
+@classdecl StartBarSButtonTriggerClass;
+@classdecl StartBarSideTitleClass;
+@if 0
+@extern method StartBarSideTitleClass, MSG_VIS_DRAW;
+@endif
+@classdecl StartBarExpressMenuControlClass ;
+
+/*=========================================================================*/
+
+
+@start APPRESOURCE;
+    /*---------------------------------------------------------------------*/
+    @object StartBarAppClass StartBarApp =
+    {
+        GI_visMoniker = list { @QBTextMoniker, @NDICO0 };
+        GI_comp = @SBPrimary ,
+                  /* Menus: */
+                  @StartBarStartButtonMenu,
+                  @StartBarMenu,
+                  @StartBarPropertiesMenu,
+@ifdef ADDLATER
+                  @StartBarPropAddStartups,
+@endif ADDLATER
+                  @EMenu
+@ifdef COMPILE_OPTION_USE_CASCADE_MENU
+                  , @Cascade
+@endif
+                  ;
+
+        gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @SBPrimary;
+        gcnList(MANUFACTURER_ID_GEOWORKS,GCNSLT_EXPRESS_MENU_CHANGE) = @EM1;
+        gcnList(MANUFACTURER_ID_GEOWORKS,MGCNLT_ACTIVE_LIST) = @EM1;
+    }
+    /*---------------------------------------------------------------------*/
+    @visMoniker QBTextMoniker = "Startbar";
+    @localize {"Short name of the application that appears in \
+                  NewManager and the Express menu"};
+    /*---------------------------------------------------------------------*/
+@end APPRESOURCE;
+
+
+/*=========================================================================*/
+
+
+@start INTERFACE;
+    /*---------------------------------------------------------------------*/
+    @object StartBarPrimaryClass SBPrimary = {
+         GI_visMoniker = "";
+         @localize {"The long name of the application that appears on the title bar"};
+
+         GI_comp = @SBLeftBox, @SBLeftSpacer, @SBMiddleBox, @SBRightSpacer, @SBRightBox;
+
+         ATTR_GEN_WINDOW_CUSTOM_LAYER_PRIORITY = LAYER_PRIO_ON_TOP ;
+         ATTR_GEN_WINDOW_CUSTOM_WINDOW_PRIORITY = WIN_PRIO_COMMAND ;
+         ATTR_GEN_HELP_CONTEXT ="TOC";
+         HINT_DISPLAY_NOT_RESIZABLE;
+         HINT_WINDOW_NO_CONSTRAINTS;
+         HINT_AVOID_MENU_BAR;
+         HINT_PRIMARY_NO_FILE_MENU;
+@if 0
+         HINT_PRIMARY_NO_EXPRESS_MENU;
+@endif
+         HINT_PRIMARY_NO_HELP_BUTTON;
+         HINT_WINDOW_NO_TITLE_BAR;
+/*         HINT_TOOLBOX; */
+         HINT_CUSTOM_CHILD_SPACING = {SST_PIXELS | 0 };
+         HINT_ORIENT_CHILDREN_HORIZONTALLY;
+         HINT_CENTER_CHILDREN_VERTICALLY;
+         HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+         HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY;
+/*         HINT_SIZE_WINDOW_AS_RATIO_OF_PARENT = { SWSS_RATIO | PCT_100 , SWSS_RATIO | PCT_5};
+         HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = { SWSS_RATIO  | PCT_0, (SWSS_RATIO | PCT_100) }; */
+         HINT_FIXED_SIZE = { SWSS_RATIO | PCT_100, 0} ;
+         HINT_KEEP_ENTIRELY_ONSCREEN;
+         HINT_EXTEND_WINDOW_TO_BOTTOM_RIGHT;
+         HINT_ORIENT_CHILDREN_HORIZONTALLY ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass SBLeftBox = {
+        GI_comp= @SBStartButton;
+      /*  HINT_FIXED_SIZE ={SST_AVG_CHAR_WIDTHS|1,SST_AVG_CHAR_WIDTHS|1, 2};*/
+        HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+        HINT_NO_WIDER_THAN_CHILDREN_REQUIRE;
+/*         HINT_NO_TALLER_THAN_CHILDREN_REQUIRE; */
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+/*
+        HINT_FIXED_SIZE ={SST_AVG_CHAR_WIDTHS|1,SST_PIXELS|16, 2};
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_INCLUDE_ENDS_IN_CHILD_SPACING;
+        HINT_MINIMIZE_CHILD_SPACING;
+*/
+    }
+    /*---------------------------------------------------------------------*/
+@ifdef COMPILE_OPTION_START_BUTTON_OPENS_EXPRESS_MENU
+    @object StartBarSButtonTriggerClass SBStartButton = {
+        GI_visMoniker = list {@NDICOCOL, @NDICOBW};
+@ifdef COMPILE_OPTION_USE_CASCADE_MENU
+        GTI_destination = @Cascade; /* EMenu;   StartBarApp;*/
+        GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE;
+@else
+        GTI_destination = @StartBarApp ;
+        GTI_actionMsg = MSG_GEN_APPLICATION_TOGGLE_EXPRESS_MENU;
+@endif
+    }
+@endif
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass SBLeftSpacer = {
+        HINT_FIXED_SIZE = {
+            SST_PIXELS | STARTBAR_SPACER_WIDTH,
+            0 } ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass SBRightSpacer = {
+        HINT_FIXED_SIZE = {
+            SST_PIXELS | STARTBAR_SPACER_WIDTH,
+            0 } ;
+    }
+    /*---------------------------------------------------------------------*/
+
+    /*************************************************
+    The Middle Box is at the center of the Startbar.
+    Left click:       Nothing happens.
+    Right click:      Opens box with Cascade, Tile Horiz, Tile Vert, Minimize
+                      all windows, Properties
+    Displays:         Running apps buttons:  pull that from
+                      ExpressMenuControllClass object
+    **************************************************/
+
+    /*---------------------------------------------------------------------*/
+    @object StartBarInteractionClass SBMiddleBox = {
+        GI_comp=@SBRunApps;
+        HINT_MINIMUM_SIZE ={SST_AVG_CHAR_WIDTHS|20,SST_PIXELS|16, 0};
+/*        HINT_MAXIMUM_SIZE ={SST_AVG_CHAR_WIDTHS|90,SST_PIXELS|16, 0}; */
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_CENTER_CHILDREN_VERTICALLY;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_CUSTOM_CHILD_SPACING = {SST_PIXELS | 3 };
+        HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+    }
+    /*---------------------------------------------------------------------*/
+    @object  StartBarExpressMenuControlClass SBRunApps = {
+        GI_states = @default | GS_ENABLED | GS_USABLE;
+        ATTR_GEN_CONTROL_PROHIBIT_UI = (
+            EMCF_DESK_ACCESSORY_LIST|
+            EMCF_MAIN_APPS_LIST     |
+            EMCF_OTHER_APPS_LIST    |
+            EMCF_CONTROL_PANEL      |
+            EMCF_DOS_TASKS_LIST     |
+            EMCF_UTILITIES_PANEL    |
+            EMCF_EXIT_TO_DOS  );
+        HINT_TOOLBOX;
+        HINT_MINIMIZE_CHILD_SPACING;
+        HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+    }
+    /*---------------------------------------------------------------------*/
+
+    /*************************************************
+    The Right Box is at the right of the Startbar.
+    Displays:         Icon tools, clock
+    **************************************************/
+
+    /*---------------------------------------------------------------------*/
+    @object StartBarRightInteractionClass SBRightBox = {
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_CUSTOM_CHILD_SPACING = {SST_PIXELS | 1 };
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+@end INTERFACE;
+
+
+/*=========================================================================*/
+/* The following objects are the pop up menus that appear usually from */
+/* right clicking on an item */
+
+@start StartBarMenuRes;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass EMenu = {
+        GI_comp = @EM1;
+        GII_type = GIT_ORGANIZATIONAL;
+        GII_visibility = GIV_DIALOG; /* as DIALOG opened near Startbar */
+        GI_attrs=@default | GIA_NOT_USER_INITIATABLE;
+        HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT={SWSS_RATIO|PCT_0,SWSS_RATIO|PCT_75};
+        HINT_SIZE_WINDOW_AS_RATIO_OF_PARENT = {SWSS_RATIO|PCT_20,SWSS_RATIO|PCT_20};
+        HINT_WINDOW_NO_TITLE_BAR;
+        HINT_INTERACTION_SINGLE_USAGE;
+    }
+    /*---------------------------------------------------------------------*/
+    @object ExpressMenuControlClass EM1 = {
+        GI_states = @default | GS_ENABLED | GS_USABLE;
+        ATTR_GEN_CONTROL_PROHIBIT_UI = (
+             EMCF_DESK_ACCESSORY_LIST|
+             EMCF_MAIN_APPS_LIST     |
+             EMCF_OTHER_APPS_LIST    |
+             EMCF_CONTROL_PANEL      |
+             EMCF_DOS_TASKS_LIST     |
+             EMCF_UTILITIES_PANEL    |
+             EMCF_EXIT_TO_DOS  );
+        HINT_MINIMIZE_CHILD_SPACING;
+        HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+        HINT_ALLOW_CHILDREN_TO_WRAP;
+        HINT_WRAP_AFTER_CHILD_COUNT={1};
+        ATTR_EMC_SET_NOT_USABLE_ON_DETACH;
+    }
+    /*---------------------------------------------------------------------*/
+@ifdef COMPILE_OPTION_USE_CASCADE_MENU
+    @object GenInteractionClass Cascade = {
+    }
+@endif
+
+@ifndef COMPILE_OPTION_START_BUTTON_OPENS_EXPRESS_MENU
+    @object GenInteractionClass SBStartButton = {
+        GI_visMoniker = list {@NDICOCOL, @NDICOBW};
+@if 1
+        GI_comp = @CascadeLeft, @CascadeRight;
+@else
+        GI_comp = @SBPrograms, @SBDocuments, @SBSettings,
+                  @SBFind, @SBHelp, @SBRun, @SBShutdown;
+@endif
+        GII_visibility = GIV_DIALOG; /* Popup refuses to accept two panels */
+        HINT_INITIAL_SIZE = {SST_PIXELS | 65, SST_PIXELS | 100 , 2 };
+        HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT={SWSS_RATIO|PCT_0,SWSS_RATIO|PCT_65};
+        HINT_ORIENT_CHILDREN_HORIZONTALLY;
+        HINT_NO_WIDER_THAN_CHILDREN_REQUIRE;
+        HINT_WINDOW_NO_TITLE_BAR;
+        HINT_INTERACTION_SINGLE_USAGE;
+    }
+@endif
+    /*---------------------------------------------------------------------*/
+@ifdef COMPILE_OPTION_USE_CASCADE_MENU
+    @object GenTextClass CascadeGlyph = {
+        GTXI_maxLength = 2;
+        GTXI_text = "  ";
+        GI_attrs = (@default) | GA_READ_ONLY;
+        HINT_INITIAL_SIZE = {SST_PIXELS | 14, SST_PIXELS | 100 , 1 };
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+        HINT_TEXT_WASH_COLOR={C_LIGHT_GREEN,C_LIGHT_GREEN,C_BLUE,C_BLUE};
+        HINT_NO_WIDER_THAN_CHILDREN_REQUIRE;
+        HINT_TEXT_NO_FRAME;
+    }
+    /*---------------------------------------------------------------------*/
+    @object StartBarSideTitleClass CascadeLeft = {
+       SBSTI_title = "New Deal Office" ;
+       HINT_FIXED_SIZE = { SST_PIXELS | 18, 0, 0 } ;
+       HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+       HINT_NO_BORDERS_ON_MONIKERS;
+    }
+    /*---------------------------------------------------------------------*/
+    /********* Triggers on "Cascading Menu *******************/
+@if 1
+    @object GenInteractionClass CascadeRight = {
+        GI_comp = @SBPrograms, @SBDocuments, @SBSettings,
+                  @SBFind, @SBHelp, @SBRun, @SBShutdown;
+        HINT_INITIAL_SIZE = {SST_PIXELS | 43, SST_PIXELS | 100 , 2 };
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+        HINT_NO_WIDER_THAN_CHILDREN_REQUIRE;
+    }
+@endif
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SBPrograms = {
+        GI_visMoniker = "Programs";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GTI_destination = process ;
+        GTI_actionMsg   = MSG_STARTBAR_OPEN_PREF ;
+        ATTR_GEN_TRIGGER_ACTION_DATA = STARTBAR_OPEN_PREF_GEOMANAGER;
+        HINT_NO_BORDERS_ON_MONIKERS;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SBDocuments = {
+        GI_visMoniker = "Documents";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GTI_destination = process ;
+        GTI_actionMsg   = MSG_STARTBAR_OPEN_PREF ;
+        ATTR_GEN_TRIGGER_ACTION_DATA = STARTBAR_OPEN_PREF_GEOMANAGER;
+        HINT_NO_BORDERS_ON_MONIKERS;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SBSettings = {
+        GI_visMoniker = "Settings";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GTI_destination = process ;
+        GTI_actionMsg   = MSG_STARTBAR_OPEN_PREF ;
+        ATTR_GEN_TRIGGER_ACTION_DATA = STARTBAR_OPEN_PREF_PREF_MANAGER;
+        HINT_NO_BORDERS_ON_MONIKERS;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SBFind = {
+        GI_visMoniker = "Find";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GTI_destination = process ;
+        GTI_actionMsg   = MSG_STARTBAR_OPEN_PREF ;
+        ATTR_GEN_TRIGGER_ACTION_DATA = STARTBAR_OPEN_PREF_FILE_FIND;
+        HINT_NO_BORDERS_ON_MONIKERS;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SBHelp = {
+        GI_visMoniker = "Help";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GTI_destination = SBPrimary ;
+        GTI_actionMsg   = MSG_META_BRING_UP_HELP ;
+        HINT_NO_BORDERS_ON_MONIKERS;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SBRun = {
+        GI_visMoniker = "Run";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GTI_destination = @StartBarApp;
+        GTI_actionMsg = MSG_GEN_APPLICATION_TOGGLE_EXPRESS_MENU;
+        HINT_NO_BORDERS_ON_MONIKERS;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass SBShutdown = {
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GII_visibility = GIV_SUB_GROUP;
+        GI_comp = @SBShutdown1;
+        HINT_NO_BORDERS_ON_MONIKERS;
+        HINT_NO_WIDER_THAN_CHILDREN_REQUIRE;
+        HINT_NO_TALLER_THAN_CHILDREN_REQUIRE;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SBShutdown1 = {
+        GI_visMoniker = "Shut Down";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GTI_destination = process ;
+        GTI_actionMsg   = MSG_STARTBAR_PROPERTIES ;
+        ATTR_GEN_TRIGGER_ACTION_DATA=9;
+        HINT_NO_BORDERS_ON_MONIKERS;
+    }
+@endif
+    /*---------------------------------------------------------------------*/
+    @object StartbarRightClickMenuClass StartBarStartButtonMenu = { /* child of the GenApp */
+        GI_comp = @SBSBM1, @SBSBM2, @SBSBM3;
+        GII_type = GIT_ORGANIZATIONAL;
+        GII_visibility = GIV_POPUP;
+        GI_attrs=@default | GIA_NOT_USER_INITIATABLE;
+        HINT_POPS_UP_BELOW ;
+        HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT={SWSS_RATIO|PCT_10,SWSS_RATIO|PCT_85};
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_INTERACTION_SINGLE_USAGE;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SBSBM1 = {
+        GI_visMoniker = "Open";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GTI_destination = process ;
+        GTI_actionMsg   = MSG_STARTBAR_OPEN_PREF ;
+        ATTR_GEN_TRIGGER_ACTION_DATA = STARTBAR_OPEN_PREF_PREF_MANAGER;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SBSBM2 = {
+        GI_visMoniker = "Explore";        /* NewManager */
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GTI_destination = process ;
+        GTI_actionMsg   = MSG_STARTBAR_OPEN_PREF ;
+        ATTR_GEN_TRIGGER_ACTION_DATA = STARTBAR_OPEN_PREF_GEOMANAGER;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SBSBM3 = {
+        GI_visMoniker = "Find";             /* File Finder */
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GTI_destination = process ;
+        GTI_actionMsg   = MSG_STARTBAR_OPEN_PREF;
+        ATTR_GEN_TRIGGER_ACTION_DATA = STARTBAR_OPEN_PREF_FILE_FIND;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+    }
+    /*---------------------------------------------------------------------*/
+
+    /***************************************************************
+     Start Bar Center Menu
+     Opens on Right Click on Start Bar
+     The first few menu items are the ones from W95
+     and don't have functionality at this time, just as they
+     often appear in W95 as NOT ENABLED. The functionality can
+     be added later, if desired. For now, we approximate the look.
+     The Properties item approximates the one from W95.
+     In order to have some functionality, we add some useful triggers.
+    ******************************************************************/
+
+    /*---------------------------------------------------------------------*/
+    @object StartbarRightClickMenuClass StartBarMenu = { /* child of the GenApp */
+@if 0
+        GI_comp =
+               @SBMCascade,
+               @SBMTH,
+               @SBMTV,
+               @SBMMinimizeGroup,
+               @SBMSettingsGroup;
+@endif
+        GI_comp = @SBM1, @SBM3, @SBM4;
+    }
+    /*---------------------------------------------------------------------*/
+@if 0
+    @object GenTriggerClass SBMCascade = {
+        GI_visMoniker = "Cascade";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GI_states=@default &~GS_ENABLED;
+        HINT_NO_BORDERS_ON_MONIKERS;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SBMTH = {
+        GI_visMoniker = "Tile Horizontally";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GI_states=@default &~GS_ENABLED;
+        HINT_NO_BORDERS_ON_MONIKERS;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SBMTV = {
+        GI_visMoniker = "Tile Vertically";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GI_states=@default &~GS_ENABLED;
+        HINT_NO_BORDERS_ON_MONIKERS;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass SBMMinimizeGroup = {
+        GI_comp = @SBMMinimize;
+        GII_visibility = GIV_SUB_GROUP;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SBMMinimize = {
+        GI_visMoniker = "Minimize All Windows";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GI_states=@default &~GS_ENABLED;
+        HINT_NO_BORDERS_ON_MONIKERS;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass SBMSettingsGroup = {
+        GI_comp = @SBM1, @SBM3, @SBM4;
+        GII_visibility = @default | GIV_SUB_GROUP;
+    }
+@endif
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SBM1 = {
+        GI_visMoniker = "Preferences";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GTI_destination = process ;
+        GTI_actionMsg   = MSG_STARTBAR_OPEN_PREF ;
+        HINT_NO_BORDERS_ON_MONIKERS;
+        ATTR_GEN_TRIGGER_ACTION_DATA = STARTBAR_OPEN_PREF_PREF_MANAGER;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+    }
+    /*---------------------------------------------------------------------*/
+    /*  Opens Configure / GeoCon3: */
+    @object GenTriggerClass SBM3 = {
+        GI_visMoniker = "Configuration";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GTI_destination = process ;
+        GTI_actionMsg   = MSG_STARTBAR_OPEN_PREF ;
+        HINT_NO_BORDERS_ON_MONIKERS;
+        ATTR_GEN_TRIGGER_ACTION_DATA = STARTBAR_OPEN_PREF_CONFIGURE;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SBM4 = {
+        GI_visMoniker = "Properties";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GTI_destination = @StartBarPropertiesMenu ;
+        GTI_actionMsg   = MSG_GEN_INTERACTION_INITIATE ;
+        HINT_NO_BORDERS_ON_MONIKERS;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+    }
+    /* END of Startbar Center */
+    /*---------------------------------------------------------------------*/
+
+    /*---------------------------------------------------------------------*/
+    /* Child of Startbar Center */
+    @object GenInteractionClass StartBarPropertiesMenu = { /* child of the GenApp */
+        GI_comp =
+@ifdef ALLOW_PROPERTY_STARTBAR_AUTO_LOAD
+                  @SBPMAutoLoadGroup,
+@endif
+                  @SBPMAutoHideGroup
+@ifdef ADDLATER
+               ,  @SBPM3
+@endif ADDLATER
+               ;
+        GI_visMoniker = "Startbar Properties";
+        GII_type = GIT_PROPERTIES ;
+        GII_visibility = GIV_DIALOG;
+        GI_attrs = @default | GIA_NOT_USER_INITIATABLE;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemGroupClass SBPMAutoLoadGroup = {
+        GI_comp = @SBPMAutoLoadYes,
+                  @SBPMAutoLoadNo;
+        GIGI_destination = process ;
+        GIGI_applyMsg = MSG_STARTBAR_PROPERTY_CHANGED ;
+        HINT_ORIENT_CHILDREN_VERTICALLY ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_DRAW_IN_BOX ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass SBPMAutoLoadYes = {
+        GI_visMoniker = "Launch Startbar automatically";
+          @localize {"Trigger to set GEOS.INI for automatic launch of Startbar"};
+        GII_identifier = STARTBAR_PROPERTY_AUTO_LOAD_ON ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass SBPMAutoLoadNo = {
+        GI_visMoniker = "Launch Startbar manually";
+          @localize {"Trigger to set GEOS.INI for manual launch of Startbar"};
+        GII_identifier = STARTBAR_PROPERTY_AUTO_LOAD_OFF ;
+    }
+    /*---------------------------------------------------------------------*/
+@ifdef ADDLATER
+    @object GenTriggerClass SBPM3 = {
+        GI_visMoniker = "Startup Programs ...";
+          @localize {"User selection to select startup program."};
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+        HINT_NO_BORDERS_ON_MONIKERS;
+        GTI_destination = StartBarPropAddStartups;
+        GTI_actionMsg   = MSG_GEN_INTERACTION_INITIATE;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+    }
+@endif ADDLATER
+    /*---------------------------------------------------------------------*/
+    @object GenItemGroupClass SBPMAutoHideGroup = {
+        GI_comp = @SBPMAutoHideYes,
+                  @SBPMAutoHideNo;
+        GIGI_destination = process ;
+        GIGI_applyMsg = MSG_STARTBAR_PROPERTY_CHANGED ;
+        HINT_ORIENT_CHILDREN_VERTICALLY ;
+        HINT_DRAW_IN_BOX ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass SBPMAutoHideYes = {
+        GI_visMoniker = "Startbar hides automatically";
+          @localize {"User selection to auto-hide application."};
+        GII_identifier = STARTBAR_PROPERTY_AUTO_HIDE_ON ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenItemClass SBPMAutoHideNo = {
+        GI_visMoniker = "Startbar always visible";
+          @localize {"User selection to keep app always visible."};
+        GII_identifier = STARTBAR_PROPERTY_AUTO_HIDE_OFF ;
+    }
+
+@ifdef ADDLATER
+    /* This menu opens on left click: */
+    @object GenInteractionClass StartBarPropAddStartups = { /* child of the GenApp */
+        GI_comp = @SBPAS1, @SBPAS2;
+        GII_type = GIT_ORGANIZATIONAL;
+        GII_visibility = GIV_DIALOG;
+        GI_attrs=@default | GIA_NOT_USER_INITIATABLE;
+        HINT_POPS_UP_BELOW ;
+        HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT={SWSS_RATIO|PCT_50,SWSS_RATIO|PCT_80};
+        HINT_CENTER_CHILDREN_HORIZONTALLY;
+        HINT_INTERACTION_SINGLE_USAGE;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenGlyphClass SBPAS1= {
+        GI_visMoniker = "Programs to startup automatically";
+            @localize {"Note that 2Web is missing"};
+        HINT_NO_BORDERS_ON_MONIKERS;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass SBPAS2= {
+        GI_attrs = @default | GA_TARGETABLE | VTS_EDITABLE;
+        GI_visMoniker = "Program:";
+            @localize {"User should type program to add."};
+        GTXI_attrs= @default | GTA_SINGLE_LINE_TEXT &~ GTA_INIT_SCROLLING;
+        GTXI_text = "";
+        GTXI_maxLength = 36;
+        ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ( /* VTDCA_NORMAL */ 0 \
+              | ( (C_BLACK)<<VTDCA_COLOR_OFFSET ) \
+               | (VTDS_12<<VTDCA_SIZE_OFFSET) \
+               | (VTDF_URW_SANS<<VTDCA_FONT_OFFSET)  ); /* Was BERKELEY */
+        HINT_DEFAULT_TARGET;
+        HINT_TEXT_DO_NOT_MAKE_LARGER_ON_PEN_SYSTEMS;
+        HINT_TEXT_FRAME;
+        HINT_DEFAULT_FOCUS;
+        HINT_TEXT_CURSOR_AT_END;
+    }
+@endif ADDLATER
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SBCMCascade = {
+        GI_visMoniker = "Cascade";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GI_states=@default &~GS_ENABLED;
+        HINT_NO_BORDERS_ON_MONIKERS;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SBCMTH = {
+        GI_visMoniker = "Tile Horizontally";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GI_states=@default &~GS_ENABLED;
+        HINT_NO_BORDERS_ON_MONIKERS;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SBCMTV = {
+        GI_visMoniker = "Tile Vertically";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GI_states=@default &~GS_ENABLED;
+        HINT_NO_BORDERS_ON_MONIKERS;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SBCMMinimize = {
+        GI_visMoniker = "Minimize All Windows";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GI_states=@default &~GS_ENABLED;
+        HINT_NO_BORDERS_ON_MONIKERS;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass SBCMProperties = {
+        GI_visMoniker = "Properties";
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        GTI_destination = process ;
+        GTI_actionMsg   = MSG_STARTBAR_OPEN_PREF ;
+        HINT_NO_BORDERS_ON_MONIKERS;
+        ATTR_GEN_TRIGGER_ACTION_DATA = STARTBAR_OPEN_PREF_PREF_MANAGER;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { IC_DISMISS };
+    }
+    /*---------------------------------------------------------------------*/
+@end StartBarMenuRes;
+
+
+/*=========================================================================*/
+
+
+/***********************************************************************
+ *              MSG_META_START_SELECT for StartBarInteractionClass
+ ***********************************************************************
+ * SYNOPSIS:    Grabs the mouse and calls for future pointer events.
+ *              When the user clicks on the object, event set in this
+ *              message will happen.
+ * PARAMETERS:  void (MouseReturnParams *retVal,
+ *                    word xPosition, word yPosition, word inputState);
+ *
+ ***********************************************************************/
+@method StartBarSButtonTriggerClass, MSG_META_START_MOVE_COPY
+{
+    @send StartBarStartButtonMenu::MSG_GEN_INTERACTION_INITIATE();
+    retVal->flags = MRF_PROCESSED;
+}
+
+@method StartBarInteractionClass, MSG_META_START_MOVE_COPY
+{
+    @send StartBarMenu::MSG_GEN_INTERACTION_INITIATE();
+    retVal->flags = MRF_PROCESSED;
+}
+
+/***********************************************************************
+ *              MSG_META_END_SELECT for StartBarInteractionClass
+ ***********************************************************************
+ * SYNOPSIS:    This message is received when the selection button has
+ *              been released and this object had the mouse grab.
+ *              All it does is release the gadget exclusive, which will
+ *              release the mouse.
+ * PARAMETERS:  void (MouseReturnParams *retVal,
+ *                    word xPosition, word yPosition, word inputState);
+ * SIDE EFFECTS:
+ *
+ ***********************************************************************/
+@method StartBarIconInteractionClass, MSG_META_END_SELECT
+{
+    retVal->flags = MRF_PROCESSED;
+}
+
+@method StartBarSButtonTriggerClass, MSG_META_END_MOVE_COPY
+{
+    retVal->flags = MRF_PROCESSED;
+}
+
+@method StartBarInteractionClass, MSG_META_END_MOVE_COPY
+{
+    retVal->flags = MRF_PROCESSED;
+}
+
+/*-----------------------------*/
+@extern method StartBarProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+    extern void StopAutoHideTimer(void) ;
+
+    UnloadStartbarModules() ;
+
+    StopAutoHideTimer() ;
+
+    return @callsuper() ;
+}
+
+/******************************************************/
+static void checkGeosIni(void)
+{
+    word dataSize;        /* Size of string that is read */
+    MemHandle block;      /* Block that string is read into */
+    char buf[50] = "";
+    Boolean On=TRUE;
+    if ((!InitFileReadBoolean("startbar", "auto", &On)) && (On!=TRUE))  {
+         @send SBPMAutoLoadGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+                   STARTBAR_PROPERTY_AUTO_LOAD_ON,
+                   FALSE) ;
+    } else {
+         @send SBPMAutoLoadGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+                   STARTBAR_PROPERTY_AUTO_LOAD_OFF,
+                   FALSE) ;
+    }
+
+    if ((!InitFileReadBoolean("startbar", "autohide", &On)) && (On!=TRUE))  {
+        @send SBPrimary::MSG_STARTBAR_PRIMARY_SHOW();
+        G_autohideOn = FALSE;
+
+        @send SBPMAutoHideGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+                  STARTBAR_PROPERTY_AUTO_HIDE_OFF,
+                  FALSE) ;
+    } else {
+        @send SBPrimary::MSG_STARTBAR_PRIMARY_HIDE();
+        G_autohideOn = TRUE;
+
+        @send SBPMAutoHideGroup::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+                  STARTBAR_PROPERTY_AUTO_HIDE_ON,
+                  FALSE) ;
+    }
+}
+
+
+/******************************************************/
+@extern method StartBarProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+/*       if (!(attachFlags &AAF_RESTORING_FROM_STATE))
+                  {
+         @call toolBar::MSG_GEN_SET_USABLE(VUM_NOW);
+                  }*/
+    InitFileReadInteger("startbar", "widthApp", &G_widthOfAppField) ;
+    @call SBPrimary::MSG_GEN_SET_WIN_POSITION(
+               GET_MM_AND_TYPE(VUM_DELAYED_VIA_UI_QUEUE, WPT_AT_RATIO),
+               (SWSS_RATIO  | PCT_0),
+               (SWSS_RATIO | PCT_100)) ;
+
+    LoadStartbarModules() ;
+
+    @callsuper();
+    checkGeosIni();
+    @call SBPrimary::MSG_META_RAW_UNIV_ENTER();
+    @call StartBarApp::MSG_GEN_APPLICATION_INSTALL_TOKEN();
+}
+
+
+/*------------------------------------------------------*/
+
+
+@method StartBarProcessClass, MSG_STARTBAR_PROPERTIES
+{
+    switch(property)  {
+        case STARTBAR_PROPERTY_AUTO_LOAD_ON:
+            UserAddAutoExec("Startbar");
+            InitFileWriteBoolean("startbar", "auto", TRUE);
+            break;
+
+        case STARTBAR_PROPERTY_AUTO_LOAD_OFF:
+            UserRemoveAutoExec("Startbar");
+
+            /* NOTE!!!: Remove this in final version!! */
+            UserRemoveAutoExec("Start Bar");
+            InitFileWriteBoolean("startbar", "auto", FALSE);
+            break;
+
+        case STARTBAR_PROPERTY_AUTO_HIDE_ON:
+            InitFileWriteBoolean("startbar", "autohide", TRUE);
+            G_autohideOn = TRUE;
+            @call SBPrimary::MSG_STARTBAR_PRIMARY_HIDE() ;
+            break;
+
+        case STARTBAR_PROPERTY_AUTO_HIDE_OFF:
+            InitFileWriteBoolean("startbar", "autohide", FALSE);
+            G_autohideOn = FALSE;
+            @call SBPrimary::MSG_STARTBAR_PRIMARY_SHOW() ;
+            break;
+
+        case 9: /* System Shutdown */
+            SysShutdown(SST_CLEAN_FORCED, 0, 0);
+            break;
+    }
+}
+
+@method StartBarProcessClass, MSG_STARTBAR_PROPERTY_CHANGED
+{
+    /* Pass the GenItemGroup selection to the generic routine */
+    /* to handle it */
+    @call oself::MSG_STARTBAR_PROPERTIES(selection) ;
+}
+
+
+
+/*=========================================================================*
+ *  METHODS FOR CLASS:  StartBarExpressMenuControlClass
+ *=========================================================================*/
+
+@method StartBarExpressMenuControlClass, MSG_EXPRESS_MENU_CONTROL_CREATE_ITEM
+{
+    MemHandle mem ;
+    CreateExpressMenuControlItemParams *p_originalParams ;
+
+
+    mem = MemAlloc(sizeof(*p_originalParams), HF_DYNAMIC, 0) ;
+    if (mem)  {
+        /* Make a copy of the original parameters */
+        p_originalParams = MemLock(mem) ;
+        memcpy(p_originalParams, &createParams, sizeof(*p_originalParams)) ;
+        MemUnlock(mem) ;
+
+        /* Redirect the call to go to our routine instead */
+        createParams.CEMCIP_responseData = mem ;
+        createParams.CEMCIP_responseMessage =
+            MSG_START_BAR_EXPRESS_MENU_ACK_CREATE ;
+        createParams.CEMCIP_responseDestination = oself ;
+    }
+
+    @callsuper() ;
+}
+
+@method StartBarExpressMenuControlClass,
+    MSG_EXPRESS_MENU_CONTROL_DESTROY_CREATED_ITEM
+{
+    @callsuper() ;
+
+    /* Try to 'squeeze back to the initial size */
+    @call SBPrimary::MSG_GEN_SET_WIN_POSITION(
+               GET_MM_AND_TYPE(VUM_DELAYED_VIA_UI_QUEUE, WPT_AT_RATIO),
+               (SWSS_RATIO  | PCT_0),
+               (SWSS_RATIO | PCT_100)) ;
+    @call SBPrimary::MSG_GEN_SET_WIN_SIZE(
+              GET_MM_AND_TYPE(VUM_DELAYED_VIA_UI_QUEUE, WPT_AT_RATIO),
+			  SWSS_RATIO | PCT_100,
+              SWSS_RATIO | PCT_5) ;
+}
+
+void StartBarEnsureHint(optr object, VardataKey hint)
+{
+    void *p_varData ;
+
+    MemLock(OptrToHandle(object)) ;
+    p_varData = ObjVarFindData(object, hint) ;
+    if (!p_varData)  {
+        @call object::MSG_GEN_ADD_GEOMETRY_HINT(
+                      hint,
+                      0,
+                      VUM_DELAYED_VIA_UI_QUEUE) ;
+    }
+    MemUnlock(OptrToHandle(object)) ;
+}
+
+@method StartBarExpressMenuControlClass, MSG_START_BAR_EXPRESS_MENU_ACK_CREATE
+{
+    optr newItem ;
+    optr parent ;
+    CreateExpressMenuControlItemParams *p_params ;
+    CreateExpressMenuControlItemResponseParams newParams ;
+
+    p_params = MemLock(response.CEMCIRP_data) ;
+
+    newParams.CEMCIRP_newItem = response.CEMCIRP_newItem ;
+    newParams.CEMCIRP_data = p_params->CEMCIP_responseData ;
+    newParams.CEMCIRP_expressMenuControl =
+          response.CEMCIRP_expressMenuControl ;
+
+    /* Modify the object based on its type */
+    newItem = response.CEMCIRP_newItem ;
+
+    @call newItem::MSG_GEN_SET_FIXED_SIZE(
+              VUM_DELAYED_VIA_UI_QUEUE,
+              0,
+              0,
+              G_widthOfAppField);
+    StartBarEnsureHint(newItem, HINT_CAN_CLIP_MONIKER_WIDTH) ;
+    StartBarEnsureHint(newItem, HINT_CENTER_MONIKER) ;
+
+    /* !!! Warning !!! We are assuming that the child is a GenItem */
+    /*     being held in a GenItemGroup which is in a GenInteractionClass. */
+    /*     It is this GenInteractionClass (Panel) that contains the */
+    /*     words "Running Applications" that we want to get rid of */
+    parent = @call newItem::MSG_GEN_FIND_PARENT() ;
+    if (parent)  {
+        StartBarEnsureHint(parent, HINT_ALLOW_CHILDREN_TO_WRAP) ;
+        StartBarEnsureHint(parent, HINT_EXPAND_WIDTH_TO_FIT_PARENT) ;
+        StartBarEnsureHint(parent, HINT_NO_TALLER_THAN_CHILDREN_REQUIRE) ;
+
+        parent = @call parent::MSG_GEN_FIND_PARENT() ;
+        if (parent)  {
+            MemLock(OptrToHandle(parent)) ;
+            StartBarEnsureHint(parent, HINT_DO_NOT_USE_MONIKER) ;
+            StartBarEnsureHint(parent, HINT_EXPAND_WIDTH_TO_FIT_PARENT) ;
+            StartBarEnsureHint(parent, HINT_NO_TALLER_THAN_CHILDREN_REQUIRE) ;
+            MemUnlock(OptrToHandle(parent)) ;
+        }
+    }
+
+    /* Send out the correct response message */
+    @call (p_params->CEMCIP_responseDestination)::
+              {MSG_START_BAR_EXPRESS_MENU_ACK_CREATE}
+                  (p_params->CEMCIP_responseMessage)(newParams) ;
+
+    MemUnlock(response.CEMCIRP_data) ;
+    MemFree(response.CEMCIRP_data) ;
+}
+
+char *FindFirstNonSpace(char *p)
+{
+    while (((*p) != '\0') && (isspace((*p)&0x7F)))
+        p++ ;
+
+    return p ;
+}
+
+void LoadStartbarModules(void)
+{
+    word i ;
+    word len ;
+    FileLongName nameModule ;
+
+    FilePushDir() ;
+    FileSetCurrentPath(SP_SYSTEM, "Startbar") ;
+    for (i=0; i<MAX_STARTBAR_MODULES; i++)  {
+        if (InitFileReadStringSectionBuffer(
+            "startbar",
+            "modules",
+            i,
+            &nameModule,
+            sizeof(nameModule)-1,
+            &len))
+        {
+
+            /* Break if we had an error */
+            break ;
+        } else {
+            /* Got an entry. */
+            LoadSingleStartbarModule(FindFirstNonSpace(nameModule)) ;
+        }
+    }
+    FilePopDir() ;
+}
+
+void LoadSingleStartbarModule(FileLongName *p_name)
+{
+    GeodeHandle libDLL ;
+    GeodeLoadError libErr ;
+    optr plug_in ;
+    MemHandle libTree ;
+    optr libParent ;
+    ThreadHandle thread ;
+
+    libDLL = GeodeUseLibrary(p_name, 0, 0, &libErr) ;
+    thread = MemGetInfo(OptrToHandle(@SBPrimary), MGIT_EXEC_THREAD) ;
+    if (libDLL != NullHandle)  {
+        plug_in = ProcCallFixedOrMovable_pascal(
+                      ProcGetLibraryEntry(
+                          libDLL,
+                          STARTBAR_MODULE_ENTRY_GET_UI_HEAD)) ;
+
+        /* Make sure we have the right thread */
+        libTree = ObjDuplicateResource(OptrToHandle(plug_in), 0, thread) ;
+        libParent = ConstructOptr(libTree, OptrToChunk(plug_in)) ;
+
+        ProcCallFixedOrMovable_pascal(
+            libParent,
+            ProcGetLibraryEntry(
+                          libDLL,
+                          STARTBAR_MODULE_ENTRY_INITIALIZE)) ;
+/*
+        @call libParent::MSG_GEN_SET_NOT_USABLE(VUM_MANUAL) ;
+*/
+        @send SBRightBox::MSG_GEN_ADD_CHILD(libParent, CCF_MARK_DIRTY|CCO_LAST) ;
+        @call libParent::MSG_GEN_SET_USABLE(VUM_NOW) ;
+
+        G_modules[G_numModules] = libDLL ;
+        G_moduleParents[G_numModules++] = libParent ;
+    }
+}
+
+void UnloadStartbarModules(void)
+{
+    word i ;
+
+    for (i=0; i<G_numModules; i++)  {
+        ProcCallFixedOrMovable_pascal(
+            G_moduleParents[i],
+            ProcGetLibraryEntry(
+                          G_modules[i],
+                          STARTBAR_MODULE_ENTRY_DEINITIALIZE)) ;
+        GeodeFreeLibrary(G_modules[i]) ;
+    }
+}
+

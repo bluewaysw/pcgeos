@@ -1,0 +1,249 @@
+COMMENT @MECHANISM DESCRIPTION -----------------------------------------------
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		User Interface
+FILE:		UserDoDialog
+
+DESCRIPTION:	UserDoDialog Mechanism
+
+	$Id: UserDoDialog.doc,v 1.2.34.1 97/03/29 03:37:25 canavese Exp $
+
+
+Synopsis
+--------
+	UserDoDialog provides a convenient way to put up a modal dialog, & get
+	feedback from the user.  Its chief advantageous over
+	MSG_GEN_INTERACTION_INITIATE is that it doesn't return until the user
+	has responded, making it quite convenient for use within inner loops,
+	or for error conditions, or other places where it is not convenient to
+	save the current state of the executing code so that things may be
+	picked up & continued once the user responds.
+
+Limitations
+-----------
+	1) The pased object must be linked into a generic tree and be fully
+	   USABLE.
+
+	2) As the application is effectively blocked until the dialog comes
+	   down, this technique should not be used if it is to perform
+	   time critical operations.  There are other non-obvious effects,
+	   such as views/windows run by the thread not getting re-drawn if
+	   exposed.  This is less of a restriction than a design
+	   consideration.  Where possible, avoid UserDoDialog & code your
+	   application to put up the modal using MSG_GEN_INTERACTION_INITIATE.
+	   The application will continue running, with nothing blocked,
+	   and the user will still get a modal dialog.
+
+	3) All objects making up the dialog must reside within a single block.
+
+	4) The dialog must be self-contained, i.e. may not rely on messages
+	   sent or called on objects outside of itself (i.e. no dynamic
+	   lists having destinations outside of the dialog)
+
+
+Alternatives
+------------
+	In cases where only simple error messages or yes/no responses are
+	needed, UserStandardDialog is much simpler to use, as it creates, 
+	executes, & destroys the dialog for you.
+
+	To avoid the unpleasant side-effects of blocking, modal dialogs should
+	be brought up where possible using MSG_GEN_INTERACTION_INITIATE.  Code
+	will continue executing, however, & will thus have to be able to deal
+	with a message coming in later from the dialog upon its completion.
+
+Implementation Status
+---------------------
+	DONE
+
+See Also
+--------
+	UserStandardDialog, GenInteractionClass, MSG_GEN_INTERACTION_INITIATE
+
+;------------------------------------------------------------------------------
+;       Description
+;------------------------------------------------------------------------------
+
+Terminology
+-----------
+
+Relationships/Context
+---------------------
+	UserDoDialog is a routine which may be used in conjunction with
+	GenInteractionClass objects that are marked as being either
+	application or system modal.
+
+
+Conceptual Overview
+-------------------
+	Modal dialog boxes may be put together using a modal GenInteractionClass
+	object having children that are text strings gadgets, & response 
+	triggers.  GenInteraction provides ways to get the dialog box
+	on screen & off screen.  What UserDoDialog does for you is to put
+	the dialog box on screen, & block or loop dispatching events
+	until the user has responded to the dialog, & then returns that
+	response code to the calling code.
+
+Warning
+--------
+
+Usage: Common setup info
+------------------------
+	In all cases outlined below, the top GenInteraction object passed
+	to UserDoDialog must be marked as GIA_INITIATED_VIA_USER_DO_DIALOG,
+	GIA_NOT_USER_INITIATABLE, and GIA_MODAL or GIA_SYS_MODAL.
+
+	Dialogs brought up via UserDoDialog are not user-initiatable, i.e.
+	don't appears as triggers in menus.  There are two common locations
+	for such dialogs, which still must reside somewhere in the application's
+	generic tree & be fully usable:
+
+		1) Beneath the the GenApplication object
+
+		2) Beneath whatever generic group it is associated with.  This
+		   has the advantage that the dialog will be affected by tree
+		   operations made somewhere higher in the tree, such as
+		   changes in usability, enabled status or for such operations
+		   as destruction or moving the branch to another location in
+		   the tree.
+
+Usage: Standard response values
+-------------------------------
+	Simple dialogs may be created by simply specifying a GenInteractionType
+	of GIT_NOTIFICATION, GIT_AFFIRMATION, or GIT_PROGRESS.  The UI will
+	create the response triggers for you, and return a response value of
+	IC_OK, IC_YES, IC_NO, or IC_STOP, or IC_NULL if the dialog is 
+	terminated by the system (as can happen if a shutdown occurs while the
+	dialog is on screen.
+
+Usage: Custom response values
+-----------------------------
+	The GenInteractionType of GIT_MULTIPLE_RESPONSE can be used to create
+	custom reply bars.  For each button desired in the reply bar, 
+	place a GenTriggerClass object below the GenInteraction, with the
+	following placed on the trigger:
+
+		HINT_SEEK_REPLY_BAR;
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND = {
+				word <InteractionCommand here>
+				};
+
+	The "InteractionCommand" may be any of the pre-defined values, or any
+	value defined by yourself, (starting at IC_CUSTOM_START).
+
+Usage: Dialog validation
+------------------------
+	UserDoDialog is generally not used in situations requiring data 
+	validation, though it is possible to do so, by subclassing the
+	top GenInteraction, & intercepting MSG_GEN_GUP_INTERACTION_COMMAND,
+	& checking for InteractionCommand's on which you wish to perform
+	validation.  The dialog will remain on screen if the message is not
+	passed on to the superclass.
+
+In-Depth:  Effects of thread model in use
+-----------------------------------------
+	The technique used to implent UserDoDialog actually depends on the
+	thread model in use, & which thread is making the call.   There
+	are two cases:
+
+	1) The calling thread is *different* than the one running the dialog.
+	   In this situation, UserDoDialog actually blocks on a semaphore, &
+	   waits for the dialog itself to "V" the semaphore to allow the first
+	   thread to continue running.
+
+	   Special notes for the case where the calling thread is *different*
+	   than the one which runs the dialog:
+
+		- As the entire UI thread continues to run, messages
+		  force-queued to any objects run by the UI thread will get
+		  delivered, even though the modal dialog box is up.  Not
+		  usually a problem, but something to watch out for.
+
+		- The rule regarding all objects having to reside in a single
+		  object block is not enforced.  It is not necessarily a
+		  good idea to take advantage of this fact, though, as the
+		  code may not then be used in 1-threaded applications.  In
+		  particular, objects exported by libraries must be tolerant
+		  of both 1-threaded  & 2 threaded applications that may be
+		  importing the object.  Stick to one object block.
+	   
+	2) The calling thread is the *same* as the one runing the dialog.
+	   In this case, UserDoDialog loop dispatches only messages pertinent
+	   to running the dialog until it comes down.  All other messages
+	   are held up in a queue & played once the dialog comes down.
+
+	   Special notes for the case where the calling thread is the
+	   *same* as the one that runs the dialog:
+	   
+		- Messages are actually delivered to the application object,
+		  only because this is necessary to get input to the dialog &
+		  to get various window/focus control to work properly.  As
+		  messages aren't delivered to other objects (until the dialog
+		  comes down), you could get some pretty weird behavior if
+		  you've force-queued messages to the application object
+		  right before calling UserDoDialog.  Not a good idea..
+
+
+See Also
+--------
+	UserStandardDialog, GenInteractionClass, MSG_GEN_INTERACTION_INITIATE
+
+;------------------------------------------------------------------------------
+;       Assembling & Debugging
+;------------------------------------------------------------------------------
+
+Sample Code/Programming Tips
+----------------------------
+        <useful code snippets, references to sample applications & a short
+         description of them>
+
+Include Files Needed
+--------------------
+
+Assembly Tips
+-------------
+
+Debugging Tools & Tips
+----------------------
+
+See Also
+--------
+        <Sample apps, related tools, other documentation>
+
+
+;------------------------------------------------------------------------------
+;	Internal Structure
+;------------------------------------------------------------------------------
+
+
+;------------------------------------------------------------------------------
+;	Most frequently asked questions
+;------------------------------------------------------------------------------
+
+	<anytime someone asks you a question about this object, clear up
+	 the documentation above to explain it, or add an entry here>
+
+
+;------------------------------------------------------------------------------
+;	Declaration
+;------------------------------------------------------------------------------
+
+	NOTE: The section between "Declaration" and "End Declaration" is
+	      copied into uilib.def by "pmake def"
+
+Declaration
+-----------
+
+;------------------------------------------------------------------------------
+;	Constants & Structures
+;------------------------------------------------------------------------------
+
+	<Use this section only for files which actually make declarations
+	 relative to the mechansism, i.e. are code & not just documentation>
+
+End Declaration
+---------------
+
+------------------------------------------------------------------------------@

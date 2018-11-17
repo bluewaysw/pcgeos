@@ -1,0 +1,615 @@
+
+/**************************************************************
+ *  ==CONFIDENTIAL INFORMATION==
+ *  COPYRIGHT 1994-2000 BREADBOX COMPUTER COMPANY --
+ *  ALL RIGHTS RESERVED  --
+ *  THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER A
+ *  NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ *  RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ *  NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ *  CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ *  AGREEMENT.
+ **************************************************************/
+
+/*
+ **************************************************************************
+ *  FILE:			ckp_mtds.goc
+ *  PROJECT:		GPC/New Banker
+ *  DESCRIPTION:	This file has methods for the check printing
+ *				functions
+ **************************************************************************
+ */
+
+/*@ifndef COMPILEGPC */
+ 
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include "bnkr30.goh"
+@include "externs.goh"
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+
+/****************************************************************************
+ *		Code for GPCBnkrProcessClass Check printing
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_CHECK_PRINT for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	Calls the dialog box when the menu
+ *              item is selected
+ *
+ *
+ *
+ ***********************************************************************/
+
+@extern method GPCBnkrProcessClass, MSG_OPEN_CHECK_PRINT
+{
+ AcctStruct		*acct;
+ DBGroupAndItem	mapitem;
+ DBMapStruct*		mapPtr;
+ char			numString[CKNUM_SIZE];
+
+
+    /* in here we put the next check to print as the default
+     * for Number and From and nextCheck -1 in the To */
+
+    /* standard set-up */
+    mapitem = DBGetMap(GPCBnkrFile);
+    mapPtr = DBLockUngrouped(GPCBnkrFile, mapitem);
+    acct = (AcctStruct *) (mapPtr + sizeof(DBMapStruct));
+
+    /* put in the next check to print number */
+    UtilHex32ToAscii(numString,
+			(sdword) acct[currentAcct].AS_nextPrintNum,
+			UHTAF_NULL_TERMINATE);
+    @call CkPCSNumber::MSG_VIS_TEXT_REPLACE_ALL_PTR(numString, 0);
+    @call CkPCRFrom::MSG_VIS_TEXT_REPLACE_ALL_PTR(numString, 0);
+
+
+    if (acct[currentAcct].AS_nextNum == 0)
+	    @call CkPCRTo::MSG_VIS_TEXT_REPLACE_ALL_PTR("0", 1);
+    else
+       UtilHex32ToAscii(numString,
+			(sdword) (acct[currentAcct].AS_nextNum - 1),
+			UHTAF_NULL_TERMINATE);
+    @call CkPCRTo::MSG_VIS_TEXT_REPLACE_ALL_PTR(numString, 0);
+
+    DBUnlock(mapPtr);
+
+    /* Open the dialog box */
+    @call CkPrintDBox::MSG_GEN_INTERACTION_INITIATE();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_PRINT_START_PRINTING for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:   prints Checks
+ *
+ *
+ *
+ *
+ ***********************************************************************/
+
+@extern method GPCBnkrProcessClass, MSG_PRINT_START_PRINTING
+{
+ char			numString[CKNUM_SIZE];
+ word			i, pagePos;
+ word			rangeSelection, styleSelection, typeSelection;
+ word			vertOffset, horizPos, vertPos;
+ dword			chkNum, toNum, fromNum, lastCheck, firstCheck, j;
+ dword			notFoundCheck;
+ TransSortStruct	*trArrayElement;
+ MemHandle		mh;
+ TransStruct		*trans;
+ DBItem			transItem;
+ TimerDateAndTime	date;
+ char			dateString[DATE_SIZE];
+ char			amtString[MAX_TEXT_LEN],  outString[75];
+ PageSizeReport	dotCheck;
+ Boolean			ledgerDotFlag, noCheck;
+ Boolean			initReadErr;
+ word			offset;
+
+ #define	STD_DATE_HORIZ_POS		492
+ #define	STD_PAYEE_HORIZ_POS		78
+ #define	STD_AMT_HORIZ_POS		492
+ #define	STD_TEXT_HORIZ_POS		14
+ #define	STD_MEMO_HORIZ_POS		46
+ #define	STD_DATE_VERT_POS		32
+ #define	STD_PAYEE_VERT_POS		69
+ #define	STD_AMT_VERT_POS		69
+ #define	STD_TEXT_VERT_POS		93
+ #define	STD_MEMO_VERT_POS		177
+ #define	WAL_DATE_HORIZ_POS		528
+ #define	WAL_PAYEE_HORIZ_POS		213
+ #define	WAL_AMT_HORIZ_POS		505
+ #define	WAL_TEXT_HORIZ_POS		192
+ #define	WAL_MEMO_HORIZ_POS		208
+ #define	WAL_DATE_VERT_POS		19
+ #define	WAL_PAYEE_VERT_POS		33
+ #define	WAL_AMT_VERT_POS		33
+ #define	WAL_TEXT_VERT_POS		50
+ #define	WAL_MEMO_VERT_POS		127
+ #define	STUB_DATE_HORIZ_POS		10
+ #define	STUB_PAYEE_HORIZ_POS	15
+ #define	STUB_AMT_HORIZ_POS		36
+ #define	STUB_MEMO_HORIZ_POS		15
+ #define	STUB_CAT_HORIZ_POS		18
+ #define	STUB_DATE_VERT_POS		25
+ #define	STUB_PAYEE_VERT_POS		48
+ #define	STUB_AMT_VERT_POS		84
+ #define	STUB_MEMO_VERT_POS		108
+ #define	STUB_CAT_VERT_POS		133
+ #define	STD_CHECK_VERT_OFFSET    252 /* 3 1/2 inches */
+ #define	WAL_CHECK_VERT_OFFSET    205 /* 2 7/8 inches */
+
+
+
+    /* if range, check for from before to */
+    rangeSelection = @call CkPCRSel::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    if (rangeSelection == CK_RANGE)  {
+	  @call CkPCRFrom::MSG_VIS_TEXT_GET_ALL_PTR(numString);
+	  UtilAsciiToHex32(numString, &fromNum);
+	  @call CkPCRTo::MSG_VIS_TEXT_GET_ALL_PTR(numString);
+	  UtilAsciiToHex32(numString, &toNum);
+	  if (toNum < fromNum)  {
+		/* bad range message */
+		NotifyDBox(0, @ChkPrntToFromMsg);
+		@send CkPrintControl::MSG_PRINT_CONTROL_PRINTING_CANCELLED();
+		return;
+		}
+	  lastCheck = toNum;
+	  firstCheck = fromNum;
+	  }
+    else { /* it's a single check */
+	  @call CkPCSNumber::MSG_VIS_TEXT_GET_ALL_PTR(numString);
+	  UtilAsciiToHex32(numString, &chkNum);
+	  lastCheck = chkNum;
+	  firstCheck = chkNum;
+	  }
+
+    /* open up the sort array */
+    transListVMBHandle = VMFind(GPCBnkrFile, NullHandle, (currentAcct*10)+ALLSORT);
+    VMLock(GPCBnkrFile, transListVMBHandle ,&mh);
+    for (j = firstCheck; j <= lastCheck; j++)  {
+	  noCheck = TRUE;
+	  for (i = 0; i < numTrans; i++)  {
+		/* Get the ith element */
+		trArrayElement = ChunkArrayElementToPtrHandles(
+				    mh,
+				    transListChunkArray,
+				    i,
+				    0);
+		/* is it a check? */
+		if (trArrayElement->TSS_type == TRANS_CK)  {
+		   /* is it the one we're looking for? */
+		   if (trArrayElement->TSS_ckNumber == j)  {
+			 /* yes - good, bail out of i loop */
+			 noCheck = FALSE;
+			 i = numTrans;
+			 }
+		   }  /* end of its a check if */
+		}  /* end of trans for loop (i) */
+	  /* did we find this check? */
+	  if (noCheck)  {
+		notFoundCheck = j;
+		j = lastCheck + 1;  /* nope - bail out */
+		}
+	  }  /* end of checks for loop (j) */
+    VMUnlock(mh);
+    /* is there a specified check missing? */
+    if (noCheck)  { /* yes */
+	  /* put up error message */
+	  UtilHex32ToAscii(numString,
+			(sdword) notFoundCheck,
+			UHTAF_NULL_TERMINATE);
+	  NotifyDBox(numString, @ChkPrntNoCheckMsg);
+	  @send CkPrintControl::MSG_PRINT_CONTROL_PRINTING_CANCELLED();
+	  return;
+	  }
+
+    /* check the ini to see if we've entered an offset */
+    initReadErr = InitFileReadInteger("Banker", "offset", &offset);
+    if (initReadErr) offset = 0;  /* no ini entry so make it 0 */
+
+    /* get printer type and check style */
+    styleSelection = @call CkPSStyle::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    typeSelection = @call CkPPType::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    if (styleSelection == CK_WALLET)  {
+	  vertOffset = WAL_CHECK_VERT_OFFSET;
+	  }
+    else  {
+	  vertOffset = STD_CHECK_VERT_OFFSET;
+	  }
+
+    /* init page position counter */
+    pagePos = 0;
+
+    if (typeSelection == CK_DOT) {
+	  if (styleSelection == CK_WALLET)  {
+		dotCheck.PSR_width = 8*72;
+		dotCheck.PSR_height = WAL_CHECK_VERT_OFFSET - (.5 * 72);
+		dotCheck.PSR_layout.PL_paper = (PO_LANDSCAPE << 3);
+		dotCheck.PSR_margins.PCMP_left = .25*72;
+		dotCheck.PSR_margins.PCMP_top = .25*72;
+		dotCheck.PSR_margins.PCMP_right = .25*72;
+		dotCheck.PSR_margins.PCMP_bottom = .25*72;
+		@call CkPrintControl::MSG_PRINT_CONTROL_SET_DOC_SIZE_INFO(&dotCheck);
+		}
+	  else if (styleSelection == CK_STD) {
+		dotCheck.PSR_width = 8*72;
+		dotCheck.PSR_height = STD_CHECK_VERT_OFFSET - (.5 * 72);
+		dotCheck.PSR_layout.PL_paper = (PO_LANDSCAPE << 3);
+		dotCheck.PSR_margins.PCMP_left = .25*72;
+		dotCheck.PSR_margins.PCMP_top = .25*72;
+		dotCheck.PSR_margins.PCMP_right = .25*72;
+		dotCheck.PSR_margins.PCMP_bottom = .25*72;
+		@call CkPrintControl::MSG_PRINT_CONTROL_SET_DOC_SIZE_INFO(&dotCheck);
+		}
+	  else if (styleSelection == CK_LEDGER) {
+		dotCheck.PSR_width = 8*72;
+		dotCheck.PSR_height = (STD_CHECK_VERT_OFFSET /** 2*/) - (.5 * 72);
+		dotCheck.PSR_layout.PL_paper = (PO_LANDSCAPE << 3);
+		dotCheck.PSR_margins.PCMP_left = .25*72;
+		dotCheck.PSR_margins.PCMP_top = .25*72;
+		dotCheck.PSR_margins.PCMP_right = .25*72;
+		dotCheck.PSR_margins.PCMP_bottom = .25*72;
+		@call CkPrintControl::MSG_PRINT_CONTROL_SET_DOC_SIZE_INFO(&dotCheck);
+		ledgerDotFlag = TRUE;
+		}
+	  }  /* end of dot matrix if */
+	 else  {  /* page feed */
+	  dotCheck.PSR_width = 8*72;
+	  dotCheck.PSR_height = 10.5 * 72;
+	  dotCheck.PSR_layout.PL_paper = 0;
+	  dotCheck.PSR_margins.PCMP_left = .25*72;
+	  dotCheck.PSR_margins.PCMP_top = .25*72;
+	  dotCheck.PSR_margins.PCMP_right = .25*72;
+	  dotCheck.PSR_margins.PCMP_bottom = .25*72;
+	  @call CkPrintControl::MSG_PRINT_CONTROL_SET_DOC_SIZE_INFO(&dotCheck);
+	  }
+
+    /* start check printing loop */
+    for (j = firstCheck; j <= lastCheck; j++)  {
+	  transListVMBHandle = VMFind(GPCBnkrFile, NullHandle, (currentAcct*10)+ALLSORT);
+	  VMLock(GPCBnkrFile, transListVMBHandle ,&mh);
+	  for (i = 0; i < numTrans; i++)  {
+		/* Get the ith element */
+		trArrayElement = ChunkArrayElementToPtrHandles(
+				    mh,
+				    transListChunkArray,
+				    i,
+				    0);
+		/* is it a check? */
+		if (trArrayElement->TSS_type == TRANS_CK)  {
+		   /* is it the one we want? */
+		   if (trArrayElement->TSS_ckNumber == j)  {
+			 /* yes - get the item, bail out of i loop */
+			 transItem = trArrayElement->TSS_item;
+			 i = numTrans;
+			 }
+		   }  /* end of its a check if */
+		}  /* end of trans for loop (i) */
+	  VMUnlock(mh);
+
+	  /* get our transaction */
+	  trans = DBLock(GPCBnkrFile, currentAcctGroup, transItem);
+
+	  /* collect the transaction data and display it */
+	  GrSetFont(gstate, FID_DTC_URW_MONO, 12.0);
+
+	  /* put the date values into struct */
+	  date.TDAT_year = trans->TS_year;
+	  date.TDAT_month = trans->TS_month;
+	  date.TDAT_day = trans->TS_day;
+	  /* format it */
+	  LocalFormatDateTime(dateString, DTF_SHORT, &date);
+	  /* send it to the text */
+	  if (styleSelection == CK_WALLET) {
+		horizPos = WAL_DATE_HORIZ_POS;
+		vertPos = WAL_DATE_VERT_POS;
+		}
+	  else {
+		horizPos = STD_DATE_HORIZ_POS;
+		vertPos = STD_DATE_VERT_POS;
+		}
+	  GrDrawText(gstate,
+			   horizPos,
+			   (pagePos * vertOffset) + vertPos + offset,
+			   dateString,
+			   0);
+
+	  /* the payee */
+	  if (styleSelection == CK_WALLET) {
+		horizPos = WAL_PAYEE_HORIZ_POS;
+		vertPos = WAL_PAYEE_VERT_POS;
+		}
+	  else {
+		horizPos = STD_PAYEE_HORIZ_POS;
+		vertPos = STD_PAYEE_VERT_POS;
+		}
+	  if (strlen(trans->TS_payee))
+		GrDrawText(gstate,
+			   horizPos,
+			   (pagePos * vertOffset) + vertPos + offset,
+			   trans->TS_payee,
+			   0);
+
+	  /* amount not in currency - may need to read in */
+	  FloatFloatToAscii_StdFormat(amtString,
+						 &trans->TS_amount,
+						 FFAF_FROM_ADDR,
+						 14,
+						 2);
+	  if (styleSelection == CK_WALLET) {
+		horizPos = WAL_AMT_HORIZ_POS;
+		vertPos = WAL_AMT_VERT_POS;
+		}
+	  else {
+		horizPos = STD_AMT_HORIZ_POS;
+		vertPos = STD_AMT_VERT_POS;
+		}
+	  GrDrawText(gstate,
+			   horizPos,
+			   (pagePos * vertOffset) + vertPos + offset,
+			   amtString,
+			   0);
+
+	  /* get written out number */
+	  NumToText(trans->TS_amount, outString);
+	  if (styleSelection == CK_WALLET) {
+		horizPos = WAL_TEXT_HORIZ_POS;
+		vertPos = WAL_TEXT_VERT_POS;
+		}
+	  else {
+		horizPos = STD_TEXT_HORIZ_POS;
+		vertPos = STD_TEXT_VERT_POS;
+		}
+	  GrDrawText(gstate,
+			   horizPos,
+			   (pagePos * vertOffset) + vertPos + offset,
+			   outString,
+			   0);
+
+	  /* the memo */
+	  if (styleSelection == CK_WALLET) {
+		horizPos = WAL_MEMO_HORIZ_POS;
+		vertPos = WAL_MEMO_VERT_POS;
+		}
+	  else {
+		horizPos = STD_MEMO_HORIZ_POS;
+		vertPos = STD_MEMO_VERT_POS;
+		}
+	  if (strlen(trans->TS_memo))
+		GrDrawText(gstate,
+			   horizPos,
+			   (pagePos * vertOffset) + vertPos + offset,
+			   trans->TS_memo,
+			   0);
+
+	  if (styleSelection == CK_WALLET) {
+		/* add the stubb stuff here */
+		horizPos = STUB_DATE_HORIZ_POS;
+		vertPos = STUB_DATE_VERT_POS;
+		GrDrawText(gstate,
+			   horizPos,
+			   (pagePos * vertOffset) + vertPos + offset,
+			   dateString,
+			   0);
+
+		horizPos = STUB_PAYEE_HORIZ_POS;
+		vertPos = STUB_PAYEE_VERT_POS;
+		if (strlen(trans->TS_payee))
+		   GrDrawText(gstate,
+				    horizPos,
+				    (pagePos * vertOffset) + vertPos + offset,
+				    trans->TS_payee,
+				    0);
+
+		horizPos = STUB_AMT_HORIZ_POS;
+		vertPos = STUB_AMT_VERT_POS;
+		GrDrawText(gstate,
+			   horizPos,
+			   (pagePos * vertOffset) + vertPos + offset,
+			   amtString,
+			   0);
+
+		horizPos = STUB_MEMO_HORIZ_POS;
+		vertPos = STUB_MEMO_VERT_POS;
+		if (strlen(trans->TS_memo))
+		  GrDrawText(gstate,
+			   horizPos,
+			   (pagePos * vertOffset) + vertPos + offset,
+			   trans->TS_memo,
+			   0);
+
+		horizPos = STUB_CAT_HORIZ_POS;
+		vertPos = STUB_CAT_VERT_POS;
+		if (strlen(trans->TS_category))
+		   GrDrawText(gstate,
+			   horizPos,
+			   (pagePos * vertOffset) + vertPos + offset,
+			   trans->TS_category,
+			   0);
+		}  /* end of wallet stub if */
+
+	  DBUnlock(trans);
+
+	  /* print it */
+	  @call self::MSG_VIS_DRAW(DF_PRINT, gstate);
+
+	  /* do we need a form feed/ */
+	  if (((pagePos == 2) && (typeSelection == CK_LASER))
+		   || (typeSelection == CK_DOT))  {
+		GrNewPage(gstate, PEC_FORM_FEED);
+		}
+
+	  /* check for ledger check special cases */
+	  if ((styleSelection == CK_LEDGER) && (pagePos != 2)
+						&& (typeSelection == CK_LASER))  {
+		j--;  /* to print the bottom 2 parts of the same check */
+		}
+	  if ((styleSelection == CK_LEDGER) && (typeSelection == CK_DOT))  {
+		if (ledgerDotFlag)  {
+		   j--;  /* to print the bottom part of the same check */
+		   ledgerDotFlag = FALSE;
+		   }
+		 else {
+		   ledgerDotFlag = TRUE;
+		   }
+		}
+
+       /* increment the page position counter */
+	  pagePos++;
+	  if (((pagePos == 3) && (typeSelection == CK_LASER))
+		  || (typeSelection == CK_DOT))  pagePos = 0;
+
+	  } /* end of printing for loop */
+
+    @send CkPrintControl::MSG_PRINT_CONTROL_PRINTING_COMPLETED();
+}
+
+/***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_PRINT_GET_DOC_NAME
+{
+char *string = "Check";
+
+
+    @call printCtrlOD::MSG_PRINT_CONTROL_SET_DOC_NAME(string);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CKP_SINGLE_SELECTED for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	When an item is selected before any apply
+ *
+ *
+ * PARAMETERS:  void (word selection, numSelections, byte flags)
+ *
+ *
+ *
+ ***********************************************************************/
+
+@extern method GPCBnkrProcessClass, MSG_CKP_SINGLE_SELECTED
+{
+    switch (selection)  {
+	  case CK_SINGLE:
+		@call CkPCRSel::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+		@send CkPCRFrom::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		@send CkPCRTo::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		@send CkPCSNumber::MSG_GEN_SET_ENABLED(VUM_NOW);
+		break;
+	  case GIGS_NONE:
+		@call CkPCRSel::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(CK_RANGE, FALSE);
+		@send CkPCRFrom::MSG_GEN_SET_ENABLED(VUM_NOW);
+		@send CkPCRTo::MSG_GEN_SET_ENABLED(VUM_NOW);
+		@send CkPCSNumber::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		break;
+       }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_CKP_RANGE_SELECTED for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	When an item is selected before any apply
+ *
+ *
+ * PARAMETERS:  void (word selection, numSelections, byte flags)
+ *
+ *
+ *
+ ***********************************************************************/
+
+@extern method GPCBnkrProcessClass, MSG_CKP_RANGE_SELECTED
+{
+    switch (selection)  {
+	  case CK_RANGE:
+		@call CkPCSSel::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+		@send CkPCSNumber::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		@send CkPCRFrom::MSG_GEN_SET_ENABLED(VUM_NOW);
+		@send CkPCRTo::MSG_GEN_SET_ENABLED(VUM_NOW);
+		break;
+	  case GIGS_NONE:
+		@call CkPCSSel::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(CK_SINGLE, FALSE);
+		@send CkPCSNumber::MSG_GEN_SET_ENABLED(VUM_NOW);
+		@send CkPCRFrom::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		@send CkPCRTo::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		break;
+       }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_PRINTER_OFFSET for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	Calls the dialog box when the menu
+ *              item is selected
+ *
+ *
+ *
+ ***********************************************************************/
+
+@extern method GPCBnkrProcessClass, MSG_OPEN_PRINTER_OFFSET
+{
+ Boolean		initReadErr;
+ word		offset;
+
+    /* check the ini to see if we've entered anything */
+    initReadErr = InitFileReadInteger("Banker", "offset", &offset);
+    if (initReadErr)  {
+	  /* prolly no .ini entry thus no previous offset */
+	  @send PADBOffset::MSG_GEN_VALUE_SET_INTEGER_VALUE(0, FALSE);
+	  }
+	else {
+	  /* fill in what's already there */
+	  @send PADBOffset::MSG_GEN_VALUE_SET_INTEGER_VALUE(offset, FALSE);
+	  }
+
+
+    /* Open the dialog box */
+    @call PrintAlignDBox::MSG_GEN_INTERACTION_INITIATE();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_SET_PRINTER_OFFSET for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:   puts the new offset into the ini file
+ *
+ *
+ *
+ *
+ ***********************************************************************/
+
+@extern method GPCBnkrProcessClass, MSG_SET_PRINTER_OFFSET
+{
+ word		offset;
+
+
+    offset = @call PADBOffset::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+
+    InitFileWriteInteger("Banker", "offset", offset);
+
+    InitFileCommit();
+
+}
+
+
+/*@endif /* COMPILEGPC */

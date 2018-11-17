@@ -1,0 +1,225 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1993 -- All Rights Reserved
+
+PROJECT:	PC/GEOS - pizza
+MODULE:		GeoWrite
+FILE:		writeControls.def
+
+AUTHOR:		Brian Witt, Aug 25, 1993
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	witt	8/25/93   	Initial revision
+	witt	9/ 7/93		Added row/column position indicator.
+	witt/brianc   9/23/93	New GCN for row/line position.
+
+DESCRIPTION:
+	This file contains class descriptions for any private controllers
+	used by GeoWrite.  The controls include FixedSpacing.  ;; PIZZA ;;
+	Also, is the row/column indicator.  It constantly displays the
+	position of the cursor using GCN messages from a revised text object.
+
+
+	For this project, two GCN notifies were added specifically.  These are:
+	GAGCNLT_APP_TARGET_NOTIFY_PAGE_INFO_STATE_CHANGE -
+		GWNT_PAGE_INFO_STATE_CHANGE: NotifyPageInfoChange
+	GAGCNLT_APP_TARGET_NOTIFY_CURSOR_POSITION_CHANGE
+		GWNT_CURSOR_POSITION_CHANGE:VisTextCursorPositionChange
+
+	The changes were made to these header files:
+		Include/geoworks.def		(rev 1.90)
+		Include/Objects/vtextC.def	(rev 1.170)
+		
+	$Id: writeControls.def,v 1.1 97/04/04 15:57:28 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+
+
+
+;*************************************************************************
+;			Header info for FixedCharLinePage Controller
+;*************************************************************************
+;
+;  Message(s) sent out:
+;	-none-
+;
+;  Notification Type(s) responded to:
+;	MANUFACTURER_ID_GEOWORKS.GWNT_TEXT_CHAR_ATTR_CHANGE: VisTextNotifyCharAttrChange
+;	MANUFACTURER_ID_GEOWORKS.GWNT_PAGE_INFO_STATE_CHANGE: NotifyPageInfoChange
+;
+;  GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+;
+;  This controller handles a dialog that sets a fixed count of chars per line
+;  and the lines per page.  We can display a style sheet to store the
+;  results into.  However, this code would be complex and it's not implemented.
+;
+
+FixedCharLinePageControlClass	class	GenControlClass
+
+;-------------------------------------------------------------------------
+;		Methods
+;-------------------------------------------------------------------------
+
+
+MSG_FCLPC_STATUS_LINESPAGE	message ;(DwordWW, GenValueStateFlags)
+MSG_FCLPC_STATUS_CHARSLINE	message ;(DWordWW, GenValueStateFlags)
+;
+;  Messages to set the values from the APPLY messasge to the dialog.
+;  Apply messages from a GenValue that the Lines/Page, or Chars/Line has
+;  been updated (immediate indication).
+;
+;  Pass:
+;	cx:dx	= current GenValue's value (WWFixed)
+;	bp	= GenValueStateFlags
+
+
+;-------------------------------------------------------------------------
+;		Internal Methods
+;-------------------------------------------------------------------------
+
+;-------------------------------------------------------------------------
+;		Constants and Structures
+;-------------------------------------------------------------------------
+
+
+MIN_FIXED_CHARS_PER_LINE	equ	5
+MAX_FIXED_CHARS_PER_LINE	equ	200
+
+MIN_FIXED_LINES_PER_PAGE	equ	5
+MAX_FIXED_LINES_PER_PAGE	equ	120
+
+
+;	Feature flags for the fixed spacing controller (used with
+;	ATTR_GEN_CONTROL_REQUIRE_UI and ATTR_GEN_CONTROL_PROHIBIT_UI)
+
+FCLPFeatures	record
+	FCLPF_CHAR_LINE_PAGE : 1	; Two spinners: chars/line & lines/page.
+	FCLPF_FONT_NAMING    : 1	; Displays font name and point size.
+FCLPFeatures	end
+
+;	Toolbox feature	flags -- there aren't any (used with
+;	ATTR_GEN_CONTROL_REQUIRE_UI and ATTR_GEN_CONTROL_PROHIBIT_UI)
+
+FCLPToolboxFeatures	record
+	:15
+FCLPToolboxFeatures	end
+
+
+FCLP_DEFAULT_FEATURES	equ	mask FCLPF_CHAR_LINE_PAGE or \
+				mask FCLPF_FONT_NAMING
+
+FCLP_DEFAULT_TOOLBOX_FEATURES	equ	0	; "none"
+
+
+; - - -
+
+FixedCharLinePageInfo	struct
+
+	;	From NotifyPageInfoChange GCN  (in points)
+	FCLPI_heightRegion	WWFixed   ; usable width within region
+	FCLPI_widthRegion	WWFixed   ; usable height within region
+
+	;	From VisTextNotifyCharAttrChange
+	;		(MUST BE IN THIS ORDER vv)
+	FCLPI_fontID		FontID	; VTCA_fontID
+	FCLPI_pointSize		WBFixed	; VTCA_pointSize
+	FCLPI_textStyles	TextStyle ; VTCA_textStyles
+	;		(MUST BE IN THIS ORDER ^^)
+
+	FCLPI_trackKerning	sword	; current track kerning
+	FCLPI_lineSpacing	BBFixed	; current line spacing
+
+;	In the .ui file, fontID is delcared as a 'wordComp'
+.assert  size FCLPI_fontID eq size word
+
+CheckHack< (offset VTCA_pointSize - offset VTCA_fontID) eq size word >
+CheckHack< (offset VTCA_textStyles - offset VTCA_pointSize) eq size WBFixed >
+
+CheckHack< (offset FCLPI_pointSize - offset FCLPI_fontID) eq size word >
+CheckHack< (offset FCLPI_textStyles - offset FCLPI_pointSize) eq size WBFixed >
+
+FixedCharLinePageInfo	ends
+
+
+;-------------------------------------------------------------------------
+;		Instance Data
+;-------------------------------------------------------------------------
+
+	FixedAttrs	FixedCharLinePageInfo <>
+
+FixedCharLinePageControlClass	endc
+
+
+
+
+;*************************************************************************
+;		RowColumnDisplayControlClass
+;*************************************************************************
+;
+;  Message(s) sent out:
+;	-none-
+;
+;  Notification Type(s) responded to:
+;	MANUFACTURER_ID_GEOWORKS.GWNT_PAGE_STATE_CHANGE: NotifyPageStateChange
+;	MANUFACTURER_ID_GEOWORKS.GWNT_CURSOR_POSITION_CHANGE:VisTextCursorPositionChange
+;
+;  GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+;
+
+RowColumnDisplayControlClass	class	GenControlClass
+
+;-------------------------------------------------------------------------
+;		Methods
+;-------------------------------------------------------------------------
+
+;-------------------------------------------------------------------------
+;		Internal Methods
+;-------------------------------------------------------------------------
+
+;-------------------------------------------------------------------------
+;		Constants and Structures
+;-------------------------------------------------------------------------
+
+;  Feature Flags (usd with ATTR_GEN_CONTROL_REQUIRE_UI and
+;	ATTR_GEN_CONTROL_PROHIBIT_UI)
+
+RCDFeatures	record
+	; this controller is read-only, therefore no dialog/menu bar options
+	;  can be changed.
+RCDFeatures	end
+
+;  Toolbox features flags (used with ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI
+;	and ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI)
+
+RCDToolboxFeatures	record
+    RCDTF_LINE	     : 1	; line position
+    RCDTF_COLUMN     : 1
+    RCDTF_PAGE       : 1	; page number start of selection range is on.
+    RCDTF_ARTICLE    : 1	; future feature of GeoWrite
+RCCPToolboxFeatures	end
+
+RCD_DEFAULT_FEATURES	equ	0	; nothing for dialog/menu
+
+RCD_DEFAULT_TOOLBOX_FEATURES	equ	mask RCDTF_LINE or \
+					mask RCDTF_COLUMN
+
+;-------------------------------------------------------------------------
+;		Instance Data
+;-------------------------------------------------------------------------
+
+
+RowColumnDisplayControlClass	endc
+
+; ((eof))
+
+

@@ -1,0 +1,328 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	
+MODULE:		
+FILE:		cword.def
+
+AUTHOR:		Jennifer Lew, May 26, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JL	5/26/94   	Initial revision
+
+
+DESCRIPTION:
+	General definitions used by all modules.
+		
+	$Id: cword.def,v 1.1 97/04/04 15:13:23 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+;--------------------------------------------------------------------------
+;	Conditional compilation flags
+;--------------------------------------------------------------------------
+
+	PEN_POSSIBLE equ FALSE
+
+	_JEDI	equ	FALSE
+
+ifidn	PRODUCT, <GULLIVER>
+	_GULLIVER	equ	TRUE
+else
+	_GULLIVER	equ	FALSE
+endif
+
+;
+; _SINGLE_CLUE_LIST
+; If screen realstate is at a premium, then consider turning this flag
+; on.  This flag will allow the user to see only one ClueList at a time,
+; and creates a "direction trigger" to switch between the two ClueLists.
+;
+	_SINGLE_CLUE_LIST	equ	FALSE
+
+;
+; _RESTRICTED_MENUS
+; If the current UI schema doesn't "really" support the notion of menus,
+; then turn this flag on.  Basically, we'll remove all redundant menu 
+; items and move the remaining ones out of a menu structure.
+;
+if _GULLIVER
+	_RESTRICTED_MENUS 	equ	TRUE
+else
+	_RESTRICTED_MENUS	equ	FALSE
+endif
+
+;--------------------------------------------------------------------------
+;	Conditional compilation flags
+;--------------------------------------------------------------------------
+;_DEBUG	equ	TRUE
+
+
+;--------------------------------------------------------------------------
+;	PROTOCOL NUMBER
+;--------------------------------------------------------------------------
+
+SOURCE_PROTOCOL_MAJOR		equ	1
+SOURCE_PROTOCOL_MINOR		equ	0
+
+USER_DOC_PROTOCOL_MAJOR		equ	1
+USER_DOC_PROTOCOL_MINOR		equ	1
+
+
+;--------------------------------------------------------------------------
+;	Type definition
+;--------------------------------------------------------------------------
+
+EngineTokenType		type	hptr
+CellTokenType		type	word
+ClueTokenType		type	word
+
+; These constants are used to intentionally assign invalid values that
+; can be checked, but the EC code won't fatal error on in.
+INVALID_CELL_TOKEN	equ	0xffff
+INVALID_CLUE_TOKEN	equ	0xffff
+
+
+DirectionType		type	word
+
+InitReturnValue		etype	word
+	; This is the result of the initialization of the ClueList and
+	; the Board.
+	IRV_SUCCESS	enum	InitReturnValue
+	IRV_FAILURE	enum	InitReturnValue
+	IRV_BAD_ETYPE	enum	InitReturnValue
+
+
+ShowNumOptions	record
+	SHOW_NUMBER:1,
+	SHOW_TRIANGLE:1,
+	:6
+ShowNumOptions	end
+
+; ACROSS and DOWN are defined in cwordEngine.def
+
+;--------------------------------------------------------------------------
+;	Struct definition
+;--------------------------------------------------------------------------
+InclusiveRange	struct
+	IR_first	Chars
+	IR_last		Chars
+InclusiveRange	ends
+
+
+;------------------------------------------------------------------------
+;		User Document File Name
+;------------------------------------------------------------------------
+
+USER_DOC_NAME	equ	offset UserDocName
+
+;------------------------------------------------------------------------
+;		Constants to specify which kind of error
+;		occured and which string to print in the error
+;		dialog box.
+;------------------------------------------------------------------------
+
+VM_ERR				equ	offset VMFileErr
+MEM_ERR 			equ	offset CwordMemErr
+GRID_ERR			equ	offset GridErr
+FILE_ERR			equ	offset CwordFileErr
+CREATE_VM_ERR			equ	offset CreateUserErr
+SOURCE_ERR			equ	offset CwordSourceErr
+CHUNK_ARRAY_ERR			equ	offset CwordChunkArrayCreateErr
+CCL_LOW_MEM_ERR			equ	offset CCLLowMemErr
+CCL_LOW_MEM_WARN		equ	offset CCLLowMemWarn
+CCL_APPEND_ERR			equ	offset CCLAppendErr
+HWR_LOW_MEM_WARN		equ	offset HWRLowMemWarn
+HWR_TEXT_QUEUE_APPEND_WARN	equ	offset HWRTextQueueAppendWarn
+CWORD_INIT_FAILED_ERR		equ	offset CwordInitFailedErr
+PATH_ERR			equ	offset CwordFileErr
+BYTES_TOO_LARGE_ERR		equ	offset BytesErr
+PROT_ERR			equ	offset ProtocolErr
+USER_PROT_ERR			equ	offset DeleteUserProtocolErr
+UPGRADE_ERR			equ	offset UpgradeErr
+SOURCE_DIR_ERR			equ	offset DirectoryErr
+
+;------------------------------------------------------------------------
+;	Constants to specify the type of dialog box to be
+;	displayed. 
+;------------------------------------------------------------------------
+ERR_N_RESTART 	equ (CDT_ERROR shl offset CDBF_DIALOG_TYPE) or (GIT_NOTIFICATION shl offset CDBF_INTERACTION_TYPE)
+WARN_N_CONT	equ (CDT_WARNING shl offset CDBF_DIALOG_TYPE) or (GIT_NOTIFICATION shl offset CDBF_INTERACTION_TYPE)
+
+;------------------------------------------------------------------------
+;	Other constants
+;------------------------------------------------------------------------
+SHOW_ON_STARTUP    equ 1
+
+;--------------------------------------------------------------------------
+;	Macro definitions
+;--------------------------------------------------------------------------
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		callerr
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Calls with a jump to label err: for error handling
+
+PASS:		func
+
+PSEUDO CODE/STRATEGY:
+	Assumes that the function returns CF SET on errors.
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	6/14/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+callerr		macro	func
+	call	func
+	jc	err
+		endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SoundUser
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Notify the user with a StandardSoundType.
+
+PASS:		sound - StandardSoundType
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	6/14/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SoundUser		macro	sound
+	PreserveAndGetIntoReg	ax, sound
+	call	UserStandardSound
+	RestoreReg		ax, sound
+		endm
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GetInstanceDataPtrDSDI
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Gets the instance data from the given object by
+		dereferencing the object and adding the appropriate
+		offset. 
+
+PASS:		*ds:si	- ObjectClass
+		classOffset - eg. CwordBoard_offset
+
+RETURN:		ds:di	- ptr to intance data
+
+DESTROYED:	Nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:	none
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	6/24/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+GetInstanceDataPtrDSDI		macro	classOffset
+ifb <classOffset>
+	ErrMessage	< GetInstanceDataPtrDSDI expects the class offset as an argument. >
+endif
+	mov	di, ds:[si]
+	add	di, ds:[di].&classOffset
+		endm
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		GetInstanceDataPtrDSBX
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Gets the instance data from the given object by
+		dereferencing the object and adding the appropriate
+		offset. 
+
+PASS:		*ds:si	- ObjectClass
+		classOffset - eg. CwordBoard_offset
+
+RETURN:		ds:bx	- ptr to intance data
+
+DESTROYED:	Nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:	none
+
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	7/25/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+GetInstanceDataPtrDSBX		macro	classOffset
+	mov	bx, ds:[si]
+	add	bx, ds:[bx].&classOffset
+		endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		LoadVarSeg
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Point a segment register at our data segment
+
+PASS:		segment	= destination register
+		trash	= optional intermediate register to biff
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	2/ 6/90		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+LoadVarSeg	macro	segment, trash
+if <trash> ne <>
+		mov	trash, dgroup
+		mov	segment, trash
+elseif @CurSeg ne Resident
+		ErrMessage <LoadVarSeg without extra register can only function in Resident>
+else
+		mov	segment, cs:serialData
+endif
+		endm
+
+
+CWORD_BAD_CHARACTER_RANGE_FOR_HWR enum FatalErrors
+; One of the chunks in the resource
+; CwordCharacterSets is corrupted.  Either it is not composed of 
+; byte-pairs of characters, or the first character of the pair comes
+; after the second character in the current, system character set
+; 

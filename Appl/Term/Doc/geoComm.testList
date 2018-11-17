@@ -1,0 +1,523 @@
+
+	Test list for:	GeoComm - General
+
+	$Id: geoComm.testList,v 1.3.36.1 97/03/29 09:45:11 canavese Exp $
+
+------------------------------------------------------------------------------
+
+			geoComm Test List (06/13/90)
+			============================
+
+Features:
+_________
+
+1. Multi-launchable
+
+2. Terminal Emulation/FSM Engine
+
+3. Scroll buffer 		- 200 line 
+				- exit scroll buffer when input arrives.
+				- scrolling should be normalized.
+
+4. File Transfer		- XModem 128, 1K, Checksum, CRC.
+
+5. Font Support			- Bison 9, Bison 12.
+
+6. Cut and Paste		- supports importing/exporting text scraps
+					and quick copy and paste.
+
+7. Script Language		- automate log-on procedure.	
+
+Specification
+_____________
+
+
+1.  Multi-launchable
+____________________
+
+- launch two instances of term, each with its own com port
+
+	- check that regular text is received and transmitted okay on
+	  each port.
+	- check if can initiate file transfers simultaneously on each port.
+	- check that each instance of geoComm is able to exit correctly.
+
+2.  Terminal Emulation 
+____________________
+
+	TTY, ANSI, Wyse 50, vt52, vt100, IBM 3101, TVI 920
+
+===========================================================================
+Testing to be done on a Unix type system
+===========================================================================
+
+Note: 	To change terminal types on unix you may have to do a couple of things. 
+
+	To see what terminal type you are emulating 
+		% echo $TERM
+	To see if an internal termcap file is being used
+		% echo $TERMCAP
+	Now to change terminal types you need to reset these variables so
+		% unsetenv TERM
+		% unsetenv TERMCAP
+	Then
+		% setenv TERM vt100 (or whatever term type you were running)
+
+	There is one last thing to check.  You need to check that unix knows
+		how big the window is
+		% stty size		
+
+		(for geoComm we generally want the output of this command
+		to be <= 24 lines, <= 80 cols.
+		To set the #rows and #cols your terminal can display
+		% stty rows 24
+		% stty cols 80
+----------------------------------------------------------------------------
+		
+	- Test underline and reverse video attributes 
+		NROFF a MAN page to test the underline attribute 
+		MORE a file to test the reverse video attribute	
+		(note: vt52, ibm3101 don't support video attributes)
+
+	- test that the video attributes are displayed if the window redraws
+
+	- test that the attributes are displayed within scroll buffer	
+
+	Test terminal emulation by using the following programs.
+
+	hunt	- get a bunch of guys to play hunt and justify the time
+		by claiming you're testing geoComm's terminal emulation.
+
+	vi, emacs, rogue, hack, poker, worms, window.
+	Emacs 	- check that scrolling bounds work by opening a bunch of
+	      	windows and then scrolling text within each window.
+	      	- open and close the windows make sure that the windows are
+	      	combined properly.
+		* if at high baud rate may have to disable software flow
+			control (under Settings/Com Options)
+	Poker
+	Hack  	- just general cursor movement commands.
+
+	Worms 	- make sure that no garbage chars are left on the screen.
+
+	Window	- open two windows and switch between the two.  The active
+	      	window should have the window # in reverse video.
+		C-p 1	- switch to window 1
+		C-p 2	- switch to window 2
+
+	Vi	-
+	(some of termcap entries on cory may be different from the ones here
+		wyse50 for example)
+
+	Cursor Movement
+	---------------
+	- test cursor up, down, left, right works 
+	- test moving cursor to the status line works	
+	- test absolute cursor (jump to various places in file)
+	- test that moving the cursor by words works.  Jump from word to 
+		word all over the document
+	- search (/foo) for specific words (foo).
+
+	Character Insertion
+	-------------------
+	Move the window after finish each test and check that screen 
+	redrawn properly.
+
+	- insert a line at top of file
+	- insert a line at middle of file
+	- insert at bottom of file
+	- open a line above current line
+	- open a line below current line
+
+	- insert at start of the line
+	- insert a char at end of the line
+	- insert a char in the middle of the line. 
+	-> move the window to cause a redraw, check that no characters
+	have incorrect video attributes.
+
+	change text  
+	-----------
+	- change text in start/middle/ and end of line
+	- undo changes 
+	- changed text is larger/smaller than orginal
+	- when change text at end of line and then move the window
+		the text should be redrawn properly.
+
+	Character Deletion
+	------------------
+	- Delete from cursor to end of file.
+	- Delete from cursor to end of line.
+	- delete first line in file.
+	- delete last line in file.
+
+	Scrolling
+	---------
+	- scroll half page down.
+	- scroll half page up.
+	- scroll one line up/down. (^e,^y)
+
+	Undoing
+	-------
+	- undo deletions, insertions.
+
+	Character Handling
+	------------------
+	- Add text to a line to make it greater than 80 chars.  Line should
+		wrap properly.  
+	- When undo your changes line should be restored okay.
+	- Read in a file with a line that is exactly 80 chars.  The following
+		line should be displayed properly if automargins are set for 
+		that terminal type.
+
+	- set term type to vt100 then check that vt100 is okay with 80 chars
+		Then switch to some other term type (wyse 50) make sure its
+		okay with 80 chars.  Then switch back to vt100 and make sure
+		it still handles 80 chars okay.
+
+	- in one session select each of the terminal types to emulate..  
+		Make sure things don't puke.
+
+	- change geoComm window size to 12 lines.  On unix side 'stty rows 12'
+		to tell unix to diplay with 12 lines.  Then VI a file.  Hit
+		'j' a couple of times so that the text scrolls up the screen.
+		Now make text scroll down the screen.  Things shouldn't crash. 
+
+	- In vt100 when hit ESCAPE key, shouldn't see 'vb' but instead
+		hear a BEEP tone.  (Visible bell? - brianc)
+	- change term types while a stream of text is coming down, geoComm
+		should put up an error message.  (This shouldn't happen
+		anymore - brianc)
+
+===========================================================================
+Testing to be done on CompuServe
+===========================================================================
+Make sure that the terminal type that compuServe thinks you're using is
+the same as the terminal emulation set for geoComm. Basically if the
+terminal emulation is working then the compuServe screen will look normal.
+The prompts will near the bottom of the screen and the title of the screen
+will appear at the upper right.  For example, the TOP screen should have
+the word TOP at the upper right corner of the window
+
+
+3.  Scroll Buffer
+_________________
+	- If in the scroll-back  buffer and input comes in then geoComm
+		exits you from the scroll-back buffer and puts you into
+		the active screen.
+
+	- If viewing scroll buffer and type 'j','k' or some other VI
+		cursor command, then should be returned to the active
+		screen.
+
+	- scrolling should be normalized (no text chars clipped) when 
+		paging, but not when dragging the scrollbar.
+
+	- scroll so that current screen is half scroll buffer stuff and
+		half current screen.  Check that if force a redraw the
+		screen is redrawn properly.
+
+	- check that when you scroll back a page into the buffer the
+		correct lines are displayed.  Check especially that
+		the correct top and bottom lines of the scroll-back screen 
+		are displayed.
+	- Completely fill up the scroll-back buffer, then add some lines
+		to the scroll-back buffer so that some lines of data flow 
+		off the top.  Now select some text in the scroll-back buffer.
+		Things should behave as expected (the right text should 
+		be selected...)
+
+4. File Transfer		
+_________________
+	- Try to receive a file to a write protected disk.
+	- Test that file send works with a file bigger than 64K.
+
+	- Test sending 1K packets
+	- test sending 128 byte packets
+	- test sendind checksum packets
+	- test sendind crc packets
+	- if receiving a text file then file size should be preserved.  
+		An 8-char file coming down in 128 byte packet is stored as 
+		an 8 byte file.
+	- When sending or receiving binary packets then the file size will
+		be a multiple of the packet size (no stripping done) 
+	- check that file transfer works off both com ports.
+	- if during file download the file to write to already exists then
+		a dialog box should come up with options to cancel or 
+		overwrite the file.
+	- During a file transfer, once the first packet is received then 
+		the 'Cancel' trigger is disabled.  Up until that first packet
+		is transmitted the 'Cancel' trigger should be enabled.
+	- after file transfer done then the other file transfer
+		options  are enabled.
+	- if start a file transfer, the triggers for the other file transfer
+		options are disabled.
+	- if hit max timeout when trying to contact host then the file 
+		transfer is aborted.
+	- test 'Type from File' (ascii send) works 
+		(may have to set 'stty tandem' on the unix
+		side.  All the characters should be displayed okay.
+	- test ascii receive (like a capture mode).
+
+	- if file selector is displaying a NULL path, then starting the
+		file transfer should do nothing.
+
+5.  Font Support
+_________________
+	- when changing fonts the view should be adjusted for the new
+		font size.  GeoComm will try to maintain the same #lines 
+		and #columns, but if your current moniter can not display
+		the same #lines with the new font then it will decrease
+		the #lines displayed.  (The number of lines will not be
+		changed by GeoComm, only by the user - brianc)
+
+	- If geoComm reduces the size of the window when changing fonts then
+		some of the screen data may be shoved into the scroll-back
+		buffer.
+	- check that no screen data is lost when switch between Large and 
+		Small fonts.
+	- if have a full scroll-back buffer and switch from Small to Large
+		font then no data should be lost.
+	- on a VGA, term should be able to display 24 lines using the
+		big font.  Max #lines geoComm supports on VGA or HGC is 24.
+		Check that when switching between fonts that the max # lines
+		displayed is correct.  Check that the WindowSize box has the
+		set the correct number of max cols and lines.  (I'm not
+		sure what it does - brianc)
+	- check that it redraws the window properly when in big font.
+	- Fill up scroll buffer, switch to Big Font, switch back to Small Font
+		Try to select some text close to top of screen.  
+		There should be no screen garbage.
+
+
+6.  Cut and Paste/Selecting Text
+________________________________
+	- "Paste" is disabled when there is no compatible clipboard item
+		  to paste.  
+	- "Copy" is disabled when there is no selection.
+	- when drag select, check that if click quickly and drag that the
+		selected text starts where you initially clicked and not
+		some nearby point afterwards.
+	- single click selects/deselects selected text.
+	- double click selects a word
+	- triple click selects a line
+
+	- click and drag causes a rectangle of inverted text 
+	- click and drag the mouse in a circle over the click point
+	  Inverted text should rotate around the click point.
+	- if lose the target (click on title bar of another application) 
+		then text is still selected, but isn't drawn that way.
+	- if regain the target then the selected text is drawn in
+		reverse video.
+	- if move cursor above the selected text then the text becomes
+		unselected.
+	- if cursor above the selected text and cause the window to be
+		redrawn, the text should stay selected.
+	- if drop a menu over the cursor while its above the selected text
+		the text should stay selected.
+	- fill up scroll buffer and then try to select below the view.  Things
+		should be okay.
+	- fill up scroll buffer, select some text, cause data to flow off
+		top of scroll buffer then unselect the text.  It should
+		be okay.
+	- if move cursor into the selected text then text becomes unselected.
+	- if move cursor below the selected text then selected text okay.	
+	- drag/select past the window boundaries is handled okay
+	- can handle quick pasting
+	- can make quick copy scraps (ignore quick move)
+	- can paste selected text through Edit menu
+	- can copy selected text through Edit menu
+	- drag select before left window bounds selects up to the first column
+	- drag select above top window bounds selects up to the first line
+	- drag select past right window bounds selects up to the far right col.
+	- drag select below bottom window bounds selects up to the bottom line.
+
+	* try copy and pasting in both small and big font screens.
+
+	- select some text in current screen, change fonts, check that 
+		text is still selected
+	- can only start a QUICK_COPY if mouse is in selected region 
+			(or relatively close to it) (should be exact
+			now - brianc)
+	- if start a QUICK_COPY, but move the mouse outside the view and then
+		release the button.  Then select some new text, move the
+		mouse away from the selected text, and then attempt to
+		start a QUICK_COPY no text should be pasted. 
+	
+	- select area that includes the cursor, then unselect area.  Cursor 	
+		should be redrawn properly.
+	- select area that includes the cursor, click on the title bar of
+		another application (so that geoComm loses the WIN_EXCL) ->
+		the selected region should appear unselected.  Click
+		on geoComm title bar (we gain WIN_EXCL) and the region
+		should appear selected again (and the cursor should not be
+		visible)
+	- select area that includes the cursor, click on a geoComm Dialog
+		box so that the view loses the focus, the cursor should
+		not attempt to display itself as an outline box.
+	- select area that includes cursor, click on view of another application
+		the selected region should become unselected and the outline
+		cursor should be displayed.
+	- drag select a region that contains the cursor and then without
+		releasing the button change the region so that the cursor
+		is no longer in the selected area.  The cursor should not
+		be confused (like if hit CR or some character don't leave
+		cursers lying around).
+	- select text while characters are still coming in.  Hopefully
+		the right thing will occur.  A bad thing would be if
+		it died.  (I agree - brianc)
+	- Fill up scroll-back buffer, then select three lines of text at
+		the top of the scroll-back buffer.  Then return to the
+		current view and cause the screen to scroll.  The selected
+		text should become unselected and things shouldn't die.
+	- fix up the whole document with text, then select and copy this to
+		the clipboard.  Do it again.  (Checking that don't get a 'Too
+		Many Locks' error.
+		
+7. Script Language
+________________________________
+	These primatives are supported
+		BELL, CLEAR, COMM, DIAL, END, GOTO, MATCH, PAUSE, PORT
+		PRINT, PROMPT, PULSE, SEND, TERM, TONE
+
+	Use GenFileSelector to pick macro files to run.
+	- execute a macro by double clicking on macro file
+	- double click on a directory cause the directory to open
+	- click on Open when selecting a directory cause directory to open
+	- execute macro by selecting macro and pressing 'Open' trigger
+	- Once a macro file is started. A display should appear
+		with 'Stop' (enabled) and CLOSE (disabled) buttons 
+		at the bottom of the display.  The OPEN button in 
+		the GenFileSelector should become deselected.
+	- The ABORT button aborts the script by looking for a label titled
+		':ABORT' it continues execution here.  If the label
+		is not found then the script is just exited.
+	- Once the script is done or ABORTED the ABORT button should
+		become disabled and the CLOSE button becomes enabled.
+	- if the macro file sets the port, data bits, terminal type ...
+		Then that entry in the dialog box is updated.
+	- If within a script there is an error trying to open a valid com port 
+		then the script should abort after printing one com port
+		error message.
+
+Windowing
+_________
+	Window can be sized by specifying the number of lines and number
+	of columns for the window or by just click and dragging the
+	window corner.  The window should be sized so that a 
+	whole line or a whole character of text is always displayed.
+
+	If the window is resized smaller than the menu bar then the
+	window will fight with the geometry manager and eventually
+	get bumped up to a size the geometry manager is happy with.
+
+	- test changing # window lines bigger/smaller than current size
+	- test changing # window columns bigger/smaller than current size
+	- test if try to drag the window to a size bigger than 24 lines
+		it shrinks back to 24 lines.
+
+Misc Stuff
+_________
+	- when geoComm comes up only available ports that the user can 
+		open should be enabled in the Options/Protocol box.
+	- cat a binary file geoComm should not
+		crash.  It should just beep a lot.
+	- if cursor loses the focus then only its outline is drawn
+	- test sending text from the Edit/Message box
+	- can close term application.
+	- can open term icon (check that the screen contains the correct data)
+		if term icon was in the middle of the document when closed
+		check that the correct screen data is drawn.
+	- cat a file, iconify the application, when open the application the
+		file should be displayed in the scroll and screen buffers 
+		properly.
+	- test auto wrap
+	- test auto linefeed
+	- test Dial/QuickDial box (dial a #) 
+	- on start up try to restore settings by checking the state of
+		the UI objects.  If UI objects not set then check the
+		geos.ini file to set if default values stored there.
+		If no values found then throw up the Protocol Dialog box
+	- cursor keys should work in applications that know how to handle 
+		them (i.e. VI)
+	- numeric keypad should work properly.
+	- check that Term does not dork keyboard accelerator/navigation
+	- check that Term restores state when UI objects have their state
+		saved.  If UI objects are not restored then geoComm should
+		look at the .ini file for default values for com ports.
+	- when restore from state file, geoComm should reset the view to
+		top of document since scroll buffer data isn't preserved.
+	- if have serial mouse running off of com1 and try to open com1 for
+		reading then geoComm should display error box that it 
+		couldn't open the port.
+	- test that the up arrow key and the arrow key on the num pad
+		(when numlock is off) send the same characters.
+	- make sure that when hit the end of a document with a VGA monitor 
+		that geoComm scrolls properly.
+	- if using the Edit/Message box to send stuff, After pressing 'Send'
+		the text in the box becomes selected (for easy editing).
+	- check that geoComm doesn't puke when you send it data when its 
+		iconified.  Check for when this happens before the end of the 
+		document and after the end of the document (when we do our own 
+		scrolling).
+	- fill up the scroll-back buffer and cat a big file.  While the text
+		is scrolling, iconify geoComm.  Do this a couple of times
+		and make sure that geoComm doesn't puke.
+	- if in half duplex mode then check that data is echoed to the screen
+		if do an ascii send.
+	- If no com ports are opened then the file tranfer menu's, quick dial,
+		modem commands, and edit message should be disabled.
+		(hang-up needs to be added to this list - brianc)
+	- set half duplex and then 'type from file'.  (Try this with
+		a remote system that won't echo your input AND with one 
+		that will!)
+	- can't start two file transfer operations at the same time
+		(when start one file transfer the other buttons become 
+		disabled)
+	- if abort file transfer operation, the file transfer buttons
+		(Type from file, Capture to file, XMODEM send, XMODEM
+		receive) are enabled.
+	- Bring down a menu then click on the view to make the menu disappear.
+		The cursor should switch from the outline form to the solid
+		cursor.
+	- capture some text with 'Capture to text file'. Then overwrite
+		that file by capturing some new text to that same file.
+		Make sure that the amount of new text is smaller than
+		the size of the old text.  Check that when the file 
+		was overwritten the file size changed so that it only
+		contained the new text.
+	- Fill up scroll-back buffer then fill screen with text so the
+		cursor is at the bottom of the screen.  Now make.
+		the window smaller the cursor is off the screen.  Hit
+		CR, the view should scroll properly even though the
+		cursor is below the view.
+	- test the default termcaps by removing all the other termcap files
+	- double-clicking GenLists in dialog boxes that contain more than one
+		lists should NOT send an apply to the box or cause any action
+		to take place.  For example, double clicking on a Baud List
+		entry should not cause the 'Apply' button to blink.
+
+Error Handling
+______________
+	- when no termcap file found.
+	- when no com port opened and set serial options (like baud rate)
+	- error writing to disk
+	- can't contact host
+	- remote is dorked
+	- send abort
+	- no response for send complete
+	- no file specified
+	- error open file
+	- file read error
+	- undefined macro
+	- undefined baud rate
+	- undefined data bits
+	- undefined parity
+	- undefined stop
+	- undefined duplex
+	- undefined terminal
+	- undefined port
+	- undefined string
+	- undefined number
+	- undefined character expression
+	- undefined label
+	- no GOTO label after MATCH cmd

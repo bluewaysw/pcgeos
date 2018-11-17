@@ -1,0 +1,105 @@
+#!/bin/sh -
+##############################################################################
+#
+# 	Copyright (c) Berkeley Softworks 1990 -- All Rights Reserved
+#
+# PROJECT:	PC GEOS
+# MODULE:	running_change
+# FILE: 	running_change
+# AUTHOR: 	Adam de Boor, Dec 10, 1990
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	ardeb	12/10/90	Initial Revision
+#
+# DESCRIPTION:
+#	A script to perform all the mechanics of making a running change branch.
+#	It is run from /staff/pcgeos and takes these arguments:
+#
+#		running_change <arguments> <base_branch> <new_branch>
+#
+#	The following arguments are supported:
+#		-nc		Prevent the increase in the change #
+#		-nm		Prevent the pmake full
+#		-rm		Before pmake full, remove all .geo, etc.
+#				files first.
+#		-nb		Prevent creation of branch
+#
+#	For example:
+#		running_change -rm Release10X Release104
+#
+#	Eric's favorite:
+#		running_change -rm -nb Release12X Release128
+#
+#	$Id: running_change,v 1.3 91/11/14 13:47:47 eric Exp $
+#
+###############################################################################
+
+while [ $# -gt 0 ]; do
+    case $1 in
+	-nc)	nochange=1;;
+	-nm)	nomake=1;;
+	-rm)	removefirst=1;;
+ 	-nb)	nobranch=1;;
+	-*) 	echo "$0: unknown flag $1 ignored";;
+	*)  	break;;
+    esac
+    shift
+done
+
+#
+# Up the running change on the base branch for all existing .rev files
+# -B$1 tells grev it's to work on the given branch
+# -S tells it it's in the source directory so it doesn't bitch about us having
+#    given it a path without it being able to tell where it is.
+# {} is the .rev file that was found
+#
+if [ ! "$nochange" ]; then
+    find Kernel Appl Library Driver -name \*.rev \
+	    -print \
+	    -exec grev -B$1 -S newchange {} "creating branch $2" \;
+fi
+
+#
+# Perform a full make in the base branch's Installed directory to get these
+# release numbers in the executables.
+#
+if [ ! "$nomake" ]; then
+    (
+	cd $1/Installed
+	# *.mk relies on PWD being set accurately
+	PWD=`pwd`
+	# adjust ROOT_DIR to the current filesystem so the things in *.mk work
+    	# right
+	ROOT_DIR=`expr $PWD : '\(.*/pcgeos\)'`
+	export PWD ROOT_DIR
+	if [ ! "$removefirst" ]; then
+		pmake -DNO_MAIL full
+	else
+		pmake -DREMOVE -DNO_MAIL full
+	fi
+    )
+fi
+
+#
+# Make a branch for this puppy.
+#
+if [ ! "$nobranch" ]; then
+    (
+	#
+	# This is a big step -- confirm before taking it
+	#
+	echo -n "Create $2 branch using $1 as a base? [yn](y) "
+	read ans
+	case "$ans" in [Nn]*) exit 0 ;; esac
+
+	#
+	# Create a new branch off the given one w/o upping the protocol
+	# number at all.
+	#
+	cd /staff/pcgeos
+	Tools/scripts/newbranch -b$1 -n $2
+    )
+fi
+echo "done."

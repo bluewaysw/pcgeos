@@ -1,0 +1,263 @@
+/*
+ * Project:	GeoWrite
+ * File:	UI/uiPrint.ui
+ *
+ * Author:	Tony Requist
+ *
+ *	This file contains the user interface description for the print
+ * layout dialog box.
+ *
+ *	$Id: uiPrint.ui,v 1.3 98/02/17 03:38:48 gene Exp $
+ *
+ */
+
+/* ----------------------------------------------------------------------------
+	Print control
+-----------------------------------------------------------------------------*/
+
+start FileMenuUI;
+
+#if FAX_SUPPORT
+WriteSendControl = MailboxSendControl {
+        visibility = subGroup;
+        type = organizational;
+        hints = {
+                ATTR_MAILBOX_SEND_CONTROL_SEND_DOCUMENT,
+		ATTR_MAILBOX_SEND_CONTROL_SEND_PAGES,
+                ATTR_MAILBOX_SEND_CONTROL_TRANSPORT_HINT {
+                        SpoolDefineTransportHint WritePrintControl
+                },
+                ATTR_MAILBOX_SEND_CONTROL_TRANSPORT_HINT {
+                        FaxsendDefineTransportHint WritePrintControl
+                }
+        }
+	defBodyType = MOT_DOCUMENT;
+        output = process;
+}
+
+#endif
+
+#if LIMITED_FAX_SUPPORT
+
+WriteSendControl = MailboxSendControl {
+        visibility = subGroup;
+        type = organizational;
+        hints = {
+                ATTR_MAILBOX_SEND_CONTROL_SEND_DOCUMENT,
+                ATTR_MAILBOX_SEND_CONTROL_TRANSPORT_HINT {
+                        FaxsendDefineTransportHint WriteFaxPrintControl
+                },
+        }
+	defBodyType = MOT_DOCUMENT;
+        output = process;
+}
+
+WriteFaxPrintControl = PrintControl vardataReloc {
+	printOutput = "TO_APP_MODEL";
+	docNameOutput = WriteDocumentGroup;
+	printAttributes = default +showProgress, +progressByPage;
+	hints = {
+		HINT_SAME_CATEGORY_AS_PARENT,
+		ATTR_GEN_DESTINATION_CLASS { UN_DD WriteDocumentClass },
+		ATTR_PRINT_CONTROL_APP_UI { UN_OPTR PrintGroup },
+		ATTR_GEN_CONTROL_DO_NOT_USE_LIBRARY_NAME_FOR_HELP
+	}
+}
+#endif
+
+#if	_DWP
+WritePrintControl = WritePrintCtrl vardataReloc {
+#else
+WritePrintControl = PrintControl vardataReloc {
+#endif
+	printOutput = "TO_APP_MODEL";
+	docNameOutput = WriteDocumentGroup;
+#if	!_SINGLE_PAGE_SPOOLING
+	printAttributes = default +showProgress, +progressByPage;
+#endif
+	hints = {
+#if LIMITED_FAX_SUPPORT
+		ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI {
+			word	mask PRINTCTF_FAX_TRIGGER
+		},
+		ATTR_GEN_CONTROL_PROHIBIT_UI {
+			word 	mask PRINTCF_FAX_TRIGGER
+		},
+#endif
+		HINT_SAME_CATEGORY_AS_PARENT,
+		ATTR_GEN_DESTINATION_CLASS { UN_DD WriteDocumentClass },
+		ATTR_PRINT_CONTROL_APP_UI { UN_OPTR PrintGroup },
+		ATTR_GEN_CONTROL_DO_NOT_USE_LIBRARY_NAME_FOR_HELP
+	}
+}
+
+end FileMenuUI;
+
+start PrintUI;
+
+PrintGroup = GenInteraction {
+	genStates = default -usable;
+	children = InnerPrintGroup;
+	genAttributes = default +notifyVisibility;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		ATTR_GEN_VISIBILITY_DATA { word 0, mask GV_PRINT }
+	}
+}
+
+
+#ifndef VS150
+
+
+
+InnerPrintGroup = GenInteraction {
+ 	moniker = "Merge Options";
+ 	children = MergeList;
+	hints = {
+		HINT_DRAW_IN_BOX,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+#else
+
+InnerPrintGroup = GenInteraction {
+	moniker = "Mail Merge";
+	children = MergeList, MergeFile;
+	hints = {
+		HINT_DRAW_IN_BOX,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY
+	}
+}
+#endif
+
+#ifdef VS150
+
+MergeList = GenItemGroup {
+	children = MergeOff, MergeOn;
+	selection = "MT_NONE";
+	numSelections = 1;
+}
+
+MergeOff = GenItem ignoreDirty {
+	moniker = "Off                     ";
+	identifier = "MT_NONE";
+}
+
+MergeOn = GenItem ignoreDirty {
+	genStates = default -enabled;
+	moniker = "On";
+	identifier = "MT_ALL";
+}
+
+MergeFile = GenInteraction ignoreDirty {
+	moniker = "Merge with File";
+	attributes = default +modal;
+	type = command;
+	visibility = dialog;
+	children = MergeGlyph1, MergeGlyph2, MergeFileSelector, MergeTrigger;
+	hints = { HINT_ORIENT_CHILDREN_VERTICALLY }
+}
+
+MergeGlyph1 = GenGlyph {
+	moniker = "Select GeoDex document file";
+}
+
+MergeGlyph2 = GenGlyph {
+	moniker = "to merge with:";
+}
+
+MergeTrigger = GenTrigger {
+	genAttributes = default +initiatesInputIgnore,
+				+signalInteractionComplete;
+	genStates = default -enabled;
+	action = MSG_WRITE_PROCESS_MERGE_FILE, process;
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		HINT_DEFAULT_DEFAULT_ACTION,
+		HINT_DEFAULT_FOCUS,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND
+			{word	IC_OK}
+	}
+}
+
+MergeFileSelector = GenFileSelector {
+	action = MSG_WRITE_PROCESS_MERGE_FILE_CHECK, process;
+	fileCriteria = dirs, geosNonExecutables;
+	hints = {
+		HINT_FILE_SELECTOR_SINGLE_ACTION,
+		ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH {
+			GeodeToken <"ADBK", MANUFACTURER_ID_GEOWORKS>
+		},
+		ATTR_GEN_PATH_DATA { GenFilePath < SP_DOCUMENT, ""> },
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS,20>
+			SpecHeight <>
+			word 	1
+		}
+	}
+}
+
+#else
+
+
+/* Non-Redwood systems */
+
+MergeList = GenItemGroup {
+	children = NoMergeEntry, MergeOneEntry, MergeAllEntry;
+	selection = 0;
+	numSelections = 1;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY
+	}
+}
+
+NoMergeEntry = GenItem ignoreDirty {
+	moniker = "No Merge";
+	identifier = "MT_NONE";
+}
+
+MergeOneEntry = GenItem ignoreDirty {
+	moniker = "Merge One";
+	identifier = "MT_ONE";
+}
+
+MergeAllEntry = GenItem ignoreDirty {
+	moniker = "Merge All";
+	identifier = "MT_ALL";
+}
+
+
+#endif
+
+end PrintUI;
+
+/* ----------------------------------------------------------------------------
+	Set merge file dialog
+-----------------------------------------------------------------------------*/
+
+#if 0
+
+start FileMenuUI;
+
+SetMergeFileDialog = GenInteraction {
+	NOT_IMPLEMENTED		/* Add SetMergeFileDialog to WriteEnableList */
+	/* genStates = default -enabled; */
+	moniker = 'M', "\\xa5Set Merge File\\xa5";
+	type = command;
+	visibility = dialog;
+}
+
+end FileMenuUI;
+
+start PrintUI;
+
+/* Put children of SetMergeFileDialog here */
+
+end PrintUI;
+
+#endif
+

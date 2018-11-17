@@ -1,0 +1,737 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	(c) Copyright Geoworks 1994 -- All Rights Reserved
+	GEOWORKS CONFIDENTIAL
+
+PROJECT:	GEOS
+MODULE:		Contact Log
+FILE:		contactlog.def
+
+AUTHOR:		Vivek Narasayya, Oct 24, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	VN	10/24/94   	Initial revision
+	reza	3/3/95		Changed a whole bunch
+
+DESCRIPTION:
+	Definitions for Contact Log application	
+		
+ 	$Id: contlog.def,v 1.1 97/04/04 14:21:43 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SetDef __CONTLOG
+
+StartLibrary	contlog
+;---------------------------------------------------------------------------
+;	Constants
+;---------------------------------------------------------------------------
+;
+; lengths of various strings
+;
+NAMENUMBER_LENGTH	equ	31
+TYPE_STRING_LENGTH	equ	16
+DIRECTION_STRING_LENGTH	equ	16
+DATETIME_STRING_LENGTH	equ	18
+DURATION_BUFFER_SIZE	equ	30
+
+;
+; maximum # of entries in the general contact log
+;
+MAX_CONTACT_LOG_ENTRIES		equ	5000
+
+;
+; maximum number of entries in each recent contacts stack
+;
+MAX_RECENT_CONTACTS_ENTRIES	equ	20
+
+;---------------------------------------------------------------------------
+;	Enumeration types for contact log
+;---------------------------------------------------------------------------
+;
+; Each log entry is either a call, a fax, or a short message.
+;
+LogEntryType		etype	byte, 0, 2
+LET_CALL		enum	LogEntryType
+LET_FAX			enum	LogEntryType
+LET_SMS			enum	LogEntryType
+LET_DATA_MAILBOX	enum	LogEntryType
+LET_DATA_WWW		enum	LogEntryType
+LET_DATA_TELNET		enum	LogEntryType
+LET_DATA_ANY		enum	LogEntryType	; used in views
+
+LET_DATA		equ	LET_DATA_MAILBOX
+
+;
+; Each log entry is either sent, received, or missed (call only).
+;
+LogEntryDirection	etype	byte, 0, 2
+LED_SENT		enum	LogEntryDirection
+LED_RECEIVED		enum	LogEntryDirection
+LED_MISSED		enum	LogEntryDirection
+LED_ANY			enum	LogEntryDirection ; used in
+						  ; notification lists
+;
+; Enumeration for dynamic list, which-fields-to-display types
+;
+ListFieldsDisplayType		etype byte, 0, 1
+LFDT_GENERAL_LOG		enum ListFieldsDisplayType
+LFDT_PERSON_CONTACTS_LOG	enum ListFieldsDisplayType
+LFDT_RECENT_CONTACTS_LOG	enum ListFieldsDisplayType
+
+;
+; Used to retrieve recent contacts stacks info
+;
+RecentContactsType		etype	word, 0, 2
+RC_SENT_CALLS			enum	RecentContactsType
+RC_RECEIVED_CALLS		enum	RecentContactsType
+RC_MISSED_CALLS			enum	RecentContactsType
+RC_SENT_FAXES			enum	RecentContactsType
+RC_RECEIVED_FAXES		enum	RecentContactsType
+RC_SENT_SMS			enum	RecentContactsType
+RC_RECEIVED_SMS			enum	RecentContactsType
+
+;
+; When operating on the log, this type can be used to specify which field
+; is to be used to find matching entries.
+;
+LogFieldType		etype	byte, 0, 2
+LFT_ALL			enum	LogFieldType	; all entries
+LFT_NUMBER		enum	LogFieldType	
+LFT_TYPE		enum	LogFieldType
+LFT_DIRECTION		enum	LogFieldType
+LFT_DATETIME		enum	LogFieldType
+LFT_CONTACT_ID		enum	LogFieldType
+LFT_CONTACT_AND_DATETIME enum	LogFieldType	; person logs
+						; used in trimming
+LFT_MANUALLY_ORIG_CALLS	enum	LogFieldType	; for finding manually
+						; originated calls
+
+; 
+; Filenames
+;
+CONTACT_LOG_FILE_NAME		equ	<"ContactLog 11/27/96",0>
+RECENT_CONTACTS_FILE_NAME	equ	<"RecentContacts 11/27/96",0>
+
+;---------------------------------------------------------------------------
+;	Structures
+;---------------------------------------------------------------------------
+; lifted from the datepick library
+DateAndTime			struc
+	DAT_year 		word
+	DAT_month		byte
+	DAT_day			byte
+	DAT_hour		byte
+	DAT_minute		byte   
+DateAndTime			ends		
+
+NameOrNumber		type	NAMENUMBER_LENGTH	dup (TCHAR)
+
+;
+; LogEntryFlags are also used internally. They must be cleared before the
+; start of each call, except for LEF_WILDCARD_NUMBER.
+;
+LogEntryFlags	record
+	LEF_SHOW_COMPANY_NAME:1		; if set, we show company name
+					; when multiple number matches
+					; are found
+	LEF_START_LOGGED:1		; always set after call
+	LEF_WILDCARD_NUMBER:1		; if set, will match any end
+					; call log with the same
+					; direction, type & datetime
+	:5
+LogEntryFlags	end
+
+;
+; Structure used when calling LogAddEntry. And also, record structure
+; of ContactLog & RecentContacts log files.
+;
+LogEntry	struc
+	LE_number	NameOrNumber		; always store the
+						; phone number string
+	LE_contactID	dword			; link to Foam DB entry
+	LE_type		LogEntryType		; call/fax/sms/data
+	LE_direction	LogEntryDirection	; sent/received
+	LE_duration	dword			; in secs.
+	LE_datetime	DateAndTime		; Date and Time
+	LE_flags	LogEntryFlags		; Internally used flags used
+						; when processing entries
+						; NOTE: must be cleared
+						; out when calling
+						; LogAddEntry for
+						; start of call.
+LogEntry	ends
+
+; LE_contactID will be set to the following, if we cannot get a
+; corresponding Contact ID from the Foam DB
+LECI_INVALID_CONTACT_ID	equ	0xffffffff
+
+;
+; Strucuture passed when "Select" trigger is pressed.
+;
+RecentContactsData struc
+	RCD_contactID	dword
+	RCD_number	NameOrNumber
+RecentContactsData ends
+
+
+;---------------------------------------------------------------------------
+;	Class Definitions
+;---------------------------------------------------------------------------
+;---------------------------------------------------------------------------
+;	LogLengthControl class
+;---------------------------------------------------------------------------
+LogLengthControlClass	class	GenControlClass
+;
+; Controller to handle the "Set Log Length" dialog in CMgr Settings.
+;
+
+MSG_LOG_LENGTH_CONTROL_INITIATE_DIALOG		message
+;
+; Sent to us, by the our own trigger to bring up the interaction
+;
+
+MSG_LOG_LENGTH_CONTROL_LIST_ITEM_SELECTED	message
+;
+; Sent to us, when any item in the Log Length list is selected.
+;
+	LogLengthControlFeatures	record
+		LLCF_LOG_UI:1
+	LogLengthControlFeatures	end
+
+	LLC_DEFAULT_FEATURES	equ	mask LLCF_LOG_UI
+
+	LLCI_dialogs	optr
+	;
+	; The top-level dialog boxes that allows user to "Set Log
+	; Length"
+	;
+LogLengthControlClass	endc
+
+;---------------------------------------------------------------------------
+;	LogGenControl class
+;---------------------------------------------------------------------------
+LogGenControlClass	class GenControlClass
+;
+; Master controller for all the controllers in our library
+; Main purpose is to allocate/deallocate a huge array in the clipboard
+; to be used for searches.
+;
+
+MSG_LOG_GEN_CONTROL_LIST_ENTRY_QUERY	message
+;
+; this is the query msg sent by the GenDynamic list that displays log entries.
+; Pass: cx:dx = optr of the dynamic list
+;	bp    = item number
+;
+
+MSG_LOG_GEN_CONTROL_SET_FIELD_SPACING	message
+;
+; sent by our GenDynamic list, so we can calculate the spacing
+; required for list items and monikers.
+; Pass: nothing
+;
+
+MSG_LOG_GEN_CONTROL_DRAW_LIST_MONIKER	message
+;
+; sent by the GenDynamic list to ask the controller to draw it's moniker
+; Pass: cx:dx = optr of the dynamic list
+;
+
+MSG_LOG_GEN_CONTROL_SET_LIST_VISIBILITY	message
+;
+; The message sent to us, when our dynamic list is opened or closed,
+; or when the "No contacts" interaction/glyph is opened/closed.
+; Pass: cx = LogVisibilityStatus
+;
+
+MSG_LOG_GEN_CONTROL_DRAW_FIELD_LINES	message
+;
+; This message is sent to us by our dynamic list to request the lines
+; be redrawn. No handler is provided. Subclasses may intercept this
+; message to draw their own vertical lines. Do not call superclass.
+;
+; Pass: cx	= GState to use
+;	bp, dx	= top, bottom coordinates of line
+;
+
+
+	LGCI_hugeArrayHandle		word
+	;
+	; The handle of the huge array used to store items for the
+	; dynamic list, in the clipboard.
+	;
+
+	LGCI_listType			ListFieldsDisplayType
+	;
+	; Used to determine which field spacing to use when drawing
+	; the moniker (if any), and list entries.
+	;
+	
+	LGCI_spacingSet			BooleanByte	(BB_FALSE)
+	;
+	; Indicates if we've set the spacing for our dynamic list
+	;
+
+	LGCI_nameNumberLineOffset	word	(NAMENUMBER_LINE_OFFSET)
+	LGCI_typeLineOffset		word	(TYPE_LINE_OFFSET)
+	LGCI_directionLineOffset	word	(DIRECTION_LINE_OFFSET)
+	LGCI_datetimeLineOffset		word	(DATETIME_LINE_OFFSET)
+	LGCI_durationLineOffset		word	(DURATION_LINE_OFFSET)
+	;
+	; Spacing used to draw the items for the list entries.
+	;
+
+LogGenControlClass	endc
+
+;---------------------------------------------------------------------------
+;	LogControl class
+;---------------------------------------------------------------------------
+LogControlClass	class	LogGenControlClass
+;
+; Controller for the contact log. It opens up the contact log UI.
+; 
+
+
+	LogControlFeatures	record
+		LCF_LOG_UI:1
+	LogControlFeatures	end
+
+	LC_DEFAULT_FEATURES	equ	mask LCF_LOG_UI
+
+
+MSG_LOG_CONTROL_AFFIRM_DELETE			message
+;
+; confirm thru a UserDoDialog whether some entries should be deleted or not.
+; Pass: nothing
+;
+
+MSG_LOG_CONTROL_DISPLAY_LOG			message
+;
+; initializes the interaction that is the root of the contact log ui.
+; Pass: nothing
+;
+
+MSG_LOG_CONTROL_VIEW_EVENTS_SEARCH_SUBSET	message
+;
+; perform a search on the log for a subset of the entries.
+; Pass: nothing
+;
+
+MSG_LOG_CONTROL_TRIM_LOG			message
+;
+; The message for deleting all entries in a log older than a
+; specified number of days.
+; Pass: nothing
+;
+
+MSG_LOG_CONTROL_SELECTION_CHANGED		message
+;
+; Internal - responds to selection change in contact log
+;
+; Pass: cx - current selection, or GIGS_NONE if no selection
+;
+; Return: nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+MSG_LOG_CONTROL_SELECT_CURRENT_ENTRY 		message
+;
+; The message sent out whenever the "Create Card" button is
+; pressed.
+; Pass: nothing
+;
+
+	ATTR_LOG_CONTROL_NOTIFY_ENTRY_SELECTED_MSG	vardata	word
+	; The message sent out when the user presses the "Create
+	; contact" trigger in the General Log, instead of the default
+	; action of creating the card.
+	;
+	; Pass: nothing
+	;
+
+LogControlClass	endc
+
+
+PersonContactsControlClass	class	LogGenControlClass
+;
+; This is the controller class for person contacts. It opens up the UI
+; of log entries for the selected person.
+;
+	PersonContactsControlFeatures	record
+		PCCF_LOG_UI:1
+	PersonContactsControlFeatures	end
+
+	PCC_DEFAULT_FEATURES	equ	mask PCCF_LOG_UI
+
+
+MSG_PERSON_CONTACTS_CONTROL_DISPLAY_LOG			message
+;
+; Sets the current contact ID to display. This message is normally
+; sent to us, before the dialog which contains this controller is
+; opened.
+; Pass: dx.cx 	= contact ID to display
+;
+
+MSG_PERSON_CONTACTS_CONTROL_PERSON_CONTACTS_SEARCH_SUBSET	message
+;
+; Generic message to search  a subset of entries from
+; the log.
+; Pass: nothing
+;
+
+MSG_PERSON_CONTACTS_CONTROL_PERSON_CONTACTS_AFFIRM_DELETE	message
+;
+; Generic message to confirm  deletion of  a subset of person entries from
+; the log.
+; Pass: nothing
+;
+
+	PCCI_currentContactID	dword
+	;
+	; the Contact ID of the logs of the current person we are displaying in
+	; the dynamic list.
+	;
+PersonContactsControlClass	endc
+
+
+RecentContactsControlClass	class	LogGenControlClass
+;
+; This is the controller class for recent contacts. It is the superclass of
+; three other classes --
+;	RecentContactsPhoneControlClass
+;	RecentContactsFaxControlClass
+;	RecentContactsSMSControlClass
+; The user of this library will never need to declare an object of
+; RecentContactsControlClass. All objects should be of one of the three
+; subclass types. 
+;
+
+MSG_RECENT_CONTACTS_CONTROL_RETRIEVE_LIST	message
+;
+; retrieve and redraws the user chosen recent contacts list.
+; Pass: cx = RecentContactsHugeArrayIDType
+;
+
+MSG_RECENT_CONTACTS_CONTROL_OPEN_LIST		message
+;
+; open the interaction that contains the dynamic list. 
+; retrieve the list so that it can be displayed in the list
+; Pass: nothing
+;
+
+MSG_RECENT_CONTACTS_CONTROL_LIST_QUERY		message
+;
+; The query message for the recent contacts dynamic list.
+; Pass: ^lcx:dx = optr of the dynamic list
+;	bx   = item number
+;
+
+MSG_RECENT_CONTACTS_CONTROL_CLEAR_ALL		message
+;
+; The message for deleting all entries in a recent contacts list.
+; Pass: nothing
+;
+
+MSG_RECENT_CONTACTS_CONTROL_SELECT_CURRENT_ENTRY message
+;
+; The message sent out whenever the "Select" (or "Call") button is
+; pressed.
+; Pass: nothing
+;
+
+MSG_RECENT_CONTACTS_CONTROL_ERASE_STACK		message
+;
+; Internal: Sent from confirm dialog, when user has approved erase stack.
+; Pass: nothing
+; Return: nothing
+;
+
+MSG_RECENT_CONTACTS_CONTROL_ERASE_STACK_CANCELED	message
+;
+; Internal: Sent from confirm dialog, when user has decided to cancel
+; erasing stack.
+; Pass: nothing
+; Return: nothing
+;
+
+;----------------------------------------------------------------------------
+; Messages available only in Communicator products after Feb 1997:
+;----------------------------------------------------------------------------
+
+MSG_RECENT_CONTACTS_CONTROL_COPY_NUMBER			message
+;
+; Internal: Sent when the "Copy number" trigger is pressed inthe
+; number list.
+; Pass: nothing
+; Return: nothing
+;
+
+MSG_RECENT_CONTACTS_CONTROL_CLEAR_ALL_LISTS		message
+;
+; Internal: Sent when the "Clear lists" trigger is pressed from the
+; main view.
+; Pass: nothing
+; Return: nothing
+;
+
+MSG_RECENT_CONTACTS_CONTROL_CLEAR_ALL_LISTS_OK		message
+; 
+; Internal: Sent when user has accepted clearing the lists from the
+; main view.
+; Pass: nothing
+; Return: nothing
+;
+
+MSG_RECENT_CONTACTS_CONTROL_SELECTION_CHANGED		message
+;
+; Internal: Sent when a selection has changed in the number list
+; Pass: nothing
+; Return: nothing
+;
+
+MSG_RECENT_CONTACTS_CONTROL_OPEN_GIVEN_LIST	message
+;
+; Open the passed list type for viewing.
+; Pass: 	cx = RecentContactsType
+; Destroyed: 	nothing
+;
+
+	ATTR_RECENT_CONTACTS_CONTROL_NOTIFY_ENTRY_SELECTED_MSG	vardata	word
+	;
+	; The message sent out when the user selects an entry from the
+	; list.
+	;
+	; Message has the following params:
+	;	Pass: ss:bp = RecentContactsData
+	;		dx  = size of RecentContactsData
+
+	TEMP_RECENT_CONTACTS_CONTROL_CONFIRM_DIALOG	vardata	optr
+	; 
+	; Internal: The optr of the confirm dialog that needs to be
+	; taken down if we are dismissed.
+	;
+
+	;--------------------------------------------------------------------
+	; Vardata available only in Communicator products after Feb 1997:
+	;--------------------------------------------------------------------
+
+	ATTR_RECENT_CONTACTS_CONTROL_NOTIFY_MULTIPLE_ENTRIES_SELECTED_MSG vardata hptr
+	;
+	; The message sent out when the user selects entries (1 or more)
+	; from the list, and either RCFCF_MULTIPLE_SELECTION or
+	; RCMCF_MULTIPLE_SELECTION is set.
+	;
+	; Message has the following params:
+	;	^hcx - block containing RecentContactsData entries
+	;	dx - # of RecentContactsData entries
+	;
+
+	RCCI_listGroupOffset	word
+
+RecentContactsControlClass	endc
+
+RecentContactsPhoneControlClass	class	RecentContactsControlClass
+;
+; controller class for opening recent phone contacts UI
+;
+
+	RecentContactsPhoneControlFeatures	record
+		:15
+		RCPCF_LOG_UI:1
+	RecentContactsPhoneControlFeatures	end
+
+	RCPC_DEFAULT_FEATURES	equ	mask RCPCF_LOG_UI
+
+  ATTR_RECENT_CONTACTS_PHONE_CONTROL_NOTIFY_MISSED_CALLS_LIST_OPENED_MSG \
+						vardata word
+	;
+	; The message sent out whenever the missed calls list of
+	; entries is opened. 
+	;
+	; Message has the following params:
+	;	Pass: nothing
+
+RecentContactsPhoneControlClass	endc
+
+RecentContactsFaxControlClass	class	RecentContactsControlClass
+;
+; controller class for opening recent phone contacts UI
+;
+
+	RecentContactsFaxControlFeatures	record
+		:14
+		RCFCF_MULTIPLE_SELECTION:1	; turns on
+						; multi-selection in
+						; the numbers view
+		RCFCF_LOG_UI:1
+	RecentContactsFaxControlFeatures	end
+
+	RCFC_DEFAULT_FEATURES	equ	mask RCFCF_LOG_UI
+
+RecentContactsFaxControlClass	endc
+
+RecentContactsSMSControlClass	class	RecentContactsControlClass
+;
+; controller class for opening recent phone contacts UI
+;
+
+	RecentContactsSMSControlFeatures	record
+		:14
+		RCMCF_MULTIPLE_SELECTION:1	; turns on
+						; multi-selection in
+						; the numbers view
+		RCMCF_LOG_UI:1
+	RecentContactsSMSControlFeatures	end
+
+	RCMC_DEFAULT_FEATURES	equ	mask RCMCF_LOG_UI
+
+RecentContactsSMSControlClass	endc
+
+
+;---------------------------------------------------------------------------
+;	Exported functions
+;---------------------------------------------------------------------------
+
+;
+; Assembly routines
+;
+global	LogAddEntry:far
+;
+; This should be called to add log entries. The following situations
+; are examples of when to use LogAddEntry, and it's effects on the
+; general and recent contacts:
+;
+;	1.	At start of call, with duration ZERO.
+;			entry will have it's duration marked as "unknown".
+;
+;	2.	At start of call, with duration ZERO, and later again at end
+;		of call with duration filled in.
+;			standard way of usage.
+;
+;	3.	At end of call with duration filled in.
+;			assumes you forgot to log entry at beginning
+;			of call. 
+;
+;		When calling LogAddEntry at start of call, set LE_flags = 0,
+;		or LEF_WILDCARD_NUMBER if you want matching at the end
+;		of the call to this log entry not be based on the phone number.
+;
+; In any case, the recent contacts log will reflect the log entry the
+; first time it is called.
+;
+; 	Pass: 		ds:si	= fptr to LogEntry
+;	Returns:	carry set if error (could be too little diskspace)
+;			carry clear otherwise, and
+;				ds:si = fptr to LogEntry with
+;				LE_contactID filled in if it was
+;				initially = LECI_INVALID_CONTACT_ID 
+;				(pass this same LogEntry with duration
+;				filled in at end of call).
+;	Destroyed:	nothing
+;
+
+global	LogDeleteAllEntries:far
+global	LogDestroy:far
+global	LogSetLogLength:far
+global	RecentContactsGetCount:far
+global	RecentContactsGetEntry:far
+global	RecentContactsGetNewCount:far
+global	RecentContactsResetNewCount:far
+global	RecentContactsEraseStack:far
+RecentContactsResetMissedCallsTotalCount equ \
+	RECENTCONTACTSRESETMISSEDCALLSTOTALCOUNT
+RecentContactsGetMissedCallsTotalCount equ \
+	RECENTCONTACTSGETMISSEDCALLSTOTALCOUNT
+
+global	LogGetCount:far
+;
+; Returns the # of items in the Contact Log.
+; 
+; 	Pass: 	nothing
+; 	Return: cx - # of items
+;
+
+global	LogGetEntry:far
+;
+; Retrieves the specified entry from the Contact Log.
+;
+;	Pass:	cx = entry #
+;		es:di - LogEntry buffer to be filled
+;	Return:	carry set if error
+;		carry clear otherwise and buffer filled
+;
+
+global	LogFindMatchingType:far
+;
+; Finds matching entries based on the given criteria.
+;
+;	Pass:	al 	= LogFieldType
+;		if al != LFT_ALL 
+;			^lbx:si = LogEntry to compare
+;		di	= hugearray handle in the clipboard file to
+;			  return results.
+;	Return:	carry set if error
+;
+; The following fields will be considered for matching:
+;
+; LogFieldType			Fields
+; -------------------------------------------------------------------------
+; LFT_ALL			none, all entries matched
+; LFT_NUMBER			LE_number
+; LFT_TYPE			LE_type
+; LFT_DIRECTION			LE_direction
+; LFT_DATETIME			LE_datetime, entries older than the passed
+; 				date/time will be matched
+; LFT_CONTACT_ID		LE_contactID
+; LFT_CONTACT_AND_DATETIME 	LE_contactID & LE_datetime, entries
+; 				older than the passed date/time will
+; 				be matched 
+; LFT_MANUALLY_ORIG_CALLS	LE_contactID & LE_direction, LE_type
+; 				must be different
+;				Note: this is most useful when filled
+;				with LE_contactID = LECI_INVALID_CONTACT_ID
+;				     LE_direction = LED_SENT
+;				     LE_type = LET_DATA_ANY
+;
+
+global	LogDeleteMatchingType:far
+;
+; Deletes matching entries based on the given criteria
+;
+;	Pass:	al 	= LogFieldType
+;		if al != LFT_ALL 
+;			^lbx:si = LogEntry to compare
+;	Return:	carry set if error
+;
+; See LogFindMatchingType for matching rules.
+;
+
+;
+; C stubs
+;
+global	LOGADDENTRY:far
+global	LOGDELETEALLENTRIES:far
+global	LOGDESTROY:far
+global	LOGSETLOGLENGTH:far
+global 	RECENTCONTACTSGETCOUNT:far
+global 	RECENTCONTACTSGETENTRY:far
+global 	RECENTCONTACTSGETNEWCOUNT:far
+global 	RECENTCONTACTSRESETNEWCOUNT:far
+global	RECENTCONTACTSERASESTACK:far
+global	RECENTCONTACTSRESETMISSEDCALLSTOTALCOUNT:far
+global	RECENTCONTACTSGETMISSEDCALLSTOTALCOUNT:far
+global	LOGGETCOUNT:far
+global	LOGGETENTRY:far
+global	LOGFINDMATCHINGTYPE:far
+global	LOGDELETEMATCHINGTYPE:far
+
+EndLibrary	contlog
+
+
+

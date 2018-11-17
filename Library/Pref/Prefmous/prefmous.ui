@@ -1,0 +1,597 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+ *
+ * PROJECT:	  PCGEOS
+ * MODULE:	  prefmous
+ * FILE:	  prefmous.ui
+ *
+ * AUTHOR:  	  Gene Anderson: Aug 25, 1992
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	8/25/92	  gene	    Initial version
+ *
+ * DESCRIPTION:
+ *	UI for Sound module of Preferences
+ *
+ *
+ * 	$Id: prefmous.ui,v 1.4 98/04/24 01:25:35 gene Exp $
+ *
+ ***********************************************************************/
+
+#include "generic.uih"
+#include "config.uih"
+
+#ifdef GPC_VERSION
+#include "Art/mkrPrefGPC.ui"
+#else
+#include "Art/mkrPrefMous.ui"
+#endif
+
+class PrefMousDialog = PrefDialog {
+}
+
+class PrefMousTrigger = GenTrigger {
+	doubleClickOnly = byteComp : FALSE;
+}
+
+class PrefMousList = PrefTocList {
+}
+
+class PrefMousPortList = PrefItemGroup {
+}
+
+class PrefMousDriverDialog = PrefInteraction {
+	static byteComp: 0;
+}
+
+
+
+/**************************************************************************
+ *	UI FOR SOUND
+ **************************************************************************/ 
+start	PrefMousUI;
+
+
+PrefMousTitle = TitledGlyph {
+	moniker = list {
+		PrefMousTextMoniker,
+#ifdef GPC_VERSION
+		PrefGPCMoniker
+#else
+		PrefMousLCMoniker,
+		PrefMousLMMoniker,
+		PrefMousLCGAMoniker
+#endif
+	}
+}
+
+
+PrefMousRoot = PrefMousDialog {
+	moniker = "Mouse";
+	attributes = default +modal, +notUserInitiatable;
+	visibility = dialog;
+	type = properties;
+	genStates = default -usable;
+
+	children =
+		PrefMousTitleGroup,
+		PrefMousSubgroup,
+#ifdef GPC_VERSION
+	        PrefTriggerGroup,
+#endif
+		TestMouseDialog;
+	hints = {
+		HINT_INTERACTION_SINGLE_USAGE,
+#ifndef GPC_VERSION
+		HINT_INTERACTION_COMPLEX_PROPERTIES,
+#endif
+		ATTR_GEN_HELP_CONTEXT {
+			char "dbMouse",0
+		}
+	}
+}
+
+#ifdef GPC_VERSION
+PrefTriggerGroup = GenInteraction {
+    children = PrefMOK, PrefMClose;
+    hints = {
+	HINT_ORIENT_CHILDREN_HORIZONTALLY
+    }
+}
+
+PrefMOK = GenTrigger {
+    moniker = 'C', "Change";
+    genStates = default -enabled;
+    genAttributes = signalInteractionComplete;
+    hints = {
+	HINT_SEEK_REPLY_BAR,
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND {
+	    word IC_APPLY
+	}
+    }
+}
+
+PrefMClose = GenTrigger {
+    moniker = 'D', "Don't Change";
+    hints = {
+	HINT_SEEK_REPLY_BAR,
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND {
+	    word IC_DISMISS
+	}
+    }
+}
+#endif
+
+PrefMousTitleGroup = GenInteraction {
+	children =
+		PrefMousTitle,
+		PrefMousHelp;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+#ifdef DO_PIZZA
+		, HINT_EXPAND_WIDTH_TO_FIT_PARENT
+#endif
+	}
+}
+
+PrefMousHelp = GenText {
+	genAttributes = readOnly;
+	text = "These options let you change the behavior of your mouse.";
+	hints = {
+		  HINT_FIXED_SIZE {
+#ifdef DO_PIZZA
+			SpecWidth <SST_PIXELS, 400>
+#else
+
+#ifdef GPC_VERSION
+			SpecWidth <SST_PIXELS, 0>
+#else
+			SpecWidth <SST_PIXELS, 425>
+#endif /* GPC_VERSION */
+#endif
+			SpecHeight <>
+		  }
+	}
+}
+
+PrefMousSubgroup = PrefInteraction {
+	children = MouseComp1, MouseDriverGroup;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		ATTR_GEN_INIT_FILE_CATEGORY {
+			char "input",0
+		}
+	}
+}
+
+
+MouseComp1 = PrefInteraction {
+	children = MouseDoubleClickGroup, MouseAccelGroup, MouseLeftGroup;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT, 
+#if DO_PIZZA
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+#endif
+		HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY,
+		ATTR_GEN_INIT_FILE_CATEGORY {
+			char "input",0
+		}
+	}
+}
+
+/**************************************************************************
+ *	LEFT HANDED
+ **************************************************************************/ 
+
+MouseLeftGroup = PrefInteraction {
+	moniker = "Button Configuration";
+	children = MouseHanded;
+	hints = {
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_DRAW_IN_BOX
+	}
+}
+
+MouseHanded = PrefItemGroup vardataReloc {
+	prefAttrs = default +rebootIfChanged;
+	initFileFlags = default +useItemStrings;
+	selection = FALSE;
+	children =
+		MouseRightHanded,
+		MouseLeftHanded;
+	hints =  {
+		ATTR_GEN_INIT_FILE_CATEGORY {
+			char "input",0
+		},
+		ATTR_GEN_INIT_FILE_KEY {
+			char "leftHanded",0
+		},
+		ATTR_PREF_REBOOT_STRING {
+			UN_OPTR buttonConfigString;
+		}
+	}
+}
+
+MouseRightHanded = PrefStringItem {
+	moniker = "Right-handed";
+	identifier = FALSE;
+	initFileString = "false";
+}
+
+MouseLeftHanded = PrefStringItem {
+	moniker = "Left-handed";
+	identifier = TRUE;
+	initFileString = "true";
+}
+
+chunk buttonConfigString = "button configuration";
+
+/**************************************************************************
+ *	DOUBLE CLICK TIME
+ **************************************************************************/ 
+
+MouseDoubleClickGroup = PrefInteraction {
+	moniker = "Double Click Time";
+	children = DoubleClickTime, DoubleClickTest;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_DRAW_IN_BOX
+	}
+}
+
+DoubleClickTime = PrefItemGroup {
+	numSelections = 1;
+	selection = MOUSE_DOUBLE_CLICK_SLOW;
+	children = DoubleClickSlow, DoubleClickMedium, DoubleClickFast;
+	destination = PrefMousRoot;
+	hints = {
+		ATTR_GEN_ITEM_GROUP_STATUS_MSG {
+			word MSG_PREF_MOUS_DIALOG_CHANGE_DOUBLE_CLICK
+		},
+		ATTR_GEN_INIT_FILE_KEY {
+			char "doubleClickTime",0
+		}
+	}
+
+
+}
+
+DoubleClickSlow = GenItem {
+	moniker = "Slow";
+	identifier = MOUSE_DOUBLE_CLICK_SLOW;
+}
+
+DoubleClickMedium = GenItem {
+	moniker = "Medium";
+	identifier = MOUSE_DOUBLE_CLICK_MEDIUM;
+}
+
+DoubleClickFast = GenItem {
+	moniker = "Fast";
+	identifier = MOUSE_DOUBLE_CLICK_FAST;
+}
+
+DoubleClickTest = PrefMousTrigger {
+	doubleClickOnly = "TRUE";
+	moniker = "Double Click Test";
+}
+
+/**************************************************************************
+ *	MOUSE ACCELERATION
+ **************************************************************************/ 
+
+MouseAccelGroup = PrefInteraction {
+	moniker = "Mouse Acceleration";
+	children = MouseAccelList;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_DRAW_IN_BOX
+	}
+}
+
+MouseAccelList = PrefItemGroup {
+	destination = PrefMousRoot;
+	numSelections  = 1;
+	selection = MOUSE_ACCEL_MEDIUM;
+	children = MouseAccelSlow, MouseAccelMedium, MouseAccelFast;
+	hints = {
+		ATTR_GEN_INIT_FILE_KEY {
+			char "mouseAccelMultiplier",0
+		},
+		ATTR_GEN_ITEM_GROUP_STATUS_MSG {
+			word MSG_PREF_MOUS_DIALOG_CHANGE_ACCEL
+		}
+	}
+}
+
+MouseAccelSlow = GenItem {
+	moniker = "Slow";
+	identifier = MOUSE_ACCEL_SLOW;
+}
+
+MouseAccelMedium = GenItem {
+	moniker = "Medium";
+	identifier = MOUSE_ACCEL_MEDIUM;
+}
+
+MouseAccelFast = GenItem {
+	moniker = "Fast";
+	identifier = MOUSE_ACCEL_FAST;
+}
+
+/**************************************************************************
+ *	MOUSE DRIVER
+ **************************************************************************/ 
+MouseDriverGroup = PrefInteraction {
+	moniker = "Type of Mouse";
+	children = MouseDisplay, MousePort, MouseDriverSummons;
+#ifdef GPC_VERSION
+	visibility = dialog;
+	attributes = default +notUserInitiatable;
+#endif
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_DRAW_IN_BOX,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+#if DO_PIZZA
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+#endif
+		HINT_CENTER_CHILDREN_VERTICALLY,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		/* So that this doesn't show up in Wizard */
+		ATTR_PREF_REQUIRED_FEATURES {
+			word mask PMF_OTHER
+		}
+	}
+}
+
+MouseDisplay = GenText {
+	genAttributes = readOnly;
+	moniker = "Current Mouse:";
+	text = "(none)";
+	hints = {
+		HINT_PLACE_MONIKER_ABOVE,
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+MousePort = GenText {
+	genAttributes = readOnly;
+	moniker = "Selected Port:";
+	text = ">>> Non-Serial Mouse <<<";
+	hints = {
+		HINT_PLACE_MONIKER_ABOVE,
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+	}
+}
+
+MouseDriverSummons = PrefMousDriverDialog {
+	moniker = "Change";
+	children = MouseList, MouseAttrGroup;
+	type = properties;
+	visibility = dialog;
+	attributes = default +modal;
+	hints = {
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		ATTR_GEN_HELP_CONTEXT {
+			char "dbMouseDrvr",0
+		},
+		INIT_FILE_CATEGORY(mouse)
+	}
+}
+
+MouseList = PrefMousList {
+	numSelections  = 1;
+	selection = 0;		/* No mouse is default */
+	moniker = "Mouse";
+	tocFlags = default +extendedDeviceDrivers;
+	tokenChars = "'MOUS'";
+#ifdef GPC_VERSION
+	prefAttrs = saveIfEnabled;
+	genStates = default -enabled;
+#endif
+	hints = {
+		ATTR_GEN_PATH_DATA {
+			GenFilePath <SP_MOUSE_DRIVERS,0>
+		},
+		HINT_DRAW_IN_BOX,
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_DEFAULT_FOCUS,
+		INIT_FILE_KEY(device),
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 50>
+			SpecHeight <SST_LINES_OF_TEXT, 5>
+			word	5
+		},
+		ATTR_PREF_TOC_LIST_EXTRA_ENTRY_1 {
+			PrefTocExtraEntry <MouseNoDevice,
+					MouseNoDriver, 0>
+		},
+		ATTR_PREF_TOC_LIST_EXTRA_ENTRY_1 {
+			PrefTocExtraEntry <GenericMouseDevice,
+				GenericMouseDriver,
+				mask MEI_GENERIC >
+		},
+		ATTR_PREF_TOC_LIST_EXTRA_ENTRY_1 {
+			PrefTocExtraEntry <dosMouse,
+				GenericMouseDriver,
+				mask MEI_GENERIC >
+		},
+		ATTR_PREF_TOC_LIST_EXTRA_ENTRY_1 {
+			PrefTocExtraEntry <win95Mouse,
+				GenericMouseDriver,
+				mask MEI_GENERIC >
+		},
+		ATTR_PREF_TOC_LIST_INFO_KEY {
+			char "info",0
+		},
+		ATTR_PREF_ITEM_GROUP_TEXT_DISPLAY {
+			lptr MouseDisplay
+		}
+
+	}
+}
+
+chunk MouseNoDevice = "None";
+chunk MouseNoDriver = "None";
+chunk GenericMouseDevice = "No idea";
+chunk win95Mouse = "Windows mouse support already installed";
+chunk dosMouse = "DOS mouse driver already installed";
+
+chunk GenericMouseDriver = "GENMOUSE.GEO";
+
+
+MouseAttrGroup = PrefInteraction {
+	children = MousePortList, MouseIntValue;
+	hints = { HINT_ORIENT_CHILDREN_HORIZONTALLY }
+}
+
+/**************************************************************************
+ *	SERIAL PORT
+ **************************************************************************/ 
+
+MousePortList = PrefMousPortList {
+	moniker = "Serial Mouse Port";
+	genStates = default -enabled;
+	prefAttrs = saveIfEnabled;
+	numSelections  = 1;
+	children = MousePort1, 
+			MousePort2, 
+			MousePort3, 
+			MousePort4;
+	selection = 1;
+	hints = {
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_DRAW_IN_BOX,
+		INIT_FILE_KEY(port),
+		ATTR_PREF_ITEM_GROUP_TEXT_DISPLAY {
+			lptr	MousePort
+		}
+	}
+}
+
+MousePort1 = PrefPortItem {
+	moniker = "COM 1";
+	identifier = 1;
+	type = PPIT_SERIAL_MOUSE;
+	portMask = "mask SDM_COM1";
+}
+
+MousePort2 = PrefPortItem {
+	moniker = "COM 2";
+	identifier = 2;
+	type = PPIT_SERIAL_MOUSE;
+	portMask = "mask SDM_COM2";
+}
+
+MousePort3 = PrefPortItem {
+	moniker = "COM 3";
+	identifier = 3;
+	type = PPIT_SERIAL_MOUSE;
+	portMask = "mask SDM_COM3";
+}
+
+MousePort4 = PrefPortItem {
+	moniker = "COM 4";
+	identifier = 4;
+	type = PPIT_SERIAL_MOUSE;
+	portMask = "mask SDM_COM4";
+}
+
+MouseIntValue = PrefValue {
+	moniker = "Interrupt Level";
+	prefAttrs = default +saveIfEnabled;
+	minimum = 2;
+	maximum = 7;
+	hints = {
+		HINT_DRAW_IN_BOX,
+		HINT_PLACE_MONIKER_ABOVE,
+		INIT_FILE_KEY(irq)
+	}
+}
+/**************************************************************************
+ *	TEST THE MOUSE
+ **************************************************************************/ 
+TestMouseDialog = GenInteraction {
+	/* Make it a properties dialog so that it becomes applyable
+	when the user clicks the test mouse trigger*/
+	type = properties;
+	visibility = dialog;
+	attributes = modal, notUserInitiatable, initiatedViaUserDoDialog;
+	children = TestMouseText, 
+			TestMouseTrigger,
+			TestMouseCancel;
+	hints = {
+		HINT_CENTER_CHILDREN_HORIZONTALLY
+	}
+}
+
+TestMouseText = GenText {
+	genAttributes = default +readOnly;
+#if DO_DBCS
+	text = data {
+	    wchar "Move the mouse until the pointer is over the box "
+	    wchar "that reads ", C_DOUBLE_TURNED_COMMA_QUOTATION_MARK
+	    wchar "Click here to test"
+	    wchar C_DOUBLE_COMMA_QUOTATION_MARK
+	    wchar " and press and release the left "
+	    wchar "mouse button.",0
+	}
+#else
+	text = data {
+	    char "Move the mouse until the pointer is over the box "
+	    char "that reads ", C_QUOTEDBLLEFT, "Click here to test"
+	    char C_QUOTEDBLRIGHT, " and press and release the left "
+	    char "mouse button.",0
+	}
+#endif
+}
+
+TestMouseTrigger = PrefMousTrigger {
+	moniker = "Click here to test";
+	action = MSG_PREF_MOUS_DRIVER_DIALOG_CLICK_TEST, MouseDriverSummons;
+}
+
+TestMouseCancel = GenTrigger {
+	moniker = "VMO_CANCEL", "ESC - Cancel";
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {
+			InteractionCommand IC_DISMISS
+		}
+	}
+}
+
+end	PrefMousUI;
+
+start	Strings, data;
+
+
+visMoniker PrefMousTextMoniker = "Mouse";
+
+visMoniker PrefMousMonikerList = list {
+		PrefMousTextMoniker,
+#ifdef GPC_VERSION
+		PrefGPCMoniker
+#else
+		PrefMousLCMoniker,
+		PrefMousLMMoniker,
+		PrefMousLCGAMoniker
+#endif
+}
+
+chunk nonSerialMouseString = "Not needed for this driver";
+chunk ErrorLoadingMouse = "Unable to load the mouse driver.";
+end	Strings;

@@ -1,0 +1,196 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1993 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		cardid.def
+
+AUTHOR:		Adam de Boor, Oct  3, 1993
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	10/ 3/93	Initial revision
+
+
+DESCRIPTION:
+	Interface definition for the library that talks to SystemSoft's
+	Card ID Card Services client
+		
+	$Id: cardid.def,v 1.1 97/04/04 14:16:43 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__CARDID
+
+StartLibrary	cardid
+
+global	CIDIsCardIDAvailable:far
+;
+;	Desc:	See if Card ID is actually loaded and can be talked to.
+;	Pass:	nothing
+;	Return:	carry set if Card ID is loaded
+;
+
+global	CIDGetCardType:far
+;
+;	Desc:	Return the type of card the configuring client believes is
+;		in the indicated socket.
+;	Pass:	cx	= socket number
+;		dx:si	= buffer in which to place the asciiz name of the
+;			  card type (CID_CARD_TYPE_STRING_LENGTH bytes).
+;			  (dx == 0 means string need not be returned)
+;		BIOS locked (either called from card services callback or
+;			caller must call SysLockBIOS before and SysUnlockBIOS
+;			afterward)
+;	Return:	carry set if card not configured.
+;		carry clear if card is configured:
+;			ax	= PCMCardType
+;			dx:si	= filled in. If bx is PCMCT_OTHER and
+;				  this is the empty string, the card was
+;				  configured by someone that doesn't support
+;				  the SystemSoft calls to determine the
+;				  configuration, nor is this library able to
+;				  determine the card type itself.
+;
+
+global	CIDSetSocketToPort:far
+;
+;	Desc:	Tells CardID the com port to which the passed socket
+;		should be configured.  Also writes CARDID.INI.
+;
+;	Pass:	bl = socket number (zero-indexed)
+;		bh = com port to use for that socket.
+;		cx = nonzero to write INI file, zero not to write
+;
+;	Return:	carry set if if CardID isn't available
+;
+
+global	CIDWriteINIFile:far
+;
+;	Desc:	Writes an integer to CARDID.INI.
+;
+;	Pass:	ds:si - category ASCIIZ string
+;		cx:dx - key ASCIIZ string
+;		bp    - value
+;
+;	Return:	carry clear if successful
+;		else carry set
+;
+
+global	CIDGetPortFromSocket:far
+;
+;	Desc:	Gets the COM port assigned to a given socket.
+;
+;	Pass:	bl = socket number (zero-indexed, of course)
+;
+;	Return:	bl = COM port (1, 2, 3, 4) for that socket
+;
+
+PCMCardType	etype	word, 0, 1
+    PCMCT_UNKNOWN_CARD	enum	PCMCardType	; => not configured
+    PCMCT_SERIAL_CARD	enum	PCMCardType	; "Modem" (serial or modem)
+    PCMCT_ATA_CARD	enum	PCMCardType	; "ATA Disk"
+    PCMCT_SRAM_CARD	enum	PCMCardType	; "SRAM Card"
+    PCMCT_FLASH_CARD	enum	PCMCardType	; "Flash Card"
+    PCMCT_ETHERNET_CARD	enum	PCMCardType	; "Ethernet"
+    PCMCT_OTHER		enum	PCMCardType	; ?
+
+CID_CARD_TYPE_STRING_LENGTH	equ	32
+
+;-----------------------------------------------------------------------------
+;	CIDGetSetArgs structure definition.  This structure
+;	contains all the current CardID parameters, each with
+;	a matching line in the CARDID.INI file.
+;-----------------------------------------------------------------------------
+
+CID_MAX_COM_PORTS	equ	4
+CID_MAX_LAN_PORTS	equ	4
+
+    SSComPortFlags	record
+	:3
+	SSCPF_USE_RI:1			; use Ring Indicate on modem cards
+	SSCPF_AUDIO_ON:1		; audio enabled on modem card
+	SSCPF_UNUSED:1			; reserved
+	SSCPF_BDA_ABSOLUTE:1		; BIOS data area address algorithm
+	SSCPF_SEL_SOCKET:1		; com port selection algorithm
+    SSComPortFlags	end
+
+    SSPortInfo	struct
+	SSPI_addr	word
+	SSPI_IRQ	byte
+    SSPortInfo	ends
+
+    SSComInfo	struct
+	SSCI_flags	SSComPortFlags
+	SSCI_portInfo	SSPortInfo	CID_MAX_COM_PORTS	dup ()
+	SSCI_comOrder	byte		CID_MAX_COM_PORTS	dup (0)
+    SSComInfo	ends
+
+    SSLanInfo	struct
+	SSLI_flags	byte		; none currently defined
+	SSLI_ports	SSPortInfo	CID_MAX_LAN_PORTS	dup ()
+	SSLI_memBase	word		CID_MAX_LAN_PORTS*2	dup (0)
+    SSLanInfo	ends
+
+    SSAtaInfo	struct
+	SSAI_splitPort1		word	; not currently used
+	SSAI_splitPort2		word	; not currently used
+	SSAI_linearPort		word	; not currently used
+    SSAtaInfo	ends
+
+    SSMiscFlags	record
+	:4
+	SSMF_BEEP:1		; 1 = beep on card configuration
+	SSMF_TR_SPEED:1		; token ring speed: 0 = 4; 1 = 16
+	SSMF_FAIL_BEEP:1	; 1 = beep on failed config
+	SSMF_UNREC_BEEP:1	; 1 = beep on unrecognized card
+    SSMiscFlags	end
+
+    SSMiscInfo	struct
+	SSMI_flags	SSMiscFlags
+    SSMiscInfo	ends
+
+    SSDosWinCommonInfo	struct
+	SSDWCI_comInfo	SSComInfo
+	SSDWCI_lanInfo	SSLanInfo
+	SSDWCI_ataInfo	SSAtaInfo
+	SSDWCI_miscInfo	SSMiscInfo
+    SSDosWinCommonInfo	ends
+
+SSGSA_COMMAND_PATH_LENGTH	equ	80
+
+CIDGetSetArgs	struct			; this is the proverbial Big One
+	CIDGSA_maxLen		word
+	CIDGSA_infoLen		word
+	CIDGSA_attributes	word
+	CIDGSA_cmdPath		char SSGSA_COMMAND_PATH_LENGTH dup (0)
+	CIDGSA_dosInfo		SSDosWinCommonInfo
+	CIDGSA_winInfo		SSDosWinCommonInfo
+CIDGetSetArgs	ends
+
+;-----------------------------------------------------------------------------
+;	Misc stuff
+;-----------------------------------------------------------------------------
+
+CIDComSetting		etype	byte, 0, 1
+	CIDCS_COM_1	enum	CIDComSetting
+	CIDCS_COM_2	enum	CIDComSetting
+	CIDCS_COM_3	enum	CIDComSetting
+	CIDCS_COM_4	enum	CIDComSetting
+
+LANPortNumber	etype	byte, 0, 1
+	LANPN_1		enum	LANPortNumber
+	LANPN_2		enum	LANPortNumber
+
+
+EndLibrary	cardid
+
+
+
+

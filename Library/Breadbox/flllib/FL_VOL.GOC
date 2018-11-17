@@ -1,0 +1,502 @@
+/*
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+ */
+
+/***************************************************************************
+ *  FILE:  FL_LOCAL.GOC
+ ***************************************************************************/
+
+@include <stdapp.goh>
+@include <Ansi\string.h>
+@include <Ansi\stdio.h>
+@include <geoMisc.h>
+@include <Objects\filelist.goh>
+@include "internal.goh"
+
+@extern object FileListUIVolumes ;
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_CREATE_VOLUMES
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Sets up a structure to hold the volume names and identifiers.
+ |     Usually this method is handled in the subclass to create all the
+ |     volume names at this point (via calls to 
+ |     MSG_GEN_FILE_LIST_APPEND_VOLUME)
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/05/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_CREATE_VOLUMES
+{
+    MemHandle mem ;
+    ChunkHandle array ;
+
+    /* Get rid of the old list (if any) */
+    if (pself->GFLI_volumeList)  {
+        MemFree(OptrToHandle(pself->GFLI_volumeList)) ;
+        pself->GFLI_volumeList = NullHandle ;
+    }
+
+    /* Create a new blank list */
+    mem = MemAllocLMem(LMEM_TYPE_GENERAL, 0) ;
+    MemLock(mem) ;
+    array = ChunkArrayCreate(mem, sizeof(T_volumeEntry), 0, 0) ;
+    pself->GFLI_volumeList = ConstructOptr(mem, array) ;
+    MemUnlock(mem) ;
+
+    /* The subclass will now create all the volumes */
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_APPEND_VOLUME
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Adds one volume entry to the volume list and gives it a user
+ |     defined numeric identifier.
+ |
+ | Inputs:
+ |     word volumeID              -- ID for this new volume
+ |     char *p_name               -- Name of volume (null terminated)
+ |
+ | Outputs:
+ |     T_volumeIndex              -- Index in list, or VOLUME_INDEX_BAD
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/05/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_APPEND_VOLUME
+{
+    optr volumeList ;
+    MemHandle mem ;
+    word len ;
+    char *p_string ;
+    ChunkHandle name ;
+    ChunkHandle displayedName ;
+    T_volumeEntry *p_volume ;
+    word index = VOLUME_INDEX_BAD ;
+
+    volumeList = pself->GFLI_volumeList ;
+    if (volumeList)  {
+        mem = OptrToHandle(volumeList) ;
+        MemLock(mem) ;
+
+        /* Allocate the name and copy it over */
+        len = strlen(p_name) ;
+        name = LMemAlloc(mem, len+1) ;
+        p_string = LMemDerefHandles(mem, name) ;
+        strcpy(p_string, p_name) ;
+
+        /* Allocate the displayed name and copy it over */
+        len = strlen(p_displayedName) ;
+        displayedName = LMemAlloc(mem, len+1) ;
+        p_string = LMemDerefHandles(mem, displayedName) ;
+        strcpy(p_string, p_displayedName) ;
+
+        /* Allocate an entry in the volume list */
+        index = ChunkArrayGetCount(volumeList) ;
+        p_volume = ChunkArrayAppend(volumeList, 0) ;
+        p_volume->VE_name = name ;
+        p_volume->VE_displayedName = displayedName ;
+        p_volume->VE_id = volumeID ;
+        MemUnlock(mem) ;
+
+        /* Change the UI to match */
+/*
+        @call @CHILD(@FileListUIVolumes)::
+                MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(index, 1) ;
+*/
+        @call @CHILD(@FileListUIVolumes)::
+                MSG_GEN_DYNAMIC_LIST_INITIALIZE(index+1) ;
+    }
+
+    return index ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_VOLUME_SELECTED
+ *-------------------------------------------------------------------------
+ | Description:
+ |     The user has clicked on a volume.  Typically intercepted and
+ |     handled by the subclass.
+ |
+ | Inputs:
+ |     T_volumeIndex index        -- index in list of selection
+ |     word volumeID              -- Corresponding ID passed to APPEND_VOL
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/05/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_VOLUME_SELECTED
+{
+    DirPathHandle path ;
+    char volumeName[80] ;
+    T_volumeIndex volumeIndex ;
+
+    path = DirPathCreate() ;
+    DirPathMakeRoot(path) ;
+    volumeIndex = @call oself::MSG_GEN_FILE_LIST_FIND_VOLUME(volumeID) ;
+    if (volumeIndex != VOLUME_INDEX_BAD)  {
+        @call oself::MSG_GEN_FILE_LIST_GET_VOLUME_NAME(
+                              volumeIndex,
+                              volumeName,
+                              sizeof(volumeName)-1) ;
+        DirPathSetVolume(path, DirPathAllocSubString(path, volumeName, 0)) ;
+    }
+    @call oself::MSG_GEN_FILE_LIST_APPLY_PARSED_PATH(path, FALSE) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_GET_VOLUME_NAME
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Get the name of a volume and put into a buffer given the index
+ |     into the list.  Use MSG_GEN_FILE_LIST_FIND_VOLUME if you only have
+ |     an ID.
+ |
+ | Inputs:
+ |     T_volumeIndex index        -- index in list of volume
+ |     char *p_name               -- Pointer to name
+ |     word nameLimit             -- size of name buffer (including \0)
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/05/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_GET_VOLUME_NAME
+{
+    word num ;
+    MemHandle mem ;
+    optr volumeList ;
+    T_volumeEntry *p_volume ;
+    char *p_storedName ;
+
+    *p_name = '\0' ;
+    volumeList = pself->GFLI_volumeList ;
+    mem = OptrToHandle(volumeList) ;
+    if (volumeList)  {
+        MemLock(mem) ;
+        num = ChunkArrayGetCount(volumeList) ;
+        if (index < num)  {
+            p_volume = ChunkArrayElementToPtr(volumeList, index, NULL) ;
+            p_storedName = LMemDerefHandles(mem, p_volume->VE_name) ;
+            strncpy(p_name, p_storedName, nameLimit-1) ;
+        }
+        MemUnlock(mem) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_GET_DISPLAYED_VOLUME_NAME
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Get the name of a volume and put into a buffer given the index
+ |     into the list.  Use MSG_GEN_FILE_LIST_FIND_VOLUME if you only have
+ |     an ID.
+ |
+ | Inputs:
+ |     T_volumeIndex index        -- index in list of volume
+ |     char *p_name               -- Pointer to name
+ |     word nameLimit             -- size of name buffer (including \0)
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/05/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@extern method GenFileListClass, 
+                MSG_GEN_FILE_LIST_GET_DISPLAYED_VOLUME_NAME
+{
+    word num ;
+    MemHandle mem ;
+    optr volumeList ;
+    T_volumeEntry *p_volume ;
+    char *p_storedName ;
+
+    *p_name = '\0' ;
+    volumeList = pself->GFLI_volumeList ;
+    mem = OptrToHandle(volumeList) ;
+    if (volumeList)  {
+        MemLock(mem) ;
+        num = ChunkArrayGetCount(volumeList) ;
+        if (index < num)  {
+            p_volume = ChunkArrayElementToPtr(volumeList, 0, NULL) ;
+            p_storedName = LMemDerefHandles(
+                               mem, 
+                               p_volume->VE_displayedName) ;
+            strncpy(p_name, p_storedName, nameLimit-1) ;
+        }
+        MemUnlock(mem) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_FIND_VOLUME
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Convert a volume's id to its index position.
+ |
+ | Inputs:
+ |     word volumeID              -- ID to a volume
+ |
+ | Outputs:
+ |     T_volumeIndex              -- matching index, or VOLUME_INDEX_BAD
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/05/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_FIND_VOLUME
+{
+    word i, num ;
+    MemHandle mem ;
+    optr volumeList ;
+    T_volumeEntry *p_volume ;
+    T_volumeIndex foundIndex = VOLUME_INDEX_BAD ;
+
+    volumeList = pself->GFLI_volumeList ;
+    mem = OptrToHandle(volumeList) ;
+    if (volumeList)  {
+        MemLock(mem) ;
+        num = ChunkArrayGetCount(volumeList) ;
+        for (i=0; i<num; i++)  {
+            p_volume = ChunkArrayElementToPtr(volumeList, i, NULL) ;
+            if (p_volume->VE_id == volumeID)  {
+                foundIndex = i ;
+                break ;
+            }
+        }
+        MemUnlock(mem) ;
+    }
+
+    return foundIndex ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_VOLUME_SELECTED_INTERNAL
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Internal method called by the volume list when a user clicks on
+ |     a list item.  This method get's the id that goes with the index
+ |     and passing on the real work to MSG_GEN_FILE_LIST_VOLUME_SELECTED
+ |
+ | Inputs:
+ |     word selection             -- Item in list selected
+ |     word numSelections         -- always 1, ignored
+ |     GenItemGroupStateFlags stateFlags -- Ignored
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/05/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_VOLUME_SELECTED_INTERNAL
+{
+    /* We need to setup the parameters for the real routine that */
+    /* handles volume selection */
+    /* Find the appropriate id */
+    MemHandle mem ;
+    optr volumeList ;
+    T_volumeEntry *p_volume ;
+    word id ;
+
+    volumeList = pself->GFLI_volumeList ;
+    if (volumeList)  {
+        mem = OptrToHandle(volumeList) ;
+        MemLock(mem) ;
+        p_volume = ChunkArrayElementToPtr(volumeList, selection, NULL) ;
+        id = p_volume->VE_id ;
+        MemUnlock(mem) ;
+        @call oself::MSG_GEN_FILE_LIST_VOLUME_SELECTED(selection, id) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_QUERY_VOLUME * INTERNAL *
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Internal method called by the volume list when it wants to setup
+ |     the monikers for selection.
+ |
+ | Inputs:
+ |     optr list                  -- optr to list doing query
+ |     word item                  -- Index to position
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/05/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_QUERY_VOLUME
+{
+    MemHandle mem ;
+    optr volumeList ;
+    T_volumeEntry *p_volume ;
+    char *p_name ;
+
+    volumeList = pself->GFLI_volumeList ;
+    if (volumeList)  {
+        mem = OptrToHandle(volumeList) ;
+        MemLock(mem) ;
+        p_volume = ChunkArrayElementToPtr(volumeList, item, NULL) ;
+        p_name = LMemDerefHandles(mem, p_volume->VE_displayedName) ;
+        @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, p_name) ;
+        MemUnlock(mem) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_SELECT_VOLUME
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Outside routines that wish to change the volume currently shown/
+ |     selected, call here.  Updates UI and triggers change of drives.
+ |
+ | Inputs:
+ |     word volumeID              -- Volume ID to find
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/05/99  Created
+ |
+ | Last tested:  10/05/99
+ *-----------------------------------------------------------------------*/
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_SELECT_VOLUME
+/* (word volumeID) ; */
+{
+    word index ;
+
+    /* Convert volume ID into an index and select that item */
+    index = @call oself::MSG_GEN_FILE_LIST_FIND_VOLUME(volumeID) ;
+    if (index != VOLUME_INDEX_BAD)
+        @call @CHILD(@FileListUIVolumes)::
+            MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(index, FALSE) ;
+}
+
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_MAP_VOLUME_NAME
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Convert a volume's name from a string to its id.
+ |
+ | Inputs:
+ |     TCHAR *p_volume            -- Name of volume
+ |
+ | Outputs:
+ |     word volumeID              -- Volume ID to found, or VOLUME_ID_BAD
+ |                                   for none
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/13/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_MAP_VOLUME_NAME
+{
+    word i, num ;
+    MemHandle mem ;
+    optr volumeList ;
+    T_volumeEntry *p_vol ;
+    word volumeID = VOLUME_ID_BAD ;
+
+    volumeList = pself->GFLI_volumeList ;
+    mem = OptrToHandle(volumeList) ;
+    if (volumeList)  {
+        MemLock(mem) ;
+        num = ChunkArrayGetCount(volumeList) ;
+        for (i=0; i<num; i++)  {
+            p_vol = ChunkArrayElementToPtr(volumeList, i, NULL) ;
+            if (strcmpi(
+                    LMemDerefHandles(mem, p_vol->VE_name),
+                    p_volume) == 0)  {
+                volumeID = p_vol->VE_id ;
+                break ;
+            }
+        }
+        MemUnlock(mem) ;
+    }
+
+    return volumeID ;
+}
+
+@start ResourceErrorMsgs, data ;
+@chunk char ErrorMessageBadPath[] = "The path entered is invalid.  Please try again." ;
+@chunk char ErrorMessageBadVolume[] = "The volume name \"\001\" is not known.  Please enter a different one." ;
+@chunk char ErrorMessageDriveNotReady[] = "Drive is not ready.  Please make sure a disk is in the drive and try again." ;
+@end ResourceErrorMsgs ;
+
+/*-------------------------------------------------------------------------
+ | Method:  GenFileListClass::MSG_GEN_FILE_LIST_REPORT_STANDARD_ERROR
+ *-------------------------------------------------------------------------
+ | Description:
+ |     Report an error of some type.
+ |
+ | Inputs:
+ |     GenFileListError error     -- Error to report
+ |     optr string                -- String for some error messages
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  10/13/99  Created
+ |
+ *-----------------------------------------------------------------------*/
+@extern method GenFileListClass, MSG_GEN_FILE_LIST_REPORT_STANDARD_ERROR
+{
+    static optr errorMsg[] = {
+        @ErrorMessageBadPath,
+        @ErrorMessageBadVolume,
+        @ErrorMessageDriveNotReady
+    } ;
+    if ((error) && (error < GEN_FILE_LIST_ERROR_UNKNOWN))  {
+        UserStandardDialogOptr(
+            NULL,
+            NULL,
+            NullHandle,
+            string,
+            errorMsg[error-1],
+            (CDT_ERROR<<CDBF_DIALOG_TYPE_OFFSET) |
+                (GIT_NOTIFICATION<<CDBF_INTERACTION_TYPE_OFFSET)) ;
+    }
+}
+
+/***************************************************************************
+ *  END OF FILE:  FL_LOCAL.GOC
+ ***************************************************************************/
+
+

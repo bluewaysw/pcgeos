@@ -1,0 +1,158 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1992 -- All Rights Reserved
+
+PROJECT:	dBase IV
+FILE:		dbase4Constant.def
+
+AUTHOR:		Ted H. Kim, 9/14/92
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Ted	9/92		Initial revision
+
+DESCRIPTION:
+
+	Contains all constants, enums, and methods definitions for dBase IV.
+		
+	$Id: dbase4Constant.def,v 1.1 97/04/07 11:43:51 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;*******************************************************************************
+;	IMPEX STUFF
+;*******************************************************************************
+
+include	cell.def
+include	math.def
+include	parse.def
+include	ssheet.def
+
+ImpexMappingControlClass	class	GenControlClass, master
+ImpexMappingControlClass	endc
+
+ImpexFlag       record
+	:6,
+	IF_IMPORT:1,
+	IF_EXPORT:1,
+ImpexFlag       end
+
+ImpexStackFrame		struc
+	ISF_fieldBlock		hptr	; handle of field data block
+	ISF_sizeFieldData	word	; size of cell data
+	ISF_cacheBlock		hptr	; handle of cache block
+	ISF_rowNumber		word	; row number of current cell data
+	ISF_colNumber		word	; column number of current cell data
+	ISF_numSourceFields	word	; number of fields in source record
+	ISF_numRecords		dword	; number of records
+	ISF_numFields		word	; number of fields
+	ISF_mappedNumFields	word	; number of fields after mapping
+	ISF_curNumFields	word	; current column number
+	ISF_curRecord		word	; current row number
+	ISF_mapBlock		word	; handle of map list data block
+	ISF_quoteFlag		byte	; field data has a pair of quotes
+	ISF_headerSize		word	; size of header in dBase III file
+	ISF_curHeaderSize	word	; current size of header block
+	ISF_recordSize		word	; length of a record
+	ISF_curRecSize		word	; current record size
+	ISF_fieldInfoBlock	hptr	; handle of field info block
+	ISF_fieldDcptrBlock	hptr	; handle of field descriptor block
+	ISF_fieldLength		word	; field length
+	ISF_fieldType		byte	; field type
+	ISF_fileHeader		hptr	; handle of file header block
+	ISF_notMappedList	hptr	; handle of not mapped column list block
+	ISF_emptyField		byte	; flag for empty field
+	ISF_endOfLine		byte	; end of record flag
+	ISF_endOfFile		byte	; end of file flag
+	ISF_entryPos		dword	; entry position for HugeArrayLock
+ImpexStackFrame		ends
+
+DBTransferHeader	struc
+	DBTH_delimiter		char
+	DBTH_escDelimit		char
+	DBTH_numFields		word
+	DBTH_numRecords		word
+	DBTH_maxSizeField	word
+	DBTH_maxFields		word
+	DBTH_maxRecords		word
+DBTransferHeader	ends
+
+FieldHeaderInfo		struc
+	FHI_type	CellType
+	FHI_length	word
+FieldHeaderInfo		ends
+
+;*******************************************************************
+; the following constants are the sizes of all header fields  
+;*******************************************************************
+
+; version number bytes for dBase IV
+
+DBASE4_NO_MEMO  equ     0x03
+DBASE4_MEMO     equ     0x8b
+DBASE4_MDX	equ	0x43
+
+LAST_UPDATE	equ	3
+RESERVED1	equ	20
+RESERVED2	equ	14
+FIELD_NAME_SIZE	equ	11
+FIELD_DATA_ADDR	equ	4
+
+FieldDescriptor	struc
+	FD_fieldName	char	FIELD_NAME_SIZE	dup	(?)
+	FD_fieldType	byte
+	FD_fieldAddr	dword
+	FD_fieldSize	byte
+	FD_decCount	byte
+	FD_reserved	byte	RESERVED2	dup	(?)
+FieldDescriptor	ends
+
+DBaseHeader	struc
+	DBH_version	byte
+	DBH_update	byte	LAST_UPDATE	dup	(?)
+	DBH_numRecords	dword	
+	DBH_headerSize	word
+	DBH_recordSize	word
+	DBH_reserved	byte	RESERVED1	dup	(?)
+DBaseHeader	ends
+
+FIELD_DESCRIPTOR_SIZE	equ	32
+DATE_FIELD_SIZE		equ	8
+TIME_FIELD_SIZE		equ	16
+INTEGER_FIELD_SIZE	equ	DECIMAL_PRECISION + 1
+FLOAT_FIELD_SIZE	equ	INTEGER_FIELD_SIZE
+TEXT_FIELD_SIZE		equ	254
+LOGIC_FIELD_SIZE	equ	32
+SIZE_NUM_RECORDS	equ	4
+DATE_YEAR_SIZE		equ	4
+
+FIELD_WIDTH_ADJUSTMENT	equ	5
+DEFAULT_FIELD_WIDTH	equ	10
+DEFAULT_DECIMAL_OFFSET	equ	2
+
+MAX_NUM_FIELDS	equ	128
+FIELD_INFO_BLOCK_SIZE	equ	(MAX_NUM_FIELDS * (size FieldHeaderInfo)) 
+
+MAX_FIELD_SIZE	 	equ	4096
+FIELD_BLOCK_SIZE        equ     1024	
+CR			equ	13
+LF			equ	10
+SPACE			equ	32
+ASTERISK		equ	42
+EOF             equ     0xff    ;InputCacheGetChar returns this if at the end
+				; of the file.
+
+;       Fatal Errors
+
+CACHE_OFFSET_EXCEEDS_SIZE                               enum    FatalErrors
+CACHE_NOT_FLUSHED                                       enum    FatalErrors
+READ_BEYOND_CACHE_END                                   enum    FatalErrors
+CANNOT_UNGET_CHAR_FROM_PREVIOUS_BLOCK                   enum    FatalErrors
+ILLEGAL_FIELD                                           enum    FatalErrors
+PREVIOUS_RUN_WAS_AFTER_CURRENT_RUN                      enum    FatalErrors
+OUTPUT_CACHE_ROUTINE_CALLED_AFTER_ERROR_RETURNED        enum    FatalErrors
+ILLEGAL_FILE_FORMAT					enum	FatalErrors
+ILLEGAL_FIELD_DATA_TYPE					enum	FatalErrors
+CORRUPTED_RECORD_DATA					enum	FatalErrors
+CORRUPTED_NOT_MAPPED_LIST				enum	FatalErrors

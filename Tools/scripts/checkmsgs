@@ -1,0 +1,64 @@
+#!/bin/sh -
+#
+#	checkmsgs - A script to check the names/order of messages in include
+#		    files.
+#
+#	usage: checkmsgs fnameRoot1 fnameRoot2
+#
+#	example: checkmsgs vTextC genC
+#
+#	$Id: checkmsgs,v 1.2 92/02/19 20:46:49 brianc Exp $
+while [ $# -ne 0 ]; do
+	if [ -f /staff/pcgeos/$USER/Include/$1.def ]; then
+		defname=/staff/pcgeos/$USER/Include/$1.def
+	else
+		if [ -f /staff/pcgeos/$USER/Include/Objects/$1.def ]; then
+			defname=/staff/pcgeos/$USER/Include/Objects/$1.def
+		else
+
+			if [ -f /staff/pcgeos/Include/$1.def ]; then
+				defname=/staff/pcgeos/Include/$1.def
+			else
+				if [ -f /staff/pcgeos/Include/Objects/$1.def ]; then
+					defname=/staff/pcgeos/Include/Objects/$1.def
+				else
+					echo "Cannot find $1.def"
+					exit 1
+				fi
+			fi
+		fi
+	fi
+	if [ -f /staff/pcgeos/$USER/CInclude/$1.goh ]; then
+		gohname=/staff/pcgeos/$USER/CInclude/$1.goh
+	else
+		if [ -f /staff/pcgeos/$USER/CInclude/Objects/$1.goh ]; then
+			gohname=/staff/pcgeos/$USER/CInclude/Objects/$1.goh
+		else
+
+			if [ -f /staff/pcgeos/CInclude/$1.goh ]; then
+				gohname=/staff/pcgeos/CInclude/$1.goh
+			else
+				if [ -f /staff/pcgeos/CInclude/Objects/$1.goh ]; then
+					gohname=/staff/pcgeos/CInclude/Objects/$1.goh
+				else
+					echo "Cannot find $1.goh"
+					exit 1
+				fi
+			fi
+		fi
+	fi
+	echo Checking $defname against $gohname...
+	#check messages
+	awk '/^MSG/&&/method/ {print $1}' $defname > /tmp/a1.$$
+	sed '1,$ s/(/ /g' $gohname | \
+	awk '/^@message/||/^@importMessage/ {if ($1 == "@message") {print $3} else {print $4}}' - > /tmp/a2.$$
+	diff /tmp/a1.$$ /tmp/a2.$$
+	rm /tmp/a1.$$ /tmp/a2.$$
+	#check hints
+	awk '/vardata/ {print $1}' $defname > /tmp/a1.$$
+	sed '1,$ s/;/ /g' $gohname | \
+	awk '/@vardata[ ,	]/ {print $3}' - > /tmp/a2.$$
+	diff /tmp/a1.$$ /tmp/a2.$$
+	rm /tmp/a1.$$ /tmp/a2.$$
+	shift
+done

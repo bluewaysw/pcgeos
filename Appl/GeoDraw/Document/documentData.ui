@@ -1,0 +1,123 @@
+/*
+ * Project:	Draw
+ * File:	Document/documentData.ui
+ *
+ * Author:	Steve Scholl
+ *
+ *	This file contains the user interface description for various
+ * data blocks to duplicate.
+ *
+ *	$Id: documentData.ui,v 1.1 97/04/04 15:51:59 newdeal Exp $
+ *
+ */
+
+
+#define	_NIKE		0
+#define	_NIKE_EUROPE	0
+
+
+
+/**********************************************************************/
+
+/*
+ * DrawBodyRulerGOAMResTemp contains the GrObjBody, GrObjAttributeManager
+ * and the horizontal and vertical rulers. It is duplicated on
+ * MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE. 
+ */
+
+start DrawBodyRulerGOAMResTemp, notDetachable;
+
+/*
+ * The DrawGrObjBodyObjTemp is duplicated as part of the 
+ * DrawBodyRulerGOAMTempRes.
+ * It is the GrObjBody which defines the size of a grobj document and
+ * serves as the parent to all the graphic objects in the document
+ */
+
+DrawGrObjBodyObjTemp = DrawGrObjBody {
+
+	/* Set the GrObjAttributeManager and Ruler*/
+
+	oam = DrawGOAMObjTemp; 
+	ruler = DrawColumnRulerObjTemp;
+}
+
+/*
+ * The DrawGOAMObjTemp is duplicated as part of the DrawBodyRulerGOAMTempRes.
+ * It is the GrObjAttributeManager which defines maintains all the
+ * attribute and style arrays for a grobj document as well as the
+ * default attributes.
+ */
+
+DrawGOAMObjTemp	= GrObjAttributeManager {
+	bodyList = GOAMBodyList;
+}
+
+chunk	GOAMBodyList =  data {
+	GOAM_BODY_LIST_CHUNK_ARRAY_HEADER (1)
+	I_OPTR DrawGrObjBodyObjTemp
+
+}
+
+/*
+ * The DrawColumnRulerObjTemp is duplicated as part of the 
+ * DrawBodyRulerGOAMTempRes.
+ * It is the Ruler that runs horizontally across the top of the GrObjBody.
+ * It maintains grids, guidelines, units and performs snap to and constrains.
+ * It is the master ruler, maintain data necessary for its slave, the
+ * row ruler.
+ */
+
+DrawColumnRulerObjTemp = VisRuler {
+	rulerAttrs = default +horizontal, +isMaster, +showMouse, -showGrid;
+
+	constrainStrategy = horizontalGuidelines, verticalGuidelines;
+
+#if	_NIKE_EUROPE
+	gridX = "22705, 28";
+	gridY = "22705, 28";
+#else
+
+#if DO_PIZZA
+	gridX = "DEFAULT_GRID_SPACING_FRAC, DEFAULT_GRID_SPACING_INT";
+	gridY = "DEFAULT_GRID_SPACING_FRAC, DEFAULT_GRID_SPACING_INT";
+#else
+	gridX = "0, DEFAULT_GRID_SPACING";
+	gridY = "0, DEFAULT_GRID_SPACING";
+#endif
+
+#endif
+
+	left = 0;
+	top = 0;
+	right = "DEFAULT_DOCUMENT_WIDTH";
+	bottom = "HEADER_HEIGHT";
+	attr = default -managed;
+	optFlags = default -geometryInvalid, -updatePath;
+
+	slaveRuler = DrawRowRulerObjTemp;
+
+}
+
+/*
+ * The DrawRowRulerObjTemp is duplicated as part of the 
+ * DrawBodyRulerGOAMTempRes.
+ * It is the Ruler that runs vertically down the left side of the GrObjBody.
+ * It is the slave ruler, so all its data is maintained by the ColumnRuler
+ */
+
+DrawRowRulerObjTemp = VisRuler {
+	left = 0;
+	top = 0;
+	constrainStrategy = horizontalGuidelines;
+	right = "HEADER_WIDTH";
+	bottom = "DEFAULT_DOCUMENT_HEIGHT";
+	attr = default -managed;
+	optFlags = default -geometryInvalid, -updatePath;
+	rulerAttrs = default -horizontal, -isMaster, +showMouse;
+
+}
+
+
+
+end DrawBodyRulerGOAMResTemp;

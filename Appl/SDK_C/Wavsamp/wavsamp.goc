@@ -1,0 +1,320 @@
+/********************************************************************
+ *
+ * 	Copyright (c) Geoworks 1993 -- All Rights Reserved.
+ *
+ * PROJECT:	GEOS Sample Applications
+ * MODULE:      Wavsamp
+ * FILE:	wavsamp.goc
+ *
+ * AUTHOR:	Paul DuBois: December 6, 1993
+ *
+ * REVISION HISTORY:
+ * 	Name	Date		Description
+ * 	----	----		-----------
+ * 	dubois	12/6/93   	Initial version
+ *
+ * DESCRIPTION:
+ * 	This file contains both the source and static object
+ * 	definitions for the wavsamp application.  This application
+ * 	is meant to demonstrate proper and improper usage of the wav
+ * 	library.  It uses the library to play digitized sounds
+ * 	asynchronously, or synchronously through either the
+ * 	application or UI thread.
+ *
+ * RCS STAMP:
+ *      $Id: wavsamp.goc,v 1.1 97/04/04 16:38:34 newdeal Exp $
+ *
+ *******************************************************************/
+
+/********************************************************************
+ *		Include Files
+ *******************************************************************/
+    @include <stdapp.goh>
+    @include <wav.goh>
+
+/********************************************************************
+ *		Class Definitions
+ *******************************************************************/
+    @class WavProcessClass, GenProcessClass;
+    @endc;
+
+    @class WavViewClass, GenViewClass;
+    @message void MSG_WAV_VIEW_PLAY_SYNCH( FileHandle fh );
+    @message void MSG_WAV_VIEW_BC5_PARITY();
+    @endc;
+
+    @class WavContentClass, VisContentClass;
+    @message (GEN_FILE_SELECTOR_NOTIFICATION_MSG)MSG_WAV_CONTENT_FILE_SELECTED;
+    @message void MSG_WAV_CONTENT_PLAY_ASYNCH();
+    @message void MSG_WAV_CONTENT_PLAY_SYNCH();
+    @message void MSG_WAV_CONTENT_PLAY_SYNCH_UI();
+        @instance char WCI_soundPath[PATH_BUFFER_SIZE];
+        @instance char WCI_soundName[FILE_LONGNAME_BUFFER_SIZE];
+        @instance DiskHandle WCI_soundDiskHandle;
+    @endc;
+
+/********************************************************************
+ *		Class Declarations
+ *******************************************************************/
+    @classdecl WavProcessClass, neverSaved;
+    @classdecl WavViewClass;
+    @classdecl WavContentClass;
+
+/********************************************************************
+ *		UI Object Resources
+ *******************************************************************/
+
+/********************************************************************
+ *		AppResource Resource
+ *******************************************************************/
+@start AppResource;
+
+@object GenApplicationClass WavApp = {
+    GI_visMoniker = list { @WavAppTextMoniker };
+    GI_comp = @WavPrimary;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) =
+        @WavPrimary;
+}
+
+@visMoniker WavAppTextMoniker = "Wav Player";
+
+@end AppResource;
+
+/********************************************************************
+ *		Interface Resource
+ *******************************************************************/
+@start Interface;
+
+@object GenPrimaryClass WavPrimary  = {
+    GI_comp = @WavFileSelector,
+              @WavButtons;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+  /*
+   * This object is only here to play sounds (in the UI thread).
+   */
+@object WavViewClass WavView = {
+    GVI_content = @WavContent;
+}
+
+@object GenFileSelectorClass WavFileSelector = {
+    GFSI_destination = @WavContent;
+    GFSI_notificationMsg = MSG_WAV_CONTENT_FILE_SELECTED;
+    ATTR_GEN_FILE_SELECTOR_NAME_MASK = { "*.WAV" };
+    HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 8;
+}
+
+@object GenInteractionClass WavButtons = {
+    GI_comp = @WavButton1,
+              @WavButton2,
+              @WavButton3;
+    GII_type = GIT_ORGANIZATIONAL;
+    GII_visibility = GIV_SUB_GROUP;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTriggerClass WavButton1 = {
+    GI_visMoniker = "Asynch";
+    GTI_destination = @WavContent;
+    GTI_actionMsg = MSG_WAV_CONTENT_PLAY_ASYNCH;
+}
+
+@object GenTriggerClass WavButton2 = {
+    GI_visMoniker = "Synch";
+    GTI_destination = @WavContent;
+    GTI_actionMsg = MSG_WAV_CONTENT_PLAY_SYNCH;
+}
+
+@object GenTriggerClass WavButton3 = {
+    GI_visMoniker = "Synch UI";
+    GTI_destination = @WavContent;
+    GTI_actionMsg = MSG_WAV_CONTENT_PLAY_SYNCH_UI;
+}
+
+@end Interface;
+
+/********************************************************************
+ *		Content Resource
+ *******************************************************************/
+@start Content;
+
+  /*
+   * This object is only here to play sounds (in the app thread).
+   */
+@object WavContentClass WavContent = {
+}
+
+@end Content;
+
+/********************************************************************
+ *		Code for WavViewClass
+ *******************************************************************/
+
+/********************************************************************
+ *		MSG_WAV_VIEW_PLAY_SYNCH
+ ********************************************************************
+ * SYNOPSIS:	 Plays a .wav file synchronously.
+ * PARAMETERS:	 FileHandle fh
+ * RETURN:	 void
+ * SIDE EFFECTS: The thread for this object will play the sound.
+ * 	         Note that it might be undesirable for this to be
+ *               the UI thread, as the user will not be able to use
+ *               any other UI gadgetry until the sound has finished
+ *               playing.
+ * STRATEGY:     Call the PlaySoundFromFile function, passing it
+ *               the file handle we've been given.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	12/6/93   	Initial version
+ *******************************************************************/
+@method WavViewClass, MSG_WAV_VIEW_PLAY_SYNCH
+{
+
+    PlaySoundFromFile( fh );
+} /* MSG_WAV_VIEW_PLAY_SYNCH */
+
+  /* This makes app work when compiled by BC5.0 */
+@method WavViewClass, MSG_WAV_VIEW_BC5_PARITY{}
+
+/********************************************************************
+ *		Code for WavContentClass
+ *******************************************************************/
+
+/********************************************************************
+ *		MSG_WAV_CONTENT_FILE_SELECTED
+ ********************************************************************
+ * SYNOPSIS:	 Copy the pathname, filename, and disk handle into
+ *		 our instance data.
+ * PARAMETERS:	 word entryNum
+ *               word entryFlags
+ * RETURN:	 void
+ * SIDE EFFECTS: none
+ * STRATEGY:     We want to play whatever sound is selected in the
+ *               File Selector box; the most convenient time to
+ *               change our instance data is whenever the user selects
+ *               a new entry.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	12/7/93   	Initial version
+ *******************************************************************/
+@method WavContentClass, MSG_WAV_CONTENT_FILE_SELECTED
+{
+
+      /*
+       * If you want to know more about the GenFileSelector
+       * class, see FSelSamp. Note that here, we don't bother
+       * checking for the OPEN operation,
+       */
+    if ( GFS_GET_ENTRY_FLAGS( entryFlags ) == GFSET_FILE ) {
+          /*
+           * File name
+           */
+        @call WavFileSelector::
+            MSG_GEN_FILE_SELECTOR_GET_SELECTION( pself->WCI_soundName );
+          /*
+           * Path
+           */
+        @call WavFileSelector::
+            MSG_GEN_PATH_GET( pself->WCI_soundPath, PATH_BUFFER_SIZE );
+          /*
+           * Disk Handle
+           */
+        pself->WCI_soundDiskHandle = @call WavFileSelector::
+            MSG_GEN_PATH_GET_DISK_HANDLE();
+    }
+} /* MSG_WAV_CONTENT_FILE_SELECTED */
+
+/********************************************************************
+ *		MSG_WAV_CONTENT_PLAY_SYNCH_UI
+ ********************************************************************
+ * SYNOPSIS:	 Play a sound synchronously in the UI thread.
+ * PARAMETERS:	 void
+ * RETURN:	 void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Make WavView do the dirty work (it's running in
+ *               the UI thread...).
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	12/7/93   	Initial version
+ *******************************************************************/
+@method WavContentClass, MSG_WAV_CONTENT_PLAY_SYNCH_UI
+{
+      /*
+       * fh - File handle of the .wav file.
+       */
+    FileHandle	fh;
+
+    FilePushDir();
+    FileSetCurrentPath( pself->WCI_soundDiskHandle,
+			pself->WCI_soundPath );
+    fh = FileOpen( pself->WCI_soundName, FILE_ACCESS_R | FILE_DENY_W );
+    FilePopDir();
+
+    if ( fh ) {
+	@call WavView::MSG_WAV_VIEW_PLAY_SYNCH( fh );
+	FileClose( fh, TRUE );
+    }
+} /* MSG_WAV_CONTENT_PLAY_SYNCH_UI */
+
+/********************************************************************
+ *		MSG_WAV_CONTENT_PLAY_SYNCH
+ ********************************************************************
+ * SYNOPSIS:	 Play a sound synchronously.
+ * PARAMETERS:	 void
+ * RETURN:	 void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Open the .wav file and call the PlaySoundFromFile
+ *               function. Close the .wav file when done.
+ *               Returns when the sound has finished playing.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	12/6/93   	Initial version
+ *******************************************************************/
+@method WavContentClass, MSG_WAV_CONTENT_PLAY_SYNCH
+{
+      /*
+       * fh - File handle of the .wav file.
+       */
+    FileHandle	fh;
+
+    FilePushDir();
+    FileSetCurrentPath( pself->WCI_soundDiskHandle,
+			pself->WCI_soundPath );
+    fh = FileOpen( pself->WCI_soundName, FILE_ACCESS_R | FILE_DENY_W );
+    FilePopDir();
+
+    if ( fh ) {
+	PlaySoundFromFile( fh );
+	FileClose( fh, TRUE );
+    }
+} /* MSG_WAV_CONTENT_PLAY_SYNCH */
+
+/********************************************************************
+ *		MSG_WAV_CONTENT_PLAY_ASYNCH
+ ********************************************************************
+ * SYNOPSIS:	 Play a sound asynchronously.
+ * PARAMETERS:	 void
+ * RETURNS:	 void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Call the WavPlayFile function with the appropriate
+ *               parameters.
+ *               Returns immediately; spawns a thread to play the
+ *               sound.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dubois	12/6/93   	Initial version
+ *******************************************************************/
+@method WavContentClass, MSG_WAV_CONTENT_PLAY_ASYNCH
+{
+
+    WavPlayFile( pself->WCI_soundDiskHandle,
+		 pself->WCI_soundPath,
+		 pself->WCI_soundName );
+} /* MSG_WAV_CONTENT_PLAY_ASYNCH */
+

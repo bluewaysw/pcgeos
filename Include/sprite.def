@@ -1,0 +1,203 @@
+COMMENT @=====================================================================
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC/GEOS
+MODULE:		Sprite Library
+FILE:		sprite.def
+
+AUTHOR:		Martin Turon, Jun 28, 1992
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	martin	6/28/92		Initial version
+	martin	11/8/94		Significant restructuring & moved to library
+
+DESCRIPTION:
+	
+
+RCS STAMP:		
+	$Id: sprite.def,v 1.1 97/04/04 14:26:42 newdeal Exp $
+
+=============================================================================@
+
+SetDef  __SPRITE
+
+StartLibrary	sprite
+
+include Objects/inputC.def	; allow user to define input event handlers
+
+;------------------------------------------------------------------------------
+;			Records
+;------------------------------------------------------------------------------
+
+SpriteFlags	record
+	MF_DETECT_COLLISIONS:1,	;True if this object can handle collision msgs
+	MF_LIMITED_LIFE:1,	;True if this object should decay its life
+	MF_WRAPPING:1,		;True if objects should wrap in parent region
+	:13
+SpriteFlags	end
+
+;------------------------------------------------------------------------------
+;			SpriteClass
+;------------------------------------------------------------------------------
+
+SpriteClass	class	VisClass
+	;
+	; This message is sent to each sprite object on every timer tick.
+	; The default handler simply sends an erase, move, and draw message
+	; to the handling object.  Optimization ideas for time-critical
+	; sprite objects implemented by handling this message:
+	; 	- call the three routines directly rather than using the
+	; 	  messaging system. 
+	;	- have the erase routine routine return the current position
+	;	  in a pair of registers, and have the move and draw
+	;	  routines update and use those values.
+	;
+	; Pass:		^hbp = GState
+	; Return:	nothing
+	;
+	MSG_SPRITE_UPDATE_POSITION	message
+
+	;
+	; This message simply draws the sprite object in the given gstate.
+	;
+	; Pass:		^hbp 	= GState
+	; Return:	return
+	;
+	MSG_SPRITE_DRAW			message
+
+	;
+	; This message simply erases the sprite object in the given gstate.
+	;
+	; Pass:		^hbp 	= GState
+	; Return:	return
+	;
+	MSG_SPRITE_ERASE			message
+
+	;
+	; This message calculates the new position for the sprite object
+	; based on its previous position and velocity.  It is also the place
+	; to hook into the collision detection mechanism if the object wants
+	; to handle collisions.
+	;
+	; Pass:		cx,dx	= position
+	; Return:	nothing
+	;
+	MSG_SPRITE_MOVE			message
+
+	;
+	; This message is sent to the sprite object whenever a collision is 
+	; detected. 
+	;
+	; Pass:		^lcx:dx	= object crashed into
+	; Return:	nothing
+	;
+	MSG_SPRITE_COLLISION			message
+
+;-----------------------------------------------------------------------------
+;			SpriteClass Instance data		
+;-----------------------------------------------------------------------------
+  ;
+  ; Movement related instance data
+  ;
+	SI_XVelocity		word	; New position = 
+	SI_YVelocity		word	; 	Old Position + Velocity 
+
+	SI_angle		word	; current angle
+	SI_rotation		word	; add this to angle each timer tick
+
+  ;
+  ; Collision related instance data
+  ;
+	SI_groupID		word	; Unique identifier of the group
+					; this sprite object belongs to.
+					; This value is used by the
+					; collision handler - collisions
+					; between objects in the same group
+					; don't create MSG_SPRITE_COLLISION
+					; messages.  MSG_SPRITE_COLLISION
+					; messages are sent to the object
+					; with the highest SI_groupID.
+
+	SI_flags		SpriteFlags
+
+	SI_uniqueID		word	; Supplied by the collision
+					; detection mechanism to speed up
+					; updating its table of positions.
+
+	SI_life			word	; Used for objects that last a
+					; limited amount of time (bullets) 
+					; or to store the "hit points" of an
+					; object.
+
+	SI_detectRadius		word	; The radius squared (used by the
+					; collision detection mechanism to
+					; verify that a collision has occured.)
+
+	SI_color		word	
+	SI_imageCount		word	; Specifies size of SI_imageArray
+
+ 	SI_currentImage		word	; Specifies which image in
+					; SI_imageArray to draw next frame.
+
+ 	SI_gstringArray		lptr	; This points to an array of either 
+					; bitmaps or line polygons.
+
+SpriteClass	endc
+
+
+;------------------------------------------------------------------------------
+;			SpriteContentClass
+;------------------------------------------------------------------------------
+;
+; The SpriteContentClass deals with collision detection between all the
+; SpriteClass children it maintains.  Some assumptions used to keep things 
+; speedy:
+;
+;	- All children of a given SpriteContentClass need to be in the same 
+; 	  object block.  Have sprites point other larger objects in seperate 
+;	  blocks if you need more sprite-related data space.
+;
+SpriteContentClass	class	GameContentClass
+	;
+	; This message is sent by each sprite whenever their position has
+	; changed.  It logs the new position in the collision detection
+	; tables within the SpriteContentClass object.
+	;
+	; Pass:		bp	 = detect id of object to update
+	;		(cl, ch) = top-left table entry
+	;		(dl, dh) = bottom-right table entry
+	; Return:	nothing
+	;
+	MSG_SPRITE_CONTENT_UPDATE_POSITION_TABLE		message
+
+	;
+	; Goes through the entire position table and checks for any
+	; collisions that can be found.  A MSG_SPRITE_COLLISION is sent to
+	; the objects that request to be informed of collisions. 
+	;
+	; Pass:		nothing
+	; Return:	nothing
+	;
+	MSG_SPRITE_CONTENT_DETECT_COLLISIONS		message
+
+;-----------------------------------------------------------------------------
+;		SpriteContentClass Instance data		
+;-----------------------------------------------------------------------------
+	SCI_tableSize		word	; # of unique objects in our tables.
+	SCI_leftColTable	lptr	; The column/row tables are each in
+	SCI_rightColTable	lptr	; their own seperate chunk, and
+	SCI_topRowTable		lptr	; contain the zone of each sprite 
+	SCI_bottomRowTable	lptr	; object.  The handle table holds the
+	SCI_handleTable		lptr	; corresponding chunk handle for
+					; each sprite object. 
+
+SpriteContentClass	endc
+
+;-----------------------------------------------------------------------------
+;			Exported routines		
+;-----------------------------------------------------------------------------
+
+EndLibrary	sprite

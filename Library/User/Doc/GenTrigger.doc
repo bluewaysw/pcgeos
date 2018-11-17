@@ -1,0 +1,526 @@
+COMMENT `CLASS DESCRIPTION-----------------------------------------------------
+
+			GenTriggerClass
+
+$Id: GenTrigger.doc,v 1.1.34.1 97/03/29 03:37:52 canavese Exp $
+
+Synopsis
+--------
+	GenTriggerClass is a simple generic object that allows events to be
+	sent out when a user clicks on it.  Usually a GenTrigger takes the
+	form of a button, although it may also become part of a menu depending
+	on the objects above it in the generic tree.  The application programmer
+	can specify a message to send and an object or process to send it to,
+	as well as optional arguments.
+
+Limitations/Alternatives
+------------------------
+    	The GenTrigger does not contain any state; it merely causes an action
+	to happen.   Two or more GenTriggers are sometimes used as a way to
+ 	toggle between different application states.  It is better to use a 
+	GenList in this instance.
+
+Implementation Status
+---------------------
+	Hopefully done as of Jan 1992.
+
+See Also
+--------
+	GenClass (in Include/Objects/genC.def, genClass.asm)
+	GenListClass (in Include/Objects/gListC.def, genList.asm)
+
+;------------------------------------------------------------------------------
+;	Description
+;------------------------------------------------------------------------------
+
+Terminology
+-----------
+	action --
+		An "action" occurs when a trigger sends out its message.
+		
+	action data -- 
+		Any parameters that you might like to pass along in an action
+		message.
+
+Relationships/Context
+---------------------
+	A GenTrigger can appear under any generic object that typically allows
+	generic gadgets to be placed under it.
+	
+
+Conceptual Overview
+-------------------
+	
+	The sole purpose in life for a GenTrigger is to deliver a message
+	when clicked upon.   Like many other generic objects, the destination 
+	for GenTrigger messages should be specified as follows:
+
+	    GTI_destination = MyObject;
+
+	To send stuff to the process:
+
+	    GTI_destination = process;
+
+	Choosing a message to send can be done as follows:
+	
+		@object GenTriggerClass MyTrigger = {
+	  	  GI_visMoniker = "Send Foo";
+		  GTI_actionMsg = MSG_FOO;
+		  GTI_destination = process;
+		}
+	
+	the visual moniker "Send Foo" will be displayed inside the button.
+	There are no restraints on the type moniker for the button.
+	
+	The action message should be defined like the following:
+	
+		@message (GEN_TRIGGER_ACTION) MSG_FOO;
+		
+	the parameters for the message (unless ATTR_GEN_TRIGGER_ACTION_DATA
+	is specified, see below) are "void (optr trigger = cx:dx)", where
+	"trigger" is the object sending the message.  Occasionally this
+	argument may be useful if you want more than one trigger to send a
+	message.
+	
+	To send the method to an object we'll call MyCoordinator:
+	
+		@object GenTriggerClass MyTrigger = {
+	  	  GI_visMoniker = "Send Foo";
+		  GTI_actionMsg = MSG_FOO;
+		  GTI_destination = MyCoordinator;
+		}
+
+	Usually all the objects in a section of a generic tree will be
+	sending their various notifications to the same place.  If you specify
+	ATTR_GEN_DESTINATION at a node in the generic tree, all the 
+	objects below it will send their output to that object or process.
+
+	The destination can be changed for queried for using MSG_GEN_TRIGGER_-
+	GET_DESTINATION and MSG_GEN_TRIGGER_SET_DESTINATION.
+	
+	
+Passing data in a GenTrigger action
+-----------------------------------
+	Varying amounts of data can be passed along in the action message
+	by using ATTR_GEN_TRIGGER_ACTION_DATA.  This variable data type
+	takes any amount of data from 1 byte upwards.  In messages whose
+	parameters are mapped to registers, the data for this command will be 
+	placed in this order (if it exists): cl, ch, dl, dh, bp low, and bp 
+	high if it under 6 bytes in length.  Anything over 6 bytes will be 
+	passed on the stack.
+	
+	The label ATTR_GEN_TRIGGER_ACTION_DATA itself only works for passing a 
+	single word of data in cx.  If the message to send is defined as 
+	either of the following:
+	
+		@message void MSG_BLAH(word foo);
+		@message void MSG_BLAH(word foo = cx);
+	
+	you can just do the following:
+	
+		@object GenTriggerClass MyTrigger = {
+	  	  GI_visMoniker = "Send Foo";
+		  GTI_actionMsg = MSG_FOO;
+		  GTI_destination = process;
+		  
+		  ATTR_GEN_TRIGGER_ACTION_DATA = FOO_DATA;
+		}
+	
+		
+	In C, ATTR_GEN_TRIGGER_ACTION_DATA is defined as taking a single word
+	argument.  Aliases are provided for passing two or three words.  If 
+	your message to pass is defined as one of:
+	
+		@message void MSG_BLAH(word foo, word foo2);
+		@message void MSG_BLAH(word foo = cx, word foo2 = dx);
+		@message void MSG_BLAH(byte foo, byte foo2);
+	
+	(the last definition because the way C passes bytes on the stack)
+	you can replace the "ATTR_GEN_TRIGGER_ACTION_DATA = FOO_DATA;" with the 
+	following:
+	
+		  ATTR_GEN_TRIGGER_ACTION_TWO_WORDS = {
+		  	FOO_DATA, FOO2_DATA
+		  }
+	
+	and similarly for messages like these:
+	
+		@message void MSG_BLAH(word foo, word foo2, word foo3);
+		@message void MSG_BLAH(word foo = cx, word foo2 = dx, 
+				       word foo3 = bp);
+		@message void MSG_BLAH(byte foo, byte foo2, byte foo3);
+		
+	you can do this:
+	
+		  ATTR_GEN_TRIGGER_ACTION_THREE_WORDS = {
+		  	FOO_DATA, FOO2_DATA, FOO3_DATA
+		  }
+	
+	If your assembly-definied message takes a single argument in dx or bp, 
+	you can still use ATTR_GEN_TRIGGER_ACTION_THREE_WORDS, passing zeros 
+	in the unused parameters.  For instance if you have defined:
+	
+		@message void MSG_BLAH(word foo = bp);
+		
+	you can pass data as follows:
+	
+		ATTR_GEN_TRIGGER_ACTION_THREE_WORDS = {
+			0, 0, FOO_DATA
+		}
+	
+	One more alias allows you to specify an optr in cx:dx and second word
+	argument in bp.  If your message looks like:
+	
+		@message void MSG_BLAH(optr object, word foo);   or
+		@message void MSG_BLAH(optr object = cx:dx, word foo = bp);
+		
+	you can pass data as follows:
+	
+		ATTR_GEN_TRIGGER_ACTION_OPTR_AND_WORD = {
+			@MyObject, FOO_DATA
+		}
+	
+	You can also use this macro with other pointers passed in cx:dx, e.g.
+	
+		@message void MSG_BLAH(Class *class = cx:dx, word foo = bp)
+		
+	could be set up with a Cast as follows:
+	
+		ATTR_GEN_TRIGGER_ACTION_OPTR_AND_WORD = {
+			(Class *)GenRangeClass, FOO_DATA
+		}
+	
+	
+	You can define your own aliases for passing other types of passed 
+	data.   Messages with single arguments are the easiest; for example,
+	a message that looks like one of the following:
+	
+		@message void MSG_BLAH(optr output);
+		@message void MSG_BLAH(optr output = cx:dx);
+		
+	can be sent data from a GenTrigger with the following code:
+
+		@vardataAlias (ATTR_GEN_TRIGGER_ACTION_DATA)
+			optr ATTR_GEN_TRIGGER_ACTION_OPTR;
+			
+		@object GenTriggerClass MyTrigger = {
+	  	  GI_visMoniker = "Set content";
+		  GTI_actionMsg = MSG_GEN_VIEW_SET_CONTENT;
+		  GTI_destination = MyView;
+		  
+		  ATTR_GEN_TRIGGER_ACTION_OPTR = @MyContent;
+		}
+	
+	If you're passing a single pre-defined structure on the stack as an 
+	argument:
+	
+		@message void MSG_BLAH(RectDWord *rect = ss:bp);   
+	
+	you can just use that structure to define the alias:
+	
+		@vardataAlias (ATTR_GEN_TRIGGER_ACTION_DATA)
+			RectDWord ATTR_GEN_TRIGGER_ACTION_DOC_RECT;
+			
+		  ATTR_GEN_TRIGGER_ACTION_DOC_RECT = {
+		  	0, 0, 100, 100
+		  }
+	
+	For something where multiple arguments are passed, you will have to
+	create a structure for the arguments.  For instance, if your message 
+	is as follows:
+	
+		@object void MSG_BLAH(dword xOrigin, dword yOrigin);
+	
+	You can create the following structure and use it in making the proper
+	alias:
+	
+		typedef struct {
+			dword 		OA_xOrigin;	
+			dword		OA_yOrigin;	
+		} OriginArgs;
+	
+		@vardataAlias (ATTR_GEN_TRIGGER_ACTION_DATA)
+		    OriginArgs ATTR_GET_TRIGGER_ACTION_ORIGIN;
+			
+		  ATTR_GEN_TRIGGER_ACTION_ORIGIN = {
+		  	MY_X_ORIGIN, MY_Y_ORIGIN
+		  }
+		}
+	
+	For messages that take a @stack parameter, you will need to create
+	a structure that takes all the arguments in reverse.  The arguments
+	of some messages, such as MSG_GEN_VIEW_SET_DOC_BOUNDS, already 
+	correspond to an existing structure when reversed (in this case, a
+	RectDWord).  To set document bounds from a button:
+	
+		@vardataAlias (ATTR_GEN_TRIGGER_ACTION_DATA)
+			RectDWord ATTR_GEN_TRIGGER_ACTION_DOC_RECT;
+		
+		  ATTR_GEN_TRIGGER_ACTION_DOC_RECT = {
+		  	0, 0, 100, 100
+		  }
+		}
+	
+	Others are not so easy,  like setting the scale factor, whose message
+	definition is as follows:
+	
+	     @message void MSG_GEN_VIEW_SET_SCALE_FACTOR(@stack sdword yOrigin, 
+		sdword xOrigin, ScaleViewType scaleType, 
+		WWFixedAsDWord yScaleFactor,
+		WWFixedAsDWord xScaleFactor);
+
+		The structure to create should look like the following:
+		
+			typedef struct {
+			  WWFixedAsDWord SSFA_xScaleFactor;
+			  WWFixedAsDWord SSFA_yScaleFactor;
+			  byte           SSFA_unused;  
+			  byte           SSFA_scaleType;    
+			  sdword         SSFA_xOrigin; 
+			  sdword         SSFA_yOrigin;
+			} SetScaleFactorArgs;
+			
+		@vardataAlias (ATTR_GEN_TRIGGER_ACTION_DATA) 
+		      SetScaleFactorArgs ATTR_GEN_TRIGGER_SET_SCALE_DATA;  
+
+		@object GenTriggerClass MyTrigger = {
+	  	  GI_visMoniker = "Set doc size";
+		  GTI_actionMsg = MSG_GEN_VIEW_SET_DOC_BOUNDS;
+		  GTI_destination = MyView;
+		  
+		  ATTR_GEN_TRIGGER_SET_SCALE_DATA = {
+		    MakeWWFixed(1.0), MakeWWFixed(1.0), 0, 
+		    SVT_AROUND_CENTER, 0, 0 
+		  };
+		}
+
+	The SSFA_unused had to be placed in front of SSFA_scaleType as padding
+	since data is pushed as whole words when using @stack arguments.
+	
+	
+	
+Custom double-press behavior
+----------------------------
+
+	Normally a GenTrigger sends the same message regardless of whether the
+	user double-clicks on the object or not.  If you want to have special
+	behavior on a double-click, you can add an ATTR_GEN_TRIGGER_-
+	CUSTOM_DOUBLE_PRESS with a message to send on a double-press (or null 
+	if you don't care at all about double-presses).  The message will be 
+	sent to the current destination object.  For example:
+
+		ATTR_GEN_TRIGGER_CUSTOM_DOUBLE_PRESS = MSG_HANDLE_DOUBLE_PRESS;
+		
+	will cause a MSG_HANDLE_DOUBLE_PRESS to be sent out on the second click.
+	Any message data set up in ATTR_GEN_TRIGGER_MESSAGE_DATA does not apply
+	to the double press, you should always do a:
+	
+		@message (GEN_TRIGGER_ACTION) MSG_HANDLE_DOUBLE_PRESS;
+		
+	when declaring a double-click message.
+	
+	
+Miscellanious messages
+----------------------
+	
+	If you want to force a trigger to deliver its message, you can call
+	MSG_GEN_TRIGGER_SEND_ACTION.  It takes a single boolean argument
+	it should send the double-press message (if any is specified).  For
+	instance, to mimic a double click, do the following:
+	
+	      @call MyTrigger::MSG_GEN_TRIGGER_SEND_ACTION(TRUE);
+	      
+	otherwise, send a:
+	      
+	      @call MyTrigger::MSG_GEN_TRIGGER_SEND_ACTION(FALSE);
+	      
+	      
+	To set a new message, do a:
+		
+	      @call MyTrigger::MSG_GEN_TRIGGER_SET_ACTION_MSG(MSG_FOO);
+	      
+	To get the current trigger message, do a:
+		
+	      @call MyTrigger::MSG_GEN_TRIGGER_GET_ACTION_MSG();
+	      
+	which will return a Message argument.
+	
+	These do not apply to the double-click message, which must be set
+	or queried for using ObjVarData routines.
+	      
+	      
+Miscellanious hints for the GenTrigger
+--------------------------------------
+	
+	Bringing up windows
+	-------------------
+	If your trigger's action usually indirectly causes a GenInteraction
+	to be activated, or a UserDoDialog to occur, you will want to include
+	a ATTR_GEN_TRIGGER_BRINGS_UP_WINDOW.   Specific UI's that support some 
+	kind of graphic or text to represent a button that leads to a window 
+	can do the appropriate thing.
+	
+	Destructive actions
+	-------------------
+	If your button initiates a potentially destructive action, you can
+	set ATTR_GEN_TRIGGER_DESTRUCTIVE_ACTION to keep the default for the 
+	window from being placed on it.
+	
+	Immediate actions
+	-----------------
+	The GenTrigger will by default use @send when dispatching its message
+	on a user click.  If the desired behavior is to use @call (meaning the
+	trigger will block, waiting for the action to be handled), then add
+	an ATTR_GEN_TRIGGER_IMMEDIATE_ACTION.
+	
+	Interaction reply buttons
+	-------------------------
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND can be set in a trigger to replace
+	various default buttons that are normally created for a GenInteraction.
+	See GenInteractionClass documentation for more info.
+	
+	
+Generic attributes in a GenTrigger
+----------------------------------
+	There are several generic attributes, available for use in the 
+	GenTrigger, which modify its behavior:
+	
+		* Have the button dismiss its window when clicked on.
+		
+		* Have user clicks cause the cursor to change to a busy cursor,
+		   for long operator.
+		   
+		* Having clicking on the button hold up input to other UI
+		  gadgetry until the handler action finishes (good for when
+		  buttons will disable or change UI gadgetry so the user can't
+		  subsequently click on an object before its disabled).
+		  
+		* Having clicking on the button cause input to its application
+		  be ignored until the action completes.
+		  
+	These are described in more detail in the GenAttrs section
+	of genClass.asm.
+		  
+		  
+GenClass hints available for the GenTrigger
+-------------------------------------------
+	These hints are discussed in more detail in genC.def.
+	
+	HINT_DEFAULT_FOCUS -- 
+		Give the trigger the focus on startup
+		
+	HINT_CENTER_MONIKER --
+		If there's extra space in the trigger, center its moniker.
+		
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT --
+		Let the button expand to fill any width available.
+		
+	HINT_FIXED_SIZE --
+	HINT_INITIAL_SIZE -- 
+	HINT_MINIMUM_SIZE --
+		Force some size behavior on the button, regardless of moniker.
+		
+	HINT_SEEK_MENU_BAR --
+		Forces button to reside in the menu bar, even if not appropriate
+		for this object.
+		
+	HINT_SEEK_REPLY_BAR --
+		Force button to reside in the reply bar of its parent window,
+		if appropriate.
+	
+	HINT_AVOID_MENU_BAR --
+		Forces button to stay out of the menu bar, even if it is 
+		appropriate for it to reside there.
+		
+	HINT_FILE_MENU -- 
+	HINT_PRINT_MENU --
+	HINT_EDIT_MENU --
+	HINT_WINDOW_MENU --
+		Have the button try to find one of these special menus.
+
+	HINT_NAVIGATION_ID --
+	HINT_NAVIGATION_NEXT_ID --
+		Set up custom navigation.
+		
+	HINT_SEEK_X_SCROLLER_AREA
+	HINT_SEEK_Y_SCROLLER_AREA	
+	HINT_SEEK_LEFT_OF_VIEW		
+	HINT_SEEK_TOP_OF_VIEW		
+	HINT_SEEK_RIGHT_OF_VIEW		
+	HINT_SEEK_BOTTOM_OF_VIEW -- 
+		For buttons under a GenView, locate in a certain place.
+		
+	ATTR_GEN_DESTINATION_CLASS --
+		Require a certain class for the output of a button.  Very use-
+		ful in conjunction with ATTR_GEN_TRIGGER_ACTION_OUTPUT, where
+		the message sent assumes a certain class and the trigger's
+		output can change at times.
+		
+Warnings
+--------
+
+See Also
+--------
+	GenClass (in Include/Objects/genC.def, genClass.asm) for various 
+	messages and hints related to GenTriggers.
+
+	GenInteractionClass (in Include/Objects/gIntC.def, genInteraction.asm)
+	for documentation in-depth discussion on HINT_SEEK_REPLY_BAR and 
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND.
+
+;------------------------------------------------------------------------------
+;	Assembling & Debugging
+;------------------------------------------------------------------------------
+
+Sample Code/Programming Tips
+----------------------------
+	
+Include Files Needed
+--------------------
+
+Assembly Tips
+-------------
+
+Debugging Tools & Tips
+----------------------
+
+See Also
+--------
+	See Appl/SDK_C/Glyph/glyph.goc --
+		A very simple example of the GenGlyph object.
+
+;------------------------------------------------------------------------------
+;	Implementation Notes
+;------------------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+;	Most frequently asked questions
+;------------------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+;	Inheritance
+;------------------------------------------------------------------------------
+
+< Add entries for every superclass, including instance data, methods & hints,
+  & then document how they are used within this object.   Example: >
+
+<Note to uigroup:
+
+	Let's hold off on documenting changes from standard behavior in
+	this section for classes we've not yet reviewed, i.e.  we've not
+	reviewed GenClass yet, so let's not actually do the type of
+	documentation listed below just yet -- Doug >
+
+From GenClass:
+-------------
+
+<List hints here, explain how, if at all they pertain to this object>
+
+
+Imported Messages Handled
+-------------------------
+
+<List any imported messages handled by this class or its superclasses.>
+
+
+------------------------------------------------------------------------------`

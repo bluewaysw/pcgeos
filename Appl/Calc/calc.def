@@ -1,0 +1,326 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1990 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Calculator Accessory -- Central Definitions
+FILE:		calc.def
+
+AUTHOR:		Adam de Boor, Mar 13, 1990
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	3/13/90		Initial revision
+
+
+DESCRIPTION:
+	Main header file for calculator.
+		
+	$Id: calc.def,v 1.1 97/04/04 14:46:57 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;
+; Standard include files
+;
+include	geos.def
+include	heap.def
+include geode.def
+include	resource.def
+include	ec.def
+include object.def
+include file.def
+
+include	graphics.def
+include win.def
+include system.def
+include localize.def
+
+UseLib	ui.def
+UseLib Objects/vTextC.def
+
+;
+;			MISCELLANEOUS STRUCTURES
+;
+DDFixed		struc
+    DDF_frac	dword		; 32 bits of fraction
+    DDF_int	dword		; 32 bits of integer
+DDFixed		ends
+
+CalcMode	struc
+    CM_engine	optr			; Engine used in mode
+    CM_display	optr			; Display used in mode
+    CM_group	optr			; Top-level interaction to set usable/
+					;  not-usable
+    CM_default	optr			; Trigger to activate when enter hit
+					;  in the display
+CalcMode	ends
+
+;
+;			PROCESS CLASS
+;
+CalcClass		class	UI_Class
+MSG_CALC_RESET		method	; Reset the current engine
+MSG_CALC_CHANGE_MODE		method	; Change mode of operation
+MSG_CALC_SET_PRECISION	method	; Set precision used in display
+MSG_CALC_DISPLAY_RETURN	method	; Handle return in a display text
+					;  object
+
+CalcModes	etype	word, 0, size CalcMode
+    CM_INFIX	enum	CalcModes
+    CM_RPN	enum	CalcModes
+
+    CI_mode		CalcModes
+    CI_precision	word		; Current precision (for changing
+					;  modes)
+CalcClass		endc
+
+;
+;			CALCULATION ENGINE
+;
+; One of these is instantiated for each mode of the calculator (infix or
+; postfix). It maintains all the state of the calculator and processes all
+; the operations the user requests.
+;
+CalcEngineClass		class	MetaClass
+MSG_CE_INFIX_OP	method
+;	Desc:	Delayed execution of an operator. Pushes the currently-displayed
+;		value onto the register stack, then performs all operators of
+;		the same or higher precedence on the operator stack, then pushes
+;		the passed operator onto that stack.
+;	Pass:	cx	= CalcOps giving the operation to perform
+;		dx	= method to invoke to perform that operation
+;	Return:	Nothing
+
+MSG_CE_EXECUTE_OP	method
+;	Desc:	Immediate execution of an operator. Pushes the
+;		currently-displayed value onto the register stack, then
+;		performs the passed operation.
+;	Pass:	cx	= CalcOps giving the operation to perform
+;		dx	= method to invoke to perform that operation
+;	Return:	Nothing
+
+MSG_CE_OPEN_PAREN	method
+;	Desc:	Begin a parenthesized expression. Pushes CALC_OP_OPEN onto the
+;		operator stack, providing a barrier beyond which evaluation will
+;		not proceed.
+;	Pass:	Nothing
+;	Return:	Nothing
+
+MSG_CE_FINISH_INFIX	method
+;	Desc:	Finish off all stored operators for an infix expression. If
+;		no operators are pending, the last-executed one is executed
+;		instead, using the operand that was on the stack at the time.
+;	Pass:	Nothing
+;	Return:	Nothing
+;
+
+;	Basic arithmetic operations
+;
+MSG_CE_DIVIDE		method	; Divide y by x
+MSG_CE_MULTIPLY		method	; Multiply y by x
+MSG_CE_SUBTRACT		method	; Subtract x from y
+MSG_CE_ADD			method	; Add x to y
+
+;	Memory operations
+;
+MSG_CE_STORE		method	; Store x in memory
+MSG_CE_RECALL		method	; Display stored value
+MSG_CE_RECALL_AND_ENTER	method	; Push stored value onto stack
+MSG_CE_STORE_PLUS		method	; Add x to stored value
+
+;	Miscellaneous other things
+;
+MSG_CE_ENTER			method	; Push current entry on the stack
+MSG_CE_EXCHANGE		method	; Exchange x and y
+MSG_CE_RESET			method	; Reset the engine
+MSG_CE_CLEARING		method	; Display is about to clear. Any
+					;  implicit enter from a recall
+					;  should happen now.
+
+MSG_CE_SET_TAPE_OD		method
+;	Desc:	Set the OD of the paper-tape display
+;	Pass:	cx:dx	= OD of paper-tape display to which operations are
+;			  appended
+;	Return:	nothing
+
+CalcOps		etype	word, 0, 2	; Known operations
+    CALC_OP_DIVIDE	enum	CalcOps
+    CALC_OP_MULTIPLY	enum	CalcOps
+    CALC_OP_SUBTRACT	enum	CalcOps
+    CALC_OP_ADD		enum	CalcOps
+    CALC_OP_OPEN	enum	CalcOps		; Open-paren
+    CALC_OP_START	enum	CalcOps		; Mark for handling '='
+    CALC_OP_CLOSE	enum	CalcOps
+    CALC_OP_PERCENT	enum	CalcOps		; %, of course
+
+    CE_registers	lptr.DDFixed	; Register stack
+    CE_regTop		word		; Offset after top-most element (offset
+					;  in chunk at which next value should
+					;  be stored)
+
+    CE_display		optr		; Object displaying T.O.S.
+
+    CE_paperTape	optr		; Object logging operations (if any)
+
+    CE_opStack		lptr.CalcOps	; Stack of pending infix operators.
+					;  Used only by MSG_CE_INFIX_OP,
+					;  so if driver doesn't send this
+					;  method, this may be 0
+    CE_opTop		word		; Index of top-most element (last valid
+					;  element in the array)
+
+    CE_memory		DDFixed		; Single stored value
+
+    ;
+    ; Data for handling repeated '=' operations
+    ; 
+    CE_lastOperand	DDFixed		; Most recent operand in infix mode
+    CE_lastOpcode	CalcEngineMethods; Most recent operation
+
+    ; 
+    ; Engine-state flags.
+    ;
+CalcEngineFlags	record
+    	; These two are mutually exclusive, as they are used in the two
+	; different modes of the engine (infix & rpn)
+	CEF_ENTER_PENDING:1,	; Flag to handle RPN semantics after performing
+				; an operation or recall. If an operation is
+				; performed immediately after the operation or
+				; recall, the result of the previous operation
+				; or recall is treated as if the user just
+				; entered it (i.e. it is evaluated, pushed on
+				; the stack and the new operation performed).
+				; If the user enters a new number, however, the
+				; previous result is implicitly pushed onto the
+				; operand stack for use in the operator that
+				; will follow the new number.
+	CEF_REPLACE_OP:1,	; If non-zero, receipt of an infix operator will
+				; cause the previously pushed operator to be
+				; discarded. This is cleared by a
+				; MSG_CE_CLEARING, as sent by the display
+				; when an implicit clear-display is executed.
+CalcEngineFlags end
+    CE_flags 		CalcEngineFlags
+CalcEngineClass		endc
+
+;
+;		NUMERIC DISPLAY AND ENTRY
+;
+CDShortcut	struc
+    CDS_char	word		; Character value to match in CX
+    CDS_trigger	optr		; Object to which to send MSG_GEN_TRIGGER_TRIGGER
+CDShortcut	ends
+
+CalcDisplayClass	class	GenTextEditClass, master
+
+		uses	VisTextClass	; Why isn't this in GenTextDisplayClass?
+
+MSG_CD_CHANGE_SIGN		method
+; 	Desc:	Negate displayed value
+;	Pass:	nothing
+;	Return:	nothing
+
+MSG_CD_CLEAR			method
+;	Desc:	Clear the display
+;	Pass:	nothing
+;	Return:	nothing
+
+MSG_CD_CLEAR_PENDING		method	; Set clearPending flag
+;	Desc:	Set the display's clearPending flag, which will cause the
+;		display to clear the next time a character is typed.
+;	Pass:	nothing
+;	Return:	nothing
+
+MSG_CD_READ			method
+; 	Desc:	Return the value currently in the display
+;	Pass:	cx	= Non-zero if display should clear itself on next
+;			  keystroke
+;	Return:	carry clear if number is in error, else
+;		ax:cx:dx:bp = number read (ax is DDF_int.high)
+
+MSG_CD_WRITE			method
+;	Desc:	Write a number to the display, replacing anything already
+;		there.
+;	Pass:	cx:dx	= Address of DDFixed to display
+;	Return:	nothing
+
+MSG_CD_SET_PRECISION		method
+; 	Desc:	Set the precision of the conversion to ascii performed by
+;		MSG_CD_WRITE
+;	Pass:	cx	= Number of decimal digits to use
+;	Return:	nothing
+
+MSG_CD_KBD_CHAR		method
+;	Desc:	Method sent by triggers to introduce characters into the
+;		display.
+;	Pass:	cx	= character value
+;	Return:	nothing
+
+    CD_engine		optr		; Associated calculation engine
+
+    CD_clearPending	BooleanByte	; True if next keystroke should clear
+					;  the display
+    CD_shortcuts	lptr.CDShortcut	; Array of "shortcuts"
+    CD_precision	word		; Precision for conversion
+    CD_DEFAULT_PRECISION equ	2	; Default to 2 decimal places of
+					;  precision.
+
+    CD_resetCount	byte		; Counter for handling C/CE. If it ever
+					;  reaches 0, CE_RESET is sent to the
+					;  engine....
+    CD_RESET_START	equ	2	; Initializer for resetCount any time
+    					;  something happens after
+					;  MSG_CD_CLEAR
+CalcDisplayClass	endc
+
+;
+;		CALCULATOR BUTTONS
+;
+CalcDataTriggerClass	class	GenTriggerClass, master
+    CDT_accelerator1	KeyboardShortcut	<>
+    CDT_accelerator2	KeyboardShortcut	<>
+CalcDataTriggerClass	endc
+
+;
+;		BOGUS INTERACTION TO SET HINTS RIGHT FOR CGA GCM MODE
+;
+CalcBogusInteractionClass	class	GenInteractionClass, master
+
+MSG_CBI_ADJUST_HINTS	method
+
+CalcBogusInteractionClass	endc
+
+CalcBogusPrimaryClass		class	GenPrimaryClass, master
+CalcBogusPrimaryClass		endc
+
+;------------------------------------------------------------------------------
+;
+;		       MISCELLANEOUS CONSTANTS
+;
+;------------------------------------------------------------------------------
+PAPER_WIDTH		=	150
+PAPER_HEIGHT		=	100
+
+; THESE MUST MATCH THE VALUES IN calc.ui
+GCM_BUTTON_WIDTH	=	60
+GCM_BUTTON_HEIGHT	=	30
+GCM_BUTTON_FONT		=	FONT_URW_SANS
+GCM_BUTTON_FONTSIZE	=	25
+
+GCM_S_BUTTON_WIDTH	=	35
+GCM_S_BUTTON_HEIGHT	=	15
+GCM_S_BUTTON_FONT	=	FONT_URW_SANS
+GCM_S_BUTTON_FONTSIZE	=	14
+
+GCM_S_FONTSIZE		=	30
+
+MAX_NUM_LENGTH		= 22		; Longest formatted DDFixed string
+PRECISION		= 9		; Precision of the calculator (decimal
+					; places)
+
+OPERATOR_OUT_OF_RANGE					enum FatalErrors
+NO_OPERATOR_STACK_PROVIDED				enum FatalErrors
+SELECTION_TOO_LARGE					enum FatalErrors
+

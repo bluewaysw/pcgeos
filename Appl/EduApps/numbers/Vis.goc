@@ -1,0 +1,598 @@
+/***********************************************************************
+ *
+ *  Copyright (c) Cool Lava Productions 1998 -- All Rights Reserved
+ *                Breadbox Computer Company
+ * PROJECT:   Kid NUMBERS
+ * MODULE:    VisClass
+ * FILE:      vis.goc
+ *
+ * AUTHOR:    Duane E. Char
+ *
+ * REVISION HISTORY:
+ *  Date        Name                Description
+ *  ----        ----                -----------
+ ************************************************************************/
+
+@include <stdapp.goh>
+@define __NUMBERS_VIS_GOC
+@include <numbers.goh>
+
+@classdecl  VisBoxClass;
+
+/***********************************************************************
+ *      Code for VisBoxClass 
+ ***********************************************************************
+ */
+
+
+/***********************************************************************
+ *   MSG_VIS_UNDETECT_BOXES      for VisBoxClass
+ ***********************************************************************
+ * SYNOPSIS:        set VA_DETECTABLE attr to off, this prevents the 
+ *             visobj from being selectable.  Called by VisContentClass
+ *	method, MSG_VIS_CONTENT_SET_LINE.
+ *
+ * PARAMETERS:      byte alldefs, byte selected, byte allwords
+ *
+ * SIDE EFFECTS:    only done for those objects with VBI_isPressed true
+ *
+ * STRATEGY:      this method works in two ways:
+ *                    1.  it undetects visboxes after a match has occurred
+ *                    2.  it also could undetect all the defboxes in round 2  
+ *                      except there is no round 2 in this app
+ *
+ * REVISION HISTORY:
+ *  Name    Date        Description
+ *  ----    ----        -----------
+ *
+ ***********************************************************************/
+@extern method VisBoxClass,  MSG_VIS_UNDETECT_BOXES
+{
+	pself = ObjDerefVis(oself);
+	if(alldefs){
+		if(!(pself->VBI_isWord)){
+			@call self::MSG_VIS_SET_ATTRS(0,VA_DETECTABLE, VUM_NOW);
+		}
+	}
+	if(selected){
+		if(pself->VBI_isPressed){
+			@call self::MSG_VIS_SET_ATTRS(0,VA_DETECTABLE, VUM_NOW);
+			if (pself->VBI_isPressed)
+			{
+			    pself->VBI_isPressed = 0;
+    			@call self::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+			}
+		}
+	}
+	if(allwords){
+		if(pself->VBI_isWord){
+			@call self::MSG_VIS_SET_ATTRS(0,VA_DETECTABLE, VUM_NOW);
+		}
+	}
+}
+
+/***********************************************************************
+ *      MSG_VIS_BOX_RESET_PRESSED for VisBoxClass
+ ***********************************************************************
+ * SYNOPSIS:        reset VBI_isPressed to zero. Called by VisContentClass
+ *		 method MSG_VIS_RESET_BOXES.
+ * PARAMETERS:      byte wordbox, 1 or 0 
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *  Name    Date        Description
+ *  ----    ----        -----------
+ *
+ ***********************************************************************/
+@extern method VisBoxClass, MSG_VIS_BOX_RESET_PRESSED
+{
+	pself = ObjDerefVis(oself);
+	if(wordbox == 1){
+		if(pself->VBI_isWord){
+			if(pself->VBI_isPressed){
+				pself->VBI_isPressed = 0;
+				@call self::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+			}
+		}
+	}
+	else{
+		if(!(pself->VBI_isWord)){
+			if(pself->VBI_isPressed){
+				pself->VBI_isPressed = 0;
+				@call self::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+			}
+		}
+	}
+}
+/***********************************************************************
+ *      MSG_VIS_DRAW for VisBoxClass
+ ***********************************************************************
+ * SYNOPSIS:        Draw ourselves in the document space.
+ * PARAMETERS:      void (DrawFlags drawFlags, GStateHandle gstate)
+ * SIDE EFFECTS:    Attributes of the gstate are altered.
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *  Name    Date        Description
+ *  ----    ----        -----------
+ *
+ ***********************************************************************/
+@extern method VisBoxClass, MSG_VIS_DRAW
+{
+    if (!g_playingGame)
+		  return;
+
+	 if (g_isColor)
+	 {
+		  word leftTopColor, rightBottomColor, fillColor;
+
+		  if (pself->VBI_state & VBC_SELECTED)
+		  {
+				leftTopColor = C_BLACK;
+				rightBottomColor = C_WHITE;
+				fillColor = C_DARK_GREY;
+		  }
+		  else
+		  {
+				leftTopColor = C_WHITE;
+				rightBottomColor = C_BLACK;
+				fillColor = g_color;
+		  }
+
+		  if(pself->VBI_isPressed == 1)
+				fillColor = C_BROWN;
+
+		  /* now draw the shape that was picked to be drawn in this round */
+		  if (g_whatShape > 1)
+		  {
+				if (pself->VBI_state & VBC_SELECTED)
+				{
+					 GrSetAreaColor(gstate, CF_INDEX, C_LIGHT_GRAY, 0, 0);
+					 GrFillEllipse(gstate,
+						pself->VI_bounds.R_left,
+						pself->VI_bounds.R_top,
+						pself->VI_bounds.R_right-1,
+						pself->VI_bounds.R_bottom-1);
+					 GrSetAreaColor(gstate, CF_INDEX, fillColor, 0, 0);
+					 GrFillEllipse(gstate,
+						pself->VI_bounds.R_left+1,
+						pself->VI_bounds.R_top+1,
+						pself->VI_bounds.R_right,
+						pself->VI_bounds.R_bottom);
+				}
+				else
+				{
+					 GrSetAreaColor(gstate, CF_INDEX, C_DARK_GRAY, 0, 0);
+					 GrFillEllipse(gstate,
+						pself->VI_bounds.R_left+1,
+						pself->VI_bounds.R_top+1,
+						pself->VI_bounds.R_right,
+						pself->VI_bounds.R_bottom);
+					 GrSetAreaColor(gstate, CF_INDEX, fillColor, 0, 0);
+					 GrFillEllipse(gstate,
+						pself->VI_bounds.R_left,
+						pself->VI_bounds.R_top,
+						pself->VI_bounds.R_right-1,
+						pself->VI_bounds.R_bottom-1);
+				}
+		  }  /* end g_whatShape > 1 if */
+		  else if (g_whatShape < 1)
+		  {
+				GrSetAreaColor (gstate, CF_INDEX, fillColor, 0, 0);
+				GrFillRect (gstate,     pself->VI_bounds.R_left+1,
+						pself->VI_bounds.R_top+1,
+						pself->VI_bounds.R_right-1,
+						pself->VI_bounds.R_bottom-1);
+
+				GrSetLineColor (gstate, CF_INDEX, leftTopColor, 0, 0);
+				GrDrawVLine (gstate,    pself->VI_bounds.R_left,
+						pself->VI_bounds.R_top,
+						pself->VI_bounds.R_bottom);
+				GrDrawHLine (gstate,    pself->VI_bounds.R_left,
+						pself->VI_bounds.R_top,
+						pself->VI_bounds.R_right);
+				GrSetLineColor (gstate, CF_INDEX, rightBottomColor, 0, 0);
+
+				GrDrawVLine (gstate, pself->VI_bounds.R_right-1,
+							 pself->VI_bounds.R_top,
+							 pself->VI_bounds.R_bottom);
+				GrDrawHLine (gstate, pself->VI_bounds.R_left,
+							 pself->VI_bounds.R_bottom-1,
+							 pself->VI_bounds.R_right-1);
+		  }   /* end g_whatShape > 1 if */
+		  else
+		  {
+				GrSetAreaColor(gstate, CF_INDEX, fillColor, 0, 0);
+				GrFillPolygon(gstate, WINDING, pself->VBI_diamond_points, 4);
+				GrSetLineColor (gstate, CF_INDEX, leftTopColor, 0, 0);
+				GrDrawLine(gstate, pself->VBI_diamond_points[0].P_x,
+						pself->VBI_diamond_points[0].P_y,
+						pself->VBI_diamond_points[1].P_x,
+						pself->VBI_diamond_points[1].P_y);
+				GrSetLineColor (gstate, CF_INDEX, rightBottomColor, 0, 0);
+				GrDrawLine(gstate, pself->VBI_diamond_points[2].P_x,
+						pself->VBI_diamond_points[2].P_y+1,
+						pself->VBI_diamond_points[3].P_x+1,
+						pself->VBI_diamond_points[3].P_y+1);
+				GrDrawLine(gstate, pself->VBI_diamond_points[0].P_x,
+						pself->VBI_diamond_points[0].P_y,
+						pself->VBI_diamond_points[3].P_x+1,
+						pself->VBI_diamond_points[3].P_y+1);
+		  }
+	 }  /* end of is g_isColor if */
+	 else
+	 {
+		  byte color;
+
+		  if (pself->VBI_isPressed == 1)
+		  {
+				if (!(pself->VBI_state & VBC_SELECTED)
+				  && (pself->VBI_state & VBC_MOUSE_DOWN))
+					 color = C_WHITE;
+				else
+					 color = C_BLACK;
+		  }
+		  else
+				color = C_GREEN;
+            
+        GrSetAreaColor(gstate, CF_INDEX, color, 0, 0);
+
+        /* now draw the shape that was picked to be drawn in this round */
+        if (g_whatShape > 1)
+        {
+            GrFillEllipse(gstate, 
+            	pself->VI_bounds.R_left, 
+            	pself->VI_bounds.R_top,
+            	pself->VI_bounds.R_right, 
+            	pself->VI_bounds.R_bottom);
+            GrDrawEllipse(gstate, 
+            	pself->VI_bounds.R_left, 
+            	pself->VI_bounds.R_top,
+            	pself->VI_bounds.R_right, 
+            	pself->VI_bounds.R_bottom);
+        }
+        else if (g_whatShape < 1)
+        {
+            GrFillRect (gstate,     pself->VI_bounds.R_left,
+            		pself->VI_bounds.R_top,
+            		pself->VI_bounds.R_right,
+            		pself->VI_bounds.R_bottom);
+    		GrDrawRect (gstate,     pself->VI_bounds.R_left,
+            		pself->VI_bounds.R_top,
+            		pself->VI_bounds.R_right,
+            		pself->VI_bounds.R_bottom);
+        }
+        else
+        {
+            GrFillPolygon(gstate, WINDING, pself->VBI_diamond_points, 4);
+            GrDrawPolygon(gstate, pself->VBI_diamond_points, 4);
+        }
+    }
+}
+
+
+/***********************************************************************
+ *                              EnsureSelectedState
+***********************************************************************
+ * SYNOPSIS:    This routine checks whether a VisBox object is
+ *              still currently selected; (the user has clicked and
+ *              held on the object).
+ *    
+ * CALLED BY:   Various message handlers for VisBoxClass
+ *              (MSG_META_START_SELECT, MSG_META_PTR, and
+ *              MSG_VIS_LOST_GADGET_EXCL)
+ *    
+ * RETURN:      -1              object is not selected          
+ *               0              object is selected    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:        
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *
+ ***********************************************************************/
+byte EnsureSelectedState(byte newState, byte *oldState) {
+  if (newState) {
+	if (!(*oldState & VBC_SELECTED)) {
+	  *oldState = *oldState | VBC_SELECTED;
+	  return (-1);
+	} else {
+	  return (0);
+	}
+  } else {
+	if (*oldState & VBC_SELECTED) {
+	  *oldState = *oldState & ~VBC_SELECTED;
+	  return (-1);
+	} else {
+	  return (0);
+	}
+  }
+}
+
+
+/***********************************************************************
+ *              MSG_META_START_SELECT for VisBoxClass
+ ***********************************************************************
+ * SYNOPSIS:    This message is sent to the CalVis object
+ *              whenever the user initiates a select-click within its
+ *              visual bounds.  This is automatically called.
+ * PARAMETERS:  
+ *      void (word xPosition, word yPosition, word inputState,
+ *                                      MouseReturnParams *retVal)
+ *    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY: 
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *
+ ***********************************************************************/
+@extern method VisBoxClass, MSG_META_START_SELECT 
+{
+	byte wordbox = 1;
+
+	pself = ObjDerefVis(oself);
+	pself->VBI_state = pself->VBI_state | VBC_MOUSE_DOWN;
+	 
+
+	@call self::MSG_VIS_GRAB_MOUSE();
+	@call @visParent::MSG_VIS_TAKE_GADGET_EXCL(oself);
+
+/* remember, pself->VBI_isWord is referring to the left column */
+		if(pself->VBI_isWord == 1)
+		{
+		   if(g_wordBoxPressed){ /* user is trying to change their choice, reset */
+			  @call @visParent::MSG_VIS_RESET_BOXES(wordbox);
+		   }
+		   g_wordBoxPressed = TRUE;  /* get global var ready for ...END_SELECT */
+		   g_wordboxHorizMidpoint = pself->VI_bounds.R_right - 2;
+		   g_wordboxVertMidpoint = pself->VI_bounds.R_top + 
+			  ((pself->VI_bounds.R_bottom - pself->VI_bounds.R_top)/2);
+		   g_selectedWordBox = pself->VBI_value; /* set the globa var for MSG_META_END_SELECT */
+		}
+		else {        /*DEFBOX is the right column */
+			if(g_defBoxPressed){  /* user is trying to change their choice, reset */
+				wordbox = 0;
+				@call @visParent::MSG_VIS_RESET_BOXES(wordbox);
+			}
+/* now set the globa var for MSG_META_END_SELECT */
+			g_selectedDefBox = pself->VBI_value;
+			g_defBoxPressed = TRUE;
+			g_defboxHorizMidpoint = pself->VI_bounds.R_left;
+			g_defboxVertMidpoint = pself->VI_bounds.R_top + 
+			  ((pself->VI_bounds.R_bottom - pself->VI_bounds.R_top)/2);
+		}
+	pself->VBI_isPressed = 1;
+			   
+	/* 
+	 * If the object is still selected, we tell it to redraw itself.
+	 * (VisBoxClass objects that are selected will be drawn
+	 * differently.)  
+	 */ 
+	if (EnsureSelectedState(VBC_SELECTED, &(pself->VBI_state))) {
+		/* This calls MSG_VIS_DRAW if the object is VA_DRAWABLE. */
+		 @call self::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+	}
+
+	retVal->flags = (MRF_PROCESSED | MRF_CLEAR_POINTER_IMAGE);
+
+}
+
+
+/***********************************************************************
+ *              MSG_META_END_SELECT for VisBoxClass
+ ***********************************************************************
+ * SYNOPSIS:    This message is sent out when the user releases the
+ *              mouse from a previously selected VisBoxClass
+ *              object.      This is automatically called.
+ * PARAMETERS:
+ *      void (word xPosition, word yPosition, word inputState,
+ *                              MouseReturnParams *retVal)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY: this has to handle both alt state and original hence
+ *         the giant if-else statement.  NOTE WE KEEP TRACK OF
+ *		g_incorrect, but we never use it later
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *
+ ***********************************************************************/
+
+@extern method VisBoxClass, MSG_META_END_SELECT 
+{
+	word count;
+
+	@call @visParent::MSG_VIS_RELEASE_GADGET_EXCL(oself);
+
+	retVal->flags = MRF_REPLAY;
+
+/* now if WORDBOX (left column) and a DEFBOX (right column) are selected, check for a match */
+
+	if(g_wordBoxPressed && g_defBoxPressed)
+	{
+		switch(g_selectedDefBox)    /*global var set to the DEFBOX number, which was done by
+		  MSG_META_START_SELECT */
+		{
+
+			case 1:
+				count = 1;
+				if(g_selectedWordBox - g_defbox1Val){ /* values are not same, no match */
+					g_incorrect +=1;
+					PlaySimpleSound(SOUND_ID_WRONG, 5) ;
+				}
+				else{ /* values are the same so is match, set up for line drawn*/
+					@send @visParent::MSG_VIS_CONTENT_SET_LINE(count);
+				}
+				break;
+			case 2:
+				count = 2;
+				if(g_selectedWordBox - g_defbox2Val){
+					g_incorrect +=1;
+					PlaySimpleSound(SOUND_ID_WRONG, 5) ;
+				}
+				else{   
+					@send @visParent::MSG_VIS_CONTENT_SET_LINE(count);
+				}
+				break;
+			case 3:
+				count = 3;
+				if(g_selectedWordBox - g_defbox3Val){
+					g_incorrect +=1;
+					PlaySimpleSound(SOUND_ID_WRONG, 5) ;
+				}
+				else{
+					@send @visParent::MSG_VIS_CONTENT_SET_LINE(count);
+				}
+				break;
+			case 4:
+				count = 4;
+				if(g_selectedWordBox - g_defbox4Val){
+					g_incorrect +=1;
+					PlaySimpleSound(SOUND_ID_WRONG, 5) ;
+				}
+				else{
+					@send @visParent::MSG_VIS_CONTENT_SET_LINE(count);
+				}
+				break;
+			case 5:
+				count = 5;
+				if(g_selectedWordBox - g_defbox5Val){
+					g_incorrect +=1;
+					PlaySimpleSound(SOUND_ID_WRONG, 5) ;
+				}
+				else{
+					@send @visParent::MSG_VIS_CONTENT_SET_LINE(count);
+				}
+				break;
+			case 6:
+				count = 6;
+				if(g_selectedWordBox - g_defbox6Val){
+					g_incorrect +=1;
+					PlaySimpleSound(SOUND_ID_WRONG, 5) ;
+				}
+				else{
+					@send @visParent::MSG_VIS_CONTENT_SET_LINE(count);
+				}
+				break;
+			case 7:
+				count = 7;
+				if(g_selectedWordBox - g_defbox7Val){
+					g_incorrect +=1;
+					PlaySimpleSound(SOUND_ID_WRONG, 5) ;
+				}
+				else{
+					@send @visParent::MSG_VIS_CONTENT_SET_LINE(count);
+				}
+				break;
+		}
+	}
+}
+
+
+/***********************************************************************
+ *              MSG_META_PTR for VisBoxClass
+ ***********************************************************************
+ * SYNOPSIS:    This message handles pointer events once the
+ *              CalVis object has the mouse grab. This handler
+ *              determines if the mouse is still within the visible
+ *              bounds of the object or has roamed outside its bounds.
+ *		 This is automatically called.
+ *     
+ * PARAMETERS:  
+ *      void (word xPosition, word yPosition, word inputState,
+ *                                      MouseReturnParams *retVal)
+ *    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *
+ ***********************************************************************/
+@extern method VisBoxClass, MSG_META_PTR 
+{
+	pself = ObjDerefVis(oself);
+	if (!(pself->VBI_state & VBC_MOUSE_DOWN)) {
+	retVal->flags = MRF_REPLAY;
+	} 
+	else {
+
+	/* 
+	 * Check if the pointer is currently outside the object
+	 * bounds. 
+	 */
+	if ((xPosition < pself->VI_bounds.R_left) ||
+		(xPosition > pself->VI_bounds.R_right) ||
+		(yPosition < pself->VI_bounds.R_top) ||
+		(yPosition > pself->VI_bounds.R_bottom)) {
+
+		/* 
+		 * We are outside, so the user has moved off of the button.
+		 * We make sure the object is deselected.
+		 */ 
+		if (EnsureSelectedState(0, &(pself->VBI_state))) {
+		@call self::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+		}
+	
+	} 
+	else {
+
+		/* 
+		 * Otherwise, the user is over the object, so we make sure
+		 * it is still selected.
+		 */
+		if (EnsureSelectedState(VBC_SELECTED, &(pself->VBI_state))) {
+		@call self::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+		}
+	}
+	/* 
+	 * We've handled this method, and we want to return to the
+	 * default cursor in case someone else set a special cursor
+	 * previously. 
+	 */
+	retVal->flags = MRF_PROCESSED | MRF_CLEAR_POINTER_IMAGE;
+	}
+}
+
+
+/***********************************************************************
+ *              MSG_VIS_LOST_GADGET_EXCL for VisBoxClass
+ ***********************************************************************
+ * SYNOPSIS:    This message handles the case where the gadget
+ *              exclusive is removed from the object before its
+ *              release. This may be done by the specific UI in some
+ *              circumstances, and you should have a message handler
+ *              for those cases. This is automatically called.
+ * 
+ * PARAMETERS:
+ *      void()      
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *
+ ***********************************************************************/
+@extern method VisBoxClass, MSG_VIS_LOST_GADGET_EXCL {
+
+	pself = ObjDerefVis(oself);
+	if (pself->VBI_state & VBC_MOUSE_DOWN) {
+		pself->VBI_state = pself->VBI_state & ~VBC_MOUSE_DOWN;
+		@call self::MSG_VIS_RELEASE_MOUSE();
+		if (EnsureSelectedState(0, &(pself->VBI_state))) {
+			@call self::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+		}
+	}
+}

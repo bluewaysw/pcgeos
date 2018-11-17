@@ -1,0 +1,219 @@
+$Id: doc,v 1.1.9.1 97/03/29 04:30:05 canavese Exp $
+********************************************************************************
+
+	TRANSLATION OF 123 FILES INTO CLIPBOARD FORMAT
+
+********************************************************************************
+
+We will be translating foreign formats into the GeoCalc transfer item format.
+A meta-format does not seem to buy us anything in terms of convenience and
+we definitely pay a price by way of speed and ease of implementation.
+
+Spreadsheet imformation can be classified as follows:
+
+	Cell data
+	Format data
+	Sytle data
+	Name data
+
+The hope is for translation to be done in a single pass.
+
+Percularities of the Lotus 123 format:
+--------------------------------------
+
+Data is stored as a stream of records.  All records are identified by a token
+(Lotus terminology is "opcode") followed by a word containing the length
+followed by the data for the record.
+
+Opcodes can occur only in an allowable order.  Lotus has a table listing the
+"record order".  Basically, all spreadsheet data precedes the cell data.
+
+So, the approach we take is to go through the Lotus file, process the
+spreadsheet data and then process the cell data.
+
+Geocalc transfer item format - the target for import, the source for export:
+----------------------------------------------------------------------------
+
+We basically have 4 VM chains - one for the cell data, one for the format data,
+one for the style data and one for the name data.
+
+Spreadsheet data
+----------------
+
+Stuff that we will handle:
+	Begin & End (of course)
+	Range of Cells
+	Name of range
+	Blank cell
+	Integer cell - we will convert to floating point
+	Floating point number
+	String (Lotus terminology = "label")
+	Formula cell
+	Justification
+
+Stuff that will generate error messages:
+(I am listing some of the Lotus tokens for my own use)
+	Table range
+	Query range
+	Print range
+	Sort range
+	Fill range
+	Primary sort key range
+	Secondary sort key range
+	Distribution range
+	Linear regression ranges (RRANGES) - since we have no current support
+	Matrix ranges (MATRIXRANGES) - since we have no current support
+	Macros
+
+Stuff that will be quietly ignored:
+	Window sizing (WIN1, COLW1, WIN2, COLW2)
+	Split windows (SPLIT)
+	Synchronized windows (SYNC)
+	Cursor location (CURSORW12)
+	Print setup - Lotus uses a null-terminated ASCII string
+	Print margins
+
+Stuff as yet unclassified (mods needed to current code to implement):
+	Calculation mode
+	Calculation order
+	Global protection
+	Header - Lotus uses a null-terminated ASCII string
+	Footer - Lotus uses a null-terminated ASCII string
+	Print borders (TITLES)
+	Graph settings (GRAPH, NGRAPH)
+	Iteration count (CALCCOUNT)
+	Formatted / unformatted printing toggle
+	Worksheet password
+	Hidden columns record (HIDVEC1, HIDVEC2)
+	Parse ranges (PARSERANGES) ?
+
+Notes:
+	For headers and footers, we will need to figure out how best to
+	allocate define our header/footer, ie. how do we search for empty cells
+	for modification.
+
+Questions for me to answer:
+	How is justification specified?
+	What's a parse range?
+	What's a cell pointer index (CPI)
+
+Cell data
+---------
+
+Unsupported data:
+When we encounter something that GeoCalc does not support or understand,
+we send a method to Impex that will allow the translation library to put
+up a box asking the user if we should ignore or bail.  For cells, ignoring
+means enclosing the offending data with an ERR statement.
+
+The import library will have to generate strings of parser tokens.
+
+Cells in Quattro pro are stored column-order and the cells in Lotus have
+row and column info per cell, and they do not state the order that they use
+to store the cells.  This requires that we buffer the cells and sort them.
+
+How do we do this given that the cells are of variable length.
+
+Also, formula data in Lotus is variable to 2064 bytes whereas we only have 256.
+We will treat such cells as "unsupported".
+
+Cell formats
+------------
+
+A cell format byte is stored with each cell.
+
+We should never encounter an unsupported format,  but we may need to generate
+user-defined formats to match the Lotus format because they do not fix the
+number of decimal places for each format.
+
+SO... pseudo code
+-----------------
+	grab next record
+	while token != EOF
+	    if the token is in the set of tokens we process
+		if the token is spreadsheet data
+		    store spreadsheet data
+		else if token is cell data then
+		    buffer cell
+		endif
+	    else
+		ignore
+	    endif
+	    grab next record
+	endfor
+	sort cell data
+
+Ugliness
+--------
+Names:
+    * No problem.
+
+Formulas:
+    * For ones we don't support - @CELL, @@, macros, etc., we will map to ERR.
+
+Floating point numbers:
+    * We will need to write a 64 bit to 80 bit float conversion routine.
+
+Text (Lotus = 'label'):
+    * No problem
+
+Headers & footers:
+    * We need some way to locate cells that can be used for our declaration.
+
+Formats:
+    * Need to map Lotus formats into Spreadsheet formats.  How can this be done
+      cleanly (ie without the translation library knowing what the formats
+      are like)?
+
+********************************************************************************
+
+	EXPORT OF GEOCALC FILES INTO 123 DATA FILES
+
+********************************************************************************
+
+Considerations:
+We are ignoring a fair amount of info when we import, so the question is
+do we the same when we export and leave set stuff we ignore with default
+settings?
+
+The approach I will take right now is to use as much of the available info as
+possible for export.  Whatever info I cannot get at, I will use defaults for
+now and inspect this list later.
+
+Pseudo code
+-----------
+	write out formatting info
+	for all cells
+	    write out cell info
+	endfor
+
+Ugliness
+--------
+Names:
+    * Lotus allows only a 16 character name, whereas we allow much more.
+    * Their names only map to ranges, whereas GeoCalc names can be constants,
+      formulas and references to other names.  
+      Named ranges are easy and will map 1 to 1.
+      We will probably need keep track of all other ranges and perform
+      substitutions as necessary.
+
+Formulas:
+    * We more or less have a superset of Lotus.
+      For functions that have no equivalent in Lotus, is an ERR function
+      acceptable?
+
+Floating point numbers:
+    * Lotus uses the 64 bit IEEE representation, whereas we use 80.
+      Conversion routines need to be written.  If the number is too big,
+      we will export an infinity or error.
+
+Text:
+    * Lotus allows 245 bytes.
+
+Headers & footers:
+    * Lotus headers and footers are just null terminated ASCII strings that
+      are a maximum of 242 bytes long.  We allow...
+
+Formats:
+    * Need code to perform matching.  We can generate formats that Lotus doesn't
+      support.  Do we attempt 'nearest match'?

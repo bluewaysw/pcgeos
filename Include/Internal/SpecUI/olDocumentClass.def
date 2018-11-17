@@ -1,0 +1,249 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1994 -- All Rights Reserved
+
+PROJECT:	SPUI
+MODULE:		
+FILE:		olDocumentClass.def
+
+AUTHOR:		David Litwin, Oct  6, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	10/ 6/94		Initial revision
+
+
+DESCRIPTION:
+	Definition of OLDocumentClass.
+		
+	OLDocument is the OPEN LOOK version of the document object.
+
+	$Id: olDocumentClass.def,v 1.1 97/04/04 14:04:42 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+OLDocumentClass	class OLContentClass
+	uses GenDocumentClass
+
+;-----------------------------------------------------------------------------
+;		Methods
+;-----------------------------------------------------------------------------
+
+MSG_OL_DOCUMENT_CONTINUE_REVERT		message
+;
+;	Finish a revert
+
+MSG_OL_DOCUMENT_CONTINUE_REVERT_QUICK	message
+;
+;	Finish a revert
+
+MSG_OL_DOCUMENT_UPDATE_UI		message
+;
+;	Send update
+
+MSG_OL_DOCUMENT_CONTINUE_CHANGE_TYPE	message
+;
+;	Continue changing the document type
+
+MSG_OL_DOCUMENT_CONTINUE_RENAME	message
+;
+;	Continue changing the name
+;
+; Pass:
+;	ss:bp - FileLongName
+
+MSG_OL_DOCUMENT_DELETE_AFTER_SAVE_ERROR	message
+MSG_OL_DOCUMENT_MOVE_AFTER_SAVE_ERROR	message
+MSG_OL_DOCUMENT_REVERT_AFTER_SAVE_ERROR message
+MSG_OL_DOCUMENT_DELETE_SELECTED_FILE	message
+MSG_OL_DOCUMENT_SAVE_ERROR_RESOLVED	message
+MSG_OL_DOCUMENT_MOVE_AFTER_ERROR_FEEDBACK	message
+MSG_OL_DOCUMENT_DELETE_FILES_FS_NOTIFY	message
+;
+;	Pass:	cx = entry #
+;		bp = GenFileSelectorEntryFlags (GFSEF_OPEN set if double-
+;		     clicked)
+
+MSG_OL_DOCUMENT_CONTINUE_CLOSE_AFTER_DISK_FULL	message
+;
+; Continue closing file after a disk full
+
+MSG_OL_DOCUMENT_AUTO_SAVE_TIMER		message
+;
+; Internal message -- OLDocumentClass uses this message with the timer
+; -- if we used MSG_GEN_DOCUMENT_AUTO_SAVE, then we would erroneously
+; think our timer had fired if an app or other source sent us that
+; message. 
+
+
+
+if VOLATILE_SYSTEM_STATE
+
+MSG_OL_DOCUMENT_WAIT_FOR_QUERY	message
+;
+; Sets OLDA_WAITING_FOR_SAVE_QUERY in the document.
+;
+
+MSG_OL_DOCUMENT_QUERY_IF_WAITING	message
+;
+; If we're waiting for a query, send a MSG_META_QUERY_SAVE_DOCUMENTS to 
+; ourselves.
+;
+; Pass:		nothing
+; Return:	carry set if fired off a query
+;
+
+endif
+
+if FLOPPY_BASED_DOCUMENTS
+
+MSG_OL_DOCUMENT_ADD_SIZE_TO_TOTAL	message
+;
+; Adds our document's size to the passed total.  Used by the document group
+; to sum up the total size of the documents, useful for non-demand-paging
+; systems with limited swap space, where you have to limited the number of
+; open documents.   Also puts up an error box if this document exceeds the
+; memory space available.
+;
+; Pass:		dx.cx -- running total
+;		bp    -- set if a previous file was flagged as too large
+; Return:	dx.cx -- adjusted to add size of GenDocument file
+;		bp    -- set non-zero if this file is too large alone
+;		ax, dx -- destroyed
+;
+endif
+
+MSG_OL_DOCUMENT_CONTINUE_MOVE_TO	message
+;
+;	Continue moving the document
+;
+; Pass:
+;	ss:bp - FileLongName
+
+
+MSG_OL_DOCUMENT_CONTINUE_REVERT_TO_AUTO_SAVE	message
+;
+; Finish a revert to last auto-saved version.
+;
+
+
+MSG_OL_DOCUMENT_CONTINUE_DUPLICATE	message
+;
+;	Continue duplicating a file
+;
+; Pass:
+;	ss:bp - FileLongName
+
+MSG_OL_DOCUMENT_CHECK_CUI_CLOSE		message
+;
+; In CUI, if only one document open, quit app.
+;
+; Pass:
+;	see MSG_GEN_DOCUMENT_CLOSE
+;
+
+
+TEMP_OL_DOCUMENT_NO_DISK_SPACE_MESSAGE	vardata	word
+;
+; The message to send back to ourself after doing the no-disk-space
+; procedure
+
+TEMP_OL_DOCUMENT_FREE_SPACE_DRIVE	vardata word
+;
+; Disk handle of drive we are showing free space for (in disk-full "delete
+; other files" dialog.
+
+TEMP_OL_DOCUMENT_DISK_FULL_RESOLVED	vardata
+;
+; Flag set as soon as disk full is resolved (when queueing 
+; MSG_OL_DOCUMENT_SAVE_ERROR_RESOLVED).  Needed to synchronously stop
+; file change notification handling.
+
+TEMP_OL_DOCUMENT_DETACH_NO_SPACE_ERROR	vardata
+;
+; Set if got out-of-disk-space error while detaching
+
+if HANDLE_DISK_FULL_ON_SAVE_AS
+TEMP_OL_DOCUMENT_SAVE_AS_DISK_FULL	vardata	DocumentCommonParams
+;
+; Stores Save As info for retrying after handling disk full error.
+;
+
+TEMP_OL_DOCUMENT_IGNORE_NEXT_DELETE	vardata
+;
+; Set when save-as fails after some other document is deleted to avoid
+; trying *again* because failed save-as file is deleted.
+;
+endif
+
+ifdef GPC
+TEMP_OL_DOCUMENT_NOT_SAVED		vardata
+;
+; Flag to help display help dialog when document is first saved after
+; new or open.  Set in CreateNewFileCommon.
+;
+endif
+
+TEMP_OL_DOCUMENT_USER_RETRY_SAVE_AS	vardata
+;
+; Flag to indicate save as is being retried by user (Save As dialog appears
+; again.  If we are in GDA_CLOSING mode, don't leave this mode.
+;
+
+
+;-----------------------------------------------------------------------------
+;		Constants & Structures
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+    OLDI_autoSaveTimer		word
+    OLDI_autoSaveTimerID	word
+
+    OLDI_changeTimer		word
+    OLDI_changeTimerID		word
+
+    OLDI_iacpEngConnects	lptr.ChunkArrayHeader
+
+
+
+OLDocumentAttrs	record
+    OLDA_USER_OPENED:1		; non-zero if user has opened the document
+    OLDA_REVERT_BEFORE_CLOSE:1	; non-zero if need to revert the document
+				;  before it is finally closed (user chose
+				;  to discard changes)
+    ; These flags are used in conjunction with DCO_USER_CONFIRM_SAVE
+    ; to avoid putting up the confirmation dialog box multiple times
+    ; when a disk full error occurs during save or update.
+
+    OLDA_SAVE_BEFORE_CLOSE:1	; set if user wants to save the document
+    OLDA_UPDATE_BEFORE_CLOSE:1	; Set if document should be updated,
+				; but not saved, when closed.
+    OLDA_WAITING_FOR_SAVE_QUERY:1
+				; this is set in all documents at the start
+				; of an application switch, then used to query
+				; on document at a time to save their document.
+    :3
+OLDocumentAttrs	end
+
+
+    OLDI_attrs			OLDocumentAttrs
+
+    OLDI_disk			word	; disk & id of the open
+    OLDI_id			FileID	;  file, for search purposes
+    OLDI_saveErrorRes		hptr	; Handle of duplicated resource holding
+					;  dialog for making room to save
+					;  a document on detach.
+if TURN_OFF_BUSY_ON_DOC_CTRL_DIALOG
+    OLDI_busyCount		word	; OLDocMarkBusy/OLDocMarkNotBusy
+endif
+OLDocumentClass	endc
+

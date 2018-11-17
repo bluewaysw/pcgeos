@@ -1,0 +1,143 @@
+#!/bin/sh
+##############################################################################
+#
+# 	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+#
+# PROJECT:	PC GEOS
+# MODULE:	Tools/scripts -- File Installation
+# FILE: 	branchinst
+# AUTHOR: 	Jacob Gabrielson, Aug 1993
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	jag	8/12/93		Initial Revision
+#
+# DESCRIPTION:
+#	This shell script allows Seattlites to install easily to Release20X.
+#	It backs up all files to /staff/pcgeos/Temp
+#
+# USAGE:
+#
+#	This script is intended for Seattle people only
+#
+#	You MUST cd to the directory where you want to install from
+#
+#	% cd /staff/pcgeos/<you>/YourDirectory
+#	% branchinst foo.asm bar.def greebo.ui
+#
+#	Pray it works
+#
+#	The files will have been backed-up to /staff/pcgeos/Temp
+#	with a time-stamp appended to their file-names
+#
+#	$Id: branchinst,v 1.3 93/08/10 16:23:03 jacob Exp $
+#
+###############################################################################
+
+#set -x
+
+CWD=`pwd`				# current working directory
+RHOST="neon"				# berkeley host to rcp to
+TMPDIR="/staff/pcgeos/Temp"
+MSGFILE=/tmp/testinst.$$
+
+# The name we were invoked as (argv[0])
+
+ourname=`basename $0`
+
+# The files to install (i.e. fooMain.asm fooConstant.def)
+
+files="$*"
+
+# The directory in Berkeley where this stuff should be put,
+# for example:
+#
+# /n/hf/pcgeos/stevey/Appl/PCMCIA/ -> /staff/pcgeos/stevey/Appl/PCMCIA/
+
+ddir=/staff/pcgeos/$USER/`expr match "$CWD" ".*$USER/\(.*\)"`
+echo "$ourname: Your development directory would appear to be:"
+echo "	$ddir"
+
+# The directory where ginstall will put the files (i.e. rdir with
+# $USER removed)
+
+idir=`echo $ddir | sed "s,/$USER,,"`
+echo "$ourname: The corresponding install directory would appear to be:"
+echo "	$idir"
+
+# Make the development directory down in Berkeley
+
+rsh $RHOST mkdir -p $ddir
+if [ "$?" -ne 0 ]; then
+	echo "$ourname: ERROR: rsh mkdir on $RHOST failed.  Aborting..."
+	exit 1
+fi
+
+# Install each file passed to us on the command line
+
+drawLine() {
+	echo -------------------------------------------------------------------------------
+}
+
+# Get a message to stick in the revision info
+
+echo "Enter a revision message to give to ginstall for each file."
+echo "Hit ^D on a line by itself to finish."
+
+# Make sure we'll remove $MSGFILE if the user hits ^C
+
+trap "rm -f $MSGFILE" 0 1 2 3 15
+
+cat > $MSGFILE
+
+for i in $files; do
+	drawLine
+
+	# Copy the file down to $USER's developement directory in Berkeley
+
+	echo "$ourname: Copying $i to $ddir"
+	echo "	in Berkeley"
+	rcp $i ${RHOST}:${ddir}
+	if [ "$?" -ne 0 ]; then
+		echo "$ourname: ERROR: rcp to $RHOST failed.  Aborting..."
+		exit 1
+	fi
+
+	# Install the above file in Berkeley
+
+	cat $MSGFILE | rsh neon "(cd $ddir; setenv DISPLAY $DISPLAY; setenv EDITOR /usr/public/emacs; /usr/public/ginstall -bRelease20X $i)"
+	if [ "$?" -ne 0 ]; then
+		echo "$ourname: ERROR: rsh ginstall on $RHOST failed.  Aborting..."
+		exit 1
+	fi
+
+	# Copy the file that ginstall installed down in Berkeley over  
+	# the equivalent file in the installed tree up here
+
+	rm -f ${idir}/$i
+	echo "$ourname: Copying $i from $idir"
+	echo "	in Berkeley to $idir in Seattle"
+	rcp ${RHOST}:${idir}/$i $idir
+	if [ "$?" -ne 0 ]; then
+		echo "$ourname: Warning: rcp failed!"
+	fi
+
+	# Move the local file we installed to a temp directory, so as
+	# there's some way to recover from bizarre errors
+
+	if [ -d $TMPDIR ]; then
+		backupFile="$TMPDIR/$i.`date +%y:%m:%d::%T`"
+		echo "$ourname: Moving $i in Seattle to"
+		echo "	$backupFile"
+		mv $i $backupFile
+	else
+		echo "$ourname: ERROR: temp dir $TMPDIR doesn't exist."
+		echo "	Your file, $i"
+		echo "  is still in your development directory!"
+	fi
+done
+
+rm -f $MSGFILE
+
+drawLine

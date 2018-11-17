@@ -1,0 +1,166 @@
+/**********************************************************************
+ * FILE:  PickList.goc - ThreadListClass Code
+ * Project - News Reader
+ * Started 4/28/98
+ **********************************************************************/
+
+/**********************************************************************
+ * Includes                                                           *
+ **********************************************************************/
+
+@include <stdapp.goh>
+
+@include "utils.goh"
+#include <ansi/stdio.h>
+#include <ansi/stdlib.h>
+#include <ansi/string.h>
+
+@include "newsread.goh"
+@include "extern.goh"
+@include "Localize/strings.goh"
+@include "newsdata.goh"
+@include "options.goh"
+
+
+/**********************************************************************
+ * Class Declarations                                                 *
+ **********************************************************************/
+
+/**********************************************************************
+ * Global Variables                                                   *
+ **********************************************************************/
+
+word G_pickListType = NGLV_SUBSCRIBED ;
+
+
+/**********************************************************************
+ * Methods                                                            *
+ **********************************************************************/
+
+/*-------------------------------------------------------------------------
+ | Method:  NewsProcessClass::MSG_NP_PICK_LIST_TYPE_CHANGED
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Change to a different list (subscribed or all)
+ |
+ | Inputs:
+ |    word selection              -- Selected item
+ |    word numSelections          -- Number of items selected (ignored)
+ |    GenItemGroupStateFlags stateFlags -- State of UI object (ignored)
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    EDG  ??/??/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@extern method NewsProcessClass, MSG_NP_PICK_LIST_TYPE_CHANGED
+{
+  /* Record new selection */
+  G_pickListType = selection;
+
+  /* Startup the new initialization */
+  @send oself::MSG_NP_PICK_LIST_INITIALIZE();
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  NewsProcessClass::MSG_NP_PICK_LIST_GET_TYPE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Return the current selected list.
+ |
+ | Outputs:
+ |    word                        -- Current selection
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    EDG  ??/??/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@extern method NewsProcessClass, MSG_NP_PICK_LIST_GET_TYPE
+{
+    return(G_pickListType);
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  NewsProcessClass::MSG_NP_PICK_LIST_INITIALIZE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Startup the list based on which list it has to view.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    EDG  ??/??/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@extern method NewsProcessClass, MSG_NP_PICK_LIST_INITIALIZE
+{
+    word count;
+
+    NewsDataLock() ;
+
+    /* Pick one */
+    switch(G_pickListType) {
+        case NGLV_SUBSCRIBED:
+            count = NewsDataCountNewsgroups() ;
+            break;
+        case NGLV_ALL:
+            count = NewsDataCountUnsubNewsgroups() ;
+            break;
+    }
+
+    NewsDataUnlock() ;
+
+    /* Initialize that list based on its size */
+    @call PickGroupList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(count);
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  NewsProcessClass::MSG_NP_PICK_LIST_MONIKER_QUERY
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Get the information for a single list item
+ |
+ | Inputs:
+ |    optr list                   -- Which list needs the moniker
+ |    word item                   -- What item on the list is needed
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    EDG  ??/??/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@extern method NewsProcessClass, MSG_NP_PICK_LIST_MONIKER_QUERY
+{
+    NewsgroupEntry *p_group;
+    UnsubscribedGroupEntry *p_unsub ;
+
+    /* Based on the type, pull out a subscribed name or */
+    /* an unsubscribed name */
+    switch(G_pickListType) {
+        case NGLV_SUBSCRIBED:
+            p_group = NewsDataGroupLock(item) ;
+            @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
+                      item,
+                      p_group->NE_groupName);
+
+            NewsDataGroupUnlock(p_group) ;
+            break;
+
+        case NGLV_ALL:
+            /* On unsubscribed newsgroups, just show their name */
+            p_unsub = NewsDataUnsubGroupLock(item) ;
+            @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
+                      item,
+                      p_unsub->UGE_text);
+            NewsDataUnsubGroupUnlock(p_unsub) ;
+            break;
+    }
+}

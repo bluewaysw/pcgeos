@@ -1,0 +1,361 @@
+//========================================================================
+//
+// Catalog.cc
+//
+// Copyright 1996 Derek B. Noonburg
+//
+//========================================================================
+
+#ifdef __GNUC__
+#pragma implementation
+#endif
+
+@include "pdfvu.goh"
+@include "catalog.goh"
+@include "obj.goh"
+@include "page.goh"
+@include "xref.goh"
+@include "diction.goh"
+@include "array.goh"
+
+//------------------------------------------------------------------------
+// Catalog
+//------------------------------------------------------------------------
+
+void CatalogInitNull(Catalog *cat) {
+
+  cat->pages = NULL;
+#ifdef KEEP_PAGE_REFS
+  cat->pageRefs = NULL;
+#endif
+  cat->numPages = 0;
+  initNull(&cat->dests);
+  initNull(&cat->nameTree);
+
+}
+
+void CatalogInit(Catalog *cat, Obj *catDict, VMFileHandle vmFile, XRef *xref) {
+  Obj pagesDict;
+  Obj obj;
+  long i;
+  Page pageTemplate;
+
+  cat->ok = gTrue;
+  cat->pages = NULL;
+#ifdef KEEP_PAGE_REFS
+  cat->pageRefs = NULL;
+#endif
+  cat->numPages = 0;
+
+  if (!ObjIsDictSame(catDict, "Catalog")) {
+//    error(-1, "Catalog object is wrong type (%s)", catDict->getTypeName());
+    EC_WARNING(-1);
+    goto err1;
+  }
+
+  // read page tree
+  ObjDictLookup(catDict, "Pages", &pagesDict, xref);
+  if (!ObjIsDictSame(&pagesDict, "Pages")) {
+//    error(-1, "Top-level pages object is wrong type (%s)",
+//	  pagesDict.getTypeName());
+    EC_WARNING(-1);
+    goto err2;
+  }
+  ObjDictLookup(&pagesDict, "Count", &obj, xref);
+  if (!isInt(&obj)) {
+//    error(-1, "Page count in top-level pages object is wrong type (%s)",
+//	  obj.getTypeName());
+    EC_WARNING(-1);
+    goto err3;
+  }
+  cat->numPages = getInt(&obj);
+  ObjFree(&obj);
+
+	/*
+	 * Init a hugearray to hold the page data.
+	 * Initialize the elements to invalid pages.
+	 */
+  cat->vmFile = vmFile;
+  cat->pages = HugeArrayCreate(vmFile, sizeof(Page), 0);
+  pageTemplate.ok = gFalse;
+  HugeArrayAppend(vmFile, cat->pages,
+		  cat->numPages, &pageTemplate);
+
+#if 0
+  cat->pages = (Page *)gmalloc(cat->numPages * sizeof(Page));
+#ifdef KEEP_PAGE_REFS
+  cat->pageRefs = (Ref *)gmalloc(cat->numPages * sizeof(Ref));
+#endif
+  for (i = 0; i < cat->numPages; ++i) {
+    cat->pages[i].ok = gFalse;
+#ifdef KEEP_PAGE_REFS
+    cat->pageRefs[i].num = -1;
+    cat->pageRefs[i].gen = -1;
+#endif
+  }
+#endif
+  CatalogReadPageTree(cat, getDict(&pagesDict), NULL, 0, xref);
+  ObjFree(&pagesDict);
+
+  // read named destination dictionary
+  ObjDictLookup(catDict, "Dests", &cat->dests, xref);
+
+  // read root of named destination tree
+  ObjDictLookup(catDict, "Names", &obj, xref);
+  if (isDict(&obj))
+    ObjDictLookup(&obj, "Dests", &cat->nameTree, xref);
+  else
+    initNull(&cat->nameTree);
+  ObjFree(&obj);
+
+  return;
+
+ err3:
+  ObjFree(&obj);
+ err2:
+  ObjFree(&pagesDict);
+ err1:
+  initNull(&cat->dests);
+  initNull(&cat->nameTree);
+  cat->ok = gFalse;
+}
+
+void CatalogFree(Catalog *cat) {
+  long i;
+  Page *page;
+
+  if (cat->pages) {
+    for (i = 0; i < cat->numPages; ++i) {
+	page = CatalogLockPage(cat, i+1);
+	if (PageIsOk(page))
+	    PageFree(page);
+	CatalogUnlockPage(page);
+    }
+    HugeArrayDestroy(cat->vmFile, cat->pages);
+//    gfree(cat->pages);
+  }
+#ifdef KEEP_PAGE_REFS
+  gfree(cat->pageRefs);
+#endif
+  ObjFree(&cat->dests);
+  ObjFree(&cat->nameTree);
+}
+
+long CatalogReadPageTree(Catalog *cat, Dict *pagesDict, PageAttrs *attrs, long start, XRef *xref) {
+  Obj kids;
+  Obj kid;
+  Obj kidRef;
+  PageAttrs attrs1, attrs2;
+  Page page;
+  long i;
+
+  PageAttrsInit(&attrs1, attrs, pagesDict, xref);
+  DictLookup(pagesDict, "Kids", &kids, xref);
+  if (!isArray(&kids)) {
+//    error(-1, "Kids object (page %d) is wrong type (%s)",
+//	  start+1, kids.getTypeName());
+    EC_WARNING(-1);
+    goto err1;
+  }
+  for (i = 0; i < ObjArrayGetLength(&kids); ++i) {
+    ObjArrayGet(&kids, i, &kid, xref);
+    if (ObjIsDictSame(&kid, "Page")) {
+      PageAttrsInit(&attrs2, &attrs1, getDict(&kid), xref);
+      PageInit(&page, start+1, getDict(&kid), &attrs2);
+      PageAttrsFree(&attrs2);
+
+      if (!PageIsOk(&page)) {
+	++start;
+	goto err3;
+      }
+
+      HugeArrayReplace(cat->vmFile, cat->pages, 1, start, &page);
+//      memcpy(&cat->pages[start], &page, sizeof (Page));
+
+#ifdef KEEP_PAGE_REFS
+      ObjArrayGetNF(&kids, i, &kidRef);
+      if (isRef(&kidRef)) {
+	cat->pageRefs[start].num = getRefNum(&kidRef);
+	cat->pageRefs[start].gen = getRefGen(&kidRef);
+      }
+      ObjFree(&kidRef);
+#endif
+
+      ++start;
+
+    //~ found one PDF file where a Pages object is missing the /Type entry
+    // } else if (kid.isDict("Pages")) {
+    } else if (isDict(&kid)) {
+      if ((start = CatalogReadPageTree(cat, getDict(&kid), &attrs1, start, xref)) < 0)
+	goto err2;
+    } else {
+//      error(-1, "Kid object (page %d) is wrong type (%s)",
+//	    start+1, kid.getTypeName());
+      EC_WARNING(-1);
+      goto err2;
+    }
+    ObjFree(&kid);
+  }
+  PageAttrsFree(&attrs1);
+  ObjFree(&kids);
+  return start;
+
+ err3:
+  PageFree(&page);
+  EC_WARNING(-1);
+ err2:
+  ObjFree(&kid);
+  EC_WARNING(-1);
+ err1:
+  ObjFree(&kids);
+  PageAttrsFree(&attrs1);
+  cat->ok = gFalse;
+  EC_WARNING(-1);
+  return -1;
+}
+
+#ifdef KEEP_PAGE_REFS
+
+long CatalogFindPage(Catalog *cat, long num, long gen) {
+  long i;
+
+  for (i = 0; i < cat->numPages; ++i) {
+    if (cat->pageRefs[i].num == num && cat->pageRefs[i].gen == gen)
+      return i + 1;
+  }
+  return 0;
+}
+#endif
+
+#if 0
+
+LinkDest *CatalogFindDest(Catalog *cat, GooString *name) {
+  LinkDest *dest;
+  Obj obj1, obj2;
+  GBool found;
+
+  // try named destination dictionary then name tree
+  found = gFalse;
+  if (isDict(&cat->dests)) {
+    DictLookup(&cat->dests, GStrGetCString(name), &obj1)
+    if (!isNull(&obj1))
+      found = gTrue;
+    else
+      ObjFree(&obj1);
+  }
+  if (!found && isDict(&cat->nameTree)) {
+    CatalogFindDestInTree(cat, &cat->nameTree, name, &obj1)
+    if (!isNull(&obj1)
+      found = gTrue;
+    else
+      ObjFree(&obj1);
+  }
+  if (!found)
+    return NULL;
+
+  // construct LinkDest
+  dest = NULL;
+  if (obj1.isArray()) {
+    dest = new LinkDest(obj1.getArray(), gTrue);
+  } else if (obj1.isDict()) {
+    if (obj1.dictLookup("D", &obj2)->isArray())
+      dest = new LinkDest(obj2.getArray(), gTrue);
+    else
+//      error(-1, "Bad named destination value");
+      EC_WARNING(-1);
+    obj2.free();
+  } else {
+//    error(-1, "Bad named destination value");
+    EC_WARNING(-1);
+  }
+  obj1.free();
+
+  return dest;
+}
+
+Object *Catalog::findDestInTree(Object *tree, GString *name, Object *obj) {
+  Object names, name1;
+  Object kids, kid, limits, low, high;
+  GBool done, found;
+  long cmp, i;
+
+  // leaf node
+  if (tree->dictLookup("Names", &names)->isArray()) {
+    done = found = gFalse;
+    for (i = 0; !done && i < names.arrayGetLength(); i += 2) {
+      if (names.arrayGet(i, &name1)->isString()) {
+	cmp = name->cmp(name1.getString());
+	if (cmp == 0) {
+	  names.arrayGet(i+1, obj);
+	  found = gTrue;
+	  done = gTrue;
+	} else if (cmp < 0) {
+	  done = gTrue;
+	}
+	name1.free();
+      }
+    }
+    names.free();
+    if (!found)
+      obj->initNull();
+    return obj;
+  }
+  names.free();
+
+  // root or intermediate node
+  done = gFalse;
+  if (tree->dictLookup("Kids", &kids)->isArray()) {
+    for (i = 0; !done && i < kids.arrayGetLength(); ++i) {
+      if (kids.arrayGet(i, &kid)->isDict()) {
+	if (kid.dictLookup("Limits", &limits)->isArray()) {
+	  if (limits.arrayGet(0, &low)->isString() &&
+	      name->cmp(low.getString()) >= 0) {
+	    if (limits.arrayGet(1, &high)->isString() &&
+		name->cmp(high.getString()) <= 0) {
+	      findDestInTree(&kid, name, obj);
+	      done = gTrue;
+	    }
+	    high.free();
+	  }
+	  low.free();
+	}
+	limits.free();
+      }
+      kid.free();
+    }
+  }
+  kids.free();
+
+  // name was outside of ranges of all kids
+  if (!done)
+    obj->initNull();
+
+  return obj;
+}
+
+#endif /* 0 */
+
+  // Is catalog valid?
+  GBool CatalogIsOk(Catalog *cat) { return cat->ok; }
+
+  // Get number of pages.
+  long CatalogGetNumPages(Catalog *cat) { return cat->numPages; }
+
+  // Get a page.
+//  Page *CatalogGetPage(Catalog *cat, long i) { return &cat->pages[i-1]; }
+
+Page *CatalogLockPage(Catalog *cat, long i) { 
+    Page *retVal;
+    word tmp;
+
+    HugeArrayLock(cat->vmFile, cat->pages,
+		  i-1, &retVal, &tmp);
+
+    return retVal;
+
+//    return &cat->pages[i-1]; 
+}
+
+void CatalogUnlockPage(Page *page) {
+    HugeArrayUnlock(page);
+}

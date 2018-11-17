@@ -1,0 +1,638 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		CommonUI/CMain
+FILE:		cmainPenInputControl.def
+
+
+REVISION HISTORY:
+	
+	Name	Date		Description
+	----	----		-----------
+	atw	7/13/92		Initial revision
+	dlitwin	4/12/94		Moved from UI to SPUI, renamed from 
+				uiPIClass.def to cmainPIClass.def
+	dlitwin	5/13/94		renamed cmainPenInputControl.def just
+				because it is more appropriate
+
+
+DESCRIPTION:
+	Contains class declarations and constants for the PenInputController
+		
+	$Id: cmainPenInputControl.def,v 1.1 97/04/07 10:52:33 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+KeyPic		struct
+    KP_top	word	(?)
+    KP_left	word	(?)
+    KP_bottom	word	(?)
+    KP_right	word	(?)
+    KP_exists	byte	(?)
+KeyPic		ends
+
+KeyboardSize		etype	word, 0, 1
+    KS_STANDARD		enum	KeyboardSize
+    KS_ZOOMER		enum	KeyboardSize
+
+
+BACKSPACE_SCANCODE	equ	0eh
+TAB_SCANCODE		equ	0fh
+ENTER_SCANCODE		equ	1ch
+LCTRL_SCANCODE		equ	1dh
+LSHIFT_SCANCODE		equ	2ah
+RSHIFT_SCANCODE		equ	36h
+SPACE_SCANCODE		equ	39h
+CAPS_LOCK_SCANCODE	equ	3ah
+DELETE_SCANCODE		equ	53h
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Common Floating Keyboard Constants
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+CHAR_TABLE_TOP_BOTTOM_MARGIN			equ	1
+CHAR_TABLE_VIRTUAL_CHAR_LEFT_RIGHT_MARGIN	equ	2
+NUM_HWR_BOXES					equ	7
+HWR_GRID_FUDGE_FACTOR				equ	5
+HWR_TOOLS_WIDTH					equ	109
+HWR_TOOLS_HEIGHT				equ	19
+
+
+
+if INITFILE_KEYBOARD or STANDARD_KEYBOARD
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Standard Floating Keyboard
+	For the initfile keyboard, we default to the standard (bullet) size
+	and change later to zoomer size (if we need to) when we tweak the
+	duplicated UI
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+; The standard floating keyboard is 12-point
+;
+KEYBOARD_LETTER_FONT_TYPE				equ	FID_UNIVERSITY
+KEYBOARD_LETTER_FONT_SIZE				equ	12
+KEYBOARD_WORD_FONT_TYPE					equ	FID_UNIVERSITY
+KEYBOARD_WORD_FONT_SIZE					equ	12
+
+KEYBOARD_CHAR_TABLE_RECT_HEIGHT				equ	21
+KEYBOARD_CHAR_TABLE_RECT_WIDTH				equ	24
+
+; The # pixels that ink has to overlap a grid cell before we say that
+; the user is *trying* to enter ink into the cell
+;
+KEYBOARD_HWR_GRID_WIDTH					equ	40
+KEYBOARD_HWR_GRID_VERTICAL_MARGIN			equ	11
+KEYBOARD_HWR_GRID_HORIZONTAL_MARGIN			equ	4
+KEYBOARD_HWR_GRID_HEIGHT 				equ	36
+
+KEYBOARD_CHAR_TABLE_WIDTH	equ	(KEYBOARD_CHAR_TABLE_RECT_WIDTH*13) + 1
+KEYBOARD_CHAR_TABLE_HEIGHT	equ	(KEYBOARD_CHAR_TABLE_RECT_HEIGHT*5) + \
+					(CHAR_TABLE_TOP_BOTTOM_MARGIN*2)
+
+FLOATING_KEYBOARD_MAX_HEIGHT	equ	KEYBOARD_CHAR_TABLE_HEIGHT+1
+FLOATING_KEYBOARD_MAX_WIDTH	equ	KEYBOARD_CHAR_TABLE_WIDTH
+
+
+endif		; if INITFILE_KEYBOARD or STANDARD_KEYBOARD
+
+
+if INITFILE_KEYBOARD or ZOOMER_KEYBOARD
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Zoomer Floating Keyboard
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+; The Zoomer floating keyboard is 9-point.
+;
+ZOOMER_FONT_TYPE					=	FID_UNIVERSITY
+ZOOMER_FONT_SIZE					=	9
+
+ZOOMER_CHAR_TABLE_RECT_HEIGHT				equ	15
+ZOOMER_CHAR_TABLE_RECT_WIDTH				equ	18
+
+; The # pixels that ink has to overlap a grid cell before we say that
+; the user is *trying* to enter ink into the cell
+;
+ZOOMER_HWR_GRID_WIDTH					equ	33
+ZOOMER_HWR_GRID_VERTICAL_MARGIN				equ	8
+ZOOMER_HWR_GRID_HORIZONTAL_MARGIN			equ	2
+ZOOMER_HWR_GRID_HEIGHT 					equ	32
+
+ZOOMER_CHAR_TABLE_WIDTH		equ	(ZOOMER_CHAR_TABLE_RECT_WIDTH*13) + 1
+ZOOMER_CHAR_TABLE_HEIGHT	equ 	(ZOOMER_CHAR_TABLE_RECT_HEIGHT*5) + \
+					(CHAR_TABLE_TOP_BOTTOM_MARGIN*2)
+
+if ZOOMER_KEYBOARD
+KEYBOARD_LETTER_FONT_SIZE		equ ZOOMER_FONT_SIZE
+KEYBOARD_LETTER_FONT_TYPE		equ ZOOMER_FONT_TYPE
+KEYBOARD_WORD_FONT_SIZE			equ ZOOMER_FONT_SIZE
+KEYBOARD_WORD_FONT_TYPE			equ ZOOMER_FONT_TYPE
+KEYBOARD_CHAR_TABLE_RECT_HEIGHT		equ ZOOMER_CHAR_TABLE_RECT_HEIGHT
+KEYBOARD_CHAR_TABLE_RECT_WIDTH		equ ZOOMER_CHAR_TABLE_RECT_WIDTH
+KEYBOARD_HWR_GRID_WIDTH			equ ZOOMER_HWR_GRID_WIDTH
+KEYBOARD_HWR_GRID_VERTICAL_MARGIN	equ ZOOMER_HWR_GRID_VERTICAL_MARGIN
+KEYBOARD_HWR_GRID_HORIZONTAL_MARGIN	equ ZOOMER_HWR_GRID_HORIZONTAL_MARGIN
+KEYBOARD_HWR_GRID_HEIGHT		equ ZOOMER_HWR_GRID_HEIGHT
+KEYBOARD_CHAR_TABLE_WIDTH		equ ZOOMER_CHAR_TABLE_WIDTH
+KEYBOARD_CHAR_TABLE_HEIGHT		equ ZOOMER_CHAR_TABLE_HEIGHT
+FLOATING_KEYBOARD_MAX_HEIGHT	equ	KEYBOARD_CHAR_TABLE_HEIGHT+1
+FLOATING_KEYBOARD_MAX_WIDTH	equ	KEYBOARD_CHAR_TABLE_WIDTH
+endif		; if ZOOMER_KEYBOARD
+
+endif		; if INITFILE_KEYBOARD or ZOOMER_KEYBOARD
+
+
+
+if STYLUS_KEYBOARD
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Stylus Floating Keyboard
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+KEYBOARD_CHAR_TABLE_RECT_HEIGHT			equ	15
+KEYBOARD_CHAR_TABLE_RECT_WIDTH			equ	18
+
+KEYBOARD_CHAR_TABLE_WIDTH	equ	(KEYBOARD_CHAR_TABLE_RECT_WIDTH*13) + 1
+KEYBOARD_CHAR_TABLE_HEIGHT	equ 	(KEYBOARD_CHAR_TABLE_RECT_HEIGHT*5) + \
+					(CHAR_TABLE_TOP_BOTTOM_MARGIN*2)
+KEYBOARD_HWR_GRID_WIDTH				equ	33
+KEYBOARD_HWR_GRID_VERTICAL_MARGIN		equ	4
+KEYBOARD_HWR_GRID_HORIZONTAL_MARGIN		equ	2
+KEYBOARD_HWR_GRID_HEIGHT			equ	32
+endif		; if STYLUS_KEYBOARD
+
+
+
+MyKeyState	record
+    MKS_PRESSED:1	;TRUE: key is "down"
+    :1
+    MKS_ACCENT_CHANGE:1	;TRUE: change in accent state
+			;	(not actually used in KeyboardStruct tables as
+			;	 keyboard drive doesn't give us this info)
+			;	(used in VisKeyboard VKI_modState instance data)
+    MKS_ACCENTABLE:1	;TRUE: is accentable
+    MKS_CAPSLOCK:1	;TRUE: is CAPSLOCK
+    MKS_ALT:1		;TRUE: is ALT key
+    MKS_CTRL:1		;TRUE: is CTRL key
+    MKS_SHIFT:1		;TRUE: is SHIFT key
+MyKeyState	end
+
+MKS_STATE_KEY	equ	mask MKS_CAPSLOCK or mask MKS_ALT \
+			or mask MKS_CTRL or mask MKS_SHIFT
+
+MKS_TEMP_STATE_KEY	equ	mask MKS_ALT or mask MKS_SHIFT \
+				or mask MKS_CTRL or mask MKS_ACCENT_CHANGE
+
+KeyboardStruct	struct
+    KS_keys	KeyMapStruct		;which characters are on key
+    KS_state	MyKeyState		;state of key
+KeyboardStruct	ends
+
+VisKeyboardExtraStateBits	record
+	VKESB_SYMBOL:1
+	VKESB_INTERNATIONAL:1
+	:6
+VisKeyboardExtraStateBits	end
+
+VKESB_TEMP_STATE_KEY	equ	mask VKESB_SYMBOL or mask VKESB_INTERNATIONAL
+
+
+if STYLUS_KEYBOARD
+
+StylusSymIntStruct struct
+	SSITE_symbol	TCHAR
+	SSITE_lowerInt	TCHAR
+	SSITE_upperInt	TCHAR
+StylusSymIntStruct ends
+
+endif
+
+;----------------------------------------------------------------------------
+;		Class Definitions
+;----------------------------------------------------------------------------
+
+NotifyEnabledStateGenViewClass	class	GenViewClass
+; This is a class that notifies its VisContent of its enabled state, via
+; MSG_VIS_SET_ATTR
+NotifyEnabledStateGenViewClass	endc
+
+KEY_CLICK_SOUNDS	equ	1
+
+VisCachedGStateClass	class	VisClass
+
+;	This is a class that creates a cached gstate on VisOpen, and destroys
+;	it on VisClose.
+
+	VCGSI_gstate	hptr.GState	;Gstate to draw through (or 0 if not
+					; on screen)	
+VisCachedGStateClass	endc
+
+
+	;
+	; This is a class designed to draw a VisKeyboard.
+	;
+VisKeyboardClass	class	VisCachedGStateClass
+;------------------------------ Methods -------------------------------------
+if INITFILE_KEYBOARD
+MSG_VIS_KEYBOARD_SET_TO_ZOOMER_SIZE	message
+;	Sent when the UI is being tweaked after being duplicated, if the
+; INITFILE_KEYBOARD conditional is set and the .ini file indicates the 
+; Zoomer keyboard.
+;
+; Context:	Sent when tweaking duplicated UI
+; Source:	InitPenInputControlUISizes
+; Destination:  A VisKeyboardClass object
+; Interception: Not likely...
+;
+; Pass:		nothing
+; Return:	nothing
+; Destroyed:	nothing
+;
+endif		; if INITFILE_KEYBOARD
+
+;----------------------------------------------------------------------------
+
+
+;------------------------------ Vardata -------------------------------------
+if STYLUS_KEYBOARD
+ATTR_VIS_KEYBOARD_NO_HWR_GRID	vardata
+;	This attr is set if the GPICF_HWR_ENTRY_AREA feature bit isn't
+; set, meaning we have no HWRGrid, so the keyboard shouldn't draw one 
+; in its faked GenItemGroup.
+;
+endif
+;--------------------------- Instance data ----------------------------------
+	VKI_modState		MyKeyState
+	VKI_extraState		VisKeyboardExtraStateBits
+	VKI_kbsHandle		lptr.KeyboardStruct
+	VKI_accentInfo		word
+	VKI_hasAltGr		byte
+
+	VKI_kbdLayoutOffset	lptr.KeyPic	; Offset to array of KeyPic
+						;  structures for each scancode
+	VKI_kbdLayoutLength	byte		; Length of above array
+	VKI_kbdDrawOutlines	nptr.near	; near call (in VisKeyboardCode)
+						;  to routine to draw the 
+						;  outlines of the keyboard:
+						;  Pass:	*ds:si = our obj
+						;		^hdi = GState
+						;  Return:	nothing
+						;  Destroyed:	ax, bx, cx, dx
+
+	VKI_keyHeight		word
+
+	VKI_letterFontType	FontID		; FontType of single letter keys
+	VKI_letterFontSize	word		; FontSize of single letter keys
+	VKI_wordFontType	FontID		; FontType of keys with words
+	VKI_wordFontSize	word		; FontSize of keys with words
+	VKI_shiftRelease	byte		; should shift release CapsLock
+VisKeyboardClass	endc
+
+
+
+if INCLUDE_VIS_CHARTABLE_CLASS
+
+;	This is a class that draws a character table on the screen, and passes
+;	the chars clicked on to the currently targeted text object.
+VisCharTableClass	class	VisCachedGStateClass
+;------------------------------ Methods -------------------------------------
+FIRST_SPECIAL_CHAR_IN_LAST_ROW	equ	9
+
+
+	ATTR_VIS_CHAR_TABLE_DATA	vardata	lptr
+	; The chunk handle of the data used to draw the character tables.
+
+	ATTR_CHAR_TABLE_SPECIAL_LAST_LINE	vardata	word
+	; data to indicate if the object has the special last line layout
+	;	data word describes last line layout of 9th char and up
+	;		0: Tab Space Enter BS
+	;		1: Enter BS
+
+
+MSG_CHAR_TABLE_GET_CUSTOM_CHAR_TABLE_DATA		message
+;
+; Copies the data in the CharTableData structure in the PenInputControl
+; to the instance data ofthe CustomCharTable object
+;
+; Pass: dx:bp - pointer to the CharTableData structure
+;
+
+if INITFILE_KEYBOARD
+MSG_VIS_CHAR_TABLE_SET_TO_ZOOMER_SIZE	message
+;	Sent when the UI is being tweaked after being duplicated, if the
+; INITFILE_KEYBOARD conditional is set and the .ini file indicates the 
+; Zoomer keyboard.
+;
+; Context:	Sent when tweaking duplicated UI
+; Source:	InitPenInputControlUISizes
+; Destination:  A VisCharTableClass object
+; Interception: Not likely...
+;
+; Pass:		nothing
+; Return:	nothing
+; Destroyed:	nothing
+;
+endif		; if INITFILE_KEYBOARD
+
+;--------------------------- Instance data ----------------------------------
+	VCTI_line1		optr
+	VCTI_line2		optr
+	VCTI_line3		optr
+	VCTI_line4		optr
+	VCTI_line5		optr
+
+	VCTI_fontType		FontID		; FontType of char table keys
+	VCTI_fontSize		word		; FontSize of char table keys
+VisCharTableClass	endc
+
+endif		; if INCLUDE_VIS_CHARTABLE_CLASS
+
+
+	;
+	; VisHWRGridClass
+	;
+VisHWRGridClass	class	VisCachedGStateClass
+HWRStatus	etype	byte
+	HWRS_NOT_ON_SCREEN		enum	HWRStatus
+	HWRS_VIEWING_TEXT		enum	HWRStatus
+	HWRS_WAITING_FOR_CONTEXT_UPDATE	enum	HWRStatus
+
+
+HWR_FONT	equ	FID_BERKELEY
+HWR_POINT_SIZE	equ	18
+
+
+;------------------------------ Methods -------------------------------------
+;
+;	Messages sent by triggers to scroll the HWR entry area
+;
+;	Pass: nothing
+;	Return: nothing
+;	Destroy: ax, cx, dx, bp
+;
+MSG_HWR_GRID_AREA_GOTO_START			message
+MSG_HWR_GRID_AREA_PAGE_BACK			message
+MSG_HWR_GRID_AREA_STEP_BACK			message
+MSG_HWR_GRID_AREA_STEP_FORWARD			message
+MSG_HWR_GRID_AREA_PAGE_FORWARD			message
+MSG_HWR_GRID_AREA_GOTO_END			message
+
+MAX_CONTEXT_CHARS		equ	500
+	;The # chars to get in one context call
+
+MAX_CHARS_IN_CONTEXT_OBJECT	equ	25
+	;The # chars to display in the context object above the HWR Grid
+
+if INITFILE_KEYBOARD
+MSG_VIS_HWR_GRID_SET_TO_ZOOMER_SIZE	message
+;	Sent when the UI is being tweaked after being duplicated, if the
+; INITFILE_KEYBOARD conditional is set and the .ini file indicates the 
+; Zoomer keyboard.
+;
+; Context:	Sent when tweaking duplicated UI
+; Source:	InitPenInputControlUISizes
+; Destination:  A VisHWRGridClass object
+; Interception: Not likely...
+;
+; Pass:		nothing
+; Return:	nothing
+; Destroyed:	nothing
+;
+endif		; if INITFILE_KEYBOARD
+
+;--------------------------- Instance data ----------------------------------
+	VHGI_context	hptr		0
+	; A block containing context data
+
+	VHGI_object	optr	
+	VHGI_position	dword		0
+	VHGI_status	HWRStatus	HWRS_NOT_ON_SCREEN
+	noreloc VHGI_context
+
+VisHWRGridClass	endc
+
+;
+;	These subclasses will pass ink queries off to the HWRGrid object.
+;
+HWRGridContextTextClass	class	GenTextClass
+HWRGridContextTextClass	endc
+
+;	Requires a local variable "libHandle"
+
+CallHWRLibrary	macro	entrynum
+	mov	ax, entrynum
+	mov	bx, libHandle
+	call	ProcGetLibraryEntry
+	call	ProcCallFixedOrMovable
+
+endm
+
+GestureHeader	struct
+	GH_gestureType	GestureType
+	; the particular gesture type
+	;
+	GH_rectangle	Rectangle
+	; the bounding rectangle of the gesture if it applies
+	;	
+	GH_data		label	word
+	; data specific to the particular type of gesture
+	;
+GestureHeader	ends
+
+
+if INCLUDE_VIS_KEYMAP_CLASS
+
+KeymapDesc struct
+	KMD_layoutOffset	nptr.Rectangle	; Offset to array of Rectangle
+						;  structures for each scancode
+	KMD_layoutLength	byte		; Length of above array
+	KMD_layoutChars		lptr		; Lptr to a chunk of characters
+						;  layed out in an array in 
+						;  KeymapDataStrings, to match
+						;  the above Rectangle array
+	KMD_drawOutlines	nptr.near	; Near call (in VisKeymapCode)
+						;  to routine to draw the 
+						;  outlines of the keyboard:
+						;  Pass:	^hdi = GState
+						;  Return:	nothing
+						;  Destroyed:	ax, bx, cx, dx
+	KMD_letterFontType	FontID		; FontType of single letter keys
+	KMD_letterFontSize	word		; Fontsize of single letter keys
+	KMD_wordFontType	FontID		; FontType of word keys
+	KMD_wordFontSize	word		; Fontsize of word keys
+KeymapDesc ends
+
+
+;
+; The VisKeymapClass is kind of a synthesis of the VisKeyboardClass and
+; VisCharTableClass.  It supports a graphically arbitrary keymapping like
+; the VisKeyboardClass (as opposed to the VisCharTableClass' row column
+; layout), but has instance data pointing to a char array chunk like the
+; VisCharTableClass to support a flexible layout of keys.
+; It is currently used for the BigKeys, Numbers and Puncutation keyboards.
+;
+;	The basics:  The VisKeymapClass has an array of Rectangles (in the
+; VisKeymapCode segment) defining its keys, and an associated array of 
+; characters in a localizable chunk.  These are mapped one to one.  It has
+; a routine to draw its outlines for a speed of drawing optimization, and
+; the size and type of font to draw the keys in.
+;
+;	The details:  The instance data also contains a pointer to a chunk
+; containing an array of special key structures.  These structures describe
+; which keys are considered special to this object and what their specific
+; attributes are.  These attributes support drawing characters, stings and
+; bitmaps for a key instead of just the character itself.  State keys (for
+; instance shift) are supported to allow switching between multiple layouts
+; (normal->caps).  Arbitrary callbacks are supported for general purpose
+; functionality (like switching between keyboards).  An attr is defined so 
+; that dynamic substitutions for characters can be made.
+;
+;	dlitwin 5/19/94
+;
+VisKeymapClass	class	VisCachedGStateClass 
+;------------------------------ Methods -------------------------------------
+MSG_VIS_KEYMAP_ADD_SUBSTITUTE_CHAR	message
+;	Add a character substitution pair to the vardata of the VisKeymap.
+;
+; Context:	Sent usually to change a key that would change to an
+;		undesired keyboard to a greyed out key.
+; Source:	Global
+; Destination:  A VisKeymapClass object
+; Interception: Not likely...
+;
+; Pass:		dx	= character to replace
+;		bp	= substitute
+; Return:	nothing
+; Destroyed:	ax, cx, dx, bp
+;
+
+;------------------------------ Vardata -------------------------------------
+; This attr's first byte is the number of KeymapSubstitutionStructs which
+; follow in an array directly afterward.
+;
+ATTR_VIS_KEYMAP_DYNAMIC_SUBSTITUTIONS	vardata
+
+;--------------------------- Instance data ----------------------------------
+	VKMI_desc		KeymapDesc	; a description of this keymap
+
+	VKMI_tempStates		byte		; States that are temporary 
+						;  i.e. any non-state key will
+						;  transition out of them.  For
+						;  example, shift is a temp
+						;  state, but CapsLock isn't.
+	VKMI_currentState	byte		; State bits describing the
+						;  the keymap (shift etc.)
+	VKMI_specialKeys	lptr		; Chunk of an array of
+						;  KeymapState structures
+						;  describing what keys are
+						;  state keys and their names.
+						;  (in KeymapDataStrings)
+						;  Zero for no special keys.
+	VKMI_descTable		lptr		; Table of KeymapDesc structures
+						;  for any given state
+						;  (in KeymapDataStrings)
+						;  this needs 2^(state bits)
+						;  entries, and will be indexed
+						;  by the state byte, so the
+						;  ordering of the table must
+						;  match the ordering of the 
+						;  bits.  If you don't have any
+						;  state bits defined it can be
+						;  zero.
+VisKeymapClass	endc
+
+
+KeymapStateBits record
+	:7
+	KSB_SHIFT:1
+KeymapStateBits end
+
+;
+; This type determines how a special char's drawData is
+; to be interperated.  All but KSKDT_LETTER use drawData.
+; This is merged in with KSKDI_INVERT and KSKDI_GREY, so
+; keep it under 64 values :)
+;
+KeymapSpecialKeyDrawType etype byte
+
+KSKDT_LETTER	enum KeymapSpecialKeyDrawType	; draw the special character
+						;  drawData is ignored here
+KSKDT_ALTERNATE	enum KeymapSpecialKeyDrawType	; draw a character that isn't
+						;  the special character
+KSKDT_STRING	enum KeymapSpecialKeyDrawType	; lptr to a char string to draw
+KSKDT_BITMAP	enum KeymapSpecialKeyDrawType	; lptr to a bitmap to draw
+;
+; no gstring support		dlitwin 5/23/94
+;KSKDT_GSTRING	enum KyemapSpecialKeyDrawType	; lptr to a gstring to draw
+
+KeymapSpecialKeyDrawInfo record
+	KSKDI_INVERT:1
+	KSKDI_GREY:1
+	KSKDI_TYPE KeymapSpecialKeyDrawType:6
+KeymapSpecialKeyDrawInfo end
+
+;
+; Special key drawing type and data.
+;
+KeymapSpecialKeyDrawData struct
+	KSKDD_drawType	KeymapSpecialKeyDrawInfo
+	KSKDD_data	word
+KeymapSpecialKeyDrawData ends
+
+;
+; This structure describes a special key and info about what makes
+; it special, i.e. how it is drawn, what state it changes to, and 
+; what routine is called when it gets pressed
+;
+KeymapSpecialKeyInfo struct
+	KSKI_char		word	; character to be used as a special key
+	KSKI_drawData		KeymapSpecialKeyDrawData ; See definition above
+	KSKI_state		byte	; state if this is a state key
+	KSKI_spKeyRoutine	nptr	; routine that special key runs
+					; Passed:
+					;	*ds:si	= VisKeymapClass object
+					;	es:bx	= KeymapSpecialKeyInfo
+					;	cs:bp	= Rectangle of key
+					;	cx	= KSKI_params below
+					; Return:	= nothing
+					; Destroyed:	= nothing
+	KSKI_params		word	; data to pass to above routine
+KeymapSpecialKeyInfo ends
+
+;
+; This is an element of an array in vardata of a VisKeymapClass object
+; so it can dynamically substitute characters.
+;
+KeymapSubstitutionStruct	struct
+	KSS_actualChar	word		; give it a word just for DBCS
+	KSS_substitute	word
+KeymapSubstitutionStruct	ends
+
+
+STYLUS_PIC_KMP_WIDTH	equ	14
+STYLUS_PIC_KMP_HEIGHT	equ	14
+
+STYLUS_DISMISS_WIDTH	equ	27	; it's actually 28, but we want to
+					;  overwrite the vertical line...
+STYLUS_DISMISS_HEIGHT	equ	14
+
+STYLUS_PIC_KMP_PADDING	equ	3
+STYLUS_PIC_KMP_L	equ	STYLUS_DISMISS_WIDTH + STYLUS_PIC_KMP_PADDING
+STYLUS_PIC_KMP_R	equ	STYLUS_PIC_KMP_L + STYLUS_PIC_KMP_WIDTH*5 + 1
+
+STYLUS_WORD_FONT_TYPE	equ	FID_UNIVERSITY
+STYLUS_WORD_FONT_SIZE	equ	9
+
+
+
+ERROR_ILLEGAL_KSKDT	enum	FatalErrors
+; The KeymapSpecialKeyDrawType was illegal, and so you
+; are probably accessing the wrong area of memory, or your table
+; is incorrect/thrashed.
+;
+
+
+endif		; if INCLUDE_VIS_KEYMAP_CLASS
+

@@ -1,0 +1,959 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT:	Breadbox Word Search Maker
+ * FILE:		process.goc
+ * AUTHOR:	Dave Hunter   6/99
+ *
+ *
+ * DESCRIPTION:
+ *	          
+ *
+ ***********************************************************************/
+
+@include "wsm.goh"
+@include "externs.goh"
+
+/***************************************************************************
+ * Globals
+ **************************************************************************/
+
+VMFileHandle fhDocument = NullHandle;
+optr oDocument = NullHandle;
+VMBlockHandle bhDocHeap = NullHandle;
+ChunkHandle chDocWordList = NullChunk;
+ChunkHandle chDocWordSearch = NullChunk;
+ChunkHandle chDocAnswers = NullChunk;
+Boolean bWSInitialized = FALSE;
+Boolean onYago = FALSE;
+
+/***************************************************************************
+ * Class declarations
+ **************************************************************************/
+
+@classdecl WSMProcessClass, neverSaved;
+@classdecl WSMDocumentControlClass;
+
+/* methods in import.goc */
+@extern method WSMProcessClass, MSG_WSM_IMPORT_WORD_LIST;
+@extern method WSMProcessClass, MSG_WSM_IMPORT_SELECTOR_ACTION;
+
+/***************************************************************************
+ * WSMProcessClass methods
+ **************************************************************************/
+ 
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_PROCESS_OPEN_APPLICATION for WSMProcessClass
+ *
+ * DESCRIPTION:	 check if we're on a yago
+ *
+ *      -jfh -
+ *
+ ***********************************************************************/
+@method WSMProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+Boolean		initReadErr;
+char			uiStr[50];
+word			size;
+
+
+    /* if we're on a Yago machine set the flag */
+    initReadErr = InitFileReadStringBuffer("ui",
+								 "specific",
+								 &uiStr,
+								 50,
+								 &size);
+    if (!initReadErr)  {
+	  if (!strcmp(uiStr, "yago.geo")) {
+		/* it is a Bro UI...
+		 * now check to see if it is BroWorks on a PC */
+		initReadErr = InitFileReadStringBuffer("ui",
+								 "productName",
+								 &uiStr,
+								 50,
+								 &size);
+
+		if (strcmp(uiStr, "Yago PC-Demo"))  onYago = TRUE;
+		}
+	  }
+
+    @callsuper();
+
+}
+
+ /***************************************************************************
+ * MSG_GEN_PROCESS_INSTALL_TOKEN
+ ***************************************************************************
+ * SYNOPSIS:    Sent by desktop to get process to install its token and
+ *              moniker lists.
+ *
+ * PARAMETERS:  none
+ *
+ * STRATEGY:    Call the superclass to install the application icon.
+ *              Check and install the document icon.
+ *
+ **************************************************************************/
+@method WSMProcessClass, MSG_GEN_PROCESS_INSTALL_TOKEN
+{
+    dword tokenChars;
+    TokenFlags tokenFlags;
+
+    /* Install application icon. */
+    @callsuper();
+    
+    tokenChars = TOKEN_CHARS('W', 'S', (dword) 'M',(dword) 'D');
+
+    if (!TokenGetTokenInfo(tokenChars, MANUFACTURER_ID_BREADBOX, &tokenFlags))
+        TokenDefineToken(tokenChars, MANUFACTURER_ID_BREADBOX,
+          @WSMDocIconList, 0);
+}
+
+/***************************************************************************
+ * MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE
+ ***************************************************************************
+ * SYNOPSIS:    Called by GenDocumentController to initialize a new file.
+ *
+ * PARAMETERS:  optr        document,
+ *              FileHandle  file
+ *
+ * STRATEGY:    Allocate and initialize the word list block.
+ *              Allocate and initialize the map block.
+ *
+ **************************************************************************/
+@method WSMProcessClass, MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE
+{
+    MemHandle mhHeap, mhMapBlock;
+    ChunkHandle chWordList, chWordSearch, chAnswers;
+    VMBlockHandle bhMapBlock, bhHeap = NullHandle;
+    WSMDocumentMap *pMap;
+    WordSearchHeader *pwsh;
+	 GeodeToken	GEAppToken = {"WSPL", 16431};
+
+    /* Allocate, set, and lock the map block. */
+    bhMapBlock = VMAlloc(file, sizeof(WSMDocumentMap), 0);
+    VMSetMapBlock(file, bhMapBlock);
+    pMap = VMLock(file, bhMapBlock, &mhMapBlock);
+
+    /* Allocate an LMem heap for the document data. */
+    mhHeap = MemAlloc(STD_INIT_HEAP, HF_DYNAMIC, HAF_STANDARD_LOCK);
+    EC_ERROR_IF(mhHeap == NullHandle, -1);
+    LMemInitHeap(mhHeap, LMEM_TYPE_GENERAL, 0, 
+      sizeof(LMemBlockHeader), 2, STD_INIT_HEAP);
+
+    /* Allocate a chunk array for the word list. */
+    chWordList = ChunkArrayCreate(mhHeap, WORD_LIST_ELEMENT_SIZE,
+      sizeof(ChunkArrayHeader), 0);
+    EC_ERROR_IF(chWordList == NullChunk, -1);
+
+    /* Allocate a chunk array for the word search. */
+    chWordSearch = ChunkArrayCreate(mhHeap, 0, 
+      sizeof(WordSearchHeader), 0);
+    EC_ERROR_IF(chWordSearch == NullChunk, -1);
+    
+    /* Set the word search defaults. */
+    pwsh = LMemDerefHandles(mhHeap, chWordSearch);
+    pwsh->WSH_width = GRID_DEFAULT_SIZE;
+    pwsh->WSH_height = GRID_DEFAULT_SIZE;
+    pwsh->WSH_level = DEFAULT_LEVEL;
+    pwsh->WSH_settings = WSMS_SQUARE | WSMS_ANSWERS;
+
+    /* Allocate a chunk array for the answers. */
+    chAnswers = ChunkArrayCreate(mhHeap, sizeof(WordSearchAnswerElement), 
+      sizeof(LMemBlockHeader), 0);
+    EC_ERROR_IF(chAnswers == NullChunk, -1);
+
+    /* Initialize the word search. */
+    WSMInitializeWordSearch(ConstructOptr(mhHeap, chWordSearch),
+        ConstructOptr(mhHeap, chAnswers));
+
+    /* Attach the LMem heap to the VM file. */
+    bhHeap = VMAttach(file, NullHandle, mhHeap);
+    EC_ERROR_IF(bhHeap == NullHandle, -1);
+
+    VMDirty(mhHeap);
+    VMUnlock(mhHeap);
+
+    /* Record the handles to the arrays in the map block. */
+    pMap->WSMDM_heapBlock = bhHeap;
+    pMap->WSMDM_wordListChunk = chWordList;
+    pMap->WSMDM_wordSearchChunk = chWordSearch;
+    pMap->WSMDM_answersChunk = chAnswers;
+
+    VMDirty(mhMapBlock);
+    VMUnlock(mhMapBlock);
+
+	/* and since we want this file to be opened by the player on a double
+		click we tell it here that it was created by the player and not the
+		builder */
+	FileSetHandleExtAttributes(file, FEA_CREATOR,
+										&GEAppToken, sizeof(GeodeToken));
+
+	 return FALSE;
+}
+
+/***************************************************************************
+ * MSG_META_DOC_OUTPUT_CREATE_UI_FOR_DOCUMENT
+ ***************************************************************************
+ * SYNOPSIS:    Called by GenDocumentController to create UI for the doc.
+ *
+ * PARAMETERS:  optr        document,
+ *              FileHandle  file
+ *
+ * STRATEGY:    Enable the document control UI.
+ *              Initialize the random number generator.
+ *
+ **************************************************************************/
+@method WSMProcessClass, MSG_META_DOC_OUTPUT_CREATE_UI_FOR_DOCUMENT
+{
+    @send WSMDocumentUIGroup::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    @send WSMSettingsGroup::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    MyRandom(0); MyRandom(0); MyRandom(0); MyRandom(0);
+}
+
+/***************************************************************************
+ * MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT
+ ***************************************************************************
+ * SYNOPSIS:    Called by GenDocumentController to setup UI for the doc.
+ *
+ * PARAMETERS:  optr        document,
+ *              FileHandle  file
+ *
+ * STRATEGY:    Setup the document UI.
+ *
+ **************************************************************************/
+@method WSMProcessClass, MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT
+{
+    MemHandle mhMapBlock = NullHandle, mhHeap;
+    VMBlockHandle bhMapBlock;
+    WSMDocumentMap *pMap;
+    RectDWord docBounds;
+    VisUpdateModeAsWord vumaw = { VUM_MANUAL, 0 };
+	 WordSearchHeader *pwsh;
+	 word numWords;
+
+
+    /* Load in the map block. */
+    bhMapBlock = VMGetMapBlock(file);
+    EC_ERROR_IF(bhMapBlock == NullHandle, -1);
+    if (bhMapBlock != NullHandle)
+    {
+        pMap = VMLock(file, bhMapBlock, &mhMapBlock);
+
+        /* Set global variables so we can quickly reference certain data. */
+        fhDocument = file;
+        bhDocHeap = pMap->WSMDM_heapBlock;
+        EC_ERROR_IF(bhDocHeap == NullHandle, -1);
+        chDocWordList = pMap->WSMDM_wordListChunk;
+        EC_ERROR_IF(chDocWordList == NullChunk, -1);
+        chDocWordSearch = pMap->WSMDM_wordSearchChunk;
+        EC_ERROR_IF(chDocWordSearch == NullChunk, -1);
+        chDocAnswers = pMap->WSMDM_answersChunk;
+        EC_ERROR_IF(chDocAnswers == NullChunk, -1);
+        VMUnlock(mhMapBlock);
+    }
+
+    if (bhDocHeap != NullHandle && chDocWordList != NullChunk)
+    {
+        VMLock(file, bhDocHeap, &mhHeap);
+
+		  /* Retrieve the size of the word list and initialize its UI. */
+		  numWords = ChunkArrayGetCount(ConstructOptr(mhHeap, chDocWordList));
+		  @send WSMWordList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numWords);
+          
+        /* Retrieve the size of the word search and set the view's
+           document bounds. */
+        pwsh = LMemDerefHandles(mhHeap, chDocWordSearch);
+        WSMGetDocBounds(pwsh, &docBounds);
+        @send WSMDocumentView::MSG_GEN_VIEW_SET_DOC_BOUNDS(docBounds.RD_bottom,
+          docBounds.RD_right, docBounds.RD_top, docBounds.RD_left);
+
+        /* Retrieve word search settings and initialize the UI. */
+        @send WSMSettingsSizeWidth::MSG_GEN_VALUE_SET_INTEGER_VALUE(
+          pwsh->WSH_width, FALSE);
+        @send WSMSettingsSizeHeight::MSG_GEN_VALUE_SET_INTEGER_VALUE(
+          pwsh->WSH_height, FALSE);
+        @send WSMSettingsLevel::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+          pwsh->WSH_level, FALSE);
+        @send WSMSettingsOther::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(
+          pwsh->WSH_settings, 0);
+
+        /* Unlock the heap. */
+        VMUnlock(mhHeap);
+    }
+
+	 if (numWords) {
+		@send WSMImportDialog::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+		}
+	 else {
+		@send WSMImportDialog::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+		}
+
+	 /* Empty the word list add text object. */
+    @send WSMWordListAddText::MSG_VIS_TEXT_DELETE_ALL();
+
+    /* Set scaling attributes for the view now; otherwise, it will
+       shrink to nothing with the initial zero bounds. */
+    @send WSMDocumentView::MSG_GEN_VIEW_SET_ATTRS(GVA_SCALE_TO_FIT, 0, vumaw);
+
+    /* Force the document view to scale and draw itself. */
+    @send WSMDocumentView::MSG_VIS_MARK_INVALID(VOF_GEOMETRY_INVALID, VUM_NOW);
+    @send WSMDocumentView::MSG_GEN_VIEW_REDRAW_CONTENT();
+    
+    /* Assume the word search isn't empty. */
+    bWSInitialized = FALSE;
+    
+    /* Cache the document's object descriptor. */
+    oDocument = document;
+}
+
+/***************************************************************************
+ * MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT
+ ***************************************************************************
+ * SYNOPSIS:    Called by GenDocumentController to break down UI for the doc.
+ *
+ * PARAMETERS:  optr        document,
+ *              FileHandle  file
+ *
+ * STRATEGY:    Break down the document UI.
+ *
+ **************************************************************************/
+@method WSMProcessClass, MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT
+{
+    /* Empty the word list UI. */
+    @send WSMWordList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(0);
+    /* Empty the word list add text object. */
+    @send WSMWordListAddText::MSG_VIS_TEXT_DELETE_ALL();
+
+    /* Set the state of the settings UI to indeterminate. */
+    @send WSMSettingsSizeWidth::MSG_GEN_VALUE_SET_INTEGER_VALUE(0, TRUE);
+    @send WSMSettingsSizeHeight::MSG_GEN_VALUE_SET_INTEGER_VALUE(0, TRUE);
+    @send WSMSettingsLevel::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+      GIGS_NONE, TRUE);
+    @send WSMSettingsOther::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(
+      0, WSMS_SQUARE | WSMS_ANSWERS | WSMS_INTERSECT);
+
+    /* Destroy global variables. */
+    chDocWordSearch = NullChunk;
+    chDocWordList = NullChunk;
+    bhDocHeap = NullHandle;
+    fhDocument = NullHandle;
+    oDocument = NullHandle;
+
+}
+
+/***************************************************************************
+ * MSG_META_DOC_OUTPUT_DESTROY_UI_FOR_DOCUMENT
+ ***************************************************************************
+ * SYNOPSIS:    Called by GenDocumentController to destroy UI for the doc.
+ *
+ * PARAMETERS:  optr        document,
+ *              FileHandle  file
+ *
+ * STRATEGY:    Disable the document control UI and erase the view.
+ *
+ **************************************************************************/
+@method WSMProcessClass, MSG_META_DOC_OUTPUT_DESTROY_UI_FOR_DOCUMENT
+{
+    @send WSMDocumentUIGroup::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+    @send WSMSettingsGroup::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+
+    /* Force the document view to empty. */
+    @send WSMDocumentView::MSG_GEN_VIEW_REDRAW_CONTENT();
+}
+
+/***************************************************************************
+ * MSG_META_DOC_OUTPUT_SAVE_AS_COMPLETED
+ ***************************************************************************
+ * SYNOPSIS:    Called by GenDocumentGroup when a "Save As" operation has
+ *              been successfully completed.  Since we cache the file handle
+ *              and a "Save As" will cause the document to adopt a new
+ *              file handle, we MUST intercept this message and re-cache
+ *              the new handle.
+ *
+ * PARAMETERS:  optr        document,
+ *              FileHandle  file
+ *
+ * STRATEGY:    Store the new file handle.
+ *
+ **************************************************************************/
+@method WSMProcessClass, MSG_META_DOC_OUTPUT_SAVE_AS_COMPLETED
+{
+    fhDocument = file;
+}
+
+/***************************************************************************
+ * MSG_GEN_DOCUMENT_CONTROL_CONFIGURE_FILE_SELECTOR
+ ***************************************************************************
+ * SYNOPSIS:    Called to allow special configuration of the file selector
+ *              used by the document control.
+ *
+ * PARAMETERS:  optr fileSelector,
+ *              word flags
+ *
+ * STRATEGY:    See if our default folder is there and go there
+ *              If not go to Document
+ *              Set the file selector's path to the path.
+ *
+ **************************************************************************/
+@method WSMDocumentControlClass, MSG_GEN_DOCUMENT_CONTROL_CONFIGURE_FILE_SELECTOR
+{
+
+ /* jfh */
+ Boolean		notThere;
+ DiskHandle	drive;
+ char		geoBookPath[50] = "\\GEOWORKS\\DOCUMENT\\";
+
+    @callsuper();
+
+    /* see if our default folder is in Document */
+    if (!onYago)  {  /* for the desktop */
+	  MemLock (OptrToHandle(@WSFolderTxt));
+	  notThere = @call fileSelector::MSG_GEN_PATH_SET
+					 (LMemDeref(@WSFolderTxt),
+					 SP_DOCUMENT);
+	  MemUnlock (OptrToHandle(@WSFolderTxt));
+	  }  /* end of desktop if */
+
+    else  {  /* on a yago */
+	  drive = DiskRegisterDiskSilently(5); /* drive f */
+
+	  MemLock (OptrToHandle(@WSFolderTxt));
+	  strcat(geoBookPath, LMemDeref(@WSFolderTxt));
+	  MemUnlock (OptrToHandle(@WSFolderTxt));
+	  notThere = @call fileSelector::MSG_GEN_PATH_SET(geoBookPath, drive);
+	  }  /* end of yago else */
+
+    /* if it was there we're all set - if not just go to Document */
+    if(notThere)  {
+	  @call fileSelector::MSG_GEN_PATH_SET(".", SP_DOCUMENT);
+	  }
+
+}
+
+/***************************************************************************
+ * MSG_WSM_PROCESS_QUERY_WORD_LIST
+ ***************************************************************************
+ * SYNOPSIS:    Called by dynamic WSMWordList to define its items.
+ *
+ * PARAMETERS:  optr        list,
+ *              word        item
+ *
+ * STRATEGY:    Retrieve the word from the list and call the replace method.
+ *
+ **************************************************************************/
+@method WSMProcessClass, MSG_WSM_PROCESS_QUERY_WORD_LIST
+{
+    optr oWordList = NullOptr;
+    MemHandle mhHeap;
+    char *pWord;
+    word dummy;
+
+    /* Ensure that no handles are null. */
+    if (fhDocument != NullHandle && bhDocHeap != NullHandle
+      && chDocWordList != NullChunk)
+    {
+        /* Lock the word list. */
+        VMLock(fhDocument, bhDocHeap, &mhHeap);
+        oWordList = ConstructOptr(mhHeap, chDocWordList);
+
+        /* Ensure that the requested item is in the array. */
+        if (item < ChunkArrayGetCount(oWordList))
+        {
+            /* Locate the requested item and set it in the dynamic list. */
+            pWord = ChunkArrayElementToPtr(oWordList, item, &dummy);
+            @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, pWord);
+        }
+        VMUnlock(mhHeap);
+    }
+}
+
+/***************************************************************************
+ * MSG_WSM_PROCESS_ADD_WORD
+ ***************************************************************************
+ * SYNOPSIS:    Called as apply method of WSMWordListAddText.
+ *
+ * PARAMETERS:  none
+ *
+ * STRATEGY:    Add the current text in the WSMWordListAddText object to
+ *              the word list, update the UI, and clear the text object.
+ *              The word list is case-insensitive and is maintained 
+ *              alphabetically.  Duplicates are prevented.
+ *
+ **************************************************************************/
+@method WSMProcessClass, MSG_WSM_PROCESS_ADD_WORD
+{
+ char szNewWord[WORD_LIST_ELEMENT_SIZE];
+ word	wasAdded;
+ optr oWordList = NullOptr;
+ MemHandle mhHeap;
+
+
+	if (@call WSMWordListAddText::MSG_VIS_TEXT_GET_ALL_PTR(szNewWord)
+			 >= WORD_MIN_SIZE) {
+
+		wasAdded = WSMAddWord(szNewWord);
+
+		if (wasAdded < ADD_WORD_DUPE) {
+			/* Update the list UI. */
+			@send WSMWordList::MSG_GEN_DYNAMIC_LIST_ADD_ITEMS(wasAdded, 1);
+
+			/* Empty the word list add text object. */
+			@send WSMWordListAddText::MSG_VIS_TEXT_DELETE_ALL();
+
+			/* Clear the word search, as it no longer reflects the words. */
+			WSMClearWordSearch();
+
+         /* if we've added the first word... */
+			VMLock(fhDocument, bhDocHeap, &mhHeap);
+			oWordList = ConstructOptr(mhHeap, chDocWordList);
+			if (ChunkArrayGetCount(oWordList) == 1) {
+				@send WSMImportDialog::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+				}
+			VMUnlock(mhHeap);
+			}
+
+		}  /* end of word not too short if */
+
+	else NotifyDBox(szNewWord, @WordTooShortMsg);
+
+}
+
+/***************************************************************************
+ * MSG_WSM_PROCESS_DELETE_WORD
+ ***************************************************************************
+ * SYNOPSIS:    Called as trigger method of WSMWordListDeleteTrigger.
+ *
+ * PARAMETERS:  none
+ *
+ * STRATEGY:    Delete the currently selected item in the WSMWordList
+ *              object from the word list.
+ *
+ **************************************************************************/
+@method WSMProcessClass, MSG_WSM_PROCESS_DELETE_WORD
+{
+    optr oWordList = NullOptr;
+    MemHandle mhHeap;
+    word dummy;
+    word nSelection;
+
+    /* Ensure that no handles are null. */
+    if (fhDocument != NullHandle && bhDocHeap != NullHandle
+      && chDocWordList != NullChunk)
+    {
+        nSelection = @call WSMWordList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+        if (nSelection != GIGS_NONE)
+        {
+            /* Lock the word list. */
+            VMLock(fhDocument, bhDocHeap, &mhHeap);
+            oWordList = ConstructOptr(mhHeap, chDocWordList);
+    
+            EC_ERROR_IF(@call WSMWordList::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS()
+              != ChunkArrayGetCount(oWordList), -1);
+            EC_ERROR_IF(ChunkArrayGetCount(oWordList) == 0, -1);
+            
+            /* Delete the item from the chunk array. */
+            ChunkArrayDelete(oWordList, 
+              ChunkArrayElementToPtr(oWordList, nSelection, &dummy));
+
+            /* Update the list UI. */
+            @send WSMWordList::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(nSelection, 1);
+
+            /* Clear the word search, as it no longer reflects the words. */
+            WSMClearWordSearch();
+
+				/* if we've deleted the last word */
+				if (!ChunkArrayGetCount(oWordList)) {
+					@send WSMImportDialog::MSG_GEN_SET_ENABLED(VUM_NOW);
+					}
+
+				VMDirty(mhHeap);            /* Dirty the word list. */
+            VMUnlock(mhHeap);           /* Unlock the word list. */
+        }
+    }
+}
+
+/***************************************************************************
+ * MSG_WSM_PROCESS_CALCULATE
+ ***************************************************************************
+ * SYNOPSIS:    Called as trigger method of WSMCalculateTrigger and sent
+ *              by apply methods of the settings UI.
+ *
+ * PARAMETERS:  none
+ *
+ * STRATEGY:    Calculate the word search, and display a warning if it
+ *              could not be completed.
+ *
+ **************************************************************************/
+@method WSMProcessClass, MSG_WSM_PROCESS_CALCULATE
+{
+    /* Ensure that no handles are null. */
+    if (fhDocument != NullHandle && bhDocHeap != NullHandle
+      && chDocWordList != NullChunk && chDocWordSearch != NullChunk
+      && chDocAnswers != NullChunk)
+    {
+        Boolean bSuccess;
+
+        /* Set busy UI states for the application. */
+        @call application::MSG_GEN_APPLICATION_MARK_BUSY();
+        @call application::MSG_GEN_APPLICATION_HOLD_UP_INPUT();
+
+        /* Perform the word search calculation. */
+        bSuccess = WSMCalculateWordSearch();
+
+        /* Reset the application UI states. */
+        @call application::MSG_GEN_APPLICATION_RESUME_INPUT();
+        @call application::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+        /* Display a warning if the calculation wasn't successful. */
+	   if (!bSuccess) NotifyDBox (0, @WSNoFitTxt);
+	 }
+}
+
+/***************************************************************************
+ * MSG_META_EXPOSED
+ ***************************************************************************
+ * SYNOPSIS:    Called by WSMDocumentView to redraw the word search display.
+ *
+ * PARAMETERS:  WindowHandle    win
+ *
+ * STRATEGY:    Call appropriate drawing functions to render the display.
+ *
+ **************************************************************************/
+@method WSMProcessClass, MSG_META_EXPOSED
+{
+    GStateHandle gstate;
+
+    gstate = GrCreateState(win);    /* Create a temporary GState. */
+    GrBeginUpdate(gstate);          /* Start a window update. */
+    WSMDrawWordSearch(gstate, DRAW_GRID_MARGINS, DRAW_GRID_MARGINS, 0, 0, FALSE);
+    GrEndUpdate(gstate);            /* We are done with the window update. */
+    GrDestroyState(gstate);         /* Destroy the temporary GState. */
+}
+
+/***************************************************************************
+ * MSG_PRINT_START_PRINTING
+ ***************************************************************************
+ * SYNOPSIS:    Sent by the print control whenever it wants to print.
+ *
+ * PARAMETERS:  optr            printCtrlOD,
+ *              GStateHandle    gstate
+ *
+ * STRATEGY:    Call appropriate drawing functions to print the document.
+ *
+ **************************************************************************/
+@method WSMStartPrinting, WSMProcessClass, MSG_PRINT_START_PRINTING
+{
+    /* Print the header. */
+    WSMDrawHeader(gstate, TRUE);
+    
+    /* Print the word search. */
+    WSMDrawWordSearch(gstate, PRINT_GRID_BOUNDS_LEFT, PRINT_GRID_BOUNDS_TOP, 
+      PRINT_GRID_BOUNDS_RIGHT, PRINT_GRID_BOUNDS_BOTTOM, TRUE);
+
+    /* Print the word list. */
+    WSMDrawWordList(gstate);
+
+	/* End with a form feed. */
+	GrNewPage(gstate, PEC_FORM_FEED);
+
+	@send printCtrlOD::MSG_PRINT_CONTROL_PRINTING_COMPLETED();
+}
+
+/***************************************************************************
+ * MSG_META_CLIPBOARD_COPY
+ ***************************************************************************
+ * SYNOPSIS:    Draw the word search display to the clipboard.
+ *
+ * PARAMETERS:  
+ *
+ * STRATEGY:    Call appropriate drawing functions to render the display.
+ *
+ **************************************************************************/
+@method WSMProcessClass, MSG_META_CLIPBOARD_COPY
+{
+ ClipboardItemHeader *headerMem ;
+ MemHandle           headerMemHandle ;
+ VMFileHandle        transferVMFile ;
+ VMBlockHandle       dataVMBlock, headerVMBlock ;
+ GStateHandle        gstate;
+
+
+	 @send WSMApp::MSG_GEN_APPLICATION_MARK_BUSY() ;
+    transferVMFile = ClipboardGetClipboardFile() ;
+
+    gstate = GrCreateGString(transferVMFile, GST_VMEM, &dataVMBlock);
+
+	 /* Draw the header. Don't draw the name/date block. */
+	 WSMDrawHeader(gstate, FALSE);
+	 /* Draw the word search. */
+    WSMDrawWordSearch(gstate, PRINT_GRID_BOUNDS_LEFT, PRINT_GRID_BOUNDS_TOP, 
+      PRINT_GRID_BOUNDS_RIGHT, PRINT_GRID_BOUNDS_BOTTOM, TRUE);
+	 /* Draw the word list. */
+    WSMDrawWordList(gstate);
+
+	 GrEndGString(gstate);
+
+    headerVMBlock = VMAlloc(transferVMFile, sizeof(ClipboardItemHeader), 1111) ;
+    headerMem = (ClipboardItemHeader *)VMLock(
+                 transferVMFile, headerVMBlock, &headerMemHandle) ;
+    headerMem->CIH_owner = ConstructOptr(GeodeGetProcessHandle(), 0) ;
+    headerMem->CIH_flags = 0 ;
+	 headerMem->CIH_name[0] = 'W' ;
+	 headerMem->CIH_name[1] = 'S' ;
+	 headerMem->CIH_name[2] = 'M' ;
+	 headerMem->CIH_name[3] = '\0' ;
+    headerMem->CIH_formatCount = 1;
+    headerMem->CIH_sourceID = 0 ;
+    headerMem->CIH_formats[0].CIFI_format =
+        FormatIDFromManufacturerAndType(
+             MANUFACTURER_ID_GEOWORKS,
+             CIF_GRAPHICS_STRING) ;
+    headerMem->CIH_formats[0].CIFI_vmChain =
+        (VMChain)(((dword)(dataVMBlock))<<16L) ;
+    headerMem->CIH_formats[0].CIFI_extra1 = 0 ;
+    headerMem->CIH_formats[0].CIFI_extra2 = 0 ;
+    VMUnlock(headerMemHandle) ;
+    ClipboardRegisterItem(BlockIDFromFileAndBlock(transferVMFile,
+        headerVMBlock),
+        0) ;
+	 @send WSMApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY() ;
+
+}
+
+/***************************************************************************
+ * MSG_WSM_PROCESS_APPLY_SETTINGS_LEVEL
+ ***************************************************************************
+ * SYNOPSIS:    Sent when changes to WSMSettingsLevel are applied.
+ *
+ * PARAMETERS:  word                    selection, 
+ *              word                    numSelections,
+ *              GenItemGroupStateFlags  stateFlags
+ *
+ * STRATEGY:    Write the setting to the document.
+ *              Queue a recalculation of the word search.
+ *
+ **************************************************************************/
+@method WSMProcessClass, MSG_WSM_PROCESS_APPLY_SETTINGS_LEVEL
+{
+    MemHandle mhHeap;
+    WordSearchHeader *pwsh;
+
+    /* Ensure that no handles are null. */
+    if (fhDocument != NullHandle && bhDocHeap != NullHandle
+      && chDocWordSearch != NullChunk)
+    {
+        /* Lock things. */
+        VMLock(fhDocument, bhDocHeap, &mhHeap);
+        pwsh = LMemDerefHandles(mhHeap, chDocWordSearch);
+        
+        /* Write the settings to the document. */
+        if (pwsh->WSH_level != selection)
+        {
+            pwsh->WSH_level = selection;
+            VMDirty(mhHeap);
+
+            /* Queue a recalculation of the word search. */
+            @send, forceQueue, checkDuplicate self::MSG_WSM_PROCESS_CALCULATE();
+        }
+
+        /* Unlock the word search. */
+        VMUnlock(mhHeap);
+    }
+}
+
+/***************************************************************************
+ * MSG_WSM_PROCESS_APPLY_SETTINGS_WIDTH, MSG_WSM_PROCESS_APPLY_SETTINGS_HEIGHT
+ ***************************************************************************
+ * SYNOPSIS:    Sent when changes to WSMSettingsLevel are applied.
+ *
+ * PARAMETERS:  WWFixedAsDWord              value,
+ *              GenValueStateFlagsAsWord    stateFlags
+ *
+ * STRATEGY:    Write the setting to the document.
+ *              Set the view's document bounds.
+ *              Queue a recalculation of the word search.
+ *
+ **************************************************************************/
+@method WSMProcessClass, MSG_WSM_PROCESS_APPLY_SETTINGS_WIDTH,
+  MSG_WSM_PROCESS_APPLY_SETTINGS_HEIGHT
+{
+    MemHandle mhHeap;
+    WordSearchHeader *pwsh;
+    Boolean bModified = FALSE;
+    RectDWord docBounds;
+
+    /* Ensure that no handles are null. */
+    if (fhDocument != NullHandle && bhDocHeap != NullHandle
+      && chDocWordSearch != NullChunk)
+    {
+        /* Lock things. */
+        VMLock(fhDocument, bhDocHeap, &mhHeap);
+        pwsh = LMemDerefHandles(mhHeap, chDocWordSearch);
+        
+        /* Write the settings to the document. */
+        if (message == MSG_WSM_PROCESS_APPLY_SETTINGS_WIDTH)
+        {
+            if (pwsh->WSH_width != IntegerOf(value))
+            {
+                pwsh->WSH_width = IntegerOf(value);
+                VMDirty(mhHeap);
+                bModified = TRUE;
+            }
+        }
+        else if (message == MSG_WSM_PROCESS_APPLY_SETTINGS_HEIGHT)
+        {
+            if (pwsh->WSH_height != IntegerOf(value))
+            {
+                pwsh->WSH_height = IntegerOf(value);
+                VMDirty(mhHeap);
+                bModified = TRUE;
+            }
+        }
+        else
+            EC_ERROR(-1);
+
+        if (bModified)
+        {
+            /* Clear the grid, as the size has been changed. A redraw now would
+               cause a crash. */
+            WSMClearWordSearch();
+
+            /* Retrieve the size of the word search and set the view's document 
+               bounds. */
+            pwsh = LMemDerefHandles(mhHeap, chDocWordSearch);
+            WSMGetDocBounds(pwsh, &docBounds);
+            @send WSMDocumentView::MSG_GEN_VIEW_SET_DOC_BOUNDS(
+              docBounds.RD_bottom, docBounds.RD_right, 
+              docBounds.RD_top, docBounds.RD_left);
+
+            /* Queue a recalculation of the word search. */
+            @send, forceQueue, checkDuplicate self::MSG_WSM_PROCESS_CALCULATE();
+        }
+
+        /* Unlock the word search. */
+        VMUnlock(mhHeap);
+
+    }
+}
+
+/***************************************************************************
+ * MSG_WSM_PROCESS_APPLY_SETTINGS_OTHER
+ ***************************************************************************
+ * SYNOPSIS:    Sent when changes are made to the WSMSettingsOther object.
+ *
+ * PARAMETERS:  word selectedBooleans,
+ *              word indeterminateBooleans,
+ *              word modifiedBooleans
+ *
+ * STRATEGY:    Write the settings to the document.
+ *              Queue a recalculation of the word search if WSMS_INTERSECT
+ *                has been changed.
+ *              Queue a redraw of the view if WSMS_ANSWERS has been changed.
+ *
+ **************************************************************************/
+@method WSMProcessClass, MSG_WSM_PROCESS_APPLY_SETTINGS_OTHER
+{
+    MemHandle mhHeap;
+    WordSearchHeader *pwsh;
+    Boolean bModified = FALSE;
+
+    /* Ensure that no handles are null. */
+    if (fhDocument != NullHandle && bhDocHeap != NullHandle
+      && chDocWordSearch != NullChunk)
+    {
+        /* Lock things. */
+        VMLock(fhDocument, bhDocHeap, &mhHeap);
+        pwsh = LMemDerefHandles(mhHeap, chDocWordSearch);
+        
+        /* Write the settings to the document. */
+        if (pwsh->WSH_settings != selectedBooleans)
+        {
+            if ((pwsh->WSH_settings & WSMS_INTERSECT) 
+              != (selectedBooleans & WSMS_INTERSECT))
+                bModified = TRUE;
+            pwsh->WSH_settings = selectedBooleans;
+            VMDirty(mhHeap);
+        }
+        
+        /* Unlock the word search. */
+        VMUnlock(mhHeap);
+        
+        /* Queue a recalculation of the word search if WSMS_INTERSECT
+           has been changed. */
+        if (bModified)
+            @send, forceQueue, checkDuplicate self::MSG_WSM_PROCESS_CALCULATE();
+
+        /* Redraw the grid if WSMS_ANSWERS has been modified. */
+        if (modifiedBooleans & WSMS_ANSWERS)
+            @send, forceQueue, checkDuplicate
+              WSMDocumentView::MSG_GEN_VIEW_REDRAW_CONTENT();
+    }
+}
+
+/***************************************************************************
+ * MSG_WSM_PROCESS_STATUS_WIDTH, MSG_WSM_PROCESS_STATUS_HEIGHT
+ ***************************************************************************
+ * SYNOPSIS:    Sent when changes are made to either of the size GenValues.
+ *
+ * PARAMETERS:  WWFixedAsDWord              value,
+ *              GenValueStateFlagsAsWord    stateFlags
+ *
+ * STRATEGY:    Change the GenValue not being modified if the "Keep grid
+ *              square" option is set.
+ *
+ **************************************************************************/
+@method WSMProcessClass, MSG_WSM_PROCESS_STATUS_WIDTH, 
+  MSG_WSM_PROCESS_STATUS_HEIGHT
+{
+    word settings = 
+      @call WSMSettingsOther::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    optr oValue;
+      
+    if (settings & WSMS_SQUARE)
+    {
+        if (message == MSG_WSM_PROCESS_STATUS_WIDTH)
+            oValue = @WSMSettingsSizeHeight;
+        else if (message == MSG_WSM_PROCESS_STATUS_HEIGHT)
+            oValue = @WSMSettingsSizeWidth;
+        else
+            EC_ERROR(-1);
+        @send oValue::MSG_GEN_VALUE_SET_VALUE(value, FALSE);
+        @send oValue::MSG_GEN_VALUE_SET_MODIFIED_STATE(TRUE);
+    }
+}
+
+/***************************************************************************
+ * MSG_WSM_PROCESS_SETTINGS_OTHER_CHANGED
+ ***************************************************************************
+ * SYNOPSIS:    Sent when changes are made to the WSMSettingsOther object.
+ *
+ * PARAMETERS:  word selectedBooleans,
+ *              word indeterminateBooleans,
+ *              word changedBooleans
+ *
+ * STRATEGY:    Make sure the two sizes are equal if WSMS_SQUARE is set.
+ *
+ **************************************************************************/
+@method WSMProcessClass, MSG_WSM_PROCESS_SETTINGS_OTHER_CHANGED
+{
+    optr oValue = @WSMSettingsSizeHeight;
+    optr oOtherValue = @WSMSettingsSizeWidth;
+    word size;
+
+    /* Make sure the two sizes are equal if WSMS_SQUARE is set. */
+    if ((changedBooleans & WSMS_SQUARE) && (selectedBooleans & WSMS_SQUARE))
+    {
+        /* Try to guess which one the user wants to set both. */
+        if (@call oOtherValue::MSG_GEN_VALUE_IS_MODIFIED() &&
+          !(@call oValue::MSG_GEN_VALUE_IS_MODIFIED()))
+        {
+            oValue = @WSMSettingsSizeWidth;
+            oOtherValue = @WSMSettingsSizeHeight;
+        }
+        size = @call oValue::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+        @send oOtherValue::MSG_GEN_VALUE_SET_INTEGER_VALUE(size, FALSE);
+        @send oOtherValue::MSG_GEN_VALUE_SET_MODIFIED_STATE(TRUE);
+    }
+}
+

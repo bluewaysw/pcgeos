@@ -1,0 +1,548 @@
+@include <stdapp.goh>
+@include "homeapp.goh"
+@include "home.goh"
+#include <gstring.h>
+#include <Ansi/string.h>
+
+Boolean Inside(Rectangle Inner, Rectangle Outer);
+@extern object HomeGroupNameText;
+@extern object HomeGroupMemberList;
+@extern object HomeRoomDimensions;
+
+/*******************************************************************************
+* HOME ROOM CLASS
+*******************************************************************************/
+@extern method HomeRoomClass, MSG_ITEM_SET_ATTRS {
+	VMBlockHandle roomBlock;
+	HomeItemBlock *blockPtr;
+	MemHandle mem;
+	word BlockID;
+
+	document = @call @visParent::MSG_GEN_DOCUMENT_GET_FILE_HANDLE();
+	roomBlock = VMFind(document, NullHandle, UserID);
+	blockPtr = VMLock(document, roomBlock, &mem);
+	pself->HI_userID = UserID;
+	blockPtr->HIB_userID = UserID;
+	pself->HI_textVisible = TRUE;
+	blockPtr->HIB_textVisible = TRUE;
+	@call HomeNewRoomNameText::MSG_VIS_TEXT_GET_ALL_PTR(pself->HI_name);
+	strcpy(blockPtr->HIB_name, pself->HI_name);
+	pself->HR_roomHeight = @call HomeNewRoomHeight::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+	pself->HR_roomWidth = @call HomeNewRoomWidth::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+
+	pself->HR_roomHeight *= ROOM_SCALE_FACTOR;
+	pself->HR_roomWidth *= ROOM_SCALE_FACTOR;
+	blockPtr->HIB_bounds = pself->VI_bounds;
+	
+	blockPtr->HIB_fields.HRB.roomHeight = pself->HR_roomHeight;
+	blockPtr->HIB_fields.HRB.roomWidth = pself->HR_roomWidth;
+	VMDirty(mem);
+	VMUnlock(mem);
+	BlockID = pself->HI_userID - INITIAL_ROOM_USER_ID;
+	BlockID += FIRST_ROOM_EVENT_USER_ID;
+	@call self::MSG_ITEM_ALLOC_OR_ATTACH_EVENT_BLOCK(BlockID);
+}
+
+@extern method HomeRoomClass, MSG_ITEM_GET_ATTRS_FROM_FILE {
+	VMBlockHandle roomBlock;
+	HomeItemBlock *blockPtr;
+	MemHandle mem;
+
+	document = @call @visParent::MSG_GEN_DOCUMENT_GET_FILE_HANDLE();
+	roomBlock = VMFind(document, NullHandle, UserID);
+	blockPtr = VMLock(document, roomBlock, &mem);
+	pself->HI_userID = UserID;
+	strcpy(pself->HI_name, blockPtr->HIB_name);
+	pself->VI_bounds = blockPtr->HIB_bounds;
+	pself->HR_roomWidth = blockPtr->HIB_fields.HRB.roomWidth;
+	pself->HR_roomHeight = blockPtr->HIB_fields.HRB.roomHeight;
+	pself->HI_dimLevel = blockPtr->HIB_dimLevel;
+	pself->HI_locked = blockPtr->HIB_locked;
+	pself->HI_textVisible = blockPtr->HIB_textVisible;
+	VMUnlock(mem);
+}
+
+@extern method HomeRoomClass, MSG_VIS_DRAW {
+	word Xoff;
+	word Yoff;
+
+    GrSaveState(gstate);
+	document = @call @visParent::MSG_GEN_DOCUMENT_GET_FILE_HANDLE();
+	GrSetMixMode(gstate, MM_COPY);
+	if (pself->HI_selected) GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+	else GrSetLineColor(gstate, CF_INDEX, C_BLUE, 0, 0);
+	GrSetLineWidth(gstate, MakeWWFixed(3.0));
+	GrSetTextColor(gstate, CF_INDEX, C_BLUE, 0, 0);
+	GrSetFont(gstate, ROOM_TEXT_FONT, ROOM_TEXT_POINT_SIZE);
+	GrDrawRect(gstate, pself->VI_bounds.R_left+2, pself->VI_bounds.R_top+2,
+												pself->VI_bounds.R_right-2, pself->VI_bounds.R_bottom-2);
+	if (pself->HI_textVisible) {
+		Xoff = ((pself->VI_bounds.R_right + pself->VI_bounds.R_left) / 2) -
+										(GrTextWidth(gstate, pself->HI_name,0) / 2);
+		Yoff = ((pself->VI_bounds.R_bottom + pself->VI_bounds.R_top) / 2) - 
+										(GrFontMetrics(gstate, GFMI_MAX_ADJUSTED_HEIGHT_ROUNDED) / 2);
+		/* Added the clip to prevent text from drawing outside of room bounds - DH 3/12/99 */
+		GrSetClipRect(gstate, PCT_INTERSECTION, pself->VI_bounds.R_left+2, pself->VI_bounds.R_top+2,
+					  pself->VI_bounds.R_right-2, pself->VI_bounds.R_bottom-2);
+		GrDrawText(gstate, Xoff, Yoff, pself->HI_name, 0);
+	}
+	GrRestoreState(gstate);
+}
+
+@extern method HomeRoomClass, MSG_META_START_SELECT {
+	@callsuper();
+	document = @call @visParent::MSG_GEN_DOCUMENT_GET_FILE_HANDLE();
+	@send HomeUnitOnOffGroup::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+	@send HomeUnitIconGroup::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	@send HomeUnitDimButton::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@send HomeUnitDimGroup::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@send HomeUnitSettingsBlock::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@send HomeUnitTypeList::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+   @send HomeGroupMemberList2::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+   @send HomeEditGroupButton::MSG_GEN_SET_NOT_USABLE(VUM_NOW); 
+	@send HomeRoomDimensions::MSG_GEN_SET_USABLE(VUM_NOW);
+	@call HomeRoomHeight::MSG_GEN_VALUE_SET_INTEGER_VALUE(
+								(pself->HR_roomHeight) / ROOM_SCALE_FACTOR, FALSE);
+	@call HomeRoomWidth::MSG_GEN_VALUE_SET_INTEGER_VALUE(
+								(pself->HR_roomWidth) / ROOM_SCALE_FACTOR, FALSE);
+	@send self::MSG_VIS_REDRAW_ENTIRE_OBJECT();
+	if (pself->HI_locked) {
+			retVal->flags = MRF_PROCESSED;
+			return;
+	}
+	@call @visParent::MSG_VIS_TAKE_GADGET_EXCL(oself);
+	@call self::MSG_VIS_GRAB_MOUSE();
+	retVal->flags = MRF_PROCESSED;
+}
+
+@extern method HomeRoomClass, MSG_META_DRAG_SELECT {
+	GStateHandle gstate;
+	WindowHandle win;
+	if (pself->HI_locked) {
+		retVal->flags = MRF_PROCESSED;
+		return;
+	}
+
+	pself->HI_dragging = TRUE;
+	win = @call self::MSG_VIS_QUERY_WINDOW();
+	gstate = GrCreateState(win);
+	GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+	GrSetMixMode(gstate, MM_INVERT);
+	pself->HI_vertPos = yPosition - (pself->HR_roomHeight/2);
+	pself->HI_horizPos = xPosition - (pself->HR_roomWidth/2);
+	if ((@call HomeObjectOptionsGroup::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS())
+			& HOO_ALIGN_OBJECTS_TO_GRID) {
+		/* force mouse coord's to nearest grid unit. */
+		document = @call @visParent::MSG_GEN_DOCUMENT_GET_FILE_HANDLE();
+		pself->HI_vertPos = (pself->HI_vertPos / GRID_POINT_SIZE);
+		pself->HI_vertPos = (pself->HI_vertPos * GRID_POINT_SIZE);
+		pself->HI_horizPos = (pself->HI_horizPos / GRID_POINT_SIZE);
+		pself->HI_horizPos = (pself->HI_horizPos * GRID_POINT_SIZE);
+	}
+	GrDrawRect(gstate, pself->HI_horizPos, pself->HI_vertPos,
+				(pself->HI_horizPos + pself->HR_roomWidth),
+				(pself->HI_vertPos + pself->HR_roomHeight));
+	GrDestroyState(gstate);
+
+	retVal->flags = MRF_PROCESSED;
+}
+
+@extern method HomeRoomClass, MSG_META_PTR {
+	if (pself->HI_dragging) {
+	GStateHandle gstate;
+	WindowHandle win;
+
+		win = @call self::MSG_VIS_QUERY_WINDOW();
+		gstate = GrCreateState(win);
+		GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+		GrSetMixMode(gstate, MM_INVERT);
+		GrDrawRect(gstate, pself->HI_horizPos, pself->HI_vertPos,
+					(pself->HI_horizPos + pself->HR_roomWidth),
+					(pself->HI_vertPos + pself->HR_roomHeight));
+		pself->HI_vertPos = yPosition - (pself->HR_roomHeight/2);
+		pself->HI_horizPos = xPosition - (pself->HR_roomWidth/2);
+		if ((@call HomeObjectOptionsGroup::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS())
+				& HOO_ALIGN_OBJECTS_TO_GRID) {
+			/* force mouse coord's to nearest grid unit. */
+			document = @call @visParent::MSG_GEN_DOCUMENT_GET_FILE_HANDLE();
+			pself->HI_vertPos = (pself->HI_vertPos / GRID_POINT_SIZE);
+			pself->HI_vertPos = (pself->HI_vertPos * GRID_POINT_SIZE);
+			pself->HI_horizPos = (pself->HI_horizPos / GRID_POINT_SIZE);
+			pself->HI_horizPos = (pself->HI_horizPos * GRID_POINT_SIZE);
+		}
+		GrDrawRect(gstate, pself->HI_horizPos, pself->HI_vertPos,
+					(pself->HI_horizPos + pself->HR_roomWidth),
+					(pself->HI_vertPos + pself->HR_roomHeight));
+		GrDestroyState(gstate);
+	}
+	retVal->flags = MRF_PROCESSED;
+}
+
+@extern method HomeRoomClass, MSG_META_END_SELECT {
+
+	@call @visParent::MSG_VIS_RELEASE_GADGET_EXCL(oself);
+	retVal->flags = MRF_PROCESSED;
+}
+
+@extern method HomeRoomClass, MSG_VIS_LOST_GADGET_EXCL {
+	 WindowHandle win;
+	 GStateHandle gstate;
+//	 word Xoff;
+//	 word Yoff;
+	 VMBlockHandle roomBlock;
+	 HomeItemBlock *blockPtr;
+	 MemHandle mem;
+
+	 if (pself->HI_dragging) {
+		EventHandle msg;
+		Rectangle oldBounds = pself->VI_bounds;
+
+        /* Erase the dragging outline. */
+		win = @call self::MSG_VIS_QUERY_WINDOW();
+		gstate = GrCreateState(win);
+		GrSetLineColor(gstate, CF_INDEX, C_BLACK, 0, 0);
+		GrSetMixMode(gstate, MM_INVERT);
+		GrDrawRect(gstate,
+				  pself->HI_horizPos,
+				  pself->HI_vertPos,
+				  ((pself->HI_horizPos) + pself->HR_roomWidth),
+				  ((pself->HI_vertPos) + pself->HR_roomHeight));
+
+/*		GrSetMixMode(gstate, MM_COPY);*/
+/*		GrSetFont(gstate, ROOM_TEXT_FONT, ROOM_TEXT_POINT_SIZE);*/
+/*		GrSetTextColor(gstate, CF_INDEX, C_WHITE, 0, 0);*/
+/*		Xoff = ((pself->VI_bounds.R_right + pself->VI_bounds.R_left) / 2) -
+										(GrTextWidth(gstate, pself->HI_name,0) / 2);*/
+/*		Yoff = ((pself->VI_bounds.R_bottom + pself->VI_bounds.R_top) / 2) -
+										(GrFontMetrics(gstate, GFMI_MAX_ADJUSTED_HEIGHT_ROUNDED) / 2);*/
+/*		GrDrawText(gstate, Xoff, Yoff, pself->HI_name, 0);*/
+		@call self::MSG_VIS_BOUNDS_CHANGED(
+												  pself->VI_bounds.R_bottom,
+												  pself->VI_bounds.R_right,
+												  pself->VI_bounds.R_top,
+												  pself->VI_bounds.R_left);
+		pself->VI_bounds.R_left = pself->HI_horizPos;
+		pself->VI_bounds.R_right = (pself->HI_horizPos) + pself->HR_roomWidth;
+		pself->VI_bounds.R_top = pself->HI_vertPos;
+		pself->VI_bounds.R_bottom = (pself->HI_vertPos) + pself->HR_roomHeight;
+		@call self::MSG_VIS_DRAW(0, gstate);
+		msg = @record HomeItemClass::MSG_UNIT_ROOM_HAS_MOVED(pself->HI_userID, oldBounds, pself->VI_bounds);
+		GCNListSend(MANUFACTURER_ID_BREADBOX, BGCNLT_UNITS, msg, NullHandle, GCNLSF_FORCE_QUEUE);
+		GrDestroyState(gstate);
+		pself->HI_dragging = FALSE;
+		/* I might be wrong, but unless the object wasn't dragged, its bounds
+		   never changed. Its document structure shouldn't be modified and
+		   marked dirty unless its bounds have changed. Therefore, the following
+		   code has been moved here from outside the if(dragging) block -
+		   DH 3/1/99 */
+		document = @call @visParent::MSG_GEN_DOCUMENT_GET_FILE_HANDLE();
+		roomBlock = VMFind(document, NullHandle, pself->HI_userID);
+		blockPtr = VMLock(document, roomBlock, &mem);
+		blockPtr->HIB_bounds = pself->VI_bounds;
+		VMDirty(mem);
+		VMUnlock(mem);
+		}
+	@call self::MSG_VIS_RELEASE_MOUSE();
+	@call self::MSG_ITEM_CHECK_POSITION_AND_DOC_SIZE();
+}
+
+@extern method HomeRoomClass, MSG_ITEM_CHANGE_STATUS {
+	EventHandle msg;
+	byte status;
+
+	@send HomeUnitOnOffGroup::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+	/* that makes the "on", "off", and "dim" buttons work like pushbuttons instead
+		of switches, since a room itself can't be on or off, anyway... */
+	status = (byte)selection;
+	if (status == HUS_DIM) {
+		status = pself->HI_dimLevel;
+	}
+	msg = @record null::MSG_UNIT_SWITCH_IN_ROOM(pself->HI_userID, status);
+	GCNListSend(MANUFACTURER_ID_BREADBOX, BGCNLT_UNITS, msg, NullHandle, GCNLSF_FORCE_QUEUE);
+}
+
+@extern method HomeRoomClass, MSG_ROOM_IS_UNIT_INSIDE {
+   if (Inside(Bounds, pself->VI_bounds)) {
+		EventHandle msg;
+
+		msg = @record HomeUnitClass::MSG_UNIT_IS_IN_ROOM(ID, pself->HI_userID);
+		GCNListSend(MANUFACTURER_ID_BREADBOX, BGCNLT_UNITS, msg, NullHandle, GCNLSF_FORCE_QUEUE);
+	}
+}
+
+@extern method HomeRoomClass, MSG_ITEM_CHANGE_NAME {
+	WindowHandle win;
+	GStateHandle gstate;
+	VMBlockHandle roomBlock;
+	HomeItemBlock *blockPtr;
+	MemHandle mem;
+
+		  document = @call @visParent::MSG_GEN_DOCUMENT_GET_FILE_HANDLE();
+		  roomBlock = VMFind(document, NullHandle, pself->HI_userID);
+		  blockPtr = VMLock(document, roomBlock, &mem);
+		  @call HomeUnitCommandNameText::MSG_VIS_TEXT_GET_ALL_PTR(pself->HI_name);
+		  strcpy(blockPtr->HIB_name, pself->HI_name);
+		  VMDirty(mem);
+		  VMUnlock(mem);
+		  win = @call self::MSG_VIS_QUERY_WINDOW();
+		  gstate = GrCreateState(win);
+		  @call self::MSG_VIS_BOUNDS_CHANGED(pself->VI_bounds.R_bottom,
+																		  pself->VI_bounds.R_right, pself->VI_bounds.R_top,
+																		  pself->VI_bounds.R_left);
+		  @call self::MSG_VIS_DRAW(DF_EXPOSED, gstate);
+		  GrDestroyState(gstate);
+}
+
+@extern method HomeRoomClass, MSG_ROOM_REDRAW {
+	WindowHandle win;
+	GStateHandle gstate;
+
+	win = @call self::MSG_VIS_QUERY_WINDOW();
+	gstate = GrCreateState(win);
+	@call self::MSG_VIS_BOUNDS_CHANGED(pself->VI_bounds.R_bottom, pself->VI_bounds.R_right,
+												  pself->VI_bounds.R_top, pself->VI_bounds.R_left);
+	@call self::MSG_VIS_DRAW(DF_EXPOSED, gstate);
+	GrDestroyState(gstate);
+}
+
+@extern method HomeRoomClass, MSG_ROOM_CHANGE_HEIGHT, MSG_ROOM_CHANGE_WIDTH {
+	VMBlockHandle roomBlock;
+	HomeItemBlock *blockPtr;
+	MemHandle mem;
+//	WindowHandle win;
+//	GStateHandle gstate;
+	EventHandle msg;
+	Rectangle oldBounds = pself->VI_bounds;
+
+	if ((@call HomeRoomHeight::MSG_GEN_CHECK_IF_FULLY_USABLE() == FALSE) ||
+	    (@call HomeRoomHeight::MSG_GEN_CHECK_IF_FULLY_ENABLED() == FALSE) ||
+	    (@call HomeRoomWidth::MSG_GEN_CHECK_IF_FULLY_ENABLED() == FALSE) ||
+       (@call HomeRoomWidth::MSG_GEN_CHECK_IF_FULLY_USABLE() == FALSE)) return;
+	/* we don't want to change size when the dialog is changed.. */
+	roomBlock = VMFind(document, NullHandle, pself->HI_userID);
+	blockPtr = VMLock(document, roomBlock, &mem);
+	switch (message) {
+		case MSG_ROOM_CHANGE_HEIGHT:
+			pself->HR_roomHeight = IntegerOf(value) * ROOM_SCALE_FACTOR;
+			blockPtr->HIB_fields.HRB.roomHeight = pself->HR_roomHeight;
+			break;
+		case MSG_ROOM_CHANGE_WIDTH:
+			pself->HR_roomWidth = IntegerOf(value) * ROOM_SCALE_FACTOR;
+			blockPtr->HIB_fields.HRB.roomWidth = pself->HR_roomWidth;
+			break;
+	}
+	@call self::MSG_VIS_SET_SIZE(pself->HR_roomWidth, pself->HR_roomHeight);
+	blockPtr->HIB_bounds = pself->VI_bounds;
+	VMDirty(mem);
+	VMUnlock(mem);
+/*	win = @call self::MSG_VIS_QUERY_WINDOW();*/
+/*	gstate = GrCreateState(win);*/
+	/* This is a better way of redrawing the object. DH 3/12/99 */
+	@call self::MSG_VIS_BOUNDS_CHANGED(oldBounds.R_bottom,oldBounds.R_right,oldBounds.R_top,oldBounds.R_left);
+	@call self::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID, VUM_DELAYED_VIA_UI_QUEUE);
+/*	@send self::MSG_VIS_REDRAW_ENTIRE_OBJECT();*/
+/*	@call self::MSG_VIS_DRAW(DF_EXPOSED, gstate);*/
+/*	GrDestroyState(gstate);*/
+	/* since our size has changed, we tell all the units, in case any are no longer
+		inside our new bounds. */
+	msg = @record HomeUnitClass::MSG_UNIT_ROOM_HAS_MOVED(pself->HI_userID, oldBounds, pself->VI_bounds);
+	GCNListSend(MANUFACTURER_ID_BREADBOX, BGCNLT_UNITS, msg, NullHandle, GCNLSF_FORCE_QUEUE);
+}
+
+@extern method HomeRoomClass, MSG_ROOM_CHANGE_SCALE_FACTOR {
+	VMBlockHandle roomBlock;
+	HomeItemBlock *blockPtr;
+	MemHandle mem;
+//	WindowHandle win;
+//	GStateHandle gstate;
+	EventHandle msg;
+	Rectangle oldBounds = pself->VI_bounds;
+
+	roomBlock = VMFind(document, NullHandle, pself->HI_userID);
+	blockPtr = VMLock(document, roomBlock, &mem);
+	pself->HR_roomHeight = (pself->HR_roomHeight / oldScale) * newScale;
+	pself->HR_roomWidth = (pself->HR_roomWidth / oldScale) * newScale;
+	blockPtr->HIB_fields.HRB.roomHeight = pself->HR_roomHeight;
+	blockPtr->HIB_fields.HRB.roomWidth = pself->HR_roomWidth;
+	@call self::MSG_VIS_SET_SIZE(pself->HR_roomWidth, pself->HR_roomHeight);
+	blockPtr->HIB_bounds = pself->VI_bounds;
+	VMDirty(mem);
+	VMUnlock(mem);
+/*	win = @call self::MSG_VIS_QUERY_WINDOW();*/
+/*	gstate = GrCreateState(win);*/
+	@call self::MSG_VIS_BOUNDS_CHANGED(oldBounds.R_bottom,oldBounds.R_right,oldBounds.R_top,oldBounds.R_left);
+	@call self::MSG_VIS_MARK_INVALID(VOF_IMAGE_INVALID, VUM_DELAYED_VIA_UI_QUEUE);
+/*	@call self::MSG_VIS_DRAW(DF_EXPOSED, gstate);*/
+/*	GrDestroyState(gstate);*/
+	/* since our size has changed, we tell all the units, in case any are no longer
+		inside our new bounds. */
+	msg = @record HomeUnitClass::MSG_UNIT_ROOM_HAS_MOVED(pself->HI_userID, oldBounds, pself->VI_bounds);
+	GCNListSend(MANUFACTURER_ID_BREADBOX, BGCNLT_UNITS, msg, NullHandle, GCNLSF_FORCE_QUEUE);
+}
+
+/*******************************************************************************/
+/* HOME GROUP CLASS MESSAGE HANDLERS                                           */
+/*******************************************************************************/
+@extern method HomeGroupClass, MSG_ITEM_SET_ATTRS {
+	VMBlockHandle groupBlock;
+	HomeItemBlock *blockPtr;
+	MemHandle mem;
+	word BlockID;
+
+	document = @call @visParent::MSG_GEN_DOCUMENT_GET_FILE_HANDLE();
+	groupBlock = VMFind(document, NullHandle, UserID);
+	blockPtr = VMLock(document, groupBlock, &mem);
+	pself->HI_userID = UserID;
+	blockPtr->HIB_userID = UserID;
+	@call HomeGroupNameText::MSG_VIS_TEXT_GET_ALL_PTR(pself->HI_name);
+	strcpy(blockPtr->HIB_name, pself->HI_name);
+   pself->HG_numMembers = @call HomeGroupMemberList::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS();
+   blockPtr->HIB_fields.HGB.members = pself->HG_numMembers;
+   pself->HI_dimLevel = 0;
+   blockPtr->HIB_dimLevel = 0;
+	VMDirty(mem);
+	VMUnlock(mem);
+	BlockID = pself->HI_userID - INITIAL_ROOM_USER_ID;
+	BlockID += FIRST_ROOM_EVENT_USER_ID;
+	@call self::MSG_ITEM_ALLOC_OR_ATTACH_EVENT_BLOCK(BlockID);
+}
+
+@extern method HomeGroupClass, MSG_ITEM_GET_ATTRS_FROM_FILE {
+	VMBlockHandle groupBlock;
+	HomeItemBlock *blockPtr;
+	MemHandle mem;
+
+	document = @call @visParent::MSG_GEN_DOCUMENT_GET_FILE_HANDLE();
+	groupBlock = VMFind(document, NullHandle, UserID);
+	blockPtr = VMLock(document, groupBlock, &mem);
+	pself->HI_userID = UserID;
+   pself->HG_numMembers = blockPtr->HIB_fields.HGB.members;
+	strcpy(pself->HI_name, blockPtr->HIB_name);
+	pself->HI_dimLevel = blockPtr->HIB_dimLevel;
+	VMUnlock(mem);
+}
+
+@extern method HomeGroupClass, MSG_GROUP_SET_GROUP_SELECTED {
+   MemHandle mem;
+   EventHandle msg;
+   VMFileHandle document;
+   VMBlockHandle eventBlock;
+   HomeEventBlockHeader* eventBlockPtr;
+
+   if (groupID != pself->HI_userID) return;
+   document = @call @visParent::MSG_GEN_DOCUMENT_GET_FILE_HANDLE();
+   eventBlock = @call self::MSG_ITEM_GET_EVENT_BLOCK();
+   eventBlockPtr = VMLock(document, eventBlock, &mem);
+   @send HomeItemEventsList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(eventBlockPtr->HEBH_numEvents);
+	VMUnlock(mem);
+   msg = @record HomeItemClass::MSG_ITEM_CLEAR_SELECTION();
+   GCNListSend(MANUFACTURER_ID_BREADBOX, BGCNLT_ALL_ITEMS, msg, NullHandle, 0);
+   pself->HI_selected = TRUE;
+   @call self::MSG_META_GRAB_TARGET_EXCL();
+   @send HomeUnitCommandClump::MSG_GEN_SET_ENABLED(VUM_NOW);
+   @send HomeUnitDimValue::MSG_GEN_VALUE_SET_INTEGER_VALUE((word) pself->HI_dimLevel, FALSE);
+   @send HomeUnitLockGroup::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+   @call HomeUnitCommandNameText::MSG_VIS_TEXT_REPLACE_ALL_PTR(pself->HI_name,0);
+   @send HomeItemTextVisibleGroup::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@send HomeUnitOnOffGroup::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+	@send HomeUnitIconGroup::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+	@send HomeUnitDimButton::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@send HomeUnitDimGroup::MSG_GEN_SET_ENABLED(VUM_NOW);
+	@send HomeUnitSettingsBlock::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	@send HomeUnitTypeList::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+   @send HomeRoomDimensions::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+   @send HomeEditGroupButton::MSG_GEN_SET_USABLE(VUM_NOW); 
+   @send HomeGroupMemberList2::MSG_GEN_SET_USABLE(VUM_NOW);
+   @send HomeGroupMemberList2::MSG_GEN_DYNAMIC_LIST_INITIALIZE(pself->HG_numMembers);
+   @send HomeGroupMemberList2::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+}
+
+@extern method HomeGroupClass, MSG_GROUP_EDIT_MEMBER_LIST {
+   @send HomeItemSettingsDialog::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+   @send @visParent::MSG_DOC_EDIT_GROUP(pself->HI_userID);
+}
+
+@extern method HomeGroupClass, MSG_GROUP_UPDATE_GROUP_PROPERTIES {
+   if (groupID != pself->HI_userID) return;
+   else {
+      @call HomeGroupNameText::MSG_VIS_TEXT_GET_ALL_PTR(pself->HI_name);
+      pself->HG_numMembers = @call HomeGroupMemberList::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS();
+   }
+}
+
+@extern method HomeGroupClass, MSG_ITEM_CHANGE_NAME {
+	VMBlockHandle groupBlock;
+	HomeItemBlock *blockPtr;
+	MemHandle mem;
+
+   document = @call @visParent::MSG_GEN_DOCUMENT_GET_FILE_HANDLE();
+	groupBlock = VMFind(document, NullHandle, pself->HI_userID);
+	blockPtr = VMLock(document, groupBlock, &mem);
+	@call HomeUnitCommandNameText::MSG_VIS_TEXT_GET_ALL_PTR(pself->HI_name);
+	strcpy(blockPtr->HIB_name, pself->HI_name);
+	VMDirty(mem);
+	VMUnlock(mem);
+   /* make the group list requery itself, so the new name shows up */
+   @send HomeGroupList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(GDLI_NO_CHANGE);
+}
+
+@extern method HomeGroupClass, MSG_ITEM_CHANGE_STATUS {
+	EventHandle msg;
+	byte status;
+   word itemNum, *memberList;
+	VMBlockHandle groupBlock;
+	HomeItemBlock *blockPtr;
+	MemHandle mem;
+
+   document = @call @visParent::MSG_GEN_DOCUMENT_GET_FILE_HANDLE();
+	groupBlock = VMFind(document, NullHandle, pself->HI_userID);
+	blockPtr = VMLock(document, groupBlock, &mem);
+	@send HomeUnitOnOffGroup::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+	/* that makes the "on", "off", and "dim" buttons work like pushbuttons instead
+		of switches, since a room itself can't be on or off, anyway... */
+	status = (byte)selection;
+	if (status == HUS_DIM) {
+		status = pself->HI_dimLevel;
+	}
+  	for (itemNum = 0, memberList = (word *)&(blockPtr->HIB_extraData); itemNum < pself->HG_numMembers;
+        itemNum++, memberList++) {   
+   	msg = @record HomeItemClass::MSG_ITEM_SWITCH_BY_ID(*memberList, status);
+   	GCNListSend(MANUFACTURER_ID_BREADBOX, BGCNLT_ALL_ITEMS, msg, NullHandle, GCNLSF_FORCE_QUEUE);
+   }
+   VMUnlock(mem);
+}
+
+/**************************************************************************************/
+/* MSG_GROUP_GET_MEMBER_NAME -- Sent by HomeGroupMemberList2 (in settings dialog) to  */
+/*                              get the name of a given member.                       */
+/**************************************************************************************/
+@extern method HomeGroupClass, MSG_GROUP_GET_MEMBER_NAME {
+   word /*itemNum, */*memberList;
+	VMBlockHandle groupBlock, itemBlock;
+	HomeItemBlock *blockPtr, *itemPtr;
+	MemHandle mem, itemMem;
+
+   document = @call @visParent::MSG_GEN_DOCUMENT_GET_FILE_HANDLE();
+	groupBlock = VMFind(document, NullHandle, pself->HI_userID);
+	blockPtr = VMLock(document, groupBlock, &mem);
+   memberList = (word *)&(blockPtr->HIB_extraData);
+   itemBlock = VMFind(document, NullHandle, memberList[item]);
+   itemPtr = VMLock(document, itemBlock, &itemMem);
+   @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, itemPtr->HIB_name);
+   VMUnlock(itemMem);
+   VMUnlock(mem);
+}
+
+/*******************************************************************************
+* LOCAL FUNCTIONS                                                              *
+*******************************************************************************/
+Boolean Inside(Rectangle Inner, Rectangle Outer) {
+	if ((Inner.R_top >= Outer.R_top) && (Inner.R_bottom <= Outer.R_bottom) &&
+		 (Inner.R_left >= Outer.R_left) && (Inner.R_right <= Outer.R_right)) {
+		return(TRUE);
+	}
+	else {
+		return(FALSE);
+	}
+}
+

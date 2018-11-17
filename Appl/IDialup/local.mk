@@ -1,0 +1,3 @@
+#include <$(SYSMAKEFILE)>
+
+full	:: LOGGING

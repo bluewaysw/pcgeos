@@ -1,0 +1,503 @@
+/***********************************************************************
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	NTaker
+MODULE:		Document
+FILE:		documentApplication.asm
+
+AUTHOR:		Andrew Wilson, Nov  3, 1992
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	atw	11/ 3/92		Initial revision
+
+DESCRIPTION:
+	Contains code for our subclass of the application object.	
+
+***********************************************************************/
+@include "ntaker.goh"
+
+@extern object NTakerIconBar;
+
+
+@classdecl	NTakerApplicationClass;
+
+/***********************************************************************
+MESSAGE:	NTakerApplicationLoadOptions -- MSG_META_LOAD_OPTIONS
+						for NTakerApplicationClass
+
+DESCRIPTION:	Open the app
+
+PASS:
+	*ds:si - instance data
+	es - segment of NTakerApplicationClass
+
+	ax - The message
+
+RETURN:
+	none
+
+DESTROYED:
+	bx, si, di, ds, es (message handler)
+
+REGISTER/STACK USAGE:
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	4/ 1/92		Initial version
+
+***********************************************************************/
+
+/*
+SettingTableEntry	struct
+    STE_showBars	NTakerToolbarStates
+    STE_features	NTakerFeatures
+SettingTableEntry	ends
+
+settingsTable	SettingTableEntry	\
+ <INTRODUCTORY_TOOLBAR_STATES, INTRODUCTORY_FEATURES>,
+ <BEGINNING_TOOLBAR_STATES, BEGINNING_FEATURES>,
+ <INTERMEDIATE_TOOLBAR_STATES, INTERMEDIATE_FEATURES>,
+ <ADVANCED_TOOLBAR_STATES, ADVANCED_FEATURES>
+
+featuresKey	char	"features", 0
+
+;---
+
+/*@method NTakerApplicationClass, MSG_META_LOAD_OPTIONS,
+							MSG_META_RESET_OPTIONS
+{
+
+	@callsuper();
+
+	; if no features settings are stored then use
+	; defaults based on the system's user level
+
+	sub	sp, INI_CATEGORY_BUFFER_SIZE
+	movdw	cxdx, sssp
+
+	mov	ax, MSG_META_GET_INI_CATEGORY
+	call	ObjCallInstanceNoLock
+	mov	ax, sp
+	push	si, ds
+	segmov	ds, ss
+	mov_tr	si, ax
+	mov	cx, cs
+	mov	dx, offset featuresKey
+	call	InitFileReadInteger
+	pop	si, ds
+	mov	bp, sp
+	lea	sp, ss:[bp+INI_CATEGORY_BUFFER_SIZE]
+	jnc	exit
+
+	; no .ini file settings -- set objects correctly based on level
+
+	push	si
+
+	call	UserGetDefaultLaunchLevel		;ax = UserLevel (0-3)
+;	mov	bl, size SettingTableEntry
+;	mul	bl
+.assert	size SettingTableEntry eq 4
+	shl	ax
+	shl	ax
+	mov_tr	di, ax				;calculate array offset
+
+	push	cs:[settingsTable][di].STE_features
+	GetResourceHandleNS	UserLevelList, bx
+	mov	si, offset UserLevelList
+	mov	ax, MSG_GEN_ITEM_GROUP_GET_SELECTION
+	call	ObjMessageCall			;ax = selection
+	pop	cx
+	mov	es:[features], ax		;AX <- old features
+	cmp	ax, cx
+	jz	afterSetUserLevel
+	mov	ax, MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION
+	clr	dx
+	call	ObjMessageSend
+	mov	cx, 1					;mark modified
+	mov	ax, MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE
+	call	ObjMessageSend
+	mov	ax, MSG_GEN_APPLY
+	call	ObjMessageSend
+afterSetUserLevel:
+
+	mov	cx, cs:[settingsTable][di].STE_showBars
+	call	SetToolbarState
+
+	pop	si
+
+exit:
+	ret
+}
+
+/***********************************************************************
+
+MESSAGE:	NTakerApplicationQueryResetOptions --
+		MSG_NTAKER_APPLICATION_QUERY_RESET_OPTIONS
+						for NTakerApplicationClass
+
+DESCRIPTION:	Make sure that the user wants to reset options
+
+PASS:
+	*ds:si - instance data
+	es - segment of NTakerApplicationClass
+
+	ax - The message
+
+RETURN:
+
+DESTROYED:
+	bx, si, di, ds, es (message handler)
+
+REGISTER/STACK USAGE:
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	11/24/92		Initial version
+
+***********************************************************************/
+/*@method NTakerApplicationClass, MSG_NTAKER_APPLICATION_QUERY_RESET_OPTIONS
+{
+	; ask the user if she wants to reset the options
+
+	push	ds:[LMBH_handle]
+	clr	ax
+	pushdw	axax				;SDOP_helpContext
+	pushdw	axax				;SDOP_customTriggers
+	pushdw	axax				;SDOP_stringArg2
+	pushdw	axax				;SDOP_stringArg1
+	GetResourceHandleNS	ResetOptionsQueryString, bx
+	mov	ax, offset ResetOptionsQueryString
+	pushdw	bxax
+	mov	ax, CustomDialogBoxFlags <0, CDT_QUESTION, GIT_AFFIRMATION,0>
+	push	ax
+	call	UserStandardDialogOptr
+	pop	bx
+	call	MemDerefDS
+	cmp	ax, IC_YES
+	jnz	done
+
+	mov	ax, MSG_META_RESET_OPTIONS
+	call	ObjCallInstanceNoLock
+done:
+	ret
+
+}
+
+/***********************************************************************
+
+MESSAGE:	NTakerApplicationSetToolbarState --
+		MSG_NTAKER_APPLICATION_SET_BAR_STATE for NTakerApplicationClass
+
+DESCRIPTION:	Set the bar state
+
+PASS:
+	*ds:si - instance data
+	es - segment of NTakerApplicationClass
+
+	ax - The message
+
+	cx - new bar state
+
+RETURN:
+
+DESTROYED:
+	bx, si, di, ds, es (message handler)
+
+REGISTER/STACK USAGE:
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	9/29/92		Initial version
+
+***********************************************************************/
+/*@method NTakerApplicationClass, MSG_NTAKER_APPLICATION_SET_TOOLBAR_STATE
+{
+
+	SetToolbarState();
+
+}
+
+/***********************************************************************
+
+FUNCTION:	SetToolbarState
+
+DESCRIPTION:	Set the state of the "show bar" boolean group
+
+CALLED BY:	INTERNAL
+
+PASS:
+	cx - new state
+
+RETURN:
+	none
+
+DESTROYED:
+	ax, bx, cx, dx, di
+
+REGISTER/STACK USAGE:
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	9/24/92		Initial version
+
+***********************************************************************/
+/*SetToolbarState	proc	near	uses si
+	.enter
+
+	push	cx
+	GetResourceHandleNS	ShowBarList, bx
+	mov	si, offset ShowBarList
+	mov	ax, MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS
+	call	ObjMessageCall			;ax = bits set
+	pop	cx
+
+	xor	ax, cx					;ax = bits changed
+	jz	done					;Exit if none changed
+
+	push	ax
+	mov	ax, MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE
+	clr	dx
+	call	ObjMessageSend
+	pop	cx
+	clr	dx
+	mov	ax, MSG_GEN_BOOLEAN_GROUP_SET_GROUP_MODIFIED_STATE
+	call	ObjMessageSend
+	mov	ax, MSG_GEN_APPLY
+	call	ObjMessageSend
+done:
+	.leave
+	ret
+
+SetToolbarState	endp
+
+/***********************************************************************
+
+MESSAGE:	NTakerApplicationToolbarVisibility --
+		MSG_NTAKER_APPLICATION_TOOLBAR_VISIBILITY
+						for NTakerApplicationClass
+
+DESCRIPTION:	Notification that the toolbar visibility has changed
+
+PASS:
+	*ds:si - instance data
+	es - segment of NTakerApplicationClass
+
+	ax - The message
+
+	cx - NTakerBarStates
+	bp - non-zero if opening, zero if closing
+
+RETURN:
+
+DESTROYED:
+	bx, si, di, ds, es (message handler)
+
+REGISTER/STACK USAGE:
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	9/29/92		Initial version
+
+***********************************************************************/
+/*@method NTakerApplicationClass, MSG_NTAKER_APPLICATION_TOOLBAR_VISIBILITY
+{
+	test	ds:[di].GAI_states, mask AS_DETACHING
+	jnz	done
+
+	tst	bp				;if opening then bail
+	jnz	done
+
+	; if closing then we want to update the bar states appropriately
+
+	mov	bp, cx
+	mov	cx, ds:[di].NAI_toolbarStates		;cx = old
+	not	bp
+	and	cx, bp
+	cmp	cx, ds:[di].NAI_toolbarStates
+	jz	done
+
+	; if we are iconifying then we don't want to turn the beasts off
+
+	push	cx, si
+	GetResourceHandleNS	NTakerPrimary, bx
+	mov	si, offset NTakerPrimary
+	mov	ax, MSG_GEN_DISPLAY_GET_MINIMIZED
+	mov	di, mask MF_CALL or mask MF_FIXUP_DS
+	call	ObjMessage			;carry set if minimized
+	pop	cx, si
+	jc	done
+
+	mov	ax, MSG_NTAKER_APPLICATION_SET_TOOLBAR_STATE
+	mov	bx, ds:[LMBH_handle]
+	mov	di, mask MF_FORCE_QUEUE
+	call	ObjMessage
+
+done:
+	ret
+
+}
+/***********************************************************************
+MESSAGE:	MSG_NTAKER_APPLICATION_UPDATE_TOOLBARS
+						for NTakerApplicationClass
+
+DESCRIPTION:	Update toolbar states
+
+PASS: ( word	selectedBooleans,
+        word	indeterminateBooleans,
+        word	modifiedBooleans)
+
+RETURN:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	4/ 1/92		Initial version
+	jfh   4/29/03		ported to GOC
+***********************************************************************/
+@method NTakerApplicationClass, MSG_NTAKER_APPLICATION_UPDATE_TOOLBARS
+{
+
+
+	if (selectedBooleans == pself->NAI_toolbarStates)
+		return;   /* no change in status */
+	else {  /* status changed */
+		/* save the new state */
+		pself->NAI_toolbarStates = selectedBooleans;
+		if (!selectedBooleans)  {
+			/* turn off tool bar */
+			@send NTakerIconBar::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+			@send NTakerIconBar::MSG_GEN_INTERACTION_POP_IN();
+			}
+		else {
+			/* turn on tool bar */
+			@send NTakerIconBar::MSG_GEN_SET_USABLE(VUM_NOW);
+			}
+		/* change the .ini */
+		InitFileWriteInteger("notetaker", "showBars", selectedBooleans);
+		InitFileCommit();
+		}  /* end of status changed else */
+
+}
+
+/***********************************************************************
+
+MESSAGE:	NTakerApplicationUpdateAppFeatures --
+		MSG_GEN_APPLICATION_UPDATE_APP_FEATURES
+					for NTakerApplicationClass
+
+DESCRIPTION:	Update feature states
+
+PASS:
+	*ds:si - instance data
+	es - segment of NTakerApplicationClass
+
+	ax - The message
+
+	ss:bp - GenAppUpdateFeaturesParams
+
+RETURN:
+
+DESTROYED:
+	bx, si, di, ds, es (message handler)
+
+REGISTER/STACK USAGE:
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/CAVEATS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Tony	4/ 1/92		Initial version
+
+***********************************************************************/
+/*
+; This table has an entry corresponding to each feature bit.  The entry is a
+; point to the list of objects to turn on/off
+
+usabilityTable	fptr	\
+	cardListList,	;NF_CARD_LIST
+	keywordsList, 	;NF_KEYWORDS
+	searchList,	;NF_SEARCH
+	miscList,	;NF_MISC_OPTIONS
+	toolList,	;NF_TOOLS
+	topicList	;NF_CREATE_TOPICS
+
+cardListList	label	GenAppUsabilityTuple
+	GenAppMakeUsabilityTuple	StartupViewGroup
+	GenAppMakeUsabilityTuple	ViewMenu, end
+keywordsList	label	GenAppUsabilityTuple
+	GenAppMakeUsabilityTuple	PrintKeywords	
+	GenAppMakeUsabilityTuple	SearchKeywordBox, end
+
+searchList	label	GenAppUsabilityTuple
+	GenAppMakeUsabilityTuple	SearchSubGroup, end
+
+miscList	label	GenAppUsabilityTuple
+	GenAppMakeUsabilityTuple	DisplayDates, end
+
+toolList	label	GenAppUsabilityTuple
+	GenAppMakeUsabilityTuple	ShowToolbarEntry, toolbar
+	GenAppMakeUsabilityTuple	NTakerToolControl, end
+topicList	label	GenAppUsabilityTuple
+	GenAppMakeUsabilityTuple	PrintCurTopic, end
+
+levelTable 	label	GenAppUsabilityTuple
+	GenAppMakeUsabilityTuple	NTakerSearchControl, recalc	
+	GenAppMakeUsabilityTuple	NTakerDisplayControl, recalc
+	GenAppMakeUsabilityTuple	NTakerDocumentControl, recalc, end
+
+@method NTakerApplicationClass, MSG_GEN_APPLICATION_UPDATE_APP_FEATURES
+{
+	; call general routine to update usability
+
+	mov	ss:[bp].GAUFP_table.segment, cs
+	mov	ss:[bp].GAUFP_table.offset, offset usabilityTable
+	mov	ss:[bp].GAUFP_tableLength, length usabilityTable
+	mov	ss:[bp].GAUFP_levelTable.segment, cs
+	mov	ss:[bp].GAUFP_levelTable.offset, offset levelTable
+
+	;
+	;  Handle "unreparenting" automatically
+	;
+	clrdw	ss:[bp].GAUFP_unReparentObject
+	clrdw	ss:[bp].GAUFP_reparentObject
+
+	mov	ax, MSG_GEN_APPLICATION_UPDATE_FEATURES_VIA_TABLE
+	call	ObjCallInstanceNoLock
+
+	ret
+
+}
+*/
+
+

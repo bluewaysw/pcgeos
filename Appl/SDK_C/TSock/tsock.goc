@@ -1,0 +1,322 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996 -- All Rights Reserved
+
+PROJECT:	Test htsock Library
+MODULE:		
+FILE:		tsock.goc
+
+AUTHOR:		Kok Kin Kee, Aug  7, 1996
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	kkee	8/ 7/96   	Initial version.
+
+DESCRIPTION:
+	Test htsock Library.
+
+	$Id: tsock.goc,v 1.1 97/04/04 16:41:22 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+/* Geos stuff */
+@include <stdapp.goh>		/* Standard application */
+@include <HTCore/htsock.goh>
+#include <Ansi/string.h>
+@include <socket.goh>
+@include "tsock.goh"
+
+#define BUFFER_LENGTH 1024
+static char readBuffer[BUFFER_LENGTH];
+static char writeBuffer[] = "GET /\r\n";
+static Socket sockfd = NULL;
+static HTStreamHandle htsocket = NullOptr;
+
+
+/*--------------------------------------------------------------------------
+ *		Class declarations
+ *-------------------------------------------------------------------------*/
+@classdecl	TestProcessClass, neverSaved;
+@classdecl	TestMgrClass;
+
+/*--------------------------------------------------------------------------
+ *		Application Object
+ *-------------------------------------------------------------------------*/
+@start	AppResource;
+
+@object GenApplicationClass TestApp = {
+    GI_visMoniker = list { @TestMoniker }
+    GI_comp = @TestPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @TestPrimary;
+}
+
+@visMoniker TestMoniker = "Test htsock";
+
+@end	AppResource;
+
+
+/*--------------------------------------------------------------------------
+ *		Interface
+ *-------------------------------------------------------------------------*/
+@start	Interface;
+
+@object GenPrimaryClass TestPrimary  = {
+	GI_comp = @LoadTrigger,
+	          @StopTrigger,
+	          @TestDisplayText;
+	HINT_DISPLAY_NOT_RESIZABLE;
+	HINT_PRIMARY_NO_FILE_MENU;
+}
+
+@object GenTriggerClass LoadTrigger = {
+	GI_visMoniker = 'L', "Load";
+	GTI_destination = TestMgr;
+	GTI_actionMsg = MSG_LOAD;
+	HINT_SEEK_MENU_BAR;
+}
+
+@object GenTriggerClass StopTrigger = {
+	GI_visMoniker = 'S', "Stop";
+	GTI_destination = TestMgr;
+	GTI_actionMsg = MSG_STOP;
+	HINT_SEEK_MENU_BAR;
+}
+
+
+@object GenTextClass TestDisplayText = {
+        GI_visMoniker = "Display Text";
+	GTXI_attrs = @default | GTA_INIT_SCROLLING | 
+	    GTA_DONT_SCROLL_TO_CHANGES;
+	HINT_DRAW_IN_BOX;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_PLACE_MONIKER_ABOVE;
+}
+
+@end   Interface;
+
+
+/*--------------------------------------------------------------------------
+ *		TestMgr 
+ *-------------------------------------------------------------------------*/
+@start	TestInterface;
+
+@object TestMgrClass TestMgr = {
+}
+
+@end 	TestInterface;
+
+
+/*--------------------------------------------------------------------------
+ *		Private routines
+ *-------------------------------------------------------------------------*/
+
+
+/***********************************************************************
+ *		LoadConnectCallback
+ ***********************************************************************
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/ 7/96   	Initial Revision
+ *
+ ***********************************************************************/
+void _far _pascal
+LoadConnectCallback (HTStreamHandle htsock, HTSocketState htstate)
+{
+    @send,forceQueue TestMgr::MSG_LOAD_CALLBACK(htsock, htstate);
+}	/* End of LoadConnectCallback.	*/
+
+
+
+/***********************************************************************
+ *		LoadThread
+ ***********************************************************************
+ * SYNOPSIS:	Procedural thread for loading a document.
+ * CALLED BY:	Kernel.
+ * RETURN:	0 - required by Kernel.
+ * SIDE EFFECTS:Global variables used here: htsocket, readBuffer, sockfd.
+ *	
+ * STRATEGY:   
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/14/96   	Initial Revision
+ *
+ ***********************************************************************/
+static word _pascal
+LoadThread (word value)
+{
+    word bytesRead;
+    HTSocketState state;
+
+    /* Send request */
+    if ((@call htsocket::MSG_HT_SOCKET_WRITE_PTR((void *)(writeBuffer),
+				 strlen(writeBuffer))) != HT_OK) {
+	state = @call htsocket::MSG_HT_SOCKET_GET_STATE();
+	return 0;
+    }
+
+    /* Read all data */
+    do {
+	bytesRead = @call htsocket::
+	    MSG_HT_SOCKET_READ_PTR((void *)readBuffer, BUFFER_LENGTH,
+				   SOCKET_NO_TIMEOUT);
+
+	if (!bytesRead) 
+	    state = @call htsocket::MSG_HT_SOCKET_GET_STATE();
+
+	else 
+	    @call TestDisplayText::
+		MSG_VIS_TEXT_APPEND_PTR(readBuffer, bytesRead);
+
+    } while ((bytesRead) || (state == HTSS_CONNECTED));
+
+    /* Remove the socket */
+    @call htsocket::MSG_HT_SOCKET_CLOSE();
+    @call htsocket::MSG_META_OBJ_FREE();
+    sockfd = NULL;
+    htsocket = NullOptr;
+
+    return 0;
+}	/* End of LoadThread.	*/
+
+
+
+/*--------------------------------------------------------------------------
+ *		Messsage Handlers for TestMgrClass
+ *-------------------------------------------------------------------------*/
+
+
+/***********************************************************************
+ *		MSG_LOAD for TestMgrClass
+ ***********************************************************************
+ * SYNOPSIS:	    Test routine.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/ 7/96   	Initial Revision
+ *
+ ***********************************************************************/
+/*
+ * This line is to make sure we use vfptr to force code relocation. 
+ * Otherwise the Library could end up executing invalid code, which
+ * often ends in crashing the app and library.
+ */
+static HTSockConnectCallback callbackFunc = LoadConnectCallback;
+static ClassStruct *className = &HTSocketClass;
+
+@method TestMgrClass, MSG_LOAD
+{
+    HTSocketState state;
+    HTSocketAddress htAddress;
+    optr htsocket;
+
+    /* Create a htsocket object */
+    htsocket = ObjInstantiateForThread(0, className);
+    
+    if (!htsocket) return;
+
+    /* Must be called to initialize the socket. */
+    if ((@call htsocket::MSG_HT_SOCKET_INITIALIZE()) != HT_OK)
+	return;
+
+    /* Call us back after connect attempt. */
+    @call htsocket::MSG_HT_SOCKET_SET_CONNECT_CALLBACK(callbackFunc);
+
+    /* Resolve and connect to a site */
+    htAddress.HTSA_port = 80;
+    htAddress.HTSA_accessPoint = 1;
+    strcpy(htAddress.HTSA_ipAddress, "www.geoworks.com");
+
+    if ((@call htsocket::MSG_HT_SOCKET_RESOLVE_AND_CONNECT(&htAddress,
+			   GeodeGetProcessHandle())) != HT_OK) {
+	state = @call htsocket::MSG_HT_SOCKET_GET_STATE();
+	return;
+    }
+
+}	/* End of MSG_LOAD.	*/
+
+
+
+/***********************************************************************
+ *		MSG_STOP for TestMgrClass
+ ***********************************************************************
+ * SYNOPSIS:	    Stop loading.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/14/96   	Initial Revision
+ *
+ ***********************************************************************/
+@method TestMgrClass, MSG_STOP
+{
+    if (sockfd)
+	SocketInterrupt(sockfd);
+}	/* End of MSG_STOP.	*/
+
+
+
+
+/***********************************************************************
+ *		MSG_LOAD_CALLBACK for TestMgrClass
+ ***********************************************************************
+ * SYNOPSIS:	    Test routine.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	kkee	8/ 7/96   	Initial Revision
+ *
+ ***********************************************************************/
+static word (*const loadFunc)(word) = &LoadThread;
+
+@method TestMgrClass, MSG_LOAD_CALLBACK
+{
+    ThreadHandle newThread;
+
+    if (htstate != HTSS_CONNECTED) return;
+
+    /* Get the descriptor so we can interrupt it. */
+    sockfd = @call htsock::MSG_HT_SOCKET_GET_DESCRIPTOR();
+    htsocket = htsock;
+
+    /* Create a thread to send request and load data. */
+    newThread = ThreadCreate(PRIORITY_STANDARD, 
+			     0,   /* No data to pass */
+			     loadFunc,
+			     1024,
+			     GeodeGetProcessHandle());
+
+    if (newThread == NullHandle) {
+	/* Failed to create a thread for nonblocking connect */
+	return;
+    }
+}	/* End of MSG_LOAD_CALLBACK.	*/

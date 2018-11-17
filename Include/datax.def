@@ -1,0 +1,536 @@
+ COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+
+PROJECT:	PC GEOS
+MODULE:		Include -- Data Exchange Library Definitions
+FILE:		datax.def
+
+AUTHOR:		Robert Greenwalt, Nov  5, 1996
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	robertg	11/ 5/96   	Initial revision
+
+DESCRIPTION:
+
+	
+		
+	$Id: datax.def,v 1.1 97/04/04 14:26:18 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef __DATAX
+
+StartLibrary	datax
+
+;-----------------------------------------------------------------------------
+;		Class definitions
+;-----------------------------------------------------------------------------
+
+DataXApplicationClass	class	GenApplicationClass
+
+DXA_iacpInitParameters optr
+
+DataXApplicationClass	endc
+
+
+;-----------------------------------------------------------------------------
+;		Exported routines
+;-----------------------------------------------------------------------------
+
+global	DXOPENPIPE:far
+;	Desc:	Caller wants to open a particular data pipe.
+;	Pass:	on stack
+;		hptr to a buffer containing a DataXPipeDescriptor
+;			followed by a set of DataXElementDescriptor,
+;			establishing startup parameters and pipe order
+;			from left to right.
+;	Return:	ax - DataXReturnType
+;
+
+global	DXCLOSEPIPE:far
+;	Desc:	Caller wants to close a particular data pipe.
+;	Pass:	on stack
+;		hptr - handle of pipe descriptor buffer used to open
+;			the pipe
+;	Return:	ax - DataXReturnType
+;
+
+
+global	DXINTERNALCLOSEPIPE:far
+;	Desc:	Called from inside a pipe.  Kills the pipe.  Does not
+;		return.  Frees PipeElementHeader
+;	Pass:	on stack:
+;			fptr to DataXBehaviorArguments
+;	Returns:Doesn't.  Jmps to ThreadDestroy
+;
+
+global	DXMANUALPIPECYCLE:far
+;	Desc:	Called from inside the pipe, it causes the pipe to
+;		cycle (we sleep and the next element takes over) from
+;		within a behavior.  Very useful for behaviors that
+;		must do enumerating callbacks.
+;	Pass:	on stack:
+;			fptr to DataXBehaviorArguments
+;	Returns:nothing, but you must resample everything: data buffer
+;			segment, DXI_infoWord, etc may have changed
+;
+
+global	DXMANUALBEHAVIORCALL:far
+;	Desc:	Called from inside the pipe, it calls a behavior from
+;		within another.  Useful for dealing with a pipe state
+;		change while doing an enumerating callback.  For example:
+;			Exporting records.  Enumerate
+;				have record, write it to buffer and
+;					cycle
+;				check incoming infoWord, continue
+;					exporting - have next record,
+;					write to buffer and cycle
+;				check incoming infoWord - indicates
+;					state change (error, done,
+;					something) so stop exporting.
+;				Deal with new word (DXMANUALBEHAVIORCALL)
+;					and return its return value
+;	Pass:	DXI_infoWord filled in
+;		on stack:
+;			fptr to DataXBehaviorArguments
+;	Returns: ax = DXET value
+;
+
+global	DXSETDXIDATABUFFERSIZE:far
+;	Desc:	Called to set the size of the data buffer inside of 
+;		DataXInfo.  Assumes there is already one allocated. 
+;	
+;	Pass:	DataXInfo fptr
+;		size of buffer
+;	Returns: carry set on error 
+
+;
+; EC Routines
+;
+
+global 	ECDXCHECKPEH:far
+;	Desc:	call to verify a PipeElementHeader in EC code
+;	Pass:	on stack:
+;			fptr to PipeElementHeader
+;	Returns:  nothing
+;	Destroys:  nothing
+;
+
+global 	ECDXCHECKDATAXINFO:far
+;	Desc:	call to verify a DataXInfo in EC code
+;	Pass:	on stack:
+;			fptr to DataXInfo
+;	Returns:  nothing
+;	Destroys: nothing
+;
+
+global	ECDXCHECKDATAXBEHAVIORARGUMENTS:far
+;	Desc:	call to verify your DataXBehaviorArguments
+;	Pass:	on stack:
+;			fptr to DataXBehaviorArguments
+;	Returns:  nothing
+;	Destroys: nothing
+;
+
+
+
+;------------------------------------------------------------------------
+;			Behavior form
+;------------------------------------------------------------------------
+;
+; All behaviors should have the following form
+;	TYPICALBEHAVIOR:far
+;		Desc:		behavior for a particular infoWord
+;		Pass:		on stack:
+;					DataXBehaviorArguments
+;				ds	= dgroup
+;		Return:		ax = DataXReturnType
+;		Destroyed:	can destroy all except bp and ds
+;
+
+
+;------------------------------------------------------------------------
+;			DXInfoWord Definitions
+;------------------------------------------------------------------------
+DXInfoWord				etype	word
+
+DXIW_NULL				enum	DXInfoWord, 0
+; Description:  NOT USED!  This is just a place holder to prevent zero
+; 		from being assigned by the enum.  
+;
+;		This is the beginning of the System infoWords.  For
+; 		these words, the custom defined default behavior will
+;		NOT be run.  They will also ensure that the infoWord 
+; 		is not changed.  EC will generate a Fatal Error.
+;
+
+DXIW_INITIALIZE				enum	DXInfoWord
+; Description:	Initialize the element - not used by pipe, but
+; 		immediately called (before Ping our Sem) on pipe
+; 		creation.  Also note it's called on the spawning
+; 		thread, not the spawned thread.
+
+DXIW_POST_THREAD_INITIALIZE		enum	DXInfoWord
+; Description:	Called before the element is run, but after it's on
+; 		its own thread.  Arguments are in their final places.
+
+DXIW_CLEAN_SHUTDOWN			enum	DXInfoWord
+; Description:	Standard shutdown mechanism.
+; Behaviors:
+;	All: 	dec the low word of miscInfo
+;		V signoff semaphore passed in first word of miscInfo
+;		Free up resources
+;		jmp to ThreadDestroy
+; miscInfo contents:
+;		element signoff counter - dec it before you V the following:
+;		signoff semaphore - V it.
+;
+
+DXIW_ERROR				enum	DXInfoWord
+; Description:	Standard error - Someone in the pipe didn't understand
+; 		the last DXIW
+; Default behaviors:
+;		Mid-pipe: do nothing
+;		End: bounce it back
+; miscInfo contents:
+;		DXErrorType
+;
+
+DXIW_NON_SYSTEM_INFO_WORDS		enum	DXInfoWord, 40h
+; Description:  NOT USED!  Place holder so that System Level words can
+;               be added without disturbing the ordering of subsequent
+;		words.  End of System InfoWords.
+; Default Behavior:
+;		nothing
+
+DXIW_DEFAULT_BEHAVIOR			enum	DXInfoWord
+; Description:	NOT USED!  Used to identify the default behavior in a 
+;               custom behavior table.
+; Default behaviors: NA
+;
+
+DXIW_OPEN				enum	DXInfoWord
+; Description:	Create a data pipe.  The data is a pipe descriptor
+; 		followed by a series of element descriptors (just like
+; 		DXOpenPipe) followed by the initial contents of the
+; 		databuffer.
+; Default behavior:
+;	All:	nothing (error?)
+;
+
+DXIW_CLOSE				enum	DXInfoWord
+; Description:	Close a data pipe.
+;
+; Default behavior:
+;	All:	nothing (error?)
+;
+
+DXIW_DONE				enum	DXInfoWord
+; Description:	The operation is complete.
+;
+; Default behaviors:
+;	All:	nothing
+;
+
+DXIW_IMPORT				enum	DXInfoWord
+; Description:  Start or continue Importing.  Data flows right to left
+; Default behaviors:
+;	Mid-pipe: do nothing
+;	End: return DXIW_ERROR - DXET_INVALID_DXIW
+; miscInfo contents:
+;	DataXImportType
+;
+
+DXIW_EXPORT				enum	DXInfoWord
+; Description:  Start or continue Exporting.  Data flows left to right
+;	Only the first _EXPORT's timestamp is used.  The export
+;	operation continues until either the DB runs out of records to
+;	export or we receive a non _EXPORT infoWord.
+; Default behaviors:
+;	Mid-pipe: do nothing
+;	End: return DXIW_ERROR - DXET_INVALID_DXIW
+; miscInfo contents:
+;	FileDateAndTime timestamp
+;
+
+DXIW_SINGLE_RECORD_EXPORT		enum	DXInfoWord
+; Description:	Export a single record, specified by the SRH_id field
+; 		in the databuffer.
+; Default behaviors:
+;	All:	nothing
+;
+
+DXIW_ALL_RECORDS			enum	DXInfoWord
+; Description:	The exporter is sending all records.  If you are the
+; 		recipient, you should note this and put back the
+; 		DXIW_EXPORT.
+; Default behaviors:
+;	All:	nothing
+;
+
+DXIW_PARTIAL_RECORDS			enum	DXInfoWord
+; Description:	The exporter is sending a differential export.  If you
+;		are the recipient, you should note this and put back
+;		the DXIW_EXPORT.
+; Default behaviors:
+; 	ALL:	nothing
+;
+
+DXIW_DEVICE_ID				enum	DXInfoWord
+; Description:  Indicates that that the DeviceID is being sent or
+;        	requested.
+; Default behaviors:
+;       All:   	nothing (not handled at the DataX level)
+;
+
+DXIW_USER_DEFINED			enum	DXInfoWord, 8000h
+; Description: Beginning of user-defined DXInfoWords.  Use DXIW_USER_DEFINED,
+;              DXIW_USER_DEFINED+1 and so on for application specific infoword
+;              use.
+; Default behavior:
+;        Application defined
+
+;----------------------------------------------------------------------------
+;		Structures
+;----------------------------------------------------------------------------
+
+DataXBehaviorArguments	struct
+DXBA_elementHeader	fptr.PipeElementHeader
+
+DXBA_customData		fptr
+
+DXBA_dataXInfo		fptr.DataXInfo
+DataXBehaviorArguments	ends
+
+
+
+DataXPipeDescriptor	struct
+DXPD_dataBuffer		hptr	;Common dataBuffer to be used
+				;throughout the pipe.  May contain
+				;startup info accessible to all links.
+DXPD_elementCount	word	;The number of elements in the pipe.
+DXPD_firstElement	label byte
+DataXPipeDescriptor	ends
+
+
+DataXElementDescriptor	struct
+DXED_geodeToken		GeodeToken	; Token of the Geode for this
+					; pipe element.
+DXED_initialInfoWord	DXInfoWord	; The startup infoWord for
+					; this pipe element.
+DXED_initialMiscInfo	dword		; The startup miscInfo for
+					; this pipe element.
+DataXElementDescriptor	ends
+
+
+DXFlags		record
+DXF_FINAL:1,
+:15,
+DXFlags		end
+
+
+DataXInfo		struct
+DXI_dataBuffer		hptr		; The handle of the data
+					;  buffer - common to all
+					;  pipes.
+DXI_dataSegment		word		; Optimization - the data
+					;  buffer remains locked, with
+					;  only one element messing
+					;  with it at a time, so just
+					;  set this to the segment so
+					;  everyone doesn't have to
+					;  redereference it each time.
+					;  Data starts at offset 0.
+DXI_bufferSize		word		; Size of the buffer block.    
+DXI_dataSize		word		; Size of the data in the
+					;  buffer.  This may be
+					;  different than the
+					;  bufferSize if the block isn't full
+					;  (blocks have 16 byte granularity).
+DXI_flags		DXFlags		; Some status information.
+					;  Currently only reports final
+					;  blocks during data
+					;  segmentation.
+DXI_infoWord		DXInfoWord	; Describes the current
+					;  operation.
+DXI_miscInfo		dword		; Passes additional control
+					;  information as dictated by
+					;  the protocol and
+					;  DXI_infoWord.
+DXI_protoMajor		word		; Used at startup to verify
+					;  protocol support.  Must be
+					;  equal to what the geode
+					;  expects.
+DXI_protoMinor		word		; Used at startup to verify
+					;  protocol support.  Must be
+					;  equal or greater than what
+					;  the geode expects.
+DXI_intSemaphoreLeft	hptr		; handle of the internal
+					;  semaphore for the left side
+					;  port.
+DXI_extSemaphoreLeft	hptr		; handle of the external
+					;  semaphore for the left side
+					;  port.
+DXI_intSemaphoreRight	hptr		; same as above, but for the
+					;  right side.
+DXI_extSemaphoreRight	hptr
+DataXInfo		ends
+
+
+DXPipeDirection		record
+:6,
+DXD_RIGHT:1,
+DXD_LEFT:1,
+DXPipeDirection		end
+
+
+DataXStartupFlags	record
+DXSF_PROTOCOL_ERROR:1,			;Set if the protocol numbers
+					;don't match our expectations
+DXSF_REENTRANT:1,			;Set if this geode supports
+					;reentrant pipes - default is set
+DXSF_MEMORY_ERROR:1,			;Memory Alloc failure..
+:13,
+DataXStartupFlags	end
+
+
+PipeElementHeader	struct
+PEH_customRoutines	word		; offset to CustomRoutineTable
+PEH_defaultRoutine	vfptr		; vfptr of our default routine
+PEH_dataXInfo		fptr		; pointer to our dataXInfo
+PEH_dgroup		word		; pointer to custom routines dgroup
+PEH_pipeDirection	DXPipeDirection ; direction of Pipe flow
+PEH_pipeToggle		DXPipeDirection ; used to xor the direction to
+					; flip the flow.  mid-pipe
+					; elements have this set,
+					; pipe-ends have it cleared
+PEH_intSemaphoreLeft	hptr
+PEH_extSemaphoreLeft	hptr
+PEH_intSemaphoreRight	hptr
+PEH_extSemaphoreRight	hptr
+PEH_customData		label byte
+PipeElementHeader	ends
+
+
+RoutineTableEntry	struct
+RTE_infoWord		DXInfoWord	; The infoWord whose behavior
+					; is being replaced
+RTE_routine		vfptr
+RoutineTableEntry	ends
+
+
+DATA_EXCHANGE_NEW_RECORD	equ	-1
+
+
+DataXReturnType		etype	word
+DXRT_NO_ERROR					enum	DataXReturnType, 0
+DXRT_BAD_PIPE_DESC				enum	DataXReturnType
+; Something about the pipe layout was wrong
+;
+
+DXRT_MEM_ERROR					enum	DataXReturnType
+; Ran out of memory..  sorry.
+;
+
+DXRT_NON_REENTRANT_ELEMENT_ALREADY_IN_USE	enum	DataXReturnType
+; You tried to use an element that was already in use, and not
+; reentrant.
+;
+
+DXRT_GEODE_TABLE_FULL				enum	DataXReturnType
+; The library has too many pipe elements already in use and our
+; internal geode table is full.
+;
+
+DXRT_IACP_ERROR					enum	DataXReturnType
+; IACP refused to connect with the geode supplied in the
+; ElementDescriptor.  I don't know what to say.  Check your
+; GeodeTokens.
+;
+
+
+DXErrorType		etype	word
+DXET_NO_ERROR					enum	DXErrorType
+; No error generated.  Do not use return this from initialization 
+; custom behavior, use either DXET_REENTRANT or DXET_NOT_REENTRANT.
+;
+
+DXET_REENTRANT					enum	DXErrorType
+; Non-error startup return value.  Says that yes, we are reentrant.
+;
+
+DXET_NOT_REENTRANT				enum	DXErrorType
+; The other non-error startup return value.  Says that we are not 
+; reentrant.
+;
+
+DXET_INVALID_DXIW				enum	DXErrorType
+; Somebody got a DXIW they didn't like.
+;
+
+DXET_INVALID_DATA				enum	DXErrorType
+; Pipe Element didn't like the data or didn't receive the data it was
+; expecting.
+;
+
+DXET_USE_INHERITED_BEHAVIOR			enum	DXErrorType
+; Pipe Element custom behavior did what it needed and now wants the
+; inherited behavior run.
+;
+
+DXET_MEM_ALLOC_ERROR				enum	DXErrorType
+; We failed memory allocation
+;
+
+DXET_RECOVERABLE_ERROR				enum	DXErrorType
+; A recoverable error was generated.  DataX does not do anything
+; special with this error, it is only to note general purpose 
+; recoverable errors.  It is up to the protocol in use to provide
+; more information as to the nature of the error.
+; 
+
+DXET_FATAL_ERROR				enum	DXErrorType
+; A fatal error was generated.  This is the same as a
+; DXET_RECOVERABLE_ERROR, but indicates an error of higher severity.
+;
+; 
+
+DXET_INVALID_DEVICE_SIGNATURE			enum	DXErrorType
+; The upper word of a pipe signature should contain a device
+; signature.  This error indicates that it did not match the device 
+; signature.
+;
+
+DXET_NON_SYSTEM_ERRORS				enum	DXErrorType, 80h
+; Beginning of non system errors.  This is a logical division, not a 
+; functional one.  It allows room for both "system" errors and
+; "non-system" errors to be added without adjusting their values.
+
+DXET_DATABASE_ERROR				enum	DXErrorType
+; We encountered a database problem.
+;
+
+
+
+DXMain equ DXMAIN
+DXOpenPipe equ DXOPENPIPE
+DXClosePipe equ DXCLOSEPIPE
+DXManualPipeCycle equ DXMANUALPIPECYCLE
+DXManualBehaviorCall equ DXMANUALBEHAVIORCALL
+DXInternalClosePipe equ DXINTERNALCLOSEPIPE
+DXSetDXIDataBufferSize equ DXSETDXIDATABUFFERSIZE
+
+if ERROR_CHECK
+ECDXCheckPEH equ ECDXCHECKPEH
+ECDXCheckDataXInfo equ ECDXCHECKDATAXINFO
+ECDXCheckDataXBehaviorArguments equ ECDXCHECKDATAXBEHAVIORARGUMENTS
+endif
+
+EndLibrary	datax

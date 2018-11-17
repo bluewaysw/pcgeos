@@ -1,0 +1,1861 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Designs in Light 2002 -- All Rights Reserved
+ *
+ * PROJECT:	  Mail
+ * MODULE:	  Mail
+ * FILE:	  mailList.goc
+ *
+ * AUTHOR:  	  Gene Anderson
+ *
+ * DESCRIPTION:
+ *	MailListClass for the Mail application
+ *
+ * 	$Id$
+ *
+ ***********************************************************************/
+
+@include "mail.goh"
+@include "class.goh"
+@include "global.goh"
+@include <rolodex.goh>
+#include <sem.h>
+#include <hugearr.h>
+#include <font.h>
+
+@classdecl MailListClass;
+@classdecl MailListHeaderClass;
+
+#ifdef __BORLANDC__
+#pragma codeseg MailCode
+#endif
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_META_FUP_KBD_CHAR
+ * PASS:            character - character
+ *                  flags - CharFlags + ShiftState
+ *                  state - scan code
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Handle an <ENTER> press
+ ***************************************************************/
+
+@method MailListClass, MSG_META_FUP_KBD_CHAR
+{
+    /*
+     * if we get a press of the Enter key...
+     */
+    if ((!(flags & CF_RELEASE)) && (character == ((CS_CONTROL<<8)|VC_ENTER))) {
+	@send, forceQueue oself::MSG_MAIL_LIST_OPEN_MESSAGE();
+	return(TRUE);
+    }
+    @callsuper();
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        FormatListDate
+ * PASS:            buf - ptr to buffer for date
+ *                  time - ptr to MailTime
+ * RETURN:          buf - filled in
+ * DESCRIPTION:
+ *         Format a date/time for the message list.
+ ***************************************************************/
+
+void
+FormatListDate(TCHAR *buf, MailTime *time)
+{
+    word i;
+
+    LocalFormatDateTime(buf, DTF_ZERO_PADDED_SHORT, time);
+    strcat(buf, " ");
+    i = strlen(buf);
+    LocalFormatDateTime(buf+i, DTF_HM, time);
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_MAIL_LIST_GET_LAST_SELECTION
+ * PASS:            none
+ * RETURN:          last selection or GIGS_NONE
+ * DESCRIPTION:
+ *         Get the last selected message. We do this because some
+ *         actions (e.g., read message) can only operate on one
+ *         message at a time. This operates on the last message
+ *         the user interacted with.
+ ***************************************************************/
+@method MailListClass, MSG_MAIL_LIST_GET_LAST_SELECTION
+{
+    MemHandle mh;
+    word numSels, *buf, sel = GIGS_NONE;
+
+    numSels = pself->GIGI_numSelections;
+    if (numSels) {
+	/*
+	 * allocate a buffer big enough for all the selections
+	 */
+	mh = MemAlloc(numSels*2, HF_DYNAMIC, HAF_STANDARD|HAF_LOCK);
+	if (mh) {
+	    buf = MemDeref(mh);
+	    @call oself::MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS(buf, numSels);
+	    /*
+	     * return the last selection
+	     */
+	    sel = buf[numSels-1];
+	    MemFree(mh);
+	}
+    }
+    return(sel);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        FormatTimezoneStr
+ * PASS:            buf - ptr to buffer
+ *                  timezone - timezone
+ * RETURN:          buf - filled in
+ * DESCRIPTION:
+ *         Create a string of the current timezone to append to a time
+ ***************************************************************/
+
+void
+FormatTimezoneStr(TCHAR *buf, sword timezone)
+{
+    word i = 0;
+
+    buf[i++] = ' ';
+    if (timezone < 0) {
+	buf[i++] = '-';
+	timezone = -timezone;
+    } else {
+	buf[i++] = '+';
+    }
+    buf[i++] = timezone/600+'0';
+    buf[i++] = (timezone%600)/60+'0';
+    buf[i++] = (timezone%60)/10+'0';
+    buf[i++] = timezone%10+'0';
+    buf[i] = 0;
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MailListGetSizes
+ * PASS:            list -   list optr
+ *                  gs - GStateHandle
+ *                  width - width of list
+ *                  *namewidth - ptr to return
+ *                  *subwidth - ptr to return
+ *                  *datewidth - ptr to return
+ * RETURN:          width, etc. - filled in
+ * DESCRIPTION:
+ *         calculate the sizes for the various list columns
+ ***************************************************************/
+
+
+void
+MailListGetSizes(optr list, GStateHandle gs, sword width, sword *namewidth, sword *subwidth, sword *datewidth)
+{
+    MailTime timedate;
+    sword iconwidth;
+    MailSubject buf;
+
+    /*
+     * Initialize the GString/GState to UI font & pointsize
+     */
+    SetUIFontPointsize(list, gs);
+
+    /*
+     * Figure out how much room we have for the recipient and the
+     * subject, taking into account the message icon and the date.
+     */
+    timedate.MT_time.TDAT_year = 2099;
+    timedate.MT_time.TDAT_month = 12;
+    timedate.MT_time.TDAT_day = 30;
+    timedate.MT_time.TDAT_dayOfWeek = DOTW_WEDNESDAY;
+    timedate.MT_time.TDAT_hours = 23;
+    timedate.MT_time.TDAT_minutes = 59;
+    timedate.MT_time.TDAT_seconds = 59;
+    FormatListDate(buf, &timedate);
+    *datewidth = GrTextWidth(gs, buf, 0);
+    iconwidth = MESSAGE_OFFSET_X;
+
+    *namewidth = (width-*datewidth-iconwidth)*1/3;
+    *subwidth =(width-*namewidth-*datewidth-iconwidth);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MessageSetMoniker
+ * PASS:            list -   list optr to set moniker in
+ *                  item -   item # to set
+ *                  bmap -   bitmap to use
+ *                  name -   ptr to from/to string
+ *                  subject - ptr to subject string
+ *                  date - ptr to date/time string
+ * RETURN:          none 
+ * DESCRIPTION:
+ *         Make and set a gstring moniker for a folder name
+ ***************************************************************/
+
+
+
+void
+MessageSetMoniker(optr list,
+		 word item,
+		 optr bmap,
+		 TCHAR *name,
+		 TCHAR *subject,
+		 TCHAR *date)
+{
+	GStateHandle gs;
+	Bitmap *bp;
+	word   gschunk;
+	sword   yOff, datewidth, namewidth, subwidth, width;
+	MailSubject buf;
+
+	/*
+	 * Create a GString to use
+	 */
+	gs = GrCreateGString(OptrToHandle(list), GST_CHUNK, &gschunk);
+
+	/*
+	 * Draw the bitmap
+	 */
+	yOff = (GetUIFontHeight(gs) + 5 - MESSAGE_ICON_HEIGHT)/2;
+	(void *) MemLock(OptrToHandle(bmap));
+	bp = LMemDeref(bmap);
+	GrDrawBitmap(gs, MESSAGE_ICON_OFFSET_X, yOff, bp, NULL);
+	MemUnlock(OptrToHandle(bmap));
+
+	/*
+	 * Calculate the sizes for the various fields
+	 */
+	/* XXX: HACK! */
+	width = @call list::MSG_VIS_GET_SIZE()-LIST_HACK_SIZE;
+	MailListGetSizes(list, gs, width, &namewidth, &subwidth, &datewidth);
+
+	/*
+	 * Draw the name in 1/3 the space
+	 */
+	strcpy(buf, name);
+	FitStringInField(gs, buf, namewidth);
+	GrDrawText(gs,
+		   MESSAGE_OFFSET_X,
+		   MESSAGE_OFFSET_Y,
+		   buf, 0);
+
+	/*
+	 * Draw the subject 2/3 the space
+	 */
+        strcpy(buf, subject);
+        FitStringInField(gs, buf, subwidth);
+        GrDrawText(gs, MESSAGE_OFFSET_X + namewidth + 1,
+		   MESSAGE_OFFSET_Y,
+		   buf, 0);
+
+	/*
+	 * Draw the date in the remaining space
+	 */
+	GrDrawText(gs,
+		   width - datewidth,
+		   MESSAGE_OFFSET_Y,
+		   date, 0);
+
+	/*
+	 * Finish up the gstring
+	 */
+	GrEndGString(gs);
+
+	/*
+	 * Finally, set the moniker
+	 */
+	@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(
+              item,              /* Item number -- Folder number */
+              0,                 /* Item not disabled */
+              0,                 /* height, 0 = auto detect */
+              0,                 /* width, 0 = auto detect */
+              0,                 /* size, 0 = auto detect */
+              VMDT_GSTRING,
+              VMST_OPTR,
+              ConstructOptr(OptrToHandle(list), gschunk)
+	      );
+
+	GrDestroyGString(gs, 0, GSKT_KILL_DATA);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_LIST_SET_FOLDER
+ * PASS:            folderNum - folder #
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Set the folder for the mail list
+ ***************************************************************/
+
+@method MailListClass, MSG_MAIL_LIST_SET_FOLDER
+{
+    pself->MLI_folderNum = folderNum;
+    @call oself::MSG_MAIL_LIST_RESCAN();
+    @call oself::MSG_MAIL_LIST_RESET_SELECTION(GIGS_NONE-1);
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_LIST_RESET_SELECTION
+ * PASS:            sel - new selection
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Set or reset the selection as necessary
+ ***************************************************************/
+
+@method MailListClass, MSG_MAIL_LIST_RESET_SELECTION
+{
+     word numMsgs;
+
+     /*
+      * figure out the selection
+      */
+     numMsgs = @call oself::MSG_MAIL_LIST_GET_NUM_MESSAGES();
+     /*
+      * if the selection is now beyond the list, reset it
+      */
+     if (sel != GIGS_NONE && sel >= numMsgs) {
+	 sel = numMsgs-1;
+     }
+
+     if (numMsgs > 0 && sel != GIGS_NONE) {
+	 @send oself::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(sel,0);
+     } else {
+	 @send oself::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(0);
+     }
+     @send oself::MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG(0);
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_LIST_RESCAN
+ * PASS:            none
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Rescan any message files
+ ***************************************************************/
+
+
+@method MailListClass, MSG_MAIL_LIST_RESCAN
+{
+     MemHandle fnh;
+     VMBlockHandle vmbh,vmbhIndex;
+     VMFileHandle vmf;
+     FileLongName *fnp;
+     dword numMsgs;
+     optr indexArray;
+     Boolean new;
+
+     @call MailAppObj::MSG_GEN_APPLICATION_MARK_BUSY();
+     ThreadGrabThreadLock(TheMessageListLock);
+     /*
+      * Close the current message array
+      */
+     if (pself->MLI_vmf) {
+	 pself->MLI_indexHandle = NULL;
+	 pself->MLI_indexChunk = NULL;
+	 VMClose(pself->MLI_vmf,NULL);
+	 pself->MLI_vmf = NULL;
+     }
+
+     /* 
+      * If the message list file already exists then open it.  If one does
+      * not already exist, one must be created.
+      */
+     fnh = @call TheFolderList::MSG_FOLDER_LIST_GET_FOLDER_NAME(pself->MLI_folderNum);
+     fnp = MemLock(fnh);
+     new = FolderGetMessages(fnp, pself->MLI_folderNum, &numMsgs, &vmf, &vmbh);	 
+     pself->MLI_messageArray = vmbh;
+     pself->MLI_vmf = vmf;
+     MemFree(fnh);
+
+     indexArray=LockIndexArray(vmf,&vmbhIndex);
+     pself->MLI_indexChunk = OptrToChunk(indexArray);
+     pself->MLI_indexHandle = vmbhIndex;
+     VMUnlock(OptrToHandle(indexArray));
+
+     if (new) {
+	 @call oself::MSG_MAIL_LIST_RESORT(); 
+     } else {
+	 @call oself::MSG_MAIL_LIST_RESHOW();
+     }
+     ThreadReleaseThreadLock(TheMessageListLock);
+     @call MailAppObj::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+}
+
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_LIST_SORT
+ * PASS:            none
+ * RETURN:          none
+ * DESCRIPTION:
+ *         sort the message list
+ ***************************************************************/
+
+typedef struct {
+    VMFileHandle      CMCBD_vmf;
+    VMBlockHandle     CMCBD_vmbh;
+    SortMessageByType CMCBD_sortType;
+} CMCBData;
+
+sword
+_pascal CompareMessagesCB (void *el1, void *el2, word cbd)
+{
+    sword retValue;
+    MessageIndexStruct *ie1, *ie2;
+    MessageListStruct *e1, *e2;
+    word elSize;
+    /*
+     * this bit of grossness is required because you can only
+     * pass a word to the sort callback. So it passes the offset
+     * of a structure on the stack, much as one would do in assembly.
+     * Less gross than a global variable, IMO.
+     */
+    CMCBData *data = ((dword)&ie1 & 0xffff0000)|cbd;
+    
+    ie1 = el1;
+    ie2 = el2;
+
+    HugeArrayLock(data->CMCBD_vmf, data->CMCBD_vmbh,
+		  ie1->MIS_index, &e1, &elSize);
+    HugeArrayLock(data->CMCBD_vmf, data->CMCBD_vmbh,
+		  ie2->MIS_index, &e2, &elSize);
+
+    retValue = CompareMessages(e1, e2, data->CMCBD_sortType);
+
+    HugeArrayUnlock(e1);
+    HugeArrayUnlock(e2);
+
+    return(retValue);
+}
+
+@method MailListClass, MSG_MAIL_LIST_SORT
+{
+    optr indexArray;
+    CMCBData data;
+
+
+//	 data.CMCBD_sortType = @call SortByList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	 data.CMCBD_sortType = GetMessageListSortType(pself->MLI_vmf);
+
+    ThreadGrabThreadLock(TheMessageListLock);
+    data.CMCBD_vmf = pself->MLI_vmf;
+    data.CMCBD_vmbh = pself->MLI_messageArray;
+
+    indexArray = @call oself::MSG_MAIL_LIST_GET_INDEX_ARRAY();
+	 ChunkArraySort(indexArray, (word) &data, CompareMessagesCB);
+    VMDirty(OptrToHandle(indexArray));
+    VMUnlock(OptrToHandle(indexArray));
+    ThreadReleaseThreadLock(TheMessageListLock);
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_LIST_RESORT
+ * PASS:            none
+ * RETURN:          none
+ * DESCRIPTION:
+ *         sort the message list
+ ***************************************************************/
+@method MailListClass, MSG_MAIL_LIST_RESORT
+{
+    VMFileHandle vmf;
+	 SortMessageByType sortType, prevType;
+
+	 sortType = @call SortByList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+
+
+	 /* There are two cases in which MSG_MAIL_LIST_RESORT gets called.
+     * 1) The first time a list is created and 2) after the sort type
+     * has changed.  In the #1 case this call is redundant, but this
+     * call is needed in the #2 case since the sortType is not changed
+     * in the VMFile anywhere else
+     */
+	 vmf = pself->MLI_vmf;
+	 EC_ERROR_IF((vmf == NULL),-1);
+
+	/* jfh - try adding a reverse sort */
+	prevType = GetMessageListSortType(vmf);
+	if((prevType == SMBT_DATE || prevType == SMBT_DATE_REV)
+						  && sortType == SMBT_DATE) {
+		if (prevType == SMBT_DATE) sortType = SMBT_DATE_REV;
+		if (prevType == SMBT_DATE_REV) sortType = SMBT_DATE;
+		}
+	if((prevType == SMBT_SUBJECT || prevType == SMBT_SUBJECT_REV)
+						  && sortType == SMBT_SUBJECT) {
+		if (prevType == SMBT_SUBJECT) sortType = SMBT_SUBJECT_REV;
+		if (prevType == SMBT_SUBJECT_REV) sortType = SMBT_SUBJECT;
+		}
+	if((prevType == SMBT_SENDER || prevType == SMBT_SENDER_REV)
+						  && sortType == SMBT_SENDER) {
+		if (prevType == SMBT_SENDER) sortType = SMBT_SENDER_REV;
+		if (prevType == SMBT_SENDER_REV) sortType = SMBT_SENDER;
+		}
+
+	 SetMessageListSortType(vmf,sortType);
+
+     /*
+      * sort the message list
+      */
+     @call oself::MSG_MAIL_LIST_SORT();
+     /*
+      * rebuild the dynamic list
+      */
+     @call oself::MSG_MAIL_LIST_RESHOW();
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_LIST_RESHOW
+ * PASS:            none
+ * RETURN:          none
+ * DESCRIPTION:
+ *         reshow the message list after a show all/unread change
+ ***************************************************************/
+@method MailListClass, MSG_MAIL_LIST_RESHOW
+{
+    word numMsgs, sel;
+
+    sel = @call oself::MSG_MAIL_LIST_GET_LAST_SELECTION();
+    numMsgs = @call oself::MSG_MAIL_LIST_GET_NUM_MESSAGES();
+
+    @call oself::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numMsgs);
+    @call oself::MSG_MAIL_LIST_RESET_SELECTION(sel);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_LIST_GET_NUM_MESSAGES
+ * PASS:            none
+ * RETURN:          # of messages
+ * DESCRIPTION:
+ ***************************************************************/
+
+@method MailListClass, MSG_MAIL_LIST_GET_NUM_MESSAGES
+{
+    word numMsgs = 0;
+    optr indexArray;
+    
+
+    ThreadGrabThreadLock(TheMessageListLock);
+    indexArray = @call oself::MSG_MAIL_LIST_GET_INDEX_ARRAY();
+    if (indexArray) {
+	numMsgs = ChunkArrayGetCount(indexArray);
+	VMUnlock(OptrToHandle(indexArray));
+    }
+    ThreadReleaseThreadLock(TheMessageListLock);
+    return(numMsgs);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_LIST_GET_FILE_NAME
+ * PASS:            msgNum - message #
+ * RETURN:          handle of file name buffer
+ * DESCRIPTION:
+ *         Get the filename for the specified message #
+ ***************************************************************/
+
+@method MailListClass, MSG_MAIL_LIST_GET_FILE_NAME
+{
+        MemHandle retHan;
+	VMBlockHandle vmbh;
+	VMFileHandle vmf;
+	FileLongName *rName;
+	MessageListStruct *mlp;
+	MessageIndexStruct *mis;
+	word elSize;
+	optr indexArray;
+
+	ThreadGrabThreadLock(TheMessageListLock);
+	vmbh = pself->MLI_messageArray;
+	vmf = pself->MLI_vmf;	
+	/*
+	 * allocate a return buffer
+	 */
+	retHan = MemAlloc(sizeof(FileLongName),
+			  HF_DYNAMIC,
+			  HAF_STANDARD);
+	/*
+	 * copy the name into the return buffer
+	 */
+	if (retHan) {
+	    rName = MemLock(retHan);
+	    indexArray = @call oself::MSG_MAIL_LIST_GET_INDEX_ARRAY();
+	    mis = ChunkArrayElementToPtr(indexArray, msgNum, 0);
+	    HugeArrayLock(vmf,vmbh,mis->MIS_index,&mlp, &elSize);
+	    strcpy(rName, mlp->MLS_filename);
+	    HugeArrayUnlock(mlp);
+	    MemUnlock(retHan);
+	    VMUnlock(OptrToHandle(indexArray));
+	}
+	ThreadReleaseThreadLock(TheMessageListLock);
+	return(retHan);
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_LIST_QUERY_MONIKER
+ * PASS:            list - optr of list
+ *                  item - item #
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Get the moniker for the specified message
+ ***************************************************************/
+
+@method MailListClass, MSG_MAIL_LIST_QUERY_MONIKER
+{
+        VMBlockHandle vmbh;
+	VMFileHandle vmf;
+	optr bmap, indexArray;
+	MailSubject dateBuf;
+	MessageListStruct *mlp;
+	MessageIndexStruct *mis;
+	word elSize;
+	dword haRet;
+
+	ThreadGrabThreadLock(TheMessageListLock);
+        vmbh = pself->MLI_messageArray;
+	vmf = pself->MLI_vmf;
+
+	LockStrings();
+	indexArray = @call oself::MSG_MAIL_LIST_GET_INDEX_ARRAY();
+	mis = ChunkArrayElementToPtr(indexArray, item, 0);
+	haRet = HugeArrayLock(vmf,vmbh,mis->MIS_index,&mlp, &elSize);
+	VMUnlock(OptrToHandle(indexArray));
+
+	/*
+	 * reformat the date in the desired format
+	 */
+	if (HAL_COUNT(haRet)) {
+	    FormatListDate(dateBuf, &mlp->MLS_time);
+	    /*
+	     * figure out which bitmap to use based on read/unread
+	     */
+	    switch (mlp->MLS_flags & (MF_READ|MF_HAS_ATTACHMENTS)) {
+	    case MF_READ:
+	        bmap = @readNoAttachMoniker;
+		break;
+	    case MF_HAS_ATTACHMENTS:
+		bmap = @unreadAttachMoniker;
+		break;
+	    case MF_READ|MF_HAS_ATTACHMENTS:
+		bmap = @readAttachMoniker;
+		break;
+	    default:
+		bmap = @unreadNoAttachMoniker;
+		break;
+	    }
+	}
+	UnlockStrings();
+
+	if (HAL_COUNT(haRet)) {
+	    MessageSetMoniker(list, item, bmap,
+			      mlp->MLS_mail, mlp->MLS_subject, dateBuf);
+	    HugeArrayUnlock(mlp);
+	}
+	ThreadReleaseThreadLock(TheMessageListLock);
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_MAIL_LIST_MESSAGE_SELECTED
+ * DESCRIPTION:     handle a list selection
+ *
+ * PASS:            selection - item #
+ *                  numSelections - # of selections
+ *                  stateFlags - GenItemGroupStateFlags
+ * RETURN:          none
+ ***************************************************************/
+
+optr messageObjs[] = {
+  @ReadMessageTrigger,
+  @ReadMessageTool,
+  @EditMessageTrigger,
+  @EditMessageTool,
+  @ThrowAwayTrigger,
+  @ThrowAwayTool,
+  @RecoverTrigger,
+  @RecoverTool,
+  @MailPrintControl,
+  @PrintTool,
+  @PrintTrigger
+};
+
+@method MailListClass, MSG_MAIL_LIST_MESSAGE_SELECTED
+{
+    word i;
+    MemHandle mh;
+
+    /*
+     * enable/disable based on whether there are any selections
+     */
+    for (i = 0; i < lengthof(messageObjs,optr); i++) {
+        if (numSelections) {
+	    @call messageObjs[i]::MSG_GEN_SET_ENABLED(VUM_DLYD);
+	} else {
+	    @call messageObjs[i]::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+	}
+    }
+
+    if (numSelections && (@call TheFolderList::MSG_FOLDER_LIST_GET_NUM_FOLDERS() > NUM_BUILT_IN_FOLDERS)) {
+	@call MoveMessageTrigger::MSG_GEN_SET_ENABLED(VUM_DLYD);
+	@call MoveMessageTool::MSG_GEN_SET_ENABLED(VUM_DLYD);
+    } else {
+	@call MoveMessageTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+	@call MoveMessageTool::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+    }
+
+    /* for remaining operations, ignore passed selection and get real
+       last selection, (in case we are adding to a multiple selection),
+       as that's what the NEXT and PREVIOUS triggers use and reading
+       will use */
+    selection = @call oself::MSG_MAIL_LIST_GET_LAST_SELECTION();
+
+    /*
+     * enable/disable based on whether the first or last is selected
+     */
+    if (selection == 0) {
+        @call ReadPrevTool::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+	@call ReadPreviousTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+    } else {
+        @call ReadPrevTool::MSG_GEN_SET_ENABLED(VUM_DLYD);
+	@call ReadPreviousTrigger::MSG_GEN_SET_ENABLED(VUM_DLYD);
+    }
+    if (selection == @call oself::MSG_GEN_DYNAMIC_LIST_GET_NUM_ITEMS()-1) {
+        @call ReadNextTool::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+	@call ReadNextTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+    } else {
+        @call ReadNextTool::MSG_GEN_SET_ENABLED(VUM_DLYD);
+	@call ReadNextTrigger::MSG_GEN_SET_ENABLED(VUM_DLYD);
+    }
+    /*
+     * if the read mail window is on screen, update its message
+     * if we aren't the Outbox or Drafts
+     *
+     * NOTE: we can't use MSG_MAIL_LIST_READ_MESSAGE() as that
+     * sets the selection, which in turn calls us again...
+     */
+    if (@call ReadMailWin::MSG_GEN_GET_USABLE() ) {
+        if (selection != GIGS_NONE) {
+	    
+	    mh = @call oself::MSG_MAIL_LIST_GET_FILE_NAME(selection);
+	    @call oself::MSG_MAIL_LIST_MARK_MESSAGE(MF_READ, selection);
+	    @call ReadMailWin::MSG_MAIL_READER_READ_MESSAGE(mh);
+	}
+    }
+}
+
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_MAIL_LIST_OPEN_FILE
+ * DESCRIPTION:     open the specified message file
+ *
+ * PASS:            msgNum - message #
+ * RETURN:          file handle (0 for error)
+ ***************************************************************/
+@method MailListClass, MSG_MAIL_LIST_OPEN_FILE
+{
+        MemHandle th;
+	FileLongName *fName;
+	FileHandle fh;
+
+	/*
+	 * get the filename of the message and open it
+	 */
+	th = @call oself::MSG_MAIL_LIST_GET_FILE_NAME(msgNum);
+	fName = MemLock(th);
+	fh = FileOpen(fName, FILE_DENY_W|FILE_ACCESS_RW);
+	MemFree(th);
+	return(fh);
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_MAIL_LIST_READ_MESSAGE
+ *                  MSG_MAIL_LIST_EDIT_MESSAGE
+ *                  MSG_MAIL_LIST_OPEN_MESSAGE
+ * DESCRIPTION:     read the current message
+ *
+ * PASS:            none
+ * RETURN:          none
+ ***************************************************************/
+@method MailListClass, MSG_MAIL_LIST_READ_MESSAGE
+{
+    MemHandle mh;
+    word sel = @call oself::MSG_MAIL_LIST_GET_LAST_SELECTION();
+
+    if (sel != GIGS_NONE) {
+	/*
+	 * open the message file
+	 */
+	mh = @call oself::MSG_MAIL_LIST_GET_FILE_NAME(sel);
+	@call oself::MSG_MAIL_LIST_MARK_MESSAGE(MF_READ, sel);
+	@call ReadMailWin::MSG_MAIL_READER_READ_MESSAGE(mh);
+    }
+}
+
+@method MailListClass, MSG_MAIL_LIST_EDIT_MESSAGE
+{
+    MemHandle mh;
+    word sel = @call oself::MSG_MAIL_LIST_GET_LAST_SELECTION();
+
+    if (pself->GIGI_selection != GIGS_NONE) {
+	/*
+	 * edit the message file
+	 */
+	mh = @call oself::MSG_MAIL_LIST_GET_FILE_NAME(sel);
+	@call ComposeMailWin::MSG_MAIL_COMPOSER_EDIT_MESSAGE(mh);
+    }
+}
+
+@method MailListClass, MSG_MAIL_LIST_OPEN_MESSAGE
+{
+    switch (pself->MLI_folderNum) {
+        case MFID_DRAFTS:
+        case MFID_OUTBOX:
+	    @call oself::MSG_MAIL_LIST_EDIT_MESSAGE();
+	    break;
+        default:
+	    @call oself::MSG_MAIL_LIST_READ_MESSAGE();
+	    break;
+    }
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_MAIL_LIST_REPLY_MESSAGE
+ * DESCRIPTION:     reply to the currently selected message
+ *
+ * PASS:            type - MailComposeType (reply, reply all)
+ * RETURN:          none
+ ***************************************************************/
+@method MailListClass, MSG_MAIL_LIST_REPLY_MESSAGE
+{
+    MemHandle mh;
+    word sel = @call oself::MSG_MAIL_LIST_GET_LAST_SELECTION();
+
+    if (sel != GIGS_NONE) {
+	@call ReadMailWin::MSG_GEN_DISPLAY_CLOSE();
+	/*
+	 * get the message file and call the composer
+	 */
+	mh = @call oself::MSG_MAIL_LIST_GET_FILE_NAME(sel);
+	@call ComposeMailWin::MSG_MAIL_COMPOSER_REPLY_MESSAGE(mh, type);
+    }
+}
+
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        ConstructFolderPath
+ * DESCRIPTION:     construct the path to a folder below SP_PRIVATE_DATA
+ *
+ * PASS:            dir - ptr to name of dir
+ * RETURN:          handle of PathName block: <account>\<dir>\
+ ***************************************************************/
+TCHAR backSlashStr[] = "\\";
+
+MemHandle
+ConstructFolderPath(TCHAR *dirName)
+{
+        MemHandle ph;
+	TCHAR *dName;
+
+	/*
+	 * get the dest dir name: <account>\<dir>
+	 */
+	ph = @call PfAccountList::MSG_ACCOUNT_LIST_GET_DIR();
+	dName = MemLock(ph);
+	strcat(dName, backSlashStr);
+	strcat(dName, dirName);
+	strcat(dName, backSlashStr);
+	MemUnlock(ph);
+	return(ph);
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_MAIL_LIST_DELETE_MESSAGE
+ * DESCRIPTION:     throw away the currently selected message
+ *
+ * PASS:            none
+ * RETURN:          none
+ ***************************************************************/
+
+/* refresh once after large group delete, move */
+#define GROUP_REFRESH 10  /* threshold, there is tradeoff using GROUP_REFRESH
+			     as index file is deleted and rebuilt from
+			     scratch */
+
+const TCHAR delCR[] = "\r";
+
+@method MailListClass, MSG_MAIL_LIST_DELETE_MESSAGE
+{
+    MemHandle mh, dh, selHan;
+    TCHAR *fName, *dName, *pNewName;
+@ifndef MANUAL_RECOVER
+    word dirLen, xfoLen;
+@endif
+    word numSelections, i, *sels, j;
+    MemHandle newName;
+    optr indexArray;
+    TCHAR *trashName;
+#ifdef GROUP_REFRESH
+    VMBlockHandle dvmbh;
+    VMFileHandle dvmf;
+    optr dindexArray;
+    Boolean inuse = FALSE;
+#endif
+
+    @call MailAppObj::MSG_GEN_APPLICATION_MARK_BUSY();
+    /*
+     * close the read mail win so it doesn't try to display another message
+     */
+    @call ReadMailWin::MSG_GEN_DISPLAY_CLOSE();
+
+    numSelections = @call oself::MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS();
+    selHan = MemAlloc(numSelections*sizeof(word),
+		      HF_DYNAMIC,
+		      HAF_STANDARD|HAF_NO_ERR);
+    sels = MemLock(selHan);
+    @call oself::MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS(sels, numSelections);
+
+    for (i = 0; i < numSelections; i++) {
+	/*
+	 * get the source file name
+	 */
+	mh = @call oself::MSG_MAIL_LIST_GET_FILE_NAME(sels[i]);
+	/*
+	 * get the source dir name
+	 */
+	dh = @call TheFolderList::MSG_FOLDER_LIST_GET_FOLDER_NAME(pself->MLI_folderNum);
+
+	fName = MemLock(mh);
+	dName = MemLock(dh);
+	LockStrings();
+	/*
+	 * record which directory the message came from
+	 */
+@ifndef MANUAL_RECOVER
+	xfoLen = strlen(LMemDeref(@xdirFieldOut));
+	dirLen = strlen(dName);
+	fh = FileOpen(fName, FILE_DENY_W | FILE_ACCESS_RW);
+	if (!fh) {
+	    goto exitError;
+	}
+	/*
+	 * see if we've already recorded it before
+	 */
+	hdrHan = MailReadHeaders(fh);
+	if (!hdrHan) {
+	    FileClose(fh, FALSE);
+	    goto exitError;
+	}
+	odh = MailGetHeader(hdrHan, LMemDeref(@xdirFieldName));
+	if (odh) {
+	    odName = MemLock(odh);
+	    if (!strcmp(dName, odName)) {
+		MemFree(odh);
+		goto skipDir;
+	    }
+	    MemFree(odh);
+	}
+	MailFileInsertSpace(fh, xfoLen+dirLen+1);
+	FilePos(fh, 0, FILE_POS_START);
+	FileWrite(fh, LMemDeref(@xdirFieldOut), xfoLen, FALSE);
+	FileWrite(fh, dName, dirLen, FALSE);
+	FileWrite(fh, delCR, sizeof(TCHAR), FALSE);
+skipDir:
+	FileClose(fh, FALSE);
+	MemFree(hdrHan);
+@endif
+	/*
+	 * move the message file
+	 */
+	trashName = MailLockStdString(MSS_TRASH_FOLDER);
+	MoveMessageFile(fName, dName, trashName, &newName);
+	MailUnlockStdString(MSS_TRASH_FOLDER);
+	/*
+	 * insert the file in the trash list
+	 */
+	pNewName = MemLock(newName);
+	indexArray = @call oself::MSG_MAIL_LIST_GET_INDEX_ARRAY();
+	DeleteMessageListArrayNL(pself->MLI_vmf,pself->MLI_messageArray,
+				 indexArray, sels[i]);
+        /* Each time a message is deleted from the message array, the 
+	 * message array gets fixed up, and consequently, every message
+	 * with an index greater than the one just deleted is invalidated.
+	 * Here we use a brute force method of solving the problem.
+	 */
+	for (j=i+1; j < numSelections; ++j) {
+	    if (sels[j] > sels[i]) {
+		--sels[j];
+	    }
+	}
+	VMDirty(OptrToHandle(indexArray));
+	VMUnlock(OptrToHandle(indexArray));
+#ifdef GROUP_REFRESH
+	if (numSelections < GROUP_REFRESH)
+#endif
+	InsertMessageListArray(MFID_TRASH,pNewName);
+	MemFree(newName);
+
+
+exitError:
+	UnlockStrings();
+	MemFree(mh);
+	MemFree(dh);
+    }
+    MemFree(selHan);
+    @call MailAppObj::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+#ifdef GROUP_REFRESH
+    /*
+     * rebuild dest (trash)
+     */
+    if (numSelections >= GROUP_REFRESH) {
+	trashName = MailLockStdString(MSS_TRASH_FOLDER);
+	DeleteMessageListArray(trashName);
+	MailUnlockStdString(MSS_TRASH_FOLDER);
+	inuse = GetMessageArrays(MFID_TRASH, &dvmf, &dvmbh, &dindexArray);
+	UnlockIndexArray(OptrToHandle(dindexArray));
+	if (!inuse) {
+	    VMClose(dvmf, NULL);
+	}
+	ThreadReleaseThreadLock(TheMessageListLock);
+    }
+#endif
+    /*
+     * rebuild the folder list, which will rebuild the message list
+     *
+     * This is overkill sometimes, but necessary if the source
+     * directory was Drafts directory or SHOW_NUM_MESSAGES_IN_FOLDERS
+     * is TRUE as the number of messages will change in two folders.
+     */
+    RebuildFolderList(MFID_LEAVE_SELECTION, TRUE);
+    EnableDisableForOutbox();
+    EnableDisableForTrash();
+}
+
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_MAIL_LIST_READ_MESSAGE_NUM
+ * DESCRIPTION:     select and read the specicifed message
+ *
+ * PASS:            msgNum - message #
+ * RETURN:          none
+ ***************************************************************/
+
+@method MailListClass, MSG_MAIL_LIST_READ_MESSAGE_NUM
+{
+    @call ReadMailWin::MSG_GEN_SET_ENABLED(VUM_NOW);
+    @call oself::MSG_MAIL_LIST_RESET_SELECTION(msgNum);
+    /*
+     * NOTE: the status message will update the message in the read window,
+     * so we don't need to explicitly update it here (if we do, it will
+     * update twice)
+     */
+}
+
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_MAIL_LIST_PREVIOUS
+ * DESCRIPTION:     select and read the previous message
+ *
+ * PASS:            none
+ * RETURN:          none
+ ***************************************************************/
+
+@method MailListClass, MSG_MAIL_LIST_PREVIOUS
+{
+    word sel = @call oself::MSG_MAIL_LIST_GET_LAST_SELECTION();
+    if (sel > 0 && sel != GIGS_NONE) {
+	@call oself::MSG_MAIL_LIST_READ_MESSAGE_NUM(sel-1);
+    }
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_MAIL_LIST_NEXT
+ * DESCRIPTION:     select and read the next message
+ *
+ * PASS:            none
+ * RETURN:          none
+ ***************************************************************/
+
+@method MailListClass, MSG_MAIL_LIST_NEXT
+{
+    word sel = @call oself::MSG_MAIL_LIST_GET_LAST_SELECTION();
+    if (sel != GIGS_NONE) {
+	@call oself::MSG_MAIL_LIST_READ_MESSAGE_NUM(sel+1);
+    }
+}
+
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_MAIL_LIST_MOVE_MESSAGE
+ * DESCRIPTION:     move a message
+ *
+ * PASS:            destFolder - destination folder #
+ * RETURN:          none
+ ***************************************************************/
+
+@method MailListClass, MSG_MAIL_LIST_MOVE_MESSAGE
+{
+    MemHandle destHan, srcHan, nameHan, selHan, newName;
+    TCHAR *destDir, *srcDir, *name, *pNewName;
+    word numSels, i, *sels, j;
+    optr indexArray;
+#ifdef GROUP_REFRESH
+    VMBlockHandle dvmbh;
+    VMFileHandle dvmf;
+    optr dindexArray;
+    Boolean inuse = FALSE;
+#endif
+
+    @call MailAppObj::MSG_GEN_APPLICATION_MARK_BUSY();
+    FileBatchChangeNotifications();
+
+    numSels = @call oself::MSG_GEN_ITEM_GROUP_GET_NUM_SELECTIONS();
+    selHan = MemAlloc(numSels*sizeof(word),
+		      HF_DYNAMIC,
+		      HAF_STANDARD|HAF_NO_ERR);
+    sels = MemLock(selHan);
+    @call oself::MSG_GEN_ITEM_GROUP_GET_MULTIPLE_SELECTIONS(sels, numSels);
+    /*
+     * get the source dir name
+     */
+    srcHan = @call TheFolderList::MSG_FOLDER_LIST_GET_FOLDER_NAME(pself->MLI_folderNum);
+    srcDir = MemLock(srcHan);
+    /*
+     * get the dest dir name
+     */
+    destHan = @call TheFolderList::MSG_FOLDER_LIST_GET_FOLDER_NAME(destFolder);
+    destDir = MemLock(destHan);
+    /*
+     * loop through all the messages
+     */
+    for (i = 0; i < numSels; i++) {
+	/*
+	 * get the filename
+	 */
+	nameHan = @call oself::MSG_MAIL_LIST_GET_FILE_NAME(sels[i]);
+	name = MemLock(nameHan);
+	/*
+	 * move the message file
+	 */
+	MoveMessageFile(name, srcDir, destDir, &newName);
+	pNewName = MemLock(newName);
+#ifdef GROUP_REFRESH
+	if (numSels < GROUP_REFRESH)
+#endif
+	InsertMessageListArray(destFolder,pNewName);
+	indexArray = @call oself::MSG_MAIL_LIST_GET_INDEX_ARRAY();
+	DeleteMessageListArrayNL(pself->MLI_vmf,pself->MLI_messageArray,
+				 indexArray, sels[i]);
+        /* Each time a message is deleted from the message array, the 
+	 * message array gets fixed up, and consequently, every message
+	 * with an index greater than the one just deleted is invalidated.
+	 * Here we use a brute force method of solving the problem.
+	 */
+	for (j=i+1; j < numSels; ++j) {
+	    if (sels[j] > sels[i]) {
+		--sels[j];
+	    }
+	}
+	VMDirty(OptrToHandle(indexArray));
+	VMUnlock(OptrToHandle(indexArray));
+	MemFree(newName);
+
+	/*
+	 * clean up
+	 */
+	MemFree(nameHan);
+    }
+#ifdef GROUP_REFRESH
+    /*
+     * rebuild dest
+     */
+    if (numSels >= GROUP_REFRESH) {
+	DeleteMessageListArray(destDir);
+	inuse = GetMessageArrays(destFolder, &dvmf, &dvmbh, &dindexArray);
+	UnlockIndexArray(OptrToHandle(dindexArray));
+	if (!inuse) {
+	    VMClose(dvmf, NULL);
+	}
+	ThreadReleaseThreadLock(TheMessageListLock);
+    }
+#endif
+    /*
+     * final clean up
+     */
+    MemFree(destHan);
+    MemFree(srcHan);
+    MemFree(selHan);
+    FileFlushChangeNotifications();
+    @call MailAppObj::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+    /*
+     * rebuild the folder list which will rebuild the message list
+     */
+    RebuildFolderList(MFID_LEAVE_SELECTION, TRUE);
+}
+
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_MAIL_LIST_GET_VMF
+ * DESCRIPTION:     
+ *
+ * PASS:            none
+ * RETURN:          none
+ ***************************************************************/
+@method MailListClass, MSG_MAIL_LIST_GET_VMF
+{
+    return pself->MLI_vmf;
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_MAIL_LIST_GET_MESSAGE_ARRAY
+ * DESCRIPTION:     
+ *
+ * PASS:            none
+ * RETURN:          none
+ ***************************************************************/
+@method MailListClass, MSG_MAIL_LIST_GET_MESSAGE_ARRAY
+{
+    return pself->MLI_messageArray;
+}
+
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_MAIL_LIST_GET_INDEX_ARRAY
+ *
+ * PASS:            none
+ * RETURN:          none
+ ***************************************************************/
+@method MailListClass, MSG_MAIL_LIST_GET_INDEX_ARRAY
+{
+    MemHandle mh;
+    word *p;
+
+    if (pself->MLI_vmf) {
+	VMLock(pself->MLI_vmf,pself->MLI_indexHandle,&mh);
+	p = MemDeref(mh);
+	p[0]=mh;
+    
+	return ConstructOptr(mh,pself->MLI_indexChunk);
+    } else {
+	return(NULL);
+    }
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_LIST_CLOSE_MESSAGE_ARRAY
+ * PASS:            none
+ * RETURN:          none
+ ***************************************************************/
+@method MailListClass, MSG_MAIL_LIST_CLOSE_MESSAGE_ARRAY
+{
+    if (TheMessageListLock) {
+	ThreadGrabThreadLock(TheMessageListLock);
+	if (pself->MLI_vmf) {
+	    pself->MLI_indexHandle = NULL;
+	    pself->MLI_indexChunk = NULL;
+	    VMClose(pself->MLI_vmf, NULL);
+	    pself->MLI_vmf = NULL;
+	    pself->MLI_messageArray = NULL;
+	}
+	ThreadReleaseThreadLock(TheMessageListLock);
+    }
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_LIST_GET_FOLDER_NUM
+ * PASS:            none
+ * RETURN:          current folder number
+ ***************************************************************/
+@method MailListClass, MSG_MAIL_LIST_GET_FOLDER_NUM
+{
+    return pself->MLI_folderNum;
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_MAIL_LIST_(UN)MARK_MESSAGE
+ * PASS:            none
+ * RETURN:          current folder number
+ ***************************************************************/
+@method MailListClass, MSG_MAIL_LIST_MARK_MESSAGE
+{
+    MessageIndexStruct *mis;
+    MessageListStruct *mlp;
+    VMFileHandle vmf;
+    VMBlockHandle vmbh;
+    word elSize;
+    optr indexArray;
+
+    vmf = pself->MLI_vmf;
+    vmbh = pself->MLI_messageArray;
+
+    indexArray = @call oself::MSG_MAIL_LIST_GET_INDEX_ARRAY();
+    mis = ChunkArrayElementToPtr(indexArray,msgNum,0);
+    mis->MIS_flags = mis->MIS_flags | flag;
+    HugeArrayLock(vmf,vmbh,mis->MIS_index,&mlp, &elSize);
+    mlp->MLS_flags = mlp->MLS_flags | flag;
+    VMDirty(OptrToHandle(indexArray));
+    VMUnlock(OptrToHandle(indexArray));
+
+    HugeArrayDirty(mlp);
+    HugeArrayUnlock(mlp);
+
+}
+
+@method MailListClass, MSG_MAIL_LIST_UNMARK_MESSAGE
+{
+    MessageIndexStruct *mis;
+    MessageListStruct *mlp;
+    VMFileHandle vmf;
+    VMBlockHandle vmbh;
+    word elSize;
+    optr indexArray;
+
+    vmf = pself->MLI_vmf;
+    vmbh = pself->MLI_messageArray;
+
+    indexArray = @call oself::MSG_MAIL_LIST_GET_INDEX_ARRAY();
+    mis = ChunkArrayElementToPtr(indexArray,msgNum,0);
+    mis->MIS_flags = mis->MIS_flags & (~flag);
+    
+    HugeArrayLock(vmf,vmbh,mis->MIS_index,&mlp, &elSize);
+    mlp->MLS_flags = mlp->MLS_flags & (~flag);
+    VMDirty(OptrToHandle(indexArray));
+    VMUnlock(OptrToHandle(indexArray));
+
+    HugeArrayDirty(mlp);
+    HugeArrayUnlock(mlp);
+
+}
+
+#ifdef __BORLANDC__
+#pragma codeseg RareCode
+#endif
+
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_MAIL_LIST_RECOVER_MESSAGE
+ * DESCRIPTION:     recover the currently selected message
+ *
+ * PASS:            none
+ * RETURN:          none
+ ***************************************************************/
+
+@method MailListClass, MSG_MAIL_LIST_RECOVER_MESSAGE
+{
+@ifdef MANUAL_RECOVER
+    @call RecoverMessageDialog::MSG_FOLDER_RECOVER_DIALOG_INIT();
+@else
+    MemHandle mh, dh, rh, hdrHan,newName;
+    TCHAR *fName, *dName, *rName, *pNewName;
+    FileHandle fh;
+    int destFolder;
+    word sel = @call oself::MSG_MAIL_LIST_GET_LAST_SELECTION();
+    if (sel == GIGS_NONE) {
+	return;
+    }
+
+    /*
+     * get the source file name
+     */
+    mh = @call oself::MSG_MAIL_LIST_GET_FILE_NAME(sel);
+    fName = MemLock(mh);
+    /*
+     * get the source dir name
+     */
+    dh = @call TheFolderList::MSG_FOLDER_LIST_GET_FOLDER_NAME(pself->MLI_folderNum);
+    dName = MemLock(dh);
+    /*
+     * get the destination directory: <account>\<dir>
+     * we do this by getting the X-Dir: header we added
+     * when we threw the file away
+     */
+    fh = FileOpen(fName, FILE_DENY_W|FILE_ACCESS_R);
+    if (!fh) {
+        ReportError(@unableToRecoverStr, NULL);
+	MemFree(mh);
+	MemFree(dh);
+	return;
+    }
+    LockStrings();
+    hdrHan = MailReadHeaders(fh);
+    rh = MailGetHeader(hdrHan, LMemDeref(@xdirFieldName));
+    MemFree(hdrHan);
+    UnlockStrings();
+    FileClose(fh, FALSE);
+    if (!rh) {
+        ReportError(@unableToRecoverStr, NULL);
+	goto errorExit2;
+    }
+    rName = MemLock(rh);
+    destFolder = @call TheFolderList::MSG_FOLDER_LIST_GET_FOLDER_NUM(rName);
+    if (destFolder != -1) {
+	MoveMessageFile(fName, dName, rName, &newName);
+	pNewName = MemLock(newName);
+	DeleteMessageListArrayName(pself->MLI_folderNum,fName);
+	InsertMessageListArray(destFolder,pNewName);
+	MemFree(newName);
+    } else {
+	ReportError(@unableToRecoverStr, NULL);
+	goto errorExit1;
+    }
+
+    /*
+     * rebuild the folder list, which will rebuild the message list
+     *
+     * This is overkill sometimes, but necessary if the source
+     * directory was Drafts directory or SHOW_NUM_MESSAGES_IN_FOLDERS
+     * is TRUE as the number of messages will change in two folders.
+     */
+    EnableDisableForOutbox();
+    EnableDisableForTrash();
+    RebuildFolderList(MFID_LEAVE_SELECTION, TRUE);
+@ifndef MANUAL_RECOVER
+    /*
+     * tell the user the happy news
+     */
+    ReportOK(@messageRecoveredStr, rName);
+@endif
+errorExit1:
+    MemFree(rh);
+errorExit2:
+    MemFree(dh);
+    MemFree(mh);
+@endif
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_PRINT_START_PRINTING
+ * PASS:            printCtrlOD - optr of PrintControl
+ *                  gstate - handle of GState to print to
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Print a mail message
+ ***************************************************************/
+
+TCHAR mlpSpace[] = "  ";
+
+@method MailListClass, MSG_PRINT_START_PRINTING
+{
+    FileHandle fileHan;
+    MemHandle hdrHan, fileName, prntHdr;
+    VMBlockHandle vmbh;
+    VMFileHandle vmf;
+    TCHAR  *prntHdrText;
+    MessageListStruct *mlp;
+    word elSize;
+    MailSubject dateBuf;
+    optr indexArray;
+    MessageIndexStruct *mis;
+    word selection = @call oself::MSG_MAIL_LIST_GET_LAST_SELECTION();
+
+    if (selection == GIGS_NONE) {
+	return;
+    }
+
+    ThreadGrabThreadLock(TheMessageListLock);
+    vmbh = pself->MLI_messageArray;
+    vmf = pself->MLI_vmf;
+
+    /*
+     * initialize for printing
+     */
+    @call PrintTextObject::MSG_VIS_TEXT_DELETE_ALL();
+    fileName = @call oself::MSG_MAIL_LIST_GET_FILE_NAME(selection);
+    fileHan = OpenMessageFile(fileName);
+    if (!fileHan) {
+	ReportError(@unableToOpenMessageErr, NULL);
+	ThreadReleaseThreadLock(TheMessageListLock);
+	return;
+    }
+    hdrHan = MailReadHeaders(fileHan);
+    /*
+     * create a header for printing:
+     *    to/from  subject  date
+     */
+    prntHdr = MemAlloc(MAX_SUBJECT_BUF_LEN + MAX_ADDRESS_NAME_LENGTH + 1,
+		       HF_DYNAMIC,
+		       HAF_STANDARD);
+    prntHdrText = MemLock(prntHdr);
+    indexArray = @call oself::MSG_MAIL_LIST_GET_INDEX_ARRAY();
+    mis = ChunkArrayElementToPtr(indexArray, selection, 0);
+    HugeArrayLock(vmf,vmbh,mis->MIS_index,&mlp, &elSize);
+    VMUnlock(OptrToHandle(indexArray));
+    LockStrings();
+    LocalCustomFormatDateTime(dateBuf,
+			      LMemDeref(@dateFormatStr),
+			      &mlp->MLS_time);
+    UnlockStrings();
+    strcpy(prntHdrText, mlp->MLS_mail);
+    strcat(prntHdrText, mlpSpace);
+    strcat(prntHdrText, mlp->MLS_subject);
+    strcat(prntHdrText, mlpSpace);
+    strcat(prntHdrText, dateBuf);
+    MemUnlock(prntHdr);
+    HugeArrayUnlock(mlp);
+    @call PrintTextObject::MSG_MAIL_LARGE_TEXT_SET_HEADER(prntHdr);
+
+    /*
+     * read the message into the PrintTextObject
+     */
+    @call PrintTextObject::MSG_MAIL_LARGE_TEXT_READ_MESSAGE(hdrHan, fileHan);
+    MemFree(hdrHan);
+    FileClose(fileHan, FALSE);
+
+    /*
+     * do the actual printing
+     */
+    @call PrintTextObject::MSG_PRINT_START_PRINTING(printCtrlOD, gstate);
+    ThreadReleaseThreadLock(TheMessageListLock);
+}
+
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_MAIL_LIST_ADD_ADDRESS_ENTRY
+ * DESCRIPTION:     add an address book entry for the current address
+ *
+ * PASS:            none
+ * RETURN:          none
+ ***************************************************************/
+
+RolodexUpdateEntryField *
+AddRolodexField(RolodexUpdateEntryFieldType fieldType, RolodexUpdateEntryField *rup, void *dataPtr, word dataSize)
+{
+    byte *r1 = rup;
+
+    /*
+     * set the fields
+     */
+    rup->RUEF_type = fieldType;
+    rup->RUEF_size = dataSize;
+    /*
+     * if any data, copy it
+     */
+    if (dataSize) {
+	memcpy(r1+RUEF_data, dataPtr, dataSize);
+    }
+    /*
+     * return a pointer to the next field
+     */
+    r1 += rup->RUEF_size+sizeof(RolodexUpdateEntryField);
+    return(r1);
+}
+
+@method MailListClass, MSG_MAIL_LIST_ADD_ADDRESS_ENTRY
+{
+    MemHandle hdrHan, mh, rupHan;
+    TCHAR *s, *s2, *s3, *emAddr;
+    FileHandle fh;
+    word rnSize, emSize;
+    RolodexUpdateEntryField *rup;
+    word sel = @call oself::MSG_MAIL_LIST_GET_LAST_SELECTION();
+
+    /*
+     * get the message file and open it
+     */
+    mh = @call oself::MSG_MAIL_LIST_GET_FILE_NAME(sel);
+    if (!mh) {
+	return;
+    }
+    s = MemLock(mh);
+    fh = FileOpen(s, FILE_ACCESS_R|FILE_DENY_W);
+    MemFree(mh);
+    if (!fh) {
+	return;
+    }
+    /*
+     * read the From: header
+     */
+    hdrHan = MailReadHeaders(fh);
+    FileClose(fh, FALSE);
+    if (!hdrHan) {
+	return;
+    }
+    LockStrings();
+    mh = MailGetHeader(hdrHan, LMemDeref(@fromFieldName));
+    UnlockStrings();
+    MemFree(hdrHan);
+    if (!mh) {
+	return;
+    }
+    /*
+     * find the email address and realname
+     */
+    s = MemLock(mh);
+    rnSize = 0;
+    emAddr = strchr(s, '<');
+    if (!emAddr) {
+	/*
+	 * no <>, so no real name
+	 */
+	emAddr = s;
+    } else {
+	/*
+	 * separate the realname and the email address
+	 */
+	emAddr[0] = 0;
+	s3 = emAddr-1;
+	emAddr++;
+	s2 = strchr(emAddr, '>');
+	if (s2) {
+	    s2[0] = 0;
+	}
+	/*
+	 * remove any trailing space or quotes on the realname
+	 */
+	while(*s3 == ' ' || *s3 == '"' || *s3 == C_SNG_QUOTE) {
+	    s3[0] = 0;
+	    s3--;
+	}
+	/*
+	 * remove any leading quotes on the realname
+	 */
+	while (*s == '"' || *s == C_SNG_QUOTE) {
+	    s++;
+	}
+	rnSize = (strlen(s)+1)*sizeof(TCHAR);
+    }
+    emSize = (strlen(emAddr)+1)*sizeof(TCHAR);
+    /*
+     * allocate a block for the RolodexUpdateEntryField array
+     */
+    if (rnSize) {
+	rupHan = MemAlloc(rnSize+emSize+sizeof(RolodexUpdateEntryField)*3, HF_DYNAMIC, HAF_STANDARD);
+    } else {
+	rupHan = MemAlloc(emSize+sizeof(RolodexUpdateEntryField)*2, HF_DYNAMIC, HAF_STANDARD);
+    }
+    if (!rupHan) {
+	MemFree(mh);
+    }
+    rup = MemLock(rupHan);
+    /*
+     * if a realname, add an entry
+     */
+    if (rnSize) {
+	rup = AddRolodexField(RUEFT_LASTNAME, rup, s, rnSize);
+    }
+    /*
+     * add an entry for the email address
+     */
+    rup = AddRolodexField(RUEFT_EMAIL_KEY, rup, emAddr, emSize);
+    /*
+     * add a entry for the end
+     */
+    rup->RUEF_type = RUEFT_LAST_FIELD;
+    rup->RUEF_size = 0;
+    /*
+     * clean up and send the data to the app
+     */
+    MemFree(mh);
+    @call MailAppObj::MSG_MAIL_APP_ADD_ADDRESS_ENTRY(rupHan);
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_MAIL_LIST_FORWARD_MESSAGE
+ * DESCRIPTION:     forward the currently selected message
+ *
+ * PASS:            none
+ * RETURN:          none
+ ***************************************************************/
+@method MailListClass, MSG_MAIL_LIST_FORWARD_MESSAGE
+{
+    MemHandle mh;
+    word sel = @call oself::MSG_MAIL_LIST_GET_LAST_SELECTION();
+
+    if (sel != GIGS_NONE) {
+	@call ReadMailWin::MSG_GEN_DISPLAY_CLOSE();
+	/*
+	 * get the message file and call the composer
+	 */
+	mh = @call oself::MSG_MAIL_LIST_GET_FILE_NAME(sel);
+	@call ComposeMailWin::MSG_MAIL_COMPOSER_FORWARD_MESSAGE(mh);
+    }
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_VIS_RECALC_SIZE
+ * DESCRIPTION:     Resize the list, and resize the buttons to match
+ *
+ * PASS:            width, height - suggested size
+ * RETURN:          SizeAsDWord - width, height
+ ***************************************************************/
+
+@method MailListClass, MSG_VIS_RECALC_SIZE
+{
+    SizeAsDWord newSize;
+    sword nWidth, oWidth;
+
+    /*
+     * call our superclass to resize ourselves
+     */
+    newSize = @callsuper();
+    nWidth = DWORD_WIDTH(newSize);
+    oWidth = DWORD_WIDTH(@call oself::MSG_VIS_GET_SIZE());
+    /*
+     * redisplay our monikers if we changed width
+     */
+    if (nWidth != oWidth) {
+	@call oself::MSG_MAIL_LIST_RESHOW();
+    }
+    return(newSize);
+}
+
+@ifdef SORT_BY_COLUMNS
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_VIS_RECALC_SIZE
+ * DESCRIPTION:     Resize the list, and resize the buttons to match
+ *
+ * PASS:            width, height - suggested size
+ * RETURN:          SizeAsDWord - width, height
+ ***************************************************************/
+
+void
+UpdateButtonWidth(optr obj, sword width)
+{
+    if (width > 0) {
+	@call obj::MSG_GEN_SET_FIXED_SIZE(VUM_DLYD, 0, 0, width);
+    }
+}
+
+@method MailListHeaderClass, MSG_VIS_RECALC_SIZE
+{
+    SizeAsDWord newSize;
+    GStateHandle gs;
+    sword namewidth, subwidth, datewidth;
+    sword nWidth, oWidth;
+
+    /*
+     * call our superclass to resize ourselves
+     */
+    newSize = @callsuper();
+    nWidth = DWORD_WIDTH(newSize);
+    oWidth = DWORD_WIDTH(@call oself::MSG_VIS_GET_SIZE());
+
+    if (nWidth && nWidth != oWidth) {
+	gs = GrCreateState(NULL);
+	MailListGetSizes(oself, gs, nWidth, &namewidth, &subwidth, &datewidth);
+	UpdateButtonWidth(@SortBySenderButton, namewidth-12);
+	UpdateButtonWidth(@SortBySubjectButton, subwidth-22);
+	UpdateButtonWidth(@SortByDateButton, datewidth);
+	GrDestroyState(gs);
+    }
+
+    return(newSize);
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_MAIL_LIST_SET_SORT_ORDER
+ * DESCRIPTION:     Set the sort order
+ *
+ * PASS:            order - SortMessageByType
+ * RETURN:          none
+ ***************************************************************/
+
+@method MailListClass, MSG_MAIL_LIST_SET_SORT_ORDER
+{
+    @call SortByList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(order, 0);
+    @call oself::MSG_MAIL_LIST_RESORT();
+}
+
+@endif
+
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_MAIL_LIST_SEND_SELECTED_MESSAGE
+ * DESCRIPTION:     Send the last selected message
+ *
+ * PASS:            none
+ * RETURN:          none
+ *
+ * Ideally we would send all selected messages, but that would be something
+ * of a pain because the list (and selections) will be updated after each
+ * range is sent, and adjusting the selections would be difficult at best.
+ ***************************************************************/
+
+@method MailListClass, MSG_MAIL_LIST_SEND_SELECTED_MESSAGE
+{
+    word sel = @call oself::MSG_MAIL_LIST_GET_LAST_SELECTION();
+
+    @call SendReceiveDialog::MSG_MSR_SEND_MESSAGE_RANGE(sel, 1);
+}

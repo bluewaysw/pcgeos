@@ -1,0 +1,371 @@
+***************************************************************************
+
+	Copyright (c) Berkeley Softworks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		FSM
+FILE:		fsm.doc
+
+AUTHOR:		Adam de Boor, August 31, 1989
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb   08/31/89        Initial revision.
+
+DESCRIPTION:
+	Spec for the FSM module of Emu	
+
+	$Id: fsm.doc,v 1.1.40.1 97/03/29 09:45:02 canavese Exp $
+
+****************************************************************************
+fsmContents:
+
+fsmGoals	- Goals for the fsm module.
+fsmRoutines	- Routines accessible outside of this module.
+fsmInternal	- Routines available only inside this module.
+
+*******************************************************************************
+			     Goals and Overview
+*******************************************************************************
+fsmGoals:
+see also [ fsmContents ]
+
+The FSM module in Emu implements a dynamically built, finite-state machine to
+parse  terminal control sequences.   The intention  is  for a  fairly simple,
+ascii terminal description file to be created for  each  type of terminal Emu
+is to emulate.
+
+Emu  provides   a well-defined  set   of  emulation  functions (forward-char,
+delete-line, insert-char, etc.) to which a string of input  characters may be
+bound. The  function of the  FSM module   is to  recognize these  strings  of
+characters and call the proper function once a known string is recognized.
+
+Because certain functions require arguments, and because there are a plethora
+of ways  arguments  are  specified  to terminals,  special  argument-fetching
+escapes  are provided  for inclusion   in strings.  All arguments  parsed are
+stored and can be passed  in any order, with the  addition  or subtraction of
+constants or other arguments, to one of Emu's functions.
+
+In  all terminal descriptions, there will   be  input  characters that should
+simply be written to the screen ('a', '1', etc.).  To  make this as efficient
+as  possible, all a machine  has a callback  function bound to  it when it is
+created.  Any  character not recognized while   the machine  is in its ground
+state is assumed  to be  a  normal character  and is buffered  until the next
+function call, when the callback function for the machine is called and given
+all the buffered characters at once, allowing it to do a  GrPutString, rather
+than a series of GrPutChars.
+
+*******************************************************************************
+				  Interface
+*******************************************************************************
+fsmRoutines:
+see also [ fsmContents ]
+
+The routines exported  by  the  FSM   module  provide an  abstraction   of  a
+finite-state machine in  the form of a token  that is used to manipulate  and
+use the  machine.  A  non-visual FSMClass  is  also provided,  with attendant
+methods that parallel the procedural interface, in case we  decide to go that
+route. My only concern is with the speed of method calls and the need  to get
+characters up on the screen as quickly as possible.
+
+The following routines are provided by the FSM module:
+
+FSMCreate:
+    	    CX:DX   = routine to call with unprocessed characters
+	    SI	    = extra data to pass routine
+	=>
+	    BX	    = machine token to be given to subsequent calls.
+	    
+    	Creates an empty finite-state machine for later use. Routines
+	and the terminal description need to be added later. Returns
+	a token to be used in subsequent calls dealing with the machine.
+	
+	When an action is about to be called, the routine passed here in
+    	CX:DX will be called:
+    	    SI	    = extra data
+	    CX	    = number of buffered characters
+	    ES:DI   = address of buffer
+	=>
+
+	The routine is expected to process all the characters when it is
+    	called.   
+
+FSMDestroy:
+    	    BX	    = machine to be nuked.
+    	=>
+	
+	Destroys the machine given. It should never again be referenced.
+
+FSMRegister:
+	    DS:SI   = fixed-memory, routine-description table
+    	    BX	    = machine token returned by FSMCreate
+    	=>
+	
+	Registers a table of routines that may be bound to input strings.
+
+FSMParseDesc:
+    	    DS:SI   = Buffer containing description (probably read from
+	    	      a file)
+	    CX	    = Length of description
+	    BX	    = machine token returned by FSMCreate
+    	=>
+    	    AX	    = 0 on success, error code on failure
+
+    	Parses the terminal description in the passed buffer,
+	discarding all previously parsed states.
+
+FSMAugmentDesc:
+    	    DS:SI   = Buffer for additional strings to be parsed.
+	    CX	    = Length of buffer
+	    BX	    = machine token returned by FSMCreate
+    	=>
+	    AX	    = 0 on success, error code on failure.
+
+    	Similar to FSMParseDesc, except the strings are added to an
+	existing machine, rather than throwing the previous states away.
+    	    
+FSMParseString:
+    	    DS:SI   = address of buffer containing input characters
+	    CX	    = length of buffer
+	    BX	    = machine token returned by FSMCreate
+	=>
+	
+	Uses the passed machine to parse the characters in the passed buffer,
+	executing whatever actions they dictate.
+    	
+*******************************************************************************
+			    Terminal Descriptions
+*******************************************************************************
+fsmDescriptions:
+see also [ fsmContents ]
+
+A terminal description  is laid  out  as  a series   of lines, each of  which
+contains a string, followed by  whitespace, followed by a function  call. Any
+line beginning with a pound sign (#) is considered a comment and  the rest of
+the line is ignored.
+
+The string is a series of characters with special escapes (always prefaced by
+a backslash) to get non-printable characters, as well as to specify what sort
+of argument should be parsed. The supported escapes are:
+
+    \e or \E	    Escape (ASCII 27, decimal)
+    \r	    	    Carriage return (ASCII 13)
+    \b	    	    Backspace (ASCII 8)
+    \n	    	    Newline (ASCII 10)
+    \\	    	    Backslash itself
+    \x<n>   	    Character whose value is <n>, base 16
+    \<n>    	    Character whose value is <n>, base 8
+    \[...\] 	    Characters in the range given between the brackets. The
+    	    	    range is specified in standard UNIX character range form,
+    	    	    i.e. a character by itself indicates just that character;
+		    a string like 0-9 indicates the characters from 0 to 9,
+		    inclusive; a ^ at the start of the class causes a match
+		    for all characters not in the range. If - is to be
+		    included, it should be the first character in the class.
+    \%	    	    Begin argument specification:
+    	    	    	\%d 	A string of digits. First non-digit ends
+			    	argument
+    	    	    	\%<n>d	A string of <n> digits. If not <n> digits
+			    	given, it is considered an error.
+    	    	    	\%c 	A single character. Its value is stored as
+			    	the argument.
+
+*******************************************************************************
+			      Internal Overview
+*******************************************************************************
+fsmInternal:
+see also [ fsmContents ]
+
+Internally,  a  finite-state machine is implemented   as a global  heap block
+managed by the LMem module  of the kernel.  The block begins with  a standard
+LMemBlockHeader structure and is followed  by variables for the machine (e.g.
+the current state).
+
+*******************************************************************************
+			      Local State Format
+*******************************************************************************
+The states themselves are implemented as LMem chunks containing two tables:
+
+    * a table of characters valid in the state
+    * a table of actions to be performed when a character is seen.
+
+The table of characters is preceded by the number of entries in the table 
+(we're dealing with 8-bit characters here, only) and the size of the table.
+Should the machine be in a given state and receive a character that isn't 
+valid in the state, one  of two options can be taken by the machine:
+
+    * return to the ground state and discard the state, or
+    * return to the ground state and act as if the character were received
+      while in that state.
+
+The option taken by the machine may be set  when  the machine is  created, to
+match the behaviour of different terminals.
+
+The table of valid characters is followed by the table of actions to be taken
+when any  of those characters  is seen.  A  single action   is bound to  each
+character, with the  actions stored in  the  same order as the characters. An
+action consists of a single word. Taking advantage of the alignment of things
+in an LMem block, if the low bit of the word is 0,  the  action is the handle
+of the state to which the machine should go. If  the low bit is non-zero, the
+remaining bits indicate the offset  of the action   descriptor in the  action
+chunk.
+
+*******************************************************************************
+				Header Block
+*******************************************************************************
+fsmHeader:
+see also [ fsmContents fsmInternal ]
+
+The header at the start of an FSM block contains the normal LMem stuff, plus
+extra fields required to maintain the state of the machine:
+
+    * current state (LMem handle).
+    * ground state (LMem handle).
+    * block containing action descriptors (LMem handle).
+    * flags to control miscellaneous machine behavior:
+    	* discard-on-err: set if an improper character gets discarded after
+	  return to ground state. If false, character gets processed in
+	  ground state and only discarded if invalid there.
+	
+
+*******************************************************************************
+			     Action Descriptors
+*******************************************************************************
+fsmActions:
+see also [ fsmContents fsmInternal ]
+
+The action taken by the FSM upon reaching a final state (the  end of a string
+in the terminal description)  is  governed by an  action descriptor.  All the
+action  descriptors  for  the machine  are  stored  in  the same block  (each
+descriptor is word-aligned so the word from the  action table  of a state can
+simply have its low bit stripped to  obtain the offset into  the chunk of the
+proper descriptor).
+
+The action descriptor holds various pieces of information about the function
+to be dispatched when the final state is reached:
+
+    * The address of the routine to be called
+    * flags:
+    	* revert-to-ground: set if should revert to ground state after
+    	  calling routine. only unset for special argument-parsing routines
+    	  that are internal to FSM.
+    * argument descriptors. The parsed arguments are stored in an array and
+      may be loaded into AX, BX, CX and DX for passing to the routine. In
+      addition to a simple load, the argument value may be modified by
+      adding or subtracting a constant from it. The constant is stored as a
+      byte between -128 and +127, inclusive. An argument descriptor is
+      thus a two-byte quantity (there are four altogether). The first byte
+      gives an argument number (0-3) or -1 if the register is not to be
+      loaded. The second byte is the amount by which to adjust the value.
+      (SHOULD THIS BE MORE COMPLEX? AN EXPRESSION OF SORTS TO ALLOW THE
+      ADDITION OF OTHER ARGS? OTHER OPERATORS?)
+
+The key here is to be able to dispatch the action as quickly as possible.
+
+There are three function types INTERNAL, EXTERNAL, and CASE.
+
+An internal function is a function used internally by the FSM.  An example
+is the CalcNumber function.  Certain terminal sequences send a string of 
+ascii digits as paramters.  These ascii digits have to be converted to
+their hex value e.g. the string "12" converts to 0xch.  Consequently in
+states where a numeric string is expected the action word for the tokens
+"0"-"9" point to an action descriptor that calls an internal routine to
+compute the number.  Thus whenever a digit comes in to this state, the
+internal function will be called to update the value of number being caluculated.
+When a non-digit token appears this signals the end of the ascii number string.
+The trick is how do we tell the FSM that the number is completed and to
+store the next number in the next slot in the array.  
+
+Current solution is to have GetToken () check if it was previously in
+the internal function if so, it'll turn off the flag and update the 
+argument index.  The internal function will have to check this flag to
+see if it should clear out its number counter.  *** The argIndex var should
+be NILed out when the sequence it was set for has been processed.***
+
+Previously the argument descriptor was contained within the action
+descriptor and internal functions were handled through action descriptors.
+This is no good, because for a single terminal sequence we want only
+one argument descriptor but may need multiple action descriptors to point
+to different internal functions and the external function.  So we have
+a separate structure a function descriptor that is used for internal 
+functions.  Changes are made to a single copy of the argument descriptor
+which is stored in idata and then copied into the action descriptor when
+the whole string is parsed.
+
+
+*******************************************************************************
+				  Algorithms
+*******************************************************************************
+fsmAlgorithms:
+see also [ fsmContents fsmInternal ]
+
+This section details various algorithms used in the FSM module.
+
+The algorithm followed by the main FSM engine (FSMParseString) runs as follows:
+
+    while buffer not empty {
+	al = next character from buffer
+    CheckChar:
+	di = current state's character table
+	cx = length of character table
+	while (cx != 0 && es:[di] != al) {
+	    di++, cx--;
+	}
+	if match {
+	    si = action word ([di + cx*2 + (di - 4)] == [2*(di+cx) - 4])
+	    if (si & 1) {
+		CallBackFunction(buffer)		;print buffered chars
+		FSMCallAction(si & ~1)
+	    } else {
+	    	current state = si
+	    }
+	} else {
+	    current state = ground state
+	    if !discard-on-err, then goto CheckChar
+    	}
+    }
+
+FSMCallAction uses the following algorithm:
+
+    si = action block + descriptor offset;
+    if revert-to-ground, then current state = ground state
+    for i in ax, bx, cx, dx; do
+    	di = argument #[i]
+	if di != -1 {
+	    i = argument[di] + offset[i]
+    	} else {
+    	    i = 0
+    	}
+    done
+    CallBackFunction(buffer)		;print buffered chars
+    call routine
+
+FSMParseDesc simple calls LMemInitHeap,  allocates an action block and ground
+state (initializing the ground state to be empty), then calls FSMAugmentDesc.
+
+*******************************************************************************
+			Calling Functions	
+*******************************************************************************
+Obviously we need to map the function in the termcap file to our 
+internal function.  We could map each of our routines to a nubmer
+and then put the numbers in the termcap file.  This looks lame, but
+it'll do for a first pass.  The second pass may have the two letter
+termcap abbreviation or even a variable length string.
+
+FunctionTable:
+	dd	ScreenSoundBell			;func 0
+	dd	ScreenCursorLeft		;func 1
+	dd	ScreenTabl			;func 2
+	dd	ScreenHomeCursor		;func 3
+
+Each entry in the FuntionTable contains the resource handle and
+the offset into the segment.  We take the segment handle, shift it
+over four bits, then pass this handle and the offset to ProcCallModuleRoutine.
+
+As stated in fsm.doc each state is a LMem chunk containing two tables.
+The format of the tables is
+	- number of characters in table				(byte)
+	- table of vaild chars for that state 			(byte width)
+	- table of actions to be performed for that state	(word width)
+

@@ -1,0 +1,1 @@
+ -M -L 4 -I. -I/home/frehwagen/workspace/g6/pcgeos/Library/Cards -I/home/frehwagen/workspace/g6/pcgeos/Installed/Include -I/home/frehwagen/workspace/g6/pcgeos/Include -DPRODUCT= -DPRODUCT_ -D_FXIP=FALSE -DHARDWARE_TYPE=PC -DREL=0.0.0.0 -DPROTO=0.0 -n cards /home/frehwagen/workspace/g6/pcgeos/Library/Cards/cardsMain.asm          

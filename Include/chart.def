@@ -1,0 +1,956 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		chart.def
+
+AUTHOR:		John Wedgwood, Oct  7, 1991
+
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jcw	10/ 7/91	Initial revision
+
+
+DESCRIPTION:
+	Definition of the chart object class.
+		
+	$Id: chart.def,v 1.1 97/04/04 14:23:20 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__CHART
+
+StartLibrary	chart
+
+include graphics.def
+UseLib	math.def
+UseLib  grobj.def
+
+;-----------------------------------------------------------------------------
+;	CONSTANTS, STRUCTURES, ETC.
+;-----------------------------------------------------------------------------
+
+; Maximum number of series for any chart
+MAX_SERIES_COUNT	equ	64
+
+; Maximum number of categories.
+MAX_CATEGORY_COUNT	equ	1024
+
+
+;----------------------------------------------------------------------------
+;	Chart Type
+;----------------------------------------------------------------------------
+;
+; For a good visual guide to what I'm talking about here, take a look at
+; Microsoft Excel's "Gallery" in their chart editing mode.
+;
+
+;-----------------------------------------------------------------------------
+;	DO NOT CHANGE this etype without changing jump tables
+;	everywhere!
+;-----------------------------------------------------------------------------
+
+ChartType		etype	byte, 0, 2
+CT_COLUMN		enum	ChartType
+;
+; A column chart has series data plotted as vertical columns. The category
+; axis is horizontal and the value axis is vertical.
+;
+; The series-markers in the legend use a rectangle of color to identify
+; each series.
+;
+
+CT_BAR			enum	ChartType
+;
+; A bar chart is like a column chart but rotated 90 degrees. The category
+; axis is vertical and the value axis is horizontal. The series data is
+; represented by horizontal bars.
+;
+; The series-markers in the legend use a rectangle of color to identify
+; each series.
+;
+
+CT_LINE			enum	ChartType
+;
+; A line chart has a horizontal category axis and a vertical value axis.
+; The series data is represented by points. Each series has some unique
+; marker which is drawn at each data point. The points are connected by
+; lines. In general (with a single exception) the data for the first
+; category is lined up right on the left edge of the plottable area.
+;
+; The series markers in the legend use a picture of the data point markers
+; to identify each series.
+;
+
+CT_AREA			enum	ChartType
+;
+; An area chart is similar to a line chart except that rather than identifying
+; series by a unique marker plotted at each data point there are no marks
+; associated with the data points. Instead the lines which connect the points
+; combine with the category axis to form a polygon. This polygon is filled
+; with a color which uniquely identifies the series.
+;
+; The series-markers in the legend use a rectangle of color to identify
+; each series.
+;
+
+CT_SCATTER		enum	ChartType
+;
+; Scatter charts are unique in that there is no category axis. Scatter charts
+; plot pairs of points from two series together. The first series is used
+; for the horizontal axis and is the series against which all others are
+; plotted.
+;
+; Each pair of points (one from the main series, one from another series)
+; becomes an x/y coordinate and that coordinate is plotted.
+;
+; A single marker is used to identify every point associated with a given
+; series.
+;
+; The legend contains one entry for every series other than the first.
+; Each entry has the marker which is associated with that series.
+;
+
+CT_PIE			enum	ChartType
+;
+; Pie charts are also unique. There is no category axis or value axis.
+; Only a single series of data can be plotted as a pie chart. If the user
+; selects more than one series only the first series is used.
+;
+; A pie chart plots each entry in a series as a percentage of its
+; contribution to the whole. This means that plotting numbers like 1,2,3
+; would result in 3 pieces of pie representing:
+;	1/(1+2+3), 2/(1+2+3), 3/(1+2+3)
+;
+; The series-markers in the legend use a rectangle of color to identify
+; each series.
+;
+
+CT_HIGH_LOW		enum	ChartType
+;
+; High-low charts are the kind commonly used for stock market reports,
+; etc.  This chart expects data to be passed in the following form:
+;
+;	SERIES 1: Low (or high) value
+;	SERIES 2: High (or low) value
+;	SERIES 3: "Open" value -- line will be drawn off to the left
+;	SERIES 4: "Close" value -- line will be drawn off to the right
+
+ifdef	SPIDER_CHART
+CT_SPIDER		enum 	ChartType
+;
+; Spider charts are common in countries such as Japan.  Unlike other
+; types of charts, spider charts possess a value axis for each
+; category.  All of the axes begin at the same center point and
+; diverge uniformly.  For instance, if there are N categories in the
+; chart, any two neighboring axes will be separated by (360/N)
+; degrees.  Each series of data will form an N-sided polygon around
+; the center point.
+endif
+
+;----------------------------------------------------------------------------
+;			      Chart Variations
+;----------------------------------------------------------------------------
+;
+; Column chart variations.
+;
+ChartColumnVariation		etype	byte, 0, 2
+CCV_STANDARD			enum	ChartColumnVariation
+;
+; The standard column chart has one column for each series placed next to
+; each other with a small space between categories. Each series is assigned
+; a unique color. The height of each column corresponds to the value
+; of the series for that category. The gap between the categories is
+; specified in terms of a percentage of a column width and can therefore be
+; represented by a floating point number between zero and one.
+;
+
+CCV_OVERLAPPED			enum	ChartColumnVariation
+;
+; This is similar to the standard variation except that the columns are all
+; overlapped slightly. The amount of overlap is some percentage of the column
+; width.
+;
+
+CCV_STACKED			enum	ChartColumnVariation
+;
+; Stacked column charts are used to indicate how much each series entry
+; contributes to the total of all series for a given category. There is one
+; column for each series. The height of the column is the sum of all the
+; series values for that category. The column is broken up into as many
+; parts as there are series. Each part of the column is drawn in the color
+; for the series which is represented by that column piece.
+;
+
+CCV_FULL_STACKED		enum	ChartColumnVariation
+;
+; This is similar to the stacked column chart except that the value axis
+; displays percentages (0..100). The columns represent the percentage that
+; each series contributes to the sum of the series values for a given
+; category.
+;
+
+CCV_ONE_COLOR_WITH_VALUES	enum	ChartColumnVariation
+;
+; This is the same as the standard column chart except that all series are
+; assigned the same color. In addition the values associated with each series
+; value are drawn at the top of each column.
+;
+
+CCV_ONE_COLOR_SQUISHED		enum	ChartColumnVariation
+;
+; This is the same as the standard column chart except that all series are
+; assigned the same color and the gap between the categories is set to 0.
+;
+
+
+;
+; Bar chart variations
+;
+ChartBarVariation		etype	byte, 0, 2
+CBV_STANDARD			enum	ChartBarVariation
+CBV_OVERLAPPED			enum	ChartBarVariation
+CBV_STACKED			enum	ChartBarVariation
+CBV_FULL_STACKED		enum	ChartBarVariation
+CBV_ONE_COLOR_WITH_VALUES	enum	ChartBarVariation
+CBV_ONE_COLOR_SQUISHED		enum	ChartBarVariation
+;
+; All of these are the same as their column chart counterparts.
+;
+
+
+;
+; Line chart variations.
+;
+ChartLineVariation		etype	byte, 0, 2
+CLV_STANDARD			enum	ChartLineVariation
+;
+; The standard line chart assigns the same marker to all series. A line is
+; drawn to connect all the points in a single series. The color of the line
+; and marker is unique to each series.
+;
+
+CLV_LINES_ONLY		enum	ChartLineVariation
+;
+; This is the same as the standard line chart except that no markers are drawn.
+; The legend changes to use rectangles of color to indicate the series markers.
+;
+
+CLV_MARKERS_ONLY		enum	ChartLineVariation
+;
+; This is the same as the standard line chart except that only the markers
+; are drawn. No lines are drawn.
+;
+
+CLV_V_LINE_GROUPING		enum	ChartLineVariation
+;
+; All series data points for a given category are drawn in a single
+; vertical line. The points are connected with a line drawn from the
+; maximum point to the minimum point.
+;
+
+;
+; Area chart variations.
+;
+ChartAreaVariation		etype	byte, 0, 2
+CAV_STANDARD			enum	ChartAreaVariation
+;
+; The standard area chart consists of lines connecting all the series data
+; points. The lines segments combine with the category axis to create a
+; polygon. This polygon is assigned a color unique to the series. The plotted
+; points are actually computed:
+;	val   = Sum[n=0->seriesNum] (series#n[curCategory].dataPoint)
+; This provides a stack of polygons each one representing the sum of all the
+; series to that point.
+;
+
+CAV_FULL		enum	ChartAreaVariation
+;
+; This is similar to the stacked column and bar charts. The value axis
+; displays percentages (0->100). The points which get plotted are
+; actually computed:
+;	total = Sum[n=0->maxSeries] (series#n[curCategory].dataPoint)
+;	point = val / total
+;
+
+CAV_DROP_LINES		enum	ChartAreaVariation
+;
+; This is the standard area chart with vertical gridlines which extend from
+; the category axis at every major tick mark and stop when they hit the
+; top of the plotted area.
+;
+
+CAV_SERIES_NAME	enum	ChartAreaVariation
+;
+; This is the standard area chart with the addition of the series names being
+; drawn over the areas that the series occupies on the chart.
+;
+
+
+;
+; Scatter chart variations.
+;
+ChartScatterVariation		etype	byte, 0, 2
+CSV_STANDARD			enum	ChartScatterVariation
+;
+;
+CSV_LINES_ONLY			enum 	ChartScatterVariation
+
+CSV_MARKERS_ONLY		enum 	ChartScatterVariation
+
+;
+; Pie chart variations.
+;
+ChartPieVariation		etype	byte, 0, 2
+CPV_STANDARD			enum	ChartPieVariation
+;
+; The standard pie chart consists of one wedge for each series. Each series
+; is assigned a unique color and the wedge is colored appropriately.
+;
+
+CPV_CATEGORY_TITLES		enum	ChartPieVariation
+;
+; This is the standard pie chart with the addition of the  category
+; titles drawn near each wedge
+; 
+;
+
+CPV_ONE_COLOR_CATEGORY_TITLES	enum	ChartPieVariation
+;
+; This is the standard pie chart except all wedges are assigned the same
+; color. Each wedge has the category title drawn next to it.
+;
+
+CPV_ONE_EXPLODED		enum	ChartPieVariation
+;
+; This is the standard pie chart with a single wedge (the first series) shifted
+; out away from the others.
+;
+
+CPV_ALL_EXPLODED		enum	ChartPieVariation
+;
+; This is the standard pie chart with all the wedges moved out away from the
+; center of the pie.
+;
+
+CPV_PERCENTAGES	enum	ChartPieVariation
+;
+; This is the standard pie chart with the addition of percentages
+; printed in (or near) each pie wedge.
+
+ChartHighLowVariation	etype	byte, 0, 2
+
+CHLV_STANDARD	enum 	ChartHighLowVariation
+; There ain't no others...
+
+ifdef	SPIDER_CHART
+;
+; Spider Chart Variations.
+;
+
+ChartSpiderVariation	etype 	byte, 0, 2
+
+CSPV_STANDARD				enum	ChartSpiderVariation
+;
+; Standard Spider chart with no category titles.
+;
+
+CSPV_CATEGORY_TITLES			enum 	ChartSpiderVariation
+;
+; Standard Spider Chart with category titles for each axis.
+;
+
+CSPV_MARKERS_WITH_CATEGORY_TITLES	enum 	ChartSpiderVariation
+;
+; Spider chart with markers (no lines) and category titles.
+;
+
+CSPV_LINES_WITH_CATEGORY_TITLES		enum	ChartSpiderVariation
+;
+; Spider chart with lines (no markers) and category titles.
+;
+
+CSPV_MARKERS_ONLY			enum	ChartSpiderVariation
+;
+; Spider chart with no lines connecting each consecutive point in a
+; series (ie. only markers).
+;
+
+CSPV_LINES_ONLY				enum	ChartSpiderVariation
+;
+; Spider chart with only lines to represent a series (ie. no markers).
+;
+endif
+
+;-----------------------------------------------------------------------------
+;	Variations that are specific to the type of chart	
+;-----------------------------------------------------------------------------
+
+ifdef 	SPIDER_CHART
+ChartVariation	union
+	CV_column	ChartColumnVariation
+	CV_bar		ChartBarVariation
+	CV_line		ChartLineVariation
+	CV_area		ChartAreaVariation
+	CV_scatter	ChartScatterVariation
+	CV_pie		ChartPieVariation
+	CV_highLow	ChartHighLowVariation
+	CV_spider	ChartSpiderVariation
+ChartVariation	end
+else
+ChartVariation	union
+	CV_column	ChartColumnVariation
+	CV_bar		ChartBarVariation
+	CV_line		ChartLineVariation
+	CV_area		ChartAreaVariation
+	CV_scatter	ChartScatterVariation
+	CV_pie		ChartPieVariation
+	CV_highLow	ChartHighLowVariation
+ChartVariation	end
+endif
+
+;-----------------------------------------------------------------------------
+; ChartFlags are used internally to set things based on the way the
+; ChartType and ChartVariation are set.  They are not settable directly.
+;-----------------------------------------------------------------------------
+ 
+ChartFlags	record
+	CF_STACKED:1
+	; Set if values are to be drawn on top of each-other.  This is
+	; always set for Area charts.
+
+	CF_FULL:1
+	; Set if every category fills the entire range.  Only valid if
+	; CF_STACKED is set.
+
+	CF_SERIES_TITLES:1
+	; Set if series titles are to be drawn -- position depends on
+	; type of chart.  Only used in area chart
+
+	CF_CATEGORY_TITLES:1
+	; Set if category titles are printed -- only used in Pie chart.
+
+	CF_VALUES:1
+	; Set if values are to be printed on the chart.
+
+	CF_SINGLE_SERIES:1
+	; Set if there's only one series.  If this is set in
+	; conjunction with "stacked", then the single series is
+	; stacked.
+
+	CF_LINES:1
+	; Set if lines are drawn -- for LINE and SCATTER charts only.
+	; Is actually used for determining whether to draw the lines
+	; of the VisSpline object representing this particular
+	; line/scatter chart -- other lines may be drawn regardless of
+	; this flag.
+
+	CF_MARKERS:1
+	; Set if markers are drawn at data points.  For LINE and
+	; SCATTER charts only
+
+	CF_PERCENT:1
+	; Set if chart is to display percentages.
+
+	CF_SINGLE_COLOR:1
+	; Set if all series are the same color.
+
+	CF_CATEGORY_MARGIN:1
+	; Set if there should be a gap (margin) between categories.
+
+	CF_DROP_LINES:1
+	; Set for line/area charts
+
+	CF_ONE_SERIES_OBJECT_PER_CATEGORY:1
+	; If set, then one series object is created for each category
+	; -- used for PIE and HIGH-LOW charts
+
+	:3
+ChartFlags	end
+
+ 
+ChartReturnType	etype	byte, 0, 2
+
+CRT_OK					enum ChartReturnType
+; No errors encountered.  Chart has been created
+
+CRT_NO_SERIES				enum ChartReturnType
+; No numeric data was found in the chart data block
+
+CRT_NEED_2_SERIES			enum ChartReturnType
+; need 2 series (for scatter charts)
+
+CRT_NO_CATEGORIES			enum ChartReturnType
+; No categories were detected in the data
+
+CRT_TOO_MANY_SERIES			enum ChartReturnType
+; There are too many series to deal with
+
+CRT_TOO_MANY_CATEGORIES			enum ChartReturnType
+; Ditto for categories
+
+CRT_OTHER_ERROR				enum ChartReturnType
+; A different error occurred. Can be used by the spreadsheet, or other
+; clients of the chart library for any purpose.
+
+
+;-----------------------------------------------------------------------------
+;	CONTROLLERS
+;-----------------------------------------------------------------------------
+
+;
+; GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+ 
+ChartGroupControlClass	class	GenControlClass
+MSG_CGC_SET_GROUP_FLAGS		message
+;	PASS:		cl - ChartGroupFlags
+; 	RETURN: nothing
+;	DESTROYED: nothing
+
+MSG_CGC_SET_LEGEND_FLAG		message
+;	PASS:		cl - ChartGroupFlags (CGF_LEGEND)
+;			bp - ListEntryState
+;	DESTROYED: nothing
+; 	RETURN: nothing
+
+
+MSG_CGC_SET_LEGEND_TYPE		message
+;	PASS:		cl - ChartGroupFlags (CGF_LEGEND_VERTICAL set
+;						or clear)
+; 	RETURN: nothing
+;	DESTROYED: nothing
+
+MSG_CGC_LEGEND_STATUS	message
+; status message sent out by the legend on-off item group
+;	Pass:		cl - CGF_LEGEND on or off
+;
+
+MSG_CGC_SET_TITLE_TEXT	message
+
+MSG_CGC_SET_X_AXIS_TEXT	message
+
+MSG_CGC_SET_Y_AXIS_TEXT	message
+
+MSG_CGC_TITLE_STATUS	message
+
+ChartGroupControlClass	endc
+
+
+ChartGroupControlFeatures	record
+	:5
+	CGCF_TITLE_TEXT:1
+	; If this feature is set, the controller will contain fields that
+	; allow editing of title text.  This feature is OFF by default
+	; since text can be edited in a more straightforward fashion
+	; by clicking directly on the title.  Some keyboard only
+	; systems will want to use this features, however, since
+	; clicking on an object is not possible.
+
+	CGCF_TITLE_ON_OFF:1
+	CGCF_LEGEND:1
+ChartGroupControlFeatures	end
+
+
+;-----------------------------------------------------------------------------
+;	Grid Control		
+;-----------------------------------------------------------------------------
+;
+; GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+
+ChartGridControlClass	class	GenControlClass
+;
+MSG_CGRC_SET_GRID_FLAGS			message
+;	PASS:	cl - GridFlags that have changed
+;		bp - LES_ACTUAL_EXCL if flags have been SET
+; 	RETURN: nothing 
+;	DESTROYED: everything
+
+ChartGridControlClass	endc
+
+ChartGridControlFeatures	record
+	:4
+	CGRCF_MAJOR_X:1
+	CGRCF_MINOR_X:1
+	CGRCF_MAJOR_Y:1
+	CGRCF_MINOR_Y:1
+ChartGridControlFeatures	end
+
+;-----------------------------------------------------------------------------
+;	Type control		
+;-----------------------------------------------------------------------------
+;
+; GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+ 
+ChartTypeControlClass	class	GenControlClass
+MSG_CTC_TYPE_CHANGE		message
+; 	PASS:		cl - ChartType
+
+MSG_CTC_VARIATION_CHANGE 	message
+; 
+;	PASS: 	cl - ChartType, 
+;		ch - ChartVariation
+; 	RETURN: nothing 
+
+MSG_CTC_TYPE_TOOL_CHANGE	message
+
+ChartTypeControlClass	endc
+
+ifdef 	SPIDER_CHART
+ChartTypeControlFeatures	record
+	CTCF_COLUMN:1
+	CTCF_BAR:1
+	CTCF_LINE:1
+	CTCF_AREA:1
+	CTCF_SCATTER:1
+	CTCF_PIE:1
+	CTCF_HIGH_LOW:1
+	CTCF_SPIDER:1
+ChartTypeControlFeatures	end
+
+
+ChartTypeControlToolboxFeatures	record
+	CTCTF_COLUMN:1
+	CTCTF_BAR:1
+	CTCTF_LINE:1
+	CTCTF_AREA:1
+	CTCTF_SCATTER:1
+	CTCTF_PIE:1
+	CTCTF_HIGH_LOW:1
+	CTCTF_SPIDER:1
+ChartTypeControlToolboxFeatures end
+
+CTC_DEFAULT_TOOLBOX_FEATURES equ \
+			mask CTCTF_COLUMN or \
+			mask CTCTF_BAR or \
+			mask CTCTF_LINE or \
+			mask CTCTF_AREA or \
+			mask CTCTF_PIE or \
+			mask CTCTF_SCATTER or \
+			mask CTCTF_HIGH_LOW or \
+			mask CTCTF_SPIDER
+else
+ChartTypeControlFeatures	record
+	:1
+	CTCF_COLUMN:1
+	CTCF_BAR:1
+	CTCF_LINE:1
+	CTCF_AREA:1
+	CTCF_SCATTER:1
+	CTCF_PIE:1
+	CTCF_HIGH_LOW:1
+ChartTypeControlFeatures	end
+
+
+ChartTypeControlToolboxFeatures	record
+	:1
+	CTCTF_COLUMN:1
+	CTCTF_BAR:1
+	CTCTF_LINE:1
+	CTCTF_AREA:1
+	CTCTF_SCATTER:1
+	CTCTF_PIE:1
+	CTCTF_HIGH_LOW:1
+ChartTypeControlToolboxFeatures end
+
+CTC_DEFAULT_TOOLBOX_FEATURES equ \
+			mask CTCTF_COLUMN or \
+			mask CTCTF_BAR or \
+			mask CTCTF_LINE or \
+			mask CTCTF_AREA or \
+			mask CTCTF_PIE or \
+			mask CTCTF_SCATTER or \
+			mask CTCTF_HIGH_LOW
+endif
+;-----------------------------------------------------------------------------
+;	Axis control
+;-----------------------------------------------------------------------------
+;
+; GenApplication GCN lists to be placed on:
+;	GAGCNLT_SELF_LOAD_OPTIONS
+ 
+ChartAxisControlClass	class	GenControlClass
+
+MSG_CAC_SET_MIN			message		
+MSG_CAC_SET_MAX			message
+MSG_CAC_SET_MAJOR_TICK_UNIT	message
+MSG_CAC_SET_MINOR_TICK_UNIT	message
+MSG_CAC_SET_X_AXIS_TICK_ATTRIBUTES	message
+MSG_CAC_SET_Y_AXIS_TICK_ATTRIBUTES	message
+
+ChartAxisControlClass	endc
+
+
+ChartAxisControlFeatures	record
+	:3
+	CACF_MIN:1
+	CACF_MAX:1
+	CACF_MAJOR_TICK:1
+	CACF_MINOR_TICK:1
+	CACF_TICK_ATTRIBUTES:1
+ChartAxisControlFeatures	end
+ 
+
+;-----------------------------------------------------------------------------
+;		Class definition		
+;-----------------------------------------------------------------------------
+ 
+ChartBodyClass	class	GrObjBodyClass
+
+;
+; The ChartBody is the object that controls all charts created in a
+; document.  It keeps the current chart settings, as well as the OD of
+; the graphic body through which chart objects are realized.  It is
+; also responsible for communicating with the chart UI controllers.
+;
+; The chart body doesn't control any of the visual aspects of charts
+; -- those are all controlled via the grobj body.
+
+;-----------------------------------------------------------------------------
+;	EXTERNAL MESSAGES
+;-----------------------------------------------------------------------------
+
+MSG_CHART_BODY_CREATE_CHART	message	
+; Create a new chart.
+;
+;	PASS: ss:bp - ChartCreateParameters
+;		dx - size of ChartCreateParameters
+;
+;	RETURN: al - ChartReturnType
+;		cx - VM block handle of new chart 
+;
+;	DESTROYED: nothing 
+
+ChartCreateParameters	struct
+	CCP_position		PointDWord	
+	; Position of chart relative to the document it's in.
+
+	CCP_size		Point	
+	; Size of the chart
+
+	CCP_data		word
+	; VM handle of chart's data block
+
+	CCP_type		ChartType
+	CCP_variation		ChartVariation
+ChartCreateParameters	ends
+
+ChartCreateReturnParameters	struct
+	CCRP_type		ChartReturnType
+	; ChartReturnType
+
+	CCRP_chart		word			
+	; VM block handle of new chart
+ChartCreateReturnParameters	ends
+
+
+MSG_CHART_BODY_UPDATE_CHART	message 
+; Update a chart with new data
+;	PASS: cx - VM block handle of chart to update
+;	      dx - VM block handle of new chart data
+;	RETURN:	ax - ChartReturnType
+;	DESTROYED: nothing 
+
+MSG_CHART_BODY_ATTACH message
+; Attaches the chart body to the application.  This message will
+; increment the in-use count for the chart body, so
+; MSG_CHART_BODY_DETACH *must* be sent when detaching.  The purpose of
+; this message is to set the to which notification is sent when a
+; chart is deleted. When a chart is deleted, the message is sent to
+; that OD, with the following parameters:
+;
+;		cx - VM block handle of chart being deleted
+;
+; Pass:		cx:dx - OD that will receive the message
+;		bp    - message to send
+;			
+; Return:	nothing 
+;
+; Destroyed:	nothing 
+;
+
+MSG_CHART_BODY_DETACH	message
+; Sent to the chart body when the document is being closed.
+; Decrements the in-use count of the chart body.
+;
+; Pass:		nothing
+; Return: 	nothing
+; Destroyed: 	nothing
+
+
+MSG_CHART_BODY_GET_SUSPEND_COUNT	message
+; return the current suspend count for the body.  Count = 0 means
+; not suspended.
+;
+;
+; Context:	
+; Source:	
+; Destination:  
+; Interception: 
+;
+; Pass:		nothing 
+;			
+; Return:	ax - suspend count.
+;
+; Destroyed:	nothing 
+;
+
+;-----------------------------------------------------------------------------
+;	INTERNAL MESSAGES		
+;-----------------------------------------------------------------------------
+ 
+MSG_CHART_BODY_UPDATE_UI	message
+; Begin the lengthy negotiations between the various chart objects to
+; update the UI.
+;
+; Context:	
+; Source:	
+; Destination:  
+; Interception: 
+;
+; Pass:		cl - ChartUpdateUIFlags
+;			
+; Return:	nothing 
+;
+; Destroyed:	nothing 
+;
+;
+;
+;
+
+ChartUpdateUIFlags	record
+	CUUIF_AXIS:1
+	CUUIF_GROUP_FLAGS:1
+	CUUIF_CHART_TYPE:1
+UpdateFlags	end
+
+CHART_UPDATE_ALL_UI equ ChartUpdateUIFlags
+
+ChartBodyUnSuspendFlags	record
+	:13
+	CBUSF_UPDATE_UI ChartUpdateUIFlags: width ChartUpdateUIFlags
+ChartBodyUnSuspendFlags	end
+
+.assert offset CBUSF_UPDATE_UI eq 0
+
+MSG_CHART_BODY_NOTIFY_CHART_DELETED	message 
+; Private message
+;
+; Pass:		^lcx:dx - OD of child to remove
+;			
+; Return:	nothing 
+;
+; Destroyed:	ax,cx,dx,bp
+
+MSG_CHART_BODY_GET_GOAM_TEXT		message
+; Return the optr of the GOAM text object. -- used internally
+; Pass:		nothing
+; Return: 	^lcx:dx - OD of text object
+; Destroyed: 	ax,bp
+
+
+MSG_CHART_BODY_FIND_GROBJ_BY_NUMBER	message
+; Return the optr of a grobj given its position in the draw order.
+;
+; Pass:		cx - position
+; Return:	^lcx:dx - optr of grobj
+; Destroyed:	nothing 
+
+MSG_CHART_BODY_GET_GROBJ_FILE_STATUS	message
+; Return the GrObjFileStatus
+;
+; Pass:		nothing
+; Return:	al - GrObjFileStatus
+; Destroyed:	nothing
+
+
+;-----------------------------------------------------------------------------
+;	Instance data		
+;-----------------------------------------------------------------------------
+ 
+
+	CBI_comp	CompPart	
+	; linkage for all charts in the document
+
+	CBI_selection	word
+	; Number of selected charts.  If count drops to zero, then
+	; chart body sends NULL notifications to controllers.
+
+	CBI_unSuspendFlags	ChartBodyUnSuspendFlags
+	; Things to put off doing until suspend count reaches zero.
+
+	CBI_notificationOD	optr
+	noreloc CBI_notificationOD
+	; 
+	; object that will be notified when a chart is deleted. Not
+	; normally relocated, as it's usually an object in the
+	; application, not in the file.
+
+	CBI_notificationMessage	word
+	; Message to send to the notification OD.  
+
+ChartBodyClass		endc
+
+;-----------------------------------------------------------------------------
+;			   Data Block
+;-----------------------------------------------------------------------------
+
+; This is the definition of the data block of data passed to the
+; charting routines.
+
+
+;
+; ChartData is the block header and comes right at the start of the
+; block.
+;
+ChartData		struct
+	CD_endOfData	nptr		; Offset to end of data
+	CD_nRows	word		; Number of rows
+	CD_nColumns	word		; Number of columns
+ChartData		ends
+	;
+	; This header is followed by an array of pointers, one pointer for 
+	; each cell (nRows*nColumns). The pointers give offsets to the cell
+	; data for quick access. The pointers are arranged row-first.
+	; A 2 row by 3 column range of data would have pointers organized:
+	;	Pointer for r1, c1
+	;	Pointer for r1, c2
+	;	Pointer for r1, c3
+	;	Pointer for r2, c1
+	;	Pointer for r2, c2
+	;	Pointer for r2, c3
+	;
+CD_cellOffsets		equ	size ChartData
+
+	;
+	; This is followed by a series of structures of the form:
+	;	Type byte
+	;	Data
+	;
+
+ChartDataCellType	etype	byte, 0, 1
+CDCT_EMPTY		enum	ChartDataCellType
+	;
+	; Followed by nothing
+	;
+
+CDCT_TEXT		enum	ChartDataCellType
+	;
+	; Followed by a null terminated text string
+	;
+CHART_PARAMETER_MAX_TEXT_LENGTH		= 256
+
+CDCT_NUMBER		enum	ChartDataCellType
+	;
+	; Followed by a FloatNum <>
+	;
+
+EndLibrary	chart
+
+

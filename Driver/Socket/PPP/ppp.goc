@@ -1,0 +1,2458 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1995 -- All Rights Reserved
+ *
+ *			GEOWORKS CONFIDENTIAL
+ *
+ * PROJECT:	  Socket
+ * MODULE:	  PPP Driver
+ * FILE:	  ppp.c
+ *
+ * AUTHOR:  	  Jennifer Wu: May  8, 1995
+ *
+ * ROUTINES:
+ *	Name	  	    Description
+ *	----	  	    -----------
+ *
+ * 	BeginNetworkPhase   LCP has reached OPENED state
+ *	EndNetworkPhase	    LCP has left OPENED state
+ *
+ *	GetInterfaceMTU	    Get MTU clients should be using
+ *	SetInterfaceMTU	    Set MTU clients should be using
+ *	SetEscapeMap	    Set escape and discard maps from ACCM
+ *	SetVJCompression
+ *	SetACCompression
+ *	SetProtoCompression
+ *	SetIPAddrs
+ *	PPPSetAccessDNS    Set negotiated DNS addresses for access point
+ *	PPPSetDataCompression
+ *
+ *	PPPSetup    	    Do any setup needed to initialize the PPP driver
+ *	PPPReset    	    Reset username/secret/local IP address, ...
+ *	PPPShutdown 	    Free any memory used by driver and close log file
+ *
+ *	PPPCallTerminated   Handle NO CARRIER situation during a connection
+ *	PPPHandleTimeout    Process protocol timers
+ *
+ *	PPPInput    	    Deliver input packet to correct protocol
+ *	demuxprotrej	    Deliver received Protocol-Reject to protocol
+ *
+ *	PPPConfigDataCompression
+ *	PPPConfigOptions    
+ *
+ *	GetLocalIPAddr
+ *	PPPSetUsername
+ *	PPPSetSecret
+ *	PPPPassiveMode
+ *
+ *	pppfcs	    	    Calculate new FCS given current FCS and new data
+ * 	PPPSendPacket	    Compute FCS, escape packet and output to device
+ *	PPPProcessInput	    Try to build PPP packets from the input data
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	5/ 8/95	  jwu	    Initial version
+ *
+ * DESCRIPTION:
+ *	
+ *
+ * 	$Id: ppp.goc,v 1.38 98/09/25 10:45:30 kho Exp $
+ *
+ ***********************************************************************/
+
+@include <stdapp.goh>
+
+#include <ppp.h>
+#include <initfile.h>
+@include <accpnt.goh>
+#include <stdarg.h>
+
+@include <foam.goh>
+
+@include <pppLog.goh>
+
+#ifdef __HIGHC__
+#pragma Code("PPPCODE");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg PPPCODE
+#endif
+
+extern lcp_sprotrej();
+
+#ifdef CONFIG_ALLOWED
+void PPPConfigOptions();    	    /* forward declaration */
+#endif /* CONFIG_ALLOWED */
+
+/*
+ *	FCS lookup table as calculated by genfcstab.
+ */
+unsigned short fcstab[256] =
+	{
+	0x0000,	0x1189,	0x2312,	0x329b,	0x4624,	0x57ad,	0x6536,	0x74bf,
+	0x8c48,	0x9dc1,	0xaf5a,	0xbed3,	0xca6c,	0xdbe5,	0xe97e,	0xf8f7,
+	0x1081,	0x0108,	0x3393,	0x221a,	0x56a5,	0x472c,	0x75b7,	0x643e,
+	0x9cc9,	0x8d40,	0xbfdb,	0xae52,	0xdaed,	0xcb64,	0xf9ff,	0xe876,
+	0x2102,	0x308b,	0x0210,	0x1399,	0x6726,	0x76af,	0x4434,	0x55bd,
+	0xad4a,	0xbcc3,	0x8e58,	0x9fd1,	0xeb6e,	0xfae7,	0xc87c,	0xd9f5,
+	0x3183,	0x200a,	0x1291,	0x0318,	0x77a7,	0x662e,	0x54b5,	0x453c,
+	0xbdcb,	0xac42,	0x9ed9,	0x8f50,	0xfbef,	0xea66,	0xd8fd,	0xc974,
+	0x4204,	0x538d,	0x6116,	0x709f,	0x0420,	0x15a9,	0x2732,	0x36bb,
+	0xce4c,	0xdfc5,	0xed5e,	0xfcd7,	0x8868,	0x99e1,	0xab7a,	0xbaf3,
+	0x5285,	0x430c,	0x7197,	0x601e,	0x14a1,	0x0528,	0x37b3,	0x263a,
+	0xdecd,	0xcf44,	0xfddf,	0xec56,	0x98e9,	0x8960,	0xbbfb,	0xaa72,
+	0x6306,	0x728f,	0x4014,	0x519d,	0x2522,	0x34ab,	0x0630,	0x17b9,
+	0xef4e,	0xfec7,	0xcc5c,	0xddd5,	0xa96a,	0xb8e3,	0x8a78,	0x9bf1,
+	0x7387,	0x620e,	0x5095,	0x411c,	0x35a3,	0x242a,	0x16b1,	0x0738,
+	0xffcf,	0xee46,	0xdcdd,	0xcd54,	0xb9eb,	0xa862,	0x9af9,	0x8b70,
+	0x8408,	0x9581,	0xa71a,	0xb693,	0xc22c,	0xd3a5,	0xe13e,	0xf0b7,
+	0x0840,	0x19c9,	0x2b52,	0x3adb,	0x4e64,	0x5fed,	0x6d76,	0x7cff,
+	0x9489,	0x8500,	0xb79b,	0xa612,	0xd2ad,	0xc324,	0xf1bf,	0xe036,
+	0x18c1,	0x0948,	0x3bd3,	0x2a5a,	0x5ee5,	0x4f6c,	0x7df7,	0x6c7e,
+	0xa50a,	0xb483,	0x8618,	0x9791,	0xe32e,	0xf2a7,	0xc03c,	0xd1b5,
+	0x2942,	0x38cb,	0x0a50,	0x1bd9,	0x6f66,	0x7eef,	0x4c74,	0x5dfd,
+	0xb58b,	0xa402,	0x9699,	0x8710,	0xf3af,	0xe226,	0xd0bd,	0xc134,
+	0x39c3,	0x284a,	0x1ad1,	0x0b58,	0x7fe7,	0x6e6e,	0x5cf5,	0x4d7c,
+	0xc60c,	0xd785,	0xe51e,	0xf497,	0x8028,	0x91a1,	0xa33a,	0xb2b3,
+	0x4a44,	0x5bcd,	0x6956,	0x78df,	0x0c60,	0x1de9,	0x2f72,	0x3efb,
+	0xd68d,	0xc704,	0xf59f,	0xe416,	0x90a9,	0x8120,	0xb3bb,	0xa232,
+	0x5ac5,	0x4b4c,	0x79d7,	0x685e,	0x1ce1,	0x0d68,	0x3ff3,	0x2e7a,
+	0xe70e,	0xf687,	0xc41c,	0xd595,	0xa12a,	0xb0a3,	0x8238,	0x93b1,
+	0x6b46,	0x7acf,	0x4854,	0x59dd,	0x2d62,	0x3ceb,	0x0e70,	0x1ff9,
+	0xf78f,	0xe606,	0xd49d,	0xc514,	0xb1ab,	0xa022,	0x92b9,	0x8330,
+	0x7bc7,	0x6a4e,	0x58d5,	0x495c,	0x3de3,	0x2c6a,	0x1ef1,	0x0f78
+	};
+
+
+/*
+ * Virtual far pointers to routines that go in the following table.
+ */
+static ByteCallback *ppp_ip_input_vfptr = ppp_ip_input;
+static VoidCallback *ipcp_protrej_vfptr = ipcp_protrej;
+static ByteCallback *ip_vj_comp_input_vfptr = ip_vj_comp_input;
+static ByteCallback *ip_vj_uncomp_input_vfptr = ip_vj_uncomp_input;
+
+static ByteCallback *lqm_input_vfptr = lqm_input;
+static VoidCallback *lqm_protrej_vfptr = lqm_protrej;
+
+static VoidCallback *ipcp_init_vfptr = ipcp_init;
+static ByteCallback *ipcp_input_vfptr = ipcp_input;
+
+static VoidCallback *lcp_init_vfptr = lcp_init;
+static ByteCallback *lcp_input_vfptr = lcp_input;
+static VoidCallback *lcp_protrej_vfptr = lcp_protrej;
+
+static VoidCallback *pap_init_vfptr = pap_init;
+static ByteCallback *pap_input_vfptr = pap_input;
+static VoidCallback *pap_protrej_vfptr = pap_protrej;
+
+static VoidCallback *chap_init_vfptr = chap_init;
+static ByteCallback *chap_input_vfptr = chap_input;
+static VoidCallback *chap_protrej_vfptr = chap_protrej;
+
+#ifdef USE_CCP
+
+static VoidCallback *ccp_init_vfptr = ccp_init;
+static ByteCallback *ccp_input_vfptr = ccp_input;
+static VoidCallback *ccp_protrej_vfptr = ccp_protrej;
+
+static ByteCallback *compress_input_vfptr = compress_input;
+
+#endif /* USE_CCP */
+
+/*
+ * PPP Data Link Layer "protocol" table.
+ * One entry per supported protocol.
+ */
+struct protent 
+{
+    unsigned short protocol;
+    VoidCallback *init;
+    ByteCallback *input;
+    VoidCallback *protrej;
+};
+
+struct protent prottbl[NUM_PROTOS];
+
+#ifdef __HIGHC__
+#pragma Code("CCONNECTCODE");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg CCONNECTCODE
+#endif
+
+
+/***********************************************************************
+ *	    	    	  BeginNetworkPhase
+ ***********************************************************************
+ * SYNOPSIS:	Authentication phase is done: enter network phase.
+ *		Network phase is when NCP configuration is allowed.
+ * CALLED BY:	chap_rresponse
+ *	    	chap_rsuccess
+ *	    	lcp_up
+ *	    	pap_rauth
+ *	    	pap_rauthack
+ * RETURN:	nothing
+ *
+ * STRATEGY:	If already in network phase, don't need to do anything.
+ *	    	Mark LCP in network phase.
+ *	    	send OPEN even to IPCP so it can initialize itself
+ *	    	Then tell IPCP that the lower layer (LCP) has come up.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 9/95		Initial Revision
+ *
+ ***********************************************************************/
+void BeginNetworkPhase (int u)
+{
+    if (lcp_wantoptions[u].lcp_flags & LF_IN_NETWORK_PHASE)
+	return;
+
+    lcp_wantoptions[u].lcp_flags |= LF_IN_NETWORK_PHASE;
+
+#ifdef USE_CCP
+    ccp_open(u);
+
+    if (active_compress)
+	ccp_lowerup(u);
+    else
+	/*
+	 * If no compression is configured, then we don't want to 
+	 * initiate CCP, but we would like to respond if our peer
+	 * sends us a CCP Configure-Request.  Sitting in the Stopped
+	 * state accomplishes that, but there's no easy way to get
+	 * there at startup, so...
+	 */
+	ccp_fsm[u].state = STOPPED;
+#endif	/* USE_CCP */
+
+    ipcp_open(u);
+    ipcp_lowerup(u);
+}
+
+
+/***********************************************************************
+ *				EndNetworkPhase
+ ***********************************************************************
+ * SYNOPSIS:	Leave network phase.  Only LCP packets are allowed at
+ *	    	this point.
+ * CALLED BY:	lcp_down
+ * RETURN:	nothing
+ *
+ * STRATEGY:	Mark LCP out of network phase.
+ *	    	Tell IPCP the lower layer has gone down.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 9/95		Initial Revision
+ *
+ ***********************************************************************/
+void EndNetworkPhase (int u)
+{
+    lcp_wantoptions[u].lcp_flags &= ~LF_IN_NETWORK_PHASE;
+    ipcp_lowerdown(u);
+
+#ifdef USE_CCP
+    ccp_lowerdown(u);
+#endif /* USE_CCP */
+
+}
+
+
+/***********************************************************************
+ *		GetInterfaceMTU
+ ***********************************************************************
+ * SYNOPSIS:	Get the MTU clients should be using.
+ * CALLED BY:	PPPGetInfo
+ * RETURN:	mtu 
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	8/20/96   	Initial Revision
+ *
+ ***********************************************************************/
+unsigned short
+GetInterfaceMTU (void)
+{
+    return (cf_mru);
+
+}	/* End of GetInterfaceMTU.	*/
+
+
+
+/***********************************************************************
+ *		SetInterfaceMTU
+ ***********************************************************************
+ * SYNOPSIS:	Set the MTU clients of PPP should be using.
+ * CALLED BY:	lcp_up
+ *	    	predictor1_initcomp
+ * RETURN:	nothing
+ *	
+ * STRATEGY:	Store the MRU in a global variable.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	8/20/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+SetInterfaceMTU (unsigned short m)
+{
+
+@ifdef LOGGING_ENABLED
+    LOG2(LOG_IF, (@setMtuLogString, m));
+@endif /* LOGGING_ENABLED */
+
+    cf_mru = m;
+
+}	/* End of SetInterfaceMTU.	*/
+
+
+
+/***********************************************************************
+ *				SetEscapeMap
+ ***********************************************************************
+ * SYNOPSIS:	Configure the escape and discard maps.
+ * CALLED BY:	lcp_lowerup
+ *	    	lcp_up
+ *	    	lcp_down
+ * RETURN:	nothing
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 9/95		Initial Revision
+ *
+ ***********************************************************************/
+void SetEscapeMap (int u,
+		   unsigned long rx,
+		   unsigned long tx)
+{
+    int i;
+    unsigned long a = rx | tx;
+    DOLOG(char map[LONG_STR_LEN];)
+
+    /*
+     * Clear the escape map, still escaping PPP_FLAG and PPP_ESCAPE.
+     */
+    for (i = 0; i < MAP_SIZE; ++i)
+	escape_map[i] = 0;
+
+    escape_map[PPP_FLAG_ESC_INDEX] |= PPP_FLAG_ESC_MASK;
+
+@ifdef LOGGING_ENABLED
+    if (debug >= LOG_IF) {
+	asyncmap_name(map, a);
+	LOG2(LOG_IF, (@setAsyncLogString, a, map));
+    }
+@endif /* LOGGING_ENABLED */
+
+    /*
+     * Make sure that the escaped value of each escaped character from
+     * 0 - 31 is not escaped so that we don't have any conflicts.
+     */
+    for (i = 0; i < 32; ++i) 
+	if (a & ((unsigned long)1 << i)) {
+	    escape_map[ MAP_INDEX(i) ] |= MAP_MASK(i);
+
+@ifdef LOGGING_ENABLED
+	    if (escape_map[MAP_INDEX(i ^ PPP_TRANS)] & 
+		MAP_MASK(i ^ PPP_TRANS)) {
+		asyncmap_name(map, (unsigned long)1 << i);
+		LOG2(LOG_BASE, (@notEscapingLogString, i, map, i ^ PPP_TRANS));
+	    }
+@endif /* LOGGING_ENABLED */
+
+	    /*
+ 	     * Unescape escaped value of the char to be escaped.
+	     */
+	    escape_map[ MAP_INDEX(i ^ PPP_TRANS) ] &= 
+		~(MAP_MASK(i ^ PPP_TRANS));
+	}
+
+    /*
+     * Any incoming character that should be escaped should be 
+     * discarded if received without escaping.
+     */
+    for (i = 0; i < 4; ++i)
+	discard_map[i] = (byte)((rx >> (8 * i)) & 0x00ff);
+
+    for (i = 4; i < MAP_SIZE; ++i)
+	discard_map[i] = 0;
+
+}
+
+
+/***********************************************************************
+ *				SetVJCompression
+ ***********************************************************************
+ * SYNOPSIS:	Configure VJ compression.
+ * CALLED BY:	ipcp_up
+ * RETURN:	nothing
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 9/95		Initial Revision
+ *
+ ***********************************************************************/
+void SetVJCompression (int unit,
+		       int rx_slots,
+		       int tx_slots,
+		       unsigned char cid)
+{
+
+    if (rx_slots) {
+	ppp_mode_flags |= SC_RX_VJ_COMP;
+@ifdef LOGGING_ENABLED
+	LOG2(LOG_IF, (@onRSlotsLogString, rx_slots));
+@endif /* LOGGING_ENABLED */
+    }
+    else {
+	ppp_mode_flags &= ~SC_RX_VJ_COMP;
+@ifdef LOGGING_ENABLED
+	LOG2(LOG_IF, (@offRSlotsLogString));
+@endif /* LOGGING_ENABLED */
+    }
+
+    if (tx_slots) {
+	ppp_mode_flags |= SC_TX_VJ_COMP;
+@ifdef LOGGING_ENABLED
+	LOG2(LOG_IF, (@onSSlotsLogString, tx_slots));
+@endif /* LOGGING_ENABLED */
+    }
+    else {
+	ppp_mode_flags &= ~SC_TX_VJ_COMP;
+@ifdef LOGGING_ENABLED
+	LOG2(LOG_IF, (@offSSlotsLogString));
+@endif /* LOGGING_ENABLED */
+    }
+
+    sl_compress_init(rx_slots, tx_slots, cid);
+}
+
+
+/***********************************************************************
+ *				SetACCompression
+ ***********************************************************************
+ * SYNOPSIS:	Configure Address and Protocol Compression.
+ * CALLED BY:	lcp_lowerup
+ *	    	lcp_up
+ *	    	lcp_down
+ * RETURN:	nothing
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 9/95		Initial Revision
+ *
+ ***********************************************************************/
+void SetACCompression (int u,
+		       word rx_accomp,
+		       word tx_accomp)
+{
+@ifdef LOGGING_ENABLED
+    LOG2(LOG_IF, (@setACCLogString, 
+		  rx_accomp 
+		 ? (tx_accomp ? "on" : "rcving on, sending off")
+		 : (tx_accomp ? "rcving off, sending on" : "off")));
+@endif /* LOGGING_ENABLED */
+
+    ppp_mode_flags &= ~(SC_RX_COMPAC | SC_TX_COMPAC);
+
+    if (rx_accomp)
+	ppp_mode_flags |= SC_RX_COMPAC;
+
+    if (tx_accomp)
+	ppp_mode_flags |= SC_TX_COMPAC;
+}
+
+
+/***********************************************************************
+ *				SetProtoCompression
+ ***********************************************************************
+ * SYNOPSIS:	Configure protocol compression.
+ * CALLED BY:	lcp_lowerup
+ *	    	lcp_up
+ *	    	lcp_down
+ * RETURN:	nothing
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 9/95		Initial Revision
+ *
+ ***********************************************************************/
+void SetProtoCompression (int u,
+		      int rx_pcomp,
+		      int tx_pcomp)
+{
+@ifdef LOGGING_ENABLED
+    LOG2(LOG_IF, (@setPCLogString,
+		 rx_pcomp
+		 ? (tx_pcomp ? "on" : "rcving on, sending off")
+		 : (tx_pcomp ? "rcving off, sending on" : "off")));
+@endif /* LOGGING_ENABLED */
+
+    ppp_mode_flags &= ~(SC_RX_COMPPROT | SC_TX_COMPPROT);
+
+    if (rx_pcomp)
+	ppp_mode_flags |= SC_RX_COMPPROT;
+
+    if (tx_pcomp)
+	ppp_mode_flags |= SC_TX_COMPPROT;
+}
+
+
+/***********************************************************************
+ *				SetIPAddrs
+ ***********************************************************************
+ * SYNOPSIS:	Set the IP address for the local and peer to use.  
+ *	    	Addresses should be in host format.
+ * CALLED BY:	PPPPassiveMode
+ *	    	PPPSetAccessIPAddr
+ *	    	PPPReset
+ * RETURN:	nothing
+ *
+ * STRATEGY:	Set the addresses and soft_ouraddr as specified.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/15/95		Initial Revision
+ *
+ ***********************************************************************/
+void SetIPAddrs (int unit,
+		 unsigned long ouraddr, 
+		 unsigned long heraddr, 
+		 unsigned char soft_ouraddr,   /* FALSE if addr MUST be used */
+		 unsigned char soft_heraddr)   /* FALSE if addr MUST be used */
+{
+    ipcp_wantoptions[unit].ipcp_neg |= IN_NEG_ADDRS;
+    ipcp_wantoptions[unit].ouraddr = 
+	ipcp_allowoptions[unit].ouraddr = ouraddr; 
+    ipcp_wantoptions[unit].heraddr = heraddr;
+    ipcp_wantoptions[unit].soft_ouraddr = soft_ouraddr;
+}
+
+
+/***********************************************************************
+ *		PPPSetAccessDNS
+ ***********************************************************************
+ * SYNOPSIS:	Set the negotiated DNS addresses for the access point.
+ * CALLED BY:	PPPOpenLink
+ * RETURN:	nothing
+ *	
+ * STRATEGY: 	If dns negotiated, store the info in the access point.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	9/21/95   	Initial Revision
+ *
+ ***********************************************************************/
+#ifdef DO_DBCS
+#undef sprintf
+#endif
+void
+PPPSetAccessDNS (int accpntID)
+{
+    TCHAR dnsAddr[16];	    	
+    if (ipcp_gotoptions[0].ipcp_neg & IN_MS_DNS1) {
+
+	if (ipcp_gotoptions[0].dns1) {
+	    sprintf(dnsAddr, _TEXT("%lu.%lu.%lu.%lu"), 
+		    BREAKDOWN_ADDR(ipcp_gotoptions[0].dns1));
+	    AccessPointSetStringProperty(accpntID,
+				 (char *)((dword)APSP_AUTOMATIC | APSP_DNS1),
+				 dnsAddr);
+	}
+
+	if (ipcp_gotoptions[0].ipcp_neg & IN_MS_DNS2 && 
+	    ipcp_gotoptions[0].dns2) {
+
+	    sprintf(dnsAddr, _TEXT("%lu.%lu.%lu.%lu"), 
+		    BREAKDOWN_ADDR(ipcp_gotoptions[0].dns2));
+	    AccessPointSetStringProperty(accpntID,
+				 (char *)((dword)APSP_AUTOMATIC | APSP_DNS2),
+				 dnsAddr);
+	}	
+
+    }
+
+}	/* End of PPPSetAccessDNS.	*/
+#ifdef DO_DBCS
+#define sprintf sprintfdbcs
+#endif
+
+
+/***********************************************************************
+ *		PPPSetDataCompression
+ ***********************************************************************
+ * SYNOPSIS:	Sets data compression setting.
+ * CALLED BY:	PPPReset
+ *		PPPSetDataCompress
+ * PASS:	True to use default settings as modified by ini
+ *		False to disable compression negotiation
+ * RETURN:	nothing
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/14/97   	Initial Revision
+ *
+ ***********************************************************************/
+void PPPSetDataCompression (Boolean doComp)
+{
+#ifdef USE_CCP
+
+    ccp_options *ao = &ccp_allowoptions[0];    
+    ccp_options *wo = &ccp_wantoptions[0];
+
+    if (doComp) {
+	/*
+	 * Reset to defaults.
+	 */
+	active_compress = default_active_comp;
+	ao -> ccp_neg = default_allowed_comp;
+	wo -> ccp_neg = default_want_comp;
+    }
+    else {
+	/*
+	 * Don't actively request CCP, and if peer sends us 
+	 * a CCP request, don't allow anything.  Receiving a 
+	 * CCP request starts up our CCP finite state machine,
+	 * but setting wantoptions to 0 will stop it.
+	 */
+	active_compress = FALSE;
+	ao -> ccp_neg = wo -> ccp_neg = 0;
+    }
+#endif /* USE_CCP */
+
+}	/* End of PPPSetDataCompression.	*/
+
+#ifdef __HIGHC__
+#pragma Code("CINITCODE");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg CINITCODE
+#endif
+
+
+/***********************************************************************
+ *				PPPSetup
+ ***********************************************************************
+ * SYNOPSIS:	Set up the PPP driver, initialize all protocols, open
+ *	    	log file, and whatever else is necessary to get PPP 
+ * 	    	ready for its work day.
+ * CALLED BY:	PPPInit
+ * RETURN:	non-zero if successful
+ *
+ * STRATEGY:	For each protocol in the table, initialize it
+ *	    	Process all configurable options
+ *	ifdef logging
+ *	    	Open log file
+ *	    	Write a header to the log file to mark start of session
+ *	    	log state is "off"   
+ *	endif
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 9/95		Initial Revision
+ *
+
+ ***********************************************************************/
+void PPPSetup ()
+{
+    int i;
+    int cnt = sizeof (prottbl) / sizeof (struct protent);
+
+    /*
+     * Initialize protocol entry table.  Order messed up so that common
+     * entries are set at the same time to reduce code size a bit, and so 
+     * protocols which require initialization follow those that don't.
+     * Every byte & cycle counts...
+     */
+    prottbl[0].protocol = IP;
+    prottbl[0].input = ppp_ip_input_vfptr;
+
+    prottbl[1].protocol = IP_VJ_COMP; 
+    prottbl[1].input = ip_vj_comp_input_vfptr; 
+
+    prottbl[2].protocol = IP_VJ_UNCOMP; 
+    prottbl[2].input = ip_vj_uncomp_input_vfptr; 
+
+    prottbl[3].protocol = LQM; 
+    prottbl[3].input = lqm_input_vfptr; 
+    prottbl[3].protrej = lqm_protrej_vfptr; 
+
+    prottbl[4].protocol = IPCP; 
+    prottbl[4].init = ipcp_init_vfptr;
+    prottbl[4].input = ipcp_input_vfptr; 
+
+    prottbl[0].protrej = prottbl[1].protrej = 
+	prottbl[2].protrej = prottbl[4].protrej = ipcp_protrej_vfptr; 
+
+    prottbl[5].protocol = LCP; 
+    prottbl[5].init = lcp_init_vfptr;
+    prottbl[5].input = lcp_input_vfptr; 
+    prottbl[5].protrej = lcp_protrej_vfptr; 
+
+    prottbl[6].protocol = PAP; 
+    prottbl[6].init = pap_init_vfptr;
+    prottbl[6].input = pap_input_vfptr; 
+    prottbl[6].protrej = pap_protrej_vfptr; 
+
+    prottbl[7].protocol = CHAP; 
+    prottbl[7].init = chap_init_vfptr;
+    prottbl[7].input = chap_input_vfptr; 
+    prottbl[7].protrej = chap_protrej_vfptr; 
+
+#ifdef USE_CCP
+    prottbl[8].protocol = CCP;
+    prottbl[8].init = ccp_init_vfptr;
+    prottbl[8].input = ccp_input_vfptr;
+
+    prottbl[9].protocol = COMPRESS;
+    prottbl[9].init = (VoidCallback *)NULL;
+    prottbl[9].input = compress_input_vfptr;
+
+    prottbl[8].protrej = prottbl[9].protrej = ccp_protrej_vfptr;
+
+#endif /* USE_CCP */
+
+    /*
+     * Initialize each of the protocols to the standard option set, 
+     * then configure them to the user's settings.  
+     *
+     * Optimization: Protocols are ordered with the first 4 requiring
+     * no initialization.  Only initialize the ones that need it.
+     *
+     * Added check for NULL init routine because COMPRESS needs it.
+     * 8/25/96 - jwu
+     */
+    for (i = 4; i < cnt; i++) {
+	if (prottbl[i].init != (VoidCallback *)NULL)
+	    ProcCallFixedOrMovable_pascal(0, prottbl[i].init);
+    }
+
+#ifdef CONFIG_ALLOWED
+    /*
+     * Configure options AFTER initializing defaults so we don't 
+     * override user preferences!
+     */
+    PPPConfigOptions();
+#endif 
+
+@ifdef LOGGING_ENABLED
+
+    current_state = "";
+    OpenLogFile();
+
+    if (logfile) {
+	FileWrite(logfile, "\r\n\r\n", 2, FALSE);
+	log2(@beginLogString);
+	log_state("off");
+    }
+
+@endif /* LOGGING_ENABLED */
+
+} 	/* End of PPPSetup */
+
+#ifdef __HIGHC__
+#pragma Code("CCONNECTCODE");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg CCONNECTCODE
+#endif
+
+
+/***********************************************************************
+ *		PPPReset
+ ***********************************************************************
+ * SYNOPSIS:	Reset frame_buffer, local IP address, username and
+ *	    	secret.  Only call from ppp thread!
+ * CALLED BY:	PPPOpenLink
+ *	    	PPPDetach 
+ * RETURN:	nothing
+ *	
+ * STRATEGY: 	Only free frame_buffer if being called by PPP thread
+ *	    	or else HugeLMem code will fatal error.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	7/18/95   	Initial Revision
+ *
+ ***********************************************************************/
+void
+PPPReset ()
+{
+    if (frame_buffer_optr) {
+	PACKET_FREE_UNLOCKED(frame_buffer_optr);
+	frame_buffer_optr = NullOptr;
+	ppp_mode_flags = SC_FLUSH;
+    }
+	
+    PPPFreeBlock(sc_comp);
+    sc_comp = 0;
+
+    /*
+     * PAP and CHAP both store the same blocks for the username and
+     * password/secret so it only has to be freed in one place.
+     */
+    PPPFreeBlock(pap[0].us_user);
+    PPPFreeBlock(pap[0].us_passwd);
+    PPPFreeBlock(pap[0].us_peerid);
+
+    pap[0].us_user = pap[0].us_passwd = pap[0].us_peerid = 
+	pap[0].us_userlen = pap[0].us_passwdlen = pap[0].us_peeridlen = 
+	chap[0].us_myname = chap[0].us_secret = 
+        chap[0].us_mynamelen = chap[0].us_secretlen = 0;
+
+    DOLOG(PPPFreeBlock(chap[0].us_hername);)
+    DOLOG(chap[0].us_hername = chap[0].us_hernamelen = 0;)
+
+    /*
+     * Only reset IP addresses if we are not the server.
+     */
+    if (! passive_waiting) 
+	SetIPAddrs(0, 0L, 0L, TRUE, TRUE);
+
+#ifdef USE_CCP
+    /*
+     * Reset data compression settings to default.
+     */
+    PPPSetDataCompression(TRUE);
+
+#endif /* USE_CCP */
+
+}	/* End of PPPReset.	*/
+
+#ifdef __HIGHC__
+#pragma Code("CINITCODE");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg CINITCODE
+#endif
+
+
+/***********************************************************************
+ *				PPPShutdown
+ ***********************************************************************
+ * SYNOPSIS:	Free any memory used by driver.  Close log file.
+ * CALLED BY:	PPPExit
+ * PASS:    	dirty = non-zero if dirty shutdown
+ * RETURN:	nothing
+ * STRATEGY:	Close the log file.
+ *	    	Driver is exiting so no need to reset variables to zeros.
+ *	    	Only close device if not a dirty shutdown.  Otherwise, 
+ *	    	modem driver may already have exited and we'll die horribly.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 9/95		Initial Revision
+ *
+ ***********************************************************************/
+void PPPShutdown (word dirty)
+{
+@ifdef LOGGING_ENABLED
+    if (logfile) {
+	if (!dirty)
+	    log2(@endLogString);
+    	FileClose(logfile, FALSE);
+    }
+@endif /* LOGGING_ENABLED */
+
+    /*
+     * Close any open device unless we're doing a dirty shutdown.
+     */
+    if (!dirty) 
+	PPPDeviceClose();
+
+}  /* End of PPPShutdown */
+
+#ifdef __HIGHC__
+#pragma Code("CCONNECTCODE");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg CCONNECTCODE
+#endif
+
+
+/***********************************************************************
+ *		PPPCallTerminated
+ ***********************************************************************
+ * SYNOPSIS:	Store NO CARRIER error and bring down the link.
+ * CALLED BY:	PPPECINotification  (Responder only)
+ * PASS:    	unit
+ * RETURN:	nothing
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu 	5/ 2/96   	Initial Revision
+ *
+ ***********************************************************************/
+void
+PPPCallTerminated (int unit)
+{
+    link_error = SSDE_NO_CARRIER | SDE_CONNECTION_RESET;
+    lcp_lowerdown(unit);
+    
+}	/* End of PPPCallTerminated.	*/
+
+#ifdef __HIGHC__
+#pragma Code("PPPCODE");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg PPPCODE
+#endif
+
+
+/***********************************************************************
+ *				PPPInput
+ ***********************************************************************
+ * SYNOPSIS:	Deliver input packet (after PPP frame processing) to
+ *	    	correct protocol.
+ * CALLED BY:	PPPProcessInput
+ *	    	compress_input
+ * RETURN:	non-zero if packet affects idle time
+ *
+ * STRATEGY:	If packet exceeds maximum negotiated MRU, drop it.
+ *	    	Pass to proper protocol input routine.
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 9/95		Initial Revision
+ *
+ ***********************************************************************/
+byte PPPInput (unsigned short protocol,
+	       PACKET *buffer,	    	    /* input frame */
+	       int len)	    	    	    /* frame length */
+{
+    int i;
+    int cnt = sizeof (prottbl) / sizeof (struct protent);
+    unsigned short max = cf_mru;
+
+    if (max < DEFMRU)
+	max = DEFMRU;
+
+    if (len > max) {
+@ifdef LOGGING_ENABLED
+	LOG2(LOG_DIAL, (@tooLongLogString));
+@endif /* LOGGING_ENABLED */
+        if (len > max + MRU_MARGIN_OF_ERROR) {
+	    /*
+	     * Give some margin of error for the server because
+	     * some naughty servers will send a packet which 
+	     * expanded during the compression phase even if the
+	     * expanded size exceeds the negotiated MRU.  Let's
+	     * just log the error and still process the packet
+	     * unless it grossly exceeds the negotiated MRU.
+	     */
+	    ++lqm[0].ifInErrors;
+	    PACKET_FREE(buffer);
+	    return(1);
+	}
+@ifdef LOGGING_ENABLED
+        else LOG2(LOG_DIAL, (@usingLongPacketLogString));
+@endif
+    }
+
+    /*
+     * Upcall the proper protocol input routine.
+     */
+    for (i = 0; i < cnt; i++)
+	if (prottbl[i].protocol == protocol)
+	    return (ProcCallFixedOrMovable_pascal(0, buffer, len, 
+						  prottbl[i].input));
+@ifdef LOGGING_ENABLED
+    LOG2(LOG_DIAL, (@unknownProtoLogString, protocol));
+@endif /* LOGGING_ENABLED */
+    lcp_sprotrej(0, buffer, len);
+    return(1);
+}
+
+#ifdef __HIGHC__
+#pragma Code("CCONNECTCODE");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg CCONNECTCODE
+#endif
+
+
+/***********************************************************************
+ *				demuxprotrej
+ ***********************************************************************
+ * SYNOPSIS:	Demultiplex a Protocol-Reject packet.
+ * CALLED BY:	fsm_input
+ * RETURN:	nothing
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 9/95		Initial Revision
+ *
+ ***********************************************************************/
+void demuxprotrej (int unit,
+		  unsigned short protocol)
+{
+    int i;
+    int cnt = sizeof (prottbl) / sizeof (struct protent);
+
+    for (i = 0; i < cnt; i++)
+	if (prottbl[i].protocol == protocol) {
+	    ProcCallFixedOrMovable_pascal(unit, prottbl[i].protrej);
+	    return;
+	}
+
+@ifdef LOGGING_ENABLED
+    LOG2(LOG_DIAL, (@protoRejLogString, protocol));
+@endif /* LOGGING_ENABLED */
+
+}
+
+#ifdef __HIGHC__
+#pragma Code("COMMONCODE");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg COMMONCODE
+#endif
+
+
+/***********************************************************************
+ *		PPPHandleTimeout
+ ***********************************************************************
+ * SYNOPSIS:	Adjust every PPP timer.
+ * CALLED BY:	PPPTimeout
+ * RETURN:	nothing
+ *	
+ * STRATEGY:	Timers are only decremented if non-zero.
+ *	    	Timer:	    	    	If timeout:
+ *	    	----------  	    	-------------
+ *	    	lcp_fsm[0].timer    	call fsm_timeout(&lcp_fsm[0])
+ *	    	ipcp_fsm[0].timer   	call fsm_timeout(&ipcp_fsm[0])
+ *	    	idle_time   	    	call lcp_close(0), reset idle time
+ *	    	lqm[0].timer	    	call lqm_send_lqr or lqm_send_echo
+ *	    	    	    	    	    depending on lq.running mode
+ *	    	pap[0].timer   	    	call pap_timeout
+ *	    	chap[0].client_timer   	call chap_clienttimeout
+ *	    	chap[0].server_timer   	call chap_servertimeout
+ *	    	chap[0].rechap_timer   	call chap_authpeer
+ *	    	
+ *	    	ccp_fsm[0].timer    	call fsm_timeout(&ccp_fsm[0])
+ *	    	    	    	    	if resetting, call ccp_resettimeout(0);
+ *
+ *	if logging enabled
+ *	    	rate_timer  	    	call time_rates(), reset rate_timer 
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/16/95   	Initial Revision
+ *
+ ***********************************************************************/
+void PPPHandleTimeout (void)
+{
+     /*
+      * LCP timer.
+      */
+    if (lcp_fsm[0].timer && (--lcp_fsm[0].timer == 0)) 
+	fsm_timeout(&lcp_fsm[0]);
+	    
+     /* 
+      * IPCP timer.
+      */
+    if (ipcp_fsm[0].timer && (--ipcp_fsm[0].timer == 0))
+	fsm_timeout(&ipcp_fsm[0]);
+
+     /*
+      * Idle timer.
+      */
+    if (idle_time && (--idle_time == 0)) {
+	/*
+	 * Timeout.  Close LCP and reset idle timer.
+	 */
+	link_error = SSDE_IDLE_TIMEOUT | SDE_CONNECTION_TIMEOUT;
+	lcp_close(0);   	    	
+	idle_time = idle_timeout;
+    }
+@ifdef LOGGING_ENABLED
+    else if (idle_time & 1)
+	log_idle (1);
+@endif /* LOGGING_ENABLED */
+
+
+     /*
+      * LQM timer.
+      */
+    if (lqm[0].timer && (--lqm[0].timer == 0)) {
+	if (lqm[0].running == LQ_LQR) 
+	    lqm_send_lqr(&lqm[0]);
+	else {
+	    EC_ERROR_IF(lqm[0].running != LQ_ECHO, -1);    
+	    lqm_send_echo(&lqm[0]);
+	}
+    }
+
+     /*
+      * PAP timer.
+      */
+    if (pap[0].timer && (--pap[0].timer == 0)) 
+	pap_timeout(&pap[0]);
+
+     /*
+      * CHAP timers.
+      */
+    if (chap[0].client_timer && (--chap[0].client_timer == 0))
+	chap_clienttimeout(&chap[0]);
+
+    if (chap[0].server_timer && (--chap[0].server_timer == 0))
+	chap_servertimeout(&chap[0]);
+
+    if (chap[0].rechap_timer && (--chap[0].rechap_timer == 0))
+	chap_authpeer(0);
+
+#ifdef USE_CCP
+    if (ccp_fsm[0].timer && (--ccp_fsm[0].timer == 0)) {
+	if (ccp[0].ccp_resetting)
+	    ccp_resettimeout(0);
+	else
+	    fsm_timeout(&ccp_fsm[0]);
+    }
+#endif /* USE_CCP */
+
+@ifdef LOGGING_ENABLED
+     /*
+      * Rate timer.
+      */
+    if (rate_timer && (--rate_timer == 0)) {
+	time_rates();
+	rate_timer = RATE_TIMEOUT;
+    }
+@endif /* LOGGING_ENABLED */
+
+}	/* End of PPPHandleTimeout.	*/
+
+
+@ifdef CONFIG_ALLOWED
+
+/*---------------------------------------------------------------------
+ *	    Code for configuring PPP options
+ --------------------------------------------------------------------*/
+/*
+ * INI key strings.
+ */
+@start Strings, data;
+@chunk char pppString[] = {'p','p','p',0};
+    @localize not;
+@chunk char mruString[] = {'m','r','u',0};
+    @localize not;
+@chunk char maxFrameString[] = {'m','a','x','F','r','a','m','e',0};
+    @localize not;
+@chunk char asyncmapString[] = {'a','s','y','n','c','m','a','p',0};
+    @localize not;
+@chunk char accmhiString[] = {'a','c','c','m','_','h','i',0};
+    @localize not;
+@chunk char accmloString[] = {'a','c','c','m','_','l','o',0};
+    @localize not;
+@chunk char magicString[] = {'m','a','g','i','c',0};
+    @localize not;
+@chunk char pcompString[] = {'p','c','o','m','p',0};
+    @localize not;
+@chunk char accompString[] = {'a','c','c','o','m','p',0};
+    @localize not;
+@chunk char lqmString[] = {'l','q','m',0};
+    @localize not;
+@chunk char lqrintervalString[] = {'l','q','r','i','n','t','e','r','v','a','l',0};
+    @localize not;
+@chunk char lqrkString[] = {'l','q','r','_','k',0};
+    @localize not;
+@chunk char lqrnString[] = {'l','q','r','_','n',0};
+    @localize not;
+@chunk char echoLqmString[] = {'e','c','h','o','l','q','m',0};
+    @localize not;
+@chunk char reqChapString[] = {'r','e','q','u','i','r','e','C','h','a','p',0};
+    @localize not;
+@chunk char reqAuthString[] = {'r','e','q','u','i','r','e','A','u','t','h',0};
+    @localize not;
+@chunk char papString[] = {'p','a','p',0};
+    @localize not;
+@chunk char chapString[] = {'c','h','a','p',0};
+    @localize not;
+@chunk char rechapString[] = {'r','e','c','h','a','p',0};
+    @localize not;
+@chunk char vjcompString[] = {'v','j','c','o','m','p',0};
+    @localize not;
+@chunk char vjslotsString[] = {'v','j','s','l','o','t','s',0};
+    @localize not;
+@chunk char vjcidString[] = {'v','j','c','i','d',0};
+    @localize not;
+@chunk char timeoutString[] = {'t','i','m','e','o','u','t',0};
+    @localize not;
+@chunk char maxIdleString[] = {'m','a','x','I','d','l','e',0};
+    @localize not;
+@chunk char maxConfigString[] = {'m','a','x','C','o','n','f','i','g','u','r','e',0};
+    @localize not;
+@chunk char maxTermString[] = {'m','a','x','T','e','r','m','i','n','a','t','e',0};
+    @localize not;
+@chunk char maxFailString[] = {'m','a','x','F','a','i','l','u','r','e',0};
+    @localize not;
+@chunk char dnsString[] = {'d','n','s',0};
+    @localize not;
+@chunk char servicesString[] = {'s','e','r','v','i','c','e','s',0};
+    @localize not;
+@chunk char autodisconnectString[] = {'a','u','t','o','d','i','s','c','o','n','n','e','c','t',0};
+    @localize not;
+
+@ifdef USE_CCP
+@chunk char decompString[] = {'d','e','c','o','m','p','O','n','l','y',0};
+    @localize not;
+@chunk char compString[] = {'c','o','m','p','e','s','s',0};
+    @localize not;
+
+@ifdef PRED_1
+@chunk char pred1String[] = {'p','r','e','d','i','c','t','o','r',0};
+    @localize not;
+@endif /* PRED_1 */
+
+@ifdef STAC_LZS
+@chunk char stacString[] = {'s','t','a','c',0};
+    @localize not;
+@chunk char perfModeString[] = {'s','t','a','c','M','o','d','e',0};
+    @localize not;
+@chunk char perfString[] = {'s','t','a','c','P','r','e','f',0};
+    @localize not;
+@chunk char stacCheckString[] = {'s','t','a','c','C','h','e','c','k','M','o','d','e',0};
+    @localize not;
+@endif /* STAC_LZS */
+
+@ifdef MPPC
+@chunk char mppcString[] = {'m','p','p','c',0};
+    @localize not;
+@endif /* MPPC */
+
+@endif /* USE_CCP */
+
+@ifdef LOGGING_ENABLED
+@chunk char debugString[] = {'d','e','b','u','g',0};
+    @localize not;
+@endif /* LOGGING_ENABLED */
+
+@chunk char mtuString[] = {'m','t','u',0};
+    @localize not;
+
+@end Strings;
+
+#ifdef __HIGHC__
+#pragma Code("CONFIGCODE");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg CONFIGCODE
+#endif
+
+@ifdef USE_CCP
+
+
+/***********************************************************************
+ *		PPPConfigDataCompression
+ ***********************************************************************
+ * SYNOPSIS:	Configure PPP data compression.
+ * CALLED BY:	PPPConfigOptions
+ * PASS:    	category string for PPP (Strings resource already locked)
+ * RETURN:	nothing
+ *	
+ * STRATEGY:
+ *	If not doing any compression, disable and return
+ *	Set direction of compression.
+ * 	Customize which compression types to offer, allow, & prefer
+ *
+ * NOTES:
+ *	The default behaviour is to do compression in both directions 
+ *	of the link only when initiated by the peer.  All compression 
+ *	algorithms are	allowed. 
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	8/26/96   	Initial Revision
+ *
+ ***********************************************************************/
+void PPPConfigDataCompression (char *category)
+{
+    Boolean bool = TRUE;
+    word value;
+    ccp_options *wo = &ccp_wantoptions[0];
+    ccp_options *ao = &ccp_allowoptions[0];
+
+    /*
+     * Should PPP negotiate data compression actively or not at all?
+     * Default is negotiate CCP when initiated by peer.
+     */
+    if (! InitFileReadBoolean(category, LMemDeref(@compString), &bool)) {
+	if (bool) {
+	    /*
+	     * PPP is initiating CCP.
+	     */
+	    active_compress = TRUE;
+	}
+	else {
+	    /*
+	     * Disable PPP data compression entirely.
+	     */
+	    wo -> ccp_comp_type = wo -> ccp_neg = ao -> ccp_neg = 0;
+	    return;
+	}
+    }
+
+    /*
+     * The config options indicate what the sender is able to 
+     * decompress.  If only doing decompression, do not allow any 
+     * options from the peer.
+     */
+    if (! InitFileReadBoolean(category, LMemDeref(@decompString), &bool) 
+	&& bool == TRUE) {
+	ao -> ccp_neg = 0;
+    }
+
+@ifdef PRED_1
+    if (! InitFileReadInteger(category, LMemDeref(@pred1String), &value)) {
+	if (value) {
+	    /*
+	     * Prefer predictor1, but allow (& offer) all compression types
+	     * for negotiation. 
+	     */
+	    wo -> ccp_comp_type = COMPRESS_PRED1;
+	} 
+	else {
+	    /*
+	     * Never use Predictor-1 compression.
+	     */
+	    wo -> ccp_comp_type &= ~COMPRESS_PRED1;
+	    wo -> ccp_neg &= ~COMPRESS_PRED1;
+	    ao -> ccp_neg &= ~COMPRESS_PRED1;
+	}
+    }
+@endif /* PRED_1 */
+
+@ifdef STAC_LZS
+    if (! InitFileReadInteger(category, LMemDeref(@stacString), &value)) {
+	if (value) {
+	    /*
+	     * Prefer Stac LZS, but allow (& offer) all compression types 
+	     * for negotiation. 
+	     */
+	    wo -> ccp_comp_type = COMPRESS_STAC;
+	}
+	else {
+	    /*
+	     * Never use Stac LZS compression.
+	     */
+	    wo -> ccp_comp_type &= ~COMPRESS_STAC;
+	    wo -> ccp_neg &= ~COMPRESS_STAC;
+	    ao -> ccp_neg &= ~COMPRESS_STAC;
+	}
+    }
+    
+    /*
+     * Set performance parameters.  Smaller equals faster.
+     */
+    if (! InitFileReadInteger(category, LMemDeref(@perfModeString), &value)) {
+	if (value <= 2) 
+	    perf_mode = value << 3;
+    }
+
+    if (! InitFileReadInteger(category, LMemDeref(@perfString), &value)) {
+	if (value <= 255)
+	    perf = value;
+    }
+
+    /*
+     * Set stac check mode to request from peer.  If ini setting
+     * is invalid, ignore it.
+     */
+    if (! InitFileReadInteger(category, LMemDeref(@stacCheckString),
+			      &value)) {
+	if (value && value <= STAC_CHECK_EXTENDED) {
+	    wo -> ccp_stac_check_mode = value;
+	}
+    }
+
+@endif /* STAC_LZS */
+
+@ifdef MPPC
+     if (! InitFileReadInteger(category, LMemDeref(@mppcString), &value)) {
+	 if (value) {
+	     /*
+	      * Prefer MPPC, but allow (& offer) all compression types
+	      * for negotiation.
+	      */
+	     wo -> ccp_comp_type = COMPRESS_MPPC;
+	 }
+	 else {
+	     /*
+	      * Never use MPPC compression.
+	      */
+	     wo -> ccp_comp_type &= ~COMPRESS_MPPC;
+	     wo -> ccp_neg &= ~COMPRESS_MPPC;
+	     ao -> ccp_neg &= ~COMPRESS_MPPC;
+	 }
+     }
+
+@endif /* MPPC */
+
+    /*
+     * If user has ruled out the default compression type,
+     * select another.
+     */
+    if (wo -> ccp_comp_type == 0)
+	ccp_select_comp_type(wo);
+
+    /* 
+     * Save defaults for compression.
+     */
+    default_active_comp = active_compress;
+    default_allowed_comp = ao -> ccp_neg;
+    default_want_comp = wo -> ccp_neg;
+
+}	/* End of PPPConfigDataCompression.	*/
+
+@endif /* USE_CCP */
+
+
+/***********************************************************************
+ *				PPPConfigOptions
+ ***********************************************************************
+ * SYNOPSIS:	Configure PPP based on settings in the INI file.  The
+ *	    	defaults have already been initialized.
+ *
+ *	    	LCP defaults:
+ *	    	    want mru, asyncmap, magic, lqm, pcompression, accompression
+ *	    	    allow mru, asyncmap, magic, lqm, pcompression, 
+ *	    	    	accompression, pap, chap, authenticate
+ *	    	    async map = ctrl-s and ctrl-q
+ *	    	    echo lqm
+ *	    	    lqm threshold (k/n) = 1/5
+ *	    	    lqr interval = 10 seconds
+ *	    	    
+ *	    	IPCP defaults:
+ *	    	    want to negotiate address and vj compression
+ *	    	    allow negotiation of address and vj compression
+ *	    	    compress id
+ *
+ * CALLED BY:	PPPSetup	
+ * RETURN:	nothing
+ *
+ * STRATEGY:   	Only process settings that alter the defaults.
+ *
+ * REVISION HISTORY: 
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/15/95		Initial Revision
+ *
+ ***********************************************************************/
+void PPPConfigOptions (void)
+{
+    char *category;
+    Boolean bool = TRUE;
+    word value, value2;
+    WordFlags disableLcp = 0;	    /* options to disable */
+
+    MemLock(OptrToHandle(@pppString));
+    category = (char *)LMemDeref(@pppString);
+
+     /*
+      * MRU configuration.
+      */
+    if (! InitFileReadBoolean(category, LMemDeref(@mruString), &bool) 
+	&& bool == FALSE) 
+	/*
+	 * Disable MRU negotiation.
+	 */
+	disableLcp |= CI_N_MRU;
+    else 	
+	/*
+ 	 * Not disabling.  Use suggested maximum value if it is valid.
+	 */
+	if (! InitFileReadInteger(category, LMemDeref(@maxFrameString), &value)
+	    && value >= MINMRU && value <= MAXMRU) 
+	    lcp_wantoptions[0].mru = value;
+
+     /*
+      * Async map configuration.
+      */
+    if (! InitFileReadBoolean(category, LMemDeref(@asyncmapString), &bool) 
+	&& bool == FALSE) 
+	/*
+	 * Disable async map negotiation.
+	 */
+	disableLcp |= CI_N_ASYNCMAP;
+    else 
+	/*
+	 * Use map suggested by user.  Have to read hi and low words
+	 * separately.
+	 */
+	if (! InitFileReadInteger(category, LMemDeref(@accmhiString), 
+				  &value) &&
+	    ! InitFileReadInteger(category, LMemDeref(@accmloString),
+				  &value2)) 
+	    lcp_wantoptions[0].asyncmap = value << 16 | value2;
+
+     /*
+      * Magic number configuration.
+      */
+    if (! InitFileReadBoolean(category, LMemDeref(@magicString), &bool)
+	&& bool == FALSE) 
+	disableLcp |= CI_N_MAGICNUMBER;
+
+     /*
+      * Protocol Compression configuration.  
+      */
+    if (! InitFileReadBoolean(category, LMemDeref(@pcompString), &bool)
+	&& bool == FALSE)
+	disableLcp |= CI_N_PCOMPRESSION;
+
+     /*
+      * Address and Control Compression configuration.
+      */
+    if (! InitFileReadBoolean(category, LMemDeref(@accompString), &bool)
+	&& bool == FALSE)
+	disableLcp |= CI_N_ACCOMPRESSION;
+
+     /*
+      * LQM configuration.
+      */
+    if (! InitFileReadBoolean(category, LMemDeref(@echoLqmString), &bool)
+	&& bool == TRUE) {
+	 /*
+	  * Use LCP echo requests instead of LQR.  
+	  */
+	disableLcp |= CI_N_LQM;
+    }
+    else if (! InitFileReadBoolean(category, LMemDeref(@lqmString), &bool)
+	&& bool == FALSE) {
+	 /*
+	  * Don't do any link quality monitoring.
+	  */
+	disableLcp |= CI_N_LQM;
+	lcp_wantoptions[0].lcp_flags &= ~LF_ECHO_LQM;
+	lcp_wantoptions[0].lqm_k = 0;
+	lcp_wantoptions[0].lqm_n = 0;
+    }
+
+    if (lcp_wantoptions[0].lcp_flags & LF_ECHO_LQM) {
+	/*
+	 * Use LQM settings suggested by user for interval, and
+	 * threshold for determing link quality (k/n).  Interval is in
+	 * hundredths of a second.  These apply for LQM using LQR packets
+	 * as well as using LCP echo requests.
+	 */
+	if (! InitFileReadInteger(category, LMemDeref(@lqrintervalString),
+				  &value))
+	    lcp_wantoptions[0].lqrinterval = value * 100;
+
+	if (! InitFileReadInteger(category, LMemDeref(@lqrkString), &value) &&
+	    ! InitFileReadInteger(category, LMemDeref(@lqrnString), &value2) &&
+	    value2 >= value) {
+	    lcp_wantoptions[0].lqm_k = value;
+	    lcp_wantoptions[0].lqm_n = value2;
+	}
+    }
+
+     /*
+      * Disable requested LCP options.
+      */
+    lcp_wantoptions[0].lcp_neg &= ~disableLcp;
+    lcp_allowoptions[0].lcp_neg &= ~disableLcp;
+
+     /*
+      * Authentication configuration.  
+      */
+    if (! InitFileReadBoolean(category, LMemDeref(@reqChapString), &bool)
+	&& bool == TRUE) {
+	/*
+	 * Require authentication with CHAP.
+	 */
+	lcp_wantoptions[0].lcp_neg |= (CI_N_CHAP | CI_N_AUTHTYPE);
+	lcp_wantoptions[0].auth_prot = CHAP;
+	lcp_allowoptions[0].lcp_neg &= ~CI_N_PAP;
+    }
+    else if (! InitFileReadBoolean(category, LMemDeref(@reqAuthString), &bool)
+	&& bool == TRUE) {
+	/*
+	 * Require CHAP or PAP authentication, trying CHAP first.
+	 */
+	lcp_wantoptions[0].lcp_neg |= (CI_N_PAP | CI_N_CHAP | CI_N_AUTHTYPE);
+	lcp_wantoptions[0].auth_prot = CHAP;
+    }
+    else {
+	/*
+	 * Allow PAP and/or CHAP negotiation to be disabled.
+	 */
+	if (! InitFileReadBoolean(category, LMemDeref(@papString), &bool)
+	    && bool == FALSE)
+	    lcp_allowoptions[0].lcp_neg &= ~CI_N_PAP;
+	if (! InitFileReadBoolean(category, LMemDeref(@chapString), &bool)
+	    && bool == FALSE)
+	    lcp_allowoptions[0].lcp_neg &= ~CI_N_CHAP;
+    }
+
+     /*
+      * If negotiating CHAP, get the reauthentication interval.  Remember
+      * it needs to be measured in half seconds.
+      */
+    if (lcp_wantoptions[0].lcp_neg & CI_N_CHAP) 
+	if (! InitFileReadInteger(category, LMemDeref(@rechapString), &value))
+	    chap[0].us_rechap_period = value * INTERVALS_PER_SEC; 
+
+     /*
+      * VJ Compression configuration.
+      */
+    if (! InitFileReadBoolean(category, LMemDeref(@vjcompString), &bool)
+	&& bool == FALSE) {
+	ipcp_wantoptions[0].ipcp_neg &= ~IN_NEG_VJ;
+	ipcp_allowoptions[0].ipcp_neg &= ~IN_NEG_VJ;
+    }
+    else {
+	/*
+	 * Configure number of slots and compression of slot ID.
+	 */
+	if (! InitFileReadInteger(category, LMemDeref(@vjslotsString), &value)
+	    && value >= MIN_VJ_SLOTS && value <= MAX_VJ_SLOTS) 
+	    ipcp_wantoptions[0].vj_maxslot = value - 1;
+	    
+	if (! InitFileReadBoolean(category, LMemDeref(@vjcidString), &bool)
+	    && bool == FALSE)
+	    ipcp_wantoptions[0].vj_cid = 0;
+    }
+
+    /*
+     * MS-IPCP DNS extensions.
+     */
+    if (! InitFileReadBoolean(category, LMemDeref(@dnsString), &bool)
+	&& bool == TRUE) {
+	ipcp_wantoptions[0].ipcp_neg |= (IN_MS_DNS1 | IN_MS_DNS2);
+	ipcp_allowoptions[0].ipcp_neg |= (IN_MS_DNS1 | IN_MS_DNS2);
+    }
+
+
+@ifdef USE_CCP
+    PPPConfigDataCompression(category);
+@endif /* USE_CCP */
+
+
+@ifdef LOGGING_ENABLED
+     /*
+      * Set debugging level.
+      */
+    InitFileReadInteger(category , LMemDeref(@debugString), (word *)&debug);
+@endif /* LOGGING_ENABLED */
+
+     /*
+      * Set MTU from init file.
+      */
+     if (! InitFileReadInteger(category, LMemDeref(@mtuString), &value)) {
+	 if ((MINMRU <= value) && (value <= MAXMRU)) {
+	     cf_mru = value;
+	 }
+     }
+
+     /*
+      * Allow user to configure the timeout for protocols, idle time,
+      * max configure, max terminate, max failures.
+      */
+
+    if (! InitFileReadInteger(category, LMemDeref(@timeoutString), &value)) 
+	lcp_fsm[0].timeouttime = ipcp_fsm[0].timeouttime = 
+	    pap[0].us_timeouttime = chap[0].us_timeouttime = 
+	        value * INTERVALS_PER_SEC;
+       
+    if (! InitFileReadInteger(category, LMemDeref(@maxConfigString), &value))
+	lcp_fsm[0].max_configure = ipcp_fsm[0].max_configure = value;
+
+    if (! InitFileReadInteger(category, LMemDeref(@maxTermString), &value))
+	lcp_fsm[0].max_terminate = ipcp_fsm[0].max_terminate = value;
+
+    if (! InitFileReadInteger(category, LMemDeref(@maxFailString), &value))
+	lcp_fsm[0].max_failure = ipcp_fsm[0].max_failure = value;
+
+    MemUnlock(OptrToHandle(@pppString));
+}
+
+@endif /* CONFIG_ALLOWED */
+
+#ifdef __HIGHC__
+#pragma Code("CCONNECTCODE");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg CCONNECTCODE
+#endif
+
+
+/***********************************************************************
+ *		PPPSetIdleTimeout
+ ***********************************************************************
+ * SYNOPSIS:	Set the max idle timeout based on ini settings.  This is
+ *		done for each connection in case user alters the settings
+ *		between connections.
+ * CALLED BY:	PPPBeginNegotiations
+ * RETURN:	nothing
+ *	
+ * STRATEGY:	Services app can override PPP's settings so read that
+ *		first from ini.  Services autodisconnect time is 
+ *		specified in minutes.  If no autodisconnect timeout
+ *		is set, then use PPP's maxIdle setting.
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	4/28/98   	Initial Revision
+ *
+ ***********************************************************************/
+void PPPSetIdleTimeout (void)
+{
+
+    char *category;
+    word value;
+
+    MemLock(OptrToHandle(@pppString));
+    category = (char *)LMemDeref(@pppString);
+
+    if (! InitFileReadInteger(LMemDeref(@servicesString),
+			      LMemDeref(@autodisconnectString),
+			      &value)) {
+	idle_timeout = value * 60 * INTERVALS_PER_SEC;
+    }
+    else if (! InitFileReadInteger(category, LMemDeref(@maxIdleString), 
+				   &value)) {
+	    idle_timeout = value * INTERVALS_PER_SEC;
+    }
+
+    MemUnlock(OptrToHandle(@pppString));
+
+}	/* End of PPPSetIdleTimeout.	*/
+
+
+
+/***********************************************************************
+ *				GetLocalIPAddr
+ ***********************************************************************
+ * SYNOPSIS:	Get the local IP address.  Address will be in host 
+ *	    	format.
+ *
+ * CALLED BY:	PPPGetInfo
+ *	    	PPPGetIPClient
+ *	    	PPPLinkOpened
+ * RETURN:	address or 0 if none yet
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/17/95		Initial Revision
+ *
+ ***********************************************************************/
+unsigned long GetLocalIPAddr ()
+{
+    ipcp_options *go = &ipcp_gotoptions[0];
+    
+    if (ipcp_fsm[0].state == OPENED && go -> ipcp_neg & IN_NEG_ADDRS)
+	return (go -> ouraddr);
+    else
+	return (0L);
+}
+
+
+
+/***********************************************************************
+ *		PPPSetUsername
+ ***********************************************************************
+ * SYNOPSIS:	Set the username used by the authentication protocols.
+ * CALLED BY:	PPPSetAccessUsername
+ * RETURN:	nothing
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/22/95   	Initial Revision
+ *
+ ***********************************************************************/
+void
+PPPSetUsername (int unit, Handle name, int len)
+{
+
+    /*
+     * PAP and CHAP both store the same block for the username
+     * so it only has to be freed in one place.
+     */
+    PPPFreeBlock(pap[unit].us_user);
+
+    pap[unit].us_user = chap[unit].us_myname = name;
+    pap[unit].us_userlen = chap[unit].us_mynamelen = len;
+
+}	/* End of PPPSetUsername.	*/
+
+
+/***********************************************************************
+ *		PPPSetSecret
+ ***********************************************************************
+ * SYNOPSIS:	Set the secret used by the authentication protocols.
+ * CALLED BY:	PPPSetAccessSecret
+ * RETURN:	nothing
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/22/95   	Initial Revision
+ *
+ ***********************************************************************/
+void
+PPPSetSecret (int unit, Handle secret, int len)
+{
+    /*
+     * PAP and CHAP both store the same block for the secret 
+     * so it only has to be freed in one place.
+     */
+    PPPFreeBlock(pap[unit].us_passwd);
+
+    pap[unit].us_passwd = chap[unit].us_secret = secret;
+    pap[unit].us_passwdlen = chap[unit].us_secretlen = len;
+
+}	/* End of PPPSetSecret.	*/
+
+
+/***********************************************************************
+ *		PPPPassiveMode
+ ***********************************************************************
+ * SYNOPSIS:	Change PPP to behave as the server.  No configure requests
+ *	    	will be sent until one has been received.
+ * CALLED BY:	PPPMediumActivated
+ * RETURN:	nothing
+ *	
+ * STRATEGY:    Set passive_waiting flag.
+ *	        Set our addr and her addr to server and client addresses
+ *	    	with no option of override for our address.
+ *	    	Be sure addresses are negotiated.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/17/95   	Initial Revision
+ *
+ ***********************************************************************/
+void
+PPPPassiveMode ()
+{
+    passive_waiting = 1;
+    SetIPAddrs(0, SERVER_IP_ADDR, CLIENT_IP_ADDR, FALSE, TRUE);
+
+}	/* End of PPPPassiveMode.	*/
+
+
+#ifdef __HIGHC__
+#pragma Code("PPPCODE");
+#endif
+#ifdef __BORLANDC__
+#pragma codeseg PPPCODE
+#endif
+
+
+/***********************************************************************
+ *				pppfcs
+ ***********************************************************************
+ * SYNOPSIS:	Calculate a new FCS given the current FCS and the new
+ *	    	data.
+ * CALLED BY:	PPPSendPacket
+ * RETURN:	new FCS
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/ 9/95		Initial Revision
+ *
+ ***********************************************************************/
+unsigned short pppfcs (unsigned short fcs, unsigned char *cp, int len)
+
+/*unsigned short fcs;*/ 	/* old-style function declaration needed */
+/*unsigned char *cp;
+int len;*/
+
+{
+    while (len--)
+	fcs = PPP_FCS(fcs, *cp++);
+
+    return (fcs);
+
+}
+
+
+/***********************************************************************
+ *		PPPSendPacket
+ ***********************************************************************
+ * SYNOPSIS:	Send a packet, computing FCS and escaping chars as needed
+ *	    	before writing data out to the physical device.
+ * CALLED BY:	chap_schallenge
+ *	    	chap_sresponse
+ *	    	chap_sresult
+ *	    	fsm_sdata
+ *	    	scr 	    = Send Configure Reject
+ *	    	sca 	    = Send Configure Ack
+ *	    	scn 	    = Send Configure Nak
+ *	    	ser 	    = Send Echo Request
+ *	    	ppp_ip_output 
+ *	    	lqm_send_lqr
+ *	    	pap_sauth
+ *	    	pap_sresp
+ * RETURN:	nothing
+ *	
+ * STRATEGY:	Use a fixed output buffer in routine to copy bytes to 
+ *	    	Output a PPP flag if enough time has elapsed that there
+ *	    	    may be garbage on the line (enough time == 1 second)
+ *	    	Update last time to now (for determining if PPP flag is needed)
+ *	    	Add data link layer header (no need to adjust packet header
+ *	    	    because we'll be freeing the buffer here)
+ *	    	if not LCP, compress data link layer header (A/C or proto)
+ *	    	    as needed by moving bytes around in the buffer.
+ *	    	do some LQM counts
+ *	    	compute FCS and stick in end of buffer, adjusting length
+ *	    	    (FCS is calculated over all bits of the address, control,
+ *	    	     protocol and information fields)
+ *	        while there are more bytes {
+ *		    	escape bytes as needed, copying them to output buffer
+ *	    	    	if buffer is full, write data to serial line
+ *	    	    	    and reset pointer to head of buffer
+ *	    	}
+ *	    	add a PPP flag to mark end of frame to output data
+ *	    	send remaining output data
+ *	    	free packet buffer
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/19/95   	Initial Revision
+ *
+ ***********************************************************************/
+void PPPSendPacket (int unit, PACKET *packet, unsigned short protocol)
+/*int unit;*/       	    	/* old-style function declaration needed here */
+/*PACKET *packet;
+unsigned short protocol; */
+{
+    unsigned short olen, plen, fcs;
+    dword now;
+    unsigned char output_buffer[OUTPUT_BUFFER_SIZE], sendfcs = 1;
+    unsigned char *p;	    
+
+    olen = 0;	    	  	    	/* size of data in output buffer */
+    plen = packet -> MH_dataSize;   	/* size of data in packet */
+    
+@ifdef LOGGING_ENABLED
+     /*
+      * Make sure packet does not exceed peer's established MRU.
+      */
+    if (plen > cf_mru) 
+	LOG2(LOG_BASE, (@exceedMruLogString));
+@endif /* LOGGING_ENABLED */
+
+
+#ifdef USE_CCP
+    /* 
+     * Compress packet if needed.  Non-protocol packets all have type
+     * less than 256.  
+     */
+    if (protocol < 256 && ccp[unit].ccp_compressor) 
+	ProcCallFixedOrMovable_pascal(unit, &packet, &plen, &protocol,
+				      ccp[unit].ccp_compressor);
+#endif /* USE_CCP */
+
+     /*
+      * Output a PPP flag if "appreciable time" has elapsed.  Update time
+      * last flag was sent to current time.
+      */
+    now = TimerGetCount();
+    if (now - last_time > ONE_SECOND) {
+	output_buffer[olen++] = PPP_FLAG;
+    }
+    last_time = now;
+
+     /*
+      * Prepend data link layer header to buffer data. 
+      */
+    p = PACKET_DATA(packet);
+    p -= DLLHEADERLEN;
+    plen += DLLHEADERLEN;
+
+    PUTCHAR(ALLSTATIONS, p);	    	    /* address field */
+    PUTCHAR(UI, p); 	    	    	    /* control field */
+    PUTSHORT(protocol, p);	     	    /* protocol field */
+    p -= DLLHEADERLEN;	    	    	    /* reset pointer to head of data */
+
+@ifdef LOGGING_ENABLED
+    if (debug >= LOG_MSGS) {
+	LOG2(LOG_MSGS, (@sendingFrameLogString, plen));
+	log_buffer(p, plen);
+    }
+@endif /* LOGGING_ENABLED */
+
+     /*
+      * Compress data link header's A/C or protocol fields if packet 
+      * if compression has been negotiated.  LCP packets should never
+      * be compressed.
+      */
+    if (protocol != LCP) {
+	if (ppp_mode_flags & SC_TX_COMPAC) {
+	    /* skip A/C fields in data */
+	    p += 2;
+	    plen -= 2;	    	    
+
+	    if ((ppp_mode_flags & SC_TX_COMPPROT) && protocol < 256) {
+		/* skip protocol field's high byte */
+		++p;
+		--plen;	    	    
+	    }
+	} else if ((ppp_mode_flags & SC_TX_COMPPROT) && protocol < 256) {
+	    /* 
+	     * Move A/C fields forward one byte to eliminate high
+ 	     * byte of protocol field.
+	     */
+	    p[2] = p[1];
+	    p[1] = p[0];
+	    ++p;
+	    --plen;
+	}
+    }
+
+     /*
+      * Update LQM octet counter.  LQM octet counters count all octets that
+      * are included in the FCS calculation, plus the FCS bytes themselves,
+      * plus one flag.
+      */
+    lqm[unit].ifOutOctets += plen + 3;	    	
+    ++lqm[unit].ifOutUniPackets;
+
+     /*
+      * Compute FCS but DO NOT append to buffer because client
+      * didn't know to reserve space at the end for us.
+      */
+    fcs = pppfcs(PPP_INITFCS, p, plen) ^ 0xffff;
+
+escapeBytes:
+     /*
+      * Escape each character, adding it to the output buffer.
+      * Pass the output data to the device as buffer fills.
+      */
+    while (plen--) {
+
+	EC(ECCheckBounds(p));
+
+	if (escape_map[ MAP_INDEX(*p)] & MAP_MASK(*p) || 
+	    (protocol == LCP && *p < PPP_TRANS)) {
+	    output_buffer[olen++] = PPP_ESCAPE;
+	    output_buffer[olen++] = *p++ ^ PPP_TRANS;
+	}
+	else
+	    output_buffer[olen++] = *p++;
+
+	 /*
+	  * Write data out to the device if buffer is full.  Buffer
+	  * is "full" when there are less than 5 bytes left (if both
+	  * FCS bytes are escaped and the end frame flag).
+	  */
+	if (olen > OUTPUT_BUFFER_SIZE - 5) {   	
+	    PPPDeviceWrite(output_buffer, olen);
+	    olen = 0;
+	    DOLOG(tx_bits += olen * BITS_PER_BYTE;)
+	}
+    }
+
+     /*
+      * Send FCS, escaping bytes if needed.  Have to do this separately
+      * because we don't know if there is extra space at the end of 
+      * the buffer.  Take advantage of our low word first architecture
+      * and reuse above code to escape FCS bytes.
+      */
+    if (sendfcs) {
+	sendfcs = 0;
+	p = (unsigned char *)&fcs;
+	plen = 2;   	    	      /* size of fcs */
+	goto escapeBytes;
+    }
+
+     /* 
+      * Send PPP flag to mark end of frame.  Pass remaining output 
+      * data to the device.  
+      */
+    output_buffer[olen++] = PPP_FLAG;
+    PPPDeviceWrite(output_buffer, olen);
+    DOLOG(tx_bits += olen * BITS_PER_BYTE;)
+    DOLOG(++tx_pkts;)
+
+    PACKET_FREE(packet);
+
+}	/* End of PPPSendPacket.	*/
+
+
+
+/***********************************************************************
+ *		PPPProcessInput
+ ***********************************************************************
+ * SYNOPSIS:	Try to build PPP packets from the input data.
+ * CALLED BY:	PPPHandleDataNotification
+ * RETURN:	nothing
+ *	
+ * STRATEGY:	Build PPP frame out of input data.
+ *	    	Deliver complete packets to appropriate protocol
+ *	    	Reset idle time if packet is important
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	jwu	5/19/95   	Initial Revision
+ *
+ ***********************************************************************/
+void
+PPPProcessInput (unsigned char *read_buffer,
+		 unsigned short len)	    	/* bytes in input */
+{
+    unsigned char *read_buffer_pointer;
+    unsigned short protocol = 0;
+
+    if (frame_buffer_optr) {
+	PACKET_LOCK(frame_buffer_optr);
+	frame_buffer = PACKET_POINTER(frame_buffer_optr);
+	frame_buffer_pointer = PACKET_DATA(frame_buffer) + frame_len;
+    }
+    else {
+     /*
+      * Buffer for the input has not been allocated yet, 
+      * do so now.  Make sure the buffer is big enough for the
+      * maximum size frame (DLL header + data + FCS bytes).  Buffer
+      * will be downsized later before delivery to the client.
+      * Must leave room for uncompression code to prepend 128 (MAX_HDR)
+      * bytes of header.  slcompress_uncompress_tcp code expects this.  
+      */
+	if ((frame_buffer = PACKET_ALLOC(MAX_HDR + DLLHEADERLEN + MAX_MTU +
+					 MAX_FCS_LEN)) == 0) {
+@ifdef LOGGING_ENABLED
+	    LOG2(LOG_BASE, (@noMemLogString));
+@endif /* LOGGING_ENABLED */
+	    frame_buffer_optr = NullOptr;
+	    ppp_mode_flags = SC_FLUSH;
+	    return;
+	}
+	frame_buffer_optr = PACKET_OPTR(frame_buffer);
+
+	frame_buffer -> MH_dataSize -= MAX_HDR;
+	frame_buffer -> MH_dataOffset += MAX_HDR;
+    }
+@ifdef LOGGING_ENABLED
+    LOG2(LOG_CHARS, (@bytesReadLogString, len));
+    if (debug >= LOG_CHARS)
+	log_buffer(read_buffer, len);
+
+    rx_bits += len * BITS_PER_BYTE;
+@endif /* LOGGING_ENABLED */
+
+    for (read_buffer_pointer = read_buffer; len > 0; 
+	 --len, ++read_buffer_pointer) {
+	 /*
+	  * Check for PPP flag.
+	  */
+	if (*read_buffer_pointer == PPP_FLAG) {
+	    unsigned char *p;
+
+	     /*
+	      * If was flushing rest of packet, reset flags, frame
+	      * pointer and fcs calculations.
+	      */
+	    if (ppp_mode_flags & SC_FLUSH) {
+		ppp_mode_flags &= ~(SC_FLUSH | SC_ESCAPED);
+		frame_len = compressed_bytes = 0;
+		frame_buffer_pointer = PACKET_DATA(frame_buffer);
+		input_fcs = PPP_INITFCS;
+		continue;
+	    }
+
+	     /*
+	      * If no prior data, the flag marks the start of a new packet.
+	      */
+	    if (frame_len == 0)
+		continue;
+
+	     /*
+	      * Flag marks end of a frame.  Verify frame is big enough
+	      * to be valid.  Reset variables for input processing.
+	      */
+	    if (frame_len < DLLHEADERLEN) {
+		++lqm[0].ifInErrors;
+@ifdef LOGGING_ENABLED
+		LOG2(LOG_DIAL, (@shortFrameLogString, frame_len));
+@endif /* LOGGING_ENABLED */
+		frame_len = compressed_bytes = 0;
+		frame_buffer_pointer = PACKET_DATA(frame_buffer);
+		input_fcs = PPP_INITFCS;
+		ppp_mode_flags &= ~SC_ESCAPED;
+		continue;
+	    }
+
+	     /*
+	      * If FCS was bad, reset variables for input processing.
+	      */
+	    if (input_fcs != PPP_GOODFCS) {
+@ifdef LOGGING_ENABLED
+		if (discarded_map) {
+		    char map[LONG_STR_LEN];
+		    asyncmap_name(map, discarded_map);
+		    LOG2(LOG_DIAL, (@badFCSLogString, map));
+		    discarded_map = 0;
+		}
+		else {
+		    LOG2(LOG_DIAL, (@badFCS2LogString));
+		}
+@endif /* LOGGING_ENABLED */		    
+		
+		++lqm[0].ifInErrors;
+		fcs_error = TRUE;
+		frame_len = compressed_bytes = 0;
+		frame_buffer_pointer = PACKET_DATA(frame_buffer);
+		input_fcs = PPP_INITFCS;
+		ppp_mode_flags &= ~SC_ESCAPED;
+		continue;
+	    }
+	    else {
+		 /*
+		  * Have a good packet.  LQM octet counters count all
+		  * octets that are included in the FCS calculation,
+		  * plus the FCS bytes themselves, plus one flag.
+		  */
+		lqm[0].InGoodOctets += frame_len + 1 - compressed_bytes;
+		++lqm[0].ifInUniPackets;
+		frame_len -= 2;	    	    /* drop FCS from length */
+	    }
+
+	    p = PACKET_DATA(frame_buffer);
+
+@ifdef LOGGING_ENABLED
+
+	    if (debug >= LOG_MSGS) {
+		LOG2(LOG_MSGS, (@frameRecvdLogString, frame_len));
+		log_buffer(p, frame_len);
+	    }
+@endif /* LOGGING_ENABLED */
+
+	     /*
+	      * Read protocol of packet.  Drop data link header from
+	      * input buffer.  Adjust header, setting the size to the
+	      * frame length.
+	      */
+	    p += 2; 	    	    /* Skip address and control fields */
+	    GETSHORT(protocol, p);
+
+	    frame_buffer -> MH_dataOffset += DLLHEADERLEN;
+	    frame_len -= DLLHEADERLEN;
+	    frame_buffer -> MH_dataSize = frame_len;
+
+	    DOLOG(discarded_map = 0;)
+
+	     /*
+	      * Toss all non-LCP packets unless LCP is OPEN.
+	      */
+	    if (protocol != LCP &&
+		lcp_fsm[0].state != OPENED) {
+		PACKET_FREE(frame_buffer);
+@ifdef LOGGING_ENABLED
+		LOG2(LOG_MSGS, (@droppingLogString));
+@endif /* LOGGING_ENABLED */
+	    }
+	    else {
+		 /*
+		  * If waiting for input packet before bringing up LCP,
+		  * bring up LCP.
+		  */
+		if (passive_waiting) {
+		    passive_waiting = 0;
+		    lcp_lowerup(0);
+		}
+
+		 /*
+		  * Deliver packet to protocol.  If packet affects
+		  * idle time, reset idle time. 
+		  */
+		if (PPPInput(protocol, frame_buffer, frame_len)) {
+		    idle_time = idle_timeout;
+@ifdef LOGGING_ENABLED
+		    idle_seconds = 0;
+@endif /* LOGGING_ENABLED */
+		}
+	    }
+	    
+	    DOLOG(++rx_pkts;)
+
+	     /*
+	      * Allocate a new buffer for next input packet, leaving room
+	      * for slcompress code to prepend an uncompressed header.
+	      * Reset variables for input processing.
+	      */
+	    if ((frame_buffer = PACKET_ALLOC(MAX_HDR + DLLHEADERLEN + MAX_MTU +
+					     MAX_FCS_LEN)) == 0) {
+		frame_buffer_optr = NullOptr;
+@ifdef LOGGING_ENABLED
+	    	LOG2(LOG_BASE, (@noMemLogString));
+@endif /* LOGGING_ENABLED */
+		ppp_mode_flags = SC_FLUSH;
+	    	return;
+	    }
+	    frame_buffer_optr = PACKET_OPTR(frame_buffer);
+
+	    frame_buffer -> MH_dataSize -= MAX_HDR;
+	    frame_buffer -> MH_dataOffset += MAX_HDR;
+	    frame_len = compressed_bytes = 0;
+	    ppp_mode_flags &= ~SC_ESCAPED;
+	    frame_buffer_pointer = PACKET_DATA(frame_buffer);
+	    input_fcs = PPP_INITFCS;
+	    continue;
+	}   /* else process regular data byte in frame */
+	 /*
+	  * If flushing rest of frame, keep reading.
+	  */
+	else if (ppp_mode_flags & SC_FLUSH) {
+	    continue;
+	}
+	 /*
+	  * If escape byte, remember that we saw the escape.  Do NOT
+	  * store escape byte in frame input buffer.  
+	  */
+	else if (*read_buffer_pointer == PPP_ESCAPE) {
+	    ppp_mode_flags |= SC_ESCAPED;
+	    continue;
+	}
+	 /*
+	  * Discard characters that may have been inserted by the hardware.
+	  * These are characters that should be escaped if transmitted by
+	  * PPP.
+	  */
+    	else if (discard_map[MAP_INDEX(*read_buffer_pointer)] & 
+		 MAP_MASK(*read_buffer_pointer)) {
+@ifdef LOGGING_ENABLED	    
+	    if (*read_buffer_pointer < PPP_TRANS)
+		discarded_map |= 1 << *read_buffer_pointer;
+@endif /* LOGGING_ENABLED */
+	    continue;
+	}
+
+	 /*
+	  * We will only get here if data byte needs to be stored in 
+	  * input buffer.  
+	  *
+	  * Unescape escaped byte if previous byte was the escape flag.
+	  */
+	if (ppp_mode_flags & SC_ESCAPED) {
+	    ppp_mode_flags &= ~SC_ESCAPED;
+	    *read_buffer_pointer ^= PPP_TRANS;
+	}
+
+	 /*
+	  * Uncompress data link header if haven't received a full
+	  * data link header yet.
+	  */
+	if (frame_len <= 3) {
+	    if (frame_len == 0)
+		 /*
+		  * If address field is missing, but A/C
+		  * compression is allowed, add A/C fields to input packet.
+		  * Otherwise, flush the rest of the frame's data.
+		  */
+		if (*read_buffer_pointer != PPP_ALLSTATIONS)
+		    if (ppp_mode_flags & SC_RX_COMPAC) {
+			EC( ECCheckBounds(frame_buffer_pointer) );
+			*frame_buffer_pointer++ = PPP_ALLSTATIONS;
+			++frame_len;
+			++compressed_bytes;
+			EC( ECCheckBounds(frame_buffer_pointer) );
+			*frame_buffer_pointer++ = PPP_UI;
+			++frame_len;
+			++compressed_bytes;
+		    }
+	    	    else {
+@ifdef LOGGING_ENABLED
+			LOG2(LOG_DIAL, (@allStationsLogString));
+@endif /* LOGGING_ENABLED */
+			ppp_mode_flags |= SC_FLUSH;
+			fcs_error = TRUE;
+			++lqm[0].ifInErrors;
+			continue;
+		    }
+
+	     /*
+	      * If received address field in data link header, then 
+	      * this byte must be the control field.  If not, flush
+	      * rest of frame.
+	      */
+	    if (frame_len == 1)
+		if (*read_buffer_pointer != PPP_UI) {
+@ifdef LOGGING_ENABLED
+		    LOG2(LOG_DIAL, (@missedUILogString));
+@endif /* LOGGING_ENABLED */
+		    ppp_mode_flags |= SC_FLUSH;
+		    fcs_error = TRUE;
+		    ++lqm[0].ifInErrors;
+		    continue;
+		}
+	    
+	     /*
+	      * Check for protocol field being compressed.  The low byte
+	      * is always odd and the high byte is always even.  If 
+	      * protocol is compressed and compression is allowed, add
+	      * high back to input buffer to uncompress the protocol.
+	      */
+	    if (frame_len == 2 && (*read_buffer_pointer & 1) == 1) 
+		if (ppp_mode_flags & SC_RX_COMPPROT) {
+		    EC( ECCheckBounds(frame_buffer_pointer) );
+		    *frame_buffer_pointer++ = 0;
+		    ++frame_len;
+		    ++compressed_bytes;
+		}
+	}
+
+	 /*
+	  * If adding this byte would overflow the input buffer,
+	  * flush rest of frame.
+	  */
+	if (++frame_len > DLLHEADERLEN + MAX_MTU + MAX_FCS_LEN) {
+@ifdef LOGGING_ENABLED
+	    LOG2(LOG_DIAL, (@longFrameLogString));
+@endif /* LOGGING_ENABLED */
+	    ppp_mode_flags |= SC_FLUSH;
+	    fcs_error = TRUE;
+	    ++lqm[0].ifInErrors;
+	    continue;
+	}
+
+	 /*
+	  * Store the input byte and add to fcs calculations.
+	  */
+	EC( ECCheckBounds(frame_buffer_pointer) );
+	EC_ERROR_IF(frame_buffer_pointer-(unsigned char *)frame_buffer >=
+		    LMemGetChunkSize(frame_buffer_optr), -1);
+	    
+	*frame_buffer_pointer++ = *read_buffer_pointer;
+	input_fcs = PPP_FCS(input_fcs, *read_buffer_pointer);
+
+    }
+
+    if (frame_buffer_optr) {
+	PACKET_UNLOCK(frame_buffer_optr);
+	frame_buffer = (PACKET *)0;
+	frame_buffer_pointer = (unsigned char *)0;
+    }
+
+}	/* End of PPPProcessInput.	*/
+
+

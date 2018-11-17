@@ -1,0 +1,102 @@
+#!/usr/local/bin/perl
+##############################################################################
+#
+#	Copyright (c) Geoworks 1996 -- All Rights Reserved
+#
+# FILE:		gtouch
+#
+# AUTHOR:	Eric Weber, Jan  4, 1996
+#
+# DESCRIPTION:
+#  Change the creation date of a geos file to the current time
+#
+#	$Id: gtouch,v 1.9 98/06/25 15:25:16 simon Exp $
+#
+##############################################################################
+
+require "newgetopt.pl";
+
+$GEOS_BASE_YEAR = 80;              # GEOS base year is 1980
+$DATE_OFFSET = 200;
+$SIGNATURE = pack("CCCC", ord("G") + 128, ord("E"), ord("A") + 128, ord("S"));
+
+if ($#ARGV < 0) {
+    die "Usage: $0 [-t hour:min] [-d month/date/year] filename ...\n";
+}
+
+&NGetOpt("t=s", "d=s");
+
+# get current time details
+($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time());
+
+# see if hour and min are passed
+if (defined ($opt_t)) {
+    # print "t: <$opt_t>\n";
+    # $opt_t = something like "9:05"
+    if ($opt_t =~ /(\d+):(\d+)/) {
+	($hour, $min) = ($1, $2);
+	$sec = 0;
+    } else {
+	print "gtouch: Bad time format [hour:min].\n";
+	die "Examples: 9:05 or 12:30\n";
+    }
+}
+
+# see if date is passed
+if (defined ($opt_d)) {
+    if ($opt_d =~ /^(\d{1,2})\/(\d{1,2})\/(\d{2})$/) {
+	($mon, $mday, $year) = ($1, $2, $3);
+	# $mon is zero-based
+	$mon--;
+    } else {
+	print "gtouch: Bad date format [month/date/year]\n";
+	die "Examples: 9/1/98 or 12/05/02\n";
+    }
+}
+
+# Fix Year 2000 problem
+if ($year < $GEOS_BASE_YEAR) {
+    $year += 100;
+}
+
+# convert to GEOS format
+$rawdate = ((($year - $GEOS_BASE_YEAR) << 9) | (($mon+1) << 5) | $mday);
+$rawtime = (($hour << 11) | ($min << 5) | ($sec >> 1));
+
+$gdate = pack("CCCC", ($rawdate & 0xff), ($rawdate >> 8), ($rawtime & 0xff), ($rawtime >> 8));
+
+# update the file(s)
+while ($fname = shift) {
+
+    # Win32 Perl 5.003 (and maybe other versions, I don't know)
+    # Strips final Ctrl-Z characters off the end of the file
+    # as soon as you open it.  There's no way I can see to prevent
+    # it.  Fortunately, this is reflected in the size returned from
+    # stat.  See below
+
+    ($a, $b, $c, $d, $e, $f, $g, $closedSize) = stat($fname);
+    open(GFILE, "+<$fname") || die "gtouch: '$fname': $!\n";
+    ($a, $b, $c, $d, $e, $f, $g, $openedSize) = stat(GFILE);
+
+    # verify the signature
+    sysread(GFILE, $sig, 4);
+    if ($sig ne $SIGNATURE) {
+	warn "gtouch: error: '$fname' is not a GEOS file\n";
+    } else {
+	# move to GFH_created
+	print "updating $fname\n";
+	seek(GFILE, $DATE_OFFSET, 0) || die "gtouch: seeking '$fname' : $!";
+	syswrite(GFILE, $gdate, 4) || die "gtouch: writing '$fname' : $!";
+
+	# If Win32 sysopen stripped the final character, it was a Ctrl-Z,
+	# so put it back.
+
+	if ($openedSize < $closedSize) {
+	    seek(GFILE, 0, 2) || die "gtouch: seeking '$fname' : $!";
+	    syswrite(GFILE, "\032", 1) || die "gtouch: reading last char '$fname' : $!";
+	}
+    }
+    close(GFILE);
+}
+
+

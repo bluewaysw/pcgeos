@@ -1,0 +1,131 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		ICON	
+FILE:		iconFile.def
+
+AUTHOR:		Steve Yegge, Jul 29, 1992
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	SY	7/29/92		Initial revision
+
+
+DESCRIPTION:
+
+	This is the definition of the file structure for the icon database.
+	An icon database consists of a huge array of "icons."  Each icon
+	consists of a header and an array of 32 formats (some of which may
+	be unused.)  The header structure:
+
+		-name (32 characters)
+		-preview settings:
+			-preview object (trigger,tool,etc)
+			-on/off color pairs for the preview object
+		-format count (how many exist for this icon, out of 32)
+		-format list
+
+	The formats are just handles to huge bitmaps.  The headers of
+	the bitmaps have all the information about size, color and
+	resolution of the format.
+	
+	There will be a map block that consists of the current Icon and
+	the HugeArray handle of the icon list.
+
+COMMENTS/IDEAS:
+
+	For viewing the icons in the database we can:
+		a) show all the formats for each icon
+		b) show one format for each icon.
+	The database doesn't keep information on what display type each
+	format was intended for, so we can't pick a format based on
+	the video resolution we're running at.  We CAN pick a color
+	scheme appropriate to the display, though, such as picking the
+	first monochrome format for the icon if we're running on a
+	monochrome display.  For now, though, if the database viewer
+	decides to show just one format for the icon, it'll have no way
+	of deciding which format was supposed to be the 'CGA' format.
+	The best it could do, perhaps, is pick the smallest monochrome
+	format if the user is viewing the database on a CGA display.
+
+	$Id: iconFile.def,v 1.1 97/04/04 16:06:33 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;-----------------------------------------------------------------------------
+;	Constants
+;-----------------------------------------------------------------------------
+
+MAX_ICON_NAME_LENGTH	equ	32
+
+;-----------------------------------------------------------------------------
+;	Data Structures
+;-----------------------------------------------------------------------------
+
+;
+; MapBlockStruct is used in the map block
+;
+
+IconMapBlockStruct	struct
+	IMBS_iconList		word		; huge array handle of icon list
+IconMapBlockStruct	ends
+
+;
+;  ColorPair and PreviewSettingsType are used to store the state
+;  of the preview area  for each icon.
+
+ColorPair		struct
+	CP_firstColor	Color			; first color to mix
+	CP_secondColor	Color			; second color to mix
+ColorPair		ends
+
+PreviewSettingsType	struct
+	PST_object	PreviewGroupInteractionObject
+	PST_onColor	ColorPair
+	PST_offColor	ColorPair
+PreviewSettingsType	ends
+
+;
+; This is the structure that will be stored in each chunk array
+; element.  (The format list is a chunk array).
+;
+
+MAX_FORMAT_NAME_LENGTH		equ	32
+
+IconFormat	struct
+	IF_name		char MAX_FORMAT_NAME_LENGTH	dup (0)
+	IF_type		VisMonikerListEntryType
+	IF_bitmap	word			; chunk array block & chunk
+	IF_reserved	word			; for later additions
+IconFormat	ends
+
+;
+;  Icon Flags, for now, just holds a bit for whether the icon is
+;  a pointer image or not.  It's got 15 bits left over, though, so
+;  if we ever need more information in the icon we have room for
+;  it without breaking existing databases.  (I've upped it to 31 bits).
+;
+
+IconFlags	record
+	IF_PTR_IMAGE:1				; is it a cursor image?
+	:15					; reserved
+IconFlags	end
+
+; 
+; an IconHeader is the basic data structure element for an icon
+; the Icon database consists of a huge array of IconHeaders and
+; all the associated bitmap data.
+;
+
+IconHeader	struct
+	IH_name		char MAX_ICON_NAME_LENGTH 	dup (0)
+	IH_preview	PreviewSettingsType	; current preview object
+	IH_flags	IconFlags		; various (ptr image, etc)
+	IH_rsrvd	word			; reserved for future use
+	IH_formatCount	word			; number of valid entries 
+						; in the format list
+	IH_formatList	optr			; block & chunk for chunkarray
+IconHeader	ends

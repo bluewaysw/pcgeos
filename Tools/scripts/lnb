@@ -1,0 +1,110 @@
+#!/bin/sh -
+##############################################################################
+#
+# 	Copyright (c) Geoworks 1995 -- All Rights Reserved
+#
+# PROJECT:	
+# MODULE:	
+# FILE: 	lnb, a SH script
+# AUTHOR: 	Jim Guggemos, Jan 18, 1995
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	JimG	1/18/95   	Initial Revision
+#
+# DESCRIPTION:
+#	Creates a symbolic link from current directory to equivalent
+#	directory in the source tree.
+#
+#	$Id: lnb,v 1.1 95/03/17 14:39:52 guggemos Exp $
+#
+###############################################################################
+
+srcRoot=/staff/pcgeos
+
+usage() {
+    echo "Usage: $prog [-b<name>] <fname> [<fname> [<fname> ...]]"
+    echo "Creates symbolic links from parallel directories in $srcRoot"
+    echo "to directory in private tree."
+    echo "	-b<name>	Force to use <name> as branch name"
+    echo "			<name> can be \"trunk\" or empty"
+    exit 1
+}
+
+if [ $# = 0 ]; then usage; fi
+
+for i in "$@"; do
+    case $i in
+	-b*)	branch=`expr "x$i" : 'x-b\(.*\)$'`
+		;;
+	
+	-*)	echo "Illegal option: $i"
+		usage
+		;;
+	
+	*)	files="$files $i"
+		;;
+    esac
+done
+
+p=`pwd`
+
+if expr $p : '/n/[^/]*/pcgeos/' >/dev/null 2>&1; then
+    : cool
+else
+    echo "Not in private tree directory"
+    exit 1
+fi
+
+if [ ! "$files" ]; then
+    echo "No files given"
+    usage
+fi
+
+pathRoot=`expr $p : '\(/n/[^/]*/pcgeos/[^/]*\)'`
+pathTail=`expr $p : $pathRoot'/\(.*\)'`
+
+if [ "$branch" = "trunk" -o "$branch" = "Trunk" ]; then
+    branch=
+
+elif [ ! "${branch+X}" ]; then
+    if [ -f $pathRoot/BRANCH ]; then
+	branch=`cat $pathRoot/BRANCH`
+    fi
+fi
+
+echo "Branch: $branch"
+
+srcPath=$srcRoot${branch:+/}${branch}${pathTail:+/}${pathTail}
+
+echo Source path: $srcPath
+
+for i in $files; do
+    if [ ! \( -f $srcPath/$i -o -d $srcPath/$i \) ]; then
+	echo $i does not exist in $srcPath
+	continue
+    fi
+
+    if [ -f $i ]; then
+	echo "** File $i already exists in current directory."
+	/bin/rm -i $i
+	if [ -f $i ]; then
+	    echo "** Skipping $i"
+	    continue
+	fi
+    
+    elif [ -d $i ]; then
+	echo "** Directory $i already exists in current directory.  Skipping"
+	continue
+    fi
+
+    if [ -f $srcPath/$i ]; then
+	echo -n "Linking file $i..."
+    elif [ -d $srcPath/$i ]; then
+	echo -n "Linking directory $i..."
+    fi
+
+    ln -s $srcPath/$i
+    echo " Done."
+done

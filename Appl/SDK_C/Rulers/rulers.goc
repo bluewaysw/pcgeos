@@ -1,0 +1,612 @@
+/********************************************************************
+ *
+ *      Copyright (c) Geoworks 1995-96 -- All Rights Reserved.
+ *
+ * PROJECT:     GEOS Sample Applications
+ * MODULE:      Ruler
+ * FILE:        rulers.goc
+ *
+ * AUTHOR:      Nathan Fiedler: August 3, 1995
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      NF      8/3/95          Initial version
+ *
+ * DESCRIPTION:
+ *      This is a sample program demonstrating the use of
+ *      rulers. It shows how to set up the view and contents
+ *      to have both a vertical and horizontal ruler. The rulers
+ *      have controllers which determine the units of measurement
+ *      used. Also shown is how to disable the rulers.
+ *
+ *      Just in case that wasn't enough, this sample uses a
+ *      PageSizeControl object to allow the user to change the
+ *      size of the "document". All the standard GEOS document
+ *      sizes are supported, including envelopes.
+ *
+ *      As a secondary example, a ViewControl object is used, and
+ *      the content draws some extra stuff in the view. This code
+ *      was used as the basis for the Draw program by Blue Marsh
+ *      Softworks.
+ *
+ * RCS STAMP:
+ *      $Id: rulers.goc,v 1.1 97/04/04 16:41:40 newdeal Exp $
+ *
+ *******************************************************************/
+
+/********************************************************************
+ *              Headers
+ *******************************************************************/
+    @include <stdapp.goh>
+    @include <spool.goh>           /* PageSizeControlClass */
+    @include <Objects/gViewCC.goh> /* GenViewControlClass */
+    @include <ruler.goh>           /* Ruler library. */
+    #include <print.h>             /* Page Size structures. */
+
+/********************************************************************
+ *                 Constants
+ *******************************************************************/
+       /* Category in GEOS.INI file for ruler sample. */
+    #define RULER_INIT_CATEGORY "rulersample"
+
+       /* Document size. */
+    #define RULER_DOCUMENT_HEIGHT ( 11  * 72 )
+    #define RULER_DOCUMENT_WIDTH  ( 8.5 * 72 )
+
+/********************************************************************
+ *                 Class Definitions
+ *******************************************************************/
+    @class RulerProcessClass, GenProcessClass;
+    @endc;
+
+      /* We intercept the message to turn the
+       * rulers on and off. */
+    @class RulerRulerShowControlClass, RulerShowControlClass;
+    @endc;
+
+    @class RulerRulerContentClass, VisContentClass;
+      /* Sets the view bounds. */
+    @message void MSG_RULER_CONTENT_SET_BOUNDS( PageSizeReport * psr );
+          /* Current page size. */
+        @instance PageSizeReport RCI_pageSize;
+    @endc;
+
+/********************************************************************
+ *              Class Declarations
+ *******************************************************************/
+    @classdecl RulerProcessClass, neverSaved;
+    @classdecl RulerRulerShowControlClass;
+    @classdecl RulerRulerContentClass;
+
+/********************************************************************
+ *              UI Object Resources
+ *******************************************************************/
+
+/********************************************************************
+ *              AppResource Resource
+ *******************************************************************/
+@start AppResource;
+
+@object GenApplicationClass RulerApp = {
+    GI_visMoniker = list { @RulerTextMoniker };
+    GI_comp = @RulerPrimary;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS ) =
+        @RulerPrimary;
+    gcnList( MANUFACTURER_ID_GEOWORKS,
+        GAGCNLT_CONTROLLED_GEN_VIEW_OBJECTS ) =
+        @RulerView;
+    gcnList( MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS ) =
+        @RulerPageSizeControl,
+        @RulerViewControl,
+        @RulerRulerShowControl,
+        @RulerRulerTypeControl;
+    gcnList( MANUFACTURER_ID_GEOWORKS, MGCNLT_ACTIVE_LIST ) =
+        @RulerViewControl,
+        @RulerRulerShowControl,
+        @RulerRulerTypeControl;
+    ATTR_GEN_INIT_FILE_CATEGORY = RULER_INIT_CATEGORY;
+}
+
+@visMoniker RulerTextMoniker = "Ruler Sample";
+
+@end AppResource;
+
+/********************************************************************
+ *              Interface Resource
+ *******************************************************************/
+@start Interface;
+
+@object GenPrimaryClass RulerPrimary = {
+    GI_comp = @RulerFileGroup,
+              @RulerViewGroup,
+              @RulerOptsGroup,
+              @RulerTopInteraction,
+              @RulerBottomInteraction;
+    HINT_DEFAULT_TARGET;
+}
+
+  /* File menu - contains the page size controller. */
+@object GenInteractionClass RulerFileGroup = {
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GI_comp = @RulerPageSizeControl;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = ( GIGT_FILE_MENU );
+}
+
+   /* Page Size Control UI */
+@object PageSizeControlClass RulerPageSizeControl = {
+    GI_states = @default | GS_ENABLED;
+    GI_visMoniker = "Page Size";
+    GCI_output = RulerContent;
+    PZCI_attrs = @default | PZCA_LOAD_SAVE_OPTIONS;
+    ATTR_GEN_CONTROL_REQUIRE_UI = {
+        PSIZECF_MARGINS |
+        PSIZECF_CUSTOM_SIZE |
+        PSIZECF_LAYOUT |
+        PSIZECF_SIZE_LIST |
+        PSIZECF_PAGE_TYPE
+    };
+}
+
+@object GenInteractionClass RulerViewGroup = {
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GI_comp = @RulerViewControl,
+              @RulerRedrawTrigger;
+    GII_visibility = GIV_POPUP;
+    ATTR_GEN_INTERACTION_GROUP_TYPE = ( GIGT_VIEW_MENU );
+}
+
+   /* Allows zooming and scroller control. */
+@object GenViewControlClass RulerViewControl = {
+}
+
+   /* For view to redraw contents. */
+@object GenTriggerClass RulerRedrawTrigger = {
+    GI_visMoniker = "Redraw";
+    GTI_destination = RulerViewControl;
+    GTI_actionMsg = MSG_GVC_REDRAW;
+}
+
+   /* Ruler options menu */
+@object GenInteractionClass RulerOptsGroup = {
+    GI_visMoniker = 'R', "Ruler Options";
+    GI_comp = @RulerRulerTypeControl,
+              @RulerRulerShowControl;
+    GII_visibility = GIV_POPUP;
+}
+
+@object RulerTypeControlClass RulerRulerTypeControl = {
+    GI_states = @default | GS_ENABLED;
+}
+
+@object RulerRulerShowControlClass RulerRulerShowControl = {
+}
+
+  /* This contains the corner view and horizontal ruler. */
+@object GenInteractionClass RulerTopInteraction = {
+    GI_comp = @RulerCornerView,
+              @RulerHorizView;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+  /* This contains the vertical ruler and main view. */
+@object GenInteractionClass RulerBottomInteraction = {
+    GI_comp = @RulerVertView,
+              @RulerView;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+  /* This is used as a place holder, to keep the horizontal
+   * ruler from being the wrong size. */
+@object GenViewClass RulerCornerView = {
+    GI_attrs = @default & ~GA_TARGETABLE;
+    GVI_docBounds = { 0, 0, VIS_RULER_HEIGHT, VIS_RULER_HEIGHT };
+    GVI_attrs = @default | GVA_SAME_COLOR_AS_PARENT_WIN
+                         | GVA_NO_WIN_FRAME;
+    GVI_horizAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT;
+    GVI_vertAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT;
+    HINT_MINIMUM_SIZE = {
+        SST_PIXELS | VIS_RULER_HEIGHT,
+        SST_PIXELS | VIS_RULER_HEIGHT,
+        0
+    };
+}
+
+   /* View for horizontal ruler. */
+@object RulerViewClass RulerHorizView = {
+    GVI_docBounds = { 0, 0, RULER_DOCUMENT_WIDTH, VIS_RULER_HEIGHT };
+    GVI_content = RulerHorizContent;
+    GVI_horizAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT;
+    GVI_vertAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT;
+    HINT_MINIMUM_SIZE = {
+        0,
+        SST_PIXELS | VIS_RULER_HEIGHT,
+        0
+    };
+}
+
+   /* View for vertical ruler. */
+@object RulerViewClass RulerVertView = {
+    GVI_docBounds = { 0, 0, VIS_RULER_HEIGHT, RULER_DOCUMENT_HEIGHT };
+    GVI_content = RulerVertContent;
+    GVI_horizAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT;
+    GVI_vertAttrs = @default | GVDA_NO_LARGER_THAN_CONTENT;
+    RVI_attrs = @default & ~RVA_HORIZONTAL;
+    HINT_MINIMUM_SIZE = {
+        SST_PIXELS | VIS_RULER_HEIGHT,
+        0,
+        0
+    };
+}
+
+   /* Main view. */
+@object GenViewClass RulerView = {
+    GVI_attrs = @default | GVA_CONTROLLED
+                         | GVA_WINDOW_COORDINATE_MOUSE_EVENTS;
+    GVI_docBounds = { 0, 0, RULER_DOCUMENT_WIDTH, RULER_DOCUMENT_HEIGHT };
+    GVI_horizAttrs = @default | GVDA_SCROLLABLE
+                              | GVDA_NO_LARGER_THAN_CONTENT;
+    GVI_vertAttrs  = @default | GVDA_SCROLLABLE
+                              | GVDA_NO_LARGER_THAN_CONTENT;
+    GVI_horizLink  = RulerVertView;
+    GVI_vertLink   = RulerHorizView;
+    GVI_content    = RulerContent;
+    ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+    HINT_DEFAULT_FOCUS;
+    HINT_DEFAULT_TARGET;
+}
+
+   /* Content for horizontal ruler. */
+@object RulerRulerContentClass RulerHorizContent = {
+    VI_bounds = { 0, 0, RULER_DOCUMENT_WIDTH, VIS_RULER_HEIGHT };
+    VCI_comp = @RulerHorizRuler;
+       /* This is large model so rulers draw properly. */
+    VCNI_attrs = @default | VCNA_SAME_HEIGHT_AS_VIEW
+                          | VCNA_LARGE_DOCUMENT_MODEL
+                          | VCNA_WINDOW_COORDINATE_MOUSE_EVENTS;
+    VCNI_view = RulerHorizView;
+}
+
+   /* Content for vertical ruler. */
+@object RulerRulerContentClass RulerVertContent = {
+    VI_bounds = { 0, 0, VIS_RULER_HEIGHT, RULER_DOCUMENT_HEIGHT };
+    VCI_comp = @RulerVertRuler;
+    VCNI_attrs = @default | VCNA_SAME_HEIGHT_AS_VIEW
+                          | VCNA_LARGE_DOCUMENT_MODEL
+                          | VCNA_WINDOW_COORDINATE_MOUSE_EVENTS;
+    VCNI_view = RulerVertView;
+}
+
+   /* Main view's content */
+@object RulerRulerContentClass RulerContent = {
+    VI_bounds = { 0, 0, RULER_DOCUMENT_WIDTH, RULER_DOCUMENT_HEIGHT };
+    VCNI_view = RulerView;
+    VCNI_attrs = @default | VCNA_LARGE_DOCUMENT_MODEL
+                          | VCNA_WINDOW_COORDINATE_MOUSE_EVENTS;
+}
+
+   /* Horizontal ruler */
+@object VisRulerClass RulerHorizRuler = {
+    VI_bounds = { 0, 0, RULER_DOCUMENT_WIDTH, VIS_RULER_HEIGHT };
+    VRI_rulerAttrs = ( VRA_SHOW_GUIDES
+                     | VRA_SHOW_GRID
+                     | VRA_SHOW_MOUSE
+                     | VRA_HORIZONTAL ) & ~VRA_MASTER;
+}
+
+   /* Vertical ruler */
+@object VisRulerClass RulerVertRuler = {
+    VI_bounds = { 0, 0, VIS_RULER_HEIGHT, RULER_DOCUMENT_HEIGHT };
+    VRI_rulerAttrs = ( VRA_SHOW_GUIDES
+                     | VRA_SHOW_GRID
+                     | VRA_SHOW_MOUSE ) & ~VRA_HORIZONTAL;
+    VRI_slave = RulerHorizRuler;
+}
+
+@end Interface;
+
+/********************************************************************
+ *              Code for RulerRulerContentClass
+ *******************************************************************/
+
+/********************************************************************
+ *              MSG_PRINT_REPORT_PAGE_SIZE
+ ********************************************************************
+ * SYNOPSIS:     Modify the page size.
+ * CALLED BY:    PageSizeControl
+ * PARAMETERS:   PageSizeReport * psr
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Set the GenView document bounds using the
+ *               passed dimensions.
+ * REVISION HISTORY:
+ *      Name    Date             Description
+ *      ----    ----            -----------
+ *      NF      8/3/95          Initial version
+ *******************************************************************/
+@extern method RulerRulerContentClass, MSG_PRINT_REPORT_PAGE_SIZE {
+      /*
+       * gstate - Graphics state handle for drawing.
+       */
+    GStateHandle gstate;
+
+      /*
+       * Tell content to set the view bounds.
+       */
+    @call self::MSG_RULER_CONTENT_SET_BOUNDS( psr );
+
+      /*
+       * Save the new page size and margins.
+       */
+    pself->RCI_pageSize = *psr;
+
+      /*
+       * Tell ourselves to redraw so everything will be
+       * redrawn properly.
+       */
+    gstate = GrCreateState( pself->VCNI_window );
+    GrInvalRect( gstate, MIN_COORD, MIN_COORD, MAX_COORD, MAX_COORD );
+    @call self::MSG_VIS_DRAW( DF_EXPOSED, gstate );
+    GrDestroyState( gstate );
+} /* MSG_PRINT_REPORT_PAGE_SIZE */
+
+/********************************************************************
+ *	        MSG_RULER_CONTENT_SET_BOUNDS
+ ********************************************************************
+ * SYNOPSIS:	 Set the view bounds, usually called after a change
+ *               in the page size.
+ * PARAMETERS:	 PageSizeReport * psr
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Call view with SET_DOC_BOUNDS message, passing
+ *               the given values.
+ * REVISION HISTORY:
+ *      Name    Date             Description
+ *      ----    ----            -----------
+ *      NF      8/3/95          Initial version
+ *******************************************************************/
+@extern method RulerRulerContentClass, MSG_RULER_CONTENT_SET_BOUNDS {
+
+      /*
+       * Set GenView document bounds.
+       */
+    pself = ObjDerefVis( oself );
+    @call pself->VCNI_view::MSG_GEN_VIEW_SET_DOC_BOUNDS(
+        psr->PSR_height,
+        psr->PSR_width,
+        0,
+        0 );
+} /* MSG_RULER_CONTENT_SET_BOUNDS */
+
+/********************************************************************
+ *	        MSG_VIS_DRAW
+ ********************************************************************
+ * SYNOPSIS:	 Draw ourselves in the view space.
+ * PARAMETERS:	 DrawFlags    drawFlags
+ *               GStateHandle gstate
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Draw some special things, like the region behind
+ *               the document and the margin boundary, then call
+ *               the superclass.
+ * REVISION HISTORY:
+ *      Name    Date             Description
+ *      ----    ----            -----------
+ *      NF      8/3/95          Initial version
+ *******************************************************************/
+@extern method RulerRulerContentClass, MSG_VIS_DRAW {
+
+      /*
+       * Check if we're not printing. If not, then draw the
+       * margin boundary line. This will work even if margins
+       * are negative numbers.
+       */
+    if ( !( drawFlags & DF_PRINT ) ) {
+          /*
+           * Draw the margin boundary.
+           */
+        GrSetLineMaskSys( gstate, SDM_50 );
+        pself = ObjDerefVis( oself );
+        GrDrawRect( gstate,
+                    pself->RCI_pageSize.PSR_margins.PCMP_left,
+                    pself->RCI_pageSize.PSR_margins.PCMP_top,
+                    pself->RCI_pageSize.PSR_width -
+                    pself->RCI_pageSize.PSR_margins.PCMP_right,
+                    pself->RCI_pageSize.PSR_height -
+                    pself->RCI_pageSize.PSR_margins.PCMP_bottom );
+    }
+
+      /*
+       * Call superclass to draw the child objects, if any.
+       */
+    @callsuper();
+} /* MSG_VIS_DRAW */
+
+/********************************************************************
+ *              MSG_VIS_RECALC_SIZE
+ ********************************************************************
+ * SYNOPSIS:     Return the size we wish our document to be.
+ * PARAMETERS:	 word width
+ *               word height
+ * RETURNS:      SizeAsDWord - Size of document.
+ * SIDE EFFECTS: none
+ * STRATEGY:     Return the current size of the document.
+ * REVISION HISTORY:
+ *      Name    Date             Description
+ *      ----    ----            -----------
+ *      NF      8/3/95          Initial version
+ *******************************************************************/
+@extern method RulerRulerContentClass, MSG_VIS_RECALC_SIZE {
+
+    pself = ObjDerefVis( oself );
+    return( MAKE_SIZE_DWORD( pself->RCI_pageSize.PSR_width,
+                             pself->RCI_pageSize.PSR_height ) );
+} /* MSG_VIS_RECALC_SIZE */
+
+/********************************************************************
+ *              MSG_META_CONTENT_VIEW_WIN_OPENED
+ ********************************************************************
+ * SYNOPSIS:     Set the document and view bounds to that stored
+ *               in the process instance data.
+ * PARAMETERS:	 word viewWidth
+ *               word viewHeight
+ *               word viewWindow
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Call process set-bounds method and then call
+ *               superclass.
+ * REVISION HISTORY:
+ *      Name    Date             Description
+ *      ----    ----            -----------
+ *      NF      8/3/95          Initial version
+ *******************************************************************/
+@extern method RulerRulerContentClass, MSG_META_CONTENT_VIEW_WIN_OPENED {
+
+      /*
+       * Set default page size, including view bounds.
+       */
+    pself = ObjDerefVis( oself );
+    pself->RCI_pageSize.PSR_width = RULER_DOCUMENT_WIDTH;
+    pself->RCI_pageSize.PSR_height = RULER_DOCUMENT_HEIGHT;
+    pself->RCI_pageSize.PSR_margins.PCMP_left = ( 0.25 * 72 );
+    pself->RCI_pageSize.PSR_margins.PCMP_top = ( 0.25 * 72 );
+    pself->RCI_pageSize.PSR_margins.PCMP_right = ( 0.25 * 72 );
+    pself->RCI_pageSize.PSR_margins.PCMP_bottom = ( 0.25 * 72 );
+
+    @call self::MSG_RULER_CONTENT_SET_BOUNDS( &(pself->RCI_pageSize) );
+
+      /*
+       * Set PageSizeControl's document size.
+       * TRUE means that the document is open.
+       */
+    SpoolSetDocSize( TRUE, &(pself->RCI_pageSize) );
+
+      /*
+       * Call the superclass to get default behavior.
+       */
+    @callsuper();
+} /* MSG_META_CONTENT_VIEW_WIN_OPENED */
+
+/********************************************************************
+ *              MSG_META_MOUSE_PTR
+ ********************************************************************
+ * SYNOPSIS:     Relay message to master ruler.
+ * PARAMETERS:	 word xPosition
+ *               word yPosition
+ *               word inputState
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Send message to master ruler, passing it the
+ *               parameters given to us.
+ * NOTE:         This method is not needed when using a
+ *               targeted GrObjBody.
+ * REVISION HISTORY:
+ *      Name    Date             Description
+ *      ----    ----            -----------
+ *      NF      8/3/95          Initial version
+ *******************************************************************/
+@extern method RulerRulerContentClass, MSG_META_MOUSE_PTR {
+
+    @send RulerVertRuler::MSG_VIS_RULER_DRAW_MOUSE_TICK(
+        yPosition,
+        0,
+        xPosition,
+        0 );
+} /* MSG_META_MOUSE_PTR */
+
+/********************************************************************
+ *              MSG_META_SEND_CLASSED_EVENT
+ ********************************************************************
+ * SYNOPSIS:     Check to see if message should be sent to the
+ *               master ruler object.
+ * PARAMETERS:	 EventHandle  event
+ *               TravelOption whereTo
+ * RETURNS:      void
+ * SIDE EFFECTS: none
+ * STRATEGY:     Use ObjGetMessageInfo to find out which object
+ *               the event belongs to. If not ours, send to the
+ *               master ruler.
+ * NOTE:         This method is not needed when using a
+ *               targeted GrObjBody.
+ * REVISION HISTORY:
+ *      Name    Date             Description
+ *      ----    ----            -----------
+ *      NF      8/3/95          Initial version
+ *******************************************************************/
+@extern method RulerRulerContentClass, MSG_META_SEND_CLASSED_EVENT {
+      /*
+       * eventOwner - Returned by ObjGetMessageInfo.
+       */
+    optr eventOwner;
+
+      /*
+       * Get the optr to the event and see if it belongs to us.
+       * If so, call superclass to handle it.
+       * Else, send it to the master ruler.
+       */
+    ObjGetMessageInfo( event, &eventOwner );
+    if ( eventOwner == oself ) {
+        @callsuper();
+    }
+    else {
+        @call RulerVertRuler::MSG_META_SEND_CLASSED_EVENT(
+            event,
+            whereTo );
+    }
+} /* MSG_META_SEND_CLASSED_EVENT */
+
+/********************************************************************
+ *              Code for RulerRulerShowControlClass
+ *******************************************************************/
+
+/********************************************************************
+ *              MSG_RSCC_CHANGE_STATE
+ ********************************************************************
+ * SYNOPSIS:     Show or hide the rulers.
+ * PARAMETERS:   void ( RulerShowControlAttrs flags )
+ * CALLED BY:    RulerRulerShowControl
+ * SIDE EFFECTS: none
+ * STRATEGY:     Set the rulers usable or unusable, according to
+ *               the attributes given to us.
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      NF      8/4/95          Initial version
+ *******************************************************************/
+@extern method RulerRulerShowControlClass, MSG_RSCC_CHANGE_STATE {
+
+      /*
+       * See which rulers are visible and make them
+       * usable accordingly.
+       */
+    if ( flags & RSCA_SHOW_VERTICAL ) {
+        @call RulerVertView::MSG_GEN_SET_USABLE(
+            VUM_DELAYED_VIA_APP_QUEUE );
+        @call RulerCornerView::MSG_GEN_SET_USABLE(
+            VUM_DELAYED_VIA_APP_QUEUE );
+    }
+    else {
+        @call RulerVertView::MSG_GEN_SET_NOT_USABLE(
+            VUM_DELAYED_VIA_APP_QUEUE );
+        @call RulerCornerView::MSG_GEN_SET_NOT_USABLE(
+            VUM_DELAYED_VIA_APP_QUEUE );
+    }
+    if ( flags & RSCA_SHOW_HORIZONTAL ) {
+        @call RulerTopInteraction::MSG_GEN_SET_USABLE(
+            VUM_DELAYED_VIA_APP_QUEUE );
+    }
+    else {
+        @call RulerTopInteraction::MSG_GEN_SET_NOT_USABLE(
+            VUM_DELAYED_VIA_APP_QUEUE );
+    }
+
+      /*
+       * Call superclass to get default behavior.
+       */
+    @callsuper();
+} /* MSG_RSCC_CHANGE_STATE */
+

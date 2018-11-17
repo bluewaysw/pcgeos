@@ -1,0 +1,1250 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+FILE:		sound.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	TS	7/27/92		Initial revision
+
+
+DESCRIPTION:
+	This file contains the description of the sound library
+	routines and data structures	
+		
+	$Id: sound.def,v 1.1 97/04/04 14:23:07 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__SOUND
+
+StartLibrary	sound
+
+include geode.def
+include	driver.def
+include	Internal/soundFmt.def
+include Internal/semInt.def
+
+;-----------------------------------------------------------------------------
+;		Stream Parameters
+;-----------------------------------------------------------------------------
+
+EndOfSongFlags	record
+     EOSF_UNLOCK     :1 = 0		; unlock block at EOS?
+     EOSF_DESTROY    :1 = 0		; destroy sound at EOS?
+     EOSF_LMEM_UNLOCK:1 = 0		; unlock LMem block at EOS?
+     :5
+EndOfSongFlags	end
+
+	;
+	;  A stream has a priority associated with it:
+	;	A sound with a higher urgency will supercede one of
+	;	a lower urgency.  This priority relates to the
+	;	sound driver only.  If the driver recieves a
+	;	command of a higher urgency, it will try to act
+	;	on it rather than those of lower urgency.  If a
+	;	higher urgency message is placed on a stream, however,
+	;	it will have to wait its turn to be acted upon.
+SoundPriority		etype	word,	10, 10
+	SP_SYSTEM_LEVEL			enum	SoundPriority
+	SP_ALARM			enum	SoundPriority
+	SP_STANDARD			enum	SoundPriority
+	SP_GAME				enum	SoundPriority
+	SP_BACKGROUND			enum	SoundPriority
+
+	SP_IMMEDIATE	equ	-1
+	SP_THEME	equ	+1
+
+	;
+	;  When the stream is created, it can be of four types.
+	;  Mainly this determines the size of the sound stream, the
+	;  slower the medium that the song is stored on, the longer
+	;  the stream should be to ensure that it never runs dry.
+SoundStreamSize		etype	word
+	SSS_ONE_SHOT		enum	SoundStreamSize,  128; bytes
+	SSS_SMALL		enum	SoundStreamSize,  256; bytes
+	SSS_MEDIUM		enum	SoundStreamSize,  512; bytes
+	SSS_LARGE		enum	SoundStreamSize, 1024; bytes
+
+	;
+	;  A sound stream is just made up of a bunch of events
+	;  these events are as follows:
+SoundStreamEvent		etype	word, 0, 2
+	SSE_VOICE_ON		enum	SoundStreamEvent
+	SSE_VOICE_OFF		enum	SoundStreamEvent
+	SSE_CHANGE		enum	SoundStreamEvent
+	SSE_GENERAL		enum	SoundStreamEvent
+
+	;
+	;  Between each event is the delay time from the current
+	;  even to the next event.  The value can be either in
+	;  msec (giving a maximum delay of 65.535 seconds), in
+	;  ticks (giving a maximum delay of ~18 minutes), or in
+	;  1/128th notes (depends on the tempo), but a tempo of
+	;  65535, and a DeltaTempo of 65535 works out to just
+	;  under 50 days.  More than enough, I would think....
+	;
+SoundStreamDeltaTimeType	etype	word, SoundStreamEvent, 2
+	SSDTT_MSEC		enum	SoundStreamDeltaTimeType
+	SSDTT_TICKS		enum	SoundStreamDeltaTimeType
+	SSDTT_TEMPO		enum	SoundStreamDeltaTimeType	
+
+	;
+	;  There are many things that are not actually involved
+	;  with sound, but are required in the sound stream.
+	;  These are classified under the "General" event heading,
+	;  since they can do anything, or nothing.
+GeneralEvent			etype	word, 0, 2
+	GE_NO_EVENT		enum	GeneralEvent
+	GE_END_OF_SONG		enum	GeneralEvent
+	GE_SET_PRIORITY		enum	GeneralEvent
+	GE_SET_TEMPO		enum	GeneralEvent
+	GE_SEND_NOTIFICATION	enum	GeneralEvent
+	GE_V_SEMAPHORE		enum	GeneralEvent
+	; GE_NO_EVENT is used to generate exceptionally
+	; long durations.
+	;
+	; USAGE ::  GE_NO_EVENT
+	;
+	; GE_END_OF_SONG marks the end of the song. Any
+	; event or delta-time after and EOS mark will be
+	; ignored
+	;
+	; USAGE ::  GE_END_OF_SONG
+	;
+	; GE_SET_PRIORITY changes the priority of the
+	; stream.  All following events will be evaluated
+	; at that priority.
+	;
+	; USAGE ::  GE_SET_PRIORITY <word SoundPriority>
+	;
+	; GE_SET_TEMPO changes the tempo of the song from
+	; that point onward.  Any deltaTempo following
+	; that event will use the new value as the # of
+	; msec per 128th beet.
+	;
+	; USAGE ::  GE_SET_TEMPO <word # of msec/128th>
+	;
+	; GE_SEND_NOTIFICATION causes the stream to send
+	; a given message to a given object.  The message
+	; will be placed at the end of the queue.
+	;
+	; USAGE ::  GE_SEND_NOTIFICATION <word message>
+	;		<object handle> <object chunk> 
+	;
+	; GE_V_SEMAPHORE causes the stream to V the semaphore
+	; handle.
+	;
+	; USAGE ::  GE_V_SEMAPHORE <handle of semaphore>
+	
+
+;-----------------------------------------------------------------------------
+;			Musical Definitions
+;-----------------------------------------------------------------------------
+;
+;	The following note constants are based upon this standard:
+;
+;	The note 'A' is represented by frequencies 220, 440, 880, etc.
+;
+;	Each half step (i.e., from a natural up to a sharp, or down to a flat)
+;	requires a scaling by the twelfth root of 2 (so that 12 half steps =
+;	one octave).
+;
+;	The twelfth root of 2 ~ 1.0594631
+;
+;	Of general interest:
+;
+;	Each note should be accompanied by a following rest period. For normal
+;	play, the note should be played for 7/8 of the duration, and rest for
+;	the remaining 1/8 duration. For staccato play, the note plays only
+;	6/8 of the time, and rests for 2/8. For legato play, the note plays
+;	for the entire duration.
+;
+;	The octave begins with 'C'; this means that the note below MIDDLE_C is
+;	LOW_B and the note above MIDDLE_B is HIGH_C.
+;
+;	Every note has an associated sharp (equal to the note times
+;	2^(-12) ) and flat (equal to the note divided by 2^(-12) ).
+;	Thus, the lowest note is LOW_C_b, which is one octave below
+;	LOW_B, and the highest note is HIGH_B_SH, which is one octave
+;	above HIGH_C.
+;
+;	You can increase/decrease octaves by multiplying/dividing the frequency
+;	by two.
+;	For example, to get the note one octave below LOW_C, use LOW_C / 2
+;
+
+LOW_C_b		equ 247				;246.942 Hz
+MIDDLE_C_b	equ LOW_B			;493.9 Hz = LOW_B
+HIGH_C_b	equ MIDDLE_B			;987.8 Hz = MIDDLE_B
+
+LOW_C 		equ 262				;261.626 Hz
+MIDDLE_C 	equ 523				;523.251 Hz
+HIGH_C 		equ 1047			;1046.502 Hz
+
+LOW_C_SH 	equ 277				;277.183 Hz
+MIDDLE_C_SH 	equ 554				;554.365 Hz
+HIGH_C_SH 	equ 1109			;1108.730 Hz
+
+LOW_D_b 	equ LOW_C_SH			;277.183 Hz
+MIDDLE_D_b 	equ MIDDLE_C_SH			;554.365 Hz
+HIGH_D_b 	equ HIGH_C_SH			;1108.730 Hz
+
+LOW_D 		equ 294				;293.665 Hz
+MIDDLE_D	equ 587				;587.330 Hz
+HIGH_D 		equ 1175			;1174.659 Hz
+
+LOW_D_SH 	equ 311				;311.126 Hz
+MIDDLE_D_SH 	equ 622				;622.254 Hz
+HIGH_D_SH 	equ 1245			;1244.508 Hz
+
+LOW_E_b 	equ LOW_D_SH			;311.126 Hz
+MIDDLE_E_b 	equ MIDDLE_D_SH			;622.254 Hz
+HIGH_E_b 	equ HIGH_D_SH			;1244.508 Hz
+
+LOW_E 		equ 330				;329.627 Hz
+MIDDLE_E 	equ 659				;659.255 Hzz
+HIGH_E 		equ 1319			;1318.510 Hz
+
+LOW_E_SH	equ LOW_F			;349.2 Hz equ LOW_F
+MIDDLE_E_SH	equ MIDDLE_F			;698.5 Hz equ MIDDLE_F
+HIGH_E_SH	equ HIGH_F			;1396.9 Hz equ HIGH_F
+
+LOW_F_b		equ LOW_E			;329.6 Hz equ LOW_E
+MIDDLE_F_b	equ MIDDLE_E			;659.3 Hz equ MIDDLE_E
+HIGH_F_b	equ HIGH_E			;1318.5 Hz equ HIGH_E
+
+LOW_F 		equ 349				;349.228 Hz
+MIDDLE_F 	equ 698				;698.456 Hz
+HIGH_F 		equ 1397			;1396.913 Hz
+
+LOW_F_SH 	equ 370				;369.994 Hz
+MIDDLE_F_SH 	equ 740				;739.989 Hz
+HIGH_F_SH 	equ 1480			;1479.978 Hz
+
+LOW_G_b 	equ LOW_F_SH			;369.994 Hz
+MIDDLE_G_b 	equ MIDDLE_F_SH			;739.989 Hz
+HIGH_G_b 	equ HIGH_F_SH			;1479.978 Hz
+
+LOW_G 		equ 392				;391.995 Hz
+MIDDLE_G 	equ 784				;783.990 Hz
+HIGH_G 		equ 1568			;1567.982 Hz
+
+LOW_G_SH 	equ 415				;415.305 Hz
+MIDDLE_G_SH 	equ 831				;830.609 Hz
+HIGH_G_SH 	equ 1661			;1661.218 Hz
+
+LOW_A_b 	equ LOW_G_SH			;415.305 Hz
+MIDDLE_A_b 	equ MIDDLE_G_SH			;830.609 Hz
+HIGH_A_b 	equ HIGH_G_SH			;1661.218 Hz
+
+LOW_A 		equ 440				;440 Hz
+MIDDLE_A 	equ 880				;880 Hz
+HIGH_A 		equ 1760			;1760 Hz
+
+LOW_A_SH 	equ 466				;466.163 Hz
+MIDDLE_A_SH 	equ 932				;932.327 Hz
+HIGH_A_SH 	equ 1865			;1864.655 Hz
+
+LOW_B_b 	equ LOW_A_SH			;466.163 Hz
+MIDDLE_B_b 	equ MIDDLE_A_SH			;932.327 Hz
+HIGH_B_b 	equ HIGH_A_SH			;1864.655 Hz
+
+LOW_B 		equ 494				;493.883 Hz
+MIDDLE_B 	equ 988				;987.767 Hz
+HIGH_B 		equ 1976			;1975.533 Hz
+
+LOW_B_SH	equ MIDDLE_C			;554.4 Hz equ MIDDLE_C
+MIDDLE_B_SH	equ HIGH_C			;1046.5 Hz equ HIGH_C
+HIGH_B_SH	equ 2093			;2093.005 Hz
+
+	;
+	;  Double-sharp & double-flat equates.
+	;
+
+LOW_C_DSH	equ LOW_D
+MIDDLE_C_DSH	equ MIDDLE_D
+HIGH_C_DSH	equ HIGH_D
+
+LOW_C_bb	equ LOW_B_b/2			; Looooow
+MIDDLE_C_bb	equ LOW_B_b
+HIGH_C_bb	equ MIDDLE_B_b
+
+LOW_D_DSH	equ LOW_E
+MIDDLE_D_DSH	equ MIDDLE_E
+HIGH_D_DSH	equ HIGH_E
+
+LOW_D_bb	equ LOW_C
+MIDDLE_D_bb	equ MIDDLE_C
+HIGH_D_bb	equ HIGH_C
+
+LOW_E_DSH	equ LOW_F_SH
+MIDDLE_E_DSH	equ MIDDLE_F_SH
+HIGH_E_DSH	equ HIGH_F_SH
+
+LOW_E_bb	equ LOW_D
+MIDDLE_E_bb	equ MIDDLE_D
+HIGH_E_bb	equ HIGH_D
+
+LOW_F_DSH	equ LOW_G
+MIDDLE_F_DSH	equ MIDDLE_G
+HIGH_F_DSH	equ HIGH_G
+
+LOW_F_bb	equ LOW_E_b
+MIDDLE_F_bb	equ MIDDLE_E_b
+HIGH_F_bb	equ HIGH_E_b
+
+LOW_G_DSH	equ LOW_A
+MIDDLE_G_DSH	equ MIDDLE_A
+HIGH_G_DSH	equ HIGH_A
+
+LOW_G_bb	equ LOW_F
+MIDDLE_G_bb	equ MIDDLE_F
+HIGH_G_bb	equ HIGH_F
+
+LOW_A_DSH	equ LOW_B
+MIDDLE_A_DSH	equ MIDDLE_B
+HIGH_A_DSH	equ HIGH_B
+
+LOW_A_bb	equ LOW_G
+MIDDLE_A_bb	equ MIDDLE_G
+HIGH_A_bb	equ HIGH_G
+
+LOW_B_DSH	equ MIDDLE_C_SH
+MIDDLE_B_DSH	equ HIGH_C_SH
+HIGH_B_DSH	equ HIGH_C_SH*2
+
+LOW_B_bb	equ LOW_A
+MIDDLE_B_bb	equ MIDDLE_A
+HIGH_B_bb	equ HIGH_A
+
+	;
+	;  Volume constants
+
+DYNAMIC_FFFF	equ	0ffffh		; ffff	  very, very loud
+DYNAMIC_FFF	equ	0e800h		; fff     very loud
+DYNAMIC_FF	equ	0d000h		; ff      rather loud
+DYNAMIC_F	equ	0b800h		; f	  loud
+DYNAMIC_MF	equ	0ad00h		; mf 	  loud-ish
+DYNAMIC_MP	equ	09800h		; mp	  soft-ish
+DYNAMIC_P	equ	08000h		; p	  soft
+DYNAMIC_PP	equ	06800h		; pp	  pretty quiet
+DYNAMIC_PPP	equ	05000h		; ppp     very quiet
+DYNAMIC_PPPP	equ	03800h		; pppp    are they playing?
+
+QUADRUPLE_FORTE	equ	DYNAMIC_FFFF
+TRIPLE_FORTE	equ	DYNAMIC_FFF
+DOUBLE_FORTE	equ	DYNAMIC_FF
+FORTE		equ	DYNAMIC_F
+MEZZO_FORTE	equ	DYNAMIC_MF
+MEZZO_PIANO	equ	DYNAMIC_MP
+PIANO		equ	DYNAMIC_P
+DOUBLE_PIANO	equ	DYNAMIC_PP
+TRIPLE_PIANO	equ	DYNAMIC_PPP
+QUADRUPLE_PIANO	equ	DYNAMIC_PPPP
+
+	;
+	;  Duration constants
+DOUBLE_DOT_WHOLE		equ	WHOLE + HALF + QUARTER
+DOTTED_WHOLE			equ	WHOLE + HALF
+WHOLE				equ	128
+DOUBLE_DOT_HALF			equ	HALF + QUARTER + EIGHTH
+DOTTED_HALF			equ	HALF + QUARTER
+HALF				equ	64
+DOUBLE_DOT_QUARTER		equ	QUARTER + EIGHTH + SIXTEENTH
+DOTTED_QUARTER			equ	QUARTER + EIGHTH
+QUARTER				equ	32
+DOUBLE_DOT_EIGHTH		equ	EIGHTH + SIXTEENTH + THIRTYSECOND
+DOTTED_EIGHTH			equ	EIGHTH + SIXTEENTH
+EIGHTH				equ	16
+DOUBLE_DOT_SIXTEENTH		equ	SIXTEENTH + THIRTYSECOND + SIXTYFOURTH
+DOTTED_SIXTEENTH		equ	SIXTEENTH + THIRTYSECOND
+SIXTEENTH			equ	8
+DOTTED_THIRTYSECOND		equ	THIRTYSECOND + SIXTYFOURTH
+THIRTYSECOND			equ	4
+SIXTYFOURTH			equ	2
+ONE_HUNDRED_TWENTY_EIGHTH	equ	1
+
+;------------------------------------------------------------------------------
+;			Mixer API Constants
+;-----------------------------------------------------------------------------
+
+	MixerLevel	record
+		ML_OFF:1
+		ML_LEVEL:7
+	MixerLevel	end
+
+	MIXER_LVL_MIN	equ	0x0
+	MIXER_LVL_MAX	equ	0x7F
+	MIXER_LVL_OFF	equ	0x80
+	MIXER_LVL_MUTE	equ	MIXER_LVL_OFF
+
+	StdSourceType		etype	byte, 0, 1
+		SST_DAC		enum	StdSourceType, 0x00
+		SST_MIDI	enum	StdSourceType, 0x01
+		SST_CDROM	enum	StdSourceType, 0x02
+		SST_MODEM	enum	StdSourceType, 0x03
+		SST_MIC_IN	enum	StdSourceType, 0x04
+		SST_PC_SPKR	enum	StdSourceType, 0x05
+
+	StdSourceBehavior	record
+		SSB_MONO:1
+		SSB_SIG_BITS:3
+		:4
+	StdSourceBehavior	end
+
+	StdEffectType		etype	byte, 0, 1
+		SET_BASS	enum	StdEffectType, 0x00
+		SET_TREBLE	enum	StdEffectType, 0x01
+		SET_EXPANDER	enum	StdEffectType, 0x02
+
+	StdEffectBehavior	record
+		SEB_MONO:1
+		SEB_SIG_BITS:3
+		:4
+	StdEffectBehavior	end
+
+
+;------------------------------------------------------------------------------
+;			Musical Macros
+;-----------------------------------------------------------------------------
+;
+;		Here are a couple macros that estimate the duration
+;		split between actual note and rest time.  As Staccato,
+;		Natural and Legatto are all musical terms, all the delta
+;		times for these notes are based on TEMPO, thus it is possible
+;		for the sound to be sped up or slowed down.
+;
+;		Here is a sample sound buffer as it would appear in a .ui file:
+;
+;		chunk SampleBuffer = data {
+;			Change	 0, IP_VIOLIN			; play a violin
+;			Staccato 0, MIDDLE_C, QUARTER, MEZZO_FORTE
+;			Staccato 0, MIDDLE_B, QUARTER, MEZZO_FORTE
+;			Rest	 QUARTER
+;			Staccato 0, LOW_C   , QUARTER, FORTE
+;			Natural  0, LOW_B   , EIGHTH , MEZZO_FORTE
+;				...
+;			General	 GE_END_OF_SONG
+;		}
+;
+
+	;
+	;  Musical macro definitions for creating sound streams
+	;  in a musical format
+Rest		macro	duration
+	General		GE_NO_EVENT
+	DeltaTick	duration
+endm
+
+	;
+	;  Stream oriented macros for defining raw stream data
+VoiceOn		macro	voice,freq,attack
+	word	SSE_VOICE_ON
+	word	voice
+	word	freq
+	word	attack
+endm
+
+VoiceOff	macro	voice
+	word	SSE_VOICE_OFF
+	word	voice
+endm
+
+ChangeEnvelope	macro	voice, instrum
+	word	SSE_CHANGE
+	word	voice
+	dword	instrum
+endm
+
+DeltaTick	macro	time
+	word	SSDTT_TICKS
+	word	time			; time = # of ticks
+endm
+
+DeltaMS		macro	time
+	word	SSDTT_MSEC
+	word	time			; time = # of msec
+endm
+
+DeltaTempo	macro	time
+	word	SSDTT_TEMPO
+	word	time			; time = # of 64th notes
+endm
+
+General		macro	command
+	word	SSE_GENERAL
+	word	command
+endm
+
+SoundNote	macro	voice, freq, duration, attack
+	VoiceOn		voice, freq, attack
+	DeltaTempo	duration
+	VoiceOff	voice
+endm
+
+Staccato	macro	voice, freq, duration, attack
+	VoiceOn		voice, freq, attack
+	DeltaTempo	(duration*3)/4
+	VoiceOff	voice
+	DeltaTempo	(duration/4)
+endm
+
+Natural 	macro	voice, freq, duration, attack
+	VoiceOn		voice, freq, attack
+	DeltaTempo	(duration*7)/8
+	VoiceOff	voice
+	DeltaTempo	(duration/8)
+endm
+
+Legato		macro	voice, freq, duration, attack
+	VoiceOn		voice, freq, attack
+	DeltaTempo	duration
+	VoiceOff	voice
+endm
+
+ChangePriority	macro	newPriority
+	word	SSE_GENERAL
+	word	GE_SET_PRIORITY
+	word	newPriority
+endm
+
+
+;-----------------------------------------------------------------------------
+;		Standard Instrument Patches
+;-----------------------------------------------------------------------------
+IT_STANDARD_TABLE	equ	0	; instrument table
+
+INVALID_INSTRUMENT	equ	-1
+
+	; MIDI patch   1-  8 = Piano
+InstrumentPatch				etype	dword, 0, 1
+IP_ACOUSTIC_GRAND_PIANO			enum InstrumentPatch
+IP_BRIGHT_ACOUSTIC_PIANO		enum InstrumentPatch
+IP_ELECTRIC_GRAND_PIANO			enum InstrumentPatch
+IP_HONKY_TONK_PIANO			enum InstrumentPatch
+IP_ELECTRIC_PIANO_1			enum InstrumentPatch
+IP_ELECTRIC_PIANO_2			enum InstrumentPatch
+IP_HARPSICORD				enum InstrumentPatch
+IP_CLAVICORD				enum InstrumentPatch
+	; MIDI patch   9- 16 = Chromatic Percussion
+IP_CELESTA				enum InstrumentPatch
+IP_GLOCKENSPIEL				enum InstrumentPatch
+IP_MUSIC_BOX				enum InstrumentPatch
+IP_VIBRAPHONE				enum InstrumentPatch
+IP_MARIMBA				enum InstrumentPatch
+IP_XYLOPHONE				enum InstrumentPatch
+IP_TUBULAR_BELLS			enum InstrumentPatch
+IP_DULCIMER				enum InstrumentPatch
+	; MIDI patch  17- 24 = Organ
+IP_DRAWBAR_ORGAN			enum InstrumentPatch
+IP_PERCUSSIVE_ORGAN			enum InstrumentPatch
+IP_ROCK_ORGAN				enum InstrumentPatch
+IP_CHURCH_ORGAN				enum InstrumentPatch
+IP_REED_ORGAN				enum InstrumentPatch
+IP_ACCORDION				enum InstrumentPatch
+
+IP_HARMONICA				enum InstrumentPatch
+IP_TANGO_ACCORDION			enum InstrumentPatch
+	; MIDI patch  25- 32  = Guitar
+IP_ACOUSTIC_NYLON_GUITAR		enum InstrumentPatch
+IP_ACOUSTIC_STEEL_GUITAR		enum InstrumentPatch
+IP_ELECTRIC_JAZZ_GUITAR			enum InstrumentPatch
+IP_ELECTRIC_CLEAN_GUITAR		enum InstrumentPatch
+IP_ELECTRIC_MUTED_GUITAR		enum InstrumentPatch
+IP_OVERDRIVEN_GUITAR			enum InstrumentPatch
+IP_DISTORTION_GUITAR			enum InstrumentPatch
+IP_GUITAR_HARMONICS			enum InstrumentPatch
+	; MIDI patch  33- 40 = Bass
+IP_ACOUSTIC_BASS			enum InstrumentPatch
+IP_ELECTRIC_FINGERED_BASS		enum InstrumentPatch
+IP_ELECTRIC_PICKED_BASS			enum InstrumentPatch
+IP_FRETLESS_BASS			enum InstrumentPatch
+IP_SLAP_BASS_1				enum InstrumentPatch
+IP_SLAP_BASS_2				enum InstrumentPatch
+IP_SYNTH_BASS_1				enum InstrumentPatch
+IP_SYNTH_BASS_2				enum InstrumentPatch
+	; MIDI patch  41- 48 = Strings
+IP_VIOLIN				enum InstrumentPatch
+IP_VIOLA				enum InstrumentPatch
+IP_CELLO				enum InstrumentPatch
+IP_CONTRABASS				enum InstrumentPatch
+IP_TREMOLO_STRINGS			enum InstrumentPatch
+IP_PIZZICATO_STRINGS			enum InstrumentPatch
+IP_ORCHESTRAL_HARP			enum InstrumentPatch
+IP_TIMPANI				enum InstrumentPatch
+	; MIDI patch  49- 56 = Ensemble
+IP_STRING_ENSEMBLE_1			enum InstrumentPatch
+IP_STRING_ENSEMBLE_2			enum InstrumentPatch
+IP_SYNTH_STRINGS_1			enum InstrumentPatch
+IP_SYNTH_STRINGS_2			enum InstrumentPatch
+IP_CHOIR_AAHS				enum InstrumentPatch
+IP_VOICE_OOHS				enum InstrumentPatch
+IP_SYNTH_VOICE				enum InstrumentPatch
+IP_ORCHESTRA_HIT			enum InstrumentPatch
+	; MIDI patch  57- 64 = Brass
+IP_TRUMPET				enum InstrumentPatch
+IP_TROMBONE				enum InstrumentPatch
+IP_TUBA					enum InstrumentPatch
+IP_MUTED_TRUMPET			enum InstrumentPatch
+IP_FRENCH_HORN				enum InstrumentPatch
+IP_BRASS_SECTION			enum InstrumentPatch
+IP_SYNTH_BRASS_1			enum InstrumentPatch
+IP_SYNTH_BRASS_2			enum InstrumentPatch
+	; MIDI patch  65- 72 = Reed
+IP_SOPRANO_SAX				enum InstrumentPatch
+IP_ALTO_SAX				enum InstrumentPatch
+IP_TENOR_SAX				enum InstrumentPatch
+IP_BARITONE_SAX				enum InstrumentPatch
+IP_OBOE					enum InstrumentPatch
+IP_ENGLISH_HORN				enum InstrumentPatch
+IP_BASSOON				enum InstrumentPatch
+IP_CLARINET				enum InstrumentPatch
+	; MIDI patch  73- 80 = Pipe
+IP_PICCOLO				enum InstrumentPatch
+IP_FLUTE				enum InstrumentPatch
+IP_RECORDER				enum InstrumentPatch
+IP_PAN_FLUTE				enum InstrumentPatch
+IP_BLOWN_BOTTLE				enum InstrumentPatch
+IP_SHAKUHACHI				enum InstrumentPatch
+IP_WHISTLE				enum InstrumentPatch
+IP_OCARINA				enum InstrumentPatch
+	; MIDI patch  81- 88 = Synth Lead
+IP_LEAD_SQUARE				enum InstrumentPatch
+IP_LEAD_SAWTOOTH			enum InstrumentPatch
+IP_LEAD_CALLIOPE			enum InstrumentPatch
+IP_LEAD_CHIFF				enum InstrumentPatch
+IP_LEAD_CHARANG				enum InstrumentPatch
+IP_LEAD_VOICE				enum InstrumentPatch
+IP_LEAD_FIFTHS				enum InstrumentPatch
+IP_LEAD_BASS_LEAD			enum InstrumentPatch
+	; MIDI patch  89- 96 = Synth Pad
+IP_PAD_NEW_AGE				enum InstrumentPatch
+IP_PAD_WARM				enum InstrumentPatch
+IP_PAD_POLYSYNTH			enum InstrumentPatch
+IP_PAD_CHOIR				enum InstrumentPatch
+IP_PAD_BOWED				enum InstrumentPatch
+IP_PAD_METALLIC				enum InstrumentPatch
+IP_PAD_HALO				enum InstrumentPatch
+IP_PAD_SWEEP				enum InstrumentPatch
+	; MIDI patch  97-104 = Synth Effects
+IP_FX_RAIN				enum InstrumentPatch
+IP_FX_SOUNDTRACK			enum InstrumentPatch
+IP_FX_CRYSTAL				enum InstrumentPatch
+IP_FX_ATMOSPHERE			enum InstrumentPatch
+IP_FX_BRIGHTNESS			enum InstrumentPatch
+IP_FX_GOBLINS				enum InstrumentPatch
+IP_FX_ECHOES				enum InstrumentPatch
+IP_FX_SCI_FI				enum InstrumentPatch
+	; MIDI patch 105-112 = Ethnic
+IP_SITAR				enum InstrumentPatch
+IP_BANJO				enum InstrumentPatch
+IP_SHAMISEN				enum InstrumentPatch
+IP_KOTO					enum InstrumentPatch
+IP_KALIMBA				enum InstrumentPatch
+IP_BAG_PIPE				enum InstrumentPatch
+IP_FIDDLE				enum InstrumentPatch
+IP_SHANAI				enum InstrumentPatch
+	; MIDI patch 113-120 = Percussive
+IP_TINKLE_BELL				enum InstrumentPatch
+IP_AGOGO				enum InstrumentPatch
+IP_STEEL_DRUMS				enum InstrumentPatch
+IP_WOODBLOCK				enum InstrumentPatch
+IP_TAIKO_DRUM				enum InstrumentPatch
+IP_MELODIC_TOM				enum InstrumentPatch
+IP_SYNTH_DRUM				enum InstrumentPatch
+IP_REVERSE_CYMBAL			enum InstrumentPatch
+	; MIDI patch 128-132 = SoundEffects
+IP_GUITAR_FRET_NOISE			enum InstrumentPatch
+IP_BREATH_NOISE				enum InstrumentPatch
+IP_SEASHORE				enum InstrumentPatch
+IP_BIRD_TWEET				enum InstrumentPatch
+IP_TELEPHONE_RING			enum InstrumentPatch
+IP_HELICOPTER				enum InstrumentPatch
+IP_APPLAUSE				enum InstrumentPatch
+IP_GUNSHOT				enum InstrumentPatch
+	; MIDI Percussion Map (Channel 10)
+	; Keys 35-42
+IP_ACOUSTIC_BASS_DRUM			enum InstrumentPatch
+IP_BASS_DRUM_1				enum InstrumentPatch
+IP_SIDE_STICK				enum InstrumentPatch
+IP_ACOUSTIC_SNARE			enum InstrumentPatch
+IP_HAND_CLAP				enum InstrumentPatch
+IP_ELECTRIC_SNARE			enum InstrumentPatch
+IP_LOW_FLOOR_TOM			enum InstrumentPatch
+IP_CLOSED_HI_HAT			enum InstrumentPatch
+	; Keys 43-50
+IP_HIGH_FLOOR_TOM			enum InstrumentPatch
+IP_PEDAL_HI_HAT				enum InstrumentPatch
+IP_LOW_TOM				enum InstrumentPatch
+IP_OPEN_HI_HAT				enum InstrumentPatch
+IP_LOW_MID_TOM				enum InstrumentPatch
+IP_HI_MID_TOM				enum InstrumentPatch
+IP_CRASH_CYMBAL_1			enum InstrumentPatch
+IP_HIGH_TOM				enum InstrumentPatch
+	; Keys 51-58
+IP_RIDE_CYMBAL_1			enum InstrumentPatch
+IP_CHINESE_CYMBAL			enum InstrumentPatch
+IP_RIDE_BELL				enum InstrumentPatch
+IP_TAMBOURINE				enum InstrumentPatch
+IP_SPLASH_CYMBAL			enum InstrumentPatch
+IP_COWBELL				enum InstrumentPatch
+IP_CRASH_CYMBAL_2			enum InstrumentPatch
+IP_VIBRASLAP				enum InstrumentPatch
+	; Keys 59-66
+IP_RIDE_CYMBAL_2			enum InstrumentPatch
+IP_HI_BONGO				enum InstrumentPatch
+IP_LOW_BONGO				enum InstrumentPatch
+IP_MUTE_HI_CONGA			enum InstrumentPatch
+IP_OPEN_HI_CONGA			enum InstrumentPatch
+IP_LOW_CONGA				enum InstrumentPatch
+IP_HI_TIMBALE				enum InstrumentPatch
+IP_LOW_TIMBALE				enum InstrumentPatch
+	; Keys 67-74
+IP_HIGH_AGOGO				enum InstrumentPatch
+IP_LOW_AGOGO				enum InstrumentPatch
+IP_CABASA				enum InstrumentPatch
+IP_MARACAS				enum InstrumentPatch
+IP_SHORT_WHISTLE			enum InstrumentPatch
+IP_LONG_WHISTLE				enum InstrumentPatch
+IP_SHORT_GUIRO				enum InstrumentPatch
+IP_LONG_GUIRO				enum InstrumentPatch
+	; Keys 75-81
+IP_CLAVES				enum InstrumentPatch
+IP_HI_WOOD_BLOCK			enum InstrumentPatch
+IP_LOW_WOOD_BLOCK			enum InstrumentPatch
+IP_MUTE_CUICA				enum InstrumentPatch
+IP_OPEN_CUICA				enum InstrumentPatch
+IP_MUTE_TRIANGLE			enum InstrumentPatch
+IP_OPEN_TRIANGLE			enum InstrumentPatch
+
+;
+; Default instrument patch is used when no instrument specified
+;
+DEFAULT_INSTRUMENT		equ	IP_ACOUSTIC_GRAND_PIANO
+	
+;
+;  we used too have this speling eror...
+;
+IP_ACCORDIAN		equ	IP_ACCORDION
+IP_STRING_ENSAMBLE_1	equ	IP_STRING_ENSEMBLE_1
+IP_STRING_ENSAMBLE_2	equ	IP_STRING_ENSEMBLE_2
+IP_TREMELO_STRINGS	equ	IP_TREMOLO_STRINGS
+
+	;
+	;  In the midi standard, all the percussion instruments
+	;  have only one "note" they play.  To get the instrument
+	;  patch to sound correct, pass the following constant as
+	;  the "frequency" for the specific patch to play.
+	;
+	;  Example:
+	;		ChangeEnvelope	0, IP_OPEN_HI_HAT
+	;		VoiceOn		0, FR_OPEN_HI_HAT, DYNAMIC_FF
+	;		DeltaTick	2
+	;		VoiceOff	0
+	;		DeltaTick	10
+	;		VoiceOn		0, FR_OPEN_HIT_HAT, DYNAMI_FF
+	;		...
+	;
+	;  You can pass any note, of course, and things should
+	;	work, but it probably won't sound correct don't
+	;	pass this constant.
+	;
+	;  These note values (by the way) are simply provided
+	;	so that our OPL2 driver works correctly.
+	
+FR_ACOUSTIC_BASS_DRUM			equ LOW_C_b
+FR_BASS_DRUM_1				equ LOW_C / 2
+FR_SIDE_STICK				equ MIDDLE_G_SH
+FR_ACOUSTIC_SNARE			equ MIDDLE_C
+FR_HAND_CLAP				equ MIDDLE_C
+FR_ELECTRIC_SNARE			equ MIDDLE_C
+FR_LOW_FLOOR_TOM			equ LOW_C
+FR_CLOSED_HI_HAT			equ MIDDLE_C
+FR_HIGH_FLOOR_TOM			equ LOW_F
+FR_PEDAL_HI_HAT				equ MIDDLE_C
+FR_LOW_TOM				equ LOW_G_SH
+FR_OPEN_HI_HAT				equ MIDDLE_C
+FR_LOW_MID_TOM				equ MIDDLE_C
+FR_HI_MID_TOM				equ MIDDLE_F
+FR_CRASH_CYMBAL_1			equ MIDDLE_C
+FR_HIGH_TOM				equ MIDDLE_G_SH
+FR_RIDE_CYMBAL_1			equ MIDDLE_C
+FR_CHINESE_CYMBAL			equ MIDDLE_C
+FR_RIDE_BELL				equ MIDDLE_C
+FR_TAMBOURINE				equ MIDDLE_C
+FR_SPLASH_CYMBAL			equ MIDDLE_C
+FR_COWBELL				equ LOW_C
+FR_CRASH_CYMBAL_2			equ MIDDLE_C
+FR_VIBRASLAP				equ MIDDLE_C
+FR_RIDE_CYMBAL_2			equ MIDDLE_C
+FR_HI_BONGO				equ MIDDLE_G_SH
+FR_LOW_BONGO				equ MIDDLE_E
+FR_MUTE_HI_CONGA			equ MIDDLE_G_SH
+FR_OPEN_HI_CONGA			equ MIDDLE_G_SH
+FR_LOW_CONGA				equ MIDDLE_C
+FR_HI_TIMBALE				equ MIDDLE_C
+FR_LOW_TIMBALE				equ LOW_G_SH
+FR_HIGH_AGOGO				equ LOW_F_SH
+FR_LOW_AGOGO				equ LOW_C
+FR_CABASA				equ MIDDLE_C
+FR_MARACAS				equ MIDDLE_C
+FR_SHORT_WHISTLE			equ HIGH_G_SH
+FR_LONG_WHISTLE				equ HIGH_G_SH
+FR_SHORT_GUIRO				equ MIDDLE_C
+FR_LONG_GUIRO				equ MIDDLE_C
+FR_CLAVES				equ HIGH_G_SH * 2
+FR_HI_WOOD_BLOCK			equ MIDDLE_C
+FR_LOW_WOOD_BLOCK			equ LOW_F_SH
+FR_MUTE_CUICA				equ MIDDLE_C
+FR_OPEN_CUICA				equ MIDDLE_C
+FR_MUTE_TRIANGLE			equ MIDDLE_G_SH
+FR_OPEN_TRIANGLE			equ MIDDLE_G_SH
+
+
+;-----------------------------------------------------------------------------
+;		DAC MANUFACTURER FORMAT
+;-----------------------------------------------------------------------------
+
+	;
+	;  DAC sounds can be stored in a variety of formats.
+	;
+	;  By default, the formats listed are monoural.  To indicate the stereo
+	;  version of a format, DACSF_STEREO is OR'd with the DACSampleFormat
+	;  enum value.  Not all formats are available in stereo.
+	;
+	;  The ADPCM data can either have a reference byte at
+	;	the start of the data, or not.  Only the 1st
+	;	block in a song will have a reference byte.
+	; 	That byte is the starting value for the DAC.
+
+DACSampleFormat		etype	word, 0, 1
+DACSF_8_BIT_PCM		enum DACSampleFormat
+DACSF_2_TO_1_ADPCM	enum DACSampleFormat
+DACSF_3_TO_1_ADPCM	enum DACSampleFormat
+DACSF_4_TO_1_ADPCM	enum DACSampleFormat
+
+DACSF_STEREO        equ 0x4000
+
+DACReferenceByte	etype	word, 0, 1
+DACRB_NO_REFERENCE_BYTE		enum DACReferenceByte
+DACRB_WITH_REFERENCE_BYTE	enum DACReferenceByte
+
+
+SampleFormat 	record
+	SMID_format	DACSampleFormat:15
+	SMID_reference	DACReferenceByte:1
+SampleFormat 	end
+
+DACPlayFlags	record
+	DACPF_CATENATE:1
+	:7
+DACPlayFlags	end
+
+SampleFormatDescription	struct
+	SFD_manufact	ManufacturerID
+	SFD_format	SampleFormat
+	SFD_rate	word
+	SFD_playFlags	DACPlayFlags
+SampleFormatDescription	ends
+
+;-----------------------------------------------------------------------------
+;		Sound Driver Definition
+
+;-----------------------------------------------------------------------------
+SoundFunction		etype	word, DriverFunction, 2
+
+DR_SOUND_ENTER_LIBRARY_ROUTINE	enum SoundFunction
+DR_SOUND_EXIT_LIBRARY_ROUTINE	enum SoundFunction
+
+DR_SOUND_ALLOC_MUSIC		enum SoundFunction
+DR_SOUND_ALLOC_MUSIC_STREAM	enum SoundFunction
+DR_SOUND_ALLOC_MUSIC_NOTE	enum SoundFunction
+
+DR_SOUND_REALLOC_MUSIC		enum SoundFunction
+DR_SOUND_REALLOC_MUSIC_NOTE	enum SoundFunction
+
+DR_SOUND_PLAY_MUSIC		enum SoundFunction
+DR_SOUND_PLAY_TO_MUSIC_STREAM   enum SoundFunction
+DR_SOUND_PLAY_TO_MUSIC_STREAM_NB \
+                                enum SoundFunction
+
+DR_SOUND_STOP_MUSIC		enum SoundFunction
+DR_SOUND_STOP_MUSIC_STREAM	enum SoundFunction
+
+DR_SOUND_INIT_MUSIC		enum SoundFunction
+
+DR_SOUND_FREE_SIMPLE		enum SoundFunction
+DR_SOUND_FREE_STREAM		enum SoundFunction
+
+DR_SOUND_CHANGE_OWNER_SIMPLE	enum SoundFunction
+DR_SOUND_CHANGE_OWNER_STREAM	enum SoundFunction
+
+DR_SOUND_ALLOC_SAMPLE_STREAM	enum SoundFunction
+DR_SOUND_ENABLE_SAMPLE_STREAM	enum SoundFunction
+DR_SOUND_PLAY_TO_SAMPLE_STREAM	enum SoundFunction
+DR_SOUND_DISABLE_SAMPLE_STREAM	enum SoundFunction
+DR_SOUND_FREE_SAMPLE_STREAM	enum SoundFunction
+
+DR_SOUND_PLAY_MUSIC_LMEM	enum SoundFunction
+DR_SOUND_REALLOC_MUSIC_LMEM	enum SoundFunction
+
+
+;-----------------------------------------------------------------------------
+;			SOUND STRUCTURES
+;-----------------------------------------------------------------------------
+	;
+	; These are the types indicating the status of writing events
+	; to a stream.
+	;
+SoundWriteStreamStatus			etype	word, 0, 2
+	SWSS_SUCCESSFUL_WRITE		enum	SoundWriteStreamStatus
+	SWSS_NOT_ENOUGH_SPACE_IN_STREAM_TO_WRITE \
+					enum	SoundWriteStreamStatus
+		
+	;
+	;  There are a couple of different types of sounds.
+	;  The first catagory is where it is stored.
+	;	A simple sound is played from fixed memory.  Simple.
+	;	A stream sound is played from a stream.
+	;  The second catagory is the type of sound.  Currently,
+	;  two formats can't be mixed.
+	;	A sound can be a Frequency Modulation sound
+	;	A sound can be a store digitally and converted to analog.
+	;
+	
+SoundType		etype	word, 0, 2
+	ST_SIMPLE_FM	enum	SoundType
+	ST_STREAM_FM	enum	SoundType
+	ST_SIMPLE_DAC	enum	SoundType
+	ST_STREAM_DAC	enum	SoundType
+
+	;
+	;  The basic pieces of information which all sound have in
+	;  common are in this structure.
+
+SOUND_ID = 022393  ; A unique word which identifies a sound structure
+		   ; as a sound structure.
+		   ; Why 022393?  Because I thought of it on Feb. 23rd, 1993.
+		   ; That's why.
+
+SoundBasicStatus		struct
+	SBS_blockHandle	hptr 		0	; handle of block
+	SBS_ID		word		SOUND_ID; Word that identifies us
+	SBS_mutExSem	hptr		0	; mutEx of this sound
+	SBS_type	SoundType 	0	; what type of block is it?
+	SBS_priority	SoundPriority 	0	; current priority
+	SBS_EOS		EndOfSongFlags 	0	; what to do at EOS
+SoundBasicStatus		ends
+
+	;
+	;  The two different formats for sounds require two different
+	;  sets of information.  As the two formats are exclusive, a
+	;  union of the information works best.
+	;  
+
+SoundFMStatus			struct
+	SFMS_timerHandle	hptr	0	; current timer handle
+	SFMS_timerID		word	0	; current timer ID
+	SFMS_timeRemaining	word	0	; # of 65535 msec left to event
+	SFMS_tempo		word	0	; # of msec per 64th note
+	SFMS_voicesUsed		word	0	; # of voices used in stream
+SoundFMStatus			ends
+
+SoundDACStatus			struct
+	SDACS_rate		word		0 ; sample rate of sound
+	SDACS_format		SampleFormat	0 ; sample format of sound
+	SDACS_manufactID	ManufacturerID	0 ; sample ManufacturerID
+SoundDACStatus			ends
+
+SoundFormatStatus		union
+	SFS_fm			SoundFMStatus	; 11 bytes
+	SFS_dac			SoundDACStatus	; 4 bytes
+SoundFormatStatus		ends
+
+	;
+	;  The two different types of sounds, simple and stream,
+	;  are also mutually exclusive and require different pieces
+	;  of data to determine the current position in the song.
+	;  For an Simple sound, only the place in memory needs
+	;  be updated, for a Stream sound, the stream, reader
+	;  and amount of data must be kept current.
+	;
+	;  The simplest version of the stream is really just a
+	;  pointer into a fixed piece of memery.  This allows for
+	;  very little startup time for the sound.  This makes
+	;  synchronizing the sound to action on the screen very
+	;  easy (I hope...)
+	;
+	;  The more complex version of a sound stream involves a
+	;	true stream.  Basically, data is slipped on 
+	;	the stream at one end and read off the other.
+	;  The main difficulty here is coordination between the
+	;	reader and the writer.  This is parially accomplished
+	;	by the writer maintaining a count of the amount of data
+	;	on the stream, when the count reaches zero, the reader
+	;	marks a flag which the writer checks periodically.  If
+	;	the flag is set, the writer re-starts the reader.
+	;  This should deal with the stream running dry in the worst
+	;	case senario.
+SoundStreamState	record
+	SSS_active	:1		; does a reader exist?
+	SSS_destroying	:1		; is it being destroyed?
+	SSS_locked	:1		; still an outstanding lock?
+	:5
+SoundStreamState	end
+
+SoundSimpleStatus		struct
+	SSS_songBuffer		fptr	0		; fptr to song buffer
+	SSS_songPointer		nptr	0		; current place in song
+	SSS_songHandle		optr	0		; optr to chunk (if
+							;  song in LMem chunk)
+SoundSimpleStatus		ends
+
+SoundStreamStatus		struct
+	SSS_streamToken		word	0		; stream handle
+	SSS_streamSegment	word	0		; stream segment
+	SSS_dataSem		Semaphore <1,>		; all data on stream?
+	SSS_activeReaderSem	Semaphore <1,>		; reader currently on?
+	SSS_writerSem		Semaphore <1,>		; writer mutEx sem
+	SSS_buffer		fptr	0		; fptr to buffer
+	SSS_dataRemaining	word	0		; # of bytes left
+	SSS_dataOnStream	word	0		; # of events/samples
+	SSS_streamState		SoundStreamState	; state of stream
+SoundStreamStatus		ends
+
+SoundPositionStatus		union
+	SSS_simple		SoundSimpleStatus	; 6 bytes
+	SSS_stream		SoundStreamStatus	; 5 bytes
+SoundPositionStatus		end
+
+	;
+	;  For every FM sound, whether simple or stream, the VoiceManager
+	;  must be able to tell what the current instrument is and
+	;  which voice (if any) the stream is currently using.
+	;  It needs to do this for two reasons:
+	;		1) whenever a note gets played the voice
+	;			has to be intialized to match what
+	;			the stream thinks is on the voice
+	;		2) when a stream issues a voice off command,
+	;			the stream manager needs to know which
+	;			voice to actually turn off.
+SoundVoiceStatus		struct
+	SVS_physicalVoice	word                    0
+	SVS_instrument		dword			0
+				word
+SoundVoiceStatus		ends
+
+	;
+	;  This brings us to the final structure, the sound control struct.
+	;  All sounds are controlled by this structure, along with the
+	;  sound data itself, and in the case of an FM sound, with
+	;  one or more SoundVoiceStatus.
+SoundControl			struct
+	SC_status		SoundBasicStatus
+	SC_format		SoundFormatStatus
+	SC_position		SoundPositionStatus
+	SC_voice		label SoundVoiceStatus
+SoundControl			ends
+
+;-----------------------------------------------------------------------------
+;			STRUCTURE MACROS
+;-----------------------------------------------------------------------------
+
+SimpleSoundHeader	macro	voices
+	SoundControl		<>
+	SoundVoiceStatus voices dup (<>)
+endm
+
+;-----------------------------------------------------------------------------
+;			SOUND ERRORS
+;-----------------------------------------------------------------------------
+
+SoundErrors				etype	word, 0, 2
+SOUND_ERROR_NO_ERROR				enum	SoundErrors
+SOUND_ERROR_EXCLUSIVE_ACCESS_GRANTED		enum	SoundErrors
+SOUND_ERROR_OUT_OF_MEMORY			enum	SoundErrors
+SOUND_ERROR_UNABLE_TO_ALLOCATE_STREAM		enum	SoundErrors
+SOUND_ERROR_HARDWARE_NOT_AVAILABLE		enum	SoundErrors
+SOUND_ERROR_FAILED_ATTACH_TO_HARDWARE		enum	SoundErrors
+SOUND_ERROR_HARDWARE_DOESNT_SUPPORT_FORMAT	enum	SoundErrors
+SOUND_ERROR_DAC_UNATTACHED			enum	SoundErrors
+SOUND_ERROR_STREAM_DESTROYED			enum	SoundErrors
+SOUND_ERROR_STREAM_FULL				enum	SoundErrors	
+SOUND_ERROR_CAN_NOT_ALLOCATE_CONTROL_WITH_NO_VOICES	enum	SoundErrors	
+SOUND_ERROR_MIXER_READ_ONLY				enum	SoundErrors
+SOUND_ERROR_MIXER_UNKNOWN_DEVICE			enum	SoundErrors
+SOUND_ERROR_MIXER_VALUE_OUT_OF_RANGE			enum	SoundErrors
+
+	
+;-----------------------------------------------------------------------------
+;			EXPORTED ROUTINES
+;-----------------------------------------------------------------------------
+global	SoundGetExclusive:far
+global	SoundGetExclusiveNB:far
+global	SoundReleaseExclusive:Far
+
+global	SoundAllocMusic:far
+global  SoundPlayMusic:far
+global	SoundStopMusic:far
+global	SoundReallocMusic:far
+global	SoundFreeMusic:far
+global	SoundInitMusic:far
+
+global  SoundAllocMusicNote:far
+global	SoundPlayMusicNote:far
+global	SoundStopMusicNote:far
+global	SoundReallocMusicNote:far
+global	SoundFreeMusicNote:far
+
+global	SoundAllocMusicStream:far
+global	SoundStopMusicStream:far
+global	SoundFreeMusicStream:far
+global  SoundPlayToMusicStream:far
+
+global	SoundChangeOwnerMusic:far
+global	SoundChangeOwnerStream:far
+
+global	SoundAllocSampleStream:far
+global	SoundFreeSampleStream:far
+global	SoundPlayToSampleStream:far
+
+global	SoundEnableSampleStream:far
+global	SoundDisableSampleStream:far
+
+;
+; Old library names
+;
+
+global	SoundAllocSimple:far
+global  SoundPlaySimple:far
+global	SoundStopSimple:far
+global	SoundReallocSimple:far
+global	SoundFreeSimple:far
+global	SoundInitSimple:far
+
+global	SoundAllocSimpleFM:far
+global  SoundPlaySimpleFM:far
+global	SoundStopSimpleFM:far
+global	SoundReallocSimpleFM:far
+global	SoundFreeSimpleFM:far
+global	SoundInitSimpleFM:far
+
+global  SoundAllocNote:far
+global	SoundPlayNote:far
+global	SoundStopNote:far
+global	SoundReallocNote:far
+global	SoundFreeNote:far
+
+global	SoundChangeOwner:far
+global	SoundChangeOwnerSimple:far
+
+;
+; VoiceManager Funcions.  Only use when you have exlcusive
+;
+
+global	SoundVoiceManagerGetFree:far
+global	SoundVoiceManagerFree:far
+global	SoundVoiceManagerActivate:far
+global	SoundVoiceManagerDeactivate:far
+global	SoundVoiceManagerAssign:far
+
+global	SoundDACManagerGetFree:far
+global	SoundDACManagerFree:far
+global	SoundDACManagerActivate:far
+global	SoundDACManagerDeactivate:far
+global	SoundDACManagerAssign:far
+
+global	SoundSynthDriverInfo:far
+global	SoundSampleDriverInfo:far
+
+;
+; C-stub names
+;
+
+global	SOUNDGETEXCLUSIVE:far
+global	SOUNDGETEXCLUSIVENB:far
+global	SOUNDRELEASEEXCLUSIVE:Far
+
+global	SOUNDALLOCMUSIC:far
+global  SOUNDPLAYMUSIC:far
+global	SOUNDSTOPMUSIC:far
+global	SOUNDREALLOCMUSIC:far
+global	SOUNDFREEMUSIC:far
+
+global  SOUNDALLOCMUSICNOTE:far
+global	SOUNDPLAYMUSICNOTE:far
+global	SOUNDSTOPMUSICNOTE:far
+global	SOUNDREALLOCMUSICNOTE:far
+global	SOUNDFREEMUSICNOTE:far
+
+global  SOUNDALLOCMUSICSTREAM:far
+global	SOUNDPLAYTOMUSICSTREAM:far
+global	SOUNDSTOPMUSICSTREAM:far
+global	SOUNDFREEMUSICSTREAM:far
+
+global  SOUNDALLOCSAMPLESTREAM:far
+global	SOUNDPLAYTOSAMPLESTREAM:far
+global	SOUNDENABLESAMPLESTREAM:far
+global	SOUNDDISABLESAMPLESTREAM:far
+global	SOUNDFREESAMPLESTREAM:far
+
+global	SOUNDCHANGEOWNERSIMPLE:far
+global	SOUNDCHANGEOWNERSTREAM:far
+
+global	SOUNDINITMUSIC:far
+
+global	SOUNDSYNTHDRIVERINFO:far
+global	SOUNDSAMPLEDRIVERINFO:far
+
+global	SOUNDVOICEMANAGERGETFREE:far
+global	SOUNDVOICEMANAGERFREE:far
+global	SOUNDVOICEMANAGERACTIVATE:far
+global	SOUNDVOICEMANAGERDEACTIVATE:far
+global	SOUNDVOICEMANAGERASSIGN:far
+
+global	SOUNDDACMANAGERGETFREE:far
+global	SOUNDDACMANAGERFREE:far
+global	SOUNDDACMANAGERACTIVATE:far
+global	SOUNDDACMANAGERDEACTIVATE:far
+global	SOUNDDACMANAGERASSIGN:far
+
+
+;
+; New routines added for the sound extensions library.
+; These routines only available on NEWER sound libraries.
+;
+global  SOUNDPLAYMUSICLMEM:far
+global	SOUNDSTOPMUSICLMEM:far
+global	SoundPlayMusicLMem:far
+global	SoundStopMusicLMem:far
+
+global  SoundPlayToMusicStreamNB:far
+global	SOUNDPLAYTOMUSICSTREAMNB:far
+
+global	SoundReallocMusicLMem:far
+global	SOUNDREALLOCMUSICLMEM:far
+
+;
+; New routines added for Global PC
+
+global	SoundMixerGetMasterVolume:far
+global	SOUNDMIXERGETMASTERVOLUME:far
+global	SoundMixerSetMasterVolume:far
+global	SOUNDMIXERSETMASTERVOLUME:far
+
+global	SoundMixerGetSourceCount:far
+global	SoundMixerMapSource:far
+global	SoundMixerGetSourceVolume:far
+global	SoundMixerSetSourceVolume:far
+
+global	SoundMixerGetEffectCount:far
+global	SoundMixerMapEffect:far
+global	SoundMixerGetEffectLevel:far
+global	SoundMixerSetEffectLevel:far
+
+EndLibrary	sound
+

@@ -1,0 +1,1018 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+PROJECT:	GEOS
+MODULE:		IrLMP Library (includes IAS and TinyTP)
+FILE:		irlmp.def
+
+AUTHOR:		Chung Liu, Mar  3, 1995
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CL	3/ 3/95   	Initial revision
+	CL	12/19/95	Added TinyTP
+
+
+DESCRIPTION:
+	Interface definition for the IrLMP Library and TinyTP.
+		
+	$Id: irlmp.def,v 1.1 97/04/04 14:26:35 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__IRLMP
+
+;----------------------------------------------------------------------------
+;			COMPILER DIRECTIVES
+;----------------------------------------------------------------------------
+
+GENOA_TEST	equ	0
+if GENOA_TEST
+PrintMessage	<Turn this flag of before shipping...>
+endif
+
+StartLibrary	irlmp
+
+UseDriver	Internal/irlapDr.def
+
+;---------------------------------------------------------------------------
+;
+;				LSAP
+;
+;---------------------------------------------------------------------------
+
+IrlmpLsapSel	type 	byte
+
+IRLMP_ANY_LSAP_SEL		equ 	0xFF
+; Not a true LSAP-Sel.  Pass this to IrlmpRegister when no specific 
+; LSAP-Sel is requested.
+
+IRLMP_MONITOR_LSAP_SEL		equ	0x82
+; Register to this LSAP in order to receive IIC_STATUS_INDICATION only.
+; 
+
+IRLMP_PENDING_CONNECT		equ	0x81
+; Not a true LSAP-Sel.  This indicates that we are still waiting for 
+; a PDU to establish the IrLMP level connection, and the peer LSAP-Sel 
+; is still unknown.
+
+IRLMP_XID_DISCOVERY_SAP		equ	0x80
+; Not a true LSAP-Sel.  Pass this to IrlmpRegister to indicate that 
+; client wishes to bind to the XID_Discovery Service Access Point,
+; in order to receive LM_DiscoverDevices.indication only.
+
+IRLMP_IAS_LSAP_SEL		equ	0x00
+; Reserved for IAS. Only a client prepared to respond to IAS queries
+; should bind to this LSAP-Sel.
+
+IRLMP_CONNECTIONLESS_LSAP_SEL	equ	0x70
+; Reserved for Connectionless Data service, which is not currently
+; supported in this implementation.
+	
+IRLMP_BROADCAST_LSAP_SEL	equ 	0x7F
+; Reserved for broadcast data, which is not currently supported.
+
+IRLMP_MAX_LEGAL_LSAP_SEL	equ	0x80
+; LSAPs with values above 0x6F are reserved.
+
+IrlmpLsapID	struct
+	ILI_irlapAddr	dword		;32-bit IrLAP device address
+	ILI_lsapSel	IrlmpLsapSel
+	align word
+IrlmpLsapID	ends
+
+;------------------------------------------------------------------------
+;
+;			Structs for requests
+;
+;------------------------------------------------------------------------
+
+if GENOA_TEST
+
+;
+; I added these options to make irlap handle data requests deterministically.
+; For instance, Genoa test suite expects us to send multiple frames in
+; response to a certain trigger data, but if we don't do anything special like
+; this, data requests will be enqueued and there is no saying when they will
+; be sent out.  Suspending irlap then enqueueing requests and then unsuspending
+; irlap guarantees that the data requests enqueued in between suspending and
+; unsuspending irlap will be sent out in one window( or as much of it as
+; possible will be sent out in one window ).
+;							- SJ
+;
+
+IrlmpDataArgFlag	record
+  IDAF_SUSPEND_IRLAP:1	 ; suspend IrLAP thread before enqueueing data request
+  IDAF_UNSUSPEND_IRLAP:1 ; unsuspend IrLAP thread after enqueueing request
+  :14
+IrlmpDataArgFlag	end
+
+endif
+
+;
+; Data is passed to the Irlmp Library in a HugeLMem buffer allocated
+; with the NetUtils Library.  The Irlmp Library will free the HugeLMem
+; buffer when done transmitting the data.
+;
+; The data buffer HugeLMem block must have IRLMP_HEADER_SIZE bytes of 
+; free space before the actual data (or TTP_HEADER_SIZE bytes, if using 
+; TinyTP.)  In other words, IDA_dataOffset must be equal or greater than 
+; IRLMP_HEADER_SIZE (or TTP_HEADER_SIZE).  This space is used by the Irlmp 
+; Library to place its (and TinyTP's) PDU header, before passing the data to 
+; the IrLAP Driver.
+;
+IrlmpDataArgs struct
+	IDA_dataSize		word
+	; IDA_dataOffset and IDA_data are only valid if IDA_dataSize > 0
+	; The maximum IDA_dataSize is ICA_QoS.QOS_param.ICP_dataSize minus
+	; either IRLMP_HEADER_SIZE or TTP_HEADER_SIZE.
+
+	IDA_dataOffset		word
+	; Offset into IDA_data where the real data starts.  IDA_dataOffset
+	; must be at least IRLMP_HEADER_SIZE (or TTP_HEADER_SIZE for TinyTP
+	; requests), providing room in IDA_data for the IrLMP and IrLAP 
+	; (and TinyTP) packet headers.
+
+	IDA_data		optr		
+	; HugeLMem data allocated with the NetUtils Library.  When passed
+	; to the Irlmp Library, the library frees the data when done using
+	; it.  When passed to a client callback, the callback routine is
+	; responsible for freeing this data by calling HugeLMemFree.
+
+if GENOA_TEST
+	IDA_flags		IrlmpDataArgFlag
+	; I am adding this flag to pass special information into IRDA stack
+	; see record definition
+	;
+endif
+
+IrlmpDataArgs ends
+
+IRLMP_HEADER_SIZE	equ	4
+TTP_HEADER_SIZE		equ	IRLMP_HEADER_SIZE + 1
+
+IrlmpConnectArgs	struct
+	ICA_dataSize		word		
+	; Maximum size is 60 bytes for IrLMP, and 53 bytes for TinyTP.  
+	; ICA_dataOffset and ICA_data are only valid if ICA_dataSize > 0.
+
+	ICA_dataOffset		word
+	; Offset into ICA_data where the real data starts.  IDA_dataOffset
+	; must be at least IRLMP_HEADER_SIZE (or TTP_HEADER_SIZE), providing 
+	; room in ICA_data for the IrLMP and IrLAP (and TinyTP) packet 
+	; headers.
+
+	ICA_data		optr		;HugeLMem data
+	; HugeLMem data allocated with the NetUtils Library.  When passed
+	; to the Irlmp Library, the library frees the data when done using
+	; it.  When passed to a client callback, the callback routine is
+	; responsible for freeing this data by calling HugeLMemFree.
+
+	ICA_lsapID		IrlmpLsapID	
+	; LSAP-ID of remote device
+
+	ICA_QoS			QualityOfService
+	; QOS_devAddr field is always ignored; the IrLAP address should
+	; be passed in ICA_lsapID.  If QOSF_DEFAULT_PARAMS is set, then
+	; the QOS_param field is ignored, and default params are read in
+	; from the initfile.
+	;
+
+	align word
+IrlmpConnectArgs ends
+
+;---------------------------------------------------------------------------
+;
+;				IAS 
+;
+;---------------------------------------------------------------------------
+
+;
+; Class and Attribute names are preceded by an 8-bit size byte.
+;
+IrlmpIasNameHeader	struct
+	IINH_size	byte
+	IINH_name	label 	char
+IrlmpIasNameHeader	ends
+
+;
+; Maximum size for a Class or Attribute name is 60 bytes.
+;
+IRLMP_IAS_MAX_NAME_SIZE		equ	60
+
+IrlmpIasMaxName		struct
+	IIMN_size	byte
+	IIMN_name	char	IRLMP_IAS_MAX_NAME_SIZE dup (?)
+IrlmpIasMaxName		ends
+
+;
+; Each object in the IAS database has an object ID.  
+;
+IrlmpIasObjectIdentifier	type	word
+
+;
+; Values for attributes are encoded so that the first byte indicates the
+; object type.
+;
+IrlmpIasValueType	etype	byte
+	IIVT_MISSING		enum IrlmpIasValueType, 0
+	IIVT_INTEGER		enum IrlmpIasValueType, 1
+	IIVT_OCTET_SEQUENCE	enum IrlmpIasValueType, 2
+	IIVT_USER_STRING	enum IrlmpIasValueType, 3
+
+;
+; IIVT_INTEGER type object.
+;
+IrlmpIasIntegerValue		type	dword
+
+;
+; IIVT_OCTET_SEQUENCE type object.
+;
+IrlmpIasOctetSequenceHeader	struct
+	IIOSH_size	word
+	IIOSH_value	label	byte
+IrlmpIasOctetSequenceHeader	ends
+
+;
+; Objects of type IIVT_USER_STRING have the character set encoded as part
+; of the value.
+;
+IrlmpIasCharSetCode	etype 	byte
+	IICSC_ASCII		enum IrlmpIasCharSetCode, 0
+	IICSC_ISO_8859_1	enum IrlmpIasCharSetCode, 1
+	IICSC_ISO_8859_2	enum IrlmpIasCharSetCode, 2
+	IICSC_ISO_8859_3	enum IrlmpIasCharSetCode, 3
+	IICSC_ISO_8859_4	enum IrlmpIasCharSetCode, 4
+	IICSC_ISO_8859_5	enum IrlmpIasCharSetCode, 5
+	IICSC_ISO_8859_6	enum IrlmpIasCharSetCode, 6
+	IICSC_ISO_8859_7 	enum IrlmpIasCharSetCode, 7
+	IICSC_ISO_8859_8	enum IrlmpIasCharSetCode, 8
+	IICSC_ISO_8859_9	enum IrlmpIasCharSetCode, 9
+	IICSC_UNICODE		enum IrlmpIasCharSetCode, 0xFF
+
+;
+; Object of type IIVT_USER_STRING
+;
+IrlmpIasUserStringHeader	struct
+	IIUSH_charSet	IrlmpIasCharSetCode
+	IIUSH_size	byte
+	IIUSH_value	label	char
+IrlmpIasUserStringHeader	ends
+
+;
+; Union of the possible types for the IIAV_value field.
+;
+IrlmpIasValueUnion union
+	IIVU_integer		IrlmpIasIntegerValue
+	IIVU_octetSequence	IrlmpIasOctetSequenceHeader
+	IIVU_userString		IrlmpIasUserStringHeader
+IrlmpIasValueUnion end
+
+;
+; IAS attribute value, with value type.
+;
+IrlmpIasAttributeValue struct
+	IIAV_type	IrlmpIasValueType
+	IIAV_value	IrlmpIasValueUnion
+IrlmpIasAttributeValue ends
+
+;-------------------------------------------------------------------------
+;
+;				TinyTP
+;
+; Applications wishing to use the TinyTP flow control mechanism must
+; use the routines below, instead of their IrLMP counterparts.
+;
+;-----------------------------------------------------------------------
+
+global	TTPRegister:far
+;	Desc:	Register to use TinyTP.  Client using TTPRegister must
+;		use:
+;			TTPConnectRequest
+;			TTPConnectResponse
+;			TTPDataRequest
+;			TTPDisconnectRequest
+;		instead of:
+;			IrlmpConnectRequest
+;			IrlmpConnectResponse
+;			IrlmpDataRequest
+;			IrlmpDisconnectRequest
+;
+;		The client callback will receive:
+;			TTPIC_CONNECT_INDICATION
+;			TTPIC_CONNECT_CONFIRMATION
+;			TTPIC_DATA_INDICATION
+;			TTPIC_DISCONNECT_INDICATION
+;		instead of:
+;			IIC_CONNECT_INDICATION
+;			IIC_CONNECT_CONFIRMATION
+;			IIC_DATA_INDICATION
+;			IIC_DISCONNECT_INDICATION
+;
+;		Other functions and callbacks are the same as when using
+;		IrlmpRegister.
+;
+;	Pass:	same as IrlmpRegister
+;	Return:	same as IrlmpRegister
+
+global	TTPUnregister:far
+;	Desc:	Same as IrlmpUnregister
+;	Pass:	Same as IrlmpUnregister
+;	Return:	Same as IrlmpUnregister
+
+global	TTPConnectRequest:far
+;	Desc:	Request that a TinyTP connection be established to a remote
+;		IrlmpLsapID.
+;	Pass:	Same as IrlmpConnectRequest
+;	Return:	Same as IrlmpConnectRequest
+	
+global	TTPConnectResponse:far
+;	Desc:	Accept a TinyTP connection initiated by a remote device.
+;		To reject a connection, use TTPDisconnectRequest.
+;	Pass:	same as IrlmpConnectResponse
+;	Return:	same as IrlmpConnectResponse
+
+global	TTPDataRequest:far
+;	Desc:	Send data through the TinyTP connection.
+;	Pass:	si	= client handle
+;		cx:dx	= IrlmpDataArgs.  IDA_dataSize must not be larger than
+;			(ICA_QoS.QOS_param.ICP_dataSize - TTP_HEADER_SIZE).
+;	Return: carry clear if okay:
+;			ax	= IE_SUCCESS
+;		carry set if error:
+;			ax	= IrlmpError
+;					IE_LSAP_DISCONNECTED
+;					IE_TTP_TX_QUEUE_FULL
+
+global	TTPTxQueueGetFreeCount:far
+;	Desc:	Returns the number of calls to TTPDataRequest that can be
+; 		handled before TxQueue is full. 
+;	Pass:	si	= client handle
+; 	Return:	cx	= free count (send credits + free TxQueue entries)
+;
+
+global	TTPDisconnectRequest:far
+;	Desc:	Terminate TinyTP connection.
+;	Pass:	si	= client handle
+;		cx:dx	= IrlmpDataArgs
+;	Return:	carry clear if okay:
+;			ax	= IE_SUCCESS
+;		carry set if error:
+;			ax	= IrlmpError
+;
+
+global	TTPStatusRequest:far
+;	Desc:	Check for unacked data
+;	Pass:	si	= client handle
+;	Return:	carry clear if okay:
+;			ax	= IE_SUCCESS
+;		carry set if error:
+;			ax	= IrlmpError
+;
+
+global	TTPAdvanceCredit:far
+;	Desc:	Increase available credit to advance to peer
+;	Pass:	si	= client handle
+;		cx	= # credits
+;	Return:	nothing
+;
+
+;-------------------------------------------------------------------------
+;
+;	 			Routines
+; 
+;-------------------------------------------------------------------------
+
+global IrlmpRegister:far
+;	Desc:	Client must call this function before any IrLMP requests,
+;		so that indications and confirmations can be delivered.
+;		A geode that uses the IrLMP Library can call this function
+;		multiple times, if it is interested in registering for
+;		more than one LSAP-Sel.
+;
+;	Pass:	cl	= IrlmpLsapSel (could be IRLMP_ANY_LSAP_SEL)
+;		dx:ax	= vfptr of callback for indications and confirmations
+;		bx	= extra word to be passed to callback (could be
+;			  caller's dgroup, process handle, or whatever is
+;			  useful.)
+;
+;	Return: carry clear if okay:
+;			ax	= IE_SUCCESS
+;			cl	= IrlmpLsapSel (actual LSAP-Sel, if 
+;				  IRLMP_ANY_LSAP_SEL was passed in.)
+;			si	= client handle
+;		carry set if error:
+;			ax	= IrlmpError
+;					IE_NO_FREE_LSAP_SEL
+;					IE_UNABLE_TO_LOAD_IRLAP_DRIVER
+;			cx, si destroyed
+;	Callback:
+;		Pass:	 di	= IrlmpIndicationOrConfirmation
+;			 si	= client handle
+;			 bx	= extra word passed to IrlmpRegister
+;			 Other registers depend on di
+;		Return:	 nothing
+;		Destroy: nothing
+;
+
+global IrlmpUnregister:far
+;
+;	Desc:	Stop receiving callbacks for the LSAP-Sel.  This routine
+;		may be called from the client's callback routine; however,
+;		afterwards arguments passed to the callback become invalid.
+;
+;	Pass:	si	= client handle
+;	Return: carry clear if okay:
+;			ax	= IE_SUCCESS
+;		carry set if error:
+;			ax 	= IE_LSAP_NOT_DISCONNECTED
+;
+
+global IrlmpDiscoverDevicesRequest:far
+;	Desc:	Look for remote machines.  If link is currently in use, the
+;		cached result of the last discovery operation is returned.
+;		Otherwise, initiate IrLAP discovery. The callback is to 
+;		receive the confirmation for the discovery request.
+;
+;	Pass:	si	= client handle, bound to IRLMP_XID_DISCOVERY_SAP
+;		bl	= IrlapUserTimeSlot
+;	Return: carry clear:
+;		ax	= IE_SUCCESS
+;
+
+global IrlmpConnectRequest:far
+;	Desc:	Request that a connection be established to a remote 
+;		LSAP-ID.
+;	Pass:	si	= client handle
+;		cx:dx	= IrlmpConnectArgs.  Up to 60 bytes of data
+;			may be transmitted along with the request.
+;
+;	Return: carry clear if okay:
+;			ax	= IE_SUCCESS
+;		carry set if error:
+;			ax	= IrlmpError
+;					IE_ALREADY_CONNECTED
+;
+
+global IrlmpConnectResponse:far
+;	Desc:	Accept a connection initiated by a remote device. 
+;		To reject a connection, use IrlmpDisconnectRequest.
+;	Pass:	si	= client handle
+;		cx:dx	= IrlmpDataArgs. 
+;
+;	Return: carry clear if okay:
+;			ax	= IE_SUCCESS
+;		carry set if error:
+;			ax	= IrlmpError
+;					IE_LSAP_DISCONNECTED
+;
+
+global IrlmpDisconnectRequest:far
+;	Desc:	Terminate a connection.
+;	Pass:	si	= client handle
+;		cx:dx	= IrlmpDataArgs.  There is no guarantee
+;			  that the data will be delivered.
+;		bl	= IrlmpDisconnectReason
+;	Return: carry clear if okay:
+;			ax	= IE_SUCCESS
+;		carry set if error:
+;			ax	= IrlmpError
+;					IE_LSAP_DISCONNECTED
+;
+
+IrlmpDisconnectReason		etype	byte
+	IDR_USER_REQUEST		enum 	IrlmpDisconnectReason, 1
+	IDR_UNEXPECTED_IRLAP_DISCONNECT	enum 	IrlmpDisconnectReason, 2
+	IDR_FAILED_TO_ESTABLISH_IRLAP_CONNECTION \
+					enum 	IrlmpDisconnectReason, 3
+	IDR_IRLAP_RESET			enum 	IrlmpDisconnectReason, 4
+	IDR_LINK_MANAGEMENT_DISCONNECT	enum 	IrlmpDisconnectReason, 5
+	IDR_DATA_ON_DISCONNECTED_LSAP	enum 	IrlmpDisconnectReason, 6
+	IDR_NON_RESPONSIVE_LM_MUX_CLIENT \
+					enum 	IrlmpDisconnectReason, 7
+	IDR_NO_AVAILABLE_LM_MUX_CLIENT	enum 	IrlmpDisconnectReason, 8
+	IDR_UNSPECIFIED			enum 	IrlmpDisconnectReason, 0xFF
+
+global IrlmpStatusRequest:far
+;	Desc:	Check if there is unacknowledged data in the IrLAP queue.
+;	Pass:	si	= client handle
+;	Return: carry clear if okay:
+;			ax	= IE_SUCCESS
+;		carry set if error:
+;			ax	= IrlmpError
+;					IE_LSAP_DISCONNECTED
+;
+
+global IrlmpDataRequest:far
+;	Desc:	Send data through the connection.
+;	Pass:	si	= client handle
+;		cx:dx	= IrlmpDataArgs.  IDA_dataSize must not be larger than
+;			(ICA_QoS.QOS_param.ICP_dataSize - IRLMP_HEADER_SIZE).
+;	Return: carry clear if okay:
+;			ax	= IE_SUCCESS
+;		carry set if error:
+;			ax	= IrlmpError
+;					IE_LSAP_DISCONNECTED
+;
+
+global IrlmpUDataRequest:far
+;	Desc: 	Send UI frame data.
+;	Pass:	si	= client handle
+;		cx:dx	= IrlmpDataArgs
+;	Return: carry clear if okay:
+;			ax	= IE_SUCCESS
+;		carry set if error:
+;			ax	= IrlmpError
+;					IE_LSAP_DISCONNECTED
+;
+
+global	IrlmpGetPacketSize:far
+;	Desc:	Converts IrlapParamDataSize to number of bytes
+;	Pass:	ax	= IrlmpParamDataSize
+;	Return:	cx	= data size
+;
+
+;------------------------------------------------------------------------------
+;
+;			IAS Requests
+;
+;------------------------------------------------------------------------------
+
+global IrlmpDisconnectIas:far
+;	Desc:	Terminate the IrLMP-level IAS connection to the remote peer.  
+;		The first IAS request to a remote peer implicity establishes
+;		an IrLMP connection to the IRLMP_IAS_LSAP_SEL of the peer.
+; 		This connection is not automatically broken after the IAS 
+;		query is completed, because almost always the first IAS query
+; 		is followed by other IAS queries or an IrlmpConnectRequest.
+;		This way the time-consuming step of terminating and
+;		re-establishing the same IrLAP connection is avoided.  What
+;		this all means is that the entity that performs an IAS query
+;		is required to call IrlmpDisconnectIas in order to sign-off
+;		from IAS.  This should preferrably be done *after* receiving
+;		an IIC_CONNECT_CONFIRMATION, ensuring that at all times there
+;		exists an IrLMP connection, and avoiding disconnecting and 
+;		reconnecting the IrLAP layer.
+;
+;	Pass:	si	= client handle
+;	Return: carry clear if okay:
+;			ax	= IE_SUCCESS
+;		carry set if error:
+;			ax	= IrlmpError
+;
+
+
+global IrlmpGetValueByClassRequest:far
+; 	Desc:	Get all the values of a named attribute in objects of a
+;		given class name.
+;	Pass:	si	= client handle
+;		cx:dx	= IrlmpGetValueByClassRequestArgs
+;
+;	Return: carry clear if okay:
+;			ax	= IE_SUCCESS
+;		carry set if error:
+;			ax	= IrlmpError
+;
+IrlmpGetValueByClassRequestArgs	struct
+	IGVBCRA_irlapAddr	dword
+	IGVBCRA_className	fptr.IrlmpIasNameHeader
+	IGVBCRA_attributeName	fptr.IrlmpIasNameHeader
+IrlmpGetValueByClassRequestArgs	ends
+
+;-----------------------------------------------------------------------
+;
+; 	Indications and Confirmations For Client Callback Routine.
+;
+;-----------------------------------------------------------------------
+
+;
+; The routine passed to IrlmpRegister will be called for Irlmp indications
+; and confirmations.  The callback runs on the irlmp thread, so it should
+; be as short as possible.  The arguments passed to the callback are not
+; valid after the callback exits, so it should copy the needed information 
+; rather than storing pointers.
+;
+
+IrlmpIndicationOrConfirmation		etype	word, 0, 2
+
+IIC_DISCOVER_DEVICES_INDICATION		enum IrlmpIndicationOrConfirmation
+; 
+; Indication to clients bound to IRLMP_XID_DISOVERY_SAP that a remote 
+; machine discovered the local machine.
+;
+;	Pass:		si	= client handle of requester
+;			bx	= extra word passed to IrlmpRegister
+;			*ds:ax 	= chunk array of DiscoveryLog.  Not valid
+;				  after callback returns, so callback should
+;			    	  copy whatever information it wants to keep.
+;				  DL_info begins with IrlmpDiscoveryServiceA,
+;				  possibly followed by IrlmpDiscoveryServiceB,
+;				  possibly followed by other service hints.
+;				  Following that is the device's name, as
+;				  an IAS User String (without the type)
+;	Return: 	nothing
+;	Destroy:	nothing
+;
+
+IIC_DISCOVER_DEVICES_CONFIRMATION	enum IrlmpIndicationOrConfirmation
+;
+; Results of discovery.
+;
+;	Pass:		si	= client handle of requester
+;			bx	= extra word passed to IrlmpRegister
+;			dl	= IrlmpDiscoveryStatus
+;			*ds:ax 	= chunk array of DiscoveryLog.  Not valid
+;				  after callback returns, so callback should
+;			    	  copy whatever information it wants to keep.
+;				  DL_info begins with IrlmpDiscoveryServiceA,
+;				  possibly followed by IrlmpDiscoveryServiceB,
+;				  possibly followed by other service hints.
+;				  Following that is the device's name, as
+;				  an IAS User String (without the type)
+;	Return:		nothing
+;	Destroy:	nothing
+;
+
+IrlmpDiscoveryStatus	etype	byte, 0, 1
+	IDS_DISCOVERY	enum 	IrlmpDiscoveryStatus
+	; Returning results of actual discovery.
+
+	IDS_CACHED	enum 	IrlmpDiscoveryStatus
+	; Already connected.  Returning cached discovery log info.
+
+	IDS_PASSIVE	enum 	IrlmpDiscoveryStatus
+	; Remote device discovered us.  
+
+IrlmpDiscoveryServiceA	record
+    IDSA_EXTENDED:1		; set means IrlmpDiscoveryServiceB byte is
+				; present
+    IDSA_LAN_ACCESS:1		; set means device provides access to a LAN
+    IDSA_FAX:1			; set means device provides fax service
+    IDSA_MODEM:1		; set means device provides data modem service
+    IDSA_PRINTER:1		; set means device provides hardcopy (and
+				;  usually supports IrLPT protocol)
+    IDSA_COMPUTER:1		; set means device is a personal computer
+				;  (desktop/laptop)
+    IDSA_PDA:1			; set means device is a PDA or palmtop computer
+    IDSA_PNP_COMPATIBLE:1	; set means device is Plug-N-Play compatible
+				;  (contains all required PnP attributes
+				;  in the IAS)
+IrlmpDiscoveryServiceA	end
+
+IrlmpDiscoveryServiceB	record
+    IDSB_EXTENDED:1		; set means further service bytes whose
+				;  meaning is unknown follow
+    :4
+    IDSB_IRCOMM:1		; set means device provides IrCOMM service
+    IDSB_FILE_SERVER:1		; set means device is a file server
+    IDSB_TELEPHONY:1		; set means device is a telephone switch/PBX
+				;  of some sort?
+IrlmpDiscoveryServiceB	end
+
+IIC_CONNECT_INDICATION			enum IrlmpIndicationOrConfirmation
+;
+; A remote LSAP wants to establish a connection to the LSAP that received
+; this indication.  The callback should respond with either
+; IrlmpConnectResponse or IrlmpDisconnectRequest.
+;
+;	Pass:		si	= client handle
+;			bx	= extra word passed to IrlmpRegister
+;			cx:dx	= IrlmpConnectArgs.  If ICA_dataSize > 0, then
+;				  callback must free the ICA_data.
+;	Return:		nothing
+;	Destroy:	nothing
+;
+
+IIC_CONNECT_CONFIRMATION		enum IrlmpIndicationOrConfirmation
+;
+; Connect request was accepted.
+;
+;	Pass:		si	= client handle
+;			bx	= extra word passed to IrlmpRegister
+;			cx:dx	= IrlmpConnectArgs.  If ICA_dataSize > 0, then
+;				  callback must free the ICA_data.
+;				  Note that ICA_QoS.QOS_param.ICP_dataSize
+;				  provides the maximum data size for the 
+;				  IrLAP layer.  The client's maximum data
+;				  size is this value minus IRLMP_HEADER_SIZE.
+;	Return:		nothing
+;	Destroy:	nothing
+;
+
+IIC_DISCONNECT_INDICATION		enum IrlmpIndicationOrConfirmation
+;
+; Connection was terminated.
+;
+;	Pass:		si	= client handle
+;			bx	= extra word passed to IrlmpRegister
+;			al	= IrlmpDisconnectReason
+;			cx:dx 	= IrlmpDataArgs.  If IDA_dataSize > 0, then
+;				  callback must free the data.
+;	Return:		nothing
+;	Destroy:	nothing
+;
+
+IIC_STATUS_INDICATION			enum IrlmpIndicationOrConfirmation
+;
+; Remote device requested status, or current connection is in jeopardy.
+;
+;	Pass:		si	= client handle
+;			bx	= extra word passed to IrlmpRegister
+;			cx	= ConnectionStatus (from IrLAP)
+;	Return:		nothing
+;	Destroy:	nothing
+;
+
+IIC_STATUS_CONFIRMATION			enum IrlmpIndicationOrConfirmation
+;
+; Received connection status from remote side.
+; 
+;	Pass:		si	= client handle
+;			bx	= extra word passed to IrlmpRegister
+;			cx	= ConnectionStatus
+;	Return:		nothing
+;	Destroy:	nothing
+;
+
+IIC_DATA_INDICATION			enum IrlmpIndicationOrConfirmation
+;
+; Incoming data indication.
+;
+;	Pass:		si	= client handle
+;			bx	= extra word passed to IrlmpRegister
+;			cx:dx	= IrlmpDataArgs.  If IDA_dataSize > 0, then
+;				  callback must free the data.
+;	Return:		nothing
+;	Destroy:	nothing
+;
+IIC_UDATA_INDICATION			enum IrlmpIndicationOrConfirmation
+;
+; Incoming UData indication.
+;
+;	Pass:		si	= client handle
+;			bx	= extra word passed to IrlmpRegister
+;			cx:dx	= IrlmpDataArgs.  If IDA_dataSize > 0, then
+;				  callback must free the data.
+;				
+;	Return:		nothing
+;	Destroy:	nothing
+;
+
+;----------------------------------------------------------------------
+;
+;			IAS Confirmations
+;
+;----------------------------------------------------------------------
+
+IIC_GET_VALUE_BY_CLASS_CONFIRMATION	enum IrlmpIndicationOrConfirmation
+;
+; Results of IAS query.
+;
+;	Pass:		si	= client handle
+;			bx	= extra word passed to IrlmpRegister
+;			dl	= IrlmpGetValueByClassReturnCode
+;
+;			If dl = IGVBCRC_SUCCESS:
+;				*ds:ax	= chunk array of IrlmpIasIdAndValue
+;					Array is not valid after callback 
+;					returns, so callback routine should 
+;					copy all the information it wants 
+;					to keep.
+;			if dl = IGVBCRC_IRLMP_ERROR:
+;				ax	= IrlmpError
+;
+;	Return:		nothing
+;	Destroy:	nothing
+;
+IrlmpIasIdAndValue	struct
+	IIIAV_id	IrlmpIasObjectIdentifier
+	IIIAV_value	IrlmpIasAttributeValue
+IrlmpIasIdAndValue	ends
+
+IrlmpGetValueByClassReturnCode	etype	byte
+	IGVBCRC_SUCCESS			enum IrlmpGetValueByClassReturnCode, 0
+	IGVBCRC_NO_SUCH_CLASS		enum IrlmpGetValueByClassReturnCode, 1
+	IGVBCRC_NO_SUCH_ATTRIBUTE	enum IrlmpGetValueByClassReturnCode, 2
+
+	IGVBCRC_IRLMP_ERROR		enum IrlmpGetValueByClassReturnCode, 0xFF
+	; Not an IAS-defined return code.  This means that the request failed
+	; because of some IrLMP error, such as a lost connection.
+
+;----------------------------------------------------------------------
+;
+; 		TinyTP Indications and Confirmations 
+;
+;----------------------------------------------------------------------
+
+TinyTPIndicationOrConfirmation	etype	word, IrlmpIndicationOrConfirmation, 2
+
+TTPIC_CONNECT_INDICATION	enum TinyTPIndicationOrConfirmation
+
+TTPIC_CONNECT_CONFIRMATION	enum TinyTPIndicationOrConfirmation
+;
+; TinyTP connection request was accepted.
+;
+;	Pass:		si	= client handle
+;			bx	= extra word passed to IrlmpRegister
+;			cx:dx	= IrlmpConnectArgs.  If ICA_dataSize > 0, then
+;				  callback must free the ICA_data.
+;				  Note that ICA_QoS.QOS_param.ICP_dataSize
+;				  provides the maximum data size for the 
+;				  IrLAP layer.  The client's maximum data
+;				  size is this value minus TTP_HEADER_SIZE.
+;	Return:		nothing
+;	Destroy:	nothing
+;
+
+TTPIC_DISCONNECT_INDICATION	enum TinyTPIndicationOrConfirmation
+TTPIC_DATA_INDICATION		enum TinyTPIndicationOrConfirmation
+TTPIC_STATUS_CONFIRMATION	enum TinyTPIndicationOrConfirmation
+
+;----------------------------------------------------------------------
+;
+; 			Ias Database
+;
+;----------------------------------------------------------------------
+
+IrdbCreateEntryFlags	record
+
+ICEF_PERMANENT	:1
+:7
+
+IrdbCreateEntryFlags	end
+
+; -------------------------------------------------
+  global	IRDBOPENDATABASE:far
+  IrdbOpenDatabase	equ	IRDBOPENDATABASE 
+; -------------------------------------------------
+; Open the database so we can read/write information to it.
+; Multiple clients can read/write to the database,
+; This routine will block the thread if another is doing
+; an access. 
+;
+; PASS:		nothing
+; RETURN:	carry set if error
+;		ax = IrdbErrorType
+;		else ax = 0
+; DESTROYED:	nothing
+;
+
+
+; -------------------------------------------------
+  global	IRDBCLOSEDATABASE:far
+  IrdbCloseDatabase	equ	IRDBCLOSEDATABASE
+; -------------------------------------------------
+; Finished with the database.  Close it up.
+;
+; PASS:		nothing
+; RETURN:	carry set if error
+;		ax = IrdbErrorType
+;		else ax = 0
+; DESTROYED:	nothing
+;
+
+; -------------------------------------------------
+  global	IrdbCreateEntry:far
+  global	IRDBCREATEENTRY:far
+; -------------------------------------------------
+; Add an entry to the database.  The information needed
+; to establish an entry is a class name.
+; You can also pass in an lptr to an endpoint.  This will
+; enable irlmp to delete your entry.  If you do not want this
+; feature, then pass zero.
+; 
+; PASS:		ds:si	= class name
+;		cx	= string length (0 for null terminated)
+;		dx	= client handle
+;		al	= IrdbCreateEntryFlags
+; RETURN:	carry clear if successful
+;			ax = Object ID
+;		carry set if error
+;			ax = IrdbErrorType
+;
+; DESTORYED:	nothing
+;
+
+; -------------------------------------------------
+  global	IrdbDeleteEntry:far
+  global	IRDBDELETEENTRY:far
+; -------------------------------------------------
+; Delete an entry in the database.  Give only
+; the object id that was returned in the
+; IrdbCreateEntry function.
+; 
+; PASS:		bx	= Object ID
+;
+; RETURN:	carry clear if successful
+;		carry set if error
+;			ax = IrdbErrorType
+;
+; DESTORYED:	nothing
+;
+
+; -------------------------------------------------
+  global	IrdbAddAttribute:far
+  global	IRDBADDATTRIBUTE:far
+; -------------------------------------------------
+; Add an attribute for an object.
+; Note this keeps attributes like an array.  You
+; are appending an attribute to the end of the list.
+;
+; PASS:		bx 	= Object ID
+; 		ds:si	= fptr to attribute name
+;		bp	= attribute name size (0 for null terminated)
+;		di	= IrlmpIasValueType
+;		cx,
+;		dxax	= Data
+;			if IIVT_MISSING
+;				invalid
+;			if IIVT_INTEGER
+;				dxax 	= dword integer
+;			if IIVT_OCTET_SEQUENCE
+;				cx   	= length of sequence
+;				dx:ax	= fptr to octet sequence
+;			if IIVT_USER_STRING
+;				cl	= length of sequence
+;				ch	= charset (0 is ascii)
+;				dx:ax	= fptr to user string
+;
+; RETURN:	carry clear if sucessful
+;			ax = Current number of attributes in the object
+; 		carry set if error
+;			ax = IrdbErrorType
+;
+
+;----------------------------------------------------------------------
+;
+; 			C Routines
+;
+;----------------------------------------------------------------------
+global IRLMPREGISTER:far
+global IRLMPUNREGISTER:far
+global IRLMPDISCOVERDEVICESREQUEST:far
+global IRLMPCONNECTREQUEST:far
+global IRLMPCONNECTRESPONSE:far
+global IRLMPDISCONNECTREQUEST:far
+global IRLMPSTATUSREQUEST:far
+global IRLMPDATAREQUEST:far
+global IRLMPUDATAREQUEST:far
+global IRLMPGETPACKETSIZE:far
+global IRLMPDISCONNECTIAS:far
+global IRLMPGETVALUEBYCLASSREQUEST:far
+
+global	TTPREGISTER:far
+global	TTPUNREGISTER:far
+global	TTPCONNECTREQUEST:far
+global	TTPCONNECTRESPONSE:far
+global	TTPDATAREQUEST:far
+global	TTPTXQUEUEGETFREECOUNT:far
+global	TTPDISCONNECTREQUEST:far
+global	TTPSTATUSREQUEST:far
+global	TTPADVANCECREDIT:far
+
+
+;----------------------------------------------------------------------
+;
+; 			Error Codes
+;
+;----------------------------------------------------------------------
+
+IrlmpError	etype	word, 0, 2
+
+IE_SUCCESS				enum	IrlmpError
+
+IE_LSAP_SEL_IN_USE			enum	IrlmpError
+; The requested LSAP-Sel is already being used by another client
+
+IE_NO_FREE_LSAP_SEL			enum	IrlmpError
+; All legal LSAP-Sel values are in use.
+
+IE_LSAP_DISCONNECTED			enum	IrlmpError
+IE_UNABLE_TO_LOAD_IRLAP_DRIVER		enum 	IrlmpError
+IE_ALREADY_CONNECTED			enum 	IrlmpError
+IE_INCOMING_CONNECTION			enum 	IrlmpError
+IE_RESPONSE_WITHOUT_INDICATION		enum 	IrlmpError
+IE_LSAP_NOT_DISCONNECTED		enum	IrlmpError
+
+IE_IAS_CONNECTED_TO_ANOTHER_ADDRESS	enum	IrlmpError
+; The IAS Client FSM is already connected to a different IrLAP address.
+
+IE_LSAP_NOT_CONNECTED_TO_IAS		enum	IrlmpError
+; IrlmpDisconnectIas was called, but the endpoint did not make any IAS
+; queries.
+
+IE_DISCONNECT_INDICATION		enum	IrlmpError
+; Lost connection to peer IAS LSAP in the middle of IAS query.
+
+IE_TTP_TX_QUEUE_FULL			enum	IrlmpError
+; The TinyTP TxQueue is full; therefore, no data requests can be accepted.
+; Caller should try again later.
+
+EndLibrary	irlmp
+

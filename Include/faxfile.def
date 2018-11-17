@@ -1,0 +1,1567 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1993 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Fax
+FILE:		faxfile.def
+
+AUTHOR:		Jacob Gabrielson, Mar 10, 1993
+
+MACROS:
+	Name			Description
+	----			-----------
+	DerefGen		Derefs a gen-object's instance data.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jag	3/10/93   	Initial revision
+	sk	4/01/94		Added FaxFileDecompressScanline stuff
+	sk	10/26/94	Added 2d stuff
+	jimw	4/12/95		moved cover page merge and utils here
+
+DESCRIPTION:
+	The FaxFile library, provides a bunch of stuff that Fax
+	applications, libraries, and drivers will find useful.  
+	It defines the FaxFile format, and provides routines to 
+	manipulate them
+
+	$Id: faxfile.def,v 1.1 97/04/04 14:22:18 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__FAX_FILE				; prevent double-inclusion
+
+include	file.def
+include vm.def
+include fax.def
+
+
+UseLib  Objects/vTextC.def
+StartLibrary	faxfile
+
+; This PASTA variable exists in order to get the Geos 2.0 PASTA fax
+; solution to compile under 3.0
+ifndef	PASTA
+	PASTA	equ	0
+endif
+
+;------------------------------------------------------------------------------
+;				  Macros
+;------------------------------------------------------------------------------
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DerefGen
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Dereferences a Gen-object's instance data.
+
+PASS:		*segmt:offst	- instance of object
+
+RETURNS:	segmt:dest	- instance data of object
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+DerefGen	macro 	segmt, offst, dest
+		mov	dest, segmt:[offst]		; deref instance data
+		add	dest, segmt:[dest].Gen_offset
+		endm
+
+;------------------------------------------------------------------------------
+;				  Data Types
+;------------------------------------------------------------------------------
+; Set this to true if you want to compile a faxfile version that includes
+; the cover page prep code.  Don't do this unless you're preparing coverpage
+; gstrings for use with the mailbox system via cpprep.geo.  This  causes cover
+;  page template files to be opened force read write, which causes problems if
+;  the cover page is expected to accessed more than once at a time (like during
+;  normal use)
+;
+COVER_PAGE_PREP	equ	FALSE
+
+
+;-------------------------------
+;	Protocol for fax files
+;-------------------------------
+
+FAXFILE_MAJOR_PROTOCOL		equ	5
+FAXFILE_MINOR_PROTOCOL		equ	0
+
+FAX_INFO_FILE_MAJOR_PROTOCOL	equ	2
+FAX_INFO_FILE_MINOR_PROTOCOL	equ	0
+
+FAXFILE_TOKEN			equ	'FXFL'
+FAXVIEW_TOKEN			equ	'FAXV'
+
+;--------------------------------
+;	FaxCompressionType
+;--------------------------------
+
+;
+; I don't expect the driver to ever use anything other than FST_SCANLINE,
+; but we might as well allow for other possibilities
+;
+FaxCompressionType		etype	byte, 0, 2
+FCT_NONE			enum	FaxCompressionType ; no compression
+FCT_CCITT_T4_1D			enum	FaxCompressionType ; run-length sorta
+FCT_CCITT_T4_2D			enum	FaxCompressionType ; you know...
+FCT_JBIG			enum	FaxCompressionType ; good luck!
+
+;--------------------------------
+;	FaxImageType
+;--------------------------------
+
+;
+; For the next couple o' years, faxes will probably still all be
+; bi-level only, but it doesn't hurt to anticipate a little
+;
+FaxImageType			etype	byte, 0, 2
+FIT_BILEVEL			enum	FaxImageType
+FIT_GRAYSCALE			enum	FaxImageType
+FIT_COLOR			enum	FaxImageType
+
+
+;--------------------------------
+;	FaxFileLocation
+;--------------------------------
+
+;
+; An enumeration of the fax file directories.
+;
+FaxFileLocation			etype	byte
+FFL_IN_DIRECTORY		enum	FaxFileLocation
+FFL_OUT_DIRECTORY		enum	FaxFileLocation
+FFL_FORWARD_DIRECTORY		enum	FaxFileLocation
+
+;------------------------------------------------------------------------------
+;				Fax File Header
+;------------------------------------------------------------------------------
+
+FAXFILE_HEADER_SIZE		equ	800	; exact size of FaxFileHeader
+
+FAXFILE_MAX_ACCESS_FIELD_LENGTH	equ	10	; max length of the access
+						; number
+FAXFILE_LONG_DIST_BUFFER_SIZE	equ	20
+						; max length of the long
+						; distance number
+FAXFILE_BILL_CARD_BUFFER_SIZE	equ	40
+						; max length of the billing
+						; card
+FAXFILE_MAX_FAX_ID_FIELD_LENGTH	equ	21
+						; max length for a
+						; fax ID
+;------------------------------------------------------------------------------
+;				Fax File TTL
+;------------------------------------------------------------------------------
+;
+; Characteristics of the TTL line for the fax.
+;
+FAXFILE_TTL_FONT		equ	FID_DTC_URW_SANS
+FAXFILE_TTL_FONT_SIZE		equ	10
+
+FAXFILE_TTL_FINE_HEIGHT		equ	40
+FAXFILE_TTL_STD_HEIGHT		equ	20
+
+
+FAXFILE_TTL_TIMESTAMP_POS	equ	10
+FAXFILE_TTL_FAX_ID_POS		equ	150
+FAXFILE_TTL_FAX_PHONE_POS	equ	300
+FAXFILE_TTL_RETRY_POS		equ	440
+FAXFILE_TTL_PAGE_COUNT_POS	equ	490
+
+;
+; The fax ID clip position is the right side of the cliprect used when blasting
+; out the fax ID.
+;
+FAXFILE_TTL_FAX_ID_CLIP_POS	equ	FAXFILE_TTL_FAX_PHONE_POS - 10
+
+;
+; When the font was changed from MONO to SANS, it no longer needed to be bold.
+; Keep around the old style definition for the syntax.
+; 
+;FAXFILE_TTL_TEXT_STYLE		equ	(0 shl 8) or mask TS_BOLD
+FAXFILE_TTL_TEXT_STYLE		equ	0
+
+FAXFILE_TTL_SCRATCH_STRING_SIZE	equ	50
+
+FAXFILE_MAX_NUMBER_OF_PAGES	equ	999	; All that fits in 3 chars
+
+; NOTE : this is 2 characters more than FAXFILE_MAX_FAX_ID_FIELD_LENGTH to
+; account for the possibility of the string "Nokia 9000 Communicator" being
+; used in the ID string.  
+FAXFILE_TTL_MAX_ID_FIELD_LENGTH equ 23		
+
+;------------------------------------------------------------------------------
+;				Fax File Resolutions
+;------------------------------------------------------------------------------
+FAXFILE_HORIZONTAL_RESOLUTION		equ	203	; X resolution of fax
+FAXFILE_STD_VERTICAL_RESOLUTION		equ	98	; Std Y fax resolution
+FAXFILE_FINE_VERTICAL_RESOLUTION	equ	196	; Fine Y fax resolution
+
+;------------------------------------------------------------------------------
+;				Fax File Sizes
+;------------------------------------------------------------------------------
+FAXFILE_HORIZONTAL_WIDTH	equ	1728	; width in pixels of Fax
+FAXFILE_HORIZONTAL_SIZE		equ	1728	; width in pixels of Fax
+FAXFILE_VERTICAL_SIZE		equ	2160	; length in pixels of Fax
+
+FAXFILE_HORIZONTAL_BYTE_WIDTH	equ	FAXFILE_HORIZONTAL_WIDTH/8
+
+;
+; The maximum number of bytes in a 2d "compressed" scan line.  Yes, it's
+; seven times the size of the original scan line!
+;
+FAXFILE_MAX_HORIZONTAL_BYTE_WIDTH equ	FAXFILE_HORIZONTAL_BYTE_WIDTH * 7
+
+;
+; Slice Stuff:
+;	SLICE_SIZE is number of scan lines that fit into the horizontal
+;	bitmap.  SLICE_SIZE_BYTES is the length of each line in the vertical
+;	bitmap.
+;
+SLICE_SIZE			equ	0x0030	; size of bitmap slices
+SLICE_SIZE_BYTES		equ	(SLICE_SIZE / 8)
+
+
+FAXFILE_PHONE_NUMBER_BUFFER_SIZE	equ	FAX_PHONE_NUMBER_SIZE
+FAXFILE_PHONE_NUMBER_SIZE		equ \
+			FAXFILE_PHONE_NUMBER_BUFFER_SIZE-1
+
+FAXFILE_NAME_BUFFER_SIZE		equ	FAX_NAME_SIZE
+FAXFILE_NUM_PAGES_BUFFER_SIZE		equ	10
+
+FaxFileNumber	type	FAXFILE_PHONE_NUMBER_BUFFER_SIZE dup (TCHAR)
+FaxFileName	type	FAXFILE_NAME_BUFFER_SIZE dup (TCHAR)
+FaxFileNumPagesString type	FAXFILE_NUM_PAGES_BUFFER_SIZE dup (TCHAR)
+
+FaxFileNumPagesStruct  struct
+	FFNPU_stringFlag	word		; TRUE if string version exists
+ 	FFNPU_int		word		; int version
+ 	FFNPU_string		FaxFileNumPagesString ; string version
+FaxFileNumPagesStruct ends
+
+
+FAX_FILE_LOW_DISK_SIZE	equ	50*1024	; 50k
+
+;
+; Rough guesses to how big a page will be in the fax file format (version 2.0
+; uses 2D compression, so this is roughly 1/2 the size of 1D compressed files).
+;
+FAX_2D_STD_PAGE_SIZE_ESTIMATE	equ	1024*20		; 20k/page estimate
+FAX_2D_FINE_PAGE_SIZE_ESTIMATE	equ	1024*40		; 40k/page estimate
+
+
+UnusedAppNameType	type	(FileLongName -2) dup (CHAR)
+;
+; This structure resides in some extra space in the header of the ChunkArray
+; that is in the map block of the fax file.  It contains everything
+; anyone could possibly want to know about the file (hopefully).
+;
+
+
+if not PASTA
+FaxFileHeader		struct
+	;
+	;  Information about sender & receiver.
+	;
+	FFH_faxNumber		FaxFileNumber	; receiver's fax number
+	FFH_toName		FaxFileName	; receiver's name
+
+	FFH_senderFax		FaxFileNumber	; sender's fax number
+	FFH_senderVoice		FaxFileNumber	; sender's voice number
+	FFH_senderName		FaxFileName	; sender's name
+	FFH_senderCompany	FaxFileName	; sender's company
+
+	FFH_faxID		TCHAR	FAXFILE_MAX_FAX_ID_FIELD_LENGTH dup (0)
+						; fax id of the sender
+	;
+	;  Dialing-assistance information.
+	;
+	FFH_access		TCHAR	FAXFILE_MAX_ACCESS_FIELD_LENGTH dup (?)
+						; contains access number 
+	FFH_longDistance	TCHAR	FAXFILE_LONG_DIST_BUFFER_SIZE dup (?)
+						; contains long distance number
+	FFH_billCard		TCHAR	FAXFILE_BILL_CARD_BUFFER_SIZE dup (?)
+						; contains billing card used
+	;
+	;  Information about the fax (for sending).
+	;
+	FFH_numPages		word		;num fax pages 
+	FFH_pageWidth		dword		; page width (points)
+	FFH_pageHeight		dword		; page height (points)
+	FFH_xRes		word		; horiz. resolution (DPI)
+	FFH_yRes		word		; vert. resolution (DPI)
+	FFH_compressionType	FaxCompressionType
+	FFH_imageType		FaxImageType
+	FFH_commentBlock	hptr.HugeArrayDirectory
+						; VM handle to block of
+						; comments
+	FFH_cpPageCount		word		; # pages in cover page
+	FFH_lastCoverPageHeight	word		; # scanlines the last page
+						; needs
+						
+	;
+	;  Information about the fax (for spooling).
+	;
+	FFH_bodyPageCount	word		 ; # pages in body
+	FFH_unusedAppName	UnusedAppNameType	; creator app
+	FFH_documentName	FileLongName	; creator document
+
+	FFH_spoolDateTime	FaxSpoolDateTime <>
+
+	FFH_fileName		FileLongName	; name of this fax file.
+
+	FFH_flags		FaxFileFlags	; various boolean bits
+	FFH_status		FaxFileStatus	FFS_DISABLED
+
+	FFH_fileHandle		hptr		; handle to the fax file.  Used
+						;  in the print driver and the
+						;  transmission code.
+
+	FFH_progressOptr	dword		; Optr to send rasterization
+						;  progress updates
+	FFH_progressMsg		word		; Message to send to above for
+						;  progress updates: cx =
+						;  current scanline.
+	;
+	;  Miscellaneous other fields.
+	;
+	FFH_extraData		hptr		; extra VM block handle
+	FFH_reserved		word		; just in case...
+FaxFileHeader		ends
+else ; now for the PASTA declarations
+FaxFileHeader		struct
+	;
+	;  Information about sender & receiver.
+	;
+	FFH_faxNumber		FaxFileNumber	; receiver's fax number
+	FFH_toName		FaxFileName	; receiver's name
+	FFH_subject		FaxFileName	; subject
+	FFH_senderFax		FaxFileNumber	; sender's fax number
+	FFH_senderVoice		FaxFileNumber	; sender's voice number
+	FFH_senderName		FaxFileName	; sender's name
+	FFH_senderCompany	FaxFileName	; sender's company
+	FFH_faxID		char	FAXFILE_MAX_FAX_ID_FIELD_LENGTH dup (0)
+						; fax id of the sender
+	;
+	;  Dialing-assistance information.
+	;
+	FFH_access		char	FAXFILE_MAX_ACCESS_FIELD_LENGTH dup (?)
+						; contains access number 
+	FFH_longDistance	char	FAXFILE_LONG_DIST_BUFFER_SIZE dup (?)
+						; contains long distance number
+	FFH_billCard		char	FAXFILE_BILL_CARD_BUFFER_SIZE dup (?)
+						; contains billing card used
+	;
+	;  Information about the fax (for sending).
+	;
+	FFH_numPages		word		; # pages INCLUDING cover page
+	FFH_pageWidth		dword		; page width (points)
+	FFH_pageHeight		dword		; page height (points)
+	FFH_xRes		word		; horiz. resolution (DPI)
+	FFH_yRes		word		; vert. resolution (DPI)
+	FFH_compressionType	FaxCompressionType
+	FFH_imageType		FaxImageType
+	FFH_commentBlock	hptr.HugeArrayDirectory
+						; VM handle to block of
+						; comments
+	FFH_currentPage		word		; current page being looked at
+	FFH_currentScanline	word		; current line being looked at
+						; the spooler
+	;
+	;  Information about the fax (for spooling).
+	;
+	FFH_appName		FileLongName	; creator app
+	FFH_documentName	FileLongName	; creator document
+	FFH_spoolDateTime	FaxSpoolDateTime <>
+	FFH_spoolID		dword		; unique ID for this spool job
+	FFH_fileName		FileLongName	; name of this fax file.
+	FFH_flags		FaxFileFlags	; various boolean bits
+	FFH_status		FaxFileStatus	FFS_DISABLED
+	;
+	;  Miscellaneous other fields.
+	;
+	FFH_extraData		hptr		; extra VM block handle
+	FFH_reserved		word		; just in case...
+	FFH_dummy		word		; MUST be 2nd to last field
+	FFH_padding		byte	(FAXFILE_HEADER_SIZE - \
+		(offset FFH_dummy + (size FaxFileHeader.FFH_dummy))) dup (?)
+						; MUST be last field
+FaxFileHeader		ends
+endif ; PASTA
+;
+; the reserved field is used by faxes that are being sent, during spooling
+; the number of pages that have already been sent is store there!
+; faxfileTTL.asm, and rasterizeMain.asm/rasterizeForward.asm of the fax
+; transport driver would be where to look for the code.
+;
+FaxFileHeaderReservedFlags	record
+	FFHRF_RETRY:1				; 1 if this is a resend attempt
+	:5
+	FFHRF_PAGES_SENT:10			; 1023 pages max, sorry
+FaxFileHeaderReservedFlags	end
+
+;
+;  Make sure it's the right size (we allocate a bunch of extra space
+;  on the end in case we need to further extend the structure without
+;  losing backwards compatibility).
+;
+
+FaxAddPage	etype	word, 0, 2			;for use in tables
+	FAP_ADD_NO_CREATE	enum	FaxAddPage	;don't create hugearray
+	FAP_ADD_CREATE		enum	FaxAddPage	;create blank hugearray
+	FAP_ADD_EXISTING	enum	FaxAddPage	;pass in a hugearray
+
+FAX_PAGE_FIRST	equ	0x0000
+FAX_PAGE_LAST	equ	0xfffe				; NOT 0xffff, which
+							; causes death.
+
+;------------------------------------------------------------------------------
+;			       Fax Info File Stuff
+;------------------------------------------------------------------------------
+;
+; This is the structure placed in the map block of the fax information file.
+; It helps us keep track of the last ten numbers dialed plus other pertinent
+; info.
+;
+FaxInfoFileMapBlock		struct
+	;
+	; Block where the last ten fax destinations are stored.
+	;
+	FIFMB_heapBlock		hptr
+
+	;
+	; Handle to the chunk array in the heapBlock.
+	;
+	FIFMB_chunkArrayHandle	nptr
+
+	;
+	; This is where the billing card number and other dialing assistance
+	; information is kept, away from most prying eyes.
+	;
+	FIFMB_dialAssistInfo	DialAssistInfo
+
+FaxInfoFileMapBlock		ends
+
+
+;-----------------------------------------------------------------------------
+;               Open Fax Information File Error Codes
+;-----------------------------------------------------------------------------
+FaxInfoFileErrorCodes   etype   byte,   0, 2
+FIFEC_FILE_MUST_BE_DELETED              enum    FaxInfoFileErrorCodes
+FIFEC_FILE_CANNOT_BE_CREATED            enum    FaxInfoFileErrorCodes
+
+;------------------------------------------------------------------------------
+;			       Decompression Stuff
+;------------------------------------------------------------------------------
+
+G3CODE_EOL		equ	0xFFFF			; code for eol in table
+ENTER_UNCOMPRESSED_MODE equ	0xFFFE			; code for uncomp mode
+UNCOMPRESSED_CODE_1D	equ	0x000F			; to recognize mode
+
+
+FaxFileDecompressionFlags	record
+	:10
+	FFDF_RL_COMPRESS_OUTPUT_LINE:1	; 0 = decompress to bits
+	:4
+	FFDF_DO_NOT_DECOMPRESS:1	; 1 = do not decompress into output buf
+FaxFileDecompressionFlags	end
+
+FaxFileCompressionFlags		record
+	:15
+	FFCF_SOURCE_IS_COMPRESSED:1	; 0 = uncompressed
+FaxFileCompressionFlags		end
+
+FaxFileColor		etype	byte, 0, 1
+	FFC_WHITE	enum	FaxFileColor
+	FFC_BLACK	enum	FaxFileColor
+
+HIGHEST_OFFSET			equ	0xFFFF
+LOW_THREE_BITS			equ	0x0007
+BITS_IN_A_WORD			equ	16
+BITS_IN_A_BYTE			equ	8
+BYTES_IN_A_WORD			equ	2
+FAX_FIRST_MAKEUP_CODE		equ	64
+FAX_TERMINATING_CODE_BITS	equ	0x003F
+FAX_BLACK_WORD			equ	0xFFFF
+FAX_BLACK_BYTE			equ	0xFF
+FAX_WHITE_WORD			equ	0x0000
+FAX_WHITE_BYTE			equ	0x00
+FAX_SHORTEST_BLACK_CODE		equ	2
+FAX_SHORTEST_WHITE_CODE		equ	4
+FAX_DECOMPRESS_SEARCH_PAST_END_FLAG	equ	-1
+FAX_1D_EOL			equ	0x01
+FAX_2D_EOL_NEXT_LINE_IS_2D	equ	0x02
+FAX_2D_EOL_NEXT_LINE_IS_1D	equ	0x03
+
+;
+; Run-Length encoding stuff.
+; RL encoding stores the length of each color run in a byte or a word.
+; Some special bytes are reserved for things other than lengths of runs
+;
+RunLengthCodeByte	etype	byte, 249, 1
+
+RLCB_MAX_RUN_LENGTH	enum	RunLengthCodeByte	; 0-249 are run values
+RLCB_EXTENDED_RUN	enum	RunLengthCodeByte	; run is stored as word
+RLCB_END_OF_LINE	enum	RunLengthCodeByte	; EOL flag
+; 252-255 are reserved, I wonder what we will come up with...	
+
+;
+; anding a tag byte with mask FF2DDF_REFERENCE_LINE_IS_1D_COMPRESSED
+; will be non zero if the line is 1d compressed
+;
+FAXFILE_1D_COMPRESSION_TAG	equ	0xff		; tag byte of a 1d line
+FAXFILE_2D_COMPRESSION_TAG	equ	0x00		; tag byte of a 2d line
+
+FAXFILE_0D_COMPRESSION_TAG	equ	0xaa		; tag byte of an
+							;  uncompressed line
+
+FAXFILE_RL_COMPRESSION_TAG	equ	0xbb		; tag of run-length
+							;  encoded line
+
+;------------------------------------------------------------------------------
+;				Compression Table Stuff
+;------------------------------------------------------------------------------
+
+FAXFILE_LONGEST_LEGAL_RUNLENGTH equ	2623	; sum of last entries in tables
+FAXFILE_SHORTEST_COMPRESSION_CODE equ	2	; 2 bits
+FAXFILE_LONGEST_COMPRESSION_CODE equ	13	; 13 bits
+
+;------------------------------------------------------------------------------
+;				BitBufferStuff
+;------------------------------------------------------------------------------
+;
+; Structure to keep track of bits in a bit buffer
+;
+BitBufferStuff	struct
+	BBS_theBuffer		fptr		; seg:current pos
+	BBS_startPos		word		; byte offset
+	BBS_endPos		word		; byte offset (one past end)
+	BBS_bitPos		word		; bit offset from beginning
+	BBS_currentData		word		; byte or word
+	BBS_validBits		byte		; bits currentData
+	BBS_color		FaxFileColor	; current color
+	BBS_tagByte		byte		; tag for the line
+BitBufferStuff	ends
+
+;------------------------------------------------------------------------------
+;				2D Stuff
+;------------------------------------------------------------------------------
+;
+; flags for compressing/decompressing 2d fax files
+;
+
+FaxFile2DDecompressionFlags	record
+	:1
+	FF2DDF_SOURCE_LINE_IS_RL_COMPRESSED:1	; 0 if it is 2d compressed
+	FF2DDF_RL_COMPRESS_OUTPUT_LINE:1        ; 1 if we want output as rl
+	FF2DDF_NO_TAG_BYTE_ON_OUTPUT:1		; 0 to put a tag byte in
+	FF2DDF_REFERENCE_LINE_IS_COMPRESSED:1	; 0 if it is uncompressed
+	FF2DDF_SOURCE_LINE_IS_1D_COMPRESSED:1	; 0 if it is 2d compressed
+	FF2DDF_1D_COMPRESS_OUTPUT_LINE:1	; 0 to totaly decompress
+	FF2DDF_DO_NOT_DECOMPRESS:1		; 0 to decompress
+FaxFile2DDecompressionFlags	end
+
+;
+; the flags SOURCE_LINE_IS_1D_COMPRESSED and SOURCE_LINE_IS_RL_COMPRESSED
+; do not need to be set or cleared by the callers of the faxfile routines,
+; they are set internally based on the tag byte on the line
+; (this did not used to be the case)
+;
+
+
+FaxFile2DCompressionFlags	record
+	:1
+	FF2DCF_OPTIMIZE_FOR_SPACE:1		; 1 if 0D compression allowed
+	:1
+	:1
+	FF2DCF_REFERENCE_LINE_IS_COMPRESSED:1	; 0 if it is uncompressed
+	FF2DCF_SOURCE_LINE_IS_COMPRESSED:1	; 0 if it is uncompressed
+	FF2DCF_NEXT_LINE_WILL_BE_2D_COMPRESSED:1; 0 if it will be 1d
+	FF2DCF_2D_COMPRESS_OUTPUT_LINE:1	; 0 to 1d compress it
+FaxFile2DCompressionFlags	end
+
+;
+; parameters to pass to the 2d compressor and decompressor
+; (nice and word sized)
+;
+
+FaxFile2DCommonParameters	struct
+	FF2DCP_referenceLine		fptr
+	FF2DCP_sourceLine		fptr
+	FF2DCP_outputLine		fptr
+	FF2DCP_uncompressedLine		fptr	; not used
+	FF2DCP_bytesInRefLine		word
+	FF2DCP_bytesInSourceLine	word
+	FF2DCP_bytesToOutput		word	; SIZE OF OUTPUT BUFFER!!!!
+	FF2DCP_decompressFlags		FaxFile2DDecompressionFlags
+	FF2DCP_compressFlags		FaxFile2DCompressionFlags
+	FF2DCP_bitsToDecompress		word	; can't be > than 1728
+FaxFile2DCommonParameters	ends
+;
+; use bitsToDecompress when decompressing to RL or 1D compressed scanlines.
+; it is not used when decompressing to raw. (use bytesToOutput)
+;
+
+;
+; The number of bytes in an uncompressed scanline is constant: the number of
+; bytes in the uncompressed bitmap, plus a tag byte
+;
+FAXFILE_0D_LINE_SIZE	equ	FAXFILE_HORIZONTAL_BYTE_WIDTH + \
+				size byte
+
+;------------------------------------------------------------------------------
+;			Useful string definitions
+;------------------------------------------------------------------------------
+
+;
+; The FAXFILE_FORWARDED_FAX_IDENTIFIER string is placed in a gstring comment at
+; the beginning of a spool file generated when forwarding fax files.  The
+; following comment is the FileLongName of the forwarded fax file in the
+; forwarded fax file directory.
+;
+FAXFILE_FORWARDED_FAX_IDENTIFIER	equ	"TiRaMiSu forwarded fax-o-gram"
+FAXFILE_LOCAL_NUMBER			equ	"+ 127-0-0-1 +"
+
+;------------------------------------------------------------------------------
+;			       Exported Routines
+;------------------------------------------------------------------------------
+
+global	FaxFileCreate:far
+global	FaxFileInitialize:far
+
+global	FaxFileInsertPage:far
+;
+;  Insert a page into the fax file.
+;
+;  Pass:	ax = FaxAddPage etype
+;		bx = fax file handle
+;		cx = position to insert at (FAX_PAGE_LAST to append page)
+;		dx = handle of huge array to use (must have been
+;		     created in the fax file!)
+;  Return:
+;
+;	for FAP_ADD_CREATE:	dx = huge-array handle of new page
+;	for FAP_ADD_NO_CREATE:	dx = unchanged
+;	for FAP_ADD_EXISTING:	dx = unchanged
+;
+;  Destroyed:	nothing
+;
+
+global	FaxFileGetHeader:far
+global	FaxFileGetPage:far
+global	FaxFileGetPageCount:far
+
+global	FaxFileCompressScanline:far
+global	FaxFileDecompressScanline:far
+
+global	FaxFileDeletePage:far
+;
+;  Delete a page from the fax
+;
+;  Pass:	bx = file handle
+;		cx = page to delete
+;
+;  Return:	carry set if page could not be deleted
+;
+;  Destroyed:	nothing
+;
+
+global	FaxFileGetName:far
+;
+;  Return the name of the fax file.
+;
+;  Pass:	bx = file handle
+;		cx:dx = buffer for name (must be at least
+;			FILE_LONGNAME_BUFFER_SIZE in length)
+;
+;  Return:	cx:dx = filled with filename from FFH_filename
+;		field in FaxFileHeader
+;
+;  Destroyed:	nothing
+;
+
+global	FaxFileSetExtAttrs:far
+;
+;	Makes sure extended attributes are set correctly for
+;	the fax file.
+;
+;  Pass:	bx = file handle
+;
+;  Return:	nothing
+;
+;  Destroyed:	nothing
+;
+
+protominor	TwoDStuff
+
+global	FaxFile2DCompressScanline:far
+;
+;  Pass:	dx:bx = FaxFile2DCommonParamaters
+;
+;  Return:	cx = bytes in output line
+;
+;  Destroyed:	nothing
+;
+
+global	FaxFile2DDecompressScanline:far
+;
+;  Pass:	dx:bx = FaxFile2DCommonParamaters
+;
+;  Return:	cx = bytes in output line
+;		dx = valid bits in last byte (if uncompressed and not 1d)
+;
+;  Destroyed:	nothing
+;
+
+global	FaxFileFixupLines:far
+;
+; Goes through all the scanlines in a page and puts the correct EOL+tag bit
+; at the end of them.  This can ONLY be called for a page that is 2d
+; compressed and has tag bytes on all the lines.  Plus the EOL must be the
+; last word in each line.  (this is how it should be anyways)
+;
+;  Pass:	bx = file handle
+;		cx = page to correct EOLs on
+;
+;  Return:	nothing
+;
+;  Destroyed:	nothing
+;
+
+protominor	Tiramisu
+
+if not PASTA
+global	PutThreadInFaxInfoDir:far
+endif 
+global	PutThreadInFaxInDir:far
+global	PutThreadInFaxForwardDir:far
+global	PutThreadInFaxReceivedDir:far
+global	PutThreadInFaxOutDir:far
+global	PutThreadInFaxDriverDir:far
+;
+; Puts the calling thread in one of the standard Fax Directories:
+;
+;		The Top (faxInfoFile) directory,
+;		the In (incoming faxes) directory,
+;		the Out (outgoing faxes) directory,
+;		the Forward (forwarded faxes) directory,
+;		the Received (finished being received) directory,
+;	    and	the Driver (input/output driver) directory.
+;		
+; If the directory doesn't exist, it will be created.  See the definitions for
+; FAX_FILE_STANDARD_PATH and FAX_DRIVER_STANDARD_PATH for the standard
+; paths the fax dirs live under.
+;
+;  Pass:	nothing
+;
+;  Return:	carry 	- set if unable to go to directory
+;			- clear if successful
+;
+;  Destroyed:	nothing
+
+global	GetFaxInfoPath:far
+global	GetFaxInPath:far
+global	GetFaxOutPath:far
+global	GetFaxForwardPath:far
+global	GetFaxReceivedPath:far
+global	GetFaxDriverPath:far
+;
+; Fills a buffer with the path that would be moved to with the
+; PutThreadInFax{}Dir calls
+;
+; Pass:		es:di = buffer to copy path into
+;		cx = length of buffer
+;
+; Return:	bx = StandardPath (disk handle) of path root
+; 		cx = length of path string
+;		carry set if buffer is not large enough to hold path string
+;		use a PathName to be sure it is long enough
+
+global	FaxfileCreateUniqueFile:far
+;
+; Creates a unique fax file in the current directory.
+;
+; Pass:		cx:dx	= buffer to put file name
+;
+; Return:	^lbx	= file handle
+;		cx:dx	= file name filled
+;
+;		carry set if file is not able to be open 
+;
+; Destroyed:	nothing
+;
+
+global	FaxInfoFileOpen:far
+;
+; Opens the fax information file in which the last ten destinations and other
+; info are kept.
+;
+; Pass:		nothing
+;
+; Return:	bx	- VM file handle
+;		carry 	- set if file is invalid
+;		al	- error code returned.
+;
+; Destroyed:	ah
+;
+
+global	FaxInfoFileGetDialAssistInfo:far
+;
+; Reads the dial assist info from a fax info file.  Pass it the values below in
+; ax:dx (a lame, easily hacked password that should not be released to the
+; outside world), and it will return the DAI_billingCard field filled out;
+; otherwise, that field will be zeroed (but all other fields filled out).
+;
+; Note: sets the DAI_flags to the saved values plus DAF_USE_SYS_DEFAULT.
+;
+; Pass:		ax:dx	- the magic number
+;		bx	- FaxInformation file handle
+;		es:di	- pointer to a DialAssistInformation structure to be
+;			  filled
+;
+; Return: 	es:di	- pointer to the filled buffer
+;		carry	- set if a file error occurred,
+;			- clear if no file error occurred.
+;
+; Destroyed:	ax
+;
+
+global	FaxInfoFileSetDialAssistInfo:far
+;
+; Sets the dial assist info in the header of the info file to the passed
+; buffer.
+;
+; Pass:		bx	- FaxInformation file handle
+;		ds:si	- pointer to a DialAssistInformation structure
+;			  to be placed in the info file.
+;
+; Return: 	carry	- set if a file error occurred,
+;			- clear if no file error occurred
+;
+; Destroyed:	ax
+;
+
+global	FaxInitFileReadT30:far
+;
+; Reads a T30Response structure from the .ini file.  Pass a category, key, and
+; a structure to fill.
+;
+; Pass:		ds:si	- category ASCIIZ string
+;		cx:dx	- key ASCIIZ string
+;		es:di	- T30Response structure to fill
+;
+; Return:	carry	- clear if successful,
+;			- set if category/key not found or is invalid.
+;
+; Destroyed:	bx
+;
+
+global	FaxInitFileWriteT30:far
+;
+; Writes a T30Response structure to the .ini file.  Pass a category, key, and
+; the structure to write.
+;
+; Pass:		ds:si	- category ASCIIZ string
+;		cx:dx	- key ASCIIZ string
+;		es:di	- T30Response structure to write
+;
+; Return:	nothing
+;
+; Destroyed:	nothing
+;
+
+global	LocalCopyDBCSASCIIToSBCS:far
+;
+; Copy just the legal ASCII DBCS characters to an SBCS string.  If cx != 0,
+; will copy that many characters or until it hits a NULL.
+;
+; WARNING: since 1-byte representable characters > 0x80 are different in SBCS
+;	   GEOS (GEOS character set) than in DBCS GEOS (1st part of Unicode,
+;	   a.k.a. Latin-1), only ASCII characters that are <= 0x80 are copied.
+;
+; Pass:		ds:si - ptr to source (DBCS)
+;		es:di - ptr to dest (SBCS)
+;		cx    - number of characters in source string (0 for
+;			NULL-terminated)
+;
+; Return:	ds:si - past last copied DBCS character
+;		es:di - past last copied SBCS character
+; 		cx    - number of SBCS characters (including
+;			NULL if it was copied)
+;
+; Destroyed:	ax
+;
+
+global	FaxfileCreateTTL:far
+;
+; Create a faxfile top-of-page timestamp bitmap based on info in a passed
+; JobParameters block.
+;
+; Remember to nuke the bitmap with GrDestroyBitmap when you're done with it.
+;
+; Pass:		bx	- VMFile handle in which to build the bitmap
+;		dx	- PrintMode job, either PM_GRAPHICS_LOW_RES or
+;			  PM_GRAPHICS_HI_RES for standard faxes or fine mode
+;			  faxes, respectively.
+;		ax	- current page number (1-based)
+;		ds:si	- JobParameters with FFH_* data set.
+;
+; Return:	ax	- VM block handle of bitmap (bx.ax = HugeArray
+; 			  handle) 
+;		di	- gstate handle		
+;
+; Destroyed:	nothing
+;
+
+protominor	CoverPage
+
+; This is the main merge routine, and must be global.
+global	CPCMergeCoverPage:far
+
+; This allows users of the CPC to allocate a clean, iniitialized block.
+global  CPCGetNewRootBlock:far
+
+; Make checking the ini for cover page info global
+global CPCCheckIniCoverPage:far
+
+global 	CPCGetCoverPageGStringAndSize:far
+
+global 	CPCSetUpIni:far
+global	CPCSetDirectory:far
+global	CPCOpenScrapbook:far
+global	CPCCloseScrapbook:far
+global	CPCFindScrap:far
+global	CPCScrapListGetEntry:far
+global 	CPCVerifyGString:far
+global 	CPCGetMsgPadSize:far
+global	CPCGetDiskHandleFromBuffer:far
+global	QNLFormatElementNicely:far
+;
+; Formats a FaxDestinationBasics element into a text buffer with the following
+; criteria:
+;
+;		If number, names, and company exist,
+;			Names at Company -- Number
+;		else if number and names exist,
+;			Names -- Number
+;		else if number and company exists,
+;			Company -- Number
+;		else if just the number exists,
+;	 		Number
+;		if no number in any of the above, replace Number with
+;			"(manual dial)".
+;	
+; There are a maximum number of characters allowed in the buffer, so if any one
+; of the above fields has too many characters, it is ellipsisized (truncated
+; and three-dotted).
+;
+; Pass:		ds:di	- FaxDestinationBasics structure
+;		ss:si	- Buffer to fill.  Must be at least
+;			  MAX_FORMATTED_QUICK_NUMBER_BUFFER + 1 characters big.
+;
+; Return:	nothing
+;
+; Destroyed:	nothing
+;
+
+Global	FaxFileValidateFaxFile:far
+;
+; Validate the faxfile by checking the vert and horiz resolutions.
+;
+; Pass:		bx	= FaxFile handle
+;
+; Return:	carry clear if valid
+;		carry set if NOT
+; Destoryed:	nothing
+;
+
+global	FaxfileStartPrintJob:far
+;
+; Start tiramisu print job.  Called by spool library at start of print job.
+;
+; Pass:		cx:dx	= GenFilePath of fax VM file
+; Return:	carry set if job cannot be printed:
+;			ax = SpoolError
+;		carry clear if job ready to go:
+;			si = handle for subsequent calls
+; Destroy:	nothing
+;
+
+global	FaxfileEndPrintJob:far
+;
+; End tiramisu print job.  Called by spool library at end of print job.
+;
+; Pass:		si	= handle from FaxfileStartPrintJob
+; Return:	nothing
+; Destroy:	nothing
+;
+
+global	FaxfileFetchPrintSwath:far
+;
+; Fill swath bitmap with data from document.
+;
+; Pass:		si	= handle from FaxfileStartPrintJob (fax VM file)
+;		di	= gstate open to the swath bitmap (cleared bitmap)
+;		cx	= logical page being printed
+; Return:	dx	= GSRT_NEW_PAGE or GSRT_COMPLETE if on last page
+;		cx	= extra information, based on enum retuned in GSRetType
+; Destroy:	nothing
+; 
+
+CPCMergeTextClass	class	VisTextClass
+
+
+MSG_CPC_MERGE_TEXT_SET_VALID		message
+;
+;	VOV_GEMOETRY_INVALID bit.  Must do this so
+;	MSG_VIS_NOTIFY_GEOMETRY_VALID will work.  That's needed
+;	in order to build out the text obj's LINE information,
+;	used in	MSG_VIS_DRAW.  whew.
+;
+;	PASS:	ds:di	= CPCMessagePadTextClass instance data
+;
+
+CPCMergeTextClass	endc
+
+
+
+
+
+;Attribute flags tell when significant components have been found.
+
+AreaAttrFlags 	record
+	:6
+	AAF_ACCOUNT_FOR_LOGO_HEIGHT:1	; set whenever we are going to need
+					;  to apply the logo height again
+
+	AAF_LOGO_HAS_BEEN_FOUND:1	;set when the logo has been drawn
+
+	AAF_MSG_ATTR_FOUND:1		;set when a msg pad rectangle has been
+					;found, and we should merge the pad
+
+	AAF_MSG_PAD_SEARCH:1		;set while we're looking for
+					;the msg pad
+
+	AAF_SANDWHICH_SEARCH:1		;set when we're looking at sandwhiches
+					;NOT msg rects
+
+	AAF_FOUND_SANDWHICH_COLOR:1	;set when the current area attribute
+					;is sandwhich-colored.
+					;cleared when the current area
+					;attribute is anything else.
+
+	AAF_FOUND_FIRST_SANDWHICH_RECT:1
+					;set when the foloowing three
+					;conditions are met:
+					;1) this bit is currently clear
+					;2) AAF_F_S_COLOR is set, and
+					;3) we've found a fill rect
+
+	AAF_FOUND_END_LINE_COLOR:1	;set when we've found the SET_AREA_ATTR
+					;that denotes the position and length
+					;of the end line.
+
+	AAF_FOUND_PAGE_SIZE_COLOR:1	;set when the set area attr repre-
+					;senting the page size has been found.
+
+	AAF_FOUND_MARGINS_SIZE_COLOR:1 	;set when we've found the area attr
+					;representing the writable ares. 
+AreaAttrFlags 	end
+
+AAF_AREA_ATTRS	equ	mask AAF_FOUND_SANDWHICH_COLOR or \
+			mask AAF_MSG_ATTR_FOUND or \
+			mask AAF_FOUND_END_LINE_COLOR or \
+			mask AAF_FOUND_PAGE_SIZE_COLOR or \
+			mask AAF_FOUND_MARGINS_SIZE_COLOR
+
+CPC_JUSTIFY_BUFFER_SIZE  	equ     100
+		
+CPC_DISK_OPAQUE_DATA_SIZE	equ  100
+
+
+if DBCS_PCGEOS
+
+DiskName	type	CPC_DISK_OPAQUE_DATA_SIZE dup (wchar)
+
+else
+
+
+
+DiskName	type	CPC_DISK_OPAQUE_DATA_SIZE dup (char)
+
+endif
+
+
+
+; Holds info identifying scrap.
+
+ScrapInfo	struct
+	SI_path		PathName	;full pathname, like n:\ensec\yada
+	SI_bookName	FileLongName	;Scrapbook name
+	SI_scrapName	FileLongName	;Scrap name
+ScrapInfo 	ends
+
+
+; This is the structure passed to the controller by its owner (and received
+; from it) both issued through MSG_META_NOTIFY_WITH_DATA_BLOCK.
+
+CPCDataBlock	struct
+	CPCDB_fileHandle	word		;VM file handle of tree root
+	CPCDB_blockHandle	word		;VM block handle of tree root
+	CPCDB_changeFlags	word		;flags indicating change ->
+CPCDataBlock	ends				;Not set by the owner, passed
+						;back by controller to signal
+						;change
+
+CPC_VM_TREE_NUM_NODES	equ	5
+; VM tree structure.  This is the block accessed with the file and
+; block handles passed in CPCDataBlock with MSG_META_MOTIFY_WITH_DATA_BLOCK
+
+CPCVMTree		struct
+
+;This is the structure that
+	;shows that this is a tree, not a chain.  You must set the VCML_next
+	;field in the VMChainLink part of the structure to VM_CHAIN_TREE
+	;Set the VCMT_offset field to point to CPCVMT_textNull,
+	;as that is the first proper node encountered.  Set
+	;VMCT_count to CPC_VM_TREE_NUM_NODES
+	CPCVMT_tree		VMChainTree
+
+	CPCVMT_numPages		FaxFileNumPagesStruct
+				; null-term string like 1 + 3, or 3 
+	CPCVMT_scrapInfo	ScrapInfo	;Holds information identifying
+						;current scrap.  Defined above.
+
+
+	;Holds infromation accompanying the trans addr list, like
+	;subject, date and time, and other useful info.
+	CPCVMT_transAddrInfo	FaxTransAddrInfo
+
+
+	CPCVMT_transAddrHeap	word	0	;transaddr list
+	CPCVMT_transAddrArray	word	0
+
+
+	;These allow canceling during a merge.  The cancelQueueHan is the
+	;handle of a message queue should check, and cancelMessage is the
+	;message to check for.  Passing these as null means you can't cancel
+	;out of a merge.
+
+	CPCVMT_cancelQueueHan	hptr	0
+	CPCVMT_cancelMessage	word	0
+
+	; The heights of the bitmaps used for the logo and signature
+	CPCVMT_logoBitmapHeight	word	0
+	CPCVMT_sigBitmapHeight	word	0
+
+	;needed because each node in a VMTree is represented by a
+	;dword. (this is to allow group and items to be copied
+	;in vm trees) text needs just a handle, so we have to have
+	;NULL field.  Set to null.
+
+	CPCVMT_textNull		word	0
+
+	CPCVMT_textBlockHandle	word	0	;Handle to TEXT TRANSFER ITEM
+						;representing the message pad
+						;text
+
+	CPCVMT_inkDBInfo	DBGroupAndItem  ;Ink group and item for msg
+						;pad ink.
+
+	CPCVMT_senderNull	word	0	;Same as above... HAVE to have
+						; a null word first, to
+						;accomadate VMCopyVMChainTree
+
+	CPCVMT_senderInfoHandle	word	0	;sender info block handle
+	
+	CPCVMT_logoNull		word	0	; must be NULL!
+	CPCVMT_logoBitmap	word	0	; vm block handle of bitmap
+						; to use in the logo field
+
+	CPCVMT_signatureNull	word	0	; must be NULL!
+	CPCVMT_signatureBitmap	word	0	; vm block handle of bitmap
+						; to use in the signature field
+CPCVMTree 	ends
+
+
+;
+; These structures are used to make getting the height of the last page
+; of a merged cover page quicker.  Rather than doing a complete cover page
+; merge with whatever text is to appear in the expando-text area, we store
+; the constanct cover page information in an escape struct at the head
+; of the cover page gstring.  CPCFastHeightStruct is the structure stored
+; with the escape code.
+;
+
+CPCFastHeightFlags	record
+		:14
+		CPCFHF_HAS_LOGO_BITMAP:1
+		CPCFHF_HAS_EXPANDABLE_TEXT:1
+CPCFastHeightFlags	end
+
+CPCFastHeightStruct	struct
+	CPCFHS_flags			CPCFastHeightFlags	; flags
+	CPCFHS_cpHeight			word		; whole height
+	CPCFHS_allowableDrawHeight	word		; page height - margins
+	CPCFHS_textWidth		word		; width of expando-text
+	CPCFHS_textFontID		FontID		; font of expando-text
+	CPCFHS_textFontSize		word		; point size 
+	CPCFHS_numPages			word		; num of pages in cp
+CPCFastHeightStruct 	ends
+	
+
+GR_CPC_ESCAPE	equ	GR_FIRST_GEOWORKS_ESCAPE
+
+
+
+
+
+
+;--------------------------------
+;	There's no .def file for the scrapbook app: have to copy
+;--------------------------------
+
+ScrapBookIndexHeader    struct
+        SBIH_numScraps  word            ; number of scraps in this scrapbook
+ScrapBookIndexHeader    ends
+
+ScrapBookIndexEntry     struct
+        SBIE_vmBlock    word            ; VM block handle of transfer item
+                                        ;       header of this scrap
+ScrapBookIndexEntry     ends
+
+
+; Since Bitmap fonts DON'T SCALE, we set our text object to have the
+; Nimbus-Q font.  We need REAL values for
+; instantiating the text object on the fly in the merge stuff.  These have
+; to match, SO the moral is:  If you change one size or font... change the
+; other, too!
+
+CPC_TEXT_FONT_SIZE_DEFAULT	equ	VTDS_12
+CPC_TEXT_FONT_SIZE		equ	     12
+CPC_TEXT_FONT_DEFAULT		equ 	VTDF_URW_SANS
+CPC_TEXT_FONT			equ 	FID_DTC_URW_SANS
+
+
+;--------------------------------
+;   definition of the SPECIAL colors
+;--------------------------------
+
+; This defines the special color for signalling where the message pad
+; information is to me merged.  Also signals that the next GR_FILL_RECT
+; contains the proper SIZE of the message area.
+
+MSG_PAD_SPECIAL_RED		equ	0
+MSG_PAD_SPECIAL_GREEN		equ	0
+MSG_PAD_SPECIAL_BLUE		equ	170
+
+MSG_PAD_SPECIAL_COLOR	equ 	(MSG_PAD_SPECIAL_RED shl 16) or \
+					(MSG_PAD_SPECIAL_GREEN shl 8) or \
+			    		(MSG_PAD_SPECIAL_BLUE)
+
+; This defines the special color for signalling either the first or
+; second of the "sandwhich" rectangle pair.  This works like so:
+;
+; When the first (back) rectangle is found, its size is used to create a
+; VisText object the same size.  This lets the object do the porper thing
+; with regards to wrapping.  All GR_DRAW_TEXT_FIELDS between then
+; and the NEXT (front) rectangle are drawn to this VisText object.
+; Then the VisText object draws itself to the gstring that's been clipped
+; to the right size.  Voila.  Text gets wrapped and text items below
+; any merging that takes place get moved down.  
+
+TEXT_FIELD_SPECIAL_RED		equ	170
+TEXT_FIELD_SPECIAL_GREEN	equ	0
+TEXT_FIELD_SPECIAL_BLUE		equ	0
+
+
+TEXT_FIELD_SPECIAL_COLOR	equ 	(TEXT_FIELD_SPECIAL_RED shl 16) or \
+					(TEXT_FIELD_SPECIAL_GREEN shl 8) or \
+			    		(TEXT_FIELD_SPECIAL_BLUE)
+
+; The yellow rectangle specifies how big the cover page paper is .
+PAGE_SIZE_SPECIAL_RED		equ	255
+PAGE_SIZE_SPECIAL_GREEN		equ	255
+PAGE_SIZE_SPECIAL_BLUE		equ	85
+
+PAGE_SIZE_SPECIAL_COLOR	equ 	(PAGE_SIZE_SPECIAL_RED shl 16) or \
+					(PAGE_SIZE_SPECIAL_GREEN shl 8) or \
+			    		(PAGE_SIZE_SPECIAL_BLUE)
+
+;
+; Light purple rectangle specifies how big the writable area is.  This means
+; that margins equal page-size - writable-page-size.
+;
+WRITABLE_PAGE_SIZE_SPECIAL_RED	equ	255	
+WRITABLE_PAGE_SIZE_SPECIAL_GREEN	equ	85
+WRITABLE_PAGE_SIZE_SPECIAL_BLUE	equ	255
+
+WRITABLE_PAGE_SIZE_SPECIAL_COLOR	equ \
+				(WRITABLE_PAGE_SIZE_SPECIAL_RED shl 16) or \
+				(WRITABLE_PAGE_SIZE_SPECIAL_GREEN shl 8) or \
+			    	(WRITABLE_PAGE_SIZE_SPECIAL_BLUE)
+
+
+; And finally, the special color which defines a rectangle that represents
+; the position and length of the end line used in the expanding msg scheme.
+END_LINE_SPECIAL_RED		equ	0
+END_LINE_SPECIAL_GREEN		equ	170
+END_LINE_SPECIAL_BLUE		equ	0
+
+END_LINE_SPECIAL_COLOR	equ 	(END_LINE_SPECIAL_RED shl 16) or \
+					(END_LINE_SPECIAL_GREEN shl 8) or \
+			    		(END_LINE_SPECIAL_BLUE)
+
+; Size of an 8  by 10 1/2 page in document coordinates. (inches * 72)
+; (accounts for printer not being able to print a WHOLE page)
+
+CPC_FAX_SHEET_HEIGHT			equ	756 - FAX_TTL_LINE_PADDING_STD
+CPC_FAX_SHEET_WIDTH			equ	576
+
+
+; The available space on the nokia A4 page, which is A4 (842) - 2 one-inch
+; margins. (72 pts per inch)
+
+
+CPC_A4_WIDTH				equ 	609		
+CPC_A4_HEIGHT				equ 	842
+CPC_A4_ALLOWABLE_DRAW_HEIGHT		equ	CPC_A4_HEIGHT - 72
+CPC_RESPONDER_MARGIN			equ	72
+
+
+
+FAXFILE_NUM_SCANLINES_STD	equ	1078
+
+
+; Black
+
+CPC_BLACK	equ	255
+
+;
+; CODE_1 signals the place where the actual message should start.
+; CODE_2 signals where any page after the first one should start.
+;
+
+
+CPC_HEADER_ESCAPE_CODE		equ 	C_CAP_H
+CPC_MAX_HEADER_LABEL_LENGTH	equ 	30 
+
+CPC_EXPANDING_MESSAGE_WIDTH	equ 612 - PR_MARGIN_LEFT - PR_MARGIN_RIGHT
+
+; Compensation for geodraw.  Geodraw puts a 1/8th scale, we need 1/1.  
+
+CPC_SCALE_COMPENSATION	equ	8
+
+; Number of merge codes we use.
+
+CPC_NUMBER_OF_MERGE_CODES	equ	18
+
+;	This is the size of the @char pair, used for merging text
+;	fields.
+
+CPC_ESCAPE_CODE_SIZE		equ	2
+
+
+;	This is the escape code.  It signals that the following char
+; 	represents a merge field of some type.
+
+CPC_ESCAPE_CODE		equ	C_AT_SIGN
+
+
+;
+; Codes to mark where the logo graphic goes
+;
+if DBCS_PCGEOS
+CPC_LOGO_ESCAPE_CODE		equ 	C_LATIN_CAPITAL_LETTER_L
+else
+CPC_LOGO_ESCAPE_CODE		equ 	C_CAP_L
+endif
+
+;CPC_LOGO_ESCAPE_CODE		equ 	C_SMALL_T
+
+;	This is the combined size of the structures that accompany
+;	the GR_DRAW_TEXT_FIELD op code as returned by GrGetGStringElement.
+;	It's used to get passed these structures to get at the text
+;	itself.
+;
+;	The complete format as returned is:
+;
+;			OpDrawTextField	: 15 bytes
+;			TFStyleRun	: 26 bytes
+;			--------------------------
+;					  41 bytes
+
+CPC_TEXT_FIELD_OP_SIZE 	equ	41
+
+
+
+; This is the size of the initial buffer passed to GeGetGStringElemement when
+; getting a GrDrawTextField element.  It equals the size of
+; QFAX_TEXT_FIELD_OP_SIZE + 300 for one line of text + FAX_NAME_SIZE
+
+CPC_TEXT_LINE_LENGTH		equ	300
+CPC_TEXT_FIELD_BUFFER_SIZE	equ	CPC_TEXT_LINE_LENGTH + CPC_TEXT_FIELD_OP_SIZE + FAX_NAME_SIZE			
+
+;
+; Here's the size of the buffer used to build the combp strings.  We have to
+; Make it pretty big...
+;
+
+CPC_COMBO_BUFFER_SIZE equ 500
+
+
+; Size of the buffer to use when getting the whole GR_DRAW_TEXT_FIELD element.
+; = 1 line (80 chars) + op code stuff
+
+CPC_TEXT_FIELD_BUILD_BUFFER_SIZE	equ	80  + CPC_TEXT_FIELD_OP_SIZE 
+
+
+;
+; Here's a few constants related to drawing the end line for the expanding
+; message shme.
+;
+; The numbers here are used in CPCPutEndLine
+;
+CPC_END_LINE_WIDTH			equ 	1	; that's one point
+CPC_END_LINE_DISTANCE_FROM_MESSAGE 	equ 	18	; that's 1/4 of inch
+CPC_END_LINE_MIDDLE_DISTANCE		equ	4	; that's 4 points
+
+CPC_HEIGHT_OF_LINES_SECTION		equ	\
+				CPC_END_LINE_DISTANCE_FROM_MESSAGE + \
+				CPC_END_LINE_MIDDLE_DISTANCE + \
+				((CPC_END_LINE_WIDTH + 1) / 2)
+;
+; More constants for the spacing around the logo and signature
+;
+CPC_SIGNATURE_DISTANCE_FROM_MESSAGE	equ	18	; 1/4 inch
+CPC_LOGO_DISTANCE_FROM_TOP_LINES	equ	10
+
+; First BYTE: 
+; The first byte represents offsets into a tabel of routines.
+; Note that all sender info merging uses the same routine, while
+; each receiver info needs a different one
+
+MergeRoutineIndecies	etype	byte, 0, 2
+		MRI_TO_COMBO		enum 	MergeRoutineIndecies
+		MRI_TO_PERSON		enum 	MergeRoutineIndecies
+		MRI_TO_COMPANY		enum 	MergeRoutineIndecies
+		MRI_RECEIVER_FAX	enum	MergeRoutineIndecies
+		MRI_TO_CC_MAYBE		enum	MergeRoutineIndecies
+		MRI_TO_CC		enum 	MergeRoutineIndecies
+		MRI_TO_SUBJECT		enum 	MergeRoutineIndecies
+		MRI_FROM_ALL		enum 	MergeRoutineIndecies
+		MRI_ESCAPE_CHAR		enum	MergeRoutineIndecies
+		MRI_DATE_AND_TIME	enum	MergeRoutineIndecies
+		MRI_NUM_PAGES		enum	MergeRoutineIndecies
+; Second BYTE: 
+
+; Receiver stuff.
+; The first five are set so as to NEVER be confused with real offsets.
+; _WRAP/_NO_WRAP are used to signaly how to build the list:
+;
+; _WRAP :   name1,
+;	    name2,
+;	    name3
+;
+; _NO_WRAP :	names1, name2, name3
+
+TO_PERSON_COMPANY_COMBO equ	-1
+TO_WRAP			equ	-2
+TO_NO_WRAP		equ	-3
+TO_COMPANY		equ	offset	FDB_companyName
+TO_SUBJECT		equ	offset	FTAI_subject
+
+; Sender stuff.  All are offsets to particular fields within the
+; sender info struct.
+
+SenderInfoIndecies	etype	word, 0, 2
+	SII_FROM_PERSON		enum	SenderInfoIndecies
+	SII_FROM_COMPANY	enum	SenderInfoIndecies
+	SII_FROM_VOICE		enum	SenderInfoIndecies
+	SII_FROM_FAX		enum	SenderInfoIndecies	
+	SII_FROM_FAX_ID 	enum	SenderInfoIndecies
+
+SaveTranslationType	etype word, 0 , 2
+	STT_HORZ_TRANS	enum 	SaveTranslationType 
+	STT_VERT_TRANS	enum 	SaveTranslationType
+
+
+; Errors for bad merging.
+
+CPCMergeErrorType	etype 	word, 0, 2
+	CPCMET_OUT_OF_MEMORY	enum	CPCMergeErrorType ; no memory?
+	CPCMET_NO_DISK_SPACE	enum	CPCMergeErrorType ; ran out of d space
+	CPCMET_USER_CANCELED	enum 	CPCMergeErrorType ; we found a
+				; cancel message during CPCCheckForCancel
+	CPCMET_NO_COVER_PAGE	enum	CPCMergeErrorType
+				; No cover page... anywhere 
+
+protominor	CoverPageFastHeight
+
+global  CPCSetUpGStringForFastHeightCalc:far
+global	CPCLoadGStringFromScrapInfo:far 
+ 
+
+protoreset
+
+protominor	CompressAPage
+global	FaxFileCompressPage:far
+global	FaxFileCompressFile:far
+
+;
+; the following flags are defined, but not used yet, for FaxFileCompressPage
+; to be able to convert pages between fine and standard modes.
+;
+FaxFileCompressPageFlags	record
+	:14
+	FFCPF_FINE_TO_STANDARD:1
+	FFCPF_STANDARD_TO_FINE:1
+FaxFileCompressPageFlags	end
+
+protoreset
+
+protominor	CopyFaxFile
+
+global	FaxFileCopyFile:far
+
+protoreset
+
+
+;
+; Structures and constants used in fax printing (Tiramisu printing).
+;
+
+FaxfileCBitmap	struct
+    FCB_cbitmap		CBitmap	<>
+    FCB_memHandle	hptr	0
+    FCB_faxFile		hptr	0
+    FCB_faxBlock	word	0
+    FCB_faxPageCount	word
+    FCB_faxXres		word
+    FCB_faxYres		word
+    FCB_refLineSize	word
+    FCB_outputLineSize	word
+    FCB_refLine		char	FAXFILE_HORIZONTAL_BYTE_WIDTH dup (0)
+    FCB_outputLine	char	FAXFILE_HORIZONTAL_BYTE_WIDTH dup (0)
+FaxfileCBitmap	ends
+
+
+protominor	FaxFindLeftEdge
+
+global	FaxFileDetectLeftEdge:far
+
+protoreset
+
+protominor	FaxBitmapStuff
+
+global	FaxFileStoreCoverPageBitmap:far
+global	FaxFileGetCoverPageBitmap:far
+
+FaxCoverPageBitmapType	etype	word, 0, 1
+	FCPBT_LOGO	enum	FaxCoverPageBitmapType
+	FCPBT_SIGNATURE	enum	FaxCoverPageBitmapType
+
+protoreset		
+
+EndLibrary	faxfile

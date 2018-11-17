@@ -1,0 +1,761 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Palm Computing, Inc. 1992 -- All Rights Reserved
+ *
+ * PROJECT:	  PEN GEOS
+ * MODULE:	  World Clock
+ * FILE:	  uiMain.ui
+ *
+ * AUTHOR:  	  Roger Flores, Oct 12, 1992
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	10/12/92  rsf	    Initial version
+ *	10/15/96  pam	    Added Penelope specific UI
+ *
+ * DESCRIPTION:
+ *	UI description for World Clock
+ *
+ * 	$Id: wc.ui,v 1.1 97/04/04 16:22:02 newdeal Exp $
+ *
+ ***********************************************************************/
+
+
+#ifdef DO_DOVE
+#define	_DOVE	1
+#else
+#define	_DOVE	0
+#endif
+
+#include "generic.uih"
+
+
+#include "wc.uih"
+
+
+#include "uiStrings.ui"
+
+
+class	GenFastInteraction = GenInteraction {
+}
+
+class	GenNotSmallerThanWorldMapInteraction = GenInteraction {
+}
+
+class	OptionsInteraction = GenInteraction {
+}
+
+class	CustomApplyInteraction = GenInteraction {
+}
+
+class	SpecialSizePrimary = GenPrimary {
+}
+
+start ApplicationUI;
+
+/*
+ * Top level object
+ */
+
+WorldClockApp = WorldClockApplication {
+	children = WorldClockPrimary;
+	gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = WorldClockPrimary;
+	moniker = list {
+		WorldClockYMMoniker,
+		"World Clock";
+	}
+	hints = {
+		ATTR_GEN_HELP_FILE {
+			char "wclockhelp", 0
+		},
+                ATTR_GEN_INIT_FILE_CATEGORY {
+                        char "World Clock", 0
+                },
+	}
+}
+
+end ApplicationUI;
+
+
+/*****************************************************************************/
+
+start Interface;
+
+/****************************************************************************
+ *	Main window
+ ***************************************************************************/
+
+/* Don't ignore dirty or it won't stay iconified through a state save. */
+WorldClockPrimary = SpecialSizePrimary {
+	children =
+		TitleGlyph,
+		BodyGroup,
+		CitySelectionInteraction;
+	hints = {
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		/*HINT_PRIMARY_NO_FILE_MENU, */
+		ATTR_GEN_HELP_CONTEXT {
+			char "world_clock_screen", 0
+		},
+		HINT_IF_SYSTEM_ATTRS { SystemAttrs mask SA_NOT or \
+					mask SA_HORIZONTALLY_TINY },
+			HINT_DISPLAY_NOT_RESIZABLE,
+			ATTR_GEN_DISPLAY_NOT_MAXIMIZABLE,
+		HINT_ENDIF
+	}
+}
+
+
+BodyGroup = GenFastInteraction ignoreDirty {
+	children = 
+		OptionsMenu,
+		SelectedTimeZoneGroup,
+		WorldView,
+		HomeDestOptionsGroup;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_IF_SYSTEM_ATTRS { SystemAttrs mask SA_HORIZONTALLY_TINY },
+			HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+			HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY,
+			HINT_INCLUDE_ENDS_IN_CHILD_SPACING,
+		HINT_ENDIF
+	}
+}
+
+OptionsMenu = GenInteraction {
+	moniker = "Options";
+	children = OptionsGroupLeftAligningInteraction;
+	visibility = popup;
+	hints = {
+		HINT_SEEK_MENU_BAR
+	}  
+}
+
+HomeDestOptionsGroup = GenNotSmallerThanWorldMapInteraction ignoreDirty {
+	children = 
+		HomeDestOptionsInteraction,
+		UserCitySelectionInteraction;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY,
+		HINT_IF_SYSTEM_ATTRS { SystemAttrs mask SA_HORIZONTALLY_TINY },
+			/* zoomer */
+			HINT_FIXED_SIZE {
+				SpecWidth <>
+				SpecHeight <SST_LINES_OF_TEXT, 8>
+				word 1
+			},
+		HINT_ELSE,
+			/* bullet, desktop */
+			HINT_FIXED_SIZE {
+				SpecWidth <>
+/*				SpecWidth <SST_PIXELS, 317>*/	/* 304 */
+/*				SpecHeight <SST_PIXELS, 126>*/	/* 131 */
+				SpecHeight <SST_LINES_OF_TEXT, /*7*/ 6>
+				word 1
+			},
+			HINT_MINIMUM_SIZE {
+				SpecWidth <SST_AVG_CHAR_WIDTHS, 32>
+				SpecHeight <>
+				word 1
+			},
+		HINT_ENDIF
+	}
+}
+
+
+HomeDestOptionsInteraction = GenFastInteraction {
+	children = 
+		HomeCityGroup,
+		DestCityGroup/*,
+		OptionsGroupLeftAligningInteraction*/;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY,
+	}
+}
+
+/* Don't ignoreDirty because the object forgets when it's disabled
+   and isn't set when restoring from state when minimized.
+*/
+TitleGlyph = GenGlyph {
+	moniker = TitleMoniker;
+	hints = {
+		HINT_CENTER_MONIKER,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, 72*3>
+/*			SpecWidth <SST_PCT_OF_FIELD_WIDTH, PCT_90>*/
+			SpecHeight <>
+		}
+	}
+}
+
+visMoniker TitleMoniker = ignoreDirty {
+	gstring {
+		GSBeginString
+		GSSetFont 	FID_DTC_URW_SANS, 18, 0
+		GSDrawText	0, 5, <World Clock   0:00       >
+		GSEndString
+	}
+}
+
+
+WorldView = GenView {
+	docRight = WORLD_MAP_WIDTH;
+	docBottom = WORLD_MAP_PLUS_DAYLIGHT_HEIGHT;
+
+	viewAttributes = default 
+		+dontSendKbdReleases, 
+		-focusable;
+
+	horizAttributes = default +noLargerThanContent, +noSmallerThanContent;
+	vertAttributes  = default +noLargerThanContent, +noSmallerThanContent;
+
+	/* when the contents of this view (i.e. the document) must be updated,
+	 * the UI should send a MSG_META_EXPOSED to the WorldClockProcessClass
+	 * object. */
+
+	output = process;
+
+}
+
+
+/****************************************************************************/
+
+
+
+SelectedTimeZoneGroup = GenFastInteraction {
+	children =
+		SelectedTimeZoneName,
+		SelectedTimeZoneTimeDate;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_DONT_INCLUDE_ENDS_IN_CHILD_SPACING,
+		HINT_IF_SYSTEM_ATTRS { SystemAttrs mask SA_HORIZONTALLY_TINY },
+			HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+			HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_ENDIF
+	}
+}
+
+
+SelectedTimeZoneName = GenGlyph ignoreDirty {
+	moniker = "Selected Time Zone:";
+}
+
+SelectedTimeZoneTimeDate = GenGlyph ignoreDirty {
+	moniker = "";
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 22>
+			SpecHeight <>
+		},
+	}
+}
+
+
+
+/****************************************************************************/
+
+
+HomeCityGroup = GenFastInteraction ignoreDirty {
+	children = 
+		HomeCityFirstLine,
+		HomeCitySecondLine;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+	}
+}
+
+HomeCityFirstLine = GenFastInteraction ignoreDirty {
+	children =
+		HomeCityTrigger/*,
+		HomeCityTimeDate*/;
+	hints = {
+		/*HINT_DONT_INCLUDE_ENDS_IN_CHILD_SPACING,*/
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT/*,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY */
+	}
+}
+
+HomeCitySecondLine = GenFastInteraction ignoreDirty {
+	children =
+		HomeCityNameHolder,
+		HomeCityTimeDateHolder;
+	hints = {
+		HINT_DONT_INCLUDE_ENDS_IN_CHILD_SPACING,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+
+
+HomeCityTrigger = GenTrigger ignoreDirty {
+	moniker = "Home:";
+	action = MSG_WC_POPUP_HOME_CITY_UI, process;
+	hints = {
+		HINT_CENTER_MONIKER,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			byte	mask HOME_CITY
+		}
+	}
+}
+
+HomeCityNameHolder = GenFastInteraction ignoreDirty {
+	children =
+		HomeCityName;
+}
+
+HomeCityName = GenGlyph ignoreDirty {
+	moniker = "";
+}
+
+HomeCityTimeDateHolder = GenFastInteraction ignoreDirty {
+	children =
+		HomeCityTimeDate;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_RIGHT_JUSTIFY_CHILDREN
+	}
+}
+
+HomeCityTimeDate = GenGlyph ignoreDirty {
+	moniker = "";
+}
+
+
+
+DestCityGroup = GenFastInteraction ignoreDirty {
+	children = 
+		DestCityFirstLine,
+		DestCitySecondLine;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+	}
+}
+
+DestCityFirstLine = GenFastInteraction ignoreDirty {
+	children =
+		DestCityTrigger/*,
+		DestCityTimeDate*/;
+	hints = {
+		/*HINT_DONT_INCLUDE_ENDS_IN_CHILD_SPACING, */
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT/*,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY */
+	}
+}
+
+DestCitySecondLine = GenFastInteraction ignoreDirty {
+	children =
+		DestCityNameHolder,
+		DestCityTimeDateHolder;
+	hints = {
+		HINT_DONT_INCLUDE_ENDS_IN_CHILD_SPACING,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+
+
+
+DestCityTrigger = GenTrigger ignoreDirty {
+	moniker = "Destination:";
+	action = MSG_WC_POPUP_HOME_CITY_UI, process;
+	hints = {
+		HINT_CENTER_MONIKER,
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			byte	mask DEST_CITY
+		}
+	}
+}
+
+DestCityNameHolder = GenFastInteraction ignoreDirty {
+	children =
+		DestCityName;
+}
+
+
+DestCityName = GenGlyph ignoreDirty {
+	moniker = "";
+}
+
+DestCityTimeDateHolder = GenFastInteraction ignoreDirty {
+	children =
+		DestCityTimeDate;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_RIGHT_JUSTIFY_CHILDREN
+	}
+}
+
+DestCityTimeDate = GenGlyph ignoreDirty {
+	moniker = "";
+}
+
+
+/****************************************************************************/
+
+
+CitySelectionInteraction = CustomApplyInteraction ignoreDirty {
+	moniker = "";
+	type = properties;
+	visibility = dialog;
+	attributes = notUserInitiatable, modal;
+	genAttributes = signalInteractionComplete;
+	children =
+		CityCountrySelectionLists,
+		CityCountrySelectionOption;
+	hints = {
+		HINT_INTERACTION_SIMPLE_PROPERTIES,
+		HINT_INTERACTION_RELATED_PROPERTIES,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_BOTTOM_JUSTIFY_CHILDREN,
+                ATTR_GEN_HELP_CONTEXT {
+                        char "clock_select_dialbx", 0
+                },
+	}
+}
+
+
+end Interface;
+
+
+start DialogResource;
+
+CityCountrySelectionLists = GenInteraction ignoreDirty {
+	children =
+		CityCountrySelectionGroup,
+		CityList;
+}
+
+
+end DialogResource;
+
+
+start SelectionListResource;
+
+CityCountrySelectionGroup = GenFastInteraction ignoreDirty {
+	children =
+		CountryList,
+		CountryCityList;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+	}
+}
+
+CountryList = GenDynamicList ignoreDirty {
+
+	/* GenDynamicListClass Instance Data */
+	queryMsg = MSG_WC_COUNTRY_LIST_REQUEST_MONIKER;
+
+	/* GenItemGroup Instance Data */
+	behaviorType = exclusive;
+	numSelections = 1;
+	destination = process;
+
+
+	hints = {
+		ATTR_GEN_ITEM_GROUP_STATUS_MSG {word MSG_WC_COUNTRY_CHANGE},
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 16>
+			SpecHeight <SST_LINES_OF_TEXT, SELECTABLE_CITIES_DISPLAYED_COUNT>
+			word	SELECTABLE_CITIES_DISPLAYED_COUNT
+		}
+	}
+}
+
+
+CountryCityList = GenDynamicList ignoreDirty {
+
+	/* GenDynamicListClass Instance Data */
+	queryMsg = MSG_WC_COUNTRY_CITY_LIST_REQUEST_MONIKER;
+
+	/* GenItemGroup Instance Data */
+	behaviorType = exclusive;
+	numSelections = 1;
+	destination = process;
+
+	hints = {
+		ATTR_GEN_ITEM_GROUP_STATUS_MSG {word MSG_WC_COUNTRY_CITY_CHANGE},
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 16>
+			SpecHeight <SST_LINES_OF_TEXT, SELECTABLE_CITIES_DISPLAYED_COUNT>
+			word	SELECTABLE_CITIES_DISPLAYED_COUNT
+		}
+	}
+}
+
+
+CityList = GenDynamicList ignoreDirty {
+	genStates = default -usable;
+
+	/* GenDynamicListClass Instance Data */
+	queryMsg = MSG_WC_CITY_LIST_REQUEST_MONIKER;
+
+	/* GenItemGroup Instance Data */
+	behaviorType = exclusive;
+	numSelections = 1;
+	destination = process;
+
+	hints = {
+		ATTR_GEN_ITEM_GROUP_STATUS_MSG {word MSG_WC_CITY_CHANGE},
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 34>
+			SpecHeight <SST_LINES_OF_TEXT, SELECTABLE_CITIES_DISPLAYED_COUNT>
+			word	SELECTABLE_CITIES_DISPLAYED_COUNT
+		}
+
+	}
+}
+
+end SelectionListResource;
+
+
+start DialogResource;
+
+CityCountrySelectionOption = GenBooleanGroup ignoreDirty {
+	children =
+		CityCountryEntry,
+		UserCity;
+
+	destination = process;
+	hints = {
+		ATTR_GEN_BOOLEAN_GROUP_STATUS_MSG {word MSG_WC_SWITCH_SELECTION},
+		HINT_ORIENT_CHILDREN_VERTICALLY
+	}
+}
+
+CityCountryEntry = GenBoolean ignoreDirty {
+	moniker = "Select by City";
+	identifier = "mask CITY_SELECTION";
+}
+
+
+UserCity = GenBoolean {
+	genStates = default -enabled;
+	moniker = "Use User City";
+	identifier = "mask USER_CITY_SELECTION";
+}
+
+end DialogResource;
+
+
+/****************************************************************************/
+
+start Interface;
+
+OptionsGroupLeftAligningInteraction  = GenFastInteraction ignoreDirty {
+	children = OptionsGroup;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}		
+}
+
+OptionsGroup = OptionsInteraction ignoreDirty {
+	moniker = "Set Clock Options";
+	type = properties;
+	visibility = dialog;
+	attributes = modal;
+	children =
+		SwitchesGroup,
+		UserCityGroup;
+	hints = {
+                ATTR_GEN_HELP_CONTEXT {
+                        char "setting_options", 0
+                }
+	}
+}
+
+end Interface;
+
+
+start DialogResource;
+
+SwitchesGroup = GenFastInteraction ignoreDirty {
+	children = 
+		SetSystemClock,
+		SetSummerTime;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_DIVIDE_WIDTH_EQUALLY,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+		HINT_INCLUDE_ENDS_IN_CHILD_SPACING,
+	}
+}
+
+
+SetSystemClock = GenItemGroup ignoreDirty {
+	moniker = 'C', "Clock:";
+	children =
+		SetSystemToHomeTime,
+		SetSystemToDestTime;
+	selection = "mask HOME_CITY";
+	numSelections = 1;
+	destination = process;
+	applyMsg = MSG_WC_SET_SYSTEM_CLOCK;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_PLACE_MONIKER_ABOVE
+	}
+}
+
+SetSystemToHomeTime = GenItem ignoreDirty {
+	moniker = "Home";
+	identifier = "mask HOME_CITY";
+}
+
+SetSystemToDestTime = GenItem {
+	moniker = "Destination";
+	identifier = "mask DEST_CITY";
+	genStates = default -enabled;
+}
+
+SetSummerTime = GenBooleanGroup ignoreDirty {
+	moniker = 'D', "Daylight Savings:";
+	destination = process;
+	applyMsg = MSG_WC_SET_SUMMER_TIME;
+	children =
+		SetHomeTimeToSummer,
+		SetDestTimeToSummer;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_PLACE_MONIKER_ABOVE
+	}
+}
+
+
+SetHomeTimeToSummer = GenBoolean ignoreDirty {
+	moniker = "Home";
+	identifier = "mask HOME_CITY";
+}
+
+
+SetDestTimeToSummer = GenBoolean ignoreDirty {
+	moniker = "Destination";
+	identifier = "mask DEST_CITY";
+	genStates = default -enabled;
+}
+
+
+UserCityGroup = GenFastInteraction ignoreDirty {
+	children =
+		UserCityText,
+		SetUserCityLocation;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_CENTER_CHILDREN_HORIZONTALLY
+	}
+}
+
+UserCityText = GenText ignoreDirty {
+	moniker = "User City Name:";
+	text = "";
+	maxLength = USER_CITY_NAME_LENGTH_MAX;
+	textDisplayAttributes = default +singleLineText;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_DEFAULT_FOCUS
+	}
+}
+
+SetUserCityLocation = GenTrigger ignoreDirty {
+	moniker = "Set Location";
+	action = MSG_WC_START_USER_CITY_MODE, process;
+}
+
+end DialogResource;
+
+
+start Interface;
+
+UserCitySelectionInteraction = GenInteraction {
+	genStates = default -usable;
+	type = organizational;
+	children =
+		UserCitySelectionInstructions,
+		UserCitySelectionOk;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_INCLUDE_ENDS_IN_CHILD_SPACING,
+		HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY,
+		ATTR_GEN_HELP_CONTEXT {
+			char "setting_user_city", 0
+		}
+	}
+}
+
+end Interface;
+
+
+start DialogResource;
+
+UserCitySelectionInstructions = GenText ignoreDirty {
+	text = "Tap on the map to indicate where your city is.  When \
+finished tap on OK.  World Clock determines the time from the \
+last location tapped.";
+	genAttributes = default +readOnly;
+	hints = {
+		ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE
+/*		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 31>
+			SpecHeight <SST_LINES_OF_TEXT, 5>
+		},
+*/	}
+}
+
+
+
+UserCitySelectionOk = GenTrigger ignoreDirty {
+	moniker = "OK";
+	genAttributes = default +signalInteractionComplete;
+	action = MSG_GEN_INTERACTION_INITIATE, OptionsGroup;
+	hints =	{
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND { word IC_OK},
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+end DialogResource;
+
+/****************************************************************************/
+
+
+#include "Art/mkrWorldClock.ui"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

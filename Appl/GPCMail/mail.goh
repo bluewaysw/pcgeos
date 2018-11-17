@@ -1,0 +1,753 @@
+/**********************************************************************
+ *
+ *	Copyright (c) New Deal 1998 -- All Rights Reserved
+ *
+ * PROJECT:	Mail
+ * MODULE:		
+ * FILE:	mail.goh
+ * 
+ * AUTHOR:		Gene Anderson
+ * 
+ * REVISION HISTORY:
+ * 	Name	Date		Description
+ * 	----	----		-----------
+ * 	gene	12/2/98		Initial revision
+ * 
+ * DESCRIPTION:
+ * 	
+ * 		
+ * 	$Id$
+ * 
+ ****************************************************************************/
+
+@include	<stdapp.goh>
+@include        <ui.goh>
+@include        <Ansi/string.h>
+@include        <Ansi/stdio.h>
+@include        <mailhub.goh>
+@include        <mailpop3.goh>
+@include        <mailsmtp.goh>
+@include        <config.goh>
+@include        <Objects/Text/tCtrlC.goh>
+@include        <spool.goh>
+@include        <Objects/vLTextC.goh>
+@include        <iapp.h>
+@include        <initfile.h>
+@include        <vm.h>
+@include        <product.goh>
+@include        <parentc.goh>
+@include        <Objects\gSysC.goh>
+
+/***************************************************************************
+ *			Product & Feature Macros 
+ ***************************************************************************/
+
+/*
+ * @define MAIL_CONVERSION_SERVER
+ * TRUE: include support for GPC's mail conversion server
+ * FALSE: don't
+ *
+ * @define MULTIPLE_MESSAGE_SELECTION
+ * TRUE: allow multiple messages to be selected
+ * FALSE: only allow single messages to be selected
+ *
+ * @define CUI_SUPPORT
+ * TRUE: include CUI support
+ * FALSE: standard version only
+ *
+ * @define: CUI_SUPPORT_2
+ * TRUE: include new CUI level support (requires CUI_SUPPORT)
+ * FALSE: don't
+ *
+ * @define SHOW_NUM_MESSAGES_IN_FOLDERS
+ * TRUE: display the number of messages in each folder after the name
+ * FALSE: display only for Drafts
+ *
+ * @define MULTIPLE_ACCOUNT_SUPPORT
+ * TRUE: supports multiple e-mail accounts
+ * FALSE: single e-mail account only
+ *
+ * @define SHOW_FULL_ATTACHMENT_PATH
+ * TRUE: attachment lists show the full path to the attachment
+ * FALSE: attachment lists show just the filename
+ *
+ * @define MAIL_ALIAS_SUPPORT
+ * TRUE: mail aliases automatically expanded
+ * FALSE: mail aliases not supported
+ *
+ * @define MAIL_STYLES_SUPPORT
+ * TRUE: mail styles are supported
+ * FALSE: mail styles are stripped from the text
+ *
+ * @define SEND_BUG_MAIL
+ * TRUE: "Send message to Global PC/NewDeal" in Message menu
+ * FALSE: none
+ *
+ * @define CUSTOM_FOLDER_ICONS
+ * TRUE: folders have custom icons
+ * FALSE: all folders have the same icon
+ *
+ * @define EMAIL_ADS
+ * TRUE: show ads
+ * FALSE: don't show ads
+ *
+ * @define INTERIM_NEWDEAL_16_COLOR_ART
+ * TRUE: include interim 16-color artwork with labels for NewDeal
+ * FALSE: don't include 16-color artwork with labels
+ *
+ * @define PRETTY_MAIL_HEADERS
+ * TRUE: include tabs and margins so To:, From:, etc. line up
+ * FALSE: left-justify headers
+ *
+ * @define PARSE_URLS
+ * TRUE: search for URLs (http://) in plain text
+ *       note: requires MAIL_STYLES_SUPPORT
+ * FALSE: URLs in plain text ignored
+ *
+ * @define SPELL_CHECK
+ * TRUE: include spell checking
+ * FALSE: no spell checking included in mail composer
+ *
+ * @define APP_START_OPTIONS
+ * TRUE: include options for minimize, quit on starting another application
+ * FALSE: don't include the options
+ *
+ * @define BCC_SUPPORT
+ * TRUE: include support for Bcc: (blind carbon copy)
+ * FALSE: don't include Bcc: support
+ *
+ * @define NO_COMPOSE_OPTIONS
+ * TRUE: no options menu in compose window
+ * FALSE: normal options in compose window
+ *
+ * @define SERVER_MOD_WARNING
+ * TRUE: put up annoying warnings when any mail server info is changed
+ * FALSE: no warning
+ *
+ * @define ALTERNATE_FIELD_ORDER
+ * TRUE: To: Cc: (Bcc:) Subject:
+ * FALSE: To: Subject: Cc: (Bcc:)
+ *
+ * @define WARN_SENT_FOLDER_100
+ * TRUE: warn user when Sent folder reaches 100 messages
+ * FALSE: don't annoy them so much
+ *
+ * @define CUI_ZOOM_IN
+ * TRUE: add "Zoom In", "Zoom Out" buttons (instead of pointsize control)
+ * FALSE: don't
+ *
+ * @define FIRST_LAUNCH_USER_GUIDE
+ * TRUE: put up special dialog first time app is launched
+ * FALSE: don't
+ *
+ * @define CHECK_MAIL_ON_STARTUP
+ * TRUE: include option to check for new mail on startup
+ * FALSE: don't
+ * NOTE: do not use with CHECK_MAIL_ON_INTERVALS
+ *
+ * @define CHECK_MAIL_ON_INTERVALS
+ * TRUE: include option to check for new mail on intervals
+ * FALSE: don't
+ * NOTE: do not use with CHECK_MAIL_ON_STARTUP
+ *
+ * @define ONE_FONT_AND_SIZE
+ * TRUE: one font and size (Sans 12 point; Berkeley 14 point (TV))
+ * FALSE: don't
+ *
+ * @define MBX_IMPORT_SUPPORT
+ * TRUE: support for importing .mbx files (Eudora and Netscape)
+ * FALSE: don't
+ *
+ * @define CREATE_ISP_ACCOUNT
+ * TRUE: check .INI file for ISP account to create
+ * FALSE: don't
+ *
+ * @define SHOW_RAW_MESSAGE
+ * TRUE: include option to show raw message data
+ * FALSE: don't
+ *
+ * @define GIVE_MESSAGE_LIST_FOCUS_ON_OPEN
+ * TRUE: give the message list the focus if any messages
+ * FALSE: keep the focus on the folder list
+ *
+ * @define MAIL_READ_IACP_SUPPORT
+ * TRUE: include IACP support for IADT_GET_NEW_MAIL
+ * FALSE: don't
+ *
+ * @define KID_GUARD_SUPPORT
+ * TRUE: include Kid Guard support to block access to the application
+ * FALSE: don't
+ * NOTE: if you turn this on, you may have to change the code for 
+ * CHECK_MAIL_ON_INTERVALS so it does not start checking when the 
+ * user fails to login.
+ *
+ * @define GRAPHICAL_ATTACHMENT_LIST
+ * TRUE: use scrolling attachment list with icons
+ * FALSE: use GPC popup
+ *
+ * @define SIGNATURE_IN_OPTIONS
+ * TRUE: put the signature settings under Advanced Options
+ * FALSE: put them under Email Accounts
+ *
+ * @define SCROLLING_OPTIONS
+ * TRUE: make the options accessible via a scrolling list of areas
+ * FALSE: make the options directly accessible
+ *
+ * @define AUTO_SIGNATURE_OPTION
+ * TRUE: include option to automatically append signature in new messages
+ * FALSE: don't
+ *
+ * @define ALLOW_CHECK_IN_BACKGROUND
+ * TRUE: include option to check mail in the background
+ * FALSE: don't
+ *
+ * @define RECEIVE_NOTIFY_OPTIONS
+ * TRUE: include option to display a dialog, etc. notifying of new mail
+ * FALSE: don't
+ *
+ * @define LEAVE_MAIL_ON_SERVER
+ * TRUE: include option to leave mail on the server
+ * FALSE: don't
+ *
+ * @define SORT_BY_COLUMNS
+ * TRUE: include buttons to sort by columns of the mail list
+ * FALSE: include "Mailbox: X messages"
+ *
+ * @define GPC_PORTAL_SUPPORT
+ * TRUE: support for GPC portal (e.g., mail account notifications)
+ * FALSE: none
+ *
+ * @define INCLUDE_PRINT_TOOL
+ * TRUE: include tool for printing in read message window
+ * FALSE: don't
+ *
+ * @define WRAP_OUTGOING_SUPPORT
+ * TRUE: include setting for wrapping outgoing mail
+ * FALSE: don't
+ *
+ * @define PRINT_HEADER
+ * TRUE: print a header on the top of each printed page
+ * FALSE: just print data
+ *
+ * @define: DELETE_MAIL_AFTER_CRASH
+ * TRUE: delete message that was being downloaded if a crash
+ * FALSE: resume as normal
+ * NOTE: not compatible with LEAVE_MAIL_ON_SERVER
+ *
+ * @define: GEOS_FILE_INSTRUCTIONS
+ * TRUE: include conversion instructions in outgoing mail
+ * FALSE: don't
+ *
+ * @define: QUOTE_ONLY_SELECTED_TEXT
+ * TRUE: include option to only quote selected text in replies
+ * FALSE: don't
+ *
+ * @define: DEFAULT_ACCOUNT_IS_CURRENT
+ * TRUE: default account means current account
+ * FALSE: default account means original, undeletable account
+ *
+ * @define: DETAILED_ADDR_ERRORS
+ * TRUE: provide detailed error messages for bad email addresses
+ * FALSE: provide simple error message for bad email addresses
+ *
+ * @define: LEVELS_SUPPORT
+ * TRUE: provide Change User Level DB (requires CUI_SUPPORT, CUI_SUPPORT_2)
+ * FALSE: don't
+ *
+ * @define: CUI_CLOSE_ADDR_BOOK
+ * TRUE: close Address Book if opened by us in CUI
+ * FALSE: don't
+ *
+ * @define: NO_STATE_FILE
+ * TRUE: don't save to state
+ * FALSE: save to state as normal
+ *
+ * @define: NO_CC_IN_CUI
+ * TRUE: don't include Cc: field in CUI (not completely spec'd)
+ * FALSE: include it as normal
+ *
+ * @define: FIXED_POINTSIZE_FOR_PRINTING
+ * TRUE: use fixed pointsize for printing (14 point)
+ * FALSE: use the size in the read mail window
+ *
+ * @define: FORCE_APP_EXIT
+ * TRUE: force email to exit if running anything but Address Book
+ * FALSE: don't
+ * NOTE: don't use with APP_START_OPTIONS
+ *
+ * @define: LAUNCH_HELP
+ * TRUE: show help on each level 1 (e.g. CUI) launch until option off
+ * FALSE: don't
+ * NOTE: conflicts with FIRST_LAUNCH_USER_GUIDE
+ *
+ * @define: COMPOSE_EMAIL_HELP
+ * TRUE: show help on each compose window open until option off
+ * FALSE: don't
+ *
+ * @define: CONFIRM_EMAIL_SENT
+ * TRUE: show confirmation dialog when email sent until option off
+ * FALSE: don't
+ *
+ * @define: CONFIRM_SEND_LATER
+ * TRUE: show confirmation dialog for Send Later function
+ * FALSE: don't
+ *
+ * @define: VERBOSE_TITLE_BAR
+ * TRUE: use "<app name> - My address is user@myturn.com" in title bar
+ * FALSE: use "<app name> - user@myturn.com" in title bar
+ *
+ * @define: CUI_SEND_EMAIL_OPENS_OUTBOX
+ * TRUE: Send Email button in CUI main screen opens outbox instead
+ *       of sending immediately
+ * FALSE: sends immediately
+ *
+ * @define: CUI_CLOSE_COMPOSE
+ * TRUE: Use "Close" instead of "Done" in upper right of CUI composer window
+ * FALSE: Use "Done"
+ *
+ * @define: CUI_FILE_SELECTORS
+ * TRUE: limit file selectors in CUI to Document, Archive and Floppy
+ * FALSE: allow anything under Documents directory and Floppy
+ * NOTE: doesn't affect mailbox import file selector
+ *
+ * @define: ALLOW_ADDR_BOOK_WRITE
+ * TRUE: to open Address Book without deny-write mode, to allow opening
+ *       when Address Book application is running
+ * FALSE: open deny-write
+ * NOTE: may only be necessary for Datalight DOS, may introduce some
+ *       inconsistency to email address list if editing is actively occurring
+ *       in Address Book
+ *
+ * @define: COMPOSE_SEND_NOW
+ * TRUE: Send Now button in mail compose window will give option of sending
+ *       current email, or all in outbox
+ * FALSE: Send Now button will Send all in outbox
+ * NOTE: in both cases, receive will follow
+ *
+ * @define: REPLY_ON_TOP
+ * TRUE: place cursor before reply
+ * FALSE: place cursor after reply
+ *
+ * @define: DELETE_READS_NEXT
+ * TRUE: leave mail reader window open onto next message after deleting
+ *       current message, only close if no next message
+ * FALSE: close mail reader window after deleting current message
+ * NOTE: this includes same change to Recover function from Trash folder
+ *
+ * @define: DIALOG_ATTACHMENT_LIST
+ * TRUE: use dialog for attachment list, if any
+ * FALSE: use popup
+ * NOTE: exclusive with GRAPHICAL_ATTACHMENT_LIST, assumes
+ *       MAIL_CONVERSION_SERVER is enabled
+ *
+ * @define: FILE_SELECTOR_PROMPTS
+ * TRUE: additional help text in file selector dialogs (save attach,
+ *       choose attach)
+ * FALSE: no additional prompts
+ *
+ * @define: SIMPLE_RECEIVE_NONE_NOTIFY
+ * TRUE: notification when no mail was received, when requested
+ * FALSE: no notification
+ * NOTE: exclusive with RECEIVE_NOTIFY_OPTIONS
+ *
+ * @define: CUI_SENT_FOLDER
+ * TRUE: add support for SENT folder in CUI/AUI Level 1
+ * FALSE: no support
+ * NOTE: AUI Level 2 also gains option to control usage of Sent folder
+ *
+ * @define: TO_HEADER_ICON
+ * TRUE: add icon to (Send) To button in compose window header area
+ * FALSE: no icon
+ *
+ * @define: FAST_FILE_MOVE
+ * TRUE: use faster version of FileMove
+ * FALSE: use kernel version of FileMove
+ * NOTE: checks for mslf IFS driver, does normal FileMove if not found
+ *
+ * @define: MANUAL_RECOVER
+ * TRUE: user selects folder to recover to, speeds up delete slightly
+ *       as X-dir:header doesn't need to be added to deleted message
+ *       (turned off as only gives an additional 20% performance benefit
+ *       over FAST_FILE_MOVE, not worth the inconvenience of having to
+ *       select recover folder)
+ * FALSE: use X-dir: header, auto recover to original directory
+ *
+ * @define: CUSTOM_COMPOSE_HEADER_SPACING
+ * TRUE: customize the spacing of the compose header fields (To, Subject
+ *       Cc, Bcc) so that the left & right sides are exactly aligned.
+ *       This is accomplished through HINT_CUSTOM_CHILD_SPACING, which
+ *       is clearly not wonderful but it gets the job done. The basic
+ *       premise for the spacing is that the buttons on the left are
+ *       2 pixels taller than the text fields on the right, but that
+ *       the Subject line glyph on the left is 6 pixels shorter than
+ *       a text field. One then can center the text fields across from
+ *       the buttons based upon this information.
+ * FALSE: SPUI does its thing which is slightly off of what is desired
+ *
+ * @define: IDIAL_CONTROL_SUPPORT
+ * TRUE: adds an IDialControl to the primary and the read and compose mail
+ *       windows. Requires inclusion of idialc library.
+ * FALSE: no IDialControls
+ *
+ * @define: DIALER_URL
+ * TRUE: add support for dialer: URL (for fetching new local numbers)
+ * FALSE: no support
+ */
+
+/*
+ * features common to NewMail and Global Email
+ */
+@define MULTIPLE_MESSAGE_SELECTION
+@define CUI_SUPPORT
+@define CUI_SUPPORT_2
+@define SHOW_NUM_MESSAGES_IN_FOLDERS
+@define MULTIPLE_ACCOUNT_SUPPORT
+@define MAIL_ALIAS_SUPPORT
+@define MAIL_STYLES_SUPPORT
+@define SEND_BUG_MAIL
+@define CUSTOM_FOLDER_ICONS
+@define PRETTY_MAIL_HEADERS
+@define PARSE_URLS
+@define SPELL_CHECK
+@define PRINT_HEADERS
+@define DETAILED_ADDR_ERRORS
+@define LEVELS_SUPPORT
+@define LAUNCH_HELP
+@define COMPOSE_EMAIL_HELP
+@define CONFIRM_EMAIL_SENT
+@define CONFIRM_SEND_LATER
+@define CUI_SEND_EMAIL_OPENS_OUTBOX
+@define CUI_CLOSE_COMPOSE
+@define CUI_CLOSE_ADDR_BOOK
+@define CUI_FILE_SELECTORS
+@define COMPOSE_SEND_NOW
+@define FILE_SELECTOR_PROMPTS
+/* not enough speed benefit */
+/*@define MANUAL_RECOVER*/
+
+@ifdef (PRODUCT_NDO2000)
+/*
+ * features only in NewMail
+ */
+
+@define APP_START_OPTIONS
+@define BCC_SUPPORT
+@define CHECK_MAIL_ON_INTERVALS
+@define MBX_IMPORT_SUPPORT
+@define SHOW_RAW_MESSAGE
+@define GRAPHICAL_ATTACHMENT_LIST
+@define SIGNATURE_IN_OPTIONS
+@define SCROLLING_OPTIONS
+@define AUTO_SIGNATURE_OPTION
+@define ALLOW_CHECK_IN_BACKGROUND
+@define RECEIVE_NOTIFY_OPTIONS
+@define LEAVE_MAIL_ON_SERVER
+@define SORT_BY_COLUMNS
+@define INCLUDE_PRINT_TOOL
+@define WRAP_OUTGOING_SUPPORT
+@define QUOTE_ONLY_SELECTED_TEXT
+
+@else
+
+/*
+ * features only in Global Email
+ */
+@define MAIL_CONVERSION_SERVER
+@define NO_COMPOSE_OPTIONS
+@define SERVER_MOD_WARNING
+@define ALTERNATE_FIELD_ORDER
+@define WARN_SENT_FOLDER_100
+@define CUI_ZOOM_IN
+@define CHECK_MAIL_ON_STARTUP
+@define ONE_FONT_AND_SIZE
+@define GIVE_MESSAGE_LIST_FOCUS_ON_OPEN
+@define MAIL_READ_IACP_SUPPORT
+@define KID_GUARD_SUPPORT
+@define GPC_PORTAL_SUPPORT
+@define DELETE_MAIL_AFTER_CRASH
+@define GEOS_FILE_INSTRUCTIONS
+@define DEFAULT_ACCOUNT_IS_CURRENT
+@define NO_STATE_FILE
+@define FIXED_POINTSIZE_FOR_PRINTING
+@define FORCE_APP_EXIT
+@define VERBOSE_TITLE_BAR
+@define ALLOW_ADDR_BOOK_WRITE
+@define REPLY_ON_TOP
+@define DELETE_READS_NEXT
+@define DIALOG_ATTACHMENT_LIST
+@define SIMPLE_RECEIVE_NONE_NOTIFY
+@define CUI_SENT_FOLDER
+@define TO_HEADER_ICON
+@define FAST_FILE_MOVE
+@define CUSTOM_COMPOSE_HEADER_SPACING
+@define IDIAL_CONTROL_SUPPORT
+@define DIALER_URL
+@endif
+
+
+/***************************************************************************
+ *			Fatal errors
+ ***************************************************************************/
+
+typedef enum {
+        MAIL_FROM_FIELD_UNEXPECTEDLY_EMPTY,
+	MAIL_BUFFER_OVERFLOW,
+	MAIL_COMPOSER_FILE_NAME_BUT_NO_DIRECTORY,
+	MAIL_SEARCH_INFO_MISSING,
+	MAIL_ILLEGAL_FOLDER_ID,
+	MAIL_TOKEN_PARSE_ERROR,
+	MAIL_UNABLE_TO_OPEN_MESSAGE_FILE,
+	MAIL_IMPORT_ERROR
+} FatalErrors;
+
+typedef enum {
+        MAIL_UIDL_NOT_SUPPORTED,
+	MAIL_MESSAGE_DELETED_AFTER_CRASH,
+	MAIL_UNABLE_TO_SET_UIDL_FLAG,
+	MAIL_UNREFERENCED_UIDL
+} Warnings;
+
+/***************************************************************************
+ *			  constants, structures, etc.
+ ***************************************************************************/
+
+typedef word OptionGroupID;
+#define OGID_MESSAGES        0
+#define OGID_START_EXIT      1
+#define OGID_CHECK_MAIL      2
+#define OGID_SIGNATURE       3
+#define OGID_NOTIFY          4
+@ifdef CUI_SENT_FOLDER
+#define OGID_SENT_FOLDER     8
+@endif
+
+typedef word MailImportApp;
+#define MIA_NONE     0xffff
+#define MIA_NETSCAPE 0
+#define MIA_EUDORA   1
+
+typedef  word  ShowMessageType;
+#define  SMT_ALL             0
+#define  SMT_UNREAD_ONLY     1
+
+typedef  word  SortMessageByType;
+#define  SMBT_DATE           0
+#define  SMBT_SUBJECT        1
+#define  SMBT_SENDER         2
+
+typedef  word  MailFolderID;
+#define  MFID_LEAVE_SELECTION -2
+#define  MFID_DRAFTS          0
+#define  MFID_INBOX           1
+#define  MFID_OUTBOX          2
+#define  MFID_SENT            3
+#define  MFID_TRASH           4
+#define  MFID_FIRST_USER_FOLDER 5
+
+#define  MFID_DEFAULT  MFID_INBOX
+
+#define  NUM_BUILT_IN_FOLDERS    5
+
+@ifdef PRODUCT_NDO2000
+#define  MAX_FOLDER_NAME_LENGTH   FILE_LONGNAME_LENGTH
+#define  MAX_ACCT_NAME_LENGTH     FILE_LONGNAME_LENGTH
+@else
+#define  MAX_FOLDER_NAME_LENGTH   20
+#define  MAX_ACCT_NAME_LENGTH     20
+@endif
+
+#define  MAX_FOLDER_CONTENTS_STRING  128+FILE_LONGNAME_BUFFER_SIZE
+#define  MAX_SUBJECT_BUF_LEN    128
+#define  MAX_HEADER_LENGTH      2048   /* for attachments */
+
+typedef  word MailSendOption;
+#define  MSO_SEND_TO_QUEUE    0
+#define  MSO_SEND_IMMEDIATELY 1
+
+
+typedef word MailReadOptions;
+#define MRO_ALL_HEADERS    1
+#define MRO_BRIEF_HEADERS  2
+#define MRO_RAW_MESSAGE    3
+
+typedef WordFlags ShowToolbarOptions;
+#define STO_MAIN_TOOLBAR    0x8000
+#define STO_READ_TOOLBAR    0x4000
+#define STO_COMPOSE_TOOLBAR 0x2000
+
+typedef word MailComposeType;
+#define MCT_REPLY     0
+#define MCT_REPLY_ALL 1
+
+typedef ByteFlags MailFieldTextFlags;
+#define MFTF_EXPAND_ALIASES 0x01
+
+#define MESSAGE_BUF_LEN   4095/sizeof(TCHAR)
+
+/* Max number of entries that FileEnum should return at a time
+ * when used for enumerating messages or folders.
+ */
+#define MAX_FOLDER_ENUM 100
+
+#define MAX_ADDRESS_EMAIL_LENGTH  64
+#define MAX_ADDRESS_NAME_LENGTH   64
+#define MAX_ADDRESS_ALIAS_LENGTH  64
+
+#define MAX_LIST_SUBJECT_LENGTH  40
+#define MAX_LIST_ADDRESS_LENGTH  30
+
+typedef TCHAR MailSubject[MAX_SUBJECT_BUF_LEN+1];
+typedef TCHAR MailListSubject[MAX_LIST_SUBJECT_LENGTH+1];
+typedef TCHAR MailAddress[MAX_ADDRESS_EMAIL_LENGTH+MAX_ADDRESS_NAME_LENGTH+1];
+typedef TCHAR MailListAddress[MAX_LIST_ADDRESS_LENGTH+1];
+
+typedef struct {
+    TimerDateAndTime MT_time;
+    sword            MT_timezone;
+} MailTime;
+
+/*
+ * change in stylesStyles.def, too
+ */
+typedef byte FilterState;
+#define FS_IN_BODY   0
+#define FS_IN_TAG    1
+#define FS_TAG_START 2
+#define FS_ADDED_CR  3
+#define FS_CHAR_START 4
+#define FS_IN_CHAR    5
+#define FS_IN_URL     6
+#define FS_AT_LINE_START 7  /* used for importing */
+#define FS_IN_FROM    8     /* used for importing */
+#define FS_FOUND_HTML 9
+#define FS_IN_STYLE_SHEET 10
+
+typedef ByteFlags FilterMode;
+#define FM_FOUND_HTML     0x01
+#define FM_IN_STYLE_SHEET 0x02
+
+typedef byte MailStyleType;
+#define MST_NONE     0
+#define MST_RICH     1
+#define MST_HTML     2
+
+#define PRINT_HEADER_HEIGHT   20
+#define PRINT_HEADER_FONT  FID_DTC_URW_SANS
+#define PRINT_HEADER_SIZE  10
+#define PRINT_HEADER_STYLE TS_ITALIC
+
+typedef WordFlags MessageFlags;
+#define MF_HAS_ATTACHMENTS 0x4000    /* message has attachments */
+#define MF_OUTBOUND        0x2000    /* outbound message */
+#define MF_READ            0x1000    /* message has been read */
+
+typedef struct {
+    PathName     AFP_full;
+    FileLongName AFP_file;
+} AttachFilePath;
+
+#define ME_FIRST_CHUNK    ConstructOptr(mh, sizeof(LMemBlockHeader))
+
+typedef struct {
+    word DM_err;
+} DMStruct;
+
+
+
+#define MLA_MINOR 0
+#define MLA_MAJOR 1
+
+typedef struct {
+    VMBlockHandle     MLA_array;
+    VMBlockHandle     MLA_indexHandle;
+    ChunkHandle       MLA_indexChunk;
+    SortMessageByType MLA_sortType;
+    dword             MLA_version;
+} MessageListArray;
+
+typedef struct {
+    DosDotFileName     MLS_filename;
+    MailListAddress    MLS_mail;
+    MailListSubject    MLS_subject;
+    MailTime           MLS_time;
+    MessageFlags       MLS_flags;
+    Color              MLS_color;
+    byte               MLS_label;
+} MessageListStruct;
+
+typedef struct {
+    word MIS_index;
+    MessageFlags MIS_flags;
+} MessageIndexStruct;
+
+/* Struct used for the Scan Headers callback
+ */
+typedef struct {
+    word LSH_folderNum;
+    word LSH_arrayHandle;
+    word LSH_arrayChunk;
+    word LSH_index;
+} LSHStruct;
+
+typedef struct {
+    MailFolderID FLS_ID;
+    FileLongName FLS_name;
+} FolderListStruct;
+
+typedef byte GMFAction;
+#define GMFA_OPEN    0
+#define GMFA_CREATE  1
+#define GMFA_MOVE    2
+
+/***************************************************************************
+ *			  folder list crud
+ ***************************************************************************/
+
+#define FOLDER_ICON_OFFSET_X      1
+@ifdef CUSTOM_FOLDER_ICONS
+#define FOLDER_ICON_WIDTH         20
+#define FOLDER_ICON_HEIGHT        18
+@else
+#define FOLDER_ICON_WIDTH         16
+#define FOLDER_ICON_HEIGHT        12
+@endif
+#define GAP_BETWEEN_ICON_AND_NAME 2
+#define FOLDER_NAME_OFFSET_Y      1
+
+#define MESSAGE_ICON_OFFSET_X     1
+#define MESSAGE_ICON_WIDTH        25
+#define MESSAGE_ICON_HEIGHT       12
+
+#define CUI_FOLDER_ICON_WIDTH     40
+#define CUI_FOLDER_ICON_HEIGHT    20
+
+#define WRAP_TEXT_LENGTH          75
+
+#define ATTACH_LIST_ICON_WIDTH    15
+#define ATTACH_LIST_ICON_HEIGHT   15
+#define ATTACH_LIST_ITEM_WIDTH    (ATTACH_LIST_ICON_WIDTH+2)
+#define ATTACH_LIST_ITEM_HEIGHT   (ATTACH_LIST_ICON_HEIGHT+2)
+
+#define ATTACH_LIST_ICON_DISPLAY_TYPE ((DC_COLOR_8<<DT_DISP_CLASS_OFFSET)|(DAR_NORMAL<<DT_DISP_ASPECT_RATIO_OFFSET)|(DS_TINY<<DT_DISP_SIZE_OFFSET))
+
+#define ATTACH_LIST_ICON_SEARCH_FLAGS (VMSF_GSTRING|(VMS_TOOL << VMSF_STYLE_OFFSET))
+
+#define MESSAGE_OFFSET_X  MESSAGE_ICON_OFFSET_X + MESSAGE_ICON_WIDTH + GAP_BETWEEN_ICON_AND_NAME
+#define MESSAGE_OFFSET_Y 1
+#define LIST_HACK_SIZE   10
+
+/***************************************************************************
+ *		lists of objects for table-driving
+ ***************************************************************************/
+
+#define lengthof(l,s)    sizeof(l)/sizeof(s)
+
+#define VUM_DLYD    VUM_DELAYED_VIA_UI_QUEUE
+
+/***************************************************************************
+ *			  mail on server shme
+ ***************************************************************************/
+
+typedef ByteFlags MailOnServerStatus;
+#define MOSS_ON_SERVER             0x01
+#define MOSS_DELETE_FROM_SERVER    0x02

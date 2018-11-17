@@ -1,0 +1,685 @@
+/*
+    Author:   Lysle E. Shields III (AOL:  AGD LesInk)
+    Demonstrates how to make a geode create other files
+
+    Modified by Marcus Gr”ber April `96 for FontMagick 1.0
+
+      - Modified multi-threading to avoid usage of ThreadCreate, which
+        doesn't work properly on geos20 platform. Instead, the program uses
+        the ui-thread keyword in the .GP file to keep the UI interactible.
+      - Moved arrayA[]... definitions out of main file into segment
+        modules, so the new segment2.exe can create the array definitions
+        dynamically, permitting changes in file sizes without manual
+        modifications to the source code.
+      - Converted all text messages to monikers, which facilitates
+        localization using ResEd.
+      - Made some changes to the UI layout.
+*/
+/************* This is for TimeTool  **************/  
+/************** BLOCK_SIZE is 8000  ****************/
+
+/* Include files ***/
+@include <stdapp.goh>
+@include <thread.h>
+@include <gstring.h>
+#include <ansi/string.h>
+#include <string.h>  /*for the sblaster strcmp */
+@include <initfile.h> /* to modify GEOS.INI */
+@include "tti_icon.goh"
+
+/* Definitions and Macros */
+#define NUMBER_FILES 34  
+#define SPACE_NEEDED 722000
+#define BLOCK_SIZE 8000
+
+/**********
+ *              Prototypes
+ **********/
+word install_file(word filenum) ;
+void AddSoundToIni(void);
+
+/**********
+ *              Externals
+ **********/
+extern optr array1A[], array1B[], array1C[], array1D[],
+		  array1E[],
+	    arrayA[], arrayB[], arrayC[], arrayD[],
+	    arrayE[], arrayF[], arrayG[], arrayH[],
+	    arrayI[], arrayJ[], arrayK[], arrayL[],
+	    arrayM[], arrayN[], arrayO[], arrayP[],
+	    arrayQ[], arrayR[], arrayS[], arrayT[],
+	    arrayU[], arrayV[], arrayW[], arrayX[],
+	    arrayY[], arrayZ[], arrayAA[], arrayAB[],
+	    arrayAC[];
+
+
+/**********
+ *              Class & Message Definitions
+***********/
+
+    @class InstallProcessClass, GenProcessClass ; ;
+         @message void MSG_INSTALL_STEP_COMPLETED() ;
+    @endc 
+
+    @classdecl InstallProcessClass, neverSaved ; ;
+
+
+
+/******* UI Objects */
+
+@start  AppResource ;
+
+    @object GenApplicationClass InstallApp = {
+         GI_visMoniker = list { @InstallTextMoniker,
+			 @Moniker0, @Moniker1,
+			 @Moniker2, @Moniker3 }
+         GI_comp       = @InstallPrimary ;
+         gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS)
+                       = @InstallPrimary;
+         HINT_APP_IS_PRODUCTIVITY_ORIENTED;
+    }
+
+    @visMoniker InstallTextMoniker =
+         "Install TimeTool" ;
+
+@end    AppResource
+
+
+@start  Interface ;       
+
+    @object GenPrimaryClass InstallPrimary  = {
+         GI_comp            = @InstallMessageBox,
+                              @InstallDialogs,
+                              @InstallStatusBox,
+                              @InstallTrigger ;
+         HINT_ORIENT_CHILDREN_VERTICALLY ;
+         HINT_CENTER_CHILDREN_HORIZONTALLY ;
+         HINT_SIZE_WINDOW_AS_DESIRED;
+    }
+
+    /* Install box:                                                        */
+    @object GenInteractionClass InstallMessageBox = {
+         GI_comp = @LeftColumn, @RightColumn;
+         HINT_ORIENT_CHILDREN_HORIZONTALLY;
+         HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+         HINT_DIVIDE_WIDTH_EQUALLY;
+    }
+    @object GenInteractionClass LeftColumn = {
+         GI_comp = @InstallIcon;
+         HINT_CENTER_CHILDREN_VERTICALLY;
+         HINT_CENTER_CHILDREN_HORIZONTALLY;
+         HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+         HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    }
+    @object GenGlyphClass InstallIcon = {
+	 GI_visMoniker = list { @Moniker0, @Moniker1,
+				@Moniker2, @Moniker3 };
+    }
+    @object GenInteractionClass RightColumn = {
+	    GI_comp = @Line1,
+		   @Line2,
+		   @Line3,
+		   @Line4;
+	    HINT_ORIENT_CHILDREN_VERTICALLY;
+	    HINT_CENTER_CHILDREN_HORIZONTALLY;
+	    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    }
+    @object GenGlyphClass Line1 = {
+	    GI_visMoniker = "Thank you for purchasing TimeTool" ;
+    }
+    @object GenGlyphClass Line2 = {
+	    GI_visMoniker = "Software from:";
+    }
+    @object GenGlyphClass Line3 = {
+	    GI_visMoniker = "Breadbox Computer Company" ;
+    }
+    @object GenGlyphClass Line4 = {
+	    GI_visMoniker = "Please read the TimeTool help file." ;
+    }
+    /* Status box:                                                         */
+    @object GenInteractionClass InstallStatusBox = {
+	    GI_visMoniker = "Status" ;
+		 GI_comp = @InstallMessage, @ErrorMessage ;
+	    HINT_DRAW_IN_BOX ;
+	    HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+	    HINT_CENTER_CHILDREN_HORIZONTALLY ;
+    }
+	 @object GenGlyphClass InstallMessage = {
+		 GI_visMoniker = " Ready to install. Click on Install button to start. " ;
+    }
+	 @object GenGlyphClass ErrorMessage = {
+		 GI_visMoniker = " " ;
+	 }
+    /* Trigger to start everything.                                        */
+    /*--------------------*/
+    @object GenTriggerClass InstallTrigger = {
+         GI_visMoniker = "Install!" ;
+         GTI_destination = process ;
+         GTI_actionMsg = MSG_INSTALL_STEP_COMPLETED ;
+    } ;
+    /* Any dialogs boxes that need to be built be UserDoDialog'd.          */
+    @object GenInteractionClass InstallDialogs = {
+	   GI_comp = @InstallCompletedBox, @RunBatchDBox;
+	   GII_type = GIT_ORGANIZATIONAL ;
+        GII_visibility = GIV_DIALOG ;
+        GII_attrs       = @default | GIA_NOT_USER_INITIATABLE ;
+    }
+
+    /* Install completed box:                                              */
+    @object GenInteractionClass InstallCompletedBox = {
+        GI_visMoniker = "Install complete!" ;
+	GI_comp = @InstallComplete1,
+		  @InstallComplete4 ;
+        GII_visibility  = GIV_DIALOG ;
+        GII_type        = GIT_NOTIFICATION ;
+        GII_attrs       = @default                         |
+                          GIA_INITIATED_VIA_USER_DO_DIALOG |
+                          GIA_MODAL                        |
+                          GIA_NOT_USER_INITIATABLE         ;
+        HINT_CENTER_CHILDREN_HORIZONTALLY ;
+    }
+    /*--------------------------*/
+    @object GenGlyphClass InstallComplete1 = {
+	   GI_visMoniker = "TimeTool is now installed." ;
+    }
+    /*--------------------*/
+    @object GenGlyphClass InstallComplete4 = {
+	   GI_visMoniker = "Have fun!" ;
+    }
+    @object GenInteractionClass RunBatchDBox = {
+	   GI_visMoniker = "Install almost complete!" ;
+	   GI_comp = @RunBatch1,
+			   @RunBatch2,
+			   @RunBatch3,
+			   @RunBatch4,
+			   @RunBatch5;
+	   GII_visibility  = GIV_DIALOG ;
+	   GII_type        = GIT_NOTIFICATION ;
+	   GII_attrs       = @default                         |
+					 GIA_INITIATED_VIA_USER_DO_DIALOG |
+					 GIA_MODAL                        |
+					 GIA_NOT_USER_INITIATABLE         ;
+	   HINT_CENTER_CHILDREN_HORIZONTALLY ;
+    }
+    /*--------------------------*/
+    @object GenGlyphClass RunBatch1 = {
+	   GI_visMoniker = "The installer has found an older Sound Blaster" ;
+    }
+    /*--------------------*/
+    @object GenGlyphClass RunBatch2 = {
+	   GI_visMoniker = "driver which needs to be updated.  To complete" ;
+    }
+    /*--------------------*/
+    @object GenGlyphClass RunBatch3 = {
+	   GI_visMoniker = "the installation you will need to do this" ;
+    }
+    /*--------------------*/
+    @object GenGlyphClass RunBatch4 = {
+	   GI_visMoniker = "update per the instructions in the README.TXT" ;
+    }
+    /*--------------------*/
+    @object GenGlyphClass RunBatch5 = {
+	   GI_visMoniker = "file on the install disk." ;
+    }
+
+   /*--------------------*/
+    @visMoniker ErrorGeneral =
+	 "Some error has occurred in the install!";
+    /*--------------------*/
+    @visMoniker ErrorNotEnufRoom =
+	 "There is not enough room to install this program.";
+
+@end Interface ;
+
+
+/*************************
+ *              Global variables
+ *************************/
+word install_step = 0xFFFF ;
+Boolean runBatch = FALSE;  /* goes True if we need to */
+
+/* Tables: */
+optr *arrays[] = {
+    array1A,
+    array1B,
+    array1C,
+    array1D,
+    array1E,
+    arrayA,
+    arrayB,
+    arrayC,
+    arrayD,
+    arrayE,
+    arrayF,
+    arrayG,
+    arrayH,
+    arrayI,
+    arrayJ,
+    arrayK,
+    arrayL,
+    arrayM,
+    arrayN,
+    arrayO,
+    arrayP,
+    arrayQ,
+    arrayR,
+    arrayS,
+    arrayT,
+    arrayU,
+    arrayV,
+    arrayW,
+    arrayX,
+    arrayY,
+    arrayZ,
+    arrayAA,
+    arrayAB,
+    arrayAC
+} ;
+
+DiskHandle disk_drives[NUMBER_FILES] = {
+    SP_APPLICATION,                     /* tmtoolb.geo */
+    SP_HELP_FILES,                      /* TTHelp.000 */
+    SP_SYSTEM,                          /* sblaster.geo */
+    SP_SYSTEM,                          /* wav.geo */
+    SP_SYSTEM,                          /* dosreal.geo */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA,                       /* xxx.wav */
+    SP_USER_DATA                        /* xxx.wav */
+} ;
+
+char subdirectories[NUMBER_FILES][80] = {
+    ".",
+    ".",
+    "SOUND",
+    ".",
+    "DMA",
+    "SOUNDS",
+    "SOUNDS",
+    "SOUNDS",
+    "SOUNDS",
+    "SOUNDS",
+    "SOUNDS",
+    "SOUNDS",
+    "SOUNDS",
+    "SOUNDS",
+    "SOUNDS",
+    "SOUNDS",
+    "SOUNDS",
+    "SOUNDS",
+    "SOUNDS",
+    "SOUNDS",
+    "SOUNDS",
+    "SOUNDS",
+    "SOUNDS",
+    "SOUNDS",
+    "SOUNDS",
+    "SOUNDS",
+    "SOUNDS",
+    "SOUNDS",
+    "SOUNDS",
+    "SOUNDS",
+    "SOUNDS",
+    "SOUNDS",
+    "SOUNDS",
+    "SOUNDS"
+} ;
+
+char filenames[NUMBER_FILES][13] = {
+    "tmtoolb.geo",
+    "tthelp.000",
+    "sblaster.geo",
+    "wav.geo",
+    "dosreal.geo",
+    "0h.wav",
+    "1h.wav",
+    "2h.wav",
+    "3h.wav",
+    "4h.wav",
+    "5h.wav",
+    "6h.wav",
+    "7h.wav",
+    "8h.wav",
+    "9h.wav",
+    "10h.wav",
+    "11h.wav",
+    "12h.wav",
+    "0m.wav",
+    "5m.wav",
+    "10m.wav",
+    "15m.wav",
+    "20m.wav",
+    "25m.wav",
+    "30m.wav",
+    "35m.wav",
+    "40m.wav",
+    "45m.wav",
+    "50m.wav",
+    "55m.wav",
+    "am.wav",
+    "pm.wav",
+    "end.wav",
+    "start.wav"
+} ;
+
+@start Interface ;
+    @visMoniker Message1 =
+	 "Installing TimeTool in World directory.";
+    @visMoniker Message2 =
+	 "Installing help file in Help directory";
+    @visMoniker Message3 =
+	 "Installing sound driver in System directory";
+    @visMoniker Message4 =
+	 "Installing wav driver in System directory";
+    @visMoniker Message5 =
+	 "Installing dosreal driver in System directory";
+    @visMoniker Message6 =
+	 "Copying WAV files to Userdata/Sounds directory.";
+    @visMoniker MessageX =
+      "Install complete!";
+@end Interface ;
+
+optr messages[NUMBER_FILES] = {
+    @Message1,
+    @Message2,
+    @Message3,
+    @Message4,
+    @Message5,
+    @Message6,
+    @Message6,
+    @Message6,
+    @Message6,
+    @Message6,
+    @Message6,
+    @Message6,
+    @Message6,
+    @Message6,
+    @Message6,
+    @Message6,
+    @Message6,
+    @Message6,
+    @Message6,
+    @Message6,
+    @Message6,
+    @Message6,
+    @Message6,
+    @Message6,
+    @Message6,
+    @Message6,
+    @Message6,
+    @Message6,
+    @Message6,
+    @Message6,
+    @Message6,
+    @Message6,
+    @Message6,
+    @Message6
+} ;
+
+
+/*========================*/
+/*  Methods:                                                               */
+/*------------------------*/
+@method InstallProcessClass, MSG_INSTALL_STEP_COMPLETED
+{
+ DiskHandle	drive;
+ dword		space;
+
+    /* Each file installed is a separate step of the installing process.
+       While not all of the files have been created, this method will
+       keep being called until it is done.  When it is done, this method
+       brings up a dialog box stating the install is completed. */
+    /* Start by incrementing the step that we are on.  Since install_step
+       is originally declared as 0xFFFF, it will roll over to 0 -- the
+       correct starting number. */
+    install_step++ ;
+
+    /* see if there is enough room to install the files
+	* and disable the install trigger */
+    if (install_step == 0) {
+	  @call InstallTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW) ;
+	  drive = SP_TOP ;
+	  space = DiskGetVolumeFreeSpace(drive);
+	  if (space < SPACE_NEEDED) {
+		@send InstallMessage::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+			   @ErrorNotEnufRoom,
+			   VUM_DELAYED_VIA_UI_QUEUE) ;
+		return;
+		}
+	  }
+
+    /* cycle thru */
+    if (install_step < NUMBER_FILES)  {
+	   /* Since we are about to install file, put up corresponding message. */
+        @send InstallMessage::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                  messages[install_step],
+                  VUM_DELAYED_VIA_UI_QUEUE) ;
+
+	   install_file(install_step);
+    } else {  /* we're done with the files */
+
+
+	/* When the program is done, put up a message stating so.  When
+           OK is clicked on the dialog, it will return.  The user can
+           then exit the application. */
+        @send InstallMessage::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                  @MessageX,
+                  VUM_NOW) ;
+
+	   if (runBatch) {
+		 UserDoDialog(@RunBatchDBox);
+		 }
+	   else {
+		 UserDoDialog(@InstallCompletedBox) ;
+		 AddSoundToIni();
+		 }
+	   @send InstallApp::MSG_META_QUIT();
+    }
+}
+
+/*-------------------------------------------------------------------------*/
+/*  Subroutines:                                                           */
+/*-------------------------------------------------------------------------*/
+void AddSoundToIni()
+{
+ Boolean		readError;
+ char		setting[13];
+ word		*size;
+
+
+    /* see if the entry is there */
+    readError = InitFileReadStringBuffer("Sound",
+					"sampleDriver",
+					&setting,
+					13,
+					size);
+
+    if(readError)  {  /* nope - add it */
+	  /* write the two keys in [Sound] */
+	  InitFileWriteString("Sound", "sampleDriver", "sblaster.geo");
+	  InitFileWriteString("Sound", "synthDriver", "sblaster.geo");
+	  /* and the dosreal driver */
+	  InitFileWriteString("dma", "driver", "dosreal.geo");
+
+	  /* and the shut down to implement ini change message goes here */
+	  UserStandardDialog((char*)0,
+			  (char*)0,
+			  (char*)0,
+			  (char*)0,
+			  "TimeTool Installer has added a sound driver "\
+			  "to your GEOS.INI file.  "\
+			  "Please shut down and re-start Ensemble/NDO "\
+			  "to implement this change.",
+			  ((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+			  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+	  }
+	  
+    return;
+}
+
+/* --------------------------------------------------- */
+word install_file(word filenum)
+{
+    FileHandle fout ;     /* File to write out. */
+    DiskHandle drive ;    /* Drive file is to be written on. */
+    char *subdir ;        /* Directory in drive. */
+    char *file ;          /* Filename of file. */
+    optr *block_list ;    /* Pointer to list of blocks. */
+    optr block ;          /* Object pointer to current block in list. */
+    byte *data ;          /* Byte pointer to current data block. */
+    word size ;           /* Size of current data block. */
+    long full_size ;      /* Full size of file left to write out. */
+    Boolean once ;        /* Flag to help extra size info
+			     from first block. */
+    ReleaseNumber release;
+   /* dword fileSize;       /* to check for "new: SB driver */
+    word fileError, delError;
+
+
+    /* Extract information from the global arrays and put in local
+       variables so that the arrays don't have be indexed over and over. */
+    drive = disk_drives[filenum] ;
+    subdir = subdirectories[filenum] ;
+    file = filenames[filenum] ;
+    /* Change to the specified drive or standard path constant. */
+    FileSetCurrentPath(drive, ".") ;
+    /* Try to create the requested subdirectory.  If the subdirectory already
+	  exists (or is illegal), nothing happens and we continue. */
+    FileCreateDir(subdir) ;
+    /* Move into the subdirectory. */
+    FileSetCurrentPath(drive, subdir) ;
+
+    /* are we installing the SB driver? */
+    if ((strcmp(file, "sblaster.geo")) == 0)  { /* yes */
+	  /* Is there an SB driver there already? */
+	  /* Is it in use? */
+	  delError = FileDelete(file);
+	  if (delError != ERROR_FILE_NOT_FOUND)  { /* yes */
+		/* Is it the new one? Check file size */
+		fileError = FileGetPathExtAttributes("sblaster.geo",
+				FEA_RELEASE,
+				&release,
+				(word) sizeof(release));
+		if (!fileError)  {  /* there is a driver there */
+		   if (release.RN_major < 3) {  /* It is the/an old one so... */
+			 /* we'll tell the user to replace it using the .BAT file */
+			 runBatch = TRUE;
+			 }
+		   /* tell the caller we're done */
+		   @send,forceQueue process::MSG_INSTALL_STEP_COMPLETED() ;
+		   return 0;
+		   }
+		}  /* end of file in use if */
+	  }  /* end of installing sbdriver if */
+
+	 /* are we installing the wave driver? JFH 10/24/2009*/
+	 if ((strcmp(file, "wav.geo")) == 0)  { /* yes */
+	  /* Is there a wave driver there already? */
+	  /* Is it in use? */
+	  delError = FileDelete(file);
+	  if (delError != ERROR_FILE_NOT_FOUND)  { /* yes */
+			/* no need to replace it - go on to next file */
+			@send,forceQueue process::MSG_INSTALL_STEP_COMPLETED() ;
+		   return 0;
+			}  /* end of file in use if */
+	  }  /* end of installing  wav driver if */
+
+	 /* If the file was there before, delete it.  This makes it start fresh. */
+    FileDelete(file) ;
+    /* Open the file. */
+    fout    = FileCreate(file,
+              FILE_CREATE_TRUNCATE |
+              FILE_ACCESS_RW |
+              FILE_DENY_NONE |
+              FCF_NATIVE,
+              FILE_ATTR_NORMAL) ;
+    /* If the file is valid, we'll continue, else we'll stop for errors. */
+    if (fout != NullHandle)  {
+        /* Since we have a valid file, let's start by finding which of
+           the block arrays we need. */
+        block_list = arrays[filenum] ;
+        /* Declare that this is the first time in the loop.  We'll use
+           this flag to extract the file size from the first block. */
+        once = FALSE ;
+        /* This loop keeps going until the file_size is zero (or we
+           haven't executed it before).  (No, a do-while is not much
+           better because of the condition inside of the loop). */
+        while ((full_size>0L) || (!once))  {
+            /* Get a block off our block list and increment to the next
+               location in the table. */
+            block = *(block_list++) ;
+            /* Lock the block into memory. */
+            MemLock(OptrToHandle(block)) ;
+            /* Since the block is an LMem heap, we need to get the particular
+               start of the block data, not the LMem's index table. */
+            data = (byte *)LMemDeref(block) ;
+            /* If this is the first time through, get the file size from
+               this block, move past that information, and declare this
+               no longer as being the first time through. */
+            if (!once)  {
+                once = TRUE ;
+                full_size = *((long *)data) ;
+                data += sizeof(long) ;
+            }
+            /* Let us now determine the size of data we have in our block.
+               If the amount we have left is bigger than 4K, then we must
+               only write out 4K.  If it is smaller, then we will make it
+               the remainder. */
+            if (full_size > (long)BLOCK_SIZE)
+                size = BLOCK_SIZE ;
+            else
+                size = (word)full_size ;
+            /* Write out the information. */
+            FileWrite(fout, data, size, FALSE) ;
+            /* Subtract out the size we just wrote. */
+            full_size -= (long)size ;
+            /* We are now done with the data block.  Unlock it so that
+               memory is freed. */
+            MemUnlock(OptrToHandle(block)) ;
+        }
+        /* The above keeps looping until the whole file is written.
+           when it is, we just close the file. */
+        FileClose(fout, FALSE) ;
+        /* If everything went ok, we are now done.  Send a message to
+           the waiting application process that this install step has
+           been completed. */
+      /*  @send process::MSG_INSTALL_STEP_COMPLETED() ;
+       *  changed per Marcus' email 8/2/96 */
+	@send,forceQueue process::MSG_INSTALL_STEP_COMPLETED() ;
+    } else {
+        /* Something went wrong.  You have your choice of error message
+           techniques at this point. */
+
+	/* At least stop installing and report some kind of error. */
+        @send ErrorMessage::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(
+                  @ErrorGeneral,
+                  VUM_DELAYED_VIA_UI_QUEUE) ;
+    }
+    return 0;
+} ;

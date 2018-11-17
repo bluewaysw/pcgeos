@@ -1,0 +1,332 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1990 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Banner (Sample PC GEOS application)
+FILE:		bannerConstants.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Roger	6/90		Initial version
+	witt	11/93		DBCS compliance
+
+DESCRIPTION:
+	This file contains the class declarations used by Banner.
+
+RCS STAMP:
+	$Id: bannerConstants.def,v 1.1 97/04/04 14:37:34 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;=============================================================================
+;
+;		Constants and structures
+;
+;=============================================================================
+
+SpecialEffects	record
+    SE_SMALL_SHADOW:1		; these four SE are exclusive
+    SE_LARGE_SHADOW:1
+    SE_THREE_D:1
+    SE_FOG:1
+
+    SE_THIN_BOX:1		; these three are exlusive
+    SE_THICK_BOX:1
+    SE_DOUBLE_BOX:1
+
+    SE_DOUBLE_HEIGHT:1		; this is two page high output
+    SE_standard	TextStyle:8	; SE_DARKEN_OUTPUT is macro for TS_STRIKE_THRU
+SpecialEffects	end
+
+BannerState	record
+	BS_PRINT:1		; is BannerDraw supposed to print?
+	BS_TEXT_DIRTY:1		; has banner text changed since last display?
+	BS_CONTROLS_DIRTY:1	; banner controls changed since last display?
+	BS_DRAW_LEFT_BORDER:1	; draw the left border of the rectangle
+	BS_DRAW_RIGHT_BORDER:1	; draw the right border of the rectangle
+	BS_PRINT_PASS:1		; 0 = top pass, 1 = bottom pass (last)
+	:2
+BannerState	end
+
+DBFixed struct
+	DBF_frac	byte		;8 bits fraction
+	DBF_intL	word
+	DBF_intH	word		;32 bits integer
+DBFixed ends
+
+PrintingVariables	struct
+	gstate			hptr.GState
+	paperHeight		word
+	leaderWidth		WBFixed
+SBCS<	nextStartPtr		byte		; byte offset		>
+DBCS<	nextStartPtr		word		; byte offset		>
+	docStart		DBFixed
+	stringStartInDoc	DBFixed
+	goalLeaderLength	word
+	goalSectionLength	word
+	entireLength		word
+	rightBorder		word
+	topMargin		word
+	leftMargin		word
+	pageCount		word	; number of pages in Banner document
+PrintingVariables	ends
+
+;------------------------------------------------------------------------------
+;			Constants
+;------------------------------------------------------------------------------
+
+ONE_INCH	equ	72
+QUARTER_INCH	equ	18
+
+HOLE_OFFSET	equ	0  ; 3
+HOLE_WIDTH	equ	0  ; 4
+HOLE_AREA	equ	0  ; HOLE_OFFSET + HOLE_WIDTH + HOLE_OFFSET 
+
+SE_PLAIN_TEXT		equ	0		; *sigh*
+SE_NO_EFFECT	equ	(mask SE_SMALL_SHADOW or mask SE_LARGE_SHADOW \
+			or mask SE_THREE_D or mask SE_FOG)
+SE_NO_BORDER	equ	(mask SE_THIN_BOX or mask SE_THICK_BOX or \
+			mask SE_DOUBLE_BOX)
+
+MINIMUM_SIZE	equ	HOLE_AREA * 2 + 14	; don't be smaller than this
+
+UPDATE_NOW	equ	1
+
+;
+; the following are passed to BannerStringWalk to decide whether or not to
+; include the last character into the string part which has been walked.
+;
+ROUND_DOWN	equ	-1
+ROUND_UP	equ	1
+
+;
+; this is the delay between the last change to the text object and the update
+; to the preview
+;
+PREVIEW_UPDATE_DELAY	equ	75
+
+;
+; the following numbers are divided into the point size to get an offset
+;
+LARGE_SHADOW_OFFSET_RATIO	equ	22
+SMALL_SHADOW_OFFSET_RATIO	equ	44
+FOG_AND_3D_OFFSET_RATIO		equ	100
+
+SHADES_COUNT			equ	8
+
+;
+; banner document name (passed to spooler) when printing constants. 
+;	1 char for quote, 1 for NULL.  (char/wchar location)
+;
+BANNER_NAME_END_QUOTE	equ	FILE_LONGNAME_LENGTH - 1 - 1
+
+;
+; these are also used by BannerGetDocName
+;
+ONLY_PRINT_PASS		equ	0
+TOP_PRINT_PASS		equ	1
+BOTTOM_PRINT_PASS	equ	2
+
+RGB_BLACK		equ 0x00
+RGB_WHITE		equ 0xff
+RGB_NEXT_SHADE		equ 0x20
+RGB_SCREEN_SHADOW	equ 0xd0
+RGB_PRINTER_SHADOW	equ 0xc0
+
+;
+; default font
+;
+if PZ_PCGEOS
+BANNER_DEFAULT_FONT_ID	equ	FID_BITSTREAM_KANJI_HON_MINCHO
+else
+BANNER_DEFAULT_FONT_ID	equ	FID_DTC_URW_ROMAN
+endif
+
+;------------------------------------------------------------------------------
+;			Fatal Errors
+;------------------------------------------------------------------------------
+
+DISTANCE_BETWEEN_DOC_AND_STRING_TOO_BIG			enum	FatalErrors
+DISPLAY_ERROR_BAD_ERROR_VALUE				enum	FatalErrors
+
+NULL_STRING_ENCOUNTERED_WHILE_PRINTING			enum	FatalErrors
+;A null-string banner should have been handled in the 
+;MSG_PRINT_VERIFY_PRINT_REQUEST handler.
+
+NO_FONT_OR_DRIVER_AVAILABLE_FOR_METRICS_CALC		enum	FatalErrors
+; Likely caused by Kernel not knowing the driver for the hand-tuned
+; bitmap version of a font's specific point size. This problem should
+; have been fixed by code that always sets the font size to a non-integer
+; value.
+
+;-----------------------------------------------------------------------------
+;			Warning Notices
+;-----------------------------------------------------------------------------
+
+FONT_METRIC_UNAVAILABLE			enum	Warnings;
+;	Font meteric unavailable, substituting some value.
+MAXIMIZE_TEXT_TOOK_DIVIDE_OVERFLOW	enum	Warnings;
+;	Division overflow averted, ax <= 0x00FE
+
+
+;=============================================================================
+;			BannerClass
+;
+;	    this is a class to handle the sample output.
+;
+;=============================================================================
+
+BannerClass class	VisContentClass, master
+
+MSG_BANNER_SET_SPECIAL_EFFECT		message
+;
+; This method is called when one of the special effects are set
+;
+MSG_BANNER_UPDATE_IF_STILL_DIRTY	message
+;
+; This method redraws the Banner only if it's display is dirty.  It then
+; cleans the display dirty bit.
+;
+MSG_BANNER_SET_SAVED_SPECIAL_EFFECTS	message
+;
+; Set the structure in the object.  Used to have it's state restored.
+;
+MSG_BANNER_GET_SPECIAL_EFFECTS		message
+;
+; Get the special effects
+;
+MSG_BANNER_GET_STATE			message
+;
+; Get the banner's state info.
+;
+MSG_BANNER_GET_FONT			message
+;
+; Get the font.
+;
+
+;-----------------------------------------------------------------------------
+;		BannerClass -- instance data
+;-----------------------------------------------------------------------------
+
+	BI_fontID		FontID	(?)
+	BI_height		word	(?)
+	BI_width		word	(?)
+
+	;  This stores the special effects possible
+
+	BI_specialEffects	SpecialEffects	(?)
+
+	;  The last Special Effects when the Banner was drawn.  If nothing
+	;  has changed then ignore redraw.
+
+	BI_lastSpecialEffects	SpecialEffects	(?)
+
+	;  The point size selected by the scaler.
+
+	BI_pointSize 		word	(?)
+
+	;  This is the difference between the highest point of the
+	;  mesage at the final point size and the lowest point.  This
+	;  is calculated at the end of BannerMaximizeTextSize, and used
+	;  when the special effects are drawn.
+
+	BI_messageHeight	word	(?)
+
+	;  This is between the edge of the paper and the text.  It is the
+	;  border width vertically and horizontally.  Used for borders and 
+	;  scaling
+
+	BI_borderWidth		word	(?)
+
+	;  This is the width of the actual line.  It doen't include the 
+	;  blank space in the border width.
+
+	BI_borderLineWidth	word	(?)
+
+	;  When using scaled images, this is what a quarter inch is scaled to.
+
+	BI_quarterInch		word	(?)
+
+	;  The offset is used to leave room for the tractor holes
+	;  during visual output is 0 during printing
+
+	BI_xOffset		word	(?)
+	BI_yOffset		word	(?)
+
+	;  When drawing the text we draw from the accent line instead of
+	;  from the very top of the tallest character.  TextOffset is the
+	;  distance between the line we draw from and the height of the
+	;  tallest character.  This value is then used in BannerDraw.
+
+	BI_textOffset		word	(?)
+
+	;  Offset to position the text.  Used during printing a section
+	;  to start printing before the graphics region so that the
+	;  character LSBs and RSBs appear.  (If the character before
+	;  the first one in the seciton is an 'f', its overhang must
+	;  appear.  During screen drawing this is set to zero.  During
+	;  printing the routines calculate a value.)
+
+	BI_leaderWidth		word	(?)
+
+	;  Handle of the timer from TimerStart to pass to TimerStop
+
+	BI_timerHandle		word	(?)
+	BI_timerID		word	(?)
+
+	;  The following records the last text height maximized to
+	;  avoid repetition.  This value is cleared when the font or
+	;  special effects change, but not the message.  Changing
+	;  a character changes the length, not the height.
+
+	BI_lastMaximizedHeight	word	(?)
+
+	;  State information.  Mostly about displaying or printing status.
+
+	BI_bannerState		BannerState
+
+	;  The position of the first character in the section.  If the 
+	;  position is zero then we're finished.
+
+	BI_printPosition	byte	(?)
+
+	;  This is the amount of space left between the border and both
+	;  ends of the banner message.  This space is left because certain
+	;  characters in italics extend beyond the string's normal bounds.
+
+	BI_endSpace		word	(?)
+
+	;  Info about what part of the banner to print.  When displaying
+	;  the banner we display it all at once; when printing we often
+	;  print it in chunks.
+
+if DBCS_PCGEOS
+	;  store offsets in to text string.  Since in DBCS we can hold more
+	;  than 128 chars, the *byte offset* will exceed 256.
+	;
+
+	BI_charStart		word	(?)
+	BI_charLength		word	(?)
+else
+	BI_charStart		byte	(?)
+	BI_charLength		byte	(?)
+endif
+
+BannerClass endc
+
+;-----------------------------------------------------------------------------
+;			BannerProcessClass
+;-----------------------------------------------------------------------------
+BannerProcessClass	class GenProcessClass
+BannerProcessClass	endc
+
+BannerGenViewClass	class GenViewClass
+BannerGenViewClass	endc
+
+BannerTextClass		class GenTextClass
+BannerTextClass		endc
+
+BannerPrimaryClass	class GenPrimaryClass
+BannerPrimaryClass	endc

@@ -1,0 +1,1023 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Designs in Light -- All Rights Reserved
+ *
+ * PROJECT:	  Mail
+ * MODULE:	  Mail
+ * FILE:	  folderList.goc
+ *
+ * DESCRIPTION:
+ *	FolderListClass for the Mail application
+ *
+ * 	$Id$
+ *
+ ***********************************************************************/
+
+@include "mail.goh"
+@include "class.goh"
+@include "global.goh"
+@include <sem.h>
+
+@classdecl FolderListClass;
+
+#ifdef __BORLANDC__
+#pragma codeseg InitCode
+#endif
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_META_FUP_KBD_CHAR
+ * PASS:            character - character
+ *                  flags - CharFlags + ShiftState
+ *                  state - scan code
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Handle an <ENTER> press by sending it to the message list
+ ***************************************************************/
+
+@method FolderListClass, MSG_META_FUP_KBD_CHAR
+{
+    /*
+     * if we get a press of the Enter key...
+     */
+    if ((!(flags & CF_RELEASE)) && (character == ((CS_CONTROL<<8)|VC_ENTER))) {
+	@send, forceQueue TheMessageList::MSG_MAIL_LIST_OPEN_MESSAGE();
+	return(TRUE);
+    }
+    return(@callsuper());
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_FOLDER_LIST_FREE
+ * PASS:            none
+ * RETURN:          none
+ * DESCRIPTION:
+ *         we're shutting down
+ ***************************************************************/
+
+@method FolderListClass, MSG_FOLDER_LIST_FREE
+{
+    if (pself->FLI_folderArray) {
+	LMemFree(pself->FLI_folderArray);
+	pself->FLI_folderArray = 0;
+    }
+}
+
+#ifdef __BORLANDC__
+#pragma codeseg FolderCode
+#endif
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        FolderSetMoniker
+ * PASS:            list:   list optr to set moniker in
+ *                  item:   item # to set
+ *                  bmap:   bitmap to use
+ *                  folderName:   name of folder
+ *                  numMsgs:   # of messages (-1 to not display)
+ * RETURN:          none 
+ * DESCRIPTION:
+ *         Make and set a gstring moniker for a folder name
+ ***************************************************************/
+
+void
+FolderSetMoniker(optr list,
+		 word item,
+		 optr bmap,
+		 char *folderName,
+		 sword numMsgs)
+{
+	GStateHandle gs;
+	Bitmap *bp;
+	word   gschunk;
+	sword   cwidth, width, yOff, sw;
+        TCHAR buf[MAX_FOLDER_NAME_LENGTH+1];
+
+	/*
+	 * Create a GString to use
+	 */
+	gs = GrCreateGString(OptrToHandle(list), GST_CHUNK, &gschunk);
+	/*
+	 * Initialize the GString/GState to UI font & pointsize
+	 */
+	SetUIFontPointsize(list, gs);
+
+	/*
+	 * Draw the bitmap
+	 */
+	yOff = (GetUIFontHeight(gs) + 5 - FOLDER_ICON_HEIGHT)/2;
+	(void *) MemLock(OptrToHandle(bmap));
+	bp = LMemDeref(bmap);
+	GrDrawBitmap(gs, FOLDER_ICON_OFFSET_X, yOff, bp, NULL);
+	MemUnlock(OptrToHandle(bmap));
+
+	/*
+	 * Draw the folder name in the space allowed
+	 */
+	width = @call list::MSG_VIS_GET_SIZE();
+	if (numMsgs != -1) {
+	    cwidth = GrFontMetrics(gs, GFMI_AVERAGE_WIDTH_ROUNDED);
+	} else {
+	    cwidth = 0;
+	}
+	strcpy(buf, folderName);
+	FitStringInField(gs, buf, width - cwidth*3 - (FOLDER_ICON_OFFSET_X + FOLDER_ICON_WIDTH + GAP_BETWEEN_ICON_AND_NAME + 2));
+	GrDrawText(gs,
+		   FOLDER_ICON_OFFSET_X + FOLDER_ICON_WIDTH + GAP_BETWEEN_ICON_AND_NAME,
+		   FOLDER_NAME_OFFSET_Y,
+		   buf, 0);
+
+	/*
+	 * Draw the number of messages
+	 */
+@ifdef SHOW_NUM_MESSAGES_IN_FOLDERS
+	sprintf(buf, "%d", numMsgs);
+        sw = GrTextWidth(gs, buf, 0);
+	GrDrawText(gs,
+		   width-cwidth-sw,
+		   FOLDER_NAME_OFFSET_Y,
+		   buf, 0);
+@else
+        if (numMsgs != -1) {
+	    sprintf(buf, " (%d)", numMsgs);
+	    GrDrawTextAtCP(gs, buf, 0);
+	}
+@endif
+
+	/*
+	 * Finish up the gstring
+	 */
+	GrEndGString(gs);
+
+	/*
+	 * Finally, set the moniker
+	 */
+	@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_MONIKER(
+              item,              /* Item number -- Folder number */
+              0,                 /* Item not disabled */
+              0,                 /* height, 0 = auto detect */
+              0 ,                /* width, 0 = auto detect */
+              0,                 /* size, 0 = auto detect */
+              VMDT_GSTRING,
+              VMST_OPTR,
+              ConstructOptr(OptrToHandle(list), gschunk)
+	      );
+
+	GrDestroyGString(gs, 0, GSKT_KILL_DATA);
+
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        MSG_FOLDER_LIST_GET_NUM_MESSAGES
+ * PASS:            folderNum - folder #
+ * RETURN:          none
+ * DESCRIPTION:
+ *         Count the number of messages in the specified folder
+ ***************************************************************/
+
+@method FolderListClass, MSG_FOLDER_LIST_GET_NUM_MESSAGES
+{
+	FileEnumParams params;
+	word bufHan;
+	char *buf;
+	word numNoFit;
+
+	FilePushDir();
+	bufHan = @call oself::MSG_FOLDER_LIST_GET_FOLDER_NAME(folderNum);
+	buf = MemLock(bufHan);
+	GotoMailDirectory(buf);
+	MemFree(bufHan);
+
+	params.FEP_searchFlags = FESF_NON_GEOS;
+	params.FEP_returnAttrs = (void *) FESRT_COUNT_ONLY;
+	params.FEP_returnSize = 0;
+	params.FEP_matchAttrs = 0;
+	params.FEP_bufSize = FE_BUFSIZE_UNLIMITED;
+	params.FEP_skipCount = 0;
+	(void) FileEnum(&params, &bufHan, &numNoFit);
+	FilePopDir();
+
+	return(numNoFit);
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_FOLDER_LIST_GET_NUM_FOLDERS
+ * DESCRIPTION:     return # of folders
+ *
+ * PASS:            none
+ * RETURN:          # of folders
+ ***************************************************************/
+@method FolderListClass, MSG_FOLDER_LIST_GET_NUM_FOLDERS
+{
+    word numDirs;
+
+    numDirs = ChunkArrayGetCountHandles(OptrToHandle(oself), pself->FLI_folderArray);
+    return(numDirs);
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_FOLDER_LIST_GET_FOLDER_NUM
+ * DESCRIPTION:     return folder #
+ *
+ * PASS:            folderName - name of folder to find
+ * RETURN:          folder #, -1 if not found
+ ***************************************************************/
+@method FolderListClass, MSG_FOLDER_LIST_GET_FOLDER_NUM
+{
+    word i, numDirs, eSize;
+    FolderListStruct *fls;
+    optr arr;
+
+    FilePushDir();
+    GotoMailDirectory(NULL);
+    arr = pself->FLI_folderArray;
+    numDirs = @call oself::MSG_FOLDER_LIST_GET_NUM_FOLDERS();
+    for (i = 0; i < numDirs; i++) {
+	fls = ChunkArrayElementToPtr(arr, i, &eSize);
+	if (!strcmp(folderName,fls->FLS_name)) {
+	    break;
+	}
+    }
+	
+    if (i == numDirs) {
+	i = -1;
+    }
+    FilePopDir();
+    return(i);
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_FOLDER_LIST_GET_FOLDER_NAME
+ * DESCRIPTION:     return name of folder
+ *
+ * PASS:            folderNum - # of folder in list
+ * RETURN:          handle of buffer with folder name
+ ***************************************************************/
+@method FolderListClass, MSG_FOLDER_LIST_GET_FOLDER_NAME
+{
+    MemHandle mh;
+    FolderListStruct *fls;
+    word eSize;
+    TCHAR *p;
+
+    mh = MemAlloc(sizeof(FileLongName), HF_DYNAMIC, HAF_STANDARD|HAF_NO_ERR);
+    p = MemLock(mh);
+    fls = ChunkArrayElementToPtr(pself->FLI_folderArray, folderNum, &eSize);
+    strcpy(p, fls->FLS_name);
+    MemUnlock(mh);
+    return(mh);
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_FOLDER_LIST_QUERY_MONIKER
+ * DESCRIPTION:     handle a dynamic list query for a moniker
+ *
+ * PASS:            list - optr of list
+ *                  item - item #
+ * RETURN:          none
+ ***************************************************************/
+
+@ifdef CUSTOM_FOLDER_ICONS
+
+optr folderMonikers[] = {
+    @draftsFolderMoniker,
+    @inboxFolderMoniker,
+    @outboxFolderMoniker,
+    @sentFolderMoniker,
+    @trashFolderMoniker
+};
+
+@endif
+
+@method FolderListClass, MSG_FOLDER_LIST_QUERY_MONIKER
+{
+	MemHandle bufHan;
+	char *buf;
+	word numMsgs;
+	optr bmap;
+
+	bufHan = @call oself::MSG_FOLDER_LIST_GET_FOLDER_NAME(item);
+	buf = MemLock(bufHan);
+	/*
+	 * Count the number of messages in the folder
+	 */
+	numMsgs = @call oself::MSG_FOLDER_LIST_GET_NUM_MESSAGES(item);
+
+        /*
+	 * Make a moniker and set it in the list
+	 */
+@ifdef CUSTOM_FOLDER_ICONS
+        if (item <= MFID_TRASH) {
+	    bmap = folderMonikers[item];
+	} else {
+	    bmap = @genericFolderMoniker;
+	}
+@else
+        bmap = @folderCloseBitmap;
+@endif
+
+@ifdef SHOW_NUM_MESSAGES_IN_FOLDERS
+        FolderSetMoniker(list, item, bmap, buf, numMsgs);
+@else
+	if (item == MFID_DRAFTS) {
+	    FolderSetMoniker(list, item, bmap, buf, numMsgs);
+	} else {
+	    FolderSetMoniker(list, item, bmap, buf, -1);
+	}
+@endif
+
+doneFree:
+	MemFree(bufHan);
+}
+
+
+/**************************************************************
+ *          
+ * FUNCTION:        MSG_FOLDER_LIST_FOLDER_SELECTED
+ * DESCRIPTION:     handle a list selection
+ *
+ * PASS:            selection - item #
+ *                  numSelections - # of selections
+ *                  stateFlags - GenItemGroupStateFlags
+ * RETURN:          none
+ ***************************************************************/
+
+#define FOLDER_NAME_MAX_LEN_FOR_MONIKER 24
+
+@method FolderListClass, MSG_FOLDER_LIST_FOLDER_SELECTED
+{
+    word fnum = selection;
+
+    /*
+     * Enable/disable based on standard folders
+     */
+    if (numSelections == 0 || selection < NUM_BUILT_IN_FOLDERS) {
+	@call DeleteFolderTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+	@call RenameFolderDialog::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+    } else {
+	@call DeleteFolderTrigger::MSG_GEN_SET_ENABLED(VUM_DLYD);
+	@call RenameFolderDialog::MSG_GEN_SET_ENABLED(VUM_DLYD);
+    }
+    /*
+     * change Throw Away to Recover for Trash
+     */
+    if (selection == MFID_TRASH) {
+	@call ThrowAwayTool::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+	@call ThrowAwayTrigger::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+	@call ReadThrowAwayTrigger::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+	@call ReadThrowAwayTool::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+	@call RecoverTool::MSG_GEN_SET_USABLE(VUM_DLYD);
+	@call RecoverTrigger::MSG_GEN_SET_USABLE(VUM_DLYD);
+	@call ReadRecoverTrigger::MSG_GEN_SET_USABLE(VUM_DLYD);
+	@call ReadRecoverTool::MSG_GEN_SET_USABLE(VUM_DLYD);
+    } else {
+	@call ThrowAwayTool::MSG_GEN_SET_USABLE(VUM_DLYD);
+	@call ThrowAwayTrigger::MSG_GEN_SET_USABLE(VUM_DLYD);
+	@call ReadThrowAwayTrigger::MSG_GEN_SET_USABLE(VUM_DLYD);
+	@call ReadThrowAwayTool::MSG_GEN_SET_USABLE(VUM_DLYD);
+	@call RecoverTool::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+	@call RecoverTrigger::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+	@call ReadRecoverTrigger::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+	@call ReadRecoverTool::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+    }
+    /*
+     * change Read to Edit for Drafts and Outbox
+     */
+    if (selection == MFID_DRAFTS || selection == MFID_OUTBOX) {
+	@call ReadMessageTool::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+	@call ReadMessageTrigger::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+	@call EditMessageTool::MSG_GEN_SET_USABLE(VUM_DLYD);
+	@call EditMessageTrigger::MSG_GEN_SET_USABLE(VUM_DLYD);
+    } else {
+	@call ReadMessageTool::MSG_GEN_SET_USABLE(VUM_DLYD);
+	@call ReadMessageTrigger::MSG_GEN_SET_USABLE(VUM_DLYD);
+	@call EditMessageTool::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+	@call EditMessageTrigger::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+    }
+
+    /*
+     * change Sender to Recipient for Sent and Outbox
+     */
+    if (selection == MFID_OUTBOX || selection == MFID_SENT || selection == MFID_DRAFTS) {
+	@call SortBySenderButton::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@recipientMkr, VUM_DLYD);
+    } else {
+	@call SortBySenderButton::MSG_GEN_REPLACE_VIS_MONIKER_OPTR(@senderMkr, VUM_DLYD);
+    }
+
+    /*
+     * rebuild the message list
+     */
+    @send TheMessageList::MSG_MAIL_LIST_SET_FOLDER(fnum);
+    @send TheMessageList::MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG(FALSE);
+
+    /*
+     * make sure we have the focus
+     */
+    @call oself::MSG_META_GRAB_FOCUS_EXCL();
+
+}
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        EnableDisableForTrash
+ * DESCRIPTION:     enable/disable "Empty Trash" depending on # messages
+ * PASS:            none
+ * RETURN:          none
+ *         
+ ***************************************************************/
+
+void
+EnableDisableForTrash()
+{
+        word numMsgs;
+
+	/*
+	 * update "Empty Trash" based on # of messages in Trash
+	 */
+        numMsgs = @call TheFolderList::MSG_FOLDER_LIST_GET_NUM_MESSAGES(MFID_TRASH);
+	if (numMsgs) {
+	    @call EmptyTrashTrigger::MSG_GEN_SET_ENABLED(VUM_DLYD);
+	} else {
+	    @call EmptyTrashTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+	}
+}
+
+void
+EnableDisableForOutbox()
+{
+        word numMsgs;
+
+	/*
+	 * update "Send Mail" based on # of messages in Outbox
+	 */
+	numMsgs = @call TheFolderList::MSG_FOLDER_LIST_GET_NUM_MESSAGES(MFID_OUTBOX);
+	if (numMsgs) {
+	    @call SendTrigger::MSG_GEN_SET_ENABLED(VUM_DLYD);
+	    @call SendTool::MSG_GEN_SET_ENABLED(VUM_DLYD);
+	} else {
+	    @call SendTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+	    @call SendTool::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+	}
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        CleanFolder
+ * DESCRIPTION:     Remove bad files from folder
+ * PASS:            none
+ * RETURN:          none
+ ***************************************************************/
+void CleanFile(TCHAR *fileName)
+{
+    FileHandle fHan;
+    dword size;
+
+    fHan = FileOpen(fileName, FILE_ACCESS_R|FILE_DENY_NONE);
+    if (fHan) {
+	size = FileSize(fHan);
+	FileClose(fHan,NULL);
+	if (size == 0) {
+	    FileDelete(fileName);
+	}
+    }
+
+}
+char wildStr2[] = "*";
+void CleanFolder(TCHAR *folderName)
+{
+    MemHandle mh;
+    int i, count;
+    FileEnumParams params;
+    FileLongName *fnp;
+
+    LockStrings();
+    FileSetCurrentPath(0,folderName);
+    FileDelete(LMemDeref(@msglistName));
+    UnlockStrings();
+    
+    params.FEP_searchFlags = FESF_GEOS_NON_EXECS|FESF_CALLBACK;
+    params.FEP_returnAttrs = (void *) FESRT_NAME;
+    params.FEP_returnSize = sizeof(FileLongName);
+    params.FEP_matchAttrs = 0;
+    params.FEP_bufSize = MAX_FOLDER_ENUM;
+    params.FEP_callback = (void *) FESC_WILDCARD;
+    params.FEP_cbData1 = (dword) wildStr2;
+    params.FEP_skipCount = 0;    
+
+    while (1) {
+	count = FileEnum(&params, &mh, NULL);
+	if (mh) {
+	    fnp = MemLock(mh);
+	    for (i=0;i<count;++i) {
+		CleanFile(fnp[i]);
+	    }
+	    MemFree(mh);
+	}
+	if (count < MAX_FOLDER_ENUM) {
+	    break;
+	} else {
+	    params.FEP_skipCount += MAX_FOLDER_ENUM;
+	}
+    }
+}
+
+
+
+/**************************************************************
+ *
+ * FUNCTION:        MSG_FOLDER_LIST_CLEAN_FOLDERS
+ * DESCRIPTION:     
+ *
+ * PASS:            none
+ * RETURN:          none
+ ***************************************************************/
+@method FolderListClass, MSG_FOLDER_LIST_CLEAN_FOLDERS
+{
+    word i,j, numAccts,numFolders;
+    MemHandle mhAccts, mhFolders;
+    FileLongName *accts, *folders;
+    FileEnumParams params;
+    word skipCount1 =0 , skipCount2=0;
+    TCHAR *mdName;
+
+    FilePushDir();
+    mdName = MailLockStdString(MSS_MAIL_DIR);
+    FileSetCurrentPath(SP_PRIVATE_DATA, mdName);
+    params.FEP_searchFlags = FESF_DIRS|FESF_CALLBACK;
+    params.FEP_returnAttrs = (void *) FESRT_NAME;
+    params.FEP_returnSize = sizeof(FileLongName);
+    params.FEP_matchAttrs = 0;
+    params.FEP_bufSize = MAX_FOLDER_ENUM;
+    params.FEP_callback = (void *) FESC_WILDCARD;
+    params.FEP_cbData1 = (dword) wildStr2;
+
+    numAccts=0;
+    while (1) {
+	params.FEP_skipCount = skipCount1;    
+	numAccts = FileEnum(&params, &mhAccts, NULL);
+	if (mhAccts) {
+	    accts = MemLock(mhAccts);
+	    for (i=0;i<numAccts;++i) {
+		numFolders=0;
+		FilePushDir();
+		FileSetCurrentPath(0,accts[i]);
+		while (1) {
+		    params.FEP_skipCount = skipCount2;    
+		    numFolders = FileEnum(&params, &mhFolders, NULL);
+		    if (mhFolders) {
+			folders = MemLock(mhFolders);
+			for (j=0;j<numFolders;++j) {
+			    FilePushDir();
+			    CleanFolder(folders[j]);
+			    FilePopDir();
+			}
+			MemFree(mhFolders);
+		    }
+		    if (numFolders < MAX_FOLDER_ENUM) {
+			break;
+		    } else {
+			skipCount2 += MAX_FOLDER_ENUM;
+		    }
+		}
+		FilePopDir();
+	    }
+	    MemFree(mhAccts);
+	}
+	if (numAccts < MAX_FOLDER_ENUM) {
+	    break;
+	} else {
+	    skipCount1 += MAX_FOLDER_ENUM;
+	}
+    }
+    MailUnlockStdString(MSS_MAIL_DIR);
+    FilePopDir();
+}
+
+
+
+/**************************************************************
+ * FUNCTION:        MSG_FOLDER_LIST_INIT_MSGLIST
+ * DESCRIPTION:     
+ *
+ * PASS:            none
+ * RETURN:          none
+ ***************************************************************/
+@method FolderListClass, MSG_FOLDER_LIST_INIT_MSGLIST
+{
+    VMFileHandle vmf;
+    VMBlockHandle vmbh;
+    optr indexArray;
+    word numDirs;
+    int folderNum;
+    Boolean inuse;
+
+    FilePushDir();
+    GotoMailDirectory(NULL);
+    numDirs = @call oself::MSG_FOLDER_LIST_GET_NUM_FOLDERS();
+    for (folderNum=0;folderNum < numDirs; ++folderNum) {
+	FilePushDir();
+	inuse = GetMessageArrays(folderNum,&vmf,&vmbh,&indexArray);
+	FilePopDir();
+	ThreadReleaseThreadLock(TheMessageListLock);
+	UnlockIndexArray(OptrToHandle(indexArray));
+	if (!inuse) {
+	    VMClose(vmf, NULL);
+	}
+    }
+	
+    FilePopDir();
+
+}
+
+
+
+/**************************************************************
+ *
+ * FUNCTION:        CompareFoldersCB
+ * DESCRIPTION:     Callback to sort the folder list
+ *
+ * PASS:            el1 - ptr to element #1
+ *                  el2 - ptr to element #2
+ * RETURN:          el1 < el2, el1 == el2, el1 > el2
+ ***************************************************************/
+
+sword
+_pascal CompareFoldersCB (void *el1, void *el2, word fooType)
+{
+    FolderListStruct *f1, *f2;
+    f1 = el1;
+    f2 = el2;
+
+    /*
+     * if the IDs are equal, i.e., user folders, then compare the names
+     */
+    if (f1->FLS_ID == f2->FLS_ID) {
+	return(LocalCmpStrings(f1->FLS_name, f2->FLS_name, 0));
+    }
+    /*
+     * if different IDs, i.e., standard folders, then compare the IDs
+     */
+    return(f1->FLS_ID - f2->FLS_ID);
+}
+
+
+/**************************************************************
+ *
+ * FUNCTION:        GetFolderIndex
+ * DESCRIPTION:     Get the index of a folder name
+ *
+ * PASS:            fname - ptr to folder name
+ * RETURN:          index - MailFolderID of folder
+ ***************************************************************/
+
+MailStdString stdDirs[] = {
+    MSS_DRAFTS_FOLDER,
+    MSS_INBOX_FOLDER,
+    MSS_OUTBOX_FOLDER,
+    MSS_SENT_FOLDER,
+    MSS_TRASH_FOLDER
+};
+
+word
+GetFolderIndex(TCHAR *fname)
+{
+    word i, retVal;
+    TCHAR *stdFldrName;
+
+    /*
+     * if not a standard folder, just return default index
+     */
+    retVal = MFID_FIRST_USER_FOLDER;
+    for (i = 0; i < NUM_BUILT_IN_FOLDERS; i++) {
+	/*
+	 * if a standard folder, return the index
+	 */
+	stdFldrName = MailLockStdString(stdDirs[i]);
+	if (!strcmp(fname, stdFldrName)) {
+	    retVal = i;
+	    i = NUM_BUILT_IN_FOLDERS; /* done */
+	}
+	MailUnlockStdString(stdDirs[i]);
+    }
+    return(retVal);
+}
+
+
+/**************************************************************
+ *
+ * FUNCTION:        MSG_FOLDER_LIST_INIT_NAME_ARRAY
+ * DESCRIPTION:     Build the array of names
+ *
+ * PASS:            none
+ * RETURN:          none
+ ***************************************************************/
+
+MemHandle
+GetDirNames(word *numDirs)
+{
+    FileEnumParams params;
+
+    /*
+     * get all the folder names
+     */
+    params.FEP_searchFlags = FESF_DIRS;
+    params.FEP_skipCount = 0;
+    return(FolderGetCommon(params, numDirs));
+}
+
+@method FolderListClass, MSG_FOLDER_LIST_INIT_NAME_ARRAY
+{
+    word numDirs, i;
+    optr arr;
+    ChunkHandle chl;
+    MemHandle bufHan;
+    FileLongName *bufP;
+    FolderListStruct *fls;
+
+    /*
+     * go to the top level directory
+     */
+    FilePushDir();
+    GotoMailDirectory(NULL);
+    arr = pself->FLI_folderArray;
+    /*
+     * make sure there's a chunk array
+     */
+    if (arr) {
+	ChunkArrayZero(arr);
+    } else {
+	chl = ChunkArrayCreate(OptrToHandle(oself), sizeof(FolderListStruct), 0, 0);
+	arr = ConstructOptr(OptrToHandle(oself), chl);
+	ObjDerefGen(oself);
+	pself->FLI_folderArray = arr;
+    }
+
+    bufHan = GetDirNames(&numDirs);
+    /*
+     * go through the folder names and build an array
+     */
+    bufP = MemLock(bufHan);
+    for (i = 0; i < numDirs; i++) {
+	fls = ChunkArrayAppend(arr, sizeof(FolderListStruct));
+	strcpy(fls->FLS_name, bufP[i]);
+	fls->FLS_ID = GetFolderIndex(bufP[i]);
+    }
+    MemFree(bufHan);
+
+    /*
+     * sort the array
+     */
+    ChunkArraySort(arr, 0, CompareFoldersCB);
+
+    FilePopDir();
+
+}
+
+#ifdef __BORLANDC__
+#pragma codeseg RareCode
+#endif
+
+
+
+/**************************************************************
+ *
+ * FUNCTION:        MSG_FOLDER_LIST_CREATE_NEW_FOLDER
+ * DESCRIPTION:     create a new folder from the New Folder dialog
+ *
+ * PASS:            none
+ * RETURN:          none
+ ***************************************************************/
+@method FolderListClass, MSG_FOLDER_LIST_CREATE_NEW_FOLDER
+{
+    char folderName[MAX_FOLDER_NAME_LENGTH+1];
+    word err;
+    optr errMsg;
+    VMFileHandle vmf;
+
+    /*
+     * Get the folder name from the user
+     */
+    @call NewFolderNameEntry::MSG_VIS_TEXT_GET_ALL_PTR(folderName);
+
+    GotoMailDirectory(NULL);
+    err = FileCreateDir(folderName);
+
+    if (!err) {
+	/*
+	 * no error: dismiss the dialog and rebuild the folder list
+	 */
+	vmf = CreateMessageListFile(folderName);
+	VMClose(vmf, FALSE);
+	@call NewFolderDialog::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+	@call NewFolderNameEntry::MSG_VIS_TEXT_DELETE_ALL();
+	@call NewFolderCreateTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_DLYD);
+	RebuildFolderList(MFID_LEAVE_SELECTION, FALSE);
+    } else {
+	/*
+	 * error: report it and leave the dialog up
+	 */
+	switch (err) {
+	case ERROR_FILE_EXISTS:
+	    errMsg = @folderExistsErr;
+	    break;
+	default:
+	    errMsg = @folderNoCreateErr;
+	}
+	ReportError(errMsg, folderName);
+    }
+}
+
+
+/**************************************************************
+ *
+ * FUNCTION:        MSG_FOLDER_LIST_DELETE_CURRENT_FOLDER
+ * DESCRIPTION:     delete the currently selected folder
+ *
+ * PASS:            none
+ * RETURN:          none
+ ***************************************************************/
+@method FolderListClass, MSG_FOLDER_LIST_DELETE_CURRENT_FOLDER
+{
+    word folderNum;
+    word numMsgs;
+    MemHandle bufHan;
+    char *folderName;
+    word errResp;
+
+    /*
+     * Get the current folder, number of messages in it, and its name
+	 */
+    folderNum = @call oself::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    numMsgs = @call oself::MSG_FOLDER_LIST_GET_NUM_MESSAGES(folderNum);
+    bufHan = @call oself::MSG_FOLDER_LIST_GET_FOLDER_NAME(folderNum);
+    folderName = MemLock(bufHan);
+
+    /*
+     * Warn the user depending on whether there are messages in the folder
+     */
+    if (numMsgs) {
+        errResp = DoYesNo(@folderDeleteNonEmpty, folderName);
+    } else {
+        errResp = DoYesNo(@folderDeleteEmpty, folderName);
+    }
+
+    /*
+     * Delete the folder
+     */
+    if (errResp == IC_YES) {
+        @call MailAppObj::MSG_GEN_APPLICATION_MARK_BUSY();
+        /*
+         * If the folder is not empty, empty it first
+         */
+        if (numMsgs) {
+            FolderDeleteMessages(folderName);
+        }
+        /*
+         * close and delete the folder cache file so we can
+         * delete the folder
+         */
+        @call TheMessageList::MSG_MAIL_LIST_CLOSE_MESSAGE_ARRAY();
+        DeleteMessageListArray(folderName);
+        /*
+         * Delete the folder
+         */
+        GotoMailDirectory(NULL);
+        errResp = FileDeleteDir(folderName);
+        @call MailAppObj::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+        if (errResp) {
+            /*
+    	 * Report the error
+    	 */
+            ReportError(@folderDeleteErr, folderName);
+        } else {
+            /*
+    	 * Update the folder list and reset the selection
+    	 */
+            RebuildFolderList(MFID_DEFAULT, FALSE);
+        }
+    }
+    MemFree(bufHan);
+}
+
+
+/**************************************************************
+ *
+ * FUNCTION:        MSG_FOLDER_LIST_RENAME_CURRENT_FOLDER
+ * DESCRIPTION:     empty the trash
+ *
+ * PASS:            none
+ * RETURN:          none
+ ***************************************************************/
+@method FolderListClass, MSG_FOLDER_LIST_RENAME_CURRENT_FOLDER
+{
+    word folderNum = @call oself::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    MemHandle oldFldrHan, newFldrHan;
+    char *oldFldrName, *newFldrName;
+    word err;
+
+    /*
+     * close the folder cache file so we can rename the folder
+     */
+    @call TheMessageList::MSG_MAIL_LIST_CLOSE_MESSAGE_ARRAY();
+    /*
+     * get the old name and the new name
+     */
+    oldFldrHan = @call oself::MSG_FOLDER_LIST_GET_FOLDER_NAME(folderNum);
+    newFldrHan = @call RenameFolderNewEntry::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+
+    oldFldrName = MemLock(oldFldrHan);
+    newFldrName = MemLock(newFldrHan);
+
+    /*
+     * rename the folder
+     */
+    GotoMailDirectory(NULL);
+    err = FileRename(oldFldrName, newFldrName);
+
+    /*
+     * report any error and clean up
+     */
+    if (err) {
+            switch (err) {
+    	    case ERROR_FILE_EXISTS:
+    	        ReportError(@folderRenameExistsErr, newFldrName);
+    		break;
+    	    default:
+    	        ReportError(@folderNoRenameErr, oldFldrName);
+    	}
+    } else {
+            @call RenameFolderDialog::MSG_GEN_INTERACTION_ACTIVATE_COMMAND(IC_DISMISS);
+            RebuildFolderList(MFID_LEAVE_SELECTION, FALSE);
+    }
+    MemFree(oldFldrHan);
+    MemFree(newFldrHan);
+}
+
+
+
+/**************************************************************
+ *      
+ * FUNCTION:        EmptyTrash
+ * DESCRIPTION:     empty the trash
+ * PASS:            none
+ * RETURN:          none
+ ***************************************************************/
+void
+EmptyTrash(void)
+{
+    TCHAR *tName;
+
+    GotoMailDirectory(NULL);
+    tName = MailLockStdString(MSS_TRASH_FOLDER);
+    FolderDeleteMessages(tName);
+    MailUnlockStdString(MSS_TRASH_FOLDER);
+}
+
+
+/**************************************************************
+ *
+ * FUNCTION:        MSG_FOLDER_LIST_EMPTY_TRASH
+ * DESCRIPTION:     empty the trash
+ *
+ * PASS:            none
+ * RETURN:          none
+ ***************************************************************/
+@method FolderListClass, MSG_FOLDER_LIST_EMPTY_TRASH
+{
+    word resp = DoYesNo(@emptyTrashStr, NULL);
+
+    if (resp == IC_YES) {
+        /*
+	 * delete the messages in the Trash folder
+	 */
+        EmptyTrash();
+	/*
+	 * rebuild the folder list (in case we're displaying
+	 * trash or the list has the # of messages
+	 */
+	RebuildFolderList(MFID_LEAVE_SELECTION, FALSE);
+	/*
+	 * Disable "Empty Trash"
+	 */
+	EnableDisableForTrash();
+    }
+}

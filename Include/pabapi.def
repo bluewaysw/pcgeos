@@ -1,0 +1,279 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1993 -- All Rights Reserved
+
+PROJECT:	
+MODULE:		
+FILE:		pabapi.def
+
+AUTHOR:		Patrick Buck, Nov  4, 1993
+
+
+	Name					Description
+	----					-----------
+	AddressBookOpen				Open AB doc, create AB bridge obj
+	AddressBookClose			Close AB doc, free AB bridge obj
+	AddressBookCountEntries			Count # of pages in AB doc
+	AddressBookEnumerateEntries		Visit AB page & do callback
+	AddressBookGetEntryInfo			Get info about a field
+	AddressBookGetEntryTextDataBlock	field ptr -> text block
+	AddressBookGetPageEntryTextDataFptr	page#/field type -> text fptr
+	AddressBookGetPageEntryTextDataBlock	page#/field type -> text block
+	AddressBookGetPageInfo			Get info about a page
+	AddressBookDBPageGetEntryTextDataBlock	page ptr/field type -> text block
+	AddressBookGetCharacterFirstPage	Get page# of 1st entry starting w/char
+   	
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PB	11/ 4/93   	Initial revision
+
+
+DESCRIPTION:
+	Routines used to communicate with Palm's book object in order
+	to access the contents of a Palm address book document.
+
+USAGE:
+   	Call AddressBookOpen passing the path/filename of an address book
+   	document created by the Palm Address Book application.
+
+   	The document will be opened and the caller will receive an
+   	'address book ID' value.  This is just the global handle of
+   	an object used internally to access the contents of the
+   	address book document (this is how Palm designed it).
+   	This ID value must be passed into the remaining API routines. 
+
+   	Use one of the data access routines to retrieve information from
+   	the document.  Data is referenced by specifying the page it resides
+   	in and the field on that page.  There is one page per address book
+   	entry and each page has multiple fields.
+
+   	Adding and removing pages from the address book will invalidate
+   	any stored page references.  To alleviate this problem I have created
+   	routines that make use of the DBGroupAndItem values of pages and
+   	fields (this is how Palm stores the stuff).  It is still possible
+   	to have erroneous references if a data item is deleted and its
+   	DBGroupAndItem is reused, but at least this should not affect other
+   	stored references.
+
+   	Call AddressBookClose to terminate access to the address book
+   	document.
+
+		
+	$Id: pabapi.def,v 1.1 97/04/04 14:23:23 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__PABAPI
+
+StartLibrary	pabapi
+
+; ============================================================================
+;			Exported Functions
+; ============================================================================
+
+; ---------------------------------------------------------
+  global	AddressBookOpen:			far
+; ---------------------------------------------------------
+;  Open a Palm Address Book document and create the "bridge"
+;  object used to access said document.
+;
+;	PASS:	ds:dx = Filename of the Address Book to use
+;
+;	RET:	bx = address book ID ("bridge" obj block handle)
+;		carry set if unable to access this book
+;	DESTROY nothing
+
+; ---------------------------------------------------------
+  global	AddressBookClose:			far
+; ---------------------------------------------------------
+;  Close a Palm Address Book document and destroy the "bridge"
+;  object used to access said document.
+;
+;	PASS:	bx = address book ID ("bridge" obj block handle)
+;	RET:	nothing
+;	DESTROY nothing
+
+; ---------------------------------------------------------
+  global	AddressBookCountEntries:		far
+; ---------------------------------------------------------
+;  Return the number of address pages in a Palm Addrees Book document
+;
+;	PASS:	bx = address book ID ("bridge" obj block handle)
+;	RET:	cx = number of entries
+;		carry set if error
+;	DESTROY nothing
+
+; ---------------------------------------------------------
+  global	AddressBookEnumerateEntries:		far
+; ---------------------------------------------------------
+;  Perform a callback to some supplied function for every address
+;  in a Palm Address Book document.
+;
+;	PASS:	bx = address book ID ("bridge" obj block handle)
+;		cx:dx = fptr to callback function
+;		ax, di, si, es, ds = Data to pass to callback
+;	RET:	carry set if error
+;	DESTROY nothing
+;
+;   Parameters passed in the callback
+;	PASS:	cx = entry ID (page number)
+;		bx = address book ID (same as the one passed above)
+;		ax, di, si, es, ds = Data passed into callback
+;
+;	RET:	ax, di, si, es, ds = Set by callback
+;		carry set to abort enumeration
+;
+;	WARNING:	
+;	In Palm's address book, pages may get new numbers whenever other
+;	pages are inserted or deleted.
+
+; ---------------------------------------------------------
+  global	AddressBookGetEntryInfo:		far
+; ---------------------------------------------------------
+;  Get the DBGroupAndItem and FieldDataType of a field in an address page.
+;
+;	PASS:	bx = address book ID ("bridge" obj block handle)
+;		cx = entry ID (page number)
+;		dl = entry field (AddrDataTypes)
+;	RET:	al = entry field data type (FieldDataType)
+;		cx:dx = entry field ID (DBGroupAndItem of the entry field)
+;		carry set if error
+;	DESTROY nothing
+
+; ---------------------------------------------------------		
+  global	AddressBookGetEntryTextDataBlock:	far
+; ---------------------------------------------------------
+;  Given the DBGroupAndItem value of an address book page, extract text
+;  from one of its fields and return the text in a block.  The field must
+;  be of type FDT_TEXT.
+;
+;	PASS:	ax = handle of a block to copy data into (zero to allocate one)
+;		bx = address book ID ("bridge" obj block handle)
+;		cx:dx = entry field ID (DBGroupAndItem of the entry field)
+;	RET:	ax = handle to a block containing the text data
+;		dx = number of character bytes copied into block
+;		carry set if error
+;	DESTROY nothing
+
+; ---------------------------------------------------------
+  global	AddressBookGetPageEntryTextDataFptr:	far
+; ---------------------------------------------------------
+;  Given the number of an address book page, extract text from one of
+;  its fields and return the text through an fptr.  The field must
+;  be of type FDT_TEXT.
+;
+;	PASS:	bx = address book ID ("bridge" obj block handle)
+;		cx = entry ID (page number)
+;		dl = entry field (AddrDataTypes)
+;		es:di = fptr of buffer to copy text into
+;  		ax = maximum number of characters to copy
+;	RET:	buffer filled
+;		dx = number of characters copied (minus NULL)
+;		carry set if error
+
+; ---------------------------------------------------------
+  global	AddressBookGetPageEntryTextDataBlock:	far
+; ---------------------------------------------------------
+;  Given the number of an address book page, extract text from one of
+;  its fields and return the text in a block.  The field must
+;  be of type FDT_TEXT.
+;
+;  *NOTE* NOT IMPLEMENTED AT THIS TIME
+;
+;	PASS:	ax = handle of a block to copy data into (zero to allocate one)
+;		bx = address book ID ("bridge" obj block handle)
+;		cx = entry ID (page number)
+;		dl = entry field (AddrDataTypes)
+;	RET:	ax = handle to a block containing the text data (0 if not text)
+;		carry set if error
+;	DESTROY nothing
+
+; ---------------------------------------------------------
+  global	AddressBookGetPageInfo:			far
+; ---------------------------------------------------------
+;  Get the DBGroupAndItem of an address page.
+;
+;	PASS:	bx = address book ID ("bridge" obj block handle)
+;		cx = page DBGroupAndItem		
+;	RET:	cx:dx = page DBGroupAndItem
+;		carry set if error
+;	DESTROY	nothing
+
+; ---------------------------------------------------------
+  global	AddressBookDBPageGetEntryTextDataBlock:	far
+; ---------------------------------------------------------
+;  Given the DBGroupAndItem value of an address book page and a field type,
+;  extract the text from the specified field into a block.  The field must
+;  be of type FDT_TEXT.
+;
+;	PASS:	ax = handle of a block to copy data into (zero to allocate one)
+;		bx = address book ID ("bridge" obj block handle)
+;		cx:di = page DBGroupAndItem
+;		dl = entry field (AddrDataTypes)
+;	RET:	ax = handle to a block containing the text data (0 if not text)
+;		dx = number of character bytes in the block
+;		carry set if error
+;	DESTROY	nothing
+
+; ---------------------------------------------------------
+  global	AddressBookGetCharacterFirstPage:	far
+; ---------------------------------------------------------
+;  This routine takes a letter group value and returns the
+;  number of the first page in that letter group.
+;
+;  	PASS:	bx = address book ID ("bridge" obj block handle)
+;  		cx = letter group value
+;
+;  	RET:	ax = page number
+
+
+; ============================================================================
+;			Exported Types
+; ============================================================================
+
+; --------------------------------------------------------------------
+; Palm data type used to access a field in an address book page entry.
+; --------------------------------------------------------------------
+
+AddrDataTypes	etype	byte, 0, 1
+ADT_NAME	enum	AddrDataTypes
+ADT_FIRST_NAME	enum	AddrDataTypes
+ADT_ADDRESS	enum	AddrDataTypes
+ADT_CITY	enum	AddrDataTypes
+ADT_STATE	enum	AddrDataTypes
+ADT_ZIP_CODE	enum	AddrDataTypes
+ADT_COUNTRY	enum	AddrDataTypes
+ADT_TITLE	enum	AddrDataTypes
+ADT_COMPANY	enum	AddrDataTypes
+ADT_WORK_PHONE	enum	AddrDataTypes
+ADT_HOME_PHONE	enum	AddrDataTypes
+ADT_OTHER_PHONE	enum	AddrDataTypes
+ADT_FAX		enum	AddrDataTypes
+ADT_EMAIL	enum	AddrDataTypes
+ADT_AOL_EMAIL	enum	AddrDataTypes
+ADT_NOTES	enum	AddrDataTypes
+ADT_CUSTOM1	enum	AddrDataTypes
+ADT_CUSTOM2	enum	AddrDataTypes
+ADT_CUSTOM3	enum	AddrDataTypes
+ADT_CUSTOM4	enum	AddrDataTypes
+ADT_OTHER	enum	AddrDataTypes, 0xff
+
+; ---------------------------------------------------------------------------
+; Data type used to identify the type of data stored in an AddrDataType field
+; ---------------------------------------------------------------------------
+FieldDataType	etype	byte, 0
+FDT_INK			enum	FieldDataType
+FDT_TEXT		enum	FieldDataType
+FDT_VIS_MONIKER		enum	FieldDataType
+FDT_NONE		enum	FieldDataType
+
+; ---------------------------------------------------------------------------
+; 				Constants
+; ---------------------------------------------------------------------------
+PALM_ADDR_BOOK_NULL_TERMINATED		equ	0
+ 
+EndLibrary	pabapi
+
+

@@ -1,0 +1,535 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+ *
+ * PROJECT:	  PCGEOS
+ * MODULE:	  prefvid
+ * FILE:	  prefvid.ui
+ *
+ * AUTHOR:  	  Gene Anderson: Aug 25, 1992
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	5/4/93	  Chrisb    Initial revision
+ *
+ * DESCRIPTION:
+ *	UI for the Video module of preferences.
+ *
+ *
+ * 	$Id: prefvid.ui,v 1.2 98/03/24 21:59:16 gene Exp $
+ *
+ ***********************************************************************/
+
+#include "generic.uih"
+#include "config.uih"
+
+#ifdef GPC_VERSION
+#include "Art/mkrPrefGPC.ui"
+
+start	PrefVidUI;
+#include "Art/mkrTvUp.ui"
+#include "Art/mkrTvDown.ui"
+#include "Art/mkrTvLeft.ui"
+#include "Art/mkrTvRight.ui"
+#include "Art/mkrTvWider.ui"
+#include "Art/mkrTvTaller.ui"
+#include "Art/mkrTvNarrower.ui"
+#include "Art/mkrTvShorter.ui"
+end	PrefVidUI;
+
+#else
+#include "Art/mkrPrefVid.ui"
+#endif
+
+class PrefVidDialog = PrefDialog {
+}
+
+class 	PrefVidDeviceList = PrefTocList {
+}
+
+#ifdef GPC_VERSION
+
+class PrefVidTvPosInteraction = PrefInteraction {
+	horizPos = typeComp "PosStruct" : "";
+	vertPos = typeComp "PosStruct" : "";
+}
+
+class PrefVidTvSizeInteraction = PrefInteraction {
+	default prefAttrs = default +rebootIfChanged;
+}
+
+class PrefVidTvSizeBordersPrimary = GenPrimary {
+}
+
+class PrefVidBooleanGroup = PrefBooleanGroup {
+}
+
+class PrefVidBoolean = PrefBoolean {
+    setVidFunc = wordComp : 0;		/* VidFunction or VidEscCode */
+}
+
+#endif	/* GPC_VERSION */
+
+
+
+/**************************************************************************
+ *	UI FOR SOUND
+ **************************************************************************/ 
+start	PrefVidUI;
+
+
+PrefVidTitle = TitledGlyph {
+	moniker = list {
+		PrefVidTextMoniker,
+#ifdef GPC_VERSION
+		PrefGPCMoniker
+#else
+		PrefVidLCMoniker,
+		PrefVidLMMoniker,
+		PrefVidLCGAMoniker
+#endif
+	}
+}
+
+
+PrefVidRoot = PrefVidDialog {
+	moniker = "Video";
+	attributes = default +modal, +notUserInitiatable;
+	visibility = dialog;
+	type = properties;
+	genStates = default -usable;
+	children =
+		PrefVidTitleGroup,
+#ifdef GPC_VERSION
+	        PrefTriggerGroup,
+#endif
+		PrefVidSubgroup;
+	hints = {
+		HINT_INTERACTION_SINGLE_USAGE,
+#ifndef GPC_VERSION
+		HINT_INTERACTION_COMPLEX_PROPERTIES,
+#endif
+		ATTR_GEN_HELP_CONTEXT {
+			char "dbVideo",0
+		} 
+	}
+}
+
+#ifdef GPC_VERSION
+PrefTriggerGroup = GenInteraction {
+    children = PrefVOK, PrefVClose;
+    hints = {
+	HINT_ORIENT_CHILDREN_HORIZONTALLY
+    }
+}
+
+PrefVOK = GenTrigger {
+    moniker = 'C', "Change";
+    genStates = default -enabled;
+    hints = {
+	HINT_SEEK_REPLY_BAR,
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND {
+	    word IC_APPLY
+	}
+    }
+}
+
+PrefVClose = GenTrigger {
+    moniker = 'D', "Don't Change";
+    hints = {
+	HINT_SEEK_REPLY_BAR,
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND {
+	    word IC_DISMISS
+	}
+    }
+}
+#endif
+
+PrefVidTitleGroup = GenInteraction {
+	children =
+		PrefVidTitle,
+		PrefVidHelp;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+
+PrefVidHelp = GenText {
+	genAttributes = readOnly;
+	text = "Use these options to change the configuration of your video adapter.";
+	hints = {
+		  HINT_MINIMUM_SIZE {
+			SpecWidth <SST_PIXELS, 375>
+			SpecHeight <>
+		  },
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+#ifdef GPC_VERSION
+
+chunk PrefVidTvPosHelpString = "Use these controls to adjust the position of the screen display.";
+
+chunk PrefVidTvPosSizeHelpString = "Use these controls to adjust the position and size of the screen display, until you can see a little of the red border all around the green screen.";
+
+#endif	/* GPC_VERSION */
+
+PrefVidSubgroup = PrefInteraction {
+#ifdef GPC_VERSION
+	children = PrefVidDriverGroup, PrefVidTvGroup;
+#else
+	children =
+	    PrefVidDriverGroup,
+	    PrefVidLargeMouse;
+#endif
+	hints = {HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT}
+}
+
+#ifndef GPC_VERSION
+
+PrefVidLargeMouse = PrefBooleanGroup vardataReloc {
+    children =
+	PVLMLarge;
+    prefAttrs = default +rebootIfChanged;
+    selectedBooleans = 0;
+    hints = {
+	ATTR_PREF_BOOLEAN_GROUP_SEPARATE_BOOLEAN_KEYS,
+	ATTR_PREF_REBOOT_STRING {
+	    UN_OPTR pointerSizeString
+	},
+	INIT_FILE_CATEGORY(screen0),
+    }
+}
+
+
+PVLMLarge = PrefBoolean {
+    moniker = 'L', "Large Mouse Pointer";
+    identifier = TRUE;
+    hints = {
+	ATTR_GEN_INIT_FILE_KEY { char "bigMousePointer", 0 }
+    }
+}
+
+#endif
+
+PrefVidDriverGroup = PrefInteraction {
+	moniker = "Type of video adapter";
+	children = PrefVideoList;
+	hints = {
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_CENTER_CHILDREN_VERTICALLY,
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_DRAW_IN_BOX,
+		HINT_CENTER_CHILDREN_HORIZONTALLY}
+}
+
+PrefVideoList = PrefVidDeviceList vardataReloc {
+	tocFlags = default +extendedDeviceDrivers;
+	tokenChars = "'VIDD'";
+	prefAttrs = default +rebootIfChanged;
+	hints = {
+		ATTR_GEN_PATH_DATA {
+			GenFilePath <SP_VIDEO_DRIVERS, 0>
+		},
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_DEFAULT_FOCUS,
+		INIT_FILE_CATEGORY(screen0),
+		INIT_FILE_KEY(device),
+		ATTR_PREF_REBOOT_STRING {
+			UN_OPTR videoDriverString
+		},
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_AVG_CHAR_WIDTHS, 50>
+			SpecHeight <SST_LINES_OF_TEXT, 6>
+			word	6
+		}
+	}
+}
+
+#ifdef GPC_VERSION
+
+PrefVidTvGroup = PrefInteraction {
+	genStates = default -usable;
+	children = PrefVidTvDimensionGroup, PrefVidTvOptions;
+	hints = {
+		INIT_FILE_CATEGORY(screen 0),
+		HINT_CENTER_CHILDREN_HORIZONTALLY
+	}
+}
+
+PrefVidTvDimensionGroup = PrefInteraction {
+	children = PrefVidTvPosGroup, PrefVidTvSizeGroup;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+	}
+}
+
+PrefVidTvPosGroup = PrefVidTvPosInteraction {
+	moniker = "Screen Position";
+	children = PrefVidTvLeftGlyph, PrefVidTvLeftTrigger,
+		   PrefVidTvPosVertSubGroup,
+		   PrefVidTvRightTrigger, PrefVidTvRightGlyph;
+	horizPos = "HORIZ_POS_INIT_VALUE, HORIZ_POS_INIT_VALUE,";
+	vertPos = "VERT_POS_INIT_VALUE, VERT_POS_INIT_VALUE,";
+	hints = {
+		HINT_DRAW_IN_BOX,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY
+	}
+}
+
+PrefVidTvLeftGlyph = GenGlyph {
+	moniker = "LEFT";
+}
+
+PrefVidTvLeftTrigger = GenTrigger {
+	moniker = TvLeftMoniker;
+	action = MSG_PVTPI_CHANGE_POS, PrefVidTvPosGroup;
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			VidEscCode	VID_ESC_SET_HORIZ_POS
+			sword		-1
+		}
+	}
+}
+
+PrefVidTvPosVertSubGroup = GenInteraction {
+	children = PrefVidTvUpGlyph, PrefVidTvUpTrigger,
+		   PrefVidTvDownTrigger, PrefVidTvDownGlyph;
+	hints = {
+		HINT_CENTER_CHILDREN_HORIZONTALLY
+	}
+}
+
+PrefVidTvUpGlyph = GenGlyph {
+	moniker = "UP";
+}
+
+PrefVidTvUpTrigger = GenTrigger {
+	moniker = TvUpMoniker;
+	action = MSG_PVTPI_CHANGE_POS, PrefVidTvPosGroup;
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			VidEscCode	VID_ESC_SET_VERT_POS
+			sword		1
+		}
+	}
+}
+
+PrefVidTvDownTrigger = GenTrigger {
+	moniker = TvDownMoniker;
+	action = MSG_PVTPI_CHANGE_POS, PrefVidTvPosGroup;
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			VidEscCode	VID_ESC_SET_VERT_POS
+			sword		-1
+		}
+	}
+}
+
+PrefVidTvDownGlyph = GenGlyph {
+	moniker = "DOWN";
+}
+
+PrefVidTvRightTrigger = GenTrigger {
+	moniker = TvRightMoniker;
+	action = MSG_PVTPI_CHANGE_POS, PrefVidTvPosGroup;
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			VidEscCode	VID_ESC_SET_HORIZ_POS
+			sword		1
+		}
+	}
+}
+
+PrefVidTvRightGlyph = GenGlyph {
+	moniker = "RIGHT";
+}
+
+PrefVidTvSizeGroup = PrefVidTvSizeInteraction vardataReloc {
+	moniker = "Screen Size";
+	genStates = default -usable;
+	children = PrefVidTvSizeHorizSubGroup, PrefVidTvSizeVertSubGroup;
+	hints = {
+		HINT_DRAW_IN_BOX,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		ATTR_PREF_REBOOT_STRING {
+			UN_OPTR	screenSizeString
+		}
+	}
+}
+
+PrefVidTvSizeHorizSubGroup = GenInteraction {
+	children = PrefVidTvWiderTrigger, PrefVidTvNarrowerTrigger;
+	hints = {
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY,
+		HINT_INCLUDE_ENDS_IN_CHILD_SPACING
+	}
+}
+
+PrefVidTvWiderTrigger = GenTrigger {
+	moniker = TvWiderMoniker;
+	action = MSG_PVTSI_CHANGE_HORIZ_SIZE, PrefVidTvSizeGroup;
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			sword	-1
+		},
+		HINT_MINIMUM_SIZE {	/* to match height of
+					   PrefVidTvNarrowerTrigger */
+			GadgetSizeHintArgs <
+				<>,
+				<SST_PIXELS, 41>,
+			>
+		}
+	}
+}
+
+PrefVidTvNarrowerTrigger = GenTrigger {
+	moniker = TvNarrowerMoniker;
+	action = MSG_PVTSI_CHANGE_HORIZ_SIZE, PrefVidTvSizeGroup;
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			sword	1
+		},
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_CENTER_MONIKER
+	}
+}
+
+PrefVidTvSizeVertSubGroup = GenInteraction {
+	children = PrefVidTvTallerTrigger, PrefVidTvShorterTrigger;
+}
+
+PrefVidTvTallerTrigger = GenTrigger {
+	moniker = TvTallerMoniker;
+	action = MSG_PVTSI_CHANGE_VERT_SIZE, PrefVidTvSizeGroup;
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			sword	-1
+		},
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_CENTER_MONIKER
+	}
+}
+
+PrefVidTvShorterTrigger = GenTrigger {
+	moniker = TvShorterMoniker;
+	action = MSG_PVTSI_CHANGE_VERT_SIZE, PrefVidTvSizeGroup;
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			sword	1
+		},
+		HINT_MINIMUM_SIZE {	/* to match height of
+					   PrefVidTvTallerTrigger */
+			GadgetSizeHintArgs <
+				<>,
+				<SST_PIXELS, 80>,
+			>
+		}
+	}
+}
+
+PrefVidTvOptions = PrefVidBooleanGroup {
+#ifdef PRODUCT_				/* default version is NTSC */
+	children = PrefVidBWBoolean, PrefVidStopCrawlingDotsBoolean;
+#else
+	children = PrefVidBWBoolean;
+#endif /* PRODUCT_ */
+	destination = "TO_SELF";
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+#ifdef PRODUCT_				/* default version is NTSC */
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+#else
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+#endif
+		INIT_FILE_KEY(tvOptions),
+		ATTR_GEN_BOOLEAN_GROUP_STATUS_MSG {
+			word MSG_PVBG_BOOLEAN_CHANGED
+		}
+	}
+}
+
+#ifdef PRODUCT_				/* default version is NTSC */
+PrefVidStopCrawlingDotsBoolean = PrefVidBoolean {
+	moniker = "Stop Crawling Dots";
+	identifier = "mask VPOF_SET_TV_SUBCARRIER_FREQ";
+	setVidFunc = "VID_ESC_SET_TV_SUBCARRIER_FREQ";
+}
+#endif /* PRODUCT_ */
+
+PrefVidBWBoolean = PrefVidBoolean {
+	moniker = "Use Black & White";
+	identifier = "mask VPOF_SET_BLACK_WHITE";
+	setVidFunc = "VID_ESC_SET_BLACK_WHITE";
+}
+
+PrefVidTvSizeBorders = PrefVidTvSizeBordersPrimary {
+	moniker = "foo";
+	genStates = default -usable;
+	hints = {
+		HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD {
+			SpecWinSizePair <
+				mask SWSS_RATIO or PCT_100,
+				mask SWSS_RATIO or PCT_100
+			>
+		},
+		HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT {
+			SpecWinSizePair <
+				mask SWSS_RATIO or PCT_0,
+				mask SWSS_RATIO or PCT_0
+			>
+		},
+		ATTR_GEN_WINDOW_CUSTOM_WINDOW_PRIORITY {
+			WinPriority WIN_PRIO_MODAL + 1
+		},
+		ATTR_GEN_WINDOW_CUSTOM_WINDOW
+	}
+}
+
+#endif	/* GPC_VERSION */
+
+end	PrefVidUI;
+
+start	Strings, data;
+
+
+visMoniker PrefVidTextMoniker = "Video";
+
+visMoniker PrefVidMonikerList = list {
+		PrefVidTextMoniker,
+#ifdef GPC_VERSION
+		PrefGPCMoniker
+#else
+		PrefVidLCMoniker,
+		PrefVidLMMoniker,
+		PrefVidLCGAMoniker
+#endif
+}
+
+#ifdef GPC_VERSION
+chunk   videoRestartNotice = "When the software restarts, you will be presented with a video test screen. If you cannot read the screen, press ESC and you will be returned to your previous display type.";
+#else
+chunk   videoRestartNotice = "When the software restarts, you will be presented with a video test screen. If you cannot read the screen, press F10 and you will be returned to your previous display type.";
+#endif
+
+chunk   noSuchDisplay = "Unable to locate requested video display hardware on this system.\\r\\rError Code: PR-01";
+
+chunk   cantLoadVidDriver = "Unable to load driver for requested video display. The system video driver file is missing or contains errors.  You may need to re-install your software.\\r\\rError Code: PR-02";
+
+chunk videoDriverString = "video driver";
+
+#ifdef GPC_VERSION
+chunk	screenSizeString = "screen size";
+#endif
+
+#ifndef GPC_VERSION
+chunk   pointerSizeString = "pointer size";
+#endif
+
+end	Strings;

@@ -1,0 +1,957 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	GeoDex
+MODULE:		Impex		
+FILE:		impexExport.asm
+
+AUTHOR:		Ted H. Kim, March 4, 1992
+
+ROUTINES:
+	Name			Description
+	----			-----------
+	RolodexExportTransferItem	Create the export file
+	FileExport		Create the export file in meta file format
+	ExportRecord		Create a record entry in meta file format
+	ReplaceCarriageReturn	Replace CR's with space characters
+	WriteEmptyField		Create a blank element and add it to huge array
+	WriteTextField		Create a text element and add it to huge array
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ted	3/92		Initial revision
+
+DESCRIPTION:
+	This file contains all routines that deal with exporting a GeoDex file.
+
+	$Id: impexExport.asm,v 1.1 97/04/04 15:50:02 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include "cdex.goh"
+
+@extern chunk DexListString1;
+@extern chunk DexListString2;
+@extern chunk DexListString3;
+@extern chunk DexListString4;
+@extern chunk DexListString5;
+@extern chunk DexListString6;
+@extern chunk DexListString7;
+@extern chunk DexListString8;
+@extern chunk DexListString9;
+@extern chunk DexListString10;
+@extern chunk DexListString11;
+@extern chunk DexListString12;
+@extern chunk DexListString13;
+@extern chunk DexListString14;
+@extern chunk DexListString15;
+@extern chunk DexListString16;
+@extern chunk DexListString17;
+
+
+word g_fieldSize[GEODEX_NUM_FIELDS + NUM_PHONE_TYPE_FIELDS] = {0};
+ImpexFlag g_exportFlag = 0;
+
+Boolean WriteTextField(SSMetaStruc *ssms, char *string, word size, word row, word col);
+Boolean WritePhoneName(SSMetaStruc *ssms, PhoneEntry *pePtr, word row, word col);
+
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		RolodexExportToClipboard
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Create a transfer item on clipboard file.
+
+CALLED BY:	(GLOBAL) MSG_ROLODEX_EXPORT_TO_CLIPBOARD
+
+PASS:		nothing
+
+RETURN:		nothing
+
+DESTROYED:	ax, bx, cx, dx, bp, si, di, es
+
+SIDE EFFECTS:	none
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	THK	10/92		Initial revision
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+RolodexExportToClipboard	proc	far
+	RETC_SSMeta	local	SSMetaStruc
+	.enter
+
+	class	GeoDexClass
+
+	push	bp
+	call	SaveCurRecord
+	pop	bp
+
+	; is the database file empty?
+
+	tst	ds:[gmb.GMB_numMainTab]
+	je	exit				; if empty, just exit
+
+	push	dx, bp	
+	mov	ax, MSG_GEN_APPLICATION_MARK_BUSY
+	call	UserCallApplication
+	pop	dx, bp
+
+	push	bp
+	call	SaveCurRecord			; update if modified
+	pop	bp
+
+	; initialize the stack frame for copying a transfer item
+
+	clr	ax
+	mov	cx, ax				; ax:cx - source ID
+	mov	bx, ax				; bx - TransferItemFlags
+	push	bp
+	mov	dx, ss				; dx:bp - SSMetaStruc
+	lea	bp, RETC_SSMeta
+	call	SSMetaInitForCutCopy
+
+	; set the scrap size
+
+	mov	ax, ds:[gmb.GMB_numMainTab]		; ax - number of rows
+	mov	cx, GEODEX_NUM_FIELDS+NUM_PHONE_TYPE_FIELDS
+	; cx - number of columns
+	call	SSMetaSetScrapSize		; update the header block
+	pop	bp
+
+	mov	ds:[exportFlag], IE_CLIPBOARD	; a clipboard item
+	call	FileExport			; export the current file
+
+	push    bp
+	mov     dx, ss                          ; SSMetaStruc => dx:bp
+	lea     bp, RETC_SSMeta
+	call    SSMetaDoneWithCutCopy           ; we are done
+	pop     bp
+
+	mov	ax, MSG_GEN_APPLICATION_MARK_NOT_BUSY
+	call	UserCallApplication
+
+exit:
+	.leave
+	ret
+RolodexExportToClipboard	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		RolodexExportTransferItem
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Create a transfer item to be exported.
+
+CALLED BY:	UI (=MSG_ROLODEX_CREATE_EXPORT_TRANSFER_ITEM)
+
+PASS:		ss:bp - ptr to ImpexTranslationParams
+
+RETURN:		TransferItem VMChain updated in ImpexTranslationParams
+
+DESTROYED:	ax, bx, cx, dx, si, di, bp, es
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ted	5/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+RolodexExportTransferItem	proc	far
+	RETI_SSMeta	local	SSMetaStruc
+	mov	bx, bp
+	.enter
+	
+	class	RolodexClass
+
+	push	bx, bp
+	call	SaveCurRecord			; update if modified
+	pop	bx, bp
+
+	; initialize the stack frame for exporting
+
+	push	bx
+	mov	bx, ss:[bx].ITP_transferVMFile	; bx - VM file handle
+	mov	ds:[xferFileHandle], bx		; save it
+	push	bp
+	mov	dx, ss				; dx:bp - SSMetaStruc
+	lea	bp, RETI_SSMeta
+	clr	cx
+	clr	ax				; ax:cx - source ID
+	call	SSMetaInitForStorage	
+
+	; set the scrap size
+
+	mov	ax, ds:[gmb.GMB_numMainTab]		; ax - number of rows
+	mov	cx, GEODEX_NUM_FIELDS+NUM_PHONE_TYPE_FIELDS ; cx - number of columns
+	call	SSMetaSetScrapSize		; update the header block
+	pop	bp
+
+	; is the database file empty?
+
+	tst	ds:[gmb.GMB_numMainTab]
+	je	empty				; if empty, skip
+
+	mov	ds:[exportFlag], IE_FILE	; not a clipboard item
+	call	FileExport			; export the current file
+
+	; return TransferItem VMChain 
+empty:
+	pop	bx
+	mov	ax, RETI_SSMeta.SSMDAS_hdrBlkVMHan	
+	mov	ss:[bx].ITP_transferVMChain.high, ax
+	tst	ds:[gmb.GMB_numMainTab]
+	jne	skip				; if file empty, skip
+	mov	ss:[bx].ITP_transferVMChain.high, 0
+skip:
+	mov	ss:[bx].ITP_transferVMChain.low, 0
+
+	mov	ss:[bx].ITP_clipboardFormat, CIF_SPREADSHEET
+	mov	ss:[bx].ITP_manufacturerID, MANUFACTURER_ID_GEOWORKS
+
+	; Send notification back to ImportControl that we're done
+
+	push	bp
+	mov	bp, bx
+	call	ImpexImportExportCompleted
+	pop	bp
+
+	.leave
+	mov	bp, bx
+	ret
+RolodexExportTransferItem	endp
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		FileExport
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Export current file into meta file format.
+
+CALLED BY:	(INTERNAL) RolodexExportTransferItem
+
+PASS:		ds - segment address of dgroup
+
+RETURN:		nothing
+
+DESTROYED:	ax, cx, dx, si, di, es	
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ted	5/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+FileExport	proc	far	uses	bp, bx
+	FE_SSMeta	local	SSMetaStruc
+	.enter	inherit	near
+
+	push	ds:[curRecord]		; save current record handle
+	call	InitFieldSize		; initialize 'fieldSize' variable
+	clr	cx			; initialize the record counter
+	clr	dx			; offset into main handle table
+mainLoop:
+	mov	di, ds:[gmb.GMB_mainTable]	; di - handle of main table
+	call	DBLockNO
+	mov	di, es:[di]		; lock this block
+	add	di, dx
+	mov	di, es:[di].TE_item	; di - handle of record entry 
+	mov	ds:[curRecord], di	; save the record handle
+	call	DBUnlock		; unlock main table
+	call	ExportRecord		; export this record entry
+	jc	error			; exit if errror
+	add	dx, size TableEntry	; next entry
+	inc	cx
+	cmp	cx, ds:[gmb.GMB_numMainTab]	; continue if not done
+	jne	mainLoop
+
+	call	ExportFieldName		; export field names 
+	jmp	quit
+error:
+	call	MemAllocErrBox		; put up an error message
+quit:
+	pop	ds:[curRecord]		; restore current record handle
+
+	.leave
+	ret
+FileExport	endp
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		InitFieldSize
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Initialize 'fieldSize' variable.
+
+CALLED BY:	(GLOBAL) FileExport
+
+PASS:		ds - dgroup
+
+RETURN:		nothing
+
+DESTROYED:	nothing
+
+SIDE EFFECTS:	none
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	THK	11/92		Initial revision
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+void InitFieldSize (void)
+{
+	/*.enter
+
+	segmov	es, ds
+	mov	di, offset fieldSize	; es:di - fieldSize
+	clr	ax
+	mov	cx, GEODEX_NUM_FIELDS+NUM_PHONE_TYPE_FIELDS	
+
+	; cx - number of words to copy
+next:
+	stosw				; clear the variable
+	loop	next
+	.leave
+	ret
+InitFieldSize	endp  */
+ word		i;
+
+	for (i = 0; i < GEODEX_NUM_FIELDS + NUM_PHONE_TYPE_FIELDS; i++) {
+		g_fieldSize[i] = 0;
+		}
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ExportFieldName
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Create a field info block that contains field name and data
+		types, etc and write this block out to ssmeta file.
+
+CALLED BY:	(GLOBAL)
+
+PASS:		nothing
+
+RETURN:
+
+DESTROYED:
+
+SIDE EFFECTS:
+
+PSEUDO CODE/STRATEGY:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	THK	11/92		Initial revision
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+void ExportFieldName(SSMetaStruc *ssms)
+{
+ MemHandle			mh;
+ FieldInfoBlock	*fibPtr;
+ word					i;
+ char					*nameStr;
+ optr		name[] = {@DexListString1, @DexListString2, @DexListString3,
+						 @DexListString4, @DexListString5, @DexListString6,
+						 @DexListString7, @DexListString8, @DexListString9,
+						 @DexListString10, @DexListString11, @DexListString12,
+						 @DexListString13, @DexListString14, @DexListString15,
+						 @DexListString16, @DexListString17};
+
+
+	/*EFN_SSMeta	local	SSMetaStruc
+	.enter	inherit	near
+
+	; allocate a data block to store field info
+
+	mov	ax, size FieldInfoBlock		; ax - # of bytes to allocate
+	mov	cx, ALLOC_DYNAMIC_NO_ERR or (mask HAF_ZERO_INIT shl 8)
+	call	MemAlloc			; allocate a block */
+	mh = MemAlloc(sizeof(FieldInfoBlock), HF_SWAPABLE, HAF_LOCK | HAF_ZERO_INIT);
+
+	/*clr	dx				; dx - field number
+	push	bx				; save the handle
+	call	MemLock */
+	fibPtr = MemDeref(mh);
+
+	/*mov	es, ax
+	mov	es:[FIB_fieldType], FDT_GENERAL_TEXT	; text field */
+	fibPtr->fieldType = FDT_GENERAL_TEXT;
+
+/*mainLoop:*/
+	for (i = 0; i < GEODEX_NUM_FIELDS + NUM_PHONE_TYPE_FIELDS; i++)  {
+		/* lock the field info block
+
+		push	ds				; ds - dgroup
+		shl	dx, 1
+		mov	di, dx
+		mov	cx, ds:fieldSize[di]
+		mov	es:[FIB_fieldSize], cx		; cx - field data size */
+		fibPtr->fieldSize = g_fieldSize[i];
+
+		/* locate field name string
+
+		GetResourceHandleNS	TextResource, bx
+		call	MemLock				; lock the strings block */
+		MemLock (OptrToHandle(name[i]));
+		/*mov	ds, ax
+		mov	si, offset DexListArray		; *ds:si - DexListArray
+		mov	si, ds:[si]			; dereference it
+		add	si, dx				; ds:si - ptr to offset list
+		mov	si, ds:[si]
+		mov	si, ds:[si]			; ds:si - ptr to string */
+		nameStr = LMemDeref(name[i]);
+
+		/*ChunkSizePtr	ds, si, ax		; ax - size of lmem chunk
+		LocalPrevChar	dsax
+		mov	cx, ax				; cx - number of bytes to copy
+
+		; check to see if the field name is too long
+
+		cmp	cx, MAX_FIELD_NAME_LENGTH
+		jle	skip  */
+		if (strlen(nameStr) > MAX_FIELD_NAME_LENGTH)
+			/*mov	cx, MAX_FIELD_NAME_LENGTH	; if too long, truncate it */
+			nameStr[MAX_FIELD_NAME_LENGTH] = 0;
+
+	/*skip:
+		mov	di, offset FIB_fieldName	; es:di - destination
+		rep	movsb				; copy the string
+		LocalClrChar	ax
+		LocalPutChar	esdi, ax		; null terminate the string */
+		strcpy(fibPtr->fieldName, nameStr);
+
+		/*call	MemUnlock			; unlock TextResource block */
+		MemUnlock (OptrToHandle(name[i]));
+
+		/* initialize ssmeta stack frame
+
+		shr	dx, 1
+		mov	EFN_SSMeta.SSMDAS_dataArraySpecifier, DAS_FIELD
+		mov	EFN_SSMeta.SSMDAS_row, 0
+		mov	EFN_SSMeta.SSMDAS_col, dx	; dx - column number */
+		ssms->SSMDAS_dataArraySpecifier = DAS_FIELD;
+		ssms->SSMDAS_row = 0;
+		ssms->SSMDAS_col = i;
+
+		/* add this entry to DAS_FIELD data array
+
+		push	bp, dx
+		mov	cx, size FieldInfoBlock		; cx - # of bytes in the entry
+		segmov	ds, es				; ds:si - string to copy
+		clr	si
+		mov	al, SSMETA_ADD_TO_END		; al - SSMetaAddEntryFlags
+		mov	dx, ss				; dx:bp - SSMetaStruc
+		lea	bp, EFN_SSMeta
+		call	SSMetaDataArrayAddEntry		; add the new element */
+		SSMetaDataArrayAddEntry(ssms, SSMETA_ADD_TO_END, sizeof(FieldInfoBlock),
+		                        fibPtr);
+		/*pop	bp, dx
+		pop	ds				; ds - dgroup
+		inc	dx
+		cmp	dx, GEODEX_NUM_FIELDS+NUM_PHONE_TYPE_FIELDS	; are we done?
+		jne	mainLoop			; if not, continue */
+		}
+
+	/*pop	bx
+	call	MemFree				; free the block */
+   MemFree(mh);
+
+	/*.leave
+	ret
+ExportFieldName		endp */
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ExportRecord
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Create a record entry in database meta file format.
+
+CALLED BY:	FileExport
+
+PASS:		ds - segment address of dgroup
+		exportFlag - flag indicating whether or not
+			this is a clipboard item
+		cx - current record number
+	GOC:	SSMetaStruc	*ssms,
+			word			recNum
+
+RETURN:		carry set if there was an error
+	GOC:	Boolean - TRUE if error
+
+DESTROYED:	ax, si, di 
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ted	5/92		Initial version
+	owa	7/93		added phonetic/zip field
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+Boolean ExportRecord(SSMetaStruc	*ssms, word recNum)
+{
+ word			i, size, num;
+ DB_Record		*record;
+ char			*string;
+ Boolean		error = FALSE;
+ DBItem		notesItem;
+ PhoneEntry	*pePtr;
+
+
+	/*ER_SSMeta	local	SSMetaStruc
+	.enter	inherit	far
+
+	clr	dx				; field number counter
+mainLoop: */
+	for (i = 0; i < GEODEX_NUM_FIELDS + NUM_PHONE_TYPE_FIELDS; i++) {
+		record = DBLock(g_fileHandle, g_groupHandle, g_curRecord);
+		if (i == TEFI_LASTNAME) {
+			/* # of bytes to copy */
+			size = record->DBR_indexSize;
+			/* ptr to string to copy */
+			record++;
+			string = record;
+			}
+		else if (i == TEFI_ADDRESS) {
+			/* # of bytes to copy */
+			size = record->DBR_addrSize;
+			/* ptr to string to copy */
+			string = record;
+			string += record->DBR_toAddr;
+			}
+		else if (i == TEFI_NOTES) {
+			/* handle of notes block */
+			notesItem = record->DBR_notes;
+			if (!notesItem) {
+				size = 0;
+				}
+			else {
+				/* lock notes block */
+				string = DBLock(g_fileHandle, g_groupHandle, notesItem);
+				/* eliminate all carriage returns and count number of bytes */
+            size = LocalStringSize(string);
+				/*inc	cx				; add 1 for null char
+				jmp	writeField */
+				}
+			}
+
+		/*cmp	dx, TEFI_PHONE_NAME1		; phone field?
+		jb	doPhone				; if so, skip to handle it
+		jmp	doPhoneTypes			; if not, must be phone type */
+		else if (i < TEFI_PHONE_NAME1) {
+			/* it's a phone number
+			sub	dx, TEFI_PHONE1-1 */
+			num = i - TEFI_PHONE1;
+			/*cmp	dx, es:[si].DBR_noPhoneNo	; no more phone entry?
+			jge	blankField			; if none, create empty field */
+			if (num > record->DBR_noPhoneNo)
+				size = 0;
+			else {
+				/*add	si, es:[si].DBR_toPhone		; es:si - source string */
+				string = record;
+				string += record->DBR_toPhone;
+				/* get past first null entry */
+				pePtr = string;
+				size = pePtr->PE_length;
+				string += size;
+				string += sizeof(PhoneEntry);
+				while (num) {
+				/*phoneLoop:
+					tst	dx				; found the phone string
+					je	phoneFound			; if so, skip
+					add	si, es:[si].PE_length */
+					pePtr = string;
+					size = pePtr->PE_length;
+					string += size;
+					/*add	si, size PhoneEntry		; otherwise, advance to */
+					string += sizeof(PhoneEntry);
+					/*dec	dx */
+					num--;
+					/*jne	phoneLoop			; the next entry */
+					}
+
+			/*phoneFound:
+				mov	cx, es:[si].PE_length */
+				pePtr = string;
+				size = pePtr->PE_length;
+				/*add	si, size PhoneEntry		; es:si - ptr to string to copy */
+            string += sizeof(PhoneEntry);
+				/*jmp	writeField */
+            }
+			}
+
+		else {
+		/*doPhoneTypes:
+			sub	dx, TEFI_PHONE_NAME1-1  */
+			num = i - TEFI_PHONE_NAME1;
+			/*cmp	dx, es:[si].DBR_noPhoneNo	; no more phone	entries?
+			jge	blankField			; if none, create empty field */
+			if (num > record->DBR_noPhoneNo)
+				size = 0;
+			else {
+				/*add	si, es:[si].DBR_toPhone		; es:si - PhoneEntry */
+				string = record;
+				string += record->DBR_toPhone;
+				/* get past first null entry */
+				pePtr = string;
+				size = pePtr->PE_length;
+				string += size;
+				string += sizeof(PhoneEntry);
+				while (num) {
+				/*phoneTypeLoop:
+					tst	dx				; found the string
+					je	phoneTypeFound			; if so, skip
+					add	si, es:[si].PE_length */
+					pePtr = string;
+					size = pePtr->PE_length;
+					string += size;
+					/*add	si, size PhoneEntry		; next entry */
+					string += sizeof(PhoneEntry);
+					/*dec	dx */
+					num--;
+					/*jne	phoneTypeLoop */
+					}
+
+			/*phoneTypeFound:
+				pop	ax, bx				; get count
+				push	ax, bx				; save count
+				call	WritePhoneName			; create text field
+				jc	exit				; exit if error */
+				if (WritePhoneName(ssms, pePtr, recNum, i)) {
+					/* exit if error */
+					DBUnlock(record);
+					error = TRUE;
+					break;
+               }
+				/*jmp	blankField  */
+				size = 0;
+            }
+         }
+
+		
+		/* Append the text field to huge array. If blank, don't write */
+		if (size) {
+			if (WriteTextField(ssms, string, size, recNum, i)) {
+				/* exit if error */
+				DBUnlock(record);
+				if ((i == TEFI_NOTES) && notesItem) DBUnlock(string);
+				error = TRUE;
+				break;
+				}
+			}
+
+		/* unlock DB block */
+		DBUnlock(record);
+		if ((i == TEFI_NOTES) && notesItem)  DBUnlock(string);
+		} /* end of lop thru text fields for */
+
+	/*clc					; exit with no error
+	jmp	quit
+exit:
+	call	DBUnlock
+	pop	cx, dx				
+quit:
+	.leave
+	ret
+ExportRecord	endp  */
+	return(error);
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		WritePhoneName
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Gets the string to copy and calls WriteTextField
+		to write the phone name to the huge array.
+
+CALLED BY:	ExportRecord()
+
+PASS:		ds    - dgroup
+		es:si - Current PhoneEntry
+		ax    - row number
+		bx    - column number
+	GOC:	SSMetaStruc *ssms, PhoneEntry *pePtr, word row, word col
+
+RETURN:		nothing
+	GOC:	Boolean - TRUE if error
+
+DESTROYED:	ax, bx
+
+PSEUDO CODE/STRATEGY:
+
+	Get the type from the current PhoneEntry.
+	if not blank
+		lock the phoneTypeBlk
+		use type number to index into array
+		add the offset to the phone type text
+		get length of text
+		call WriteTextField
+	else write blank field
+		
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	grisco	8/ 2/94    	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+Boolean WritePhoneName(SSMetaStruc *ssms, PhoneEntry *pePtr, word row, word col)
+{
+ Boolean		error;
+ PhoneTypeNameItem	*phoneStruct;
+ char			*string;
+ word			start, size;
+
+
+	/*uses	cx,dx,si,di,bp,es
+	.enter
+	
+	clr	cx
+	mov	cl, es:[si].PE_type		; get the phone name type
+	jcxz	blankName			; if field name empty, skip */
+	if (!(pePtr->PE_type))  return(FALSE);
+
+	/* Lock the phoneTypeBlk and index into the type
+		of phone name text.
+
+	mov	di, ds:[gmb.GMB_phoneTypeBlk]
+	call	DBLockNO
+	mov	di, es:[di]			; beginning of phone table  */
+	phoneStruct = DBLock(g_fileHandle, g_groupHandle, g_gmb.GMB_phoneTypeBlk);
+
+	/*mov	si, di
+	shl	cx, 1				; word-size entries
+	add	si, cx				; index to offset
+	add	di, es:[si]			; es:di -> phone name text */
+	/* the second string in the struct is PTI_HOME (2) so we set our
+		starting point accordingly */
+	start = phoneStruct->PEI_offsets[pePtr->PE_type - 1];
+	string = phoneStruct;
+	string += start;
+
+	/* Write out the phone name to the huge array
+	;
+	call	LocalStringSize			; cx = bytes in string */
+	size = LocalStringSize(string);
+	/*mov	si, di				; es:si points to string
+	inc	cx				; for null char
+
+	call	WriteTextField			; create a text field */
+	error = WriteTextField(ssms, string, size, row, col);
+	/*call	DBUnlock			; unlock phone type blk */
+   DBUnlock(phoneStruct);
+
+/*blankName:
+	.leave
+	ret */
+	return(error);
+
+/*WritePhoneName	endp */
+
+}
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		ReplaceCarriageReturn
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Replace all CR's with space characters, in place.
+
+CALLED BY:	ExportRecord
+
+PASS:		es:si - ptr to string to scan
+
+RETURN:		cx - number of bytes in the string
+
+DESTROYED:	nothing
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ted	5/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+ReplaceCarriageReturn	proc	near	uses	si, ax
+	.enter
+	
+	clr	cx				; initialize the counter
+addrLoop:
+	LocalGetChar	ax, essi, noAdvance	; scan string for CR
+	LocalIsNull	ax			; end of string?
+	je	exit				; if so, done
+
+	LocalCmpChar	ax, C_CR		; carriage return?
+	je	replace				; if so, skip
+next:
+	LocalNextChar	essi			; if not, check the next char
+	inc	cx				; update the counter
+	jmp	addrLoop
+
+replace:
+SBCS <	mov	{char} es:[si], ' '		; replace CR with space	>
+DBCS <	mov	{wchar} es:[si], ' '		; replace CR with space	>
+	jmp	next				; check the next character
+
+exit:
+	inc	cx				; add one for null terminator
+DBCS<	shl	cx, 1				; cx - string size	>
+
+	.leave
+	ret
+ReplaceCarriageReturn	endp
+
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		WriteTextField
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Create a text element and append it to the huge array.
+
+CALLED BY:	ExportRecord
+
+PASS:		ds - segment address of dgroup
+		es:si - points to the string to copy
+		cx - number of bytes to copy (string size)
+		ax - row number
+		bx - column number
+	GOC:	char *string,
+			word	size,
+			word row, word col
+
+RETURN:		carry set if there was an error
+	GOC:	Boolean - TRUE if error
+
+DESTROYED:	ax, bx, cx, dx, si, di, bp
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ted	5/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+Boolean WriteTextField(SSMetaStruc	*ssms, char *string, word size, word row, word col)
+{
+ MemHandle		mh;
+ CellCommon		*cc;
+ char				*destStr;
+
+
+	/*WTF_SSMeta	local	SSMetaStruc
+	.enter	inherit near
+
+	mov	dl, ds:[exportFlag]
+
+	; update the size of text fields if necessary
+
+	push	bx
+	shl	bx, 1
+	cmp	cx, ds:fieldSize[bx]	; is this the biggest text field?
+	jle	skip			; if not, skip */
+	if (size > g_fieldSize[col])
+		/*mov	ds:fieldSize[bx], cx	; if so, update  */
+		g_fieldSize[col] = size;
+
+/*skip:
+	pop	bx
+
+	/* initialize ssmeta stack frame
+
+	mov	WTF_SSMeta.SSMDAS_dataArraySpecifier, DAS_CELL
+	mov	WTF_SSMeta.SSMDAS_row, ax
+	mov	WTF_SSMeta.SSMDAS_col, bx */
+	ssms->SSMDAS_dataArraySpecifier = DAS_CELL;
+	ssms->SSMDAS_row = row;
+	ssms->SSMDAS_col = col;
+
+	/* allocate a new data block
+
+	push	es, si				; es:si - ptr to source string
+	push	cx				; cx - number of bytes to copy
+	add	cx, size CellCommon		
+	mov	ax, cx				; ax - # of bytes to allocate
+	mov	cx, ALLOC_DYNAMIC_LOCK		; HeapAllocFlags | HeapFlags
+	call	MemAlloc			; allocate a block */
+	mh = MemAlloc(size + 1 + sizeof(CellCommon), HF_SWAPABLE, HAF_LOCK);
+	/*pop	cx
+	jc	exit				; exit if not enough memory */
+	if (!mh) return(TRUE);
+	/*mov	es, ax
+	clr	di				; es:di - destination */
+	cc = MemDeref(mh);
+
+	/* copy cell data and cell type into this data block
+
+	mov	es:[di].CC_type, CT_TEXT	; mark it as a text field */
+	cc->CC_type = CT_TEXT;
+	/*add	di, size CellCommon		; es:di - destination */
+	cc++;
+	destStr = cc;
+	/*pop	ds, si				; ds:si - source string
+	push	cx
+	rep	movsb				; copy the string */
+	strcpy(destStr, string);
+
+	/* We don't want to save CRs in CSV files
+
+	cmp	dl, IE_CLIPBOARD
+	je	noReplace */
+	if (g_exportFlag != IE_CLIPBOARD) {
+		/*mov	si, size CellCommon		; es:si - copied string
+		call	ReplaceCarriageReturn		; replace CRs with spaces */
+		}
+
+/*noReplace:
+	pop	cx
+
+	/* add this entry to the data array
+
+	push	bp
+	add	cx, size CellCommon		; cx - # of bytes in the entry
+	segmov	ds, es				; es:si - source string
+	clr	si
+	mov	al, SSMETA_ADD_TO_END		; al - SSMetaAddEntryFlags
+	mov	dx, ss				; dx:bp - SSMetaStruc
+	lea	bp, WTF_SSMeta 
+	call	SSMetaDataArrayAddEntry		; add the new element*/
+	SSMetaDataArrayAddEntry(ssms, SSMETA_ADD_TO_END,
+	                                size + sizeof(CellCommon), MemDeref(mh));
+
+	/*pop	bp
+	call	MemFree				; free the data block */
+	MemFree(mh);
+
+	/*clc					; exit with no error
+	jmp	quit
+exit:
+	pop	es, si
+quit:
+	.leave
+	ret   */
+   return(FALSE);
+
+/*WriteTextField		endp */
+
+}
+
+/*Impex	ends */
+

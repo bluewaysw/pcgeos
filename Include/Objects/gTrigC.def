@@ -1,0 +1,258 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Include/Objects
+FILE:		gTrigC.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	chris	1/92		Initial version
+
+DESCRIPTION:
+	Object definitions for GenTriggerClass.   
+
+	$Id: gTrigC.def,v 1.1 97/04/04 14:19:16 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__GTRIGC
+
+StartLibrary	ui
+		
+include ui.def
+
+
+GenTriggerClass	class	GenClass
+
+;------------------------------------------------------------------------------
+;	Methods
+;------------------------------------------------------------------------------
+
+MSG_GEN_TRIGGER_SEND_ACTION			message
+;
+; Causes a GenTrigger to send its message as if the user had clicked on it.
+; A flag can be passed to cause it to send its double-press message if  
+; ATTR_GEN_CUSTOM_DOUBLE_PRESS_ACTION exists in the object.
+;
+; Pass:		cl -- zero if we should send regular action, non-zero if trigger
+;		      should act as if double-pressed on.
+; Return: 	none
+;		ax, cx, dx, bp - destroyed
+
+MSG_GEN_TRIGGER_GET_ACTION_MSG		message
+;
+; Returns the current action message for the GenTrigger.
+;
+; Pass:		none
+; Return:	cx - message
+;		ax, dx, bp - destroyed
+
+
+MSG_GEN_TRIGGER_SET_ACTION_MSG		message
+;
+; Sets a new action message for the trigger.
+;
+; Pass:		cx - new message
+; Return: 	none
+;		ax, cx, dx, bp - destroyed
+
+MSG_GEN_TRIGGER_SET_DESTINATION		message
+;
+; Change the destination for the trigger.
+;
+; Context:	Can be used any time.
+; Source:	Anyone.  
+; Destination:	Any GenTrigger object.   
+; Interception:	Not normally intercepted.
+;
+; Pass:		^lcx:dx -- destination
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_TRIGGER_GET_DESTINATION		message
+;
+; Returns the current destination defined for this object.  
+;
+; Context:	Can by used at any time.
+; Source:	Anyone.  
+; Destination:	Any GenTrigger object.   
+; Interception:	Not normally intercepted.
+;
+; Pass:		nothing
+; Return:	^lcx:dx -- current destination 
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_TRIGGER_MAKE_DEFAULT_ACTION	message
+;
+; Sets this trigger as the temporary default trigger in the parent windowed
+; object.  The default trigger is activated on a default-action.
+;
+; Context:	Can be used at any time.
+; Source:	Anyone.
+; Destination:	Any GenTrigger object, results depend on parent windowed object.
+; Interception:	Not normally intercepted.
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+;------------------------------------------------------------------------------
+;	Hints
+;------------------------------------------------------------------------------
+
+HINT_TRIGGER_BRINGS_UP_WINDOW 		vardata
+	;If your trigger's action usually indirectly causes a GenInteraction
+	;to be activated, or a UserDoDialog to occur, you will want to include
+	;this hint.   Specific UI's that support some kind of graphic or text 
+	;to represent a button that leads to a window can do the appropriate 
+	;thing.
+
+;The following two hints are mutually exclusive. If neither is given, the
+;trigger will send MSG_GEN_TRIGGER_TRIGGER to itself by sending a method to the front
+;of the UI queue. This allows the menu to close before the MSG_GEN_TRIGGER_TRIGGER is
+;processed, but allows the trigger event to be synchronous, so no keyboard.
+;events can sneak in.
+
+ATTR_GEN_TRIGGER_IMMEDIATE_ACTION		vardata
+			;use this when placing a GenTrigger within a menu,
+			;and you need the trigger event to be sent immediately
+			;as the trigger is activated (meaning synchonously,
+			;before the menu is told to close. This is used for
+			;the PIN triggers in pinnable menus.)
+
+HINT_TRIGGER_UNUSED			vardata			
+
+;------------------------------------------------------------------------------
+;	Attributes stored in hints area
+;------------------------------------------------------------------------------
+
+ATTR_GEN_TRIGGER_ACTION_DATA			vardata	word
+		; Used to specify data to be delivered along with message when
+		; object is activated.  If data is <= 3 words, it is placed
+		; into registers in the following order:  cl, ch, dl, dh,
+		; bp low, bp high.  If > 3 words, the data is placed on the
+		; stack, & the message sent using MF_STACK.  This attribute 
+		; will NOT apply to a message defined in ATTR_GEN_CUSTOM_-
+		; DOUBLE_PRESS.
+		;
+		; Example usage:
+		; --------------
+		; RedTrigger = GenTrigger {
+		;	moniker = "Make GenView background red";
+		;	action = MSG_GEN_VIEW_SET_COLOR, MyView;
+                ;       hints = {
+                ;               ATTR_GEN_TRIGGER_ACTION_DATA {
+                ;                       byte    C_LIGHT_RED
+		;			WinColorFlags <0, 0, 0, ColorMapMode <1, CMT_CLOSEST>>
+                ;                       byte    0
+                ;                       byte    0
+		;	}
+                ; }
+
+
+ATTR_GEN_TRIGGER_INTERACTION_COMMAND	vardata	InteractionCommand
+	; This indicates that this GenTrigger is a interaction command trigger
+	; for the parent GenInteraction.  Takes a word of data that is the
+	; command type of the trigger.  The trigger can perform one of the
+	; standard interaction commands by using one of the pre-defined
+	; InteractionCommand types.
+	;
+	; If trigger ouput and message are null, the interaction command data
+	; word will be sent with MSG_GEN_GUP_INTERACTION_COMMAND to the trigger
+	; itself.  This will travel up the generic tree to the first non-
+	; GIT_ORGANIZATIONAL GenInteraction, where it will be handled.  So,
+	; leaving the output and message null are equivalent to setting the
+	; following:
+	;
+	;	GTI_destination = "TO_SELF";
+	;	GTI_actionMsg = MSG_GEN_GUP_INTERACTION_COMMAND;
+	;	ATTR_GEN_TRIGGER_ACTION_DATA = { data };
+	;
+	; where the data for ATTR_GEN_TRIGGER_ACTION_DATA is the same as the
+	; data for ATTR_GEN_TRIGGER_INTERACTION_COMMAND:
+	;
+	;	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = { data };
+	;
+	; For GenInteractions displayed with UserDoDialog, the
+	; ATTR_GEN_TRIGGER_INTERACTION_COMMAND has the effect of storing the
+	; return value of the trigger if that trigger is the response used to
+	; dismiss the dialog.
+	
+ATTR_GEN_TRIGGER_CUSTOM_DOUBLE_PRESS	vardata		word
+	;This attribute allows a special message to be sent out on double-
+	;presses in lieu of the actionMsg.  The parameters sent with the 
+	;specified message is the default data for an action:
+	; 
+	; Pass:		^lcx:dx -- the trigger
+	; Return:	nothing
+	;		ax, cx, dx, bp -- destroyed
+	;
+	;These are the parameters for a double-click message, regardless of any
+	;ATTR_GEN_TRIGGER_ACTION_DATA attribute that may be defined for the
+	;trigger.
+	;
+
+HINT_TRIGGER_UNUSED1			vardata
+HINT_TRIGGER_UNUSED2			vardata		;leave these!
+HINT_TRIGGER_UNUSED3			vardata
+HINT_TRIGGER_UNUSED4			vardata
+
+HINT_TRIGGER_DESTRUCTIVE_ACTION		vardata
+	;this indicates that the GenTrigger initiates a
+	;potentially destructive action, and so should never
+	;be used as a default in a window. A GenTrigger which
+	;has the FOCUS exclusive will be the default trigger
+	;if it DOES NOT have this hint.
+
+	.assert (HINT_TRIGGER_DESTRUCTIVE_ACTION eq \
+		 HINT_INTERACTION_CANNOT_BE_DEFAULT)
+
+
+HINT_TRIGGER_BLANK_STYLE_BUTTON			vardata
+HINT_TRIGGER_TOOL_STYLE_BUTTON			vardata
+HINT_TRIGGER_WINDOW_CONTROL_BUTTON		vardata
+HINT_TRIGGER_EDGE_STYLE_UPPER_RIGHT		vardata
+HINT_TRIGGER_EDGE_STYLE_LOWER_RIGHT		vardata
+HINT_TRIGGER_COMMAND_STYLE_BUTTON		vardata
+
+protominor TriggerRGB
+;
+; To specify full color of button interior.
+;
+ATTR_GEN_TRIGGER_RGB_COLOR			vardata ColorQuad
+protoreset
+
+;------------------------------------------------------------------------------
+;	Constants & Structures
+;------------------------------------------------------------------------------
+;------------------------------------------------------------------------------
+;	Instance data
+;------------------------------------------------------------------------------
+
+    ;IMPORTANT: if you add instance data, update GenTriggerCopyTree
+
+    GTI_destination	optr
+	    	; The destination for the action message.
+    
+    GTI_actionMsg	word
+ 	   	; The message to be sent out on when the trigger is pressed. 
+		; The arguments sent out with the message are as follows:
+		; 
+		; Pass:		^lcx:dx -- the trigger
+		; Return:	nothing
+		;		ax, cx, dx, bp -- destroyed
+		;
+		; These parameters can be modified by an ATTR_GEN_TRIGGER_-
+		; ACTION_DATA defined in the trigger.
+
+GenTriggerClass	endc
+
+		
+
+EndLibrary 	ui

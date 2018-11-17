@@ -1,0 +1,511 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Crossword
+MODULE:		HWR Module
+FILE:		cwordHWR.def
+
+AUTHOR:		Peter Trinh, May  4, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+	CallHWRLibrary		Makes a call into the HWR library.
+	HwrGetMatchCharIndex	Gets the value in TQBH_matchCharIndex.
+	HwrSetMatchCharIndex	Sets the value in TQBH_matchCharIndex.
+	HwrIncMatchCharIndex	Increments the value in TQBH_matchCharIndex.
+	HwrDisableCharRange	Disables a range of char in HWR Lib
+	HwrEnableCharRange	Enables a range of char in HWR lib
+	HwrDisableCharRangeImmed Same as HwrDisableCharRange but
+				 support immediate constants.
+	HwrEnableCharRangeImmed	Same as HwrDisableCharRange but
+			 	support immediate constants.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	5/ 4/94   	Initial revision
+
+
+DESCRIPTION:
+	This file contains constants, structures, and macros
+	definitions that are related to the HWR Module.
+		
+	$Id: cwordHWR.def,v 1.1 97/04/04 15:13:50 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+; Constants for minus sign criteria:
+
+; Allows a minus sign to have a slope of up to +.5 or -.5 exclusively.
+HWR_SLOPE_FACTOR	equ	2	
+
+; Minus signs have to be at lease 4 pixels wide.
+HWR_MIN_WIDTH		equ	4	
+
+; Minus signs can't be taller than 6 pixels.
+HWR_MAX_HEIGHT		equ	6	
+
+
+; Constant for period criteria:
+HWR_PERIOD_SIZE		equ	3
+
+
+; Used to see if the stroke bit is set.
+HWR_STROKE_MASK	equ	0x8000
+
+
+; Used for calling into the Palm HWR library, in order to get the
+; bounds of a character.
+HWRR_GET_BUFFER_PTRS	equ	0xf
+MAXMATCHESPERCHAR	equ	4
+
+
+; These are used for range checking on the passed parameters.
+; Theoretically, we can have up to 2K of TextInfo elements inside
+; the TextQueue, but that's very unlikely.  I arbitrarily chose 128,
+; which allows for 64 characters and 64 spaces between them.
+HWR_MIN_NUM_TEXT_INFO  equ  0
+HWR_MAX_NUM_TEXT_INFO  equ  128
+
+; This structure will be the form in which the recognized character
+; and its center point will be stored.
+TextInfo struct
+	TI_center	Point <>	; center of bound, in doc-coord
+	TI_character	word		; recognized character
+TextInfo ends
+
+
+TextQueueBlockHeader struct
+	TQBH_header	LMemBlockHeader <>
+	TQBH_textQueueHandle	lptr.ChunkArray	; chunk handle to
+						; array of TextInfo
+
+	TQBH_matchCharIndex	byte
+	; Temporary place holder to indicate which array element
+	; should be accessed this time.  This number is used
+	; to index into Palm's internal data structure in order to
+	; retrieve the bound.  Until the CHAR_GET_BOUND API is
+	; implemented, this is necessary:  For multiple characters
+	; entered, Palm has built out a list of possible character
+	; choices, designated the characters' bounds, and filled these
+	; and other informations in their internal data structure
+	; before calling our callback routine.  So a call to their
+	; GET_BUFFER_PTR gives us a pointer to an array of lists of
+	; character choices, thus the need for this field since our
+	; character callback routine is called for each list choice.
+	; WARNING: make sure to check count before appending new
+	; items.
+
+TextQueueBlockHeader ends
+
+
+
+; For now, these are necessary until Palm comes out with the needed
+; API.
+
+AbsRect	struct
+	AR_left		word
+	AR_top		word
+	AR_right	word
+	AR_bottom	word
+AbsRect	ends
+
+MatchChar	struct
+	MC_chValue	word
+	MC_certainty	byte
+	MC_reserved	byte
+MatchChar	ends
+
+MatchCharInfo	struct
+	MCI_numMatchesThisChar	word
+	MCI_chRect		AbsRect
+	MCI_firstStrokeThisChar	word
+	MCI_lastStrokeThisChar	word
+	MCI_reserved		word	2 dup(?)
+	MCI_ch			MatchChar	MAXMATCHESPERCHAR dup (?)
+MatchCharInfo	ends
+
+MatchText	struct
+	MT_maxTextChars		word
+	MT_numTextChars		word
+	MT_chInfo		MatchCharInfo
+MatchText	ends
+
+
+
+;------------------------------------------------------------------------------
+;		Macros
+;------------------------------------------------------------------------------
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		CallHWRLibrary
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Calls into the HWR library.  This macro will be called
+		very often.
+
+PASS:		pass parameters on the stack
+		entrynum	- message number
+		di		- HWR library handle
+
+DESTROYED:	ax, bx, cx, dx
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:	none
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	3/10/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+CallHWRLibrary	macro	entrynum
+	Assert	handle	di
+	mov	ax, entrynum
+	mov	bx, di
+	call	ProcGetLibraryEntry
+	call	ProcCallFixedOrMovable
+endm
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		CallHWRLibraryHandle
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Same as CallHWRLibrary except takes an additional
+		parameter which is the HWR library handle.
+
+PASS:		pass parameters on the stack
+		entrynum	- message number
+
+DESTROYED:	ax, bx, cx, dx
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:	none
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	8/ 2/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+CallHWRLibraryHandle		macro	hwrLibHandle, entrynum
+	mov	ax, entrynum
+
+ifdif <hwrLibHandle>, <bx>
+	mov	bx, hwrLibHandle
+endif
+
+	call	ProcGetLibraryEntry
+	call	ProcCallFixedOrMovable
+		endm
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		HwrGetMatchCharIndex
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Gets the current count, which will be used to
+		index into Palm's array of MatchTextInfo.
+
+PASS:		blockHandle	- word
+RETURN:		cx		- index
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	5/ 9/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+HwrGetMatchCharIndex		macro	blockHandle
+	push	ax,ds
+
+	Assert 	TextQueueBlock	blockHandle	; get handle
+	PreserveAndGetIntoReg	bx, blockHandle
+	call	MemLock
+
+	mov	ds, ax			; get locked segment
+	clr	cx			; faster than clr ch
+	mov	cl, ds:[TQBH_matchCharIndex]
+	Assert	urange	cx, HWR_MIN_NUM_TEXT_INFO, HWR_MAX_NUM_TEXT_INFO
+
+	call	MemUnlock
+	RestoreReg	bx, blockHandle
+	pop	ax,ds
+		endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		HwrSetMatchCharIndex
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Sets the current count, which will be used to index
+		into Palm's array of MatchTextInfo. 
+
+PASS:		blockHandle	- word
+		storageValue	- word, but will actually only store
+				  the low byte.
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	5/ 9/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+HwrSetMatchCharIndex		macro	blockHandle, storageValue
+	push	ax,ds
+
+	Assert	TextQueueBlock	blockHandle
+	PreserveAndGetIntoReg	bx, blockHandle
+	call	MemLock
+
+	mov	ds, ax			; get locked segment
+	mov	ax, storageValue
+	Assert	urange	ax, HWR_MIN_NUM_TEXT_INFO, HWR_MAX_NUM_TEXT_INFO
+	mov	ds:[TQBH_matchCharIndex], al
+
+	call	MemUnlock
+	RestoreReg
+	pop	ax,ds
+		endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		HwrIncMatchCharIndex
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Increments the current count, which will be used to
+		index into Palm's array of MatchTextInfo.
+
+PASS:		blockHandle	- word
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	5/ 9/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+HwrIncMatchCharIndex		macro	blockHandle, storageValue
+	push	ax,ds
+
+	Assert	TextQueueBlock	blockHandle
+	PreserveAndGetIntoReg	bx, blockHandle
+	call	MemLock
+
+	mov	ds, ax			; get locked segment
+
+EC <	mov	al, ds:[TQBH_matchCharIndex]			>
+EC <	inc	al						>
+	Assert	urange	al, HWR_MIN_NUM_TEXT_INFO, HWR_MAX_NUM_TEXT_INFO
+
+	inc	ds:[TQBH_matchCharIndex]
+
+	call	MemUnlock
+	RestoreReg	bx, blockHandle
+	pop	ax,ds
+		endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		HwrDisableCharRange
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Disables the given range, inclusively, in the HWR
+		library. 
+
+PASS:		hwrLibHandle	- handle to HWR library
+		first	- first character in range to disable (cant be immed)
+		last	- last character in range to disable (cant be immed)
+
+DESTROYED:	ax, bx, cx, dx
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:	none
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	5/10/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+HwrDisableCharRange		macro	hwrLibHandle, first, last
+
+	; Pushing parameters on the stack
+	push	first
+	push	last
+
+ifidn	<hwrLibHandle>, <di>
+	CallHWRLibrary	HWRR_DISABLE_CHAR_RANGE
+else
+	mov	bx, hwrLibHandle
+	Assert	handle	bx
+	mov	ax, HWRR_DISABLE_CHAR_RANGE
+	call	ProcGetLibraryEntry
+	call	ProcCallFixedOrMovable
+endif	
+		endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		HwrEnableCharRange
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Enables the given range, inclusively, in the HWR
+		library. 
+
+PASS:		hwrLibHandle	- handle to HWR library
+		first	- first character in range to enable (cant be immed)
+		last	- last character in range to enable (cant be immed)
+
+DESTROYED:	ax, bx, cx, dx
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:	none
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	5/10/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+HwrEnableCharRange		macro	hwrLibHandle, first, last
+
+	; Pushing parameters on the stack
+	push	first
+	push	last
+
+ifidn	<hwrLibHandle>, <di>
+	CallHWRLibrary	HWRR_ENABLE_CHAR_RANGE
+else
+	mov	bx, hwrLibHandle
+	Assert	handle	bx
+	mov	ax, HWRR_ENABLE_CHAR_RANGE
+	call	ProcGetLibraryEntry
+	call	ProcCallFixedOrMovable
+endif	
+		endm
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		HwrDisableCharRangeImmed
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Same as HwrDisableCharRange except will allow
+		immediate values for first and last.
+
+PASS:		hwrLibHandle	- handle to HWR library
+		first	- first character in range to disable
+		last	- last character in range to disable
+
+DESTROYED:	ax, bx, cx, dx
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:	none
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	8/ 2/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+HwrDisableCharRangeImmed	macro	hwrLibHandle, first, last
+
+	; Pushing parameters on the stack
+	mov	ax, first
+	push	ax
+	mov	ax, last
+	push	ax
+
+ifidn	<hwrLibHandle>, <di>
+	CallHWRLibrary	HWRR_DISABLE_CHAR_RANGE
+else
+	mov	bx, hwrLibHandle
+	Assert	handle	bx
+	mov	ax, HWRR_DISABLE_CHAR_RANGE
+	call	ProcGetLibraryEntry
+	call	ProcCallFixedOrMovable
+endif
+		endm
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		HwrEnableCharRangeImmed
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Same as HwrEnableCharRange except will support
+		immediate values for first and last
+
+PASS:		hwrLibHandle	- handle to HWR library
+		first	- first character in range to enable
+		last	- last character in range to enable
+
+DESTROYED:	ax, bx, cx, dx
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:	none
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	PT	8/ 2/94   	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+HwrEnableCharRangeImmed		macro	hwrLibHandle, first, last
+
+	; Pushing parameters on the stack
+	mov	ax, first
+	push	ax
+	mov	ax, last
+	push	ax
+
+ifidn	<hwrLibHandle>, <di>
+	CallHWRLibrary	HWRR_ENABLE_CHAR_RANGE
+else
+	mov	bx, hwrLibHandle
+	Assert	handle	bx
+	mov	ax, HWRR_ENABLE_CHAR_RANGE
+	call	ProcGetLibraryEntry
+	call	ProcCallFixedOrMovable
+endif
+		endm
+
+
+
+
+
+
+
+
+
+

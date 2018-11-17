@@ -1,0 +1,411 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	Navigation Library	
+MODULE:		Navigation Controller
+FILE:		navigate.goh
+
+AUTHOR:		Alvin Cham, Sep 29, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	AC	9/29/94   	Initial version.
+
+DESCRIPTION:
+	The header file for the Navigation controller.
+
+	$Id: navigate.goh,v 1.1 97/04/04 15:59:47 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@ifndef __NAVIGATE
+@define __NAVIGATE
+
+@deflib	navigate
+
+/* ***************************************************************************
+ *    Include files
+ * ***************************************************************************/
+@include <geos.h>
+
+/* ***************************************************************************
+ *    Defines + constants
+ * ***************************************************************************/
+#define	NAV_MAX_ENTRY_BUFFER_SIZE	80
+#define NAV_ENTRY_BUFFER_SIZE		(NAV_MAX_ENTRY_BUFFER_SIZE+2)
+
+typedef	char NavEntryName[NAV_ENTRY_BUFFER_SIZE];
+
+/* ***************************************************************************
+ *    Enums 
+ * ***************************************************************************/
+/* -------------------------------------------------------------------------
+ * NavigatePrevTriggerStateType specifies the state we want to set the 
+ * "previous page" trigger	
+ * -------------------------------------------------------------------------
+ */
+typedef	enum
+{
+	NPTST_ENABLE,		/* set it enable */
+	NPTST_DISABLE,		/* set it disable */
+} NavigatePrevTriggerStateType;
+
+/* -------------------------------------------------------------------------
+ * NavigateNextTriggerStateType specifies the state we want to set the 
+ * "next page" trigger	
+ * -------------------------------------------------------------------------
+ */
+typedef	enum
+{
+	NNTST_ENABLE,		/* set it enable */
+	NNTST_DISABLE,		/* set it disable */
+} NavigateNextTriggerStateType;
+
+/* ***************************************************************************
+ *    Structures
+ * ***************************************************************************/
+/* -------------------------------------------------------------------------
+ *	The info that the app needs to pass in for a history list entry
+ * -------------------------------------------------------------------------
+ */
+typedef struct {
+    ChunkHandle		NHLI_selector;
+    NavEntryName	NHLI_moniker;
+} NavigateHistoryListInfo;
+
+/* -------------------------------------------------------------------------
+ *    Notification purposes
+ * --------------------------------------------------------------------------
+ *    Description of data sent with GWNT_NAVIGATE_CONTEXT_CHANGE (send
+ *    to GAGCNLT_NOTIFY_NAVIGATE_CONTEXT_CHANGE)
+ */
+typedef WordFlags NotifyNavContextChangeFlags;		/* CHECKME */
+/* 10 bits unused */
+/* did the page triggers' state change? */
+#define	NNCCF_pageTriggerStateChanged	(0x0020)
+/*  does page have a prev page? */
+#define NNCCF_prevEnabled	(0x0010)
+/*  does page have a next page? */
+#define NNCCF_nextEnabled	(0x0008)
+/*
+ *  clear: don't update history
+ *  because NavControl already
+ *  knows about the change
+ */
+#define NNCCF_updateHistory	(0x0004)
+/*
+ *  set: NavControl doesn't need
+ *  to update history list,
+ *  because the history list is
+ *  restored from state
+ */
+#define NNCCF_retnWithState	(0x0002)
+/*  Set: main page is displayed */
+#define NNCCF_displayMain	(0x0001)
+
+/*
+ *  Notification structure sent when the currently displayed context
+ *  changes 
+ */
+typedef struct {		/* CHECKME */
+    NotifyNavContextChangeFlags	NNCC_flags;
+/*  context name to link to */
+    NavEntryName	NNCC_moniker;
+/*  selector chunk */
+    ChunkHandle NNCC_selector;
+/*  page number */
+    word	NNCC_page;
+/*
+ *  used to insure
+ *  uniqueness
+ */
+    word	NNCC_counter;
+} NotifyNavContextChange;
+
+/* ***************************************************************************
+ *    NavigateControlClass definitions
+ * ***************************************************************************/
+@class  NavigateControlClass, GenControlClass;
+
+/* ---------------------------------------------------------------------------
+ *    Messages
+ * --------------------------------------------------------------------------*/
+/*
+ *  Handler for displaying the page (text or menu) of a particular
+ *  history list entry
+ * 
+ *  Context:	Navigate history list, Navigate display
+ *  Source:	App UI
+ *  Destination:  Navigate control object
+ *  Interception: unlikely
+ * 
+ *  Pass:	cl = NavigateHistoryListType
+ * 			
+ *  Return:   	nothing
+ *  Destroyed:	nothing
+ */
+@message void MSG_NC_GOTO_HISTORY(byte position = cl); 
+
+/*
+ *  Handler for displaying the main page 
+ * 
+ *  Context:	Navigate display
+ *  Source:	App UI
+ *  Destination:  Navigatino control object
+ *  Interception: must be subclassed and it should handle the displaying
+ *    	    	of the main page
+ * 
+ *  Pass:	    	nothing
+ * 			
+ *  Return:   	nothing
+ *  Destroyed:	nothing
+ */
+@message void MSG_NC_GOTO_HOME_PAGE(); /* FIXME */
+
+/*
+ *  Handler for displaying the previous page 
+ * 
+ *  Context:	Navigate display 
+ *  Source:	App UI
+ *  Destination:  Navigate control object
+ *  Interception: must be subclassed and it should handle the displaying
+ *    	    	of the page.
+ * 
+ *  Pass:	    	nothing
+ * 			
+ *  Return:   	nothing
+ *  Destroyed:	nothing
+ */
+@message void MSG_NC_PREVIOUS_PAGE(); /* FIXME */
+
+/*
+ *  Handler for displaying the next page 
+ * 
+ *  Context:	Navigate display
+ *  Source:	App UI
+ *  Destination:  Navigate control object
+ *  Interception: must be subclassed and it should handle the displaying
+ *    	    	of the page.
+ * 
+ *  Pass:	    	nothing
+ * 			
+ *  Return:   	nothing
+ *  Destroyed:	nothing 
+ */
+@message void MSG_NC_NEXT_PAGE(); /* FIXME */
+
+/*
+ *  Go back to the previous entry in the history list 
+ * 
+ *  Context:	Navigate history list
+ *  Source:	App UI
+ *  Destination:  Navigate control object
+ *  Interception: unlikely to be subclassed
+ * 
+ *  Pass:    	nothing
+ * 			
+ *  Return:   	nothing
+ *  Destoryed:	nothing
+ */
+@message void MSG_NC_GO_BACK(); 
+
+/*
+ *  Go forward to the next entry in the history list 
+ * 
+ *  Context:	Navigate history list
+ *  Source:	App UI
+ *  Destination:  Navigate control object
+ *  Interception: unlikely to be subclassed
+ * 
+ *  Pass:	    	nothing
+ * 			
+ *  Return:   	nothing
+ *  Destoryed:	nothing
+ */
+@message void MSG_NC_GO_FORWARD(); 
+
+/*
+ *  Get the moniker in the history list entry
+ * 
+ *  Context:	Navigate history list
+ *  Source:	App UI
+ *  Destination:  Navigate control object
+ *  Interception: unlikely
+ * 
+ *  Pass:	    	^lcx:dx	    = the OD of list requesting
+ *    	    	bp  	    = the nth position of the list entry	
+ * 
+ *  Return:   	nothing
+ *  Destroyed:	nothing
+ */
+@message void MSG_NC_GET_HISTORY_LIST_MONIKER(optr list = cx:dx, 
+	word position = bp); 
+
+/*
+ *  Gets the handle of the block holding the lists so that it can
+ *  be saved to state when the application shuts down to DOS
+ * 
+ *  Context:	Navigation lists
+ *  Source:	Any object -- from application
+ *  Destination:  Navigate control object
+ *  Interception: unlikely
+ * 
+ *  Pass:	nothing
+ * 
+ *  Return:   	cx = block handle
+ *  Destroyed:	nothing
+ */
+@message MemHandle MSG_NC_GET_STATE_BLOCK() = cx; 
+
+/*
+ *  Free the list and reinitialize the go back index
+ * 
+ *  Context:	Navigate history list
+ *  Source:	Internal
+ *  Destination:  Navigate control object
+ *  Interception: none
+ * 
+ *  Pass:	    	nothing
+ * 			
+ *  Return:   	nothing
+ *  Destroyed:	nothing
+ */
+@message void MSG_NC_FREE_HISTORY_LIST(); 
+
+/*
+ *  Initialize the lists interaction in response to user activating
+ *  the history list or hotlist features or tools
+ * 
+ *  Context:	Navigate history list
+ *  Source:	Internal
+ *  Destination:  Navigate control object
+ *  Interception: none
+ * 
+ *  Pass:	    	nothing
+ * 			
+ *  Return:   	nothing
+ *  Destroyed:	nothing
+ */
+@message void MSG_NC_INIT_HISTORY_LIST(); 
+
+/*
+ *  Inserting a history list entry
+ * 
+ *  Context:	Navigate history list
+ *  Source:	App UI
+ *  Destination:  Navigate control object
+ *  Interception: none
+ * 
+ *  Pass:	a stack of information containing a history entry
+ * 			
+ *  Return:   	nothing
+ *  Destroyed:	nothing
+ */
+@message void MSG_NC_INSERT_ENTRY
+	(char *text = cx:dx, ChunkHandle selectorChunk = bp);
+
+/*
+ * Enabling/Disabling both the "prev page" and/or the "next page" trigger
+ *
+ * Context:	"Prev page" and "Next page" triggers
+ * Source:	Application
+ * Destination:	Navigate control object
+ * Interception:unlikely
+ */
+@message void MSG_NC_SET_PREV_NEXT_TRIGGERS_STATE
+	(NavigatePrevTriggerStateType prevState = cx,
+	 NavigateNextTriggerStateType nextState = dx);
+
+/* ---------------------------------------------------------------------------
+ *    Constants and structures
+ * --------------------------------------------------------------------------*/
+
+
+/* ***************************************************************************
+ *  features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+ *  ATTR_GEN_CONTROL_PROHIBIT_UI)
+ * 
+ *  NOTE: Feature and tool records must be identical
+ * 
+ *  The NavigateFeatureFlags record expects these flags to be in this
+ *  order.  If you change here, you must change NavigateFeatureFlags
+ *  as well.
+ *  
+ * ***************************************************************************/
+
+/* ---------------------------------------------------------------------------
+ *    Feature record
+ * --------------------------------------------------------------------------*/
+/* WARNING: if the following is a features record for a controller, 
+   it should be a typedef WordFlags instead. */
+typedef WordFlags NCFeatures;		/* CHECKME */
+/* 11 bits unused */
+/*  go to the main page */
+#define NCF_MAIN_PAGE	(0x0010)
+/*  prev/next page triggers */
+#define NCF_PREV_NEXT	(0x0008)
+/*  history list interaction */
+#define NCF_HISTORY	(0x0004)
+/*  go back one history list entry */
+#define NCF_BACK	(0x0002)
+/*  go forward one history list entry */
+#define NCF_FORWARD	(0x0001)
+
+/* ---------------------------------------------------------------------------
+ *    Tool box feature record
+ * --------------------------------------------------------------------------*/
+/* WARNING: if the following is a features record for a controller, 
+   it should be a typedef WordFlags instead. */
+typedef WordFlags NCToolBoxFeatures;		/* CHECKME */
+/* 11 bits unused */
+/*  go to the main page tool */
+#define NCTBF_MAIN_PAGE	(0x0010)
+/*  prev/next page tool */
+#define NCTBF_PREV_NEXT	(0x0008)
+/*  history list interaction tool */
+#define NCTBF_HISTORY	(0x0004)
+/*  go back one history list entry tool */
+#define NCTBF_BACK	(0x0002)
+/*  go forward one history list entry tool */
+#define NCTBF_FORWARD	(0x0001)
+
+/* ---------------------------------------------------------------------------
+ *    Default features for Navigate 
+ * --------------------------------------------------------------------------*/
+#define NC_DEFAULT_FEATURES	\
+(NCF_MAIN_PAGE | NCF_PREV_NEXT | NCF_HISTORY | NCF_BACK | NCF_FORWARD)
+/* ----------------------------------------------------------------------------
+ *    Default tool box features for Navigate
+ * --------------------------------------------------------------------------*/
+#define NC_DEFAULT_TOOLBOX_FEATURES	\
+(NCTBF_MAIN_PAGE | NCTBF_PREV_NEXT | NCTBF_HISTORY | NCTBF_BACK | NCTBF_FORWARD)
+/* ---------------------------------------------------------------------------
+ *    Internal vardata
+ * --------------------------------------------------------------------------*/
+@vardata	void		TEMP_NAVIGATION_DETACH_RECEIVED;
+
+/*
+ *  Internal only: If this exists, the controller has received
+ *  MSG_META_DETACH and will ignore any updates received after this
+ */
+
+/* ---------------------------------------------------------------------------
+ *    Instance data
+ * --------------------------------------------------------------------------*/
+
+    @instance	MemHandle	NCI_historyBlock = 0;
+
+    @instance	ChunkHandle	NCI_historyList = 0;
+
+    @instance	word		NCI_index = -1;
+
+@endc	/* NavigateControlClass */
+
+@endlib
+@endif

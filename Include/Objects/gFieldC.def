@@ -1,0 +1,632 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Include/Objects
+FILE:		gFieldC.def
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	brianc	5/92		Initial version
+
+DESCRIPTION:
+	Object definitions for GenFieldClass.   
+
+	$Id: gFieldC.def,v 1.1 97/04/04 14:18:37 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__GFIELDC
+
+StartLibrary	ui
+
+include ui.def
+
+GenFieldClass	class	GenClass
+
+;------------------------------------------------------------------------------
+;	Methods
+;------------------------------------------------------------------------------
+
+;----------------------------------------
+; SETUP
+;----------------------------------------
+
+MSG_GEN_FIELD_SET_VIS_PARENT			message
+;
+; Allows placing a field onto a screen other than the default.  This
+; must be called before the object is set usable.  It is accessed by the
+; specific UI during MSG_SPEC_BUILD of the field.
+;
+; Pass:		cx:dx	- OD of visible parent (screen) for this field)
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+
+;----------------------------------------
+; STATE SAVE/RESTORE
+;----------------------------------------
+
+MSG_GEN_FIELD_RESTORE_APPS			message
+;
+; Restores any detached apps (unless currently restoring them)
+;
+; Pass:		nothing	
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+MSG_GEN_FIELD_RESTORE_NEXT_APP			message
+;
+; Restores all application instances saved away as shut down in this
+; field.  May be called after ATTACHED & USABLE
+;
+; Pass:		cx - # app that is starting up
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+;
+;
+
+MSG_GEN_FIELD_RESTORE_APP			message
+;
+; Restores an application from the state file.
+;	
+; Pass:	 cx - # app that is starting up
+;	      dx - AppLaunchBlock for app to load up
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+
+MSG_GEN_FIELD_SHUTDOWN_APPS			message
+;
+; Shuts down all applications running in field, & stores their
+; name & state file name locally, so that they can be restored.  
+; MSG_META_ACK is sent back to the caller on completion of the shutdown.
+; The field MAY NOT BE SET NOT USABLE until this method has been called
+; & the ACK received.
+;
+; Pass:		cx	- caller's ID
+;		dx:bp	- caller's OD
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+;----------------------------------------
+; APPLICATION REGISTRATION ATTACH/DETACH INTERNALS
+;----------------------------------------
+
+MSG_GEN_FIELD_APP_STARTUP_NOTIFY		message
+;
+; Request for an application will be starting up and attaching to
+; the field.  Must be paired with MSG_GEN_FIELD_APP_STARTUP_DONE, unless
+; cx is returned non-zero, in which case MSG_GEN_FIELD_APP_STARTUP_DONE 
+; should not be sent.
+;
+; NOTE:  Early 2.0 versions required the following to be passed (If you are
+;	 dependent only on a version of the library dated before 5/14/93,
+;	 you will need to pass this info):
+;
+; 		dx - AppLaunchBlock being used to start app up  (Ref count
+;		     is *not* incremented for this reference, so don't
+;		     decrement.)
+;
+; Pass:		nothing
+; Return:	cx - 0 if it is OK to start up the application
+;		      	     non-0 if it is not OK (field is detaching or is not
+;		      	     attached)
+;		ax, dx, bp - destroyed
+
+MSG_GEN_FIELD_APP_STARTUP_DONE			message
+;
+; Notification that an application has started or has not been able to
+; attach.  Must be paired exactly with any successful
+; MSG_GEN_FIELD_APP_STARTUP_NOTIFY call (cx returned 0), or the field is
+; left thinking that some app somewhere is still attaching, & the system
+; busy cursor is left on.
+;
+; NOTE:  Early 2.0 versions required the following to be passed (If you are
+;	 dependent only on a version of the library dated before 5/14/93,
+;	 you will need to pass this info):
+;
+; 		cx	- geode, or 0 if couldn't be started
+;		dx 	- AppLaunchBlock (used only if null geode) Ref count
+;		     	  is *not* incremented for this reference, so don't
+;		     	  decrement.)
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+
+MSG_GEN_FIELD_ADD_GEN_APPLICATION		message
+;
+; Add a GenApplication object to the field.  Will add GenApplication
+; using upward-link only.  Will also add GenApplication optr to field's
+; GenApplication optr list (position specified by CompChildFlags).
+;
+; Pass:		^lcx:dx - optr of GenApplication object
+;		bp - CompChildFlags
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+MSG_GEN_FIELD_REMOVE_GEN_APPLICATION		message
+;
+; Remove a GenApplication object to the field.  Will remove GenApplication
+; optr from field's GenApplication optr list.
+;
+; Pass:		^lcx:dx - optr of GenApplication object
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+MSG_GEN_FIELD_MOVE_GEN_APPLICATION		message
+;
+; Move a GenApplication object within the field's GenApplication list
+; (position specified by CompChildFlags).
+;
+; Pass:		^lcx:dx - optr of GenApplication object
+;		bp - CompChildFlags
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+MSG_GEN_FIELD_ORDER_GEN_APPLICATION_LIST	message
+;
+; Called from GenField whenever its list of applications needs to be sorted
+; by window order, generally at SHUTDOWN time, so that the apps can be 
+; brought back up in the correct order when restarting.
+;
+; Source:	GenFieldClass object
+; Destination:	GenFieldClass object
+; Interception:	Intercepted by specific UI to perform the ordering of the
+;		application list (via MSG_GEN_FIELD_MOVE_GEN_APPLICATION)
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_GEN_FIELD_RESTORE_APP_ACK			message
+;
+; Notification that a process has/has not been restarted from a state
+; file.
+;
+;	 Pass:	cx - geode handle
+;		dx - error (0 if none, -1 if no statefile passed)
+;		bp - ID passed in ALB_userLoadAckID
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+MSG_GEN_FIELD_NO_APPS_RESTORED			message
+;
+; Notification that no processes have been restarted from the state file.
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+MSG_GEN_FIELD_ADD_APP_INSTANCE_REFERENCE	message	; private
+;
+; Adds app reference passed to the field's list of applications.
+;
+; Pass:		dx	- block holding AppInstanceReference structure
+; 			- 0 if app shouldn't be restored when field is
+;			  restored from state.
+;		bp	- handle of block containing app object
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_GEN_FIELD_ADD_APP_INSTANCE_REFERENCE_HOLDER	message	; private
+;
+; Adds a "place holder" app instance reference to the fields list of
+; apps.
+;
+; Pass:		bp	- handle of block containing app object
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_GEN_FIELD_PROCESS_EXIT			message
+;
+; Notification that a process has exited
+;
+; Pass:		cx - process handle
+; Return:	carry set if process found in this field
+;		ax, cx, dx, bp - destroyed
+
+;----------------------------------------
+; BACKGROUND BITMAP
+;----------------------------------------
+
+MSG_GEN_FIELD_RESET_BG				message
+;
+; Resets the background bitmap.
+;
+; Pass:	  	nothing
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_GEN_FIELD_ENABLE_BITMAP			message
+;
+; By default, fields do not have bitmaps on them. This method enables
+; the bitmap drawing.
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+
+;----------------------------------------
+; EXPRESS MENU
+;----------------------------------------
+
+MSG_GEN_FIELD_CREATE_EXPRESS_MENU		message
+;
+; Sent to field itself to cause creation of the express menu.
+; May be intercepted by an object subclassing GenField to provide a different
+; menu.
+;
+; Pass:		cx:dx	- Generic object to add menu to (usually the field)
+;		bp	- CompChildFlags to use
+; Return:	dx	- chunk handle of created menu
+;		cx, bp - destroyed
+;
+
+MSG_GEN_FIELD_CREATE_SPECIFIC_EXPRESS_SUBGROUP	message
+;
+; This must be processed by the specific UI to add any specific
+; menu item or subgroup to the workspace menu needed because of the uniqueness
+; of the specific UI.   Only called by environment subclassed GenField object,
+; when it is replacing the default Workspace menu.
+;
+; Pass:		cx:dx	- Generic object to add subgroup to
+;		bp	- CompChildFlags to use
+; Return:	dx	- chunk handle of created subgroup
+;		ax, cx, bp	- destroyed
+;
+
+;----------------------------------------
+; Internal Express Menu Messages
+; Added 5/ 5/94.   Redwood only.
+;----------------------------------------
+
+MSG_GEN_FIELD_DISABLE_EXPRESS_MENU		message
+MSG_GEN_FIELD_ENABLE_EXPRESS_MENU		message
+;
+; Used to disable and enable the express menu, to avoid various bad switching
+; app situations.
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_FIELD_UNUSED_3	message
+
+;----------------------------------------
+; UTILITY
+;----------------------------------------
+
+MSG_GEN_FIELD_UNUSED_4	message
+
+MSG_GEN_FIELD_EXIT_TO_DOS			message
+;
+; Request to exit system & go back to DOS.  Sent here so that Welcome's
+; professional room fields can intercept this, & shut down per Welcome's method
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_GEN_FIELD_EXIT_TO_DOS_CONFIRMATION_RESPONSE		message
+;
+; Internal message for Exit to DOS confirmation dialog.
+;
+
+MSG_GEN_FIELD_LOAD_DEFAULT_LAUNCHER		message
+;
+; Launch default launcher for this field.  Used internally.
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+MSG_GEN_FIELD_ABOUT_TO_CLOSE			message
+;
+; Sent by an environment application (like Welcome) to tell the field that
+; it is about to be closed.  If 'quitOnClose' is set in the field's .ini file
+; category, the GenField will attempt to quit all the applications running in
+; that field.  Otherwise, the GenField does nothing.  When all applications
+; are exited, MSG_META_FIELD_NOTIFY_NO_FOCUS will be sent to the field's
+; notification destination.  If one or more of the applications don't exit,
+; no such notification will be sent.
+;
+; Pass:		nothing
+; Return:	carry clear if GenField doesn't have 'quitOnClose' set and can
+;			be closed immediately
+;		carry set if 'quitOnClose' is set and field should not be
+;			closed until all apps are exited (whence
+;			MSG_META_FIELD_NOTIFY_NO_FOCUS will be sent)
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_GEN_FIELD_UNUSED_5			message
+
+MSG_GEN_FIELD_ABOUT_TO_DETACH_COMPLETE	message
+;
+; Internal message used during detach.
+;
+; Pass:		nothing
+; Return:	nothing
+
+MSG_GEN_FIELD_OPEN_WINDOW_LIST		message
+;
+; Sent by anyone who wants to bring up the window list dialog.
+; Used only by PM.
+;
+; Pass:		nothing
+; Return:	nothing
+;
+
+MSG_GEN_FIELD_GET_TOP_GEN_APPLICATION	message
+;
+; Get top (visually) GenApplication in field.
+;
+; Pass:		nothing
+; Return:	^lcx:dx = top GenApplication
+;
+
+MSG_GEN_FIELD_GET_LAUNCH_MODEL		message
+;
+; Retrieves launch model in use for field
+;
+; Pass:		nothing
+; Return:	ax - UILaunchModel
+;
+
+MSG_GEN_FIELD_SHUTDOWN_CONTROL_RESPONSE	message
+;
+; Internal message.  Do not use.
+;
+
+MSG_GEN_FIELD_ACTIVATE_UPDATE		message
+; Called on field after MSG_GEN_FIELD_ACTIVATE_INITIATE, to update the
+; field with what geode handle corresponds to the AppLaunchBlock passed
+; earlier.  "AppLaunchBlock" block must be same passed in
+; MSG_GEN_FIELD_ACTIVATE_INITIATE.  Fetches token icon to use, adds it to
+; box if it is still the current one displayed. Field must be able to
+; take this at any time & deal with it robustly.
+;
+; NOTE:  This message was named MSG_GEN_FIELD_STARTUP_UPDATE in early 2.0
+;	 versions (before 5/14/93)
+;
+; Pass:		cx - geode
+; Pass:		dx - AppLaunchBlock being used to start app up  (Ref count
+;		     is *not* incremented for this reference, so don't
+;		     decrement.)
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+MSG_GEN_FIELD_ACTIVATE_DISMISS		message
+; Sent once app is on-screen, for successful launches.  Used to take
+; activation box off screen in transparent launch mode.  Field must be
+; able to take this message at any time & deal with it robustly.
+;
+; NOTE:  This message was named MSG_GEN_FIELD_STARTUP_ON_SCREEN in early 2.0
+;	 versions (before 5/14/93)
+;
+; Pass:		cx	- geode, or 0 if unable to start up
+;		dx	- Used only if cx=0, AppLaunchBlock passed in to
+;			  MSG_GEN_FIELD_ACTIVATE_INITIATE
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+protominor UINewForZoomer
+
+MSG_GEN_FIELD_ACTIVATE_INITIATE		message
+;
+; Notification to the field that an app is "Activating" another app for
+; the user, either from being loaded, or because of transition from
+; engine to app mode.  Puts up activation dialog if in transparent launch
+; mode.  Call MSG_GEN_FIELD_ACTIVATE_UPDATE when the geode handle is known, and
+; MSG_GEN_FIELD_ACTIVATE_DISMISS to bring down the box, whether or not
+; MSG_GEN_FIELD_ACTIVATE_UPDATE was able to be called.
+;
+; NOTE:  This message was added 5/14/93
+;
+; Pass:		dx - AppLaunchBlock being used to start app up  (Ref count
+;		     is *not* incremented for this reference, so don't
+;		     decrement.)
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+
+MSG_GEN_FIELD_APP_NO_LONGER_EXITING	message
+;
+; Notification to the field that an app has aborted a quit.
+;
+; NOTE:  This message was added 5/20/93
+;
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+protoreset
+
+;----------------------------------------
+; HANDLING OF MESSAGES NOT DECLARED HERE
+;----------------------------------------
+
+;MSG_META_ENSURE_ACTIVE_FT			message
+;
+; Behavior as implemented in GenFieldClass:
+;
+; Checks to make sure that some geode within the field which the Focus & Target
+; exclusives.  Called from within the UI, usually when apps are closed, or
+; moved to the back, to give the Focus and/or Target to the most
+; suitable geode.  Typical click-to-type model is implemented using the
+; following rules:
+;
+;	Target:
+;		1) Object currently having target
+;		2) On field window:
+;			Top targetable window of LAYER_PRIO_STD priority
+;			(InputOD if is a GenField run by the UI, else
+;			InputObj of owning Geode)
+;		3) On field window:
+;			Top targetable window of LAYER_PRIO_ON_TOP priority
+;			(InputOD if is a GenField run by the UI, else
+;			InputObj of owning Geode)
+;		4) NULL
+;
+; 	Focus:
+;		1) Object currently having focus
+;		2) InputOD of field on which a current system modal geode sits
+;		3) Last non-modal object to have or request the exlusive
+;		4) Object having Target exclusive
+;		5) On field window:
+;			Top focusable window of LAYER_PRIO_STD priority
+;			(InputOD if is a GenField run by the UI, else
+;			InputObj of owning Geode)
+;		6) On field window:
+;			Top focusable window of LAYER_PRIO_ON_TOP priority
+;			(InputOD if is a GenField run by the UI, else
+;			InputObj of owning Geode)
+;		7) UI geode (?)
+;
+;
+;
+; Pass: 	Nothing
+; Return:	nothing
+; 		ax, cx, dx, bp - destroyed
+
+;------------------------------------------------------------------------------
+;	Hints
+;------------------------------------------------------------------------------
+
+TEMP_GEN_FIELD_LOADING_DEFAULT_LAUNCHER			vardata hptr
+;
+; Internal flag.  Do not set.
+;
+
+TEMP_GEN_FIELD_EXIT_TO_DOS_PENDING			vardata
+;
+; Internal flag.  Do not set.
+;
+
+TEMP_GEN_FIELD_DEFAULT_LAUNCHER_ID			vardata	GeodeToken
+;
+; Internal data.  Do not set.
+;
+
+ActivationData	struc
+	AD_dialog		optr
+	; On-screen "Activating..." dialog.
+
+	AD_appLaunchBlock	hptr
+	; Initial AppLaunchBlock - not used once geode is known
+	; (NOT a reference, i.e. MemRefCount is *not* incremented for
+	; this usage, so don't decrement later)
+
+	AD_geode		hptr
+	; Geode having a dialog put up for it
+
+	AD_savedBlankMoniker	lptr
+	; Saved blank moniker if not currently in use in the "Activating"
+	; dialog
+
+ActivationData	ends
+
+TEMP_GEN_FIELD_ACTIVATION_DIALOG		vardata ActivationData
+; Data needed to put up "activation" dialog for user while app is being
+; loaded.
+;
+; Internal flag.  Do not set.
+;
+
+TEMP_GEN_FIELD_OPEN_APP_ON_TOP				vardata
+;
+; Internal flag.  Do not set.
+;
+
+;------------------------------------------------------------------------------
+;	Constants & Structures
+;------------------------------------------------------------------------------
+
+GenFieldFlags	record
+	GFF_DETACHING:1
+	; Set if MSG_META_DETACH has been sent to this object.  Cleared
+	; when detach is complete.  (DO NOT SET IN .UI FILE, UNLESS YOU WANT
+	; ME TO PUNCH YOU IN THE BELLY -ATW)
+
+	GFF_LOAD_BITMAP:1
+	; Set if we want to draw a bitmap on this field
+
+	GFF_RESTORING_APPS:1
+	; Set if we are currently restoring applications
+
+	GFF_NEEDS_WORKSPACE_MENU:1
+	; Set if an application (express) menu is needed
+
+	GFF_HAS_DEFAULT_LAUNCHER:1
+	; Set if this field should start a default launcher.  Name is
+	; stored in .ini under key 'defaultLauncher' and category specified
+	; by ATTR_GEN_INIT_FILE_CATEGORY.
+
+	GFF_NEED_DEFAULT_LAUNCHER:1
+	; Set if the field detached because it had no focusable apps available,
+	; so we need to start the default launcher when we restore it.
+
+	GFF_QUIT_ON_CLOSE:1
+	; Set if the field is in the process of doing a 'quitOnClose'.
+
+	GFF_LOAD_DEFAULT_LAUNCHER_WHEN_NEXT_PROCESS_EXITS:1
+	; We tried to load the default launcher, but couldn't because the 
+	; system was too busy - wait until a process exits, then try again.
+
+GenFieldFlags	end
+
+;------------------------------------------------------------------------------
+;	Instance data
+;------------------------------------------------------------------------------
+
+	GFI_flags	GenFieldFlags
+	; Flags for Field object
+
+	GFI_visParent	optr
+	; Visible parent to place field on.  This is typically set just
+	; before setting field USABLE, although may be left null, in which
+	; case specific UI fills in.  This field is cleared out at MSG_META_DETACH
+	; & may not be saved to the state file.
+
+	GFI_numDetachedApps	byte
+	; # of application instances saved away in GFI_apps chunk
+
+	GFI_numRestartedApps	byte
+	; # of applications that actually got started up
+	
+	GFI_numAttachingApps	byte
+	; # of applications currently trying to attach to the application
+
+	GFI_apps	lptr.ChunkArrayHeader
+	; A chunkarray containing AppInstanceReference's, which are variable-
+	; sized when saved to state, owing to the saved disk data.
+
+	GFI_processes		lptr.hptr
+	; A chunk containing the process handles started under the field
+
+	GFI_genApplications	lptr.optr
+	GFI_numAppsToCheck	byte
+
+	GFI_notificationDestination	optr
+	; Destination to receive notification messages:
+	; 	MSG_META_FIELD_NOTIFY_DETACH,
+	; 	MSG_META_FIELD_NOTIFY_NO_FOCUS
+	;	MSG_META_FIELD_NOTIFY_START_LAUNCHER_ERROR
+
+	noreloc	GFI_flags, GFI_visParent
+
+GenFieldClass	endc
+
+EndLibrary	ui

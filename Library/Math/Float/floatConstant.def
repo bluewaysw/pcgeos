@@ -1,0 +1,252 @@
+
+COMMENT @-----------------------------------------------------------------------
+
+	Copyright (c) Berkeley Softworks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		floatConstant.def
+
+AUTHOR:		Cheng, 1/91
+
+ROUTINES:
+	Name			Description
+	----			-----------
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Cheng	1/91		Initial revision
+
+DESCRIPTION:
+		
+	$Id: floatConstant.def,v 1.1 97/04/05 01:23:11 newdeal Exp $
+
+-------------------------------------------------------------------------------@
+
+;-------------------------------------------------------------------------------
+; Constants
+;-------------------------------------------------------------------------------
+
+BIAS = 3fffh
+
+;
+; constants in math.def
+;
+; DECIMAL_PRECISION = 19
+; DECIMAL_EXPONENT_UPPER_LIMIT = 4932
+; DECIMAL_EXPONENT_LOWER_LIMIT = -4932
+;
+
+NUM_DEC_DIGITS_IN_32_BITS = 10
+
+DwordToAsciiFlags	record
+	DTAF_INCLUDE_LEADING_ZEROS:1,
+	DTAF_INCLUDE_LEADING_ZEROS_FIXED:1,
+	DTAF_NULL_TERMINATE:1,
+	DTAF_INCLUDE_COMMAS:1
+DwordToAsciiFlags	end
+
+
+FloatStatusWord		record
+	FSW_BUSY:1
+	FSW_CONDITION_CODE_3:1
+	FSW_STACK_TOP:3
+	FSW_CONDITION_CODE_2:1
+	FSW_CONDITION_CODE_1:1
+	FSW_CONDITION_CODE_0:1
+	FSW_EXCEPTION_SUMMARY:1
+	FSW_STACK_FAULT:1
+	FSW_PRECISION:1
+	FSW_UNDERFLOW:1
+	FSW_OVERFLOW:1
+	FSW_ZERO_DIVIDE:1
+	FSW_DENORMALIZED_OPERAND:1
+	FSW_INVALIDE_OPERATION:1
+FloatStatusWord		end
+
+;-------------------------------------------------------------------------------
+; Structures
+;-------------------------------------------------------------------------------
+
+;
+; The floating point stack is a block on the heap.  The block contains some
+; variables that keep track of the pointers starting at offset 0.  The stack
+; grows downward from the highest memory location toward the variables.
+;
+; stkTop <= stkBot
+; stkBot+1 = size of the block
+; size of block > size available for the fp stack (by virtue of the vars)
+;
+
+FloatStackVars	struct
+	FSV_topPtr	word    	; offset to top of fp stack
+        FSV_bottomPtr	word		; offset to bottom of fp stack
+	FSV_handle	hptr		; handle of this block
+	FSV_thread	hptr		; handle of thread owning this fp stack
+	FSV_stackType	FloatStackType	; type of stack (ie. GROW, WRAP, ERROR)
+	FSV_randomX	FloatNum	; current random number seed
+	FSV_status	FloatStatusWord	; status word for the thing
+	; THIS TEMP SPACE MUST BE THE LAST THING IN THIS HEADER, PLEASE
+	; DO NOT ADD ANYTHING BELOW IT, ABOVE IT IS FINE...
+	FSV_tempSpace	FloatNum 	; extra FPSIZE bytes used by many
+				 	; routines for terporary storage
+FloatStackVars	ends
+	
+TwoFloatNums	struct
+	F_mantissa2_wd0	word			; offset 0
+	F_mantissa2_wd1	word			; offset 2
+	F_mantissa2_wd2	word			; offset 4
+	F_mantissa2_wd3	word			; offset 6
+	F_exponent2	FloatExponent <>	; offset 8
+	F_mantissa1_wd0	word			; offset 0ah
+	F_mantissa1_wd1	word			; offset 0ch
+	F_mantissa1_wd2	word			; offset 0eh
+	F_mantissa1_wd3	word			; offset 10h
+	F_exponent1	FloatExponent <>	; offset 12h
+TwoFloatNums	ends
+
+;-------------------------------------------------------------------------------
+; Macros
+;-------------------------------------------------------------------------------
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		FloatGetSP_DSSI
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	macro to set up ds:si to point at the top element
+
+CALLED BY:	INTERNAL
+
+PASS:		ds = fp stack segment
+
+RETURN:		ds:si = top fp element
+
+DESTROYED	Nada.
+
+PSEUDOCODE/STRATEGY:	
+
+KNOWN BUGS/SIDEFFECTS/IDEAS:	
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	1/13/93		Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+FloatGetSP_DSSI	macro
+EC<	call	FloatCheckStack >
+	mov	si, ds:FSV_topPtr
+endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		FloatGetSP_ESDI
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	macro to get es:di = top of fpstack
+
+CALLED BY:	INTERNAL
+
+PASS:		ds = fp stack segment
+
+RETURN:		es:di = top element on fp stack
+
+DESTROYED	Nada.
+
+PSEUDOCODE/STRATEGY:	
+
+KNOWN BUGS/SIDEFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jimmy	1/13/93		Initial version.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+FloatGetSP_ESDI	macro
+EC<	call	FloatCheckStack >
+	segmov	es, ds
+	mov	di, ds:FSV_topPtr
+endm
+
+;-------------------------------------------------------------------------------
+; FatalErrors
+;-------------------------------------------------------------------------------
+
+FLOAT_TOO_MANY_CALLS_TO_INIT					enum FatalErrors
+; There is some object that is calling FloatInit() but not making a
+; corresponding call to FloatExit().
+
+FLOAT_TOO_MANY_CALLS_TO_EXIT					enum FatalErrors
+; There is some object that is calling FloatExit() but hasn't made a
+; corresponding call to FloatInit().
+;	-or-
+; The call to FloatExit() isn't happening in the same thread as the call
+; to FloatInit().
+
+FLOAT_INIT_SIZE_MUST_BE_MULTIPLE_OF_FLOAT_SIZE			enum FatalErrors
+; The stack size passed to FloatInit() must be a multiple of the size of a
+; FloatNum.
+
+FLOAT_INIT_SIZE_TOO_SMALL					enum FatalErrors
+; The stack size passed to FloatInit() must be at least FP_MIN_STACK_SIZE.
+
+FLOAT_INIT_HAS_NOT_BEEN_CALLED_FOR_THIS_THREAD			enum FatalErrors
+; Is this object in the same thread as you called FloatInit?  If you've called
+; FloatInit() in your OPEN_APPLICATION handler, then your calls to floating
+; point operations need to happen in your application thread, too.
+;	-or-
+; Have you called FloatInit()?  All floating point operations need an FP stack.
+
+FLOAT_BAD_STACK_SEGMENT			enum FatalErrors
+FLOAT_BAD_STACK_BOTTOM			enum FatalErrors
+FLOAT_BAD_STACK_TOP			enum FatalErrors
+FLOAT_BAD_FLAGS				enum FatalErrors
+FLOAT_BAD_ARGUMENT			enum FatalErrors
+FLOAT_WRONG_NUMBER_OF_ITEMS_ON_STACK	enum FatalErrors
+FLOAT_INSUFFICIENT_ARGUMENTS_ON_STACK	enum FatalErrors
+FLOAT_BAD_STACK_FRAME			enum FatalErrors
+
+;
+; Underflows are definitely fatal errors.  Overflows on the other hand
+; can generate stack size increases, but we'll fatal error for now.
+;
+FLOAT_STACK_UNDERFLOW			enum FatalErrors
+FLOAT_STACK_OVERFLOW			enum FatalErrors
+
+FLOAT_BAD_PTR				enum FatalErrors
+FLOAT_BAD_DECIMAL_EXPONENT		enum FatalErrors
+
+;
+; Errors generated by FloatFloatToAscii
+;
+FLOAT_BAD_SIGNIFICANT_DIGITS		enum FatalErrors
+FLOAT_BAD_DECIMAL_DIGITS		enum FatalErrors
+FLOAT_ASSERTION_FAILED			enum FatalErrors
+FLOAT_BAD_STACK_POINTER			enum FatalErrors
+FLOAT_BAD_HEADER			enum FatalErrors
+FLOAT_BAD_TRAILER			enum FatalErrors
+FLOAT_POSITIVE_NUMBER_EXPECTED		enum FatalErrors
+
+;
+; Date and time errors
+;
+FLOAT_BAD_DATE				enum FatalErrors
+FLOAT_BAD_TIME				enum FatalErrors
+FLOAT_BAD_DATE_PARAMS			enum FatalErrors
+FLOAT_BAD_TIME_PARAMS			enum FatalErrors
+
+;
+; Format errors
+;
+FORMAT_BAD_PRE_DEF_TOKEN		enum FatalErrors
+
+POINTER_SEGMENT_NOT_SAME_AS_STACK_FRAME	enum FatalErrors
+; This error occurs in a C stub when the caller passes a pointer
+; that should be in the current stack frame (which is done by declaring
+; a local variable in a C function then passing a pointer to the variable).

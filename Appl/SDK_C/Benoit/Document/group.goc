@@ -1,0 +1,97 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1993 -- All Rights Reserved
+
+PROJECT:	GEOS SDK Sample Application	
+MODULE:		Benoit (Mandelbrot Set Sample Application)
+FILE:		group.goc
+
+AUTHOR:		Tom Lester, Aug  4, 1993
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	TL	8/ 4/93   	Initial version.
+
+DESCRIPTION:
+	This file contains the DocumentUI resource which contains 
+	the BDocumentGroup object.
+
+	$Id: group.goc,v 1.1 97/04/04 16:39:45 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>			/* GEOS Standard Applications */
+@include <Document/bDocC.goh>		/* BDocumentClass definition */
+
+@define __BENOIT_DOC_GROUP_GOC		/* Don't over-define  */
+@include <benoit.goh>			/* Benoit Application */
+
+
+/*
+ *	Document Group
+ *
+ * The GenDocumentGroup should be put in a resource of its own run by
+ * the application thread. It is responsible for creating and administering
+ * the various GenDocument objects (one per document), coordinating its actions
+ * with the GenDocumentControl object.
+ */
+
+@start DocumentUI ;
+
+@object GenDocumentGroupClass BDocumentGroup = {
+    GDGI_untitledName = "Benoit Untitled"; /* Name for untitled documents */
+    GDGI_documentClass = &BDocumentClass;  /* Class for document objects */
+
+    /*
+     * In order to display multiple documents, we cannot have just a single
+     * view in which all the documents are displayed. Instead, each document
+     * is shown within its own GenDisplay, which contains a GenView for which
+     * the BDocument object becomes the content.
+     *
+     * After instantiating the BDocument object, the GenDocumentGroup will
+     * duplicate the resource containing BDisplay and add the display as
+     * a generic child of BDisplayGroup, then make the BDocument object be
+     * the content for the duplicated BView. In this way, the process of
+     * dealing with the GenDisplayControl et al is competely taken care of
+     * for you.
+     *
+     * NOTE: if you specify both GDGI_genDisplay and GDGI_genView, the GenView
+     * *must* lie in the same resource as the GenDisplay. The resource should
+     * contain only those objects required to display the document within the
+     * GenDisplay; do not attempt to make the same resource hold objects for
+     * some other purpose, as this will just waste memory.
+     */
+    GDGI_genDisplayGroup = BDisplayGroup;
+    GDGI_genDisplay = BDisplay;
+    GDGI_genView = BView;
+
+    /*
+     * Document protocol
+     */
+    GDGI_protocolMajor = DOCUMENT_PROTOCOL_MAJOR;
+    GDGI_protocolMinor = DOCUMENT_PROTOCOL_MINOR;
+
+    /*
+     * Pointer to the GenDocumentControl
+     */
+    GDGI_documentControl = BDocumentControl;
+
+    /*
+     *	This attribute allows the calculation thread to have blocks locked
+     *	while the document group's thread (the app thread) saves the VMFile.
+     *	Without this attribute, we would have to subclass some of the
+     *	MSG_GEN_DOCUMENT_PHYSICAL_* messages to pause the thread before
+     *	saving, and then to continue after a @callsuper().
+     */
+    ATTR_GEN_DOCUMENT_GROUP_ALLOW_MULTIPLE_WRITE_ACCESS;
+}
+
+@end DocumentUI;

@@ -1,0 +1,195 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		GeoCalc
+FILE:		geocalcDocument.def
+
+AUTHOR:		Gene Anderson, Feb 12, 1991
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	eca	2/12/91		Initial revision
+
+
+DESCRIPTION:
+	Definition for GeoCalcDocumentClass, a subclass of GenDocumentClass
+		
+	$Id: geocalcDocument.def,v 1.1 97/04/04 15:49:26 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+GeoCalcDocumentClass	class	GenDocumentClass
+	uses	VisContentClass
+
+;-----------------------------------------------------------------------------
+;		Messages
+;-----------------------------------------------------------------------------
+
+MSG_GEOCALC_DOCUMENT_SET_TARGET_BASED_ON_TOOL			message
+;
+; Set the target based on the current tool selected
+;	PASS:	nothing
+;	RETURN:	none
+;
+MSG_GEOCALC_DOCUMENT_CHANGE_PAGE_SETUP				message
+;
+; Change the page setup
+;	PASS:	none
+;	RETURN:	none
+;
+MSG_GEOCALC_DOCUMENT_SET_TARGET					message
+;
+; Set the target layer
+;	PASS:	cl - GeoCalcTargetLayer
+;	RETURN:	none
+;
+MSG_GEOCALC_DOCUMENT_GET_FLAGS					message
+;
+; Return GeoCalcDocumentFlags for the document
+;
+;	PASS:	none
+;	RETURN:	cl - GeoCalcDocumentFlags
+;
+
+
+MSG_GEOCALC_DOCUMENT_SPLIT_VIEWS				message
+;
+; Split the views, based upon the current selection
+;
+; PASS:		nothing
+; RETURN:	nothing
+; DESTROYED:	ax, cx, dx, bp
+;
+
+MSG_GEOCALC_DOCUMENT_SPLIT_FROM_MAP				message
+;
+; This message is called when the document is first opened, if there's
+; "split" information in the map block.
+;
+; PASS:		nothing
+; RETURN:	nothing
+; DESTROYED:	ax, cx, dx, bp
+;
+
+MSG_GEOCALC_DOCUMENT_UNSPLIT_VIEWS				message
+;
+; Unsplit the views
+;
+; PASS:		nothing
+; RETURN:	nothing
+; DESTROYED:	ax, cx, dx, bp
+;
+
+MSG_GEOCALC_DOCUMENT_DRAW_RANGE					message
+;
+; Draw an area of the document -- used for drawing "split views" stuff
+;
+; PASS:		cx, dx, bp - same as MSG_VIS_DRAW
+; RETURN: 	nothing
+; DESTROYED: 	ax, cx, dx, bp
+;
+
+
+MSG_GEOCALC_DOCUMENT_INVALIDATE_LOCKED_AREAS			message
+;
+; Invalidate the views used when in the split view mode, so they
+; redraw. Used to force grobjs in locked areas to redraw.
+;
+; PASS:		nothing
+; RETURN: 	nothing
+; DESTROYED: 	ax, cx, dx, bp
+
+
+
+;-----------------------------------------------------------------------------
+;		Constants
+;-----------------------------------------------------------------------------
+
+GEOCALC_DEFAULT_START_PAGE	equ	1
+GEOCALC_DEFAULT_PRINT_FLAGS	equ	mask SPF_PRINT_HEADER or \
+					mask SPF_PRINT_FOOTER or \
+					mask SPF_PRINT_ROW_COLUMN_TITLES or \
+					mask SPF_PRINT_GRID
+
+GeoCalcDocumentFlags	record
+    :6
+    GCDF_SPLIT:1		; Views are currently split
+    GCDF_IS_FOCUS:1		;TRUE: document is focus
+GeoCalcDocumentFlags	end
+
+if _SUPER_IMPEX
+GeoCalcDocumentFileType	etype word, 0, 2
+	GCDFT_CALC	enum	GeoCalcDocumentFileType
+	GCDFT_LOTUS123	enum	GeoCalcDocumentFileType
+	GCDFT_CSV	enum	GeoCalcDocumentFileType
+endif
+
+;-----------------------------------------------------------------------------
+;		Error constants
+;-----------------------------------------------------------------------------
+
+GRAPHIC_BODY_BLOCK_NOT_FOUND			enum FatalErrors  
+DS_SI_NOT_POINTING_TO_GRAPHIC_DOCUMENT_OBJECT	enum FatalErrors 
+
+;-----------------------------------------------------------------------------
+;		Structures
+;-----------------------------------------------------------------------------
+; The "split" information is maintained in the document so that it can
+; be saved across shutdowns.  The RD_top and RD_left fields contain
+; the upper left-hand corner of the top left window.  The RD_right and
+; RD_bottom fields determine the size of this window.  All coordinates
+; are document coordinates
+
+SplitViewInfo		struct
+    SVI_docOrigin	PointDWord
+    SVI_cornerSize	Point
+SplitViewInfo		ends
+
+GeoCalcMapFlags	record
+    GCMF_SPLIT:1
+    :15
+GeoCalcMapFlags	end
+
+;
+; DB map block for GeoCalc data file.  NOTE:  In different versions of
+; GeoCalc, this structure is different sizes.  In older versions, the
+; size is equal to the offset of CMB_oldSize, and the "reserved" bytes
+; are undefined.  In newer versions, the size is equal to
+; CalcMapBlock, and the reserved bytes are zero.
+;
+CalcMapBlock	struct
+    CMB_spreadsheetMap	word		; VM handle of spreadsheet map block
+    CMB_grObjBody	word		; VM handle of grobj body
+    CMB_pageSetup	CalcPageSetupData
+    CMB_reserved	byte 16 dup (?)
+    CMB_flags		GeoCalcMapFlags
+    CMB_splitInfo	SplitViewInfo
+CalcMapBlock	ends
+
+
+
+
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+	GCDI_spreadsheet	hptr	; handle of associated
+					; spreadsheet block
+
+    	GCDI_bounds		RectDWord	; document bounds.  Used
+					; during MSG_VIS_DRAW to draw
+					; "mystery gray area".
+	GCDI_flags		GeoCalcDocumentFlags
+					; NOTE: these flags are not saved
+					; as part of the document.
+
+if    _SUPER_IMPEX
+	GCDI_dosFileName	FileLongName
+endif
+
+GeoCalcDocumentClass	endc
+

@@ -1,0 +1,470 @@
+/*
+ **************************************************************************
+ *  FILE:		doc_mtds.goc
+ *  PROJECT:		Breadbox HomeBase
+ *  DESCRIPTION:	This file has methods for document management
+ *			
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include "hbase.goh"
+
+/*
+ ***************************************************************************
+ *		Code for HBaseProcessClass   document handling
+ ***************************************************************************
+ */
+
+  /* initialize things */
+  FileHandle  HBFile = NullHandle;
+
+  word  numRecords = 0;
+  word  numFields = MAX_FIELDS;
+  word  firstGroup = 99;
+  word  lastGroup = 99;
+  word  currentRecord = 0;
+  Boolean isMod = FALSE;
+
+
+  @extern object TRNumber;
+  @extern object CRNumber;
+  @extern object IndexDList;
+  @extern object FirstButton;
+  @extern object PrevButton;
+  @extern object NextButton;
+  @extern object LastButton;
+  @extern object NewButton;
+  @extern object EnterButton;
+  @extern object DeleteButton;
+  @extern object ModButton;
+  @extern object TextContent;
+  @extern object TextWindow;
+  @extern object ImpCanxTrigger;
+  @extern object RepCreate;
+
+  @extern chunk ModRecMsg;
+  @extern chunk f1Str;
+  @extern chunk f2Str;
+  @extern chunk f3Str;
+  @extern chunk f4Str;
+  @extern chunk f5Str;
+  @extern chunk f6Str;
+  @extern chunk f7Str;
+  @extern chunk f8Str;
+  @extern chunk f9Str;
+  @extern chunk f10Str;
+ @extern object Field1;
+ @extern object Field2;
+ @extern object Field3;
+ @extern object Field4;
+ @extern object Field5;
+ @extern object Field6;
+ @extern object Field7;
+ @extern object Field8;
+ @extern object Field9;
+ @extern object Field10; 
+
+  @extern visMoniker HBDocIconMonikerList;
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_PROCESS_OPEN_APPLICATION for HBaseProcessClass
+ *
+ * DESCRIPTION:	 does VLT initialization
+ *               AND BETA FOR BETA ONLY!!!!!
+ *
+ ***********************************************************************/
+@extern method HBaseProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+/*    VisContentInstance *vself;
+    VMFileHandle fileHan;
+
+*/
+    @callsuper();
+
+/*    if (!(attachFlags & AAF_RESTORING_FROM_STATE))  {
+
+       /* FOR THE VIS LARGE TEXT OBJECT */
+       /* Set up the geometry for the content so that the geometry manager
+        * is not used. */
+/*       MemLock (OptrToHandle(oself));  /* Swat wants this */
+/*       vself = ObjDerefVis(oself);
+       vself->VI_attrs &= ~VA_MANAGED;
+       vself->VI_optFlags &= ~(VOF_GEOMETRY_INVALID | VOF_GEO_UPDATE_PATH);
+       vself->VI_geoAttrs |= VCGA_CUSTOM_MANAGE_CHILDREN;
+       MemUnlock (OptrToHandle(oself));
+
+       /* Add the text object as a child of the content.  This must be done
+        * dynamically because the text object is a visual child, not a generic
+        * one. */
+/*       @call TextContent::MSG_VIS_ADD_CHILD(@TextWindow, CCO_FIRST);
+
+       /* Set up the text object to be large */
+/*       fileHan = ClipboardGetClipboardFile();
+       @call TextWindow::MSG_VIS_TEXT_SET_VM_FILE(fileHan);
+       @call TextWindow::MSG_VIS_LARGE_TEXT_CREATE_DATA_STRUCTURES();
+       @call TextWindow::MSG_VIS_NOTIFY_GEOMETRY_VALID();
+
+       /* mark it dirty so it will be saved to state */
+/*       ObjMarkDirty(@TextWindow);
+
+       }
+*/
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE for HBaseProcessClass
+ *              FileHandle  file
+ *
+ * DESCRIPTION:	Called to initialize a newly opened document.
+ *              
+ *
+ ***********************************************************************/
+@extern method HBaseProcessClass, MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE
+{
+    DBGroupAndItem	mapItem;
+    GroupStruct		*group;
+    DBMapStruct*	mapPtr;
+    DBItem		indexItem;
+    DBGroup		groupGroup;
+    VMMapStruct		*VMmapPtr;
+    MemHandle		mh;
+    VMBlockHandle	vmbh;
+    word		i;
+
+
+    /* Create an ungrouped item to use for map item */
+    mapItem = DBAllocUngrouped(file, sizeof(DBMapStruct));
+    /* Set the map item to our new item */
+    DBSetMapUngrouped(file, mapItem);
+    /* Now initialize the map item.  */
+    mapPtr = DBLockMap(file);
+    mapPtr->MS_numRecords = 0;
+    mapPtr->MS_firstGroup = 99;
+    mapPtr->MS_lastGroup = 99;
+    /* Mark the map item as dirty */
+    DBDirty(mapPtr);
+    DBUnlock(mapPtr);
+
+    /* increase the map item for the group array */
+    DBReAllocUngrouped(file, mapItem,
+		       sizeof(DBMapStruct) + (27 * sizeof(GroupStruct)));
+
+    /* initialize the groups in the map */
+    /* Lock the map */
+    mapPtr = DBLockMap(file);
+    /* Get the beginning of the array of group structures */
+    group = (GroupStruct *) (mapPtr + 1);
+
+
+    /* loop thru */
+    for (i = 0; i < 27; i++)  {
+       group[i].GS_group = 0;
+       group[i].GS_numGroupRecs = 0;
+       group[i].GS_indexStart = 0;
+       }
+
+    /* Mark the map item as dirty */
+    DBDirty(mapPtr);
+    DBUnlock(mapPtr);
+
+    /* now a VM Map Block for field names */
+    vmbh = VMAlloc(file, sizeof(VMMapStruct), 0);
+    VMSetMapBlock(file, vmbh);
+
+    VMmapPtr = VMLock(file, vmbh, &mh);
+
+    VMmapPtr->VMS_numFields = MAX_FIELDS;
+    MemLock (OptrToHandle(@f1Str));
+    strcpy(VMmapPtr->VMS_fn1, LMemDeref(@f1Str));
+    strcpy(VMmapPtr->VMS_fn2, LMemDeref(@f2Str));
+    strcpy(VMmapPtr->VMS_fn3, LMemDeref(@f3Str));
+    strcpy(VMmapPtr->VMS_fn4, LMemDeref(@f4Str));
+    strcpy(VMmapPtr->VMS_fn5, LMemDeref(@f5Str));
+    strcpy(VMmapPtr->VMS_fn6, LMemDeref(@f6Str));
+    strcpy(VMmapPtr->VMS_fn7, LMemDeref(@f7Str));
+    strcpy(VMmapPtr->VMS_fn8, LMemDeref(@f8Str));
+    strcpy(VMmapPtr->VMS_fn9, LMemDeref(@f9Str));
+    strcpy(VMmapPtr->VMS_fn10, LMemDeref(@f10Str));
+    MemUnlock (OptrToHandle(@f1Str));
+
+    VMDirty(mh);
+    VMUnlock(mh);
+
+    return(FALSE);
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT for HBaseProcessClass
+ *              FileHandle  file
+ *
+ * DESCRIPTION:	Put the doc file data into the right places.
+ *              
+ *
+ ***********************************************************************/
+@extern method HBaseProcessClass, MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT
+{
+    DBMapStruct        *mapPtr;
+    VMBlockHandle	vmbh;
+    VMMapStruct		*VMmapPtr;
+    MemHandle		mh;
+
+
+    /* assign our HBase file handle */
+    HBFile = file;
+
+    /* Just lock the map item */
+    mapPtr = (DBMapStruct *) DBLockMap(HBFile);
+
+    /* Get the number of records*/
+    numRecords = mapPtr->MS_numRecords;
+    firstGroup = mapPtr->MS_firstGroup;
+    lastGroup = mapPtr->MS_lastGroup;
+
+    DBUnlock(mapPtr);
+
+    /* get our VMmap block */
+    vmbh = VMGetMapBlock(HBFile);
+    VMmapPtr = (VMMapStruct *) VMLock(HBFile, vmbh, &mh);
+
+    /* and the number of fields*/
+    numFields = VMmapPtr->VMS_numFields;
+
+    VMUnlock(mh);
+
+    /* Show the fields */
+    @call process::MSG_DISPLAY_FIELDS(numFields);
+
+    /* Show the field names */
+    @call process::MSG_DISPLAY_NAMES();
+
+    /* show the number of records */
+    UpdateNumRecords();
+
+    /* en/disable the Reports menu */
+    if (numRecords == 0)  {
+       @send RepCreate::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+       }
+      else  {
+       @send RepCreate::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+       }
+
+    /* initialize the list */
+    @send IndexDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numRecords); 
+
+    /* Show first record data if it exists */
+    if (numRecords >= 1)  {
+       @call process::MSG_NAV_RECORDS(FIRST);
+       }
+
+    /* set the isMod flag */
+    isMod = FALSE;
+
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT for HBaseProcessClass
+ *
+ * DESCRIPTION:	Called when the app is shut down.
+ *              
+ *
+ ***********************************************************************/
+
+@extern method HBaseProcessClass, MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT
+{
+
+    HBFile = NullHandle;
+
+    /* reset globals in case another file is opened. */
+    numRecords = 0;
+    /*numFields = MAX_FIELDS;*/
+    firstGroup = 99;
+    lastGroup = 99;
+    currentRecord = 0;
+    isMod = FALSE;
+    SNChar = 0;
+    SNField = 1;
+    SNRecord = 0;  
+
+    /* and the display... */
+    ClearData();
+    UpdateNumRecords();
+    @call CRNumber::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+		    "-",
+		    VUM_DELAYED_VIA_APP_QUEUE);
+    @send IndexDList::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numRecords);
+    @send NextButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    @send LastButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    @send FirstButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    @send PrevButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    @send NewButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    @send DeleteButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    @send ModButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    @send EnterButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+    /* display the field names */
+    MemLock (OptrToHandle(@f1Str));
+    @call Field1::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+		    LMemDeref(@f1Str),
+		    VUM_DELAYED_VIA_APP_QUEUE);
+    if(numFields >= 2)
+       @call Field2::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+		    LMemDeref(@f2Str),
+		    VUM_DELAYED_VIA_APP_QUEUE);
+    if(numFields >= 3)
+       @call Field3::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+		    LMemDeref(@f3Str),
+		    VUM_DELAYED_VIA_APP_QUEUE);
+    if(numFields >= 4)
+       @call Field4::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+		    LMemDeref(@f4Str),
+		    VUM_DELAYED_VIA_APP_QUEUE);
+    if(numFields >= 5)
+       @call Field5::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+		    LMemDeref(@f5Str),
+		    VUM_DELAYED_VIA_APP_QUEUE);
+    if(numFields >= 6)
+       @call Field6::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+		    LMemDeref(@f6Str),
+		    VUM_DELAYED_VIA_APP_QUEUE);
+    if(numFields >= 7)
+       @call Field7::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+		    LMemDeref(@f7Str),
+		    VUM_DELAYED_VIA_APP_QUEUE);
+    if(numFields >= 8)
+       @call Field8::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+		    LMemDeref(@f8Str),
+		    VUM_DELAYED_VIA_APP_QUEUE);
+    if(numFields >= 9)
+       @call Field9::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+		    LMemDeref(@f9Str),
+		    VUM_DELAYED_VIA_APP_QUEUE);
+    if(numFields >= 10)
+       @call Field10::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(
+		    LMemDeref(@f10Str),
+		    VUM_DELAYED_VIA_APP_QUEUE);
+    MemUnlock (OptrToHandle(@f1Str));
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_META_DOC_OUTPUT_SAVE_AS_COMPLETED for HBaseProcessClass
+ *
+ * DESCRIPTION:	Called on Save As.
+ *             
+ *
+ ***********************************************************************/
+
+@extern method HBaseProcessClass, MSG_META_DOC_OUTPUT_SAVE_AS_COMPLETED
+{
+
+    HBFile = file;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_PROCESS_INSTALL_TOKEN for HBaseProcessClass
+ *
+ * DESCRIPTION:	Associates token with docs
+ *               
+ *              needs token.h include
+ ***********************************************************************/
+
+@extern method HBaseProcessClass, MSG_GEN_PROCESS_INSTALL_TOKEN
+{
+    dword	HBTokenChars;
+    TokenFlags	HBTokenFlags;
+
+    @callsuper();
+
+    HBTokenChars = TOKEN_CHARS('H', 'B', (dword) 'D', (dword) 'A');
+	
+    if (!TokenGetTokenInfo(HBTokenChars, 16431, &HBTokenFlags)) {
+
+       TokenDefineToken(HBTokenChars,
+		16431,
+		@HBDocIconMonikerList,
+		0);
+    }
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	AckDBox for HBaseProcessClass
+ *              (char* string1, optr ackMsg)
+ * CALLED BY:	
+ *      	
+ *
+ * STRATEGY:    returns user's Yes or No response
+ *		
+ *
+ ***********************************************************************/
+
+word AckDBox (char* string1, optr ackMsg)
+{
+    char*		msgString;
+
+
+    MemLock (OptrToHandle(@ModRecMsg));
+    msgString = LMemDeref(ackMsg);
+    /* put up an Are you sure box */
+    if ((UserStandardDialog((char*)0,
+			    (char*)0,
+			    (char*)0,
+			    string1,
+			    msgString,
+			    ((CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+			    (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))
+			    ) != IC_YES))  {
+       MemUnlock (OptrToHandle(@ModRecMsg));
+       return(ACK_NO);
+       }
+      else  {
+       MemUnlock (OptrToHandle(@ModRecMsg));
+       return(ACK_YES);
+       }
+
+}
+
+/***********************************************************************
+ *
+ * FUNCTION:	NotifyDBox for HBaseProcessClass
+ *              (optr notifyMsg)
+ * CALLED BY:	
+ *      	
+ *
+ * STRATEGY:    Puts up selected notification box
+ *		
+ *
+ ***********************************************************************/
+
+void NotifyDBox (optr notifyMsg)
+{
+    char*		msgString;
+
+
+    /* put up a notification box */
+    MemLock (OptrToHandle(@ModRecMsg));
+    msgString = LMemDeref(notifyMsg);
+    UserStandardDialog((char*)0,
+		       (char*)0,
+		       (char*)0,
+		       (char*)0,
+		       msgString,
+		       ((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+		       (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+    MemUnlock (OptrToHandle(@ModRecMsg));
+
+}

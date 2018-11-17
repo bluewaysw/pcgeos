@@ -1,0 +1,2621 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Designs in Light 2002 -- All Rights Reserved
+ *
+ * PROJECT:	  Mail
+ * MODULE:	  Mail
+ * FILE:	  uiMain.goc
+ *
+ * AUTHOR:  	  Gene Anderson
+ *
+ * DESCRIPTION:
+ *	UI for email app
+ *
+ ***********************************************************************/
+@include <stdapp.goh>
+@include <ui.goh>
+@include <Objects/gEditCC.goh>
+@include <Objects/Text/tCtrlC.goh>
+@include <Objects/vLTextC.goh>
+@include <spell.goh>
+@include <spool.goh>
+@include <product.goh>
+@include "mail.goh"
+@include "class.goh"
+@include "parentc.goh"
+@include <bbxmlib.goh>
+
+@start APPSCMONIKERRESOURCE, data;
+@include "Art/mkrMail.goh"
+@end APPSCMONIKERRESOURCE;
+@include "Art/mkrTinyMail.goh"
+
+@start APPMONIKERRESOURCE1, data;
+@include "Art/mkrComposeAttach.goh"
+@include "Art/mkrComposeSend.goh"
+@include "Art/mkrComposeSendLater.goh"
+@end APPMONIKERRESOURCE1;
+
+@start APPMONIKERRESOURCE2, data;
+@include "Art/mkrSendTool.goh"
+@include "Art/mkrReceiveTool.goh"
+@include "Art/mkrMainPrintTool.goh"
+@include "Art/mkrCreateNewMessageTool.goh"
+@include "Art/mkrReadMessageTool.goh"
+@include "Art/mkrEditMessageTool.goh"
+@end APPMONIKERRESOURCE2;
+
+@start APPMONIKERRESOURCE3, data;
+@include "Art/mkrMoveMessageTool.goh"
+@include "Art/mkrThrowAwayTool.goh"
+@include "Art/mkrRecoverTool.goh"
+
+@include "Art/mkrReadThrowAwayTool.goh"
+@include "Art/mkrReadRecoverTool.goh"
+
+@end APPMONIKERRESOURCE3;
+
+@start APPMONIKERRESOURCE4, data;
+@include "Art/mkrAddressTool.goh"
+@include "Art/mkrReplyTool.goh"
+@include "Art/mkrReplyAllTool.goh"
+@include "Art/mkrForwardTool.goh"
+@include "Art/mkrPreviousTool.goh"
+@include "Art/mkrNextTool.goh"
+@include "Art/mkrPrintTool.goh"
+@end APPMONIKERRESOURCE4;
+
+@start APPFOLDERICONS, data;
+@include "Art/mkrDraftsFolder.goh"
+@include "Art/mkrInboxFolder.goh"
+@include "Art/mkrOutboxFolder.goh"
+@include "Art/mkrSentFolder.goh"
+@include "Art/mkrTrashFolder.goh"
+@include "Art/mkrGenericFolder.goh"
+@include "Art/mkrUnreadNoAttach.goh"
+@include "Art/mkrReadNoAttach.goh"
+@include "Art/mkrUnreadAttach.goh"
+@include "Art/mkrReadAttach.goh"
+@end APPFOLDERICONS;
+
+
+@include "Art/mkrAttach.goh"
+
+
+@ifdef MAIL_STYLES_SUPPORT
+
+@start PointerData, data;
+
+@chunk byte linkPtr[] = {
+    16,
+    16,
+    0,
+    0,
+    0xe0, 0x0,
+    0xf8, 0x0,
+    0xfe, 0x0,
+    0x7f, 0x80,
+    0x7f, 0xff,
+    0x3f, 0xff,
+    0x3f, 0xff,
+    0x1f, 0xff,
+    0x1f, 0xff,
+    0xf, 0xff,
+    0xf, 0xff,
+    0x7, 0xff,
+    0x7, 0xff,
+    0x7, 0xff,
+    0x7, 0xff,
+    0x7, 0xff,
+
+    0xe0, 0x0,
+    0x98, 0x0,
+    0x86, 0x0,
+    0x41, 0x80,
+    0x40, 0x7f,
+    0x20, 0x1,
+    0x21, 0xfd,
+    0x11, 0x5,
+    0x11, 0xfd,
+    0x9, 0x5,
+    0x9, 0xfd,
+    0x5, 0x5,
+    0x5, 0xfd,
+    0x5, 0xfd,
+    0x4, 0x1,
+    0x7, 0xff
+};
+
+@end PointerData;
+
+@endif
+
+@start AppUI;
+
+@object MailAppClass MailAppObj = {
+        GI_visMoniker = list {
+	    @MailTextMoniker,
+	    @MailMoniker,
+	    @TinyMailTCMoniker
+	}
+	GI_comp =
+		@MailPrimary,
+@ifdef MANUAL_RECOVER
+	        @RecoverMessageDialog,
+@endif
+	        @ComposeMailWin,
+	        @ReadMailWin;
+	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_WINDOWS) =
+	        @MailPrimary,
+	        @ComposeMailWin,
+	        @ReadMailWin;
+	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) =
+	        @ComposeEditControl,
+	        @ComposeFindControl,
+@ifdef SPELL_CHECK
+	        @ComposeSpellControl,
+@endif
+	        @ComposeFontControl,
+	        @ComposePointsizeControl,
+	        @MailSearchControl,
+	        @ReadEditControl,
+	        @ReadFontControl,
+	        @ReadPointsizeControl,
+	        @MailPrintControl;
+	gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_STARTUP_LOAD_OPTIONS) =
+	        @MainShowToolbar,
+	        @ComposeShowToolbar,
+	        @ReadShowToolbar;
+	ATTR_GEN_APPLICATION_PRINT_CONTROL = @MailPrintControl;
+	ATTR_GEN_HELP_FILE = "mail";
+	ATTR_GEN_INIT_FILE_CATEGORY = "bbxmail";
+}
+
+@visMoniker MailTextMoniker = 
+	"Email";
+
+@end AppUI;
+
+@start PrimaryUI;
+
+@object GenPrimaryClass MailPrimary = {
+	GI_attrs = @default | GA_KBD_SEARCH_PATH;
+	GI_comp =
+	        @FileMenu,
+	        @FolderMenu,
+	        @MessageMenu,
+	        @SearchMenu,
+	        @ToolsMenu,
+	        @MailToolbar,
+	        @BottomArea,
+	        @SendReceiveDialog,
+	        @GetPasswordDB,
+			  @MailPrintControl,
+			  @PCRoot;
+
+	HINT_PRIMARY_FULL_SCREEN;
+	ATTR_GEN_HELP_CONTEXT = "TOC";
+}
+
+@object ParentalControlClass PCRoot = {
+}
+
+@object GenTextClass srSendReceiveStatusText = {
+        GI_visMoniker = "Status:";
+	GI_attrs = @default | GA_READ_ONLY;
+	GTXI_maxLength = 50;
+	GTXI_attrs = @default|GTA_SINGLE_LINE_TEXT;
+	HINT_PLACE_MONIKER_TO_LEFT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_DEFAULT_FOCUS;
+}
+
+@object GenTriggerClass srStopTrigger = {
+        GI_visMoniker = "Stop";
+	HINT_SEEK_REPLY_BAR;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = (IC_STOP);
+}
+
+@object GenValueClass srProgress = {
+  GI_attrs = @default | GA_READ_ONLY;
+  GVLI_value = 0;
+  GVLI_minimum = 0;
+  GVLI_maximum = MakeWWFixed(100);
+  GVLI_displayFormat = GVDF_PERCENTAGE;
+  HINT_PLACE_MONIKER_ABOVE;
+  HINT_VALUE_ORIENT_HORIZONTALLY;
+  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+  HINT_VALUE_ANALOG_DISPLAY;
+  HINT_VALUE_NO_DIGITAL_DISPLAY;
+  /*
+   * do not use HINT_VALUE_MERGE_ANALOG_AND_DIGITAL_DISPLAYS
+   * as the GenValue no longer displays the moniker
+   * The HINT_FIXED_SIZE is so the moniker doesn't draw over
+   * the progress bar...blech.
+   */
+  HINT_FIXED_SIZE = {0, SST_PIXELS|5};
+}
+
+@object GenTextClass srProgressText = {
+    GI_visMoniker = "Progress:";
+    GI_attrs = @default | GA_READ_ONLY;
+    ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+/*    HINT_FIXED_SIZE = {0, SST_LINES_OF_TEXT|1, 1}; */
+}
+
+@object MailSendReceiveClass SendReceiveDialog = {
+    GI_visMoniker = 'S', "Send and Receive";
+    GI_comp =
+        @srSendReceiveStatusText,
+        @srProgressText,
+        @srProgress,
+        @srStopTrigger;
+    GII_type = (GIT_PROGRESS);
+    GI_attrs =  @default & ~GA_SIGNAL_INTERACTION_COMPLETE;
+    GII_visibility = (GIV_DIALOG);
+    GII_attrs = (@default | GIA_NOT_USER_INITIATABLE | GIA_MODAL);
+    ATTR_GEN_HELP_CONTEXT = "dbSendReceive";
+    HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD = {
+	SWSS_RATIO|PCT_50,
+	SWSS_RATIO|PCT_10
+    };
+}
+
+@object GenInteractionClass FileMenu = {
+        GII_visibility = GIV_POPUP;
+	GI_attrs = @default | GA_KBD_SEARCH_PATH;
+        ATTR_GEN_INTERACTION_GROUP_TYPE = {GIGT_FILE_MENU};
+	GI_comp =
+	        @SendTrigger,
+	        @ReceiveTrigger,
+	        @EmptyTrashTrigger,
+	        @AddressBookTrigger,
+	        @PrintTrigger;
+}
+
+@object GenInteractionClass FolderMenu = {
+        GI_visMoniker = 'l', "Folder";
+        GII_visibility = GIV_POPUP;
+	GI_comp =
+	        @NewFolderDialog,
+	        @DeleteFolderTrigger,
+	        @RenameFolderDialog;
+}
+
+@object GenInteractionClass MessageMenu = {
+        GI_visMoniker = 'E', "Email";
+	GI_attrs = @default | GA_KBD_SEARCH_PATH;
+        GII_visibility = GIV_POPUP;
+	GI_comp =
+	        @CreateNewMessageTrigger,
+	        @ReadMessageTrigger,
+	        @EditMessageTrigger,
+	        @MoveMessageTrigger,
+	        @MoveMessageDialog,
+	        @ThrowAwayTrigger,
+	        @RecoverTrigger,
+	        @SortByGroup;
+}
+
+@object GenInteractionClass SearchMenu = {
+    GI_visMoniker = 'S', "Search";
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GII_visibility = GIV_POPUP;
+    GI_comp =
+        @MailSearchControl,
+        @FindAgainTrigger;
+}
+
+@object GenInteractionClass ToolsMenu = {
+    GII_visibility = GIV_POPUP;
+	 GI_visMoniker = 'O', "Options";
+    GI_comp =
+		  @MainShowToolbar,
+		  @SelAddrBookDialog,
+        @PfAccountsDialog;
+}
+
+@end PrimaryUI;
+
+/*------------------------------------------------------------------------*/
+
+@start ToolUI;
+
+@object GenInteractionClass MailToolbar = {
+        GI_comp =
+	        @SendTool,
+	        @ReceiveTool,
+		@CreateNewMessageTool,
+		@ReadMessageTool,
+	        @EditMessageTool,
+		@MoveMessageTool,
+	        @PrintTool,
+		@ThrowAwayTool,
+	        @RecoverTool;
+	HINT_TOOLBOX;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass PrintTool = {
+	GI_visMoniker = @list {
+	    @mainPrintToolMoniker
+	};
+	GTI_actionMsg = MSG_PRINT_CONTROL_INITIATE_PRINT;
+	GTI_destination = @MailPrintControl;
+	ATTR_GEN_FOCUS_HELP = @MainPrintEnabledBHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @MainPrintDisabledBHelp;
+}
+@chunk char MainPrintEnabledBHelp[] = "Print the selected message(s)";
+@chunk char MainPrintDisabledBHelp[] = "Nothing selected to Print";
+
+
+@object GenTriggerClass SendTool = {
+    GI_visMoniker = @list {
+	@sendToolMoniker
+    };
+    GTI_actionMsg = MSG_MSR_SEND_MESSAGES;
+    GTI_destination = @SendReceiveDialog;
+	ATTR_GEN_FOCUS_HELP = @SendEnabledBHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @SendDisabledBHelp;
+}
+@chunk char SendEnabledBHelp[] = "Send the selected message(s)";
+@chunk char SendDisabledBHelp[] = "Nothing selected to Send";
+
+@object GenTriggerClass ReceiveTool = {
+    GI_visMoniker = @list {
+	@receiveToolMoniker
+    };
+    GTI_actionMsg = MSG_MSR_RECEIVE_MESSAGES;
+    GTI_destination = @SendReceiveDialog;
+	ATTR_GEN_FOCUS_HELP = @ReceiveEnabledBHelp;
+}
+@chunk char ReceiveEnabledBHelp[] = "Check the server for email";
+
+@object GenTriggerClass CreateNewMessageTool = {
+	GI_visMoniker = @list {
+	    @createNewMessageToolMoniker
+	};
+	GTI_actionMsg = MSG_MAIL_COMPOSER_NEW_MESSAGE;
+	GTI_destination = @ComposeMailWin;
+	ATTR_GEN_FOCUS_HELP = @CreateNewEnabledBHelp;
+}
+@chunk char CreateNewEnabledBHelp[] = "Write a new email";
+
+@object GenTriggerClass ReadMessageTool = {
+        GI_visMoniker = @list {
+	    @readMessageToolMoniker
+	}
+	GTI_actionMsg = MSG_MAIL_LIST_READ_MESSAGE;
+	GTI_destination = @TheMessageList;
+	ATTR_GEN_FOCUS_HELP = @ReadEnabledBHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @ReadDisabledBHelp;
+}
+@chunk char ReadEnabledBHelp[] = "Read the selected message";
+@chunk char ReadDisabledBHelp[] = "Nothing selected to Read";
+
+@object GenTriggerClass EditMessageTool = {
+        GI_states = @default & ~GS_USABLE;
+        GI_visMoniker = @list {
+	    @editMessageToolMoniker
+	}
+	GTI_actionMsg = MSG_MAIL_LIST_EDIT_MESSAGE;
+	GTI_destination = @TheMessageList;
+	ATTR_GEN_FOCUS_HELP = @EditEnabledBHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @EditDisabledBHelp;
+}
+@chunk char EditEnabledBHelp[] = "Edit the selected message";
+@chunk char EditDisabledBHelp[] = "Nothing selected to Edit";
+
+@object GenTriggerClass MoveMessageTool = {
+	GI_visMoniker = @list {
+	    @moveMessageToolMoniker
+	};
+	GTI_actionMsg = MSG_FOLDER_MOVE_DIALOG_INIT;
+	GTI_destination = @MoveMessageDialog;
+	ATTR_GEN_FOCUS_HELP = @MoveEnabledBHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @MoveDisabledBHelp;
+}
+@chunk char MoveEnabledBHelp[] = "Move the selected message";
+@chunk char MoveDisabledBHelp[] = "Nothing selected to Move or no folders to Move to";
+
+
+@object GenTriggerClass ThrowAwayTool = {
+	GI_visMoniker = @list {
+	    @throwAwayToolMoniker
+	}
+	GTI_actionMsg = MSG_MAIL_LIST_DELETE_MESSAGE;
+	GTI_destination = @TheMessageList;
+	ATTR_GEN_FOCUS_HELP = @ThrowAwayEnabledBHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @ThrowAwayDisabledBHelp;
+}
+@chunk char ThrowAwayEnabledBHelp[] = "Discard the selected message(s)";
+@chunk char ThrowAwayDisabledBHelp[] = "Nothing selected to Discard";
+
+@object GenTriggerClass RecoverTool = {
+	GI_visMoniker = @list {
+	    @recoverToolMoniker
+	}
+	GTI_actionMsg = MSG_MAIL_LIST_RECOVER_MESSAGE;
+	GTI_destination = @TheMessageList;
+	ATTR_GEN_FOCUS_HELP = @RecoverEnabledBHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @RecoverDisabledBHelp;
+}
+@chunk char RecoverEnabledBHelp[] = "Recover the selected message(s)";
+@chunk char RecoverDisabledBHelp[] = "Nothing selected to REcover";
+
+@end ToolUI;
+
+@start PrimaryUI;
+
+@object GenInteractionClass BottomArea = {
+	 GI_comp = @MainAccountsList, @FolderMessageArea;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_MINIMIZE_CHILD_SPACING;
+}
+
+/* jfh - mess with tabs */
+@object GenItemGroupClass MainAccountsList = {
+	 /* we'll add the GenItems dynamically - template at the end
+	  * of this resource */
+	GIGI_destination = @PfAccountList;
+	GIGI_applyMsg = MSG_ACCOUNT_LIST_TAB_APPLY;
+	HINT_ITEM_GROUP_TAB_STYLE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+/* for the tab stuff we'd normally have  a separate child in here
+ * for each tab, but since it's already set up to change the stuff
+ * in the MailAccountArea GenInter then we can get away with just the one
+ */
+@object GenInteractionClass FolderMessageArea = {
+	 GI_comp = @MailAccountArea;
+	 HINT_RAISED_FRAME = { GRFI_LEFT | GRFI_RIGHT | GRFI_BOTTOM };
+	 HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+
+@object GenInteractionClass MailAccountArea = {
+    GI_comp =
+        @FolderArea,
+        @MessageArea;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+/*------------------------------------------------------------------------*/
+
+
+@object GenInteractionClass FolderArea = {
+    GI_comp =
+        @TheFolderList;
+
+    HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS|FILE_LONGNAME_LENGTH};
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY;
+    HINT_MAXIMUM_SIZE = {SST_PCT_OF_FIELD_WIDTH|PCT_20+0x8};
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+/*------------------------------------------------------------------------*/
+
+@object GenInteractionClass MessageArea = {
+    GI_comp =
+        @SortByButtonGroup,
+		  @TheMessageList;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_MINIMIZE_CHILD_SPACING;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object MailListHeaderClass SortByButtonGroup = {
+    GI_comp =
+	@SortByStatusSpacer,
+	@SortBySenderButton,
+	@SortBySubjectButton,
+	@SortByDateButton;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_CUSTOM_CHILD_SPACING = {SST_PIXELS|0};
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_TOOLBOX;
+}
+
+@object GenGlyphClass SortByStatusSpacer = {
+    HINT_FIXED_SIZE = {
+	SST_PIXELS | MESSAGE_OFFSET_X+3,
+	SST_PIXELS | 10
+    };
+}
+
+@visMoniker senderMkr = " Sender";
+@localize {"text for sender/subject/date headers  Please keep the leading space"};
+
+@visMoniker recipientMkr = " Recipient";
+@localize {"text for recipient/subject/date headers  Please keep the leading space"};
+
+@object GenTriggerClass SortBySenderButton = {
+    GI_visMoniker = " ";
+	 GTI_destination = @TheMessageList;
+    GTI_actionMsg = MSG_MAIL_LIST_SET_SORT_ORDER;
+    ATTR_GEN_TRIGGER_ACTION_DATA = { SMBT_SENDER };
+}
+
+@object GenTriggerClass SortBySubjectButton = {
+	 GI_visMoniker = " Subject";
+	 @localize {"text for recipient/subject/date headers  Please keep the leading space"};
+	 GTI_destination = @TheMessageList;
+    GTI_actionMsg = MSG_MAIL_LIST_SET_SORT_ORDER;
+    ATTR_GEN_TRIGGER_ACTION_DATA = { SMBT_SUBJECT };
+}
+
+@object GenTriggerClass SortByDateButton = {
+	 GI_visMoniker = " Date";
+	 @localize {"text for recipient/subject/date headers  Please keep the leading space"};
+	 GTI_destination = @TheMessageList;
+    GTI_actionMsg = MSG_MAIL_LIST_SET_SORT_ORDER;
+    ATTR_GEN_TRIGGER_ACTION_DATA = { SMBT_DATE };
+}
+
+/*------------------------------------------------------------------------*/
+
+@object GenTriggerClass SendTrigger = {
+    GI_visMoniker = 'n', "Send Mail";
+    GTI_actionMsg = MSG_MSR_SEND_MESSAGES;
+    GTI_destination = @SendReceiveDialog;
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass ReceiveTrigger = {
+    GI_visMoniker = 'C', "Check Mail";
+    GI_kbdAccelerator = ctrl 'm';
+    GTI_actionMsg = MSG_MSR_RECEIVE_MESSAGES;
+    GTI_destination = @SendReceiveDialog;
+    HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass PrintTrigger = {
+        GI_visMoniker = 'P', "Print";
+	GI_kbdAccelerator = ctrl 'p';
+	GI_attrs = @default | GA_KBD_SEARCH_PATH;
+	GTI_actionMsg = MSG_PRINT_CONTROL_INITIATE_PRINT;
+	GTI_destination = @MailPrintControl;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass EmptyTrashTrigger = {
+        GI_visMoniker = 'E', "Empty Trash";
+        GTI_destination = @TheFolderList;
+	GTI_actionMsg = MSG_FOLDER_LIST_EMPTY_TRASH;
+        HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass AddressBookTrigger = {
+		  GI_visMoniker = 'A', "Address Book";
+	GTI_destination = @MailAppObj;
+	GTI_actionMsg = MSG_MAIL_APP_LAUNCH_ADDRESS_BOOK;
+		  HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object PrintControlClass MailPrintControl = {
+        PCI_attrs = (@default & ~( PCA_PAGE_CONTROLS | PCA_VERIFY_PRINT))
+	    | PCA_MARK_APP_BUSY
+	    | PCA_SHOW_PROGRESS
+	    | PCA_PROGRESS_PAGE;
+	PCI_output = @TheMessageList;
+	PCI_docNameOutput = @PrintTextObject;
+	GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+	GII_visibility = GIV_DIALOG;
+}
+
+@end PrimaryUI;
+
+@start TabItemTemplateResource;
+@object GenItemClass AcctTabTemplate = {
+	 GI_visMoniker = "";
+	 GI_states = @default & ~GS_USABLE;
+	 GII_identifier = 0;
+}
+@end TabItemTemplateResource;
+
+
+/*------------------------------------------------------------------------*/
+
+@start FldrMenuUI;
+
+@object GenInteractionClass NewFolderDialog = {
+        GI_visMoniker = 'N', "New";
+	GII_type = (GIT_COMMAND);
+	GII_visibility = (GIV_DIALOG);
+	GI_comp =
+	        @NewFolderNameEntry,
+	        @NewFolderCreateTrigger,
+	        @NewFolderCancelTrigger;
+}
+
+@object EnableTextClass NewFolderNameEntry = {
+        GI_visMoniker = "Enter the name of the new folder you would like to create:";
+	GTXI_maxLength = (MAX_FOLDER_NAME_LENGTH);
+	GTXI_attrs = @default|GTA_SINGLE_LINE_TEXT;
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	ATTR_GEN_TEXT_LEGAL_FILENAMES;
+	HINT_DEFAULT_FOCUS;
+	ETI_object = @NewFolderCreateTrigger;
+}
+
+@object GenTriggerClass NewFolderCreateTrigger = {
+        GI_states = @default & ~GS_ENABLED;
+        GTI_destination = @TheFolderList;
+	GTI_actionMsg = MSG_FOLDER_LIST_CREATE_NEW_FOLDER;
+	GI_visMoniker = 'r', "Create";
+	HINT_DEFAULT_DEFAULT_ACTION;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass NewFolderCancelTrigger = {
+        GI_visMoniker = @VMO_CANCEL, "Cancel";
+	HINT_SEEK_REPLY_BAR;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = (IC_DISMISS);
+}
+
+@object GenTriggerClass DeleteFolderTrigger = {
+        GI_visMoniker = 'D', "Delete";
+        HINT_TRIGGER_BRINGS_UP_WINDOW;
+	GTI_actionMsg = MSG_FOLDER_LIST_DELETE_CURRENT_FOLDER;
+	GTI_destination = @TheFolderList;
+}
+
+@object FolderRenameDialogClass RenameFolderDialog = {
+        GI_visMoniker = 'R', "Rename";
+	GII_visibility = GIV_DIALOG;
+        GI_comp =
+	        @RenameFolderCurrentEntry,
+	        @RenameFolderNewEntry,
+	        @RenameFolderRenameTrigger,
+	        @RenameFolderCancelTrigger;
+	HINT_CENTER_CHILDREN_ON_MONIKERS;
+}
+
+@object GenTextClass RenameFolderCurrentEntry = {
+        GI_visMoniker = "Rename:";
+	GI_attrs = @default | GA_READ_ONLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+}
+
+@object EnableTextClass RenameFolderNewEntry = {
+        GI_visMoniker = "To:";
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	GTXI_maxLength = (MAX_FOLDER_NAME_LENGTH);
+	ETI_object = @RenameFolderRenameTrigger;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_TEXT_SELECT_TEXT;
+	HINT_DEFAULT_FOCUS;
+	ATTR_GEN_TEXT_LEGAL_FILENAMES;
+}
+
+@object GenTriggerClass RenameFolderRenameTrigger = {
+        GI_visMoniker = 'R', "Rename";
+	GTI_actionMsg = MSG_FOLDER_LIST_RENAME_CURRENT_FOLDER;
+	GTI_destination = @TheFolderList;
+	HINT_DEFAULT_DEFAULT_ACTION;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass RenameFolderCancelTrigger = {
+        GI_visMoniker = @VMO_CANCEL, "Cancel";
+	HINT_SEEK_REPLY_BAR;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = (IC_DISMISS);
+}
+
+@end FldrMenuUI;
+
+/*------------------------------------------------------------------------*/
+
+@start MsgMenuUI;
+
+@object GenTriggerClass CreateNewMessageTrigger = {
+        GI_visMoniker = 'N', "New";
+	GI_kbdAccelerator = ctrl 'n';
+	GI_attrs = @default | GA_KBD_SEARCH_PATH;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+	GTI_actionMsg = MSG_MAIL_COMPOSER_NEW_MESSAGE;
+	GTI_destination = @ComposeMailWin;
+}
+
+@object GenTriggerClass ThrowAwayTrigger = {
+        GI_visMoniker = 'D', "Discard";
+	GI_kbdAccelerator = ctrl 'd';
+	GI_attrs = @default | GA_KBD_SEARCH_PATH;
+	GI_states = @default & ~GS_ENABLED;
+	GTI_actionMsg = MSG_MAIL_LIST_DELETE_MESSAGE;
+	GTI_destination = @TheMessageList;
+}
+
+@object GenTriggerClass RecoverTrigger = {
+        GI_visMoniker = 'R', "Recover";
+	GI_states = @default & ~GS_USABLE;
+	GTI_actionMsg = MSG_MAIL_LIST_RECOVER_MESSAGE;
+	GTI_destination = @TheMessageList;
+}
+
+@object GenTriggerClass MoveMessageTrigger = {
+        GI_visMoniker = 'M', "Move";
+        GI_states = @default & ~GS_ENABLED;
+	GTI_actionMsg = MSG_FOLDER_MOVE_DIALOG_INIT;
+	GTI_destination = @MoveMessageDialog;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object FolderMoveClass MoveMessageDialog = {
+        GI_visMoniker = "Move Message";
+	GII_attrs = @default|GIA_NOT_USER_INITIATABLE;
+	GI_comp =
+	    @MoveMessageGlyph,
+	    @MoveFolderList,
+	    @MoveMoveTrigger,
+	    @MoveCloseTrigger;
+	GII_visibility = GIV_DIALOG;
+}
+
+@object GenGlyphClass MoveMessageGlyph = {
+        GI_visMoniker = "Move Message To:";
+}
+
+@object GenDynamicListClass MoveFolderList = {
+        GDLI_queryMsg = MSG_FOLDER_MOVE_QUERY_MONIKER;
+	GIGI_destination = @MoveMessageDialog;
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS|MAX_FOLDER_NAME_LENGTH};
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass MoveMoveTrigger = {
+        GI_visMoniker = 'M', "Move";
+	GTI_actionMsg = MSG_FOLDER_MOVE_MESSAGE;
+	GTI_destination = @MoveMessageDialog;
+	HINT_DEFAULT_DEFAULT_ACTION;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass MoveCloseTrigger = {
+        GI_visMoniker = @VMO_CANCEL, "Close";
+	HINT_SEEK_REPLY_BAR;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = (IC_DISMISS);
+}
+
+@object GenTriggerClass ReadMessageTrigger = {
+        GI_visMoniker = 'R', "Read";
+	GTI_actionMsg = MSG_MAIL_LIST_READ_MESSAGE;
+	GTI_destination = @TheMessageList;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass EditMessageTrigger = {
+        GI_states = @default & ~GS_USABLE;
+        GI_visMoniker = 'E', "Edit";
+	GTI_actionMsg = MSG_MAIL_LIST_EDIT_MESSAGE;
+	GTI_destination = @TheMessageList;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenInteractionClass SortByGroup = {
+        GI_visMoniker = 'S', "Sort By";
+        GII_visibility = GIV_POPUP;
+        GI_comp =
+	        @SortByList;
+}
+
+@object GenItemGroupClass SortByList = {
+        GI_comp =
+	        @SortByDateItem,
+	        @SortBySubjectItem,
+	        @SortBySenderItem;
+	GIGI_selection = (SMBT_DATE);
+	GIGI_destination = @TheMessageList;
+	GIGI_applyMsg = MSG_MAIL_LIST_RESORT;
+	ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION;
+}
+
+@object GenItemClass SortByDateItem = {
+        GI_visMoniker = 'D', "Date";
+	GII_identifier = (SMBT_DATE);
+}
+
+@object GenItemClass SortBySubjectItem = {
+        GI_visMoniker = 'S', "Subject";
+	GII_identifier = (SMBT_SUBJECT);
+}
+
+@object GenItemClass SortBySenderItem = {
+        GI_visMoniker = 'e', "Sender";
+	GII_identifier = (SMBT_SENDER);
+}
+
+@ifdef MANUAL_RECOVER
+@object FolderRecoverClass RecoverMessageDialog = {
+        GI_visMoniker = "Recover Message";
+	GII_attrs = @default|GIA_NOT_USER_INITIATABLE|GIA_MODAL;
+	GI_comp =
+	    @RecoverMessageGlyph,
+	    @RecoverFolderList,
+	    @RecoverRecoverTrigger,
+	    @RecoverCancelTrigger;
+	GII_visibility = GIV_DIALOG;
+}
+
+@object GenGlyphClass RecoverMessageGlyph = {
+        GI_visMoniker = "Recover Message To:";
+}
+
+@object GenDynamicListClass RecoverFolderList = {
+        GDLI_queryMsg = MSG_FOLDER_RECOVER_QUERY_MONIKER;
+	GIGI_destination = @RecoverMessageDialog;
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS|MAX_FOLDER_NAME_LENGTH};
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass RecoverRecoverTrigger = {
+        GI_visMoniker = 'R', "Recover";
+	GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+	GTI_actionMsg = MSG_FOLDER_RECOVER_MESSAGE;
+	GTI_destination = @RecoverMessageDialog;
+	HINT_DEFAULT_DEFAULT_ACTION;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass RecoverCancelTrigger = {
+	HINT_SEEK_REPLY_BAR;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = (IC_DISMISS);
+}
+@endif
+
+@end MsgMenuUI;
+
+/*------------------------------------------------------------------------*/
+
+@start OptionsUI;
+
+@object MailSearchClass MailSearchControl = {
+        GI_visMoniker = 'F', "Find";
+	GI_kbdAccelerator = ctrl 'f';
+        GI_attrs = @default|GA_KBD_SEARCH_PATH;
+	GII_visibility = GIV_DIALOG;
+	SRCI_enableFlags = SREF_SEARCH;
+	GCI_output = (TO_SELF);
+	GI_comp =
+	    @SearchStatusText,
+	    @SearchStop;
+	ATTR_GEN_CONTROL_PROHIBIT_UI = ~(SRCF_FIND_NEXT|SRCF_PARTIAL_WORDS|SRCF_IGNORE_CASE|SRCF_WILDCARDS|SRCF_CLOSE);
+	ATTR_SEARCH_CONTROL_SELECTION_TYPE = SDT_TEXT;
+@ifdef	PRODUCT_DBCS
+	ATTR_GEN_EXTRA_KBD_ACCELERATORS = C_SYS_F2 & KS_CHAR_MASK;
+@else
+	ATTR_GEN_EXTRA_KBD_ACCELERATORS = (KS_CHAR_SET_CONTROL << 8) | VC_F2;
+@endif
+	ATTR_GEN_CONTROL_DO_NOT_USE_LIBRARY_NAME_FOR_HELP;
+}
+
+@object GenTextClass SearchStatusText = {
+        GI_visMoniker = "Searching:";
+ 	GI_attrs = @default | GA_READ_ONLY;
+	GI_states = @default & ~GS_ENABLED;
+}
+
+@object GenTriggerClass SearchStop = {
+        GI_visMoniker = 'p', "Stop";
+	GI_states = @default & ~GS_ENABLED;
+	GTI_actionMsg = MSG_MAIL_SEARCH_STOP;
+	GTI_destination = @MailSearchControl;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass FindAgainTrigger = {
+        GI_visMoniker = 'A', "Find Again";
+	GI_kbdAccelerator = specificUI ctrl ';';
+        GI_attrs = @default|GA_KBD_SEARCH_PATH;
+	GTI_destination = @MailSearchControl;
+	GTI_actionMsg = MSG_MAIL_SEARCH_AGAIN;
+	GI_states = @default & ~GS_ENABLED;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+/*------------------------------------------------------------------------*/
+
+@visMoniker showToolbarMoniker = 'T', "Show Toolbar";
+@localize {"used for hide/show toolbar triggers"};
+
+@visMoniker hideToolbarMoniker = 'T', "Hide Toolbar";
+@localize {"used for hide/show toolbar triggers"};
+
+@object ShowToolbarClass MainShowToolbar = {
+    GTI_destination = (TO_SELF);
+    STI_toolbar = @MailToolbar;
+    STI_mask = STO_MAIN_TOOLBAR;
+    ATTR_GEN_INIT_FILE_KEY = "toolbars";
+}
+
+@object GenInteractionClass SelAddrBookDialog = {
+	GI_visMoniker = 'S', "Select Address Book";
+	GI_comp = @SABInstr1, @SABInstr2, @SABFileSel, @SABOKTrigger,
+				 @SABCancelTrigger;
+	GI_attrs = @default | GA_TARGETABLE;
+	GII_visibility = GIV_DIALOG;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+	ATTR_GEN_HELP_CONTEXT = "dbSelAddrBk";
+}
+
+@object GenGlyphClass SABInstr1 = {
+	GI_visMoniker = "Select the Address Book that has your email addresses";
+}
+
+@object GenGlyphClass SABInstr2 = {
+	GI_visMoniker = " ";
+}
+
+@object GenFileSelectorClass SABFileSel = {
+	GFSI_fileCriteria = FSFC_DIRS | FSFC_GEOS_NON_EXECUTABLES;
+	GFSI_destination = process;
+	GFSI_notificationMsg = MSG_EMAIL_PROC_ADDR_BOOK_SEL_NOTIFICATION;
+	ATTR_GEN_PATH_DATA = {SP_DOCUMENT, "."};
+	ATTR_GEN_FILE_SELECTOR_CREATOR_MATCH = {"ADBK" , 0};
+	HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 8;
+	HINT_FILE_SELECTOR_FILE_LIST_WIDTH = 40;
+}
+
+@object GenTriggerClass SABOKTrigger = {
+	GI_visMoniker = "Select";
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = process;
+	GTI_actionMsg = MSG_EMAIL_PROC_SAVE_SELECTED_ADDR_BOOK;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass SABCancelTrigger = {
+	GI_visMoniker = @VMO_CANCEL, "Cancel";
+	HINT_SEEK_REPLY_BAR;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = (IC_DISMISS);
+}
+
+
+@end OptionsUI;
+/*------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------*/
+
+@start PrimaryUI;
+
+@object MailComposerClass ComposeMailWin = {
+        GI_states = @default & ~GS_USABLE;
+        GI_visMoniker = "Edit Message";
+	GI_attrs = @default|GA_KBD_SEARCH_PATH|GA_TARGETABLE;
+	GI_comp =
+	        @ComposeMenubar,
+	        @ComposeMainArea,
+	        @ComposeAddressDialog;
+	HINT_CENTER_WINDOW;
+	HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD = {
+	    SWSS_RATIO | PCT_90,
+	    SWSS_RATIO | PCT_85
+	};
+	ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+	ATTR_GEN_HELP_CONTEXT = "dbNewMessage";
+	HINT_PRIMARY_NO_FILE_MENU;
+}
+
+@end PrimaryUI;
+
+@start ComposeUI;
+
+@object GenInteractionClass ComposeMainArea = {
+        GI_comp =
+	        @ComposeToolbar,
+	        @ComposeComposeArea;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass ComposeToolbar = {
+        GI_comp =
+	        @ComposeAttachTool,
+	        @ComposeSendNowTool,
+	        @ComposeSendLaterTool
+	        ;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenInteractionClass ComposeComposeArea = {
+        GI_comp =
+	        @ComposeHeaders,
+	        @ComposeAttachGroup,
+	        @ComposeBodyView;
+	HINT_ORIENT_CHILDREN_VERTICALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass ComposeMenubar = {
+        GI_attrs = @default|GA_KBD_SEARCH_PATH;
+	GI_comp =
+	        @ComposeFileMenu,
+	        @ComposeEditMenu,
+	        @ComposeOptionsMenu;
+        HINT_SEEK_MENU_BAR;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenViewClass ComposeBodyView = {
+        GVI_vertAttrs = @default | GVDA_SCROLLABLE;
+	GVI_attrs = @default | GVA_DRAG_SCROLLING
+	                     | GVA_WINDOW_COORDINATE_MOUSE_EVENTS
+	                     | GVA_DONT_SEND_KBD_RELEASES
+	                     | GVA_FOCUSABLE;
+	GVI_content = @ComposeBodyContent;
+	ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_DEFAULT_FOCUS;
+	HINT_DEFAULT_TARGET;
+}
+
+
+@object MailContentClass ComposeBodyContent = {
+        GI_attrs = @default | GA_TARGETABLE;
+        GCI_genView = @ComposeBodyView;
+	GCI_attrs = @default | VCNA_LARGE_DOCUMENT_MODEL
+	                     | VCNA_WINDOW_COORDINATE_MOUSE_EVENTS
+	                     | VCNA_SAME_WIDTH_AS_VIEW;
+}
+
+@object MailComposeTextClass ComposeBodyText = {
+        VTI_output = @ComposeMailWin;
+        VTI_state = @default | VTS_SELECTABLE
+	                     | VTS_EDITABLE
+	                     | VTS_TARGETABLE;
+        VLTI_displayMode = VLTDM_DRAFT_WITH_STYLES;
+	VLTI_regionArray = @ComposeBodyRegionArray;
+	VLTI_attrs = VLTA_EXACT_HEIGHT;
+	ATTR_MAIL_LARGE_TEXT_FONT_KEY = "cfont";
+	ATTR_MAIL_LARGE_TEXT_POINTSIZE_KEY = "csize";
+	ATTR_VIS_TEXT_EXTENDED_FILTER = VTEFT_CHARACTER_LEVELER_LEVEL;
+}
+
+@chunk ChunkArrayHeader ComposeBodyRegionArray = {
+    0,
+    sizeof( VisLargeTextRegionArrayElement ),
+    0,
+    sizeof( ChunkArrayHeader )
+};
+
+
+@object GenInteractionClass ComposeAttachGroup = {
+        GI_visMoniker = 'A', "Attachments:";
+        GI_comp =
+	    @ComposeAttachList;
+}
+
+/*------------------------------------------------------------------------*/
+
+@object GenTriggerClass ComposeAttachTool = {
+        GI_visMoniker = @list {
+	    @composeAttachMoniker
+	};
+        GTI_destination = @ComposeAttachDialog;
+	GTI_actionMsg = MSG_GEN_INTERACTION_INITIATE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	ATTR_GEN_FOCUS_HELP = @ComposeAttachEnabledBHelp;
+}
+@chunk char ComposeAttachEnabledBHelp[] = "Attach a file to the message";
+
+@object GenTriggerClass ComposeSendNowTool = {
+        GI_visMoniker = @list {
+	    @composeSendMoniker
+	};
+	GTI_destination = @ComposeMailWin;
+	GTI_actionMsg = MSG_MAIL_COMPOSER_SEND_MESSAGE_NOW;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	ATTR_GEN_FOCUS_HELP = @SendNowEnabledBHelp;
+}
+@chunk char SendNowEnabledBHelp[] = "Send this message now";
+
+@object GenTriggerClass ComposeSendLaterTool = {
+        GI_visMoniker = @list {
+	    @composeSendLaterMoniker
+	};
+	GTI_destination = @ComposeMailWin;
+	GTI_actionMsg = MSG_MAIL_COMPOSER_SEND_MESSAGE_LATER;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	ATTR_GEN_FOCUS_HELP = @SendLaterEnabledBHelp;
+}
+@chunk char SendLaterEnabledBHelp[] = "Send this message later";
+
+/*------------------------------------------------------------------------*/
+
+@object GenInteractionClass ComposeFileMenu = {
+        GI_attrs = @default|GA_KBD_SEARCH_PATH;
+        GI_visMoniker = 'M', "Message";
+        GII_visibility = GIV_POPUP;
+	GI_comp =
+	        @ComposeSign,
+	        @ComposeAttachDialog,
+	        @ComposeSend,
+	        @ComposeSendLater,
+	        @ComposeSave,
+	        @ComposeClose,
+	        @ComposeAttachRemoveDialog;
+}
+
+@object GenTriggerClass ComposeSign = {
+        GI_visMoniker = 'g', "Sign";
+	GTI_destination= @ComposeMailWin;
+    	GTI_actionMsg = MSG_MAIL_COMPOSER_SIGN;
+}
+
+@object GenTriggerClass ComposeSend = {
+        GI_visMoniker = 'S', "Send Now";
+	GI_kbdAccelerator = ctrl 'd';
+	GI_attrs = @default|GA_KBD_SEARCH_PATH;
+	GTI_destination = @ComposeMailWin;
+	GTI_actionMsg = MSG_MAIL_COMPOSER_SEND_MESSAGE_NOW;
+}
+
+@object GenTriggerClass ComposeSendLater = {
+        GI_visMoniker = 'L', "Send Later";
+	GI_kbdAccelerator = ctrl 'q';
+	GI_attrs = @default|GA_KBD_SEARCH_PATH;
+	GTI_destination = @ComposeMailWin;
+	GTI_actionMsg = MSG_MAIL_COMPOSER_SEND_MESSAGE_LATER;
+}
+
+@object GenTriggerClass ComposeSave = {
+        GI_visMoniker = 'v', "Save";
+	GI_states = @default & ~GS_ENABLED;
+	GTI_destination = @ComposeMailWin;
+	GTI_actionMsg = MSG_MAIL_COMPOSER_SAVE_MESSAGE;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass ComposeClose = {
+        GI_visMoniker = 'o', "Done";
+	GTI_destination = @ComposeMailWin;
+	GTI_actionMsg = MSG_GEN_DISPLAY_CLOSE;
+}
+
+@object GenInteractionClass ComposeEditMenu = {
+        GI_visMoniker = 'E', "Edit";
+	GII_visibility = GIV_POPUP;
+	GI_attrs = @default|GA_KBD_SEARCH_PATH;
+	GI_comp =
+	          @ComposeEditControl,
+	          @ComposeFindControl
+@ifdef SPELL_CHECK
+	          ,
+	          @ComposeSpellControl;
+@else
+	          ;
+@endif
+	ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_EDIT_MENU);
+}
+
+@object GenEditControlClass ComposeEditControl = {
+        GCI_output = (TO_APP_TARGET);
+	GI_attrs = @default|GA_KBD_SEARCH_PATH;
+	ATTR_GEN_CONTROL_PROHIBIT_UI = (GECF_UNDO|GECF_CLIP_ART);
+}
+
+@object SearchReplaceControlClass ComposeFindControl = {
+        GI_visMoniker = 'F', "Find and Replace";
+	GI_attrs = @default|GA_KBD_SEARCH_PATH;
+	GI_kbdAccelerator = ctrl 'f';
+	GII_visibility = GIV_DIALOG;
+	GCI_output = @ComposeBodyText;
+	ATTR_SEARCH_CONTROL_SELECTION_TYPE = SDT_TEXT;
+	ATTR_SEARCH_CONTROL_INTERACT_ONLY_WITH_TARGETED_TEXT_OBJECTS;
+	ATTR_GEN_CONTROL_PROHIBIT_UI = {SRCF_SPECIAL_CHARS};
+@ifdef	PRODUCT_DBCS
+	ATTR_GEN_EXTRA_KBD_ACCELERATORS = C_SYS_F2 & KS_CHAR_MASK;
+@else
+	ATTR_GEN_EXTRA_KBD_ACCELERATORS = (KS_CHAR_SET_CONTROL << 8) | VC_F2;
+@endif
+}
+
+@ifdef SPELL_CHECK
+
+@object SpellControlClass ComposeSpellControl = {
+	GI_kbdAccelerator = @specificUI F7;
+        GI_visMoniker = 'h', "Check Spelling";
+	GII_visibility = GIV_DIALOG;
+	GCI_output = @ComposeBodyText;
+	ATTR_SPELL_CONTROL_INTERACT_ONLY_WITH_TARGETED_TEXT_OBJECTS;
+}
+
+@endif
+
+
+@object GenInteractionClass ComposeOptionsMenu = {
+        GI_visMoniker = 'O', "Options";
+	GII_visibility = GIV_POPUP;
+	GI_comp =
+	         @ComposeShowToolbar,
+	         @ComposeFontControl,
+	         @ComposePointsizeControl;
+}
+
+@object ShowToolbarClass ComposeShowToolbar = {
+        GTI_destination = (TO_SELF);
+	STI_toolbar = @ComposeToolbar;
+	STI_mask = STO_COMPOSE_TOOLBAR;
+	ATTR_GEN_INIT_FILE_KEY = "toolbars";
+}
+
+@object FontControlClass ComposeFontControl = {
+    GCI_output = @ComposeBodyText;
+    GI_visMoniker = 'F', "Set Font";
+    GII_visibility = GIV_POPUP;
+//    ATTR_FONT_CONTROL_INCLUDE_UI_FONT;   don't want it - jfh
+}
+
+@object PointSizeControlClass ComposePointsizeControl = {
+    GCI_output = @ComposeBodyText;
+    GI_visMoniker = 'P', "Set Pointsize";
+    GII_visibility = GIV_POPUP;
+}
+
+/*------------------------------------------------------------------------*/
+
+@object GenInteractionClass ComposeHeaders = {
+    GI_comp =
+        @ComposeLeftGroup,
+        @ComposeRightGroup;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass ComposeLeftGroup = {
+    GI_comp =
+        @ComposeToTrigger,
+		  @ComposeCCTrigger,
+@ifdef BCC_SUPPORT
+		  @ComposeBccTrigger,
+@endif
+		  @ComposeSubjectGlyph;
+    HINT_RIGHT_JUSTIFY_CHILDREN;
+}
+
+
+@object GenInteractionClass ComposeRightGroup = {
+    GI_comp =
+        @ComposeToField,
+		  @ComposeCCField,
+@ifdef BCC_SUPPORT
+		  @ComposeBccField,
+@endif
+		  @ComposeSubjectField;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+
+@object GenTriggerClass ComposeToTrigger = {
+    GI_visMoniker = @list {
+	@sendToText
+    }
+    GTI_actionMsg = MSG_ADDRESS_DIALOG_INIT;
+    GTI_destination = @ComposeAddressDialog;
+    ATTR_GEN_TRIGGER_ACTION_TWO_WORDS = { OptrToChunk(@sendMsgMkr), OptrToChunk(@ComposeToField) };
+}
+
+@visMoniker sendToText = "To:";
+@localize "moniker for To: trigger";
+
+@object GenTriggerClass ComposeCCTrigger = {
+    GI_visMoniker = "Cc:";
+    GTI_actionMsg = MSG_ADDRESS_DIALOG_INIT;
+    GTI_destination = @ComposeAddressDialog;
+    ATTR_GEN_TRIGGER_ACTION_TWO_WORDS = { OptrToChunk(@ccMsgMkr), OptrToChunk(@ComposeCCField) };
+}
+
+@object GenTriggerClass ComposeBccTrigger = {
+    GI_visMoniker = "Bcc:";
+    GI_states = @default & ~GS_USABLE;
+    GTI_actionMsg = MSG_ADDRESS_DIALOG_INIT;
+    GTI_destination = @ComposeAddressDialog;
+    ATTR_GEN_TRIGGER_ACTION_TWO_WORDS = { OptrToChunk(@bccMsgMkr), OptrToChunk(@ComposeBccField) };
+}
+
+@object GenGlyphClass ComposeSubjectGlyph = {
+    GI_visMoniker = "Subject:";
+}
+
+@object AddressDialogClass ComposeAddressDialog = {
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default|GIA_NOT_USER_INITIATABLE;
+    GI_comp =
+        @ComposeToList,
+        @ComposeClearTrigger,
+        @ComposeDoneTrigger;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_CENTER_CHILDREN_HORIZONTALLY;
+    ATTR_GEN_HELP_CONTEXT = "dbSendTo";
+}
+
+@visMoniker sendMsgMkr = "Send this message to:";
+@localize {"used for 'to:' addressing dialog"};
+
+@visMoniker ccMsgMkr = "Copy this message to:";
+@localize {"used for 'cc:' addressing dialog"};
+
+@visMoniker bccMsgMkr = "Bcc this message to:";
+@localize {"used for 'bcc:' addressing dialog"};
+
+@object AddressListClass ComposeToList = {
+    GIGI_destination = @ComposeAddressDialog;
+    GIGI_behaviorType = GIGBT_NON_EXCLUSIVE;
+    HINT_ITEM_GROUP_SCROLLABLE;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_MINIMUM_SIZE = {
+	SST_AVG_CHAR_WIDTHS | 50,
+	SST_LINES_OF_TEXT | 10,
+	10
+    };
+}
+
+@object GenTriggerClass ComposeClearTrigger = {
+    GI_visMoniker = 'C', "Clear Selection(s)";
+    GTI_actionMsg = MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED;
+    GTI_destination = @ComposeToList;
+}
+
+@object GenTriggerClass ComposeDoneTrigger = {
+    GI_visMoniker = 'D', "Done";
+    GTI_actionMsg = MSG_ADDRESS_DIALOG_PASTE_ADDRESSES;
+    GTI_destination = @ComposeAddressDialog;
+    HINT_SEEK_REPLY_BAR;
+}
+
+@object GenInteractionClass ComposeCCDialog = {
+    GI_visMoniker = "Copy To (CC):";
+    GII_visibility = GIV_DIALOG;
+}
+
+@object MailFieldTextClass ComposeToField = {
+    GI_attrs = @default | GA_TARGETABLE;
+    GTXI_attrs = @default|GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = FIELD_BUFFER_BLOCK_SIZE/sizeof(TCHAR)-2;
+    GTXI_destination = @ComposeMailWin;
+	 MFTI_nextField = @ComposeCCField;
+    MFTI_flags = MFTF_EXPAND_ALIASES;
+    HINT_TEXT_WHITE_WASH_COLOR;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_DEFAULT_FOCUS;
+	 /* don't need this since we're gonna encode special chars - jfh
+	 ATTR_GEN_TEXT_NORMAL_ASCII;  */
+}
+
+@object MailFieldTextClass ComposeCCField = {
+    GI_attrs = @default | GA_TARGETABLE;
+    GTXI_attrs = @default|GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = FIELD_BUFFER_BLOCK_SIZE/sizeof(TCHAR)-2;
+    GTXI_destination = @ComposeMailWin;
+	 MFTI_nextField = @ComposeSubjectField;
+    MFTI_flags = MFTF_EXPAND_ALIASES;
+    HINT_TEXT_WHITE_WASH_COLOR;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+//    ATTR_GEN_TEXT_NORMAL_ASCII;
+}
+
+@object MailFieldTextClass ComposeBccField = {
+    GI_attrs = @default | GA_TARGETABLE;
+    GI_states = @default & ~GS_USABLE;
+    GTXI_attrs = @default|GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = FIELD_BUFFER_BLOCK_SIZE/sizeof(TCHAR)-2;
+    GTXI_destination = @ComposeMailWin;
+	 MFTI_nextField = @ComposeSubjectField;
+    MFTI_flags = MFTF_EXPAND_ALIASES;
+    HINT_TEXT_WHITE_WASH_COLOR;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+//    ATTR_GEN_TEXT_NORMAL_ASCII;
+}
+
+@object MailFieldTextClass ComposeSubjectField = {
+    GI_attrs = @default | GA_TARGETABLE;
+    GTXI_attrs = @default|GTA_SINGLE_LINE_TEXT;
+    GTXI_maxLength = FIELD_BUFFER_BLOCK_SIZE/sizeof(TCHAR)-2;
+    GTXI_destination = @ComposeMailWin;
+	 MFTI_nextField = @ComposeBodyView;
+    MFTI_flags = MFTF_UPDATE_SUBJECT;
+    HINT_TEXT_WHITE_WASH_COLOR;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+//    ATTR_GEN_TEXT_NORMAL_ASCII;
+}
+
+/*------------------------------------------------------------------------*/
+
+@object GenInteractionClass ComposeAttachDialog = {
+    GI_attrs = @default|GA_KBD_SEARCH_PATH;
+    GI_visMoniker = 'A', "Attach";
+    GI_kbdAccelerator = ctrl 'h';
+    GII_visibility = GIV_DIALOG;
+    GI_comp =
+        @ComposeAttachFileSelector,
+        @ComposeAttachAttach,
+        @ComposeAttachCancel;
+}
+
+@object GenFileSelectorClass  ComposeAttachFileSelector = {
+    GFSI_notificationMsg = MSG_ATTACH_LIST_FILE_SELECTED;
+    GFSI_destination = @ComposeAttachList;
+    ATTR_GEN_PATH_DATA = {SP_DOCUMENT, 0};
+}
+
+@object GenTriggerClass ComposeAttachAttach = {
+    GI_visMoniker = 'A', "Attach This File";
+    GTI_destination = @ComposeAttachList;
+    GTI_actionMsg = MSG_ATTACH_LIST_ATTACH_FILE;
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass ComposeAttachCancel = {
+    GI_visMoniker = @VMO_CANCEL, "Cancel";
+    HINT_SEEK_REPLY_BAR;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = (IC_DISMISS);
+}
+
+@end ComposeUI;
+
+/*------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------*/
+
+@start PrefUI;
+
+@object GenInteractionClass PreferencesDialog = {
+    GI_visMoniker = 'A', "Account Options";
+    GII_visibility = GIV_DIALOG;
+    GI_comp =
+        @PfOptionsList,
+        @PfOptionRaisedGroup,
+        @PfPrefOK;
+    ATTR_GEN_HELP_CONTEXT = "dbPrefs";
+    HINT_INTERACTION_SINGLE_USAGE;
+    HINT_MINIMIZE_CHILD_SPACING;
+}
+
+@object GenItemGroupClass PfOptionsList = {
+	 GI_comp =
+		  @PfMessageOptionItem,
+		  @PfStartExitOptionItem,
+		  @PfSignatureOptionItem;
+    GIGI_selection = OGID_MESSAGES;
+	 GIGI_destination = @PfAccountsDialog;
+	 ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_ACCOUNT_DIALOG_OPTION_GROUP_SELECTED;
+	 HINT_ITEM_GROUP_TAB_STYLE;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass PfOptionRaisedGroup = {
+    GI_comp =
+		  @PfMessageGroup,
+		  @PfStartExitGroup,
+        @PfSignatureGroup;
+	 HINT_RAISED_FRAME = { GRFI_LEFT | GRFI_RIGHT | GRFI_BOTTOM };
+	 HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 HINT_DRAW_IN_BOX;
+}
+
+
+@object GenItemClass PfMessageOptionItem = {
+	 GI_visMoniker = "Messages";
+	 GII_identifier = OGID_MESSAGES;
+}
+
+@object GenItemClass PfStartExitOptionItem = {
+    GI_visMoniker = "Start and Exit";
+    GII_identifier = OGID_START_EXIT;
+}
+
+@object GenItemClass PfSignatureOptionItem = {
+    GI_visMoniker = "Signature";
+    GII_identifier = OGID_SIGNATURE;
+}
+
+@object GenTriggerClass PfPrefOK = {
+        GI_visMoniker = "OK";
+	GTI_actionMsg = MSG_GEN_INTERACTION_ACTIVATE_COMMAND;
+	GTI_destination = @PreferencesDialog;
+	ATTR_GEN_TRIGGER_ACTION_DATA = IC_DISMISS;
+	HINT_DEFAULT_DEFAULT_ACTION;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenInteractionClass PfMessageGroup = {
+    GI_comp =
+        @PfMessageOptionList;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenBooleanGroupClass PfMessageOptionList = {
+	 GI_comp =
+		  @PfMOLLogBoolean,
+		  @PfMOLBcc,
+		  @PfMOLQuoteBoolean
+@ifdef LEAVE_MAIL_ON_SERVER
+		  , @PfMOLServer
+@endif
+			;
+	 HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenBooleanClass PfMOLLogBoolean = {
+	 GI_visMoniker = 'K', "Keep a log of outgoing messages";
+	 GBI_identifier = MMO_LOG_OUTGOING;
+}
+
+@object GenBooleanClass PfMOLQuoteBoolean = {
+    GI_visMoniker = 'q', "Automatically quote original in replies";
+    GBI_identifier = MMO_QUOTE_ORIGINAL;
+}
+
+@object GenBooleanClass PfMOLBcc = {
+    GI_visMoniker = 'B', "Bcc: support";
+    GBI_identifier = MMO_SHOW_BCC;
+}
+
+@ifdef LEAVE_MAIL_ON_SERVER
+@object GenBooleanClass PfMOLServer = {
+        GI_visMoniker = 'L', "Leave mail on server";
+	GBI_identifier = MMO_LEAVE_ON_SERVER;
+}
+@endif
+
+@object GenInteractionClass PfStartExitGroup = {
+    GI_states = @default & ~GS_USABLE;
+    GI_comp =
+        @PfStartOptionList,
+		  @PfAppStartOptionGroup
+@ifdef MULTIPLE_ACCOUNT_SUPPORT
+			  , @PfDefaultAcctList
+@endif
+		  ;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_PLACE_MONIKER_ABOVE;
+}
+
+@ifdef MULTIPLE_ACCOUNT_SUPPORT
+@object GenBooleanGroupClass PfDefaultAcctList = {
+	GI_comp = @PfIsDefault;
+	GBGI_destination = process;
+	ATTR_GEN_BOOLEAN_GROUP_STATUS_MSG =
+	                       MSG_MAIL_PROCESS_DEFAULT_ACCT_BOOLEAN_STATUS;
+}
+
+@object GenBooleanClass PfIsDefault = {
+	GI_visMoniker = 'D', "Default account on startup";
+	GBI_identifier = MDO_IS_DEFAULT;
+}
+@endif
+
+@object GenBooleanGroupClass PfStartOptionList = {
+    GI_comp =
+	@PfSOEmptyTrash;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenBooleanClass PfSOEmptyTrash = {
+    GI_visMoniker = 'E', "Empty trash when exiting";
+    GBI_identifier = MSEO_EMPTY_TRASH;
+}
+
+@object GenInteractionClass PfAppStartOptionGroup = {
+    GI_comp =
+        @PfAppStartOptionGlyph,
+        @PfAppStartOptionList;
+    HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenGlyphClass PfAppStartOptionGlyph = {
+    GI_visMoniker = "When starting applications:";
+}
+
+@object GenItemGroupClass PfAppStartOptionList = {
+    GI_comp =
+        @PfASONothing,
+	@PfASOMinimize,
+	@PfASOQuit;
+    GIGI_selection = MASO_NOTHING;
+    HINT_ITEM_GROUP_MINIMIZE_SIZE;
+    HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+}
+
+@object GenItemClass PfASONothing = {
+    GI_visMoniker = "Do Nothing";
+    GII_identifier = MASO_NOTHING;
+}
+
+@object GenItemClass PfASOMinimize = {
+    GI_visMoniker = "Minimize Email";
+    GII_identifier = MASO_MINIMIZE;
+}
+
+@object GenItemClass PfASOQuit = {
+    GI_visMoniker = "Quit Email";
+    GII_identifier = MASO_QUIT;
+}
+
+/*------------------------------------------------------------------------*/
+
+@object AccountDialogClass PfAccountsDialog = {
+		  GI_attrs = @default | GA_TARGETABLE;
+		  GI_visMoniker = 'A', "Account Settings";
+	GII_visibility = GIV_DIALOG;
+	GI_comp =
+@ifdef MULTIPLE_ACCOUNT_SUPPORT
+			  @PfAccountListGroup,
+@else
+			  @PfAccountList,
+@endif
+			  @PfAccountGroup,
+			  @PfServerGroup,
+@ifndef SIGNATURE_IN_OPTIONS
+			  @PfSignatureGroup,
+@endif
+			  @PreferencesDialog,
+			  @PfAcctOK;
+	HINT_CENTER_CHILDREN_HORIZONTALLY;
+		  ATTR_GEN_HELP_CONTEXT = "emsetup";
+}
+
+@ifdef MULTIPLE_ACCOUNT_SUPPORT
+@object GenInteractionClass PfAccountListGroup = {
+		  GI_visMoniker = "Account Name";
+		  GI_comp =
+		  /*	  @PfAccountGlyph, */
+	        @PfAccountList,
+			  @PfAccountNewDialog,
+           @PfAccountRenameDialog,
+	        @PfAccountDeleteTrigger;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_CENTER_CHILDREN_VERTICALLY;
+   HINT_DRAW_IN_BOX;
+}
+
+/*@object GenGlyphClass PfAccountGlyph = {
+        GI_visMoniker = "Account:";
+}  */
+@endif
+
+@object AccountListClass PfAccountList = {
+@ifndef MULTIPLE_ACCOUNT_SUPPORT
+        GI_states = @default & ~GS_USABLE;
+@endif
+	GDLI_queryMsg = MSG_ACCOUNT_LIST_QUERY_MONIKER;
+	GIGI_destination = (TO_SELF);
+	ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_ACCOUNT_LIST_ACCOUNT_SELECTED;
+	HINT_ITEM_GROUP_MINIMIZE_SIZE;
+	HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+        HINT_FIXED_SIZE = {SST_AVG_CHAR_WIDTHS|15};
+}
+
+@ifdef MULTIPLE_ACCOUNT_SUPPORT
+
+@object GenInteractionClass PfAccountNewDialog = {
+        GI_visMoniker = 'N', "New";
+	GII_visibility = GIV_DIALOG;
+	GI_comp =
+	        @PfAccountsNewName,
+	        @PfAccountsNewOK,
+	        @PfAccountsNewCancel;
+}
+
+@object GenTextClass PfAccountsNewName = {
+        GI_visMoniker = "Enter the name of the new account you would like to create:";
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	GTXI_maxLength = MAX_ACCT_NAME_LENGTH;
+	HINT_DEFAULT_FOCUS;
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	ATTR_GEN_TEXT_LEGAL_FILENAMES;
+}
+
+@object GenTriggerClass PfAccountsNewOK = {
+        GI_visMoniker = "OK";
+	GTI_actionMsg = MSG_ACCOUNT_LIST_NEW_ACCOUNT;
+	GTI_destination = @PfAccountList;
+	HINT_DEFAULT_DEFAULT_ACTION;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass PfAccountsNewCancel = {
+        GI_visMoniker = @VMO_CANCEL, "Cancel";
+	HINT_SEEK_REPLY_BAR;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = (IC_DISMISS);
+}
+
+@object GenInteractionClass PfAccountRenameDialog = {
+		  GI_visMoniker = 'R', "Rename";
+	GII_visibility = GIV_DIALOG;
+	GI_comp =
+			  @PfAccountsRenameName,
+			  @PfAccountsRenameOK,
+			  @PfAccountsRenameCancel;
+}
+
+@object GenTextClass PfAccountsRenameName = {
+	GI_visMoniker = "Enter a new name for the account:";
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	GTXI_maxLength = MAX_ACCT_NAME_LENGTH;
+	HINT_DEFAULT_FOCUS;
+	HINT_PLACE_MONIKER_ABOVE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	ATTR_GEN_TEXT_LEGAL_FILENAMES;
+}
+
+@object GenTriggerClass PfAccountsRenameOK = {
+        GI_visMoniker = "OK";
+	GTI_actionMsg = MSG_ACCOUNT_LIST_RENAME_ACCOUNT;
+	GTI_destination = @PfAccountList;
+	HINT_DEFAULT_DEFAULT_ACTION;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass PfAccountsRenameCancel = {
+        GI_visMoniker = @VMO_CANCEL, "Cancel";
+	HINT_SEEK_REPLY_BAR;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = (IC_DISMISS);
+}
+
+@object GenTriggerClass PfAccountDeleteTrigger = {
+        GI_visMoniker = 'D', "Delete";
+	GTI_actionMsg = MSG_ACCOUNT_LIST_DELETE_ACCOUNT;
+	GTI_destination = @PfAccountList;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@endif /* @ifdef MULTIPLE_ACCOUNT_SUPPORT */
+
+@object GenTriggerClass PfAcctOK = {
+        GI_visMoniker = "OK";
+	GTI_actionMsg = MSG_ACCOUNT_LIST_DONE;
+	GTI_destination = @PfAccountList;
+	HINT_DEFAULT_DEFAULT_ACTION;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenInteractionClass PfAccountGroup = {
+        GI_visMoniker = "Account Information";
+	GI_comp =
+	        @PfMailAccountText,
+	        @PfPasswordText,
+	        @PfReturnAddr,
+	        @PfRealNameText;
+        HINT_DRAW_IN_BOX;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_CHILDREN_ON_MONIKERS;
+}
+
+@object GenTextClass PfMailAccountText = {
+        GI_visMoniker = 'L', "Login:";
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	GTXI_maxLength = MAX_CLIENT_NAME_LENGTH - 1;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@chunk VisTextCharAttr PfPasswordStyle = {
+	{{{3, 0}}, CA_NULL_ELEMENT},   /* StyleSheetElementHeader */
+	FID_BISON,                     /* font */
+	{0, 13},                       /* point size */
+	0,                             /* TextStyle */
+	{C_BLACK, CF_INDEX, 0, 0},     /* ColorQuad */
+	0,                             /* track kerning */
+	FWI_MEDIUM, FW_NORMAL,         /* font weight, font width */
+	{VTES_HIDDEN},                 /* VisTextExtendedStyles */
+	SDM_100, {0},                  /* SystemDrawMask, GraphicPattern */
+	{C_WHITE, CF_INDEX, 0, 0},     /* background ColorQuad */
+	SDM_0,                         /* background SystemDrawMask */
+	{0},                           /* background GraphicPattern */
+	{0,0,0,0,0,0,0}                /* unused */
+};
+
+@object PasswordTextClass PfPasswordText = {
+        GI_visMoniker = 'P', "Password:";
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	GTXI_maxLength = MAX_CLIENT_NAME_LENGTH - 1;
+	ATTR_GEN_TEXT_CHAR_ATTR = @PfPasswordStyle;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTextClass PfReturnAddr = {
+        GI_visMoniker = 'E', "Email Address:";
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTextClass PfRealNameText = {
+        GI_visMoniker = 'R', "Real Name:";
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	ATTR_GEN_TEXT_CUSTOM_FILTER = @realnameFilter;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@chunk VisTextCustomFilterData realnameFilter[] = {
+    /* no: " */
+    {C_QUOTE, C_QUOTE},
+    /* no: ' */
+    {C_SNG_QUOTE, C_SNG_QUOTE},
+    /* no: <> */
+    {C_LESS_THAN, C_GREATER_THAN},
+    /* no: @ */
+    {C_AT_SIGN, C_AT_SIGN},
+    /* no: \ */
+    {C_BACKSLASH, C_BACKSLASH}
+};
+
+@object GenInteractionClass PfServerGroup = {
+        GI_visMoniker = "Servers";
+	GI_comp =
+	        @PfSMTPServer,
+			  @PfSMTPAuthGroup,
+			  @PfPOP3Server;
+	HINT_DRAW_IN_BOX;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_CHILDREN_ON_MONIKERS;
+}
+
+@object GenTextClass PfSMTPServer = {
+        GI_visMoniker = 'S', "SMTP:";
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenBooleanGroupClass PfSMTPAuthGroup = {
+	 GI_comp = @PfAuthBoolean;
+}
+
+@object GenBooleanClass PfAuthBoolean = {
+	 GI_visMoniker = "SMTP server requires authentication";
+	 GBI_identifier = SMTP_AUTH;
+}
+
+@object GenTextClass PfPOP3Server = {
+        GI_visMoniker = '3', "POP3:";
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass PfSignatureGroup = {
+        GI_states = @default & ~GS_USABLE;
+        GI_comp =
+	        @PfSignature,
+	        @PfSigOptList;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_CHILDREN_ON_MONIKERS;
+}
+
+@ifdef AUTO_SIGNATURE_OPTION
+
+@object GenBooleanGroupClass PfSigOptList = {
+    GI_comp =
+        @PfSigOptItem;
+}
+
+@object GenBooleanClass PfSigOptItem = {
+    GI_visMoniker = 'A', "Automatically insert signature";
+    GBI_identifier = MMO_AUTO_SIGN;
+}
+
+@endif
+
+@object GenTextClass PfSignature = {
+        GI_attrs = @default | GA_TARGETABLE;
+	GTXI_attrs = @default | GTA_INIT_SCROLLING;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+@ifdef SIGNATURE_IN_OPTIONS
+	HINT_FIXED_SIZE = {
+	    0,
+	    SST_LINES_OF_TEXT|3,
+	};
+@endif
+}
+
+/*------------------------------------------------------------------------*/
+
+@object GenInteractionClass GetPasswordDB = {
+    GI_comp =
+        @GPPrompt,
+        @GPPassword,
+        @GPCapsLockWarning,
+        @GPOK,
+        @GPCancel;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_MODAL;
+}
+
+@object GenTextClass GPPrompt = {
+    GI_attrs = @default | GA_READ_ONLY;
+    ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+}
+
+@object PasswordTextClass GPPassword = {
+    GI_visMoniker = "Password:";
+    GTXI_attrs = @default|GTA_SINGLE_LINE_TEXT;
+    ATTR_GEN_TEXT_CHAR_ATTR = @PfPasswordStyle;
+    HINT_DEFAULT_FOCUS;
+}
+
+@object GenTextClass GPCapsLockWarning = {
+    GI_attrs = @default | GA_READ_ONLY;
+    ATTR_GEN_TEXT_NEVER_MAKE_SCROLLABLE;
+    GTXI_text = "NOTE: The CapsLock key may intefere with passwords.";
+}
+
+@object GenTriggerClass GPOK = {
+    GI_visMoniker = "OK";
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_OK;
+    HINT_SEEK_REPLY_BAR;
+    HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass GPCancel = {
+    GI_visMoniker = "Cancel";
+    GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+    ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_NO;
+    HINT_SEEK_REPLY_BAR;
+}
+
+
+
+@end PrefUI;
+
+/*------------------------------------------------------------------------*/
+/*------------------------------------------------------------------------*/
+
+@start PrimaryUI;
+
+@object MailReaderClass ReadMailWin = {
+        GI_states = @default & ~GS_USABLE;
+        GI_visMoniker = "Message";
+	GI_attrs = @default | GA_KBD_SEARCH_PATH | GA_TARGETABLE;
+	GI_comp =
+	        @ReadMenubar,
+	        @ReadMainArea;
+	HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD = {
+	    SWSS_RATIO | PCT_90,
+	    SWSS_RATIO | PCT_85
+	};
+	HINT_CENTER_WINDOW;
+	ATTR_GEN_DISPLAY_NOT_MINIMIZABLE;
+	ATTR_GEN_HELP_CONTEXT = "dbReadMessage";
+	HINT_PRIMARY_NO_FILE_MENU;
+}
+
+@end PrimaryUI;
+
+@start ReadUI;
+
+@object GenInteractionClass ReadMenubar = {
+        GI_attrs = @default | GA_KBD_SEARCH_PATH;
+        GI_comp =
+	        @ReadMessageMenu,
+	        @ReadEditMenu,
+	        @ReadOptionsMenu;
+	HINT_SEEK_MENU_BAR;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass ReadMainArea = {
+        GI_comp =
+	        @ReadToolbar,
+	        @ReadReadArea;
+	HINT_ORIENT_CHILDREN_HORIZONTALLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass ReadToolbar = {
+        GI_comp =
+	        @ReadAddressTool,
+	        @ReadReplyToolGroup,
+	        @ReadPrintTool,
+	        @ReadNavToolGroup,
+	        @ReadThrowAwayTool,
+	        @ReadRecoverTool;
+        HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenInteractionClass @ReadReplyToolGroup = {
+        GI_comp =
+	        @ReadReplyTool,
+	        @ReadReplyAllTool,
+	        @ReadForwardTool;
+	HINT_MINIMIZE_CHILD_SPACING;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@ifdef INCLUDE_PRINT_TOOL
+
+@object GenTriggerClass ReadPrintTool = {
+        GI_visMoniker = @list {
+            @printToolMoniker
+	};
+	GTI_destination = @MailPrintControl;
+	GTI_actionMsg = MSG_PRINT_CONTROL_INITIATE_PRINT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	ATTR_GEN_FOCUS_HELP = @ReadPrintEnabledBHelp;
+}
+@chunk char ReadPrintEnabledBHelp[] = "Print this message";
+
+@endif // INCLUDE_PRINT_TOOL
+
+@object GenInteractionClass @ReadNavToolGroup = {
+        GI_comp =
+	        @ReadPrevTool,
+	        @ReadNextTool;
+	HINT_MINIMIZE_CHILD_SPACING;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass ReadAddressTool = {
+        GI_visMoniker = @list {
+	    @addressToolMoniker
+	};
+	GTI_destination = @TheMessageList;
+	GTI_actionMsg = MSG_MAIL_LIST_ADD_ADDRESS_ENTRY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	ATTR_GEN_FOCUS_HELP = @ReadAddressEnabledBHelp;
+}
+@chunk char ReadAddressEnabledBHelp[] = "Open the Address Book";
+
+@object GenTriggerClass ReadReplyTool = {
+        GI_visMoniker = @list {
+	    @replyToolMoniker
+	}
+	GTI_destination = @TheMessageList;
+	GTI_actionMsg = MSG_MAIL_LIST_REPLY_MESSAGE;
+	ATTR_GEN_TRIGGER_ACTION_DATA = MCT_REPLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	ATTR_GEN_FOCUS_HELP = @ReadReplyEnabledBHelp;
+}
+@chunk char ReadReplyEnabledBHelp[] = "Reply to the sender";
+
+@object GenTriggerClass ReadReplyAllTool = {
+        GI_visMoniker = @list {
+	    @replyAllToolMoniker
+	}
+	GTI_destination = @TheMessageList;
+	GTI_actionMsg = MSG_MAIL_LIST_REPLY_MESSAGE;
+	ATTR_GEN_TRIGGER_ACTION_DATA = MCT_REPLY_ALL;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	ATTR_GEN_FOCUS_HELP = @ReadReplyAllEnabledBHelp;
+}
+@chunk char ReadReplyAllEnabledBHelp[] = "Reply to all";
+
+@object GenTriggerClass ReadForwardTool = {
+        GI_visMoniker = @list {
+	    @forwardToolMoniker
+	}
+	GTI_destination = @TheMessageList;
+	GTI_actionMsg = MSG_MAIL_LIST_FORWARD_MESSAGE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	ATTR_GEN_FOCUS_HELP = @ReadForwardEnabledBHelp;
+}
+@chunk char ReadForwardEnabledBHelp[] = "Forward this message";
+
+@object GenTriggerClass ReadPrevTool = {
+        GI_visMoniker = @list {
+	    @previousToolMoniker
+	}
+	GTI_destination = @TheMessageList;
+	GTI_actionMsg = MSG_MAIL_LIST_PREVIOUS;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	ATTR_GEN_FOCUS_HELP = @ReadPrevEnabledBHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @ReadPrevDisabledBHelp;
+}
+@chunk char ReadPrevEnabledBHelp[] = "Read the previous message";
+@chunk char ReadPrevDisabledBHelp[] = "This is the first message";
+
+@object GenTriggerClass ReadNextTool = {
+        GI_visMoniker = @list {
+	    @nextToolMoniker
+	}
+	GTI_destination = @TheMessageList;
+	GTI_actionMsg = MSG_MAIL_LIST_NEXT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	ATTR_GEN_FOCUS_HELP = @ReadNextEnabledBHelp;
+	ATTR_GEN_FOCUS_DISABLED_HELP = @ReadNextDisabledBHelp;
+}
+@chunk char ReadNextEnabledBHelp[] = "Read the next message";
+@chunk char ReadNextDisabledBHelp[] = "This is the last message";
+
+@object GenTriggerClass ReadThrowAwayTool = {
+        GI_visMoniker = @list {
+            @readThrowAwayToolMoniker
+	}
+	GTI_actionMsg = MSG_MAIL_READER_DELETE_MESSAGE;
+	GTI_destination = @ReadMailWin;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	ATTR_GEN_FOCUS_HELP = @ReadThrowAwayEnabledBHelp;
+}
+@chunk char ReadThrowAwayEnabledBHelp[] = "Discard this message";
+
+@object GenTriggerClass ReadRecoverTool = {
+        GI_states = @default & ~GS_USABLE;
+        GI_visMoniker = @list {
+            @readRecoverToolMoniker
+	}
+	GTI_actionMsg = MSG_MAIL_READER_RECOVER_MESSAGE;
+	GTI_destination = @ReadMailWin;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_CENTER_MONIKER;
+	ATTR_GEN_FOCUS_HELP = @ReadRecoverEnabledBHelp;
+}
+@chunk char ReadRecoverEnabledBHelp[] = "Recover this message";
+
+/*------------------------------------------------------------------------*/
+
+@object GenInteractionClass ReadMessageMenu = {
+        GI_visMoniker = 'M', "Message";
+	GI_attrs = @default | GA_KBD_SEARCH_PATH;
+        GII_visibility = GIV_POPUP;
+	GI_comp =
+	        @ReadReplyTrigger,
+	        @ReadReplyAllTrigger,
+			  @ReadForwardTrigger,
+	        @ReadSubgroup,
+	        @ReadThrowAwayTrigger,
+	        @ReadRecoverTrigger,
+	        @ReadPrintTrigger,
+	        @ReadCloseTrigger,
+	        @ReadAttachDialog,
+	        @SaveAttachDialog;
+}
+
+@object GenTriggerClass ReadReplyTrigger = {
+        GI_visMoniker = 'R', "Reply to Sender";
+	GI_attrs = @default | GA_KBD_SEARCH_PATH;
+	GI_kbdAccelerator = ctrl 'r';
+        GTI_actionMsg = MSG_MAIL_LIST_REPLY_MESSAGE;
+        GTI_destination = @TheMessageList;
+        HINT_TRIGGER_BRINGS_UP_WINDOW;
+        ATTR_GEN_TRIGGER_ACTION_DATA = MCT_REPLY;
+}
+
+@object GenTriggerClass ReadReplyAllTrigger = {
+        GI_visMoniker = 'A', "Reply to All";
+	GI_attrs = @default | GA_KBD_SEARCH_PATH;
+	GI_kbdAccelerator = shift ctrl 'r';
+	GTI_actionMsg = MSG_MAIL_LIST_REPLY_MESSAGE;
+	GTI_destination = @TheMessageList;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+	ATTR_GEN_TRIGGER_ACTION_DATA = MCT_REPLY_ALL;
+}
+
+@object GenTriggerClass ReadForwardTrigger = {
+        GI_visMoniker = 'F', "Forward";
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+	GTI_destination = @TheMessageList;
+	GTI_actionMsg = MSG_MAIL_LIST_FORWARD_MESSAGE;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenInteractionClass ReadSubgroup = {
+        GI_comp =
+	        @ReadNextTrigger,
+	        @ReadPreviousTrigger;
+	GII_visibility = GIV_SUB_GROUP;
+}
+
+@object GenTriggerClass ReadNextTrigger = {
+        GI_visMoniker = 'N', "Read Next";
+	GTI_destination = @TheMessageList;
+	GTI_actionMsg = MSG_MAIL_LIST_NEXT;
+}
+
+@object GenTriggerClass ReadPreviousTrigger = {
+        GI_visMoniker = 'v', "Read Previous";
+	GTI_destination = @TheMessageList;
+	GTI_actionMsg = MSG_MAIL_LIST_PREVIOUS;
+}
+
+@object GenTriggerClass ReadThrowAwayTrigger = {
+        GI_visMoniker = 'D', "Discard";
+	GTI_actionMsg = MSG_MAIL_READER_DELETE_MESSAGE;
+	GTI_destination = @ReadMailWin;
+}
+
+@object GenTriggerClass ReadRecoverTrigger = {
+        GI_visMoniker = 'R', "Recover";
+	GTI_actionMsg = MSG_MAIL_READER_RECOVER_MESSAGE;
+	GTI_destination = @ReadMailWin;
+}
+
+@object GenTriggerClass ReadPrintTrigger = {
+        GI_visMoniker = 'P', "Print";
+	GTI_destination = @MailPrintControl;
+	GTI_actionMsg = MSG_PRINT_CONTROL_INITIATE_PRINT;
+        HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass ReadCloseTrigger = {
+        GI_visMoniker = 'o', "Done";
+	GTI_destination = @ReadMailWin;
+	GTI_actionMsg = MSG_GEN_DISPLAY_CLOSE;
+}
+
+/*------------------------------------------------------------------------*/
+
+@object GenInteractionClass ReadEditMenu = {
+        GI_visMoniker = 'E', "Edit";
+	GII_visibility = GIV_POPUP;
+	GI_attrs = @default | GA_KBD_SEARCH_PATH;
+	GI_comp =
+	        @ReadEditControl,
+	        @ReadMakeAddressEntry;
+}
+
+@object GenEditControlClass ReadEditControl = {
+        GCI_output = @ReadBodyText;
+	GI_attrs = @default | GA_KBD_SEARCH_PATH;
+        ATTR_GEN_CONTROL_PROHIBIT_UI = (GECF_UNDO|GECF_CUT|GECF_PASTE|GECF_DELETE|GECF_CHAR_MAP|GECF_CLIP_ART);
+}
+
+@object GenTriggerClass ReadMakeAddressEntry = {
+        GI_visMoniker = 'B', "Add to Address Book";
+        GTI_destination = @TheMessageList;
+	GTI_actionMsg = MSG_MAIL_LIST_ADD_ADDRESS_ENTRY;
+}
+
+@object GenInteractionClass ReadOptionsMenu = {
+        GI_visMoniker = 'O', "Options";
+	GII_visibility = GIV_POPUP;
+	GI_comp =
+	        @ReadShowToolbar,
+	        @ReadHeadersGroup,
+	        @ReadFontControl,
+	        @ReadPointsizeControl
+	        ;
+}
+
+@object ShowToolbarClass ReadShowToolbar = {
+        GTI_destination = (TO_SELF);
+	STI_toolbar = @ReadToolbar;
+	STI_mask = STO_READ_TOOLBAR;
+	ATTR_GEN_INIT_FILE_KEY = "toolbars";
+}
+
+@object GenInteractionClass ReadHeadersGroup = {
+        GII_visibility = GIV_SUB_GROUP;
+	GI_comp =
+	        @ReadHeadersList;
+}
+
+@object GenItemGroupClass ReadHeadersList = {
+        GI_comp =
+	        @ReadAllHeadersItem,
+	        @ReadBriefHeadersItem
+@ifdef SHOW_RAW_MESSAGE
+	        , @ReadRawItem
+@endif
+	        ;
+	GIGI_selection = MRO_NORMAL_HEADERS;
+	GIGI_destination = @TheMessageList;
+	GIGI_applyMsg = MSG_MAIL_LIST_READ_MESSAGE;
+}
+
+@object GenItemClass ReadAllHeadersItem = {
+        GI_visMoniker = 'N', "Show Normal Headers";
+	GII_identifier = MRO_NORMAL_HEADERS;
+}
+
+@object GenItemClass ReadBriefHeadersItem = {
+        GI_visMoniker = 'B', "Show Brief Headers";
+	GII_identifier = MRO_BRIEF_HEADERS;
+}
+
+@ifdef SHOW_RAW_MESSAGE
+
+@object GenItemClass ReadRawItem = {
+        GI_visMoniker = 'R', "Show Raw Message";
+	GII_identifier = MRO_RAW_MESSAGE;
+}
+
+@endif
+
+@object FontControlClass ReadFontControl = {
+        GCI_output = @ReadBodyText;
+        GI_visMoniker = 'F', "Set Font";
+        GII_visibility = GIV_POPUP;
+//	ATTR_FONT_CONTROL_INCLUDE_UI_FONT;    don't want it - jfh
+}
+
+@object PointSizeControlClass ReadPointsizeControl = {
+        GCI_output = @ReadBodyText;
+        GI_visMoniker = 'P', "Set Pointsize";
+        GII_visibility = GIV_POPUP;
+}
+
+/*------------------------------------------------------------------------*/
+
+@object GenInteractionClass ReadReadArea = {
+        GI_comp =
+	        @ReadBodyView,
+	        @ReadAttachGroup;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenViewClass ReadBodyView = {
+        GVI_vertAttrs = @default | GVDA_SCROLLABLE;
+	GVI_attrs = @default | GVA_DRAG_SCROLLING
+	                     | GVA_WINDOW_COORDINATE_MOUSE_EVENTS
+	                     | GVA_DONT_SEND_KBD_RELEASES
+	                     | GVA_FOCUSABLE;
+	GVI_content = @ReadBodyContent;
+	ATTR_GEN_VIEW_DOES_NOT_ACCEPT_TEXT_INPUT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_DEFAULT_FOCUS;
+	HINT_DEFAULT_TARGET;
+}
+
+
+@object MailContentClass ReadBodyContent = {
+        GI_attrs = @default | GA_TARGETABLE;
+	GCI_genView = @ReadBodyView;
+	GCI_attrs = @default | VCNA_LARGE_DOCUMENT_MODEL
+	                     | VCNA_WINDOW_COORDINATE_MOUSE_EVENTS
+	                     | VCNA_SAME_WIDTH_AS_VIEW;
+}
+
+@object MailReadTextClass ReadBodyText = {
+        VTI_output = (TO_SELF);
+        VTI_state = @default | VTS_SELECTABLE
+	                     | VTS_TARGETABLE;
+        VLTI_displayMode = VLTDM_DRAFT_WITH_STYLES;
+	VLTI_regionArray = @ReadBodyRegionArray;
+	VLTI_attrs = VLTA_EXACT_HEIGHT;
+	ATTR_MAIL_LARGE_TEXT_FONT_KEY = "rfont";
+	ATTR_MAIL_LARGE_TEXT_POINTSIZE_KEY = "rsize";
+}
+
+@chunk ChunkArrayHeader ReadBodyRegionArray = {
+    0,
+    sizeof( VisLargeTextRegionArrayElement ),
+    0,
+    sizeof( ChunkArrayHeader )
+};
+
+@object GenInteractionClass ReadAttachGroup = {
+        GI_visMoniker = "Attachments:";
+	GI_comp =
+	     @ReadAttachList;
+}
+
+@end ReadUI;
+
+/*------------------------------------------------------------------------*/
+
+@start AttachUI;
+
+@object GenInteractionClass ReadAttachDialog = {
+        GI_visMoniker = "Attachment";
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = @default|GIA_NOT_USER_INITIATABLE;
+	GI_comp =
+	        @AttachNameText,
+	        @OpenAttachTrigger,
+	        @SaveAttachTrigger,
+	        @CancelAttachTrigger;
+}
+
+@object GenTextClass AttachNameText = {
+        GI_visMoniker = "File:";
+        GI_attrs = @default | GA_READ_ONLY;
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_MINIMUM_SIZE = {
+	    SST_AVG_CHAR_WIDTHS | 50
+	};
+}
+
+@object GenTriggerClass OpenAttachTrigger = {
+        GI_visMoniker = 'O', "Open";
+	GTI_destination = @ReadAttachList;
+	GTI_actionMsg = MSG_ATTACH_LIST_OPEN_FILE;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass SaveAttachTrigger = {
+        GI_visMoniker = 'S', "Save";
+	GTI_destination = @ReadAttachList;
+	GTI_actionMsg = MSG_ATTACH_LIST_SAVE_FILE;
+	HINT_TRIGGER_BRINGS_UP_WINDOW;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass CancelAttachTrigger = {
+        GI_visMoniker = @VMO_CANCEL, "Cancel";
+	HINT_SEEK_REPLY_BAR;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = (IC_DISMISS);
+}
+
+@object GenInteractionClass SaveAttachDialog = {
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = @default|GIA_NOT_USER_INITIATABLE;
+        GI_visMoniker = "Save Attachment";
+	GI_comp =
+	        @SaveAttachSelector,
+	        @SaveAttachName,
+	        @SaveAttachSaveTrigger,
+	        @SaveAttachCancelTrigger;
+	HINT_INTERACTION_MODAL;
+}
+
+@object GenFileSelectorClass SaveAttachSelector = {
+	ATTR_GEN_PATH_DATA = {SP_DOCUMENT, 0};
+        GFSI_attrs = (@default) | FSA_SHOW_FILES_DISABLED;
+}
+
+@object GenTextClass SaveAttachName = {
+        GI_visMoniker = 'N', "New Name";
+	GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	GTXI_maxLength = FILE_LONGNAME_LENGTH;
+}
+
+@object GenTriggerClass SaveAttachSaveTrigger = {
+        GI_visMoniker = 'S', "Save";
+	GTI_actionMsg =  MSG_ATTACH_LIST_DO_SAVE;
+	GTI_destination = @ReadAttachList;
+	HINT_SEEK_REPLY_BAR;
+	HINT_DEFAULT_DEFAULT_ACTION;
+}
+
+@object GenTriggerClass SaveAttachCancelTrigger = {
+        GI_visMoniker = @VMO_CANCEL, "Cancel";
+	HINT_SEEK_REPLY_BAR;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = (IC_DISMISS);
+}
+
+@object AttachListClass ComposeAttachList = {
+	GDLI_queryMsg = MSG_ATTACH_LIST_QUERY_MONIKER;
+	GIGI_destination = (TO_SELF);
+	HINT_ITEM_GROUP_MINIMIZE_SIZE;
+	HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+	ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_ATTACH_LIST_COMPOSE_ATTACHMENT_SELECTED;
+	ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION;
+}
+
+@object AttachListClass ReadAttachList = {
+        GDLI_queryMsg = MSG_ATTACH_LIST_QUERY_MONIKER;
+	GIGI_destination = (TO_SELF);
+	HINT_ITEM_GROUP_MINIMIZE_SIZE;
+	HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION;
+	HINT_FIXED_SIZE = {
+	    SST_AVG_CHAR_WIDTHS|FILE_LONGNAME_LENGTH,
+	};
+	ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_ATTACH_LIST_ATTACHMENT_SELECTED;
+	ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION;
+}
+
+@object GenInteractionClass ComposeAttachRemoveDialog = {
+        GI_visMoniker = "Unattach File";
+	GII_visibility = GIV_DIALOG;
+	GII_attrs = @default|GIA_NOT_USER_INITIATABLE;
+	GI_comp =
+	    @ComposeAttachRemoveName,
+	    @ComposeAttachRemoveRemove,
+	    @ComposeAttachRemoveCancel;
+}
+
+@object GenTextClass ComposeAttachRemoveName = {
+        GI_visMoniker = "File:";
+        GI_attrs = @default | GA_READ_ONLY;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass ComposeAttachRemoveRemove = {
+        GI_visMoniker = "Unattach this file";
+	GTI_destination = @ComposeAttachList;
+	GTI_actionMsg = MSG_ATTACH_LIST_UNATTACH_FILE;
+	HINT_SEEK_REPLY_BAR;
+}
+
+@object GenTriggerClass ComposeAttachRemoveCancel = {
+        GI_visMoniker = @VMO_CANCEL, "Cancel";
+	HINT_SEEK_REPLY_BAR;
+	ATTR_GEN_TRIGGER_INTERACTION_COMMAND = (IC_DISMISS);
+}    
+
+@end AttachUI;
+
+/*------------------------------------------------------------------------*/
+
+@start FListUI;
+
+@object FolderListClass TheFolderList = {
+	 GI_visMoniker = "  Folders:";
+	 @localize {"Please keep the two leading spaces"};
+	 HINT_PLACE_MONIKER_ABOVE;
+    GIGI_destination = (TO_SELF);
+    GDLI_queryMsg = MSG_FOLDER_LIST_QUERY_MONIKER;
+    GIGI_selection = MFID_INBOX;
+    ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_FOLDER_LIST_FOLDER_SELECTED;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+    HINT_MINIMUM_SIZE = {
+	0,
+	SST_PIXELS | FOLDER_ICON_HEIGHT,
+	1
+    };
+    HINT_MAXIMUM_SIZE = {SST_PCT_OF_FIELD_WIDTH|PCT_20+0x8};
+    HINT_ITEM_GROUP_SCROLLABLE;
+}
+
+@end FListUI;
+
+@start MListUI;
+
+@object MailListClass TheMessageList = {
+	GDLI_queryMsg = MSG_MAIL_LIST_QUERY_MONIKER;
+	GIGI_destination = (TO_SELF);
+	GIGI_behaviorType = GIGBT_EXTENDED_SELECTION;
+
+	HINT_ITEM_GROUP_SCROLLABLE;
+	HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	HINT_PLACE_MONIKER_ABOVE;
+	ATTR_GEN_ITEM_GROUP_STATUS_MSG = MSG_MAIL_LIST_MESSAGE_SELECTED;
+	ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS = MSG_MAIL_LIST_OPEN_MESSAGE;
+}
+
+@end MListUI;
+
+@start PrintUI;
+
+@object MailLargeTextClass PrintTextObject = {
+	VTI_output = (TO_SELF);
+	VLTI_displayMode = VLTDM_DRAFT_WITH_STYLES;
+	VLTI_regionArray = @PrintTextRegionArray;
+	VLTI_attrs = VLTA_EXACT_HEIGHT;
+	ATTR_VIS_TEXT_DO_NOT_NOTIFY_CONTENT;
+}
+
+@chunk ChunkArrayHeader PrintTextRegionArray = {
+	0,
+	sizeof(VisLargeTextRegionArrayElement),
+	0,
+	sizeof(ChunkArrayHeader)
+};
+
+@end PrintUI;
+
+/*------------------------------------------------------------------------*/
+
+@start ProcObjs;
+
+@object MailSearcherClass SearchObj = {
+}
+
+@end ProcObjs;
+
+/*------------------------------------------------------------------------*/

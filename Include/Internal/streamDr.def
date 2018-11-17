@@ -1,0 +1,321 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1990 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Stream Driver
+FILE:		streamDr.def
+
+DECLARER:	Stream Driver
+INTENDED USERS:	No restrictions
+OVERRIDE CONST:	-
+
+AUTHOR:		Adam de Boor, Jan  9, 1990
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	1/ 9/90		Initial revision
+
+
+DESCRIPTION:
+	Header file for all users of the stream driver.
+		
+	$Id: streamDr.def,v 1.1 97/04/04 14:16:21 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef __STREAMDR
+
+include driver.def
+
+StartDriver	stream
+
+;
+; Protocol number for the interface defined in this file. NOTE: DO NOT
+; UP THE MINOR NUMBER OF THIS PROTOCOL IF YOU ADD A FUNCTION HERE UNLESS YOU
+; UP THE MAJOR NUMBER OF ALL DRIVERS THAT USE THE STREAM INTERFACE.
+;
+STREAM_PROTO_MAJOR	equ DRIVER_PROTO_MAJOR+1
+STREAM_PROTO_MINOR	equ DRIVER_PROTO_MINOR+0
+
+;------------------------------------------------------------------------------
+;		    INTERFACE CONSTANTS/STRUCTURES
+;------------------------------------------------------------------------------
+STREAM_BOTH		= -2		; Operation applies to both sides
+STREAM_READ		= -1		; Operation applies to reading side
+STREAM_WRITE		= 0		; Operation applies to writing side
+
+STREAM_BLOCK		= 2		; Block waiting to fill request, if
+					;  necessary
+STREAM_NOBLOCK		= 0		; Return short read/write if request
+					;  cannot be filled completely
+
+STREAM_LINGER		= -1		; Wait for data to be read before
+					;  destroying the stream.
+STREAM_DISCARD		= 0		; Discard any pending data
+
+StreamNotifyMode	etype	byte, 0
+    SNM_NONE	enum	StreamNotifyMode	; Disable notifier
+    SNM_ROUTINE	enum	StreamNotifyMode	; Notify by calling fixed
+						;  routine
+    SNM_MESSAGE	enum	StreamNotifyMode	; Notify by sending to an
+    						;  action descriptor
+
+StreamNotifyEvent	etype	byte, 0
+    SNE_ERROR	enum	StreamNotifyEvent	; Error notification
+    SNE_DATA	enum	StreamNotifyEvent	; Data/space avail notification
+    ; Other drivers may add events here (up to 8 total) in their own headers
+
+StreamNotifyType	record
+    SNT_READER:1,			; Set to notify reader, clear to
+					;  notify writer.
+    SNT_EVENT StreamNotifyEvent:3,	; Event for which notifier is being
+					;  registered.
+    SNT_HOW StreamNotifyMode:2,	; Notification mechanism to use.
+StreamNotifyType	end
+
+;
+; 	Not used by the stream driver itself, but by drivers like the serial
+;	and parallel drivers. Defined here to avoid possible multiple-definition
+;	errors.
+;
+StreamOpenFlags	record
+    SOF_NOBLOCK:1,		; Set if may not block if port already in-use.
+    SOF_TIMEOUT:1		; Set if BP contains the maximum number of
+				;  clock ticks for which to block if port
+				;  already open.
+StreamOpenFlags	end
+
+;------------------------------------------------------------------------------
+;			DRIVER-LEVEL INTERFACE
+;
+; NOTE: All functions except DR_STREAM_CREATE will return return an error
+; if the stream is being closed. This error takes the form of a set carry and
+; an error code in AX of STREAM_CLOSING. Callers should be aware of this and
+; act accordingly.
+;------------------------------------------------------------------------------
+StreamFunction	etype	word, DriverFunction, 2
+
+DR_STREAM_GET_DEVICE_MAP enum	StreamFunction
+;	PASS:	nothing
+;	RETURN:	ax	= mask of available devices (interpretation depends
+;			  on driver called)
+;
+;	This call is intended only for stream drivers that interface to
+;	actual hardware. For example, the stream driver itself will just
+;	return all 0's (it has no devices). See the appropriate header
+;	(serialDriver.def, eg) for the driver you are using for the format of
+;	value returned.
+;
+
+DR_STREAM_CREATE	enum	StreamFunction
+DR_STREAM_OPEN		enum	StreamFunction, DR_STREAM_CREATE
+;	PASS: 	ax	= buffer size
+;		bx	= geode handle to own the stream buffer
+;		cx	= HF_FIXED setting for stream block (ALLOC_FIXED | 0)
+;	RETURN:	bx	= stream token, if carry clear else
+;		ax	= error code:
+;				STREAM_CANNOT_ALLOC
+;					Cannot allocate a block of fixed memory
+;					to hold the stream buffer
+;				STREAM_BUFFER_TOO_LARGE
+;					Owing to implementation details, a
+;					stream buffer cannot be larger than
+;					32K, which the caller exceeded.
+;	DESTROYED: ax if carry clear
+;
+;	The returned token is to be used for all further calls. Other drivers
+;	can treat the token as the segment it is and use it for accessing the
+;	stream data.
+;	If the stream is to remain in fixed memory, pass ALLOC_FIXED in
+;	cx, otherwise, clear cx for a movable stream.
+
+DR_STREAM_DESTROY	enum	StreamFunction
+DR_STREAM_CLOSE		enum	StreamFunction, DR_STREAM_DESTROY
+;	PASS:	ax	= STREAM_LINGER if destruction should wait for remaining
+;			  data to be read. If this is STREAM_DISCARD, any
+;			  waiting data will be discarded.
+;		bx	= stream token
+;	RETURN:	nothing
+;
+;	When this function returns, the stream block will have been freed and
+;	no further use should be made of the stream.
+
+DR_STREAM_SET_NOTIFY	enum	StreamFunction
+;	PASS:	ax	= StreamNotifyType that identifies for which side of
+;			  the stream and what event the notifier is being
+;			  registered.
+;		bx	= stream token
+;		cx:dx	= address of handling routine, if SNM_ROUTINE
+;			  destination of output if SNM_MESSAGE
+;		bp	= AX to pass if SNM_ROUTINE (except for SNE_DATA with
+;			  threshold of 1, in which case this value is passed in
+;			  CX); method to send if SNM_MESSAGE.
+;	RETURN:	nothing
+;
+;	Registers a notifier for any of the possible events. The
+;	StreamNotifyType indicates for which side of the stream and for
+;	which event the notifier is to be registered.
+
+DR_STREAM_GET_ERROR	enum	StreamFunction
+;	PASS:	ax	= STREAM_READ if error for reader desired,
+;			  STREAM_WRITE if error for writer desired.
+;		bx	= stream token
+;	RETURN:	ax	= stored error token.
+;
+;	Returns any posted error for the indicated side of the stream. A
+;	return value of 0 indicates no error has been posted. Any previous
+;	error is cleared by this function.
+
+DR_STREAM_SET_ERROR	enum	StreamFunction
+;	PASS:	ax	= STREAM_READ if error being posted by reader.
+;			  STREAM_WRITE if error being posted by writer. The
+;			  other end of the stream will be notified if it
+;			  has registered an error notifier.
+;		bx	= stream token
+;		cx	= error code
+;	RETURN:	nothing
+;	
+;	The error code is recorded even if notification is sent.
+;		
+
+DR_STREAM_FLUSH		enum	StreamFunction
+;	PASS:	bx	= stream token
+;	RETURN:	nothing
+;	
+;	Flushes all pending data in the stream.
+
+DR_STREAM_SET_THRESHOLD	enum	StreamFunction
+;	PASS:	ax	= STREAM_READ or STREAM_WRITE, indicating for which
+;			  side of the stream the notification threshold is being
+;			  set.
+;		bx	= stream token
+;		cx	= threshold (number of bytes that must be available
+;			  for reading, or for which space must be available
+;			  for writing)
+;	RETURN:	nothing
+
+DR_STREAM_READ		enum	StreamFunction
+;	PASS:	ax	= STREAM_BLOCK/STREAM_NOBLOCK to tell whether to
+;			  block waiting for the full request to be filled or
+;			  to return as many bytes as are currently available.
+;		bx	= stream token
+;		cx	= number of bytes to read
+;		ds:si	= buffer to which to read
+;	RETURN:	cx	= number of bytes read
+
+DR_STREAM_READ_BYTE	enum	StreamFunction
+;	PASS:	ax	= STREAM_BLOCK/STREAM_NOBLOCK to tell whether to
+;			  block waiting for the byte to arrive.
+;		bx	= stream token
+;	RETURN:	al	= byte read, unless ax was STREAM_NOBLOCK and
+;			  carry is set, in which case no byte was available.
+;	
+DR_STREAM_WRITE		enum	StreamFunction
+;	PASS:	ax	= STREAM_BLOCK/STREAM_NOBLOCK to tell whether to
+;			  block waiting for the full request to be processed or
+;			  to return as many bytes as could be written
+;			  immediately.
+;		bx	= stream token
+;		cx	= number of bytes to write
+;		ds:si	= buffer from which to write
+;	RETURN:	cx	= number of bytes written
+
+DR_STREAM_WRITE_BYTE	enum	StreamFunction
+;	PASS:	ax	= STREAM_BLOCK/STREAM_NOBLOCK to tell whether to
+;			  block if there is no space in the stream.
+;		bx	= stream token
+;		cl	= byte to write
+;	RETURN:	carry set if byte could not be written and STREAM_NOBLOCK
+;		was specified.
+
+DR_STREAM_QUERY		enum	StreamFunction
+;	PASS:	ax	= STREAM_READ/STREAM_WRITE to indicate which side is
+;			  being queried
+;		bx	= stream token
+;	RETURN:	ax	= number of bytes available to that side
+;
+;-----------------------------------------------------------------------------
+;		STREAM DRIVER ESCAPE CODES		
+;-----------------------------------------------------------------------------
+
+	; codes from 0x8000-0x80ff are standard escape codes common
+	; to all drivers (see geode.def)
+
+	;     standard video escapes range from 0x8100 to 0xbfff
+	; user-defined video escapes range from 0xc000 to 0xffff
+
+StreamEscapeCode	etype	word,  0x8100, 1
+
+STREAM_ESC_LOAD_OPTIONS	enum	StreamEscapeCode
+; Stream driver can load any internally-defined options at this time.
+; Pass:		ds:si - category AsciiZ string
+;
+; Return:	IF ERROR
+;			Carry set
+;		ELSE
+;			carry clear
+;
+
+
+STREAM_ESC_RESTART_OUTPUT	enum	StreamEscapeCode
+; Used primarily by stream drivers that are acting as custom port drivers for
+; the spooler, this escape will be called by the spooler when the user has
+; said to keep going after the driver has generated an error.
+;
+; PASS: 	bx	= stream token
+; 		ax	= non-zero if the byte that was pending when the error
+;			  occurred should be resent.
+; RETURN:	carry clear
+;
+
+;------------------------------------------------------------------------------
+;			     ERROR CODES
+;------------------------------------------------------------------------------
+StreamError	etype	word, 1
+STREAM_WOULD_BLOCK	enum	StreamError	; Operation would block when
+						;  no blocking is allowed. This
+						;  is only returned if no part
+						;  of the request could be
+						;  satisfied.
+STREAM_CLOSING		enum	StreamError	; Cannot write -- stream is
+						;  being closed
+STREAM_CANNOT_ALLOC	enum	StreamError	; Cannot create -- unable to
+						;  allocate buffer.
+STREAM_BUFFER_TOO_LARGE	enum	StreamError	; Cannot create -- buffer size
+						;  too large (32K max)
+STREAM_CLOSED		enum	StreamError	; Cannot access -- stream is
+						;  not open
+STREAM_SHORT_READ_WRITE	enum	StreamError	; Read or write with
+						;  STREAM_BLOCK and stream
+						;  closed before
+						;  operation could 
+						;  complete.
+
+; Codes for device-driven streams
+STREAM_NO_DEVICE	enum	StreamError	; Attempting to open a device-
+						;  based stream (e.g. parallel
+						;  or serial port) when the
+						;  device requested doesn't
+						;  exist.
+STREAM_DEVICE_IN_USE	enum	StreamError	; SOF_NOBLOCK or SOF_TIMEOUT
+						;  given and device is in-use.
+
+STREAM_POWER_ERROR	enum	StreamError	; Tried to open the requested
+						;  port, but couldn't due to
+						;  some error in the power
+						;  driver.
+
+STREAM_FIRST_DEV_ERROR	equ	256		; Start of range stream-based
+						;  drivers can use for their
+						;  errors.
+
+;
+; Owing to implementation details, a stream buffer cannot be
+; larger than 32K.  If a size > 32K is passed to StreamCreate
+; STREAM_BUFFER_TOO_LARGE is returned.
+;
+STREAM_MAX_STREAM_SIZE equ 32767
+
+EndDriver	stream

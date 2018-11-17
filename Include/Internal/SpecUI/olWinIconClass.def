@@ -1,0 +1,120 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1994 -- All Rights Reserved
+
+PROJECT:	SPUI
+MODULE:		
+FILE:		olWinIconClass.def
+
+AUTHOR:		David Litwin, Oct  6, 1994
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	dlitwin	10/ 6/94		Initial revision
+
+
+DESCRIPTION:
+	Definition of OLWinIconClass.
+		
+	$Id: olWinIconClass.def,v 1.1 97/04/04 14:12:23 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+	;
+	;	For documentation of the OLWinIconClass see:
+	;	/staff/pcgeos/Spec/olWinIconClass.doc
+	; 
+
+OLWinIconClass	class	OLWinClass
+	uses	GenClass, VisClass
+
+;------------------------------------------------------------------------------
+;			Hint Declarations
+;------------------------------------------------------------------------------
+;Specific Hints:
+
+HINT_WIN_ICON vardata		;Since we create the OLWinIcon object
+				;by duplicating a GenPrimary from the
+				;specific UI resource, we need to tell the
+				;the Primary that it really is an icon.
+
+;------------------------------------------------------------------------------
+;			Method Declarations
+;------------------------------------------------------------------------------
+
+MSG_OL_WIN_ICON_SET_USABLE	message
+;	This method is sent to make the icon visible and usable.
+
+MSG_OL_WIN_ICON_SET_STATE	message
+;	This method is sent to initialize some instance data in this object,
+;	including its position and Icon Slot # if necessary. This is called
+;	when the icon is created, to pass info about its GenPrimary
+;	(such as moniker handles) and other info from previous shutdowns
+;	(such as position and icon slot #).
+;
+;	Pass:	*ds:si	- window icon object
+;		ss:bp	- pointer to bottom of data passed on stack
+;		dx	- size of data passed on stack
+;		on stack: (in order pushed)
+;			word	- WinPosSizeFlags <> (positioning requests)
+;			word	- WinPosSizeState <> (which icon slot #)
+;			2 words - VI_bounds.R_left, R_top (position)
+;			OD	- OD of OLWinClass object associated w/icon
+;					(meaning the GenPrimary)
+;	Return:	*ds:si	- same
+;
+;NOTE: the lptrs passed on the stack point to chunks within this ObjectBlock.
+;
+
+MSG_OL_WIN_ICON_UPDATE_MONIKER	message
+; Sent by OLMenuedWin to set icon moniker and icon caption moniker.  OLWinIcon
+; will copy (i.e. duplicate) the passed monikers into local moniker chunks.
+;
+; Pass:		ss:bp	- IconMonikerPassData (see below)
+; Return:	nothing
+
+MSG_OL_MAXIMIZE_FROM_ICON	message
+;	This method is sent when the user selects MAXIMIZE from the system
+; menu attached to this icon. We send the GenPrimary two generic methods
+; in sequence to get the job done. See method handler.
+;	Pass:	nothing
+;	Return:	nothing
+
+;------------------------------------------------------------------------------
+;			Instance data
+;------------------------------------------------------------------------------
+
+    OLWII_window	optr		;GenPrimary which is opened by this icon
+    OLWII_titleGlyphWin lptr		;OLWinGlyph object which
+					;shows title below icon.
+    OLWII_iconMoniker	lptr.VisMoniker	;moniker for icon
+    OLWII_iconCaptionMoniker lptr.VisMoniker	;moniker for caption below icon
+OLWinIconClass	endc
+
+;------------------------------------------------------------------------------
+;			Misc structures
+;------------------------------------------------------------------------------
+
+;This structure is passed on the stack when calling MSG_WIN_ICON_SET_STATE
+;or MSG_WIN_ICON_GET_STATE. The first word is the last item pushed.
+
+IconPassData	struct
+	IPD_window		optr
+	IPD_top			word
+	IPD_left		word
+	IPD_winPosSizeState	WinPosSizeState <>
+	IPD_winPosSizeFlags	WinPosSizeFlags <>
+IconPassData	ends
+
+;This structure is passed on the stack when calling
+;MSG_OL_WIN_ICON_UPDATE_MONIKER.
+
+IconMonikerPassData	struct
+	IMPD_iconMoniker	optr
+	IMPD_iconCaptionMoniker	optr
+IconMonikerPassData	ends

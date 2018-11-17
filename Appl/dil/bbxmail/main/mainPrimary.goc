@@ -1,0 +1,98 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Designs in Light 2002 -- All Rights Reserved
+ *
+ * PROJECT:	  Mail
+ * MODULE:	  Mail
+ * FILE:	  mainPrimary.goc
+ *
+ * DESCRIPTION:
+ *	MailPrimary2Class for the Mail application
+ *
+ ***********************************************************************/
+
+@include "mail.goh"
+@include "class.goh"
+@include "global.goh"
+@include "dex.goh"
+
+@classdecl MailPrimary2Class;
+
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_GEN_DISPLAY_CLOSE
+* PASS:            none
+* RETURN:          none
+* DESCRIPTION:     don't let display close exit the app
+***************************************************************/
+
+@method MailPrimary2Class, MSG_GEN_DISPLAY_CLOSE
+{
+    /*
+     * lower ourselves so other mail windows come to top
+     */
+    @call oself::MSG_GEN_LOWER_TO_BOTTOM();
+    /*
+     * just make ourselves not usable
+     */
+    @call oself::MSG_GEN_SET_NOT_USABLE(VUM_DLYD);
+}
+
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_MAIL_PRIMARY_OPEN
+* PASS:            none
+* RETURN:          none
+* DESCRIPTION:     open the primary and bring it to the front
+***************************************************************/
+
+@method MailPrimary2Class, MSG_MAIL_PRIMARY_OPEN
+{
+    @call oself::MSG_GEN_SET_USABLE(VUM_NOW);
+    @call oself::MSG_GEN_BRING_TO_TOP();
+}
+
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_MAIL_PRIMARY_UPDATE_LONG_TERM_MONIKER
+* PASS:            subjHan - handle of block with subject (0 for none)
+* RETURN:          subject - free'd
+* DESCRIPTION:     update the long term moniker
+***************************************************************/
+
+#define MAX_SUBJECT_DISP_LEN  40
+
+@method MailPrimary2Class, MSG_MAIL_PRIMARY_UPDATE_LONG_TERM_MONIKER
+{
+    MemHandle mh;
+    TCHAR *mhb;
+    TCHAR buf[MAX_SUBJECT_DISP_LEN + DATE_TIME_BUFFER_SIZE];
+
+    LockStrings();
+    if (subjHan) {
+	mhb = MemLock(subjHan);
+	/*
+	 * truncate long subjects
+	 */
+	if (strlen(mhb) > MAX_SUBJECT_DISP_LEN) {
+	    mhb[MAX_SUBJECT_DISP_LEN-1] = C_ELLIPSIS;
+	    mhb[MAX_SUBJECT_DISP_LEN] = 0;
+	}
+	sprintf(buf, LMemDeref(@messTitleMkr), mhb);
+	@call oself::MSG_GEN_PRIMARY_REPLACE_LONG_TERM_MONIKER(
+	    VUM_NOW, 0, 0, 0,
+	    VMDT_TEXT, VMST_FPTR, (dword)buf);
+	MemFree(subjHan);
+    } else {
+	@call oself::MSG_GEN_PRIMARY_REPLACE_LONG_TERM_MONIKER(
+	    VUM_NOW, 0, 0, 0,
+	    VMDT_TEXT, VMST_FPTR, (dword)LMemDeref(@messTitleNoSubjMkr));
+    }
+    UnlockStrings();
+}

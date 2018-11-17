@@ -1,0 +1,1927 @@
+***************************************************************************
+
+	Copyright (c) Berkeley Softworks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Graphic
+FILE:		
+
+AUTHOR:		Steve Scholl, November 15, 1989
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ss      11/28/90        Initial revision.
+
+DESCRIPTION:
+	
+
+	$Id: DEEPER_THOUGHTS,v 1.3.26.1 97/03/29 03:39:53 canavese Exp $
+
+****************************************************************************
+
+
+
+	This file is for in depth discussion of proposed changes, new
+	features and the like.
+
+
+
+
+
+
+Talk with Tony dump
+	11/30
+	Benefits of using don't discard if in use vm stuff
+		if set in use for object while selected then no dirting
+		when changing selecting
+
+		if set in use for editing object, then no text object
+		problems. (what about iconify)
+
+		if set in Body it would never be discarded, eliminates
+		parent pointer problem.
+
+		would still have to worry about gstate and global modes
+		but they should be pretty easy, maybe even store then
+		in grobj
+
+		will want to keep as much data as possible in blocks other
+		than the object blocks. Bitmaps,spline points maybe text
+		if that can be arranged.
+
+		will want to use ObjIncInUseCount to set this. will also need
+		to prevent VisOpen from incrementing it.
+
+		Can I just set IN_USE when an object becomes selected
+		and clear it when it becomes deselected. Or is there
+		other don't dirty me data.
+
+			I won't be saving which objects are selected, because
+			blocks won't be marked dirty. So that is not a problem
+
+			Global modes will only be stored in body.
+
+			Handles may be a potential problem, but only
+			during interactive handle display. Could inc
+			every objects in use count before. Yuck. Could
+			hope that no object with handle modified gets
+			discarded. Could inc in use count when setting
+			TEMP bit. (careful of multiple inc and decs)
+			DANGER - blocks are not currently dirtied when
+			TEMP is set or cleared. YO DUDE, how about
+			incing IN_USE every time the handles are drawn
+			and everytime TEMP is actually changed from 
+			clear to set and vice versa. Another solution
+			is if tony can add flag to temporarily disable
+			discarding in vm file. While TEMP is set
+			need in use count at least 1. Could inc
+			it directly.
+
+			
+
+	Relocate
+
+		On relocate when reading from file I want to set the
+		REALIZED bit if the bodies bit is set. This counts
+		on the body keeper being already relocated. The
+		VisOpen handler for objects should have no error
+		checking on realized and should not up the in use
+		count. VisClose will no longer dec the in use count.
+		
+		For body, on relocate when reading, clear parent and
+		window fields and REALIZED.
+
+		For objects on reloc when reading clear REALIZED
+
+		Need to free sprite transform, clear any temporary bits
+		including spriteDrawn on after read
+
+		Clear in use count on reloc on after read except body
+
+	In The Future
+		bit in objects that tells ui to ignore temporary bits
+		no vis open/vis close in draw
+		clear body parent on reloc after read
+		some changes maybe necessary in text,bitmap,spline
+
+	Attributes array idea
+		separate block in file with array of attribute strucs and
+		ref counts for structs
+		
+		objects would have token for struc with proper attributes
+
+		this keeps objects small and makes in use count less
+		damaging in terms of stuff that can't be discarded
+
+		text attributes would probably be different.
+		
+	Sprite Info
+		keep sprite info in lmem chunk, only alloc when moving
+		resize, rotating
+		
+		lowers file size
+
+		
+
+Other Apps
+	11/30
+	If had method to specify a corner or edge and a two deltas then
+	an app without mouse control could change basic object sizes.
+	This same routine could used for the final step of interactively
+	resizing an object instead of copying the sprite data. 
+	
+
+
+
+
+
+More Attribute Stuff + Global Object
+	12/3
+	Move all attribute methods into graphic class
+	For each group of Graphic Bodies have a global object in grobj
+	Global Object is subclass of graphic
+	To set global attributes send method to Global object
+	To set attributes of selected object(s) send method to
+	body which will send it to selected objects
+	Each body would have identifier for global object, 
+	most likely the OD.
+	The application using library would also have identifier for
+	global objects. It could use more than one global object if it chose.
+
+	4/30
+	When application wants to change global attributes should it send
+	method to body or to global object?
+	Seems like global object is the correct thing since as far as I can
+	tell the body will not have any attributes in it. This will prevent
+	documents from being saved with attributes, but that would be a
+	problem anyway if the user opened multiple documents with different
+	saved attributes.
+	Could provide ability to set attributes to a selected object which
+	would allow user to immedidately reset attributes of given document.
+	Global object needs to keep current and default tool also. So even
+	before a document is opened in draw the tool can be set by the user
+	without having it pop back to the pointer like it does now.
+
+	GrObj will need a list of each global object that has been
+	created so it can destroy them we it is killed off.
+
+	What is the data structure maintained by Global object?
+		For each group of bodies it will need
+			current tool
+			default tool
+			floater object
+			line attributes
+			area attributes
+			text attributes
+			current body
+
+		For each body it will need
+			body OD
+			potentially the gstate and object modes for
+			the body. I noticed that both of these are
+			saved in special array in the grobj. This is 
+			because setting the gstate and changing the
+			object modes doesn't dirty the objects
+			because it would dirty every object in the
+			document on start up (gstate) and any time
+			the user switched from drag modes and such.
+
+		Perhaps the object modes should be consistent for all
+		bodies under the GO. Except that target and closed
+		are body specific.
+
+	How does application or global object keep track which
+	document is the current one?
+	If GO keeps track then could have a GO method that you pass all 
+	body method info to and it would send it to the correct body, or to 
+	all the bodies if necessary. Or could have GO method that returns
+	current body od, but that doesn't help the multiple case.
+	GO seems like the better place since when sending to multiple bodies
+	I can't continue using the display control because one document
+	could have mulitple bodies.
+	So I just need a way for the GO to know which body is the current one.
+	A method to GO with the body OD would be good. This way something
+	besides the body could notify the GO. But for draw, the body will have
+	to notify the GO. I wonder if the body gets a gained target even if
+	the lowest level target is lower than it. Body could also notify 
+	GO on lost target that it was no longer it. Of course the GO 
+	might already have a new one, so it will have to check the current OD
+	against the passed OD before zeroing the current on the lost target.
+
+
+	Talked to Doug 5/1
+	Need to make body a target win excl node. Some functionality will
+	need to be added to the content for this to work. Once this
+	is functional I will need to add HierarchialGrab structure to
+	body and then field events like GAINED_TARGET LOST_TARGET GET_TARGET
+	and a couple others. Prime examples are available in the
+	VisIsoContent code.
+	problem - won't be able to send method to none target body. This
+	could affect the spreadsheet because the body in the graphic
+	layer may not have the target while the spread sheet is up. Of
+	course the OD of the body was returned when it was created. Does
+	this mean that the TEXT_OP methods must be handled by the body 
+	too? Yes, this was necessary anyway, the GO would have passed
+	these methods on through from the UI.
+
+	For now I can change draw to only allow one document open and
+	hardwire the GO to send to this single object. This will help
+	for gene.
+	
+
+	First pass for spreadsheet GO needs 
+		Data structure
+			current tool
+			default tool
+			floater object
+			current/only body
+
+		Methods to 
+			set current tool
+			set default tool
+			create floater? - currently this is done when
+					  current tool class is set
+			method to body
+			method to all bodies?
+			add body
+
+
+	My Thoughts 6/14
+
+	Routine to create GO and return OD
+	Need block in library to hold od's of all GO
+	This block will need to be accessed by many threads
+	GO should be run by app thread, so create routine will
+	need to be passed processHandle
+	
+
+
+	
+	If ui calls exported routine in library to get info to the
+	grobj/body/object, the library code will be executing in the
+	ui thread so it will be unable to call and get info, such
+	as a text object od. 
+
+	In at least the case of the text object then, the library
+	routine will have to create a stack frame with the text object
+	method data and send a different method to the GO. May end up
+	with two stack frames, the other will be necessary for the text
+	object method data.
+
+	What will be the interface from the app programmers view.
+	Need to consider text object methods and normal methods.
+
+		1. Normal methods could all be sent directly to the
+		GO. This means that things like area attributes 
+		would need two or three separate methods to
+		change global attrs, selected objects attributes in
+		target body and all selected objects in all bodies.
+		Text object methods would instead have different
+		exported routines to choose between these three.
+
+		2. Have one exported routine that you pass flags to
+		to direct the method. Flags would include global,
+		selected,edited,target body, all bodies, text. This
+		exported routine would need to take all the 
+		parameters of ObjMessage. The problem is that there
+		are no available registers to store the flags. Unless
+		the GO identifier was not an OD but just some number,
+		then I could use either bx or si to hold the flags.
+		Some number could be the block handle, particularly
+		if I guaranteed that the GO was at the same chunk
+		handle each time.
+
+		The exported routine would examine the text bit
+		and if it was set, it would slap all the instance
+		data into a stack frame and send it with say a
+		METHOD_TEXT_OP to the GO.
+
+		The global object upon receiving a method would
+		be FUCKED because the flags would not exist.
+		Not necessarily so. If none of my methods expected
+		the flags in cx, then the GO could put the flags
+		there before sending off the method.
+
+		3. All my methods could use say cx to store
+		the flags and pass any other data in dx,bp.
+		The text object methods would still need
+		several exported routines. Such as
+			TextGlobal
+			TextSelectedObjects
+			TextEditedObject
+			TextSelectedObjectsInAll
+			TextEditedInAll
+			
+		4.  I think I am over doing it. Just go with
+		number 1, there aren't that many variations. For
+		text provide methods like METHOD_GH_GLOBAL_TEXT_OP
+		as well as exported routines which will set up
+		call to this method.
+
+
+		5. Methods for GH should go directly to it. 
+		   SET_GLOBAL_AREA_ATTRS. Methods for one body
+		   or all bodies should go through routines
+		   like GraphicHeadMessageToCurrentBody which
+		   would be like the text message routines 
+		   shown below.
+
+
+
+
+
+	My Thoughts 6/17
+		Draw needs to store the global object od somewhere
+		so that attribute and such methods can be sent to 
+		it.
+		Needs to be accesible from ui thread
+		Stick that baby in idata.
+		Use mov ax,dgroup for now - this will eventually change to
+		some call.
+		Should probably create a drawGlobal.def file and define
+		the GO od data structure there.
+
+
+		Methods to change global things need to be in GO class
+		Methods to change things in body need to be in GraphicClass,
+		because both GO and Body need to handle these.
+		Object specific methods still in ObjectClass
+
+
+	TALK WITH TONY/JON ABOUT GSTATE/MODES
+
+		Problem of gstate and object modes in blocks that
+		are not marked dirty. 
+
+		1. Store gstate and global modes in library indexed
+		by vm file handle. Would have to call the library
+		everytime the data was needed. Could be slow 
+
+		2. On relocation (only when file being read in, not
+		during unrelocate/relocate of save), zero the gstate
+		and set invalid bit in modes. When attempting to 
+		use either, check for valid data and if it is not
+		found then GRUP for it.
+
+		OOH OOH - the gstate and the global modes could
+		actually be stored in the lmem header for each 
+		block, so they would have to be recovered less
+		often, instance data in each object will be saved
+		and accessing the gstate will actually be faster
+		in some cases.
+
+		OOH OOH - I could have one block with lots of
+		global data and its handle could be in the
+		lmemHeader. Is there other info that could
+		go in this block?
+
+		WOW OOH OHH - have each block created by the
+		body have a little dummy object in it that's
+		only instance data is the body od. Since this
+		will get relocated and unrelocated the body
+		od will always be valid. When an object needs
+		something like the gstate, global modes, 
+		handles sizes, it could just snag the od
+		(the dummy object will always be at the
+		same offset), lock the body (ObjLockObjBlock)
+		and pull out the needed data.
+		The objects handle should be at 
+		size ObjLMemHeader+4
+
+		However, this causes problems with accessing data
+		in a subclassed graphic body. Dummy could just
+		keep od of body and then objects would still have
+		to GRUP to get the info they need.
+
+
+	Floater Issues
+		When creating a new floater need to terminate create
+		and destroy old floater.
+		Create new floater and set it's parent link.
+		Need routine that takes class of new tool. This routine
+		should call destroy routine and basic routine that allocates
+		one object in a block for head (could also be used for body).
+		I guess this routine might as well send activate create to.
+			GraphicHeadCreateFloater
+		Routine to destroy floater
+			GraphicHeadDestroyFloater
+				should it send TERMINATE AND CREATE?
+				probably, but it currently won't
+				know of the method because head is
+				before object in grobj.def
+		
+		floater should be created when current tool is set and
+		a current body exists. Or when a a new body becomes the
+		current body and no floater exists. If the floater does
+		exist and a new body is made the current one, the floater
+		needs to have its upward link reset.
+
+		When floater created it can count on head od being set in
+		body.
+		CurrentTool will always have a valid class in it.
+
+
+		Why does floater need a visual link to the current
+		body instead of say the head?
+			access priority list
+			vup for mouse, focus
+		Is any information in the floater specific to the 
+		current body?
+			upward link (duh)
+			gstate - this may become global
+
+		Things that can happen to the floater
+			Parent body goes away
+				destroy it
+				or
+				nuke link
+				reset instance data ala basic init
+				release mouse, et al
+			Parent body ceases to be current body
+				destroy it
+			Terminated
+				follow passed command (add,destroy)
+				reset instance data ala basic init
+			Finish being created
+				duplicate and  add
+				send after create
+				reset instance data
+
+		Do I guarantee that set current body will only come
+		when there is no current body. Should be ok since they
+		are sent on lost/gained target. If so, what does floater
+		do when it's body becomes not the current one.
+			It could be destroyed and when new body becomes
+			current and new floater is created
+			It could go dormant and reattach itself when
+			a new body becomes current
+			NOTE: a floater is not created when the tool changes
+			unless there is a body.
+			Is there any message I would want to send to a
+			bodyless floater. No, it should acquire any info 
+			it needs when it is created.
+
+
+
+
+		How does body send messages to the floater
+			Encapsulate a message and send it with a
+			message to the head
+
+		Body MUST make itself not the current body before
+		it is removed from the visual tree. Otherwise
+		floater couldn't release mouse and stuff
+			
+
+
+DEFAULT TOOL
+
+	Having the grobj switch back to the default tool is undesirable
+	from an apps control point of view. It would be better if the
+	app was notified that a tool had completed its job.  The
+	grobj could automatically create a new tool of the current class.
+	If the app wanted to pop back to the pointer, it could reset the
+	tool when it was notified. This does leave a window of vulnerability
+	between the time that the app is notified and the method it sends
+	out reaches the graphic head. Possibly the grobj could call the
+	app and the app could stick its method at the beginning of the queue.
+
+	Body could send current tool along with tool done method to
+	the ui. The ui could then decided if it wanted to changed to the
+	tool. If so it would send two classes to the head, 1 - class
+	of new tool, 2 - the class of the tool that just finished. When
+	the head received the method it would only set the new tool class,
+	if the current tool class matched the second passed class. If these
+	two didn't match, it means that the user chose a new tool in
+	in the window of vulnerability.
+
+
+NEW UI and ATTRIBUTE STUFF and HEAD 7/6
+
+	Create set of generic attribute changing messages. If head
+	receives one it sets its own attributes. If body receives
+	one it sets the attributes of selected object and passes	
+	it off to head. If app write wants different behaviour for
+	setting default attributes he will have to subclass body
+	handler. 
+
+	OUCH - this gets a little weird with encapsulated text object
+	methods. Generally text object methods are considered to
+	be these generic attribute methods. So when the body receives
+	an encapsulated method it will send it to the selected object
+	and pass it off to the head. This however is a problem
+	because some text object methods are not attribute related.
+	Such as SET_TEXT. The spreadsheet may want to set the text
+	for a graph label. Of course the spreadsheet could just send
+	the text directly to the specified object as it will have the
+	od for each and every one. Tony thinks that we should blow
+	this off for now.
+
+	Head must still know current body so that it can set up the
+	floater correctly, but only bodies should be sending the set
+	current body to the head. My CreateBody and CreateHead routines
+	are very iffy because they are useless for someone who is 
+	subclassing them.
+
+	10/8
+	Currently the attribute setting routines take a record
+	with the structure specifying which fields are valid. This
+	should change to use suspend and unsuspend like geowrite
+	for consistency. Will need to change object draw handers
+	and such to check if they can truly draw. (gstate = 0
+	suspend bit set)
+
+
+John and Gene Spreadsheet discussion
+
+
+	Object instance data bit and method sent when draw pt is used
+	so that it can adjust for documents that are larger that the
+	graphics system.  Spreadsheet could subclass this method and
+	adjust draw pt or provide deltas to it to draw object in
+	correct place.
+
+	Special methods for when using draw pt and when changing
+	draw pt.
+
+	Problem of object being moved and travelling outside the
+	range of its anchor cell/point. More special methods for
+	moving sprite and drawing sprite?
+
+	Need static object methods for creating charts.
+
+	Methods to tell body to grab mouse and release it when 
+	switching in and out of graphics mode.
+
+	Consider which new features would be good for both new
+	verison of draw and benefit the spreadsheet.
+
+	HMM
+	Double clicking on object in Excel results in attribute box about
+	it being brought up. How to easily do this. Double clicking could
+	deselect all other objects, then the ui update block would contain
+	that objects information. Still app would need to be informed of
+	double click.	
+
+
+New Spreadsheet discussion 6/5
+	different locking attributes are important
+		resize
+		move
+		rotate
+		edit
+		delete
+		selectable
+		attribute change
+	
+	hidden attribute bit - selectable but not drawable
+	 (for making piece of pie chart disappear)
+	
+	not-printable attributes - for info text, other guides
+	
+	no hit detection attribute - (for graphic ornaments in
+	data entry mode)
+
+NEEDS FOR GEOWRITE
+	select objects in/overlapping a given rect
+	wraparound attribute
+	modify selected list based on attribute settings
+		(select all wraparound objects or all non wraparound)
+	notification scheme - OD to send to and type of change
+
+
+
+
+My thoughts on grouping 1/21
+
+	Should be able to apply objects transform to group objects' transform
+	All objects would have to save and restore group transforms ( ie
+	the transform that was passed to it), this enables multiple level
+	grouping.
+	
+	Objects will need full transform
+		drawing object
+		drawing/erasing sprite
+		possibly during calculations
+		drawing to gstring
+
+	Could have grup method to return full transform, but very slow
+	Problem of object sending draw methods to itself, won't have full
+		transform 
+	Object could have IN_GROUP bit, if set it could request full
+	transform with grup if self inflicted drawing.
+	Objects on top level (children of body) don't need full transform,
+	just default, as long as no objects damage originally set default
+	Possible interesting effects could be done by storing a default 
+	transform in the body, rotate entire body.
+
+	For sanity's sake, have a FULL_TRANSFORM_BIT in object signifying if
+	the current gstate transformation is correct for object. Routine to
+	calc full transfrom checks bit. Routine to reset passed transfrom
+	clears bit. Actually, should use ref count of how many requests to set
+	full transform. Only needed if a routine that sets full calls another
+	externably callable routine that sets full
+
+	For saving the tranforms could have my own LMBHeader which
+	had room for the tranform. Each block would have one. Or
+	tony suggested the temp chunk ability.
+
+
+		
+
+
+
+GROUPING	8/23
+
+	The group object will need child linkage
+
+	By default messages will be handled by group, so I only need
+	enumerate messages to be passed to children
+		SET_ATTRIBUTES
+		*MSG_O_CLEAR
+		*MSG_O_DRAW
+		*MSG_O_INVALIDATE ???
+		*sprite drawing messages or just invert object sprite
+			problem INVERT_OBJECT_SPRITE expects transform
+			already applied, DrawSprite require action
+			happening. Further complicated by that fact
+			that children wont have sprite data. Sounds
+			like new message
+
+	Zingers
+		MSG_O_COPY_OBJECT
+
+	For draw messages, the group will need to apply its
+	transform first and then send to children
+	Same for draw sprite - unless drag as rect mode
+
+
+	todo
+		routine names in header		
+		hit detection
+		delete
+		ungrouping
+
+
+	Routines Needed
+		*MSG_O_APPLY_TRANSFORM
+		*MSG_O_AFTER_REMOVED_FROM_GROUP
+		*Find child position in draw and reverse list
+		*ObjectMessageToGroup
+		*Create and get gstate message handlers
+		*MSG_O_AFTER_ADDED_TO_GROUP
+
+	Creating a group
+		bail if no selected children
+		get selection bounds 
+		error check size of group
+		instantiate group object
+		init group to size of bounds
+		calc center of group
+		calc position of highest selected child
+		add group to body at position of highest selected child
+		process selected children in draw order
+			remove from body chains
+			remove from selected list
+			add child to group
+			move child -center of group
+			set reverseLink to group
+			set in group bit
+		select group object
+
+	Ungrouping
+		Which objects should/must be switched to full transforms
+		objects that were rotated and the group was scaled must convert
+		bitch to separate scale and rotate, so if either applied to
+		rotated object then convert.
+		what about unrotated objects - shouldn't ever have to
+		same with flipped objects
+		but wouldn't it be more consistent for user, though space
+		wasteful to always convert
+		Don't compliate it - convert them all
+			beware of text object and bitmap - editing problems
+
+		Get reverse position of group
+		remove group from body
+		Process each child in group
+			??????Add group center to child center
+			Trans/Untrans this value through groups transform/null
+			Move child abs to this position
+			send group transform to object -MSG_O_APPLY_TRANSFORM
+			clear in group bit
+			remove child from group
+			add child to body using groups reverse position
+			add child to selection list
+		destroy group
+
+	MSG_O_APPLY_TRANSFORM
+		convert to full if necessary
+		create null gstate
+		copy group trans to it
+		apply object trans to it
+		stick back in object
+		recalc dimensions
+
+	To Be Resolved
+		should I check in group bit when drawing handles
+		*should I show individual object sprites when moving group - yes
+
+	Charting Grouping Problems
+		Not clear whether all objects in chart should be part
+		of one group. This faciliates moving the chart and
+		resizing but you still need to be able to select
+		individual objects or groups inside of chart.
+
+		When chart is resized, some objects inside it need
+		to resize, while others, like text are not supposed
+		to change their point size.
+	
+		Other solution is to provide notification mechanism
+		so that the spreadsheet will know when the chart
+		has been moved or resized and then it can 
+		move or regenerate all the objects in the chart.
+		This allows the charting much more flexibility in
+		laying out it's chart.
+
+
+BITMAPS/TEXT/SPLINE/SOLE GROUPS
+		Need to specify for group text/bitmap class, what 
+		the class of its sole child is. VisTextClass, BasicTextClass
+		DataBaseBasicTextClass.
+		
+		New class, something like GrObjVisParent which is a
+		graphic object that has one child which is a vis dude.
+		
+		GrObjVisParent will need to know what the class of 
+		its child is.
+
+		Some objects, like text and bitmap, will be created by 
+		dragging open a rectangle. Others, like bitmap and spline 
+		will be created by the vis object itself.
+
+		Can floater still just be GrObjVisParent (GOVP) or does
+		it need to have the vis child created? Seems to be a 
+		problem even for text object because the width/height depends
+		on the text font/style/..
+
+		So, user selects tool and a GOVP is created and it creates
+		a vis object of the proper class underneath it.
+
+		It seems that GOVP will need to be vis object specific because
+		it will need special knowledge of the vis child. Like
+		constrain for text object. Maybe this can be done in the
+		vis subclass, but that remains to be seen.
+		
+		For drag create, the GOVP floater handles the mouse events
+		events and on end select it does usually add duplicate
+		to body. 
+
+		For start selects the floater GOVP must determine 
+		if there is a GOVP of same vis class under point and pass
+		control to it. This is clear for text objects, but more
+		of a problem for bitmap because bitmap tools will want to
+		be passed to existing bitmaps but bitmap create tool
+		(easel) needs to create a new bitmap. Possibly two different
+		GOVP classes and the easel class would have no associated
+		VisBitmap until it was added. When user selects a bitmap
+		tool, draw will need to created a GOVP and then send it
+		encapsulated message so set correct bitmap tool in 
+		vis bitmap child.
+
+		Assuming the start select needs to be passed through, the
+		GOVP must convert the mouse event back to a normal mouse
+		event for the vis object. GOVP will need to know whether
+		to create a large or small mouse event.
+
+		When that start select gets to vis object it will grab the
+		mouse. The questions is, who is the vis parent of the
+		vis object. It really needs to be the GOVP so that it
+		can grab the mouse from the body.
+
+		How will GOVP handle messages like vis grab mouse shit. 
+		First guess is that I will need vis objects to send
+		messages to themselves when they need to grab the mouse.
+
+		Of course mouse grab may not matter since the GOVP will
+		already have to have the mouse grab just so that it can
+		give mouse events to the vis child. but this will be a
+		problem for other things like target, focus. I think.
+
+		Let's just say the user has selected the pencil tool and 
+		tells its child about the pencil tool.
+		So the floater gets a start select,
+		it checks the child underneath the point and it is a bitmap.
+		Floater needs to get the tool from the its vis bitmap and
+		tool the vis bitmap in the document about the pencil tool.
+		Use an encapsulated message for that.
+		Floater sends grobj start select to GOVP in document, GOVP
+		grabs mouse from body, convert mouse to start select and
+		passes it on to its child. Pretty straight forward. Bitmap
+		doodles with pencil with the GOVP converting all grobj pointer
+		events to pointer events until GOVP gets grobj end select.
+		end select is converted and sent to vis bitmap then GOVP
+		releases mouse.
+		
+		Text object wants to be keep simple transform as long as
+		possible, but what happens to text editing after going to
+		full transform.
+
+		Bitmap needs to drawn with full transform or some special
+		scaling based on bitmaps bounds and object dimensions
+		stored in GOVP.
+	
+		If bitmap is done with full transform it will grow in size
+		every time it is rotated. If I kept it in simple transform
+		I could unrotate it for editing like I planned for the
+		text object.
+
+		Do I really want the default resize behaviour of bitmaps
+		to be scale as opposed to changing bitmap real estate? 
+		This will cause some ui discrepancies with gstring dudes.
+
+
+		Things to think about:
+			object changing it vis bounds
+			selection
+			enlarging bitmap - separate from resizing
+			modifications to vis required by resize, rotate ..
+
+
+		Mechanisms
+			message to send encapsulated message to child
+			convert grobj mouse message to large/small mouse 
+
+CODING THOUGHTS
+	Adopt the destroy nothing standard
+	Spend several hours each week just commenting (maybe from home)
+	Object specific error checking routines for each object
+	Move structures and enums near methods
+	Don't overly optimize during first programming pass
+	For each routine decide if it is speed critical and if
+	not then remember to save bytes instead
+	fix up local labels
+
+
+
+
+
+RANDOM NOTES
+	Could see the use for a don't draw handles bit in objects. For 
+	example charting might want to select an object in chart and move
+	it to front or back of chart without handles showing. Or, chart
+	could just send shuffle method to body with od of object to shuffle.
+	Or, if objects are marked, it could shuffle marked objects.
+	Or more simple, there could be methods to manipulate the selection
+	list using the marks. Add all these marked objects to the selection
+	list. Remove all these marked objects from the selection list. Return
+	block of ods of all object with this mark. Would this mark provide
+	any more functionality than grouping? Would it allow "illegal" 
+	operations such as sending methods directly to objects in a group.
+
+	Throw out the mark idea. It would be better for the creator app
+	to maintain ods in chunk arrays to delineate things
+
+	Don't draw handles bit is still a good idea
+
+	Doing pie chart would be much easier if you could specify which
+	point to rotate about? This depends on the interface to the arc
+	routine in the kernel.
+	
+	While examine Excel discovered the possibility of having a 
+	group with the objects inside it individually selectable. This way
+	transforms could be applied to the whole group but each object 
+	could be moved.
+
+	Also could use ablility to make text objects non-editable
+
+
+TRANSFORMS
+	12/3
+	Noticed that resize routine is combination of figuring out
+	how much to shrink or enlarge object and figuring out how
+	to much to move the object.
+	So,need low level routines, one for moving, one for scaling
+	and one for rotating.
+	Then resize method would figure out how much to move and how much to
+	scale and then call the two low level routines.
+	Need further consideration on the mechanics of the low level routines
+	and the data structures in the object.
+	Need to analyze how constrain currently works and how it would
+	work with the new routines.
+	Decide what exactly constitues the object's coordinate system.
+
+TRANSFORM SHIT
+	1/25
+	Base coordinate system  (BASE)
+	Translated base coordinate system
+	Translated, rotated coordinate system
+	Scaled, translated, rotated coordinate system (FINAL, DOCUMENT)
+	Scaled, translated coordinate system 
+	Scaled, possibly flipped by scale
+	Scaled, not flipped by scale, just size changed (STANDARD)
+
+	Could use either BASE or STANDARD coordinate system for hit detection
+	Seems more accurate for rect, ellipses, etc to use SCALED so there
+	is no loss in accuracy when scaling down to base.
+	But for polys need to use BASE because poly points are in BASE, 
+	otherwise would have to convert all poly points to STANDARD
+
+	Standard object gstate transforms converts BASE coords to DEVICE
+	coords. Untranslating through null gstate returns DOCUMENT coords.
+	Reverse operation would convert DOCUMENT coords to BASE coords.
+
+	Is there a different set of transforms that I could use to convert
+	DOCUMENT to STANDARD? This would lower the amount of instance data I
+	need but would slow down certain operations I believe.
+	Still need translation and rotation stuff and flipping stuff but
+	no scaling in untransform gstate. But rotation stuff use scaled
+	rotate point offset (well, so what).
+
+	If I allow specify the rotate point I will need to be able to
+	convert a document coordinate to a STANDARD coordinate. There will
+	be confusion for the user in specify this point if the object
+	is rotated. They can't be given options like upper left, lower right.
+
+	Is there a problem with BASE coords when considering line widths?
+	For BASE rectangle to check would have to start with the rotated
+	bounds that surround the line width the convert to BASE, next
+	convert point to check to BASE and compare it to the converted
+	rectangle.
+
+	I need to decide which data structures are important and which
+	can be done without. I should list the uses of the rotated bounds
+	and rotated deltas
+
+	rotatedBoundsTL
+		position for draw and hit detecting handles
+		calculating normalized bounds
+		updating rotated bounds
+		calcing rotated deltas - only called in poly code
+		ObjectConvertToRotatedCoordSystem
+		Used by line code
+			METHOD_O_IN_RECT?
+			METHOD_O_EVALUATE_POSITION
+			HIT_DETECTION
+			DRAWING HANDLES
+		PolygonGenerateBaseDataFromCur
+		PolygonAdjustRotatedBounds
+		
+	rotatedBoundsBR
+		position for draw and hit detecting handles
+		calculating normalized bounds
+		updating rotated bounds
+		calcing rotated deltas - only called in poly code
+		Used by line code
+			METHOD_O_IN_RECT?
+			METHOD_O_EVALUATE_POSITION
+			HIT_DETECTION
+		PolygonGenerateBaseDataFromCur
+		PolygonAdjustRotatedBounds
+
+	rotatedBoundsBL
+		position for draw and hit detecting handles
+		calculating normalized bounds
+		updating rotated bounds
+		calcing rotated deltas - only called in poly code
+		initialized in poly code
+		PolygonAdjustRotatedBounds
+
+	rotatedBoundTR
+		position for draw and hit detecting handles
+		calculating normalized bounds
+		updating rotated bounds
+		calcing rotated deltas - only called in poly code
+		initialized in poly code
+		PolygonAdjustRotatedBounds
+
+	rotatedDeltaLR
+		ObjectEvaluatePosition
+		ObjectFlipHorizObject
+		ObjectSetPositionAndSize
+		ObjectVerifyInstanceData
+		ObjectDecideMiddleHandles
+		ObjectOutputIDEsc
+		ObjectCalcRotatedDeltas
+		ObjectInitSpriteObjectTransform
+		ObjectModifyObjectTransformForScaling
+		ObjectResetInstanceDataAfterScaling
+		ObjectCalcObjectTransformScale
+		ObjectRecalcOptimizationData
+		BitmapPointInLineWidthRect?
+		EllipsePointInLineWidthEllipse?
+		EllipseConstrainDeltas
+		RectPointInLineWidthRect?
+		RectAdjustDeltas
+		BasicTextGStringDraw
+		BTTweakVisBounds
+		BasicTextAdjustDeltaX
+		GStringConstrainDeltas
+
+	ObjectConvertToRotatedCoordSystem -> ToStandardCoordSystem
+		ObjectEvaluatePosition
+		RectEvaluatePosition
+		EllipseEvaluatePosition
+		BitmapEvaluatePosition
+
+	BaseBounds
+		InvertObjectSprite
+		SetPositionAndSize
+		ObjectOutputIDEsc
+		ObjectUpdateRotatedBounds
+		ObjectCalcSpriteObjectTransformScale
+		ObjectCalcObjectTransformScale
+		DrawLineLine
+		DrawBitmapArea
+		FillEllipseArea
+		DrawEllipseArea
+		Polygon..
+
+	Objects that will need base bounds anyway
+		bitmap
+		polygon
+		polyline
+
+	Objects that don't need base bounds
+		rect
+		ellipse
+		line
+		text
+	
+	Only speed critical place is CalcSpriteObjectTransformScale routine.
+	Could add a method to send to obect to get it's base bounds,
+	the default method would return 0,0 1,1
+	The sprite lmem could temporarily hold the base bounds of the object
+	which would be gotten via the method at the begining of a resize.
+	How careful do I need to be about the size of the sprite lmem.?
+
+	Is the drawPt translated into document coords the rotatedBoundsTL?
+	The upper left of the base bounds transforms to the rotatedBoundsTL.
+	So yes the drawPt transforms to the rotatedBoundsTL.
+
+	Can I dispose of any instance data or move it to lmem?
+		sprite stuff -> lmem
+		*possibly rotatePtOffset - it can be easily calced from
+		width and height of object, but only if it remains
+		in the center of the object.
+	Q. What is the benefit of being able to choose a point to rotate about?
+	A. At current I can't see big reason so lets nuke it for now.
+	   Actually, if rotate possibilities are only corner or center of
+	   object then offset is not needed. Only need flags telling where.
+	   If arbitrary point is allowed then need to store offsets
+
+
+	Should the rotated bounds be WWFixed?
+	At least the upper left of the rotatedBounds in WWFixed?
+	If I keep the upper left in rotateBounds I can still do 
+	the handle drawing and hit detection reasonably quick. Using
+	the upper left I can convert a mouse point into STANDARD
+	coords and then check against width and height. For drawing
+	I convert in the opposite direction and add values to the
+	rotated upper left. I will have to convert each of the
+	3 corners for every time the handles are drawn. Will need routine
+	to convert from standard to document. 
+
+	DANGER this will make selecting mulitple objects slow.
+		Hit detection methods should only go to objects whos
+		bounds encompass the point - not speed issue
+		Hit detection only requires converting mouse pt - no problem
+		Drawing handles for one object should be acceptable
+		If a bunch of objects are selected drawing will be slow
+			expose
+			deselecting
+		Dragging to select a large number of objects only a few
+		are drawing their handles at once
+
+	Can I overlap sprite lmem and rotated bounds info
+		alloc when selected
+		alloc when moved if not already alloced
+		makes file size larger if lots of objects selected when saved
+		strange problem when drag selecting a group, don't want
+			objects allocing and deallocing lmems
+		could have object check if lmem exists and if not then
+			calc corners, solves alloc/dealloc problem. would
+			also speed up moving many objects because chunks
+			would already be alloced. slow down would occur
+			after release of button on drag select when
+			many objects alloc chunk
+
+	Current Disposal and Modification Plan
+		rotatePtOffset
+		origMousePt
+		sprite stuff in lmem
+
+
+
+LOW LEVEL TRANSFORM ROUTINES
+	Move Object
+	Rotate Object
+	Scale Object
+	Flip Object
+
+	Move object - just modify standard data
+	Move object - move from standard data and store result in sprite
+	Copy sprite data to standard data
+	Copy standard data to sprite data	
+	Have low level routines take ds:si as source and es:di as
+	destination. They can be the same structure
+
+	DocumentToStandard - ObjectConvertToRotatedCoordSystem
+	StandardToDocument -   " with negative of degrees
+	DocumentToBase - ObjectConvertToBaseCoordSystem
+	BaseToDocument - Normally done when drawing
+
+	What about mouse events.
+		movement needs document coords
+		resize needs deltas,but uses both standard and document
+		rotate uses document
+		text object uses document
+	Q. Could I just send document deltas to objects and save more instance
+	data
+	A. I think rotate would have a problem. No rotate could be handled
+	by the pointer object. It would have to get the center of the current
+	object and save it and then send out the rotation amounts.
+	Q. What about create.
+	A. It could uses the rotatedBoundTL as the orig point, or drawPt
+
+	Solution: Pointer should save orig mouse pt and only pass delta
+	or angles as in the case of rotation.
+	To really generalize the resize ptr methods would have to pass
+	info on which handle was grabbed so that mulitple objects could
+	be resized at once.
+
+
+SCALE PROBLEMS
+	All this junk is for trying to figure out where the new draw pt is
+	after a resize.
+	Resize is comprised of a size change and a move
+	Size change is relatively straight forward
+		Convert mouse deltas to standard coord system 
+		these are the absolute value of size change
+		Zero irrelevant deltas (if grabbed a middle handle)
+		Determine sign of size change, it
+		depends handle resizing from and curFlip state
+		Add size change values to width/height
+		Can also now set rotatePtOffset to middle of object
+
+	Movement of center
+		Get deltas in standard coord system
+		Zero unnecessary deltas
+		Divide delta in half
+		If curFlip is set then negate approprate delta
+		
+	Moving rotate pt changes draw pt
+	Resizing changes DrawPt, even resizing from center
+
+	Motion of rotate pt corresponds to motion of the draw point
+	in magnitude and direction. The rotate point will always
+	move along the axes of the object mapped to the document 
+	coord system.
+
+	The draw pt also moves when the mapped draw pt is moved in 
+	relation to the rotate pt. The draw pt moves the change in distance
+	between the mapped draw pt and the rotate pt along the axes of
+	the document coordinate system.
+
+	In case of the center being the rotate point
+
+	movement of center = (Unrotated((Rotated (mouse deltas)/2)))
+	relative movement of mapped draw pt =
+	(1/2 old dimensions - 1/2 new dimensions)
+
+	drawPt = drawPt + movement of center + relative movement of mapped
+
+	This doesn't take into consideration whether the object has been
+	flipped. Actually the flipped stuff is relatively straight forward.
+	It is take care of by Size change and Movement of center calculations
+	listed above. For alternative rotate points will need separate
+	movement calc routines for each corner. I don't know about
+	random points.
+
+
+	I believe the new draw pt could be calced from the new position
+	of the mapped draw pt, translated through a new gstate and then
+	untranslated through a gstate with the objects transform except
+	for the initial translation.
+
+
+ROTATE ABOUT ARBITRARY POINT
+
+	User ends rotate about mode.
+	Pointer displays a marker, small circle with x in the middle of it.
+	Marker can be picked up and moved around.
+	If user the uses rotate tool to click on handle of object,
+	all selected objects rotate about that point.
+	To acutally rotate object would need to send it the angle
+	and the center. Object would:
+		calc offset from draw pt to center
+		object rotates itself
+		create gstate
+		translate gstate to center
+		rotate gstate
+		transform offset through gstate 
+		untransform result through null gstate to get new draw pt
+
+CONSTRAIN
+
+	Should be able to constrain
+		size
+		angle - horiz, vertical
+		aspect - circle,square
+		side of axis - ie no flipping
+		rotation degress - ie every 10 degrees
+		aspect ratio
+
+	Current method 
+		Determine desired size from sprite size
+		Calc delta between desired size and current size, taking
+		into consideration the spritFlipFlags by negating desired
+		width before subtraction if flip is set. This creates the
+		change in size deltas.
+		Adjust sign of the change in size deltas depending on
+		handle grabbed negate for left and top. Because normally
+		a positive delta when grabbing the left handle would 
+		shrink the object.
+		I believe that the deltas are now in STANDARD coords, the
+		steps below do this conversion to DOCUMENT
+		Adjust sign of deltas based on cur flip flags
+		Convert deltas back into DOCUMENT coord system
+		Apply deltas to current size to get desired size in sprite info
+
+
+	Q. Could I just set the sprite data the way I want. For example,
+	to constrain a rect to a square just set the height or width
+	to the opposite dimension.
+	A. Seems like I would have trouble with the drawPt. I would need
+		to be able to recalc most of the tranform info.
+
+
+	Options
+	1. Examine deltas before applying
+	2. Examine data after applying deltas and apply new deltas to 
+	   original data
+	3. Examine data after applying deltas and apply new detlas to 
+	   sprite data
+	4. Examine data after applying deltas and change data
+	
+	It seems that 4 is really the same as 2 and 3, we change the data
+	by applying new deltas
+
+	It is important to constrain object using same handle user is
+	resizing from.
+	
+	To apply new deltas to sprite data would require ModifyForScale 
+	routine to take two transform structures instead of an object. This
+	is not terrible I just don't feel like doing it now.
+		
+	If resizing from center, constrain routine needs to know. The change
+	in size deltas would be twice a big as necessary otherwise.
+
+
+	Seems like size constrain should be global routine and always called
+	while special constrains can be methods.
+
+
+	New Constrain Stuff 7/14 after talking with jon
+
+	On create have objects constrain as such
+		rectangle to square
+		ellipse to circle
+		lines to horizontal, vertical, 45 degrees
+	
+	On resize have all objects do aspect ratio constrain
+		squares will retain their squareness
+		circles will maintain their circularity
+		lines will extend along their current direction 
+			regardless of whether they were rotated
+		rectangles and ellipses will maintain their ratio
+		bitmaps and polygons will do the right thing
+
+
+GRIDS
+	When creating objects force corners/points to grid intersections
+	If object is created with grid off and then grid is turned on
+	have object move/resize in increments of grid but not actually
+	on grid. Provide menu item to align object to grid. This will
+	get this object back onto the grid.
+
+	If rotated object is moved/resized attempt to line up leftmost 
+	point on a vertical grid line and the top most point on a 
+	horizontal grid line. (don't sweat about intersections)
+
+	Don't fuck with the mouse.
+
+SPRITE LMEM
+	Handle should always be zero when not in use
+	Should have errorchecking to that it is not zero when accessed
+	and that it is zero when alloced
+	When to alloc it
+		Activate routines for move,resize,rotate
+		What about create. init?, activate?
+	When to dealloc
+		End routines for move, resize,rotate and create
+	Routine to alloc it should initialize it to normal data
+	Routine to dealloc should set handle to zero
+	Consider refresh problem. in general- if object is being read in
+	for the first time the sprite lmem should be vaporized if it exists.
+	and the file should be dirtied. However, could have alloc routine
+	re-initialize if chunk handle is not zero,but seems cleaner to
+	dirty file.
+	How careful do I need to be about the size of the sprite lmem.?
+
+	DANGER, I will have to be more careful about the number of objects
+	in a given block because the sprite lmems provide expansion for
+	objects that didn't expand before.
+
+
+DEF FILES
+	need file for exported things
+		many methods for objects
+		position and size args	
+
+	need file for things global to grobj (body and objects)
+		grup methods
+
+	need file for things that just objects use
+		internal structures - transform struc
+
+
+	if struc is part of instance data it should be in class def file
+	if struc is used by body and objects it should be in graphicClass
+		or grobjConstant
+	strucs and enums and constants needed for a method should be
+		with the methods
+	if people will be instantiating objects in .ui files do all
+		the internal object structures need to be exported
+
+	is grobj.def only used outside of grobj - 
+	or does order of includes determines access to constants,strucs 
+		inside library
+	how does body access stuff in graphic.asm
+
+	No Really - just organize structs and constants closer to the 
+	related methods. everything in grobj.def is accessible to everything
+	in draw so there should be no trouble. object instance data is
+	private by default and methods are public by default. So mark some 
+	methods as private to narrow scope of what library user can do.
+
+
+32 BIT DOCUMENTS
+
+	Have a 32 bit draw offset (32DRO) associated with each object, either
+	in the object or in an array like that planned changes for
+	the area attributes.
+
+	Objects current draw pt would be an offset from the 32DRO.
+
+	Before any operation involving the gstate I would need to call
+	GrSetDrawOffset. These operations are
+		Drawing
+		Graphics system converting that used gstates
+		Apply transformations? - this is just part of the above two
+
+	What about hit detection?
+		Mouse coord comes in 16 bits from upper left of window
+		Graphic Body has document offset - 32 bit offset to 
+		upper left corner of window onto document
+		Subtracting objects 32DR0 produces 16 bit document coords
+		which is what I work in now.
+
+	Moving Sprite Problem
+		May have to adjust sprite's 32DRO
+		Every time object sprite moves I will have to check
+		the distance from the 32DRO and adjust it and spriteDrawPt
+		as necessary
+
+	Calling GrSet32BitDrawOffset will cause gstate to recalc it trans and
+	maybe window. This affects performance
+
+
+	What about 48 bit draw pt, 32 bits of integer solution
+		could nuke initial translation in apply routines
+		but the 32 bit draw offset will not have fractional
+		so i will still have to apply translation for fractional
+		portion of draw pt		
+
+	drawPt usage
+		ObjectFlipHoriz - part of move
+		ObjectFlipVert - part of move
+		SetPositionAndSize
+		ObjectVerifyInstanceData
+		ObjectInitCreate - being initialized
+		OutputIDEsc
+		CalcFreeRotateAngle
+		InitSpriteObjectTransform
+		ModifyObjectTranformForScaling                         
+		ModifyObjectTranformForMoving
+		ResetInstanceDataAfterScaling
+		ResetInstanceDataAfterMoving
+		ObjectApplyObjectTransform
+		ObjectApplySpecialObjectTransform
+
+	HOLY SHIT - i haven't been thinking about other points
+	stored in the object. rotatedBounds, orig mouse pt
+	I believe this forces me to use 32DRO method
+
+	How far from 32DRO will objects be drawn? This affects where I 
+	choose the 32DRO for each object and how big I can let the object
+	get.	
+
+
+	GraphicBody will need 32 bit bounds
+
+	I am currently operating under the assumption that all my
+	objects will be receiving at least 32 bit values and maybe
+	48 bit ones with mouse events
+
+	Another possibility is to have all mouse events go through
+	the graphic body and have it do the conversion.
+
+	For testing now I can add a utililty routine to convert
+	cx,dx to DWFPoint stack frame and put UIFA in dx. I believe
+	that will have to be a macro, can't create stack frame in routine.
+
+	What about 32 bit integer resizes? This is garanteed to violate
+	the maximum size of the object. Should I pass the deltas as DWF
+	anyway since I have to handle excessive resizes anyway. Sounds
+	good. Where shall I handle excessive resizes. ObjectChangeSizeLow
+	should force oversized objects back to max size. At some point
+	I will have to nuke high word of DWFint and correct sign and value
+	in low int.
+
+	I will need to handle VisCompDraw myself to figure out which objects
+	actually fit within the exposed area.
+
+
+
+
+OTHER TYPES OF POINTER/CREATE TOOLS
+
+	For text object have ptrText class. When text tool is selected
+	from the palette a ptrText class is created and put in the
+	library. For clicks the ptrText class could pass mouse
+	events to an underlying basicText object, or it could create
+	( after click/release or after click/drag/release) a
+	new basicText object at the proper position.
+
+	Could a similar model be used for bitmaps and polypoints?
+
+	What is gained by this over having the code to handle
+	creation in the basicText object? Some space saving in
+	grobj block.
+
+	For bitmap, only a BEO can receive the mouse events because
+	of all the possible different pointer images.
+
+	When user chooses a new bitmap tool, it needs to set in
+	the floater beo. But if the user clicks on an existing bitmap
+	the new tool must be passed on to the underlying BEO.
+
+	Seems better to have same type of object in floater and just
+	sub class it to handle checking of pointer events. Which
+	is basically what is done now.
+
+
+
+
+OBJECT INITIALIZATION METHODS
+	It is a bad idea have different subclasses of a method
+	take different parameters
+
+	Objects with more complicated setup should have their own
+	init method, which may call basic init method.
+
+
+
+
+DRAW HANDLES ROUTINE
+	Do the handling drawing routines really need to be passed 
+	a gstate. If I remember only in the case of expose events
+	is a different gstate need and I could add a separate 
+	method handler for that one case.
+
+
+
+
+DISTANCE
+	Some where way back in my mind is something about using
+	arctan to calculate distances. 
+	Also, what about implementing a point to line distance
+	calculation routine.
+	
+
+WHEN TO STOP AND TEST FOR A COUPLE OF DAYS
+	after rotate and selection are working
+	after getting ellipse and line working again
+	after content stuff has changed
+	after attributes stuff had changed
+	after grouping has been added
+	after api complete
+	
+	
+
+NEW ROTATION
+	Pointer needs to get the center of the object that was selected
+	and store it. It must then calc the angle of the orig line and
+	the angle between subsequent mouse position and the center. It
+	will save time to store that initial angle instead recalcing it
+	each time.
+	The delta angle must be sent with METHOD_O_PTR_ROTATE
+
+
+
+JIM THOUGHTS ON LINE SELECTION
+
+	Form rectangle around line points and bump it out by line
+	width in each direction. Check for point in this rectangle.
+	If yes, then form three rectangles along line. From edge of
+	initial rectangle to middle of rect, from 1/4 into rect
+	to 3/4 and from 1/2 to other side. Check these three rects.
+	If still in, then continue dividing into smaller rects.
+
+	
+	Use r^2=X^2+y^2 and do a binary search of line segment midpoints
+	to find the closest point on the line and then do the distance 
+	formula or could even use r^2 value to that point.
+
+
+
+FOCUS
+	For pointer next and prev selection thing it needs the focus.
+	Certain objects, like the text object, can't have their floater
+	with the focus because a different text object may be in edit
+	mode and will need the focus to get chars. In general it seems
+	that floaters can alway grab the focus between start and end
+	select to facilitate canceling the action. The pointer can
+	be a special case and always have the focus.
+
+
+
+
+HIGHEST SELECTED OBJECT and CHILDREN UNDER POINT
+	HIGHEST SELECT OBJECT is currently only used for doing
+	hit detection on handles.
+	Both handle hit detection and children under point should
+	only be sent to objects who's bounds surround the point
+	in question. Currently only children under point does.
+	Handle hit detection should also only send to objects in
+	selection list. This can be done with ObjCompFind child
+	or I could cheat and check selection bit in object or
+	check the selection list field.
+	I could even use the rating system to choose move or resize
+	if I felt like it in handle hit detection.
+	Both methods handles would benefit from getting DOR coords.
+	Could have extra data returned from method and stored in
+	chunk array. This could hold transform flags.
+
+	Should methods sent to each object expect the priority list
+	block or should they just be passed the point and return
+	the rating and other info.
+	They could possibly add themselves to the list but that
+	seems wrong. It is more flexible but slower to have them
+	passed the point. Could I pass a far ptr to the point
+	or should I put in on the stack. Danger of passing fptr
+	seems nil since the object won't be causing anything to
+	move in the priority block.
+
+
+MORE 32 BIT / TONY SHIT
+	Body will need to support an 16 mode where its bounds are valid
+	to work with tony's future geowrite modifications. 
+	But what about mouse events. I will be needing 48 bit mouse events
+	that he will most likely be unable to supply. Maybe for the small
+	mode I will need to supply normal mouse event method handlers which
+	then convert the 16 bits into a stack frame mouse event.
+
+DOUGS VIS32BITTREE
+	How about another bit to prevent it from calcing the frac even though
+	it is sending out 48 bits. Better for speed purposes and provides
+	functionality draw will probably give to user.
+
+
+
+
+DUAL DIRECTION LIST AND RELATED TOPICS
+	When checking for handle being hit, the search continues all the
+	way through to the top of the list. I could just stop at the
+	first object that has a handle hit.
+
+
+
+PRIORITY LIST
+	Could have body allocate block and provide grup methods to 
+	access it.
+	This wouldn't be too slow because in general the objects that will
+	be accessing it will be the floaters which have a direct link
+	to the body.
+	This is also good for the case of one floater for mulitple
+	bodies. Each body will have it's own list to go with its current
+	selection, but the one floater will never know the difference.
+	But wait, currently the floater is destroyed and re-created when
+	a new body gets the target.
+	If floater not destroyed, will need to send it a method to 
+	notify it of switch so that it can reset its parent pointer
+	and reset the action object if that is necessary. At first
+	thought I don't think the action object can exist except during
+	select, drag select, move, resize or rotate, so their shouldn't
+	be any problems with it.
+	Since body will never be discarded, don't have to worry about
+	relocation.
+	Body should allocat it when it is opened and destroy when it gets
+	body closed.
+	Should it be in a separate block, or just part of body data.
+	Can't see much reason to take up a handle with extra block, will
+	have to be careful about deref body chunk, but I don't think I 
+	am using it much.
+
+
+
+
+
+SUBCLASSING
+	Think more about what methods other programmers will want to
+	subclass.
+
+	Setting Default Attributes From Body - to change behaviour
+	Drawing of handles - to change shape
+
+	Notification of move/resize.. Should have only one handler
+	in object that handles each of these
+
+	Interactive apply random transform, like skew. Needs changes
+	in pointer
+
+
+UNDO
+	If editing an object just send it the undo method, nothing
+	needs to be registered.
+
+	Only need to perform registering when operating on a bunch
+	of selected objects.
+
+	If nothing is selected can there be an undo? Don't think so.
+		Changing attributes in head?
+		Changing  tool?
+
+	The register must at least contain the od of each object that
+	needs to be undone. It could also maintain a method and the
+	data to be sent back to each object. But I think it would
+	be better to have each object maintain it's own undo data. 
+	This would probably be a word defining the type of undo
+	(the type could be a method number) and a word of data 
+	(possible an index into the attribute array or a chunk
+	handle to more data).
+
+	Deleted objects are their own special problem. Could either have
+	a bit in each that would mark it as deleted. But then I would
+	have to check that bit in all the methods an object handle. I
+	prefer the idea of a deleted list hanging off the graphic body.
+	The objects would be accessible but wouldn't be receving any
+	methods accept the ones I sent to them ( which should only
+	be Kill Yourself Now and Undelete Yourself )
+	
+	Consider problem of when to clear out undo register. I think the
+	best solution is to have each register of a new item clear
+	out the previous register unless the register has been explictly
+	perserved. For the multiple case, the body would clear the register,
+	perserve the register, perform the call to all the selected objects
+	then unperserve the register. Clearing the register might also involve
+	sending method to "deleted objects" so that they can truly
+	delete themselves.
+
+	Consider problem of undoing undo. Will I need two registers. If
+	I only store the ods in the register, then no. I will just have
+	to prevent the objects from registering themselves twice. This
+	could be done by checking for the od or explicitly locking the
+	register (would work similar to preserve mechanism, body would
+	lock register, send undo undo to all selected objects, then
+	unlock register.
+	
+	If however I decided to store methods and data in register then
+	I will need to have two register blocks because the undo data
+	will be different than the undo undo data. I might be able to
+	get away with a locking mechanism similar to the one mentioned
+	above, but in this case of locking an object that already 
+	existed in the registry would simply replace the old method and
+	data with the new stuff.
+
+	Would it be possible to use the selected list as the undo
+	register along with the delete list. This would mean that
+	the user would be unable to undo if he changed the selection
+	list. This seems bad because I would have to clear the 
+	undo info in every object on the selection list every time
+	a object was added or deleted.
+
+
+
+LAST IMPORTANT POINT
+	Set when clicking nowhere
+	Set to upper left of cut
+	On Paste
+		if last important point on screen then
+		paste to it, else paste to middle
+
+	This means that cut followed by paste will give you back
+	what you have.
+
+	Could zoom around last important point if no selected objects
+
+SELECTION HANDLES
+	It would be nice if the selection handles weren't so small
+	when zoomed out and so big when zoomed in. Could add parameter
+	to draw handles methods to tell it how wide to make the
+	handles. The body could set this parameter for large draws.
+	If object is sending method to itself it could just pass
+	0 and the draw handles handler could query for the size.
+
+SELECTION
+	When zoomed all the way out it is hard to click and select the
+	object because moving the mouse one pixel causes the pointer to
+	use the marquee instead. As with drawing the handles the same size
+	all the time, the pointer will need to know the view
+
+NO HANDLES
+	jon suggests a no handles mode.
+
+
+
+INVALIDATE OPTIMIZATIONS
+
+	Could add parameter to MSG_O_INVALIDATE to specify
+	whether object should actually invalidate if it
+	is the last object (LP_IS_PARENT). Many operations
+	would save time this way.
+
+	Instead of check parent bit, could use ObjCompProcessChildren
+	to see if any objects higher up are actually on top of
+	this object. If not, just redraw instead of invalidating.
+	
+	Problem, if object moves just a little bit, it will invalidate
+	at its old position, then with the optimized invalidate just
+	redraw at it's new position. Unfortunately, the expose from
+	the old position invalidate will come along causing it to
+	draw twice. Problem is exacerbated when moving multiple objects.
+
+	For things like color changes it would still work.
+
+	Talked to Doug 8/9
+	
+	Could do my own expose events. Create a gstate, call
+	WinStartUpdate, send expose, call WinEndUpdate. Would
+	have to prevent the object(s) in question from drawing
+	during the expose and the update them later.
+
+
+
+KEYBOARD MODIFIERS
+	Since the keys that set the UIFA_PREF_A,B and C bits are 
+	different for SELECT and MOVE_COPY bits, I will need to
+	monitor the keyboard modifies myself so that I can 
+	keep things consistent. I will even have to use
+	my own constrain because under different uis it might conflict
+	with with my other key choices
+
+
+
+CUT/COPY/PASTE
+	To facilitate subclassing of copy should have method handler
+	write out begining and end object esc and call utility routine
+	to do the rest. This way someone can subclass the handler
+	and write in extra escapes before and after the main object
+	stuff
+
+	Not sure If I can do something similar for paste. Guy may
+	just have to subclass entire functionality. Maybe jump
+	table for different gstring opcodes.
+
+
+
+MULTI BLOCK DOCUMENTS / POTENTIAL EXPANSION
+
+12/4/91
+	Sprite transform affects expansion
+	Undo will also affect expansion
+
+	Keep count of number of objects in block in
+	bodykeeper. If count ever goes to zero then free
+	the block. The prevents uncompactable empty blocks
+	from remaining in the file. Inc count when
+	object gets added to block and det count
+	when object get final obj free
+
+	Keep potential expansion in lmem header. Then body
+	would know when a block was empty of objects and
+	it could add objects to older blocks in document. This
+	also simplifies duplicating groups.
+
+
+
+GRAPHICS IN TEXT OBJECTS
+	What about selecting text and graphics in write and pasting
+	them into draw. 
+		Could easily paste the text with graphics into a
+		text object in draw. The problem is copying them
+		out to a gstring. I would need to be able to
+		create a mulitblock graphic escape to hold the
+		linked blocks created by the text object. And I would
+		need to be able to paste that linked block setup
+		back into the text object when parsing the
+		gstring.
+
+
+PASTE INSIDE
+	thought about this some more. For an object have an associated
+	gstring. after the object is drawn, the gstring is drawn 
+	clipped to the original object. Instead of a gstring is
+	could simply be another object, multiple objects could be linked
+	through their next field and each object could have it's
+	own paste inside objects. This might make deleting and undoing
+	a bit hard though.
+
+
+DRAW MODES
+	paint mode for draw. just creates a large bitmap over the whole
+	document and brings up the bitmap tool palette.
+
+	tiled paint mode
+
+	superpaint mode
+
+	canvas mode
+
+	illustrator mode
+
+EDIT LIST
+	When change to using selection list as edit list too will
+	need to methods for objects to show that they are being
+	edited just like handle drawing routines. Will
+	need same type of message handlers as sprite/handles.
+
+NOTIFICATION
+	Object sends message to itself with notification info
+	Default handler sends message to body
+	Chart and Database can subclass this handler and send
+	notification to their own od
+	Problem: How to set od in interactively created objects
+	such as database fields
+	Will need enum for notification and some other info to
+	go with enum. Probably want simple routine to set
+	it up.
+	Examples: End of move, resize, Start of move/resize for 
+	constrain, Select/Deselect, gained/lost target/focus
+
+	
+PROTOCOL
+	Do I need protocol number in body for other programs that
+	use body. If the grobj changes but they don't how would
+	they now about changes to grobj
+
+
+
+
+ERRORS
+	GraphicBody has set of error enums and associated strings.
+	Send message to body passing enum.
+	Appers can subclass message handler and take their own
+	action based on enum if they want to.
+
+
+
+DRAW FIXES:
+	Fatal Error if proper vm attributes not set. Probably in
+	message initialize
+	
+	Set proper bits somewhere in draw not grobj
+
+	Set vm preserve block bit for body in grobj
+
+	Replace NEW_SETUP, OPEN_SETUP, CLOSE_SETUP
+	with messages named to match gen document INIT,ATTACH,DETACH
+
+	On INIT
+		attach body to vm file
+		set preserve bit
+		puke if vm attributes for file not set
+		do whatever else done on NEW_SETUP expect 
+		possible bounds and margins
+
+
+	On ATTACH
+		attach to head
+		add to document/content
+		do open stuff
+		
+* Added GADCA_VM_FILE_CONTAINS_OBJECTS attribute in the AppDC that
+  causes the correct VMAttributes to automatically be set for VM
+  files.
+	*** GENE, STEVE: Use this in GeoDraw and GeoCalc
+	*** In AppDC: attributes = default +vmFileContainsObjects;
+
+	On DETACH
+		remove from head
+		remove from content
+
+
+	Provide other messages for doc, margins
+
+	GeoCalc needs a way to not dirty body when setting bounds

@@ -1,0 +1,402 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+FILE:		Internal/semInt.def
+
+DECLARER:	Kernel
+
+MACROS:
+	Name		Description
+	----		-----------
+	PSem		Do the P operation on a semaphore
+	PTimedSem	Do the P operation on a timed semaphore
+	VSem		Do the V operation on a semaphore
+	VAllSem		Do the VALL operation on a semaphore
+	FastPSem1	First part of a fast PSem
+	FastPSem2	Second part of a fast PSem
+	FastVSem1	First part of a fast VSem
+	FastVSem2	Second part of a fast VSem
+
+DESCRIPTION:
+	This file defines semaphore structures and routines.
+
+	$Id: semInt.def,v 1.1 97/04/04 14:15:31 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__SEMINT
+
+StartKernel
+
+global ThreadBlockOnQueue:far
+global ThreadWakeUpQueue:far
+global TimerBlockOnTimedQueue:far
+
+;-----------------------------------------------------------------------------
+;		Semaphore structure
+;-----------------------------------------------------------------------------
+
+Semaphore	struct
+    Sem_value	sword	1		;value
+    Sem_queue	hptr	0		;queue of waiting threads
+Semaphore	ends
+
+;--------------------------------------------------------------------------
+;			     Module Locks
+;
+; A ThreadLock is a thread-specific, nestable, mutual-exclusion semaphore.
+;--------------------------------------------------------------------------
+
+ThreadLock	struct
+    TL_sem	Semaphore	<1,0>
+    TL_nesting	word		0	; Nested locks by same thread
+    TL_owner	hptr		-1	; NOT 0 -- that's the kernel thread
+ThreadLock	ends
+
+;---
+
+ifdef	_Kernel
+condLock	equ	<>
+else
+condLock	equ	<lock>
+endif
+
+
+COMMENT @----------------------------------------------------------------------
+
+	PSem	seg, sem, options
+
+	FUNCTION:
+		Do the P operation on a semaphore
+		(carry flag preserved)
+	ARGUMENTS:
+		seg -- register containing segment of semaphore
+		sem -- semaphore to P
+		options1 -- possible options for macro:
+			TRASH_AX_BX - do not save ax or bx
+			TRASH_AX - do not save ax
+			TRASH_BX - do not save bx
+		options2 -- NO_EC
+
+-------------------------------------------------------------------------------@
+PSem	macro	seg, sem, options1, options2
+	local	continue
+	condLock dec	seg:sem.Sem_value
+	jns	continue
+
+if <options1> ne <TRASH_AX> and <options1> ne <TRASH_AX_BX>
+	push	ax
+endif
+if <options1> ne <TRASH_BX> and <options1> ne <TRASH_AX_BX>
+	push	bx
+endif
+
+	mov	ax,seg
+	lea	bx, seg:sem.Sem_queue
+ifdef	_Kernel
+    if	@CurSeg eq kcode
+	call	BlockOnLongQueue
+    else
+	call	ThreadBlockOnQueue
+    endif
+else
+	call	ThreadBlockOnQueue
+endif
+
+if <options1> ne <TRASH_BX> and <options1> ne <TRASH_AX_BX>
+	pop	bx
+endif
+if <options1> ne <TRASH_AX> and <options1> ne <TRASH_AX_BX>
+	pop	ax
+endif
+
+continue:
+
+if (<options1> eq <TRASH_AX> or <options1> eq <TRASH_AX_BX>) and ERROR_CHECK \
+   and <options2> ne <NO_EC>
+	not	ax
+endif
+if (<options1> eq <TRASH_BX> or <options1> eq <TRASH_AX_BX>) and ERROR_CHECK \
+   and <options2> ne <NO_EC>
+	not	bx
+endif
+
+endm
+
+COMMENT @----------------------------------------------------------------------
+
+	PTimedSem	seg, sem, timeOut, options
+
+	FUNCTION:
+		Do the P operation on a semaphore, but return carry set
+		if timeout expires before operation complete.
+	ARGUMENTS:
+		seg -- register containing segment of semaphore
+		sem -- semaphore to P
+		timeOut -- time out value to wait
+		options -- possible options for macro:
+			TRASH_AX_BX_CX - do not save ax or bx or cx
+
+-------------------------------------------------------------------------------@
+PTimedSem	macro	seg,sem,timeOut, options1, options2
+	local	continue
+	condLock dec	seg:sem.Sem_value
+	clc
+	jns	continue
+
+ifdif	<options1>,<TRASH_AX_BX_CX>
+	push	ax
+	push	bx
+	push	cx
+endif
+
+	mov	ax,seg
+	lea	bx, seg:sem.Sem_queue
+
+ifdif	<timeOut>,<cx>
+	mov	cx,timeOut
+endif
+	call	TimerBlockOnTimedQueue
+
+ifdif	<options1>,<TRASH_AX_BX_CX>
+	pop	cx
+	pop	bx
+	pop	ax
+endif
+
+continue:
+
+if	<options1> eq <TRASH_AX_BX_CX> and ERROR_CHECK
+ifdif	<options2>, <NO_EC>
+;;
+;; Make sure the registers are nuked if TRASH_AX_BX_CX is specified
+;;
+	not	ax
+	not	bx
+	not	cx
+endif
+endif
+
+endm
+
+
+COMMENT @----------------------------------------------------------------------
+
+	VSem	seg, sem, options
+
+	FUNCTION:
+		Do the V operation on a semaphore
+		(carry flag preserved)
+	ARGUMENTS:
+		seg -- register containing segment of semaphore
+		sem -- semaphore to V
+		options -- possible options for macro:
+			TRASH_AX_BX - do not save ax or bx
+			TRASH_AX - do not save ax
+			TRASH_BX - do not save bx
+
+-------------------------------------------------------------------------------@
+VSem	macro	seg, sem, options1, options2
+	local	continue
+	condLock inc	seg:sem.Sem_value
+	jg	continue
+
+if <options1> ne <TRASH_AX> and <options1> ne <TRASH_AX_BX>
+	push	ax
+endif
+if <options1> ne <TRASH_BX> and <options1> ne <TRASH_AX_BX>
+	push	bx
+endif
+
+	mov	ax,seg
+	lea	bx, seg:sem.Sem_queue
+ifdef	_Kernel
+    if	@CurSeg eq kcode
+	call	WakeUpLongQueue
+    else
+	call	ThreadWakeUpQueue
+    endif
+else
+	call	ThreadWakeUpQueue
+endif
+
+if <options1> ne <TRASH_BX> and <options1> ne <TRASH_AX_BX>
+	pop	bx
+endif
+if <options1> ne <TRASH_AX> and <options1> ne <TRASH_AX_BX>
+	pop	ax
+endif
+
+continue:
+
+if (<options1> eq <TRASH_AX> or <options1> eq <TRASH_AX_BX>) and ERROR_CHECK \
+   and <options2> ne <NO_EC>
+	not	ax
+endif
+if (<options1> eq <TRASH_BX> or <options1> eq <TRASH_AX_BX>) and ERROR_CHECK \
+   and <options2> ne <NO_EC>
+	not	bx
+endif
+
+endm
+
+COMMENT @----------------------------------------------------------------------
+
+	VAllSem	seg, sem, options
+
+	FUNCTION:
+		Loop doing the V operation on a semaphore
+		until all waiting processes have been WakeUp'ed
+		(carry flag preserved)
+	ARGUMENTS:
+		seg -- register containing segment of semaphore
+		sem -- semaphore to VALL
+		options -- possible options for macro:
+			TRASH_AX_BX - do not save ax or bx
+
+-------------------------------------------------------------------------------@
+VAllSem	macro	seg, sem, options
+	local	loop, continue
+loop:
+	condLock inc	word ptr seg:sem.Sem_value
+	jg	continue
+
+ifdif	<options>,<TRASH_AX_BX>
+	push	ax
+	push	bx
+endif
+
+	mov	ax,seg
+	lea	bx, seg:sem.Sem_queue
+ifdef	_Kernel
+    if	@CurSeg eq kcode
+	call	WakeUpLongQueue
+    else
+	call	ThreadWakeUpQueue
+    endif
+else
+	call	ThreadWakeUpQueue
+endif
+
+ifdif	<options>,<TRASH_AX_BX>
+	pop	bx
+	pop	ax
+endif
+
+	jmp	short loop
+continue:
+
+if	<options> eq <TRASH_AX_BX> and ERROR_CHECK
+	not	ax
+	not	bx
+endif
+endm
+
+COMMENT @----------------------------------------------------------------------
+
+	FastPSem1	seg, sem, label1, label2
+	FastPSem2	seg, sem, label1, label2
+
+	FUNCTION:
+		Do the P operation on a semaphore FAST.  Put the 1 macro
+		where the P should be, put the 2 macro close by, out of the
+		flow of execution
+		(carry flag preserved)
+	ARGUMENTS:
+		seg -- register containing segment of semaphore
+		sem -- semaphore to P
+		label1 -- must be same as passed with FAST_PSem_2
+		label2 -- must be same as passed with FAST_PSem_2
+
+-------------------------------------------------------------------------------@
+FastPSem1	macro	seg, sem, label1, label2, options
+	condLock dec	seg:sem.Sem_value
+	js	label2
+label1:
+endm
+
+FastPSem2	macro	seg, sem, label1, label2, options1, options2
+label2:
+ifdif <options1>, <TRASH_AX_BX>
+	push	ax
+	push	bx
+endif
+	mov	ax,seg
+	lea	bx, seg:sem.Sem_queue
+ifdef	_Kernel
+    if	@CurSeg eq kcode
+	call	BlockOnLongQueue
+    else
+	call	ThreadBlockOnQueue
+    endif
+else
+	call	ThreadBlockOnQueue
+endif
+ifdif <options1>,<TRASH_AX_BX>
+	pop	bx
+	pop	ax
+elseif ERROR_CHECK
+ifdif	<options2>, <NO_EC>
+       	not	ax
+	not	bx
+endif
+endif
+	jmp	short label1
+endm
+
+COMMENT @----------------------------------------------------------------------
+
+	FastVSem1	seg, sem, label1, label2
+	FastVSem2	seg, sem, label1, label2
+
+	FUNCTION:
+		Do the V operation on a semaphore FAST.  Put the 1 macro
+		where the V should be, put the 2 macro close by out of the
+		flow of execution
+		(carry flag preserved)
+	ARGUMENTS:
+		seg -- register containing segment of semaphore
+		sem -- semaphore to V
+		label1 -- must be same as passed with FAST_VSem_2
+		label2 -- must be same as passed with FAST_VSem_2
+
+-------------------------------------------------------------------------------@
+FastVSem1	macro	seg, sem, label1, label2, options
+	condLock inc	seg:sem.Sem_value
+	jng	label2
+label1:
+endm
+
+FastVSem2	macro	seg, sem, label1, label2, options1, options2
+label2:
+ifdif <options1>,<TRASH_AX_BX>
+	push	ax
+	push	bx
+endif
+	mov	ax,seg
+	lea	bx, seg:sem.Sem_queue
+ifdef	_Kernel
+    if	@CurSeg eq kcode
+	call	WakeUpLongQueue
+    else
+	call	ThreadWakeUpQueue
+    endif
+else
+	call	ThreadWakeUpQueue
+endif
+ifdif <options1>,<TRASH_AX_BX>
+	pop	bx
+	pop	ax
+elseif ERROR_CHECK
+ifdif	<options2>, <NO_EC>
+        not	ax
+	not	bx
+endif
+endif
+
+	jmp	short label1
+endm
+
+EndKernel

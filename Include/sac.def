@@ -1,0 +1,175 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1995 -- All Rights Reserved
+
+			GEOWORKS CONFIDENTIAL
+
+PROJECT:	Socket
+MODULE:		Net Utils Library
+FILE:		sac.def
+
+AUTHOR:		Jennifer Wu, Apr  5, 1995
+
+	
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jwu	4/ 5/95		Initial revision
+
+
+DESCRIPTION:
+	SocketAddressControlClass definitions.
+	
+		
+	$Id: sac.def,v 1.1 97/04/04 14:26:32 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__SAC
+
+StartLibrary	netutils
+
+;#############################################################################
+;			  Address Controller
+;#############################################################################
+
+SocketAddressControlClass	class	GenControlClass
+
+MSG_SOCKET_ADDRESS_CONTROL_SET_MEDIUM	message	
+; Informs the subclass of the type of medium selected by the user, so it can
+; customize its appearance appropriately, should the controller handle media
+; that have different ways of addressing.
+;
+; Context:	Sent by application immediately after instantiating the
+;		the controller
+; Source:	application
+; Destination:  SocketAddressControl *subclass*
+; Interception: If the subclass wishes to do anything special based on the
+;		selected medium, it will have to do all the work itself. The
+;		method defined by SocketAddressControlClass simply returns.
+;
+; Pass:
+;		cxdx	= MediumType
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_SOCKET_ADDRESS_CONTROL_GET_ADDRESSES	message	
+; Build the block of data that holds the addresses selected by the user to
+; pass to the transport driver.
+;
+; Context:	Called by the SocketSendControl just before registering a
+;		message.
+; Source:	SocketSendControl
+; Destination:  SocketAddressControl *subclass*
+; Interception: Always intercepted by the subclass, as SocketAddressControl
+;		has no useful information to provide.
+;
+; Pass:		nothing
+;
+; Return:
+;		if ok:
+;			ax	= ChunkArray of SACAddress structures
+;				  in same block as controller
+;		else
+;			ax	= 0
+;		cx, dx, bp - destroyed
+;
+
+SACAddress	struct
+    SACA_opaqueSize	word		; number of bytes of this element that
+					;  are the opaque address. Immediately
+					;  following the opaque address comes
+					;  the null-terminated user-readable
+					;  form of the address.
+    SACA_opaque	label byte		; start of the opaque data the driver
+					;  understands.
+SACAddress	ends
+
+; for details of what will be placed into the opaque field, see sockmisc.def
+
+MSG_SOCKET_ADDRESS_CONTROL_SET_ADDRESSES	message
+; Sets the current user-editable address to the passed address.
+; If address controller expects 
+;
+; Context:	Usually called by SocketTDAddressControl when it gets
+;		MSG_MAILBOX_ADDRESS_CONTROL_SET_ADDRESSES.
+; Source:	SocketTDAddressControlClass
+; Destination:	SocketAddressControlClass
+; Interception:	Usually intercepted by subclasses to use the passed addresses
+;		as the current addresses.
+;
+; Pass:
+;		^lcx:dx	= ChunkArray of SACAddress structrues
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+MSG_SOCKET_ADDRESS_CONTROL_SET_ACTION	message
+; Inform the controller of the message and target it should use to
+; notify the invoker that a valid address exists.  
+;
+; Context:	Sent by instantiator immediately after instantiating the
+;		controller
+; Source:	external
+; Destination:	SocketAddressControl
+; Interception:	don't
+;
+; Pass:
+;		^lcx:dx	- destination of action message
+;		bp	- action message id
+;
+; Return:
+;		nothing
+;		ax,cx,dx,bp - destroyed
+;
+; 
+
+MSG_SOCKET_ADDRESS_CONTROL_SET_VALID_STATE	message	
+; Let the containing dialog know whether the address we've got is a valid one,
+; so it can decide whether to allow the user to send the message.
+;
+; Context:	Called by subclass when the validity of the address changes
+; Source:	SocketAddressControl subclass
+; Destination:  SocketAddressControl
+; Interception: don't
+;
+; Pass:
+;		cx	= FALSE if address not valid
+;			= TRUE if address is valid
+; Return:
+;		nothing
+;		ax, cx, dx, bp - destroyed
+;
+
+SACI_actionMsg		word
+	; The message to send when valid state changes
+	;
+	; Pass:	^ldx:bp - optr of controller
+	; 	cx	- FALSE if address not valid
+	; 		  TRUE if address is valid
+	;
+	; Return: nothing
+	;         ax,cx,dx,bp - destroyed
+	;
+
+SACI_geode		word
+	; Geode which owns the subclass of this object
+	;
+	; GeodeRemoveReference will be called on this geode during
+	; MSG_META_FINAL_OBJ_FREE.   This means the object must be
+	; freed with MSG_GEN_DESTROY rather then with ObjFreeObjBlock,
+	; since the latter does not generate a M_M_F_O_F.
+	;
+	; Furthermore, the application freeing the object is responsible
+	; for ensuring that the NetUtils library will not exit as a result.
+	; In practice, this means that the application must either have
+	; another address controller (from the save driver or otherwise),
+	; be using the NetUtils library, or be using the Socket library.
+	;
+SocketAddressControlClass	endc
+
+
+EndLibrary	netutils

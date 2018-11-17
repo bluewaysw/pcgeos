@@ -1,0 +1,348 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	PC GEOS	
+FILE:		gaf.def
+
+AUTHOR:		Jason VandenBerghe, Apr  7, 1994
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	JV	4/ 7/94   	Initial revision
+
+DESCRIPTION:
+	This file contains the structures and function declarations that are
+	necessary to use the GAF (GEOS Audio File) format.
+		
+	$Id: soundex.def,v 1.1 97/04/04 14:25:59 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__SOUNDEX
+
+StartLibrary	soundex
+
+include	geode.def
+include	driver.def
+
+;----------------------------------------------------------------------------
+;				  Constants
+;----------------------------------------------------------------------------
+
+SOUND_VM_GAF_TRACK_BLOCK			equ	0xfeed
+	; Block id for VM file Tracks.  Why feed?  'Cause.
+
+SOUND_ALBUM_MAX_NUMBER_OF_SONGS			equ	256
+	; Max. 256 Songs in a single Album.  This size will bring the headers
+	; block up to ~8K.
+
+;
+;  This is used in SoundCopySong, which is on hold for now.
+;
+;SOUND_SONG_HEADER_TRANSFERABLE_DATA_SIZE	equ	4
+;	;  The front of the SoundSongHeader contains all the data that is
+;	;  valid in a SongCopy (the non-handle information).  This is the
+;	;  size of that data.  NOTE: is there a better way to generate this
+;	;  number?
+;	;
+;	;  Also, note that this does not include the number of Tracks in the
+;	;  Song.  This is because Sound...AllocTrack keeps track (ha) of this
+;	;  value.
+
+
+;----------------------------------------------------------------------------
+;				 Enumerations
+;----------------------------------------------------------------------------
+
+;
+;  A track may contain either synthesized data (FM), or sampled data.  This
+;  etype distinguishes between the two.
+;
+SoundTrackType		etype	word,	0, 1
+	STT_SYNTH		enum	SoundTrackType
+	STT_SAMPLE		enum	SoundTrackType
+
+
+;
+;  Track priority is a value that will tell the sound library, "if there is
+;  only one voice available on the hardware, I want you to play _this_ voice.
+;  If there are three voices, use _these_ three voices," instead of having
+;  the sound driver attempt to distribute the available voices at random.
+;
+;  The highest prioirity is 1, and priority lessens as the value increases.
+;  The exception is 0 (STP_NO_PRIORITY), which means that there has been no
+;  priority assigned to this track.  Tracks with no priority are considered
+;  last when choosing which tracks to play, and all are equal. 
+;
+;  STP_NO_PRIORITY is included so that it will be easy for sound designers
+;  to ignore track priority, as it is an optional feature, and just leave
+;  the sound selection process up to the driver.
+;
+SoundTrackPriority	etype	word, 	0, 1
+	STP_NO_PRIORITY		enum	SoundTrackPriority
+
+
+;
+;  Each of the SoundEx library allocation routines will return either the
+;  handle of the block just allocated, or the the number of the item (Song
+;  number or Track number).  A SoundLibReturnType is passed to these routines,
+;  indicating which return value the caller wants.
+;
+SoundLibReturnType	etype	word,	0, 1
+	SLRT_HANDLE		enum	SoundLibReturnType
+	SLRT_NUMBER		enum	SoundLibReturnType
+
+
+;----------------------------------------------------------------------------
+;			       Header Structures
+;----------------------------------------------------------------------------
+
+;
+;  SoundSynthData and SoundSampleRate are the two members of the SoundTrackData
+;  union.  Since there is data specific to each type of track, a union is the
+;  best way to reserve the fields necessary for each type, since syth tracks
+;  and sample tracks are exclusive of each other.
+;
+SoundSynthData		struct
+	SSD_voices	word		0	; # of voices in the track
+SoundSynthData		ends
+
+SoundSampleInfo		struct
+	SST_rate	word		0	; sample rate of sound
+	SST_format	DACSampleFormat	0	; sample format of sound
+	SST_manufactID	ManufacturerID	0	; sample ManufacturerID
+SoundSampleInfo		ends
+
+
+;
+;  SoundTrackData is the union of the data that is specific to a particular
+;  type of track (synthesized or sampled).  This data is stored in the track
+;  header for each track.  Which union member is appropriate for a particular
+;  track is dependant on the STH_type field of the SoundTrackHeader (see
+;  below).
+;
+SoundTrackData		union
+	STD_synth	SoundSynthData		; data for a synth track
+	STD_sample	SoundSampleInfo		; data for a sample track
+SoundTrackData		ends
+
+
+;
+;  Every block in a Track starts with a SoundTrackBlockHeader.  It contains
+;  the handle of the next block in the chain, and the size of the block itself.
+;
+SoundTrackBlockHeader	struct
+	STBH_next	VMChainLink		; handle to next block
+	STBH_size	word			; size of the block (inc. this
+						;   header struct)
+SoundTrackBlockHeader	ends
+
+
+;
+;  Each track has a SoundTrackHeader to store all the data that is necessary
+;  to play the individual track.  This header lives at the beginning of the
+;  first block of the list of blocks that is the track.  This makes the track
+;  itself much more portable, as all the data necessary to play it lives in
+;  the structure itself.
+;
+;  The second field (STH_offset) is intended to allow easy dereferencing to the
+;  beginning of the sound data, without having to worry about the actual size
+;  of the header (this will allow the header to grow dynamically; not real
+;  useful right now, but you never know what the future holds, and this is
+;  just as easy as adding the size of the SoundTrackHeader to your pointer).
+;
+SoundTrackHeader	struct
+	STH_header	SoundTrackBlockHeader	; the header block is a Track
+						;   block too
+	STH_offset	word			; size of header; pointer to
+						;   beginning of sound data
+	STH_number	word			; Track number in the Song
+	STH_type	SoundTrackType		; synth or sample?
+	STH_priority	SoundTrackPriority	; priority for the track
+	STH_protocol	word			; library required to play the
+						;   track
+	STH_data	SoundTrackData		; info needed to play the track
+SoundTrackHeader	ends
+
+
+;
+;  The array of references to Tracks that is managed in a Song (see
+;  SoundTrackHeader) contains SoundTrackReferences.  There are two
+;  pieces of information we need about a Track: which block is the
+;  start block, and where in the current block are we as we play.
+;
+SoundTrackReference	struct
+	STR_track	hptr			; handle of the first block
+						;   in the Track
+	STR_position	fptr			; pointer to the current pos
+SoundTrackReference	ends
+
+
+;
+;  SoundSongHeader is the header structure for a Song (duh).  All Songs
+;  must have a chunk containing a SoundSongHeader associated with them;
+;  indeed, it is this structure that is pointed to in the SoundAlbumHeader
+;  (see below).
+;
+;  Since there are several different types of Songs that can be kept in
+;  an Album (but we want to hide this complexity from the programmer for
+;  maximum ease of use), there is a field in the SoundSongHeader to specify
+;  which type a particular Song is.  Which member of the SSH_data union
+;  is pertinant to a particular song is dependant on this field.
+;
+SoundSongHeader		struct
+	SSH_number	word			; Song number in Album
+	SSH_priority	SoundPriority		; starting priority for Song
+	SSH_voices	word			; total # of voices in song
+	SSH_tempo	word			; starting tempo for the song
+		;
+		;  A note on tempo:  There is a tempo field in both the track
+		;  header and the song header.  This is to make the track an
+		;  autonomous entity; that is, so that we can play the track
+		;  without the song.  These values should be identical from
+		;  track to track to song.
+		;
+	SSH_tracks	word			; # of tracks in the song
+	SSH_performance	hptr			; handle to the current 
+						;  PlayControl block
+	SSH_playSem	Semaphore
+	SSH_infoBlock	hptr			; handle to a SongInfoBlock
+	SSH_trackList	lptr			; handle to the chunkarray of
+						;  SoundTrackReferences
+SoundSongHeader		ends
+
+
+;
+;  Songs are collected together into Albums.  An Album is an LMem block
+;  with a SoundAlbumHeader as the block header, and a chunkarray of
+;  chunk handles to Songs, in the same block.  The chunk handle to the
+;  array is kept in the SoundAlbumHeader, as is the number of Songs held
+;  in the Album.
+;
+SoundAlbumHeader	struct
+	SAH_header	LMemBlockHeader		; standard LMem header
+	SAH_songs	word			; # of songs in album
+	SAH_songList	lptr			; handle to chunkarray of
+						;   SoundAlbumSongReferences
+SoundAlbumHeader	ends
+
+
+;
+;  When a Song is played, a SoundPerformanceControl block is allocated for
+;  that performance.  This block has a SoundPerformanceControl structure as
+;  its header, and that is followed by and arra of SoundPerformanceTrackRefs,
+;  one for each Track in the performance.
+;
+SoundPerformanceControl	struct
+	SPC_offset	word			; offset to pointers array
+	SPC_control	hptr			; handle to SoundControl block
+SoundPerformanceControl	ends
+
+
+SoundPerformanceTrackRef	struct
+	SPTR_pos	fptr			; current position in block
+	SPTR_handle	optr			; handle to current block (for
+						;   unlock)
+SoundPerformanceTrackRef	ends
+
+;----------------------------------------------------------------------------
+;			       Global Routines
+;----------------------------------------------------------------------------
+
+; Album routines
+
+global	SoundVMOpenAlbumFile:far
+global	SoundVMCloseAlbumFile:far
+global	SoundVMUpdateAlbumFile:far
+
+global	SoundVMAllocSong:far
+global	SoundVMAllocTrack:far
+global	SoundVMFreeSong:far
+global	SoundVMFreeTrack:far
+
+global	SoundMemAllocAlbum:far
+global	SoundMemAllocSong:far
+global	SoundMemAllocTrack:far
+global	SoundMemFreeAlbum:far
+global	SoundMemFreeSong:far
+global	SoundMemFreeTrack:far
+
+; Edit routines
+
+global	SoundMemCopyTrack:far
+
+; Access routines
+
+global	SoundMemAlbumGetNumberOfSongs:far
+global	SoundMemAlbumGetSongHandle:far
+
+global	SoundVMAlbumGetNumberOfSongs:far
+global	SoundVMAlbumGetSongHandle:far
+
+global	SoundMemSongGetSongNumber:far
+global	SoundMemSongGetSoundPriority:far
+global	SoundMemSongGetNumberOfTracks:far
+global	SoundMemSongGetNumberOfVoices:far
+global	SoundMemSongGetTempo:far
+global	SoundMemSongGetInfoBlock:far
+global	SoundMemSongGetTrackList:far
+global	SoundMemSongGetTrackHandle:far
+
+global	SoundVMSongGetSongNumber:far
+global	SoundVMSongGetSoundPriority:far
+global	SoundVMSongGetNumberOfTracks:far
+global	SoundVMSongGetNumberOfVoices:far
+global	SoundVMSongGetTempo:far
+global	SoundVMSongGetInfoBlock:far
+global	SoundVMSongGetTrackList:far
+global	SoundVMSongGetTrackHandle:far
+
+global	SoundMemSongSetSoundPriority:far
+global	SoundMemSongSetTempo:far
+global	SoundMemSongSetInfoBlock:far
+
+global	SoundVMSongSetSoundPriority:far
+global	SoundVMSongSetTempo:far
+global	SoundVMSongSetInfoBlock:far
+
+global	SoundMemTrackGetTrackNumber:far
+global	SoundMemTrackGetOffset:far
+global	SoundMemTrackGetType:far
+global	SoundMemTrackGetTrackPriority:far
+global	SoundMemTrackGetProtocol:far
+global	SoundMemTrackGetSynthVoices:far
+global	SoundMemTrackGetSampleRate:far
+global	SoundMemTrackGetSampleFormat:far
+global	SoundMemTrackGetSampleManufactID:far
+
+global	SoundVMTrackGetTrackNumber:far
+global	SoundVMTrackGetOffset:far
+global	SoundVMTrackGetType:far
+global	SoundVMTrackGetTrackPriority:far
+global	SoundVMTrackGetProtocol:far
+global	SoundVMTrackGetSynthVoices:far
+global	SoundVMTrackGetSampleRate:far
+global	SoundVMTrackGetSampleFormat:far
+global	SoundVMTrackGetSampleManufactID:far
+
+global	SoundMemTrackSetType:far
+global	SoundMemTrackSetTrackPriority:far
+global	SoundMemTrackSetProtocol:far
+global	SoundMemTrackSetSynthVoices:far
+global	SoundMemTrackSetSampleRate:far
+global	SoundMemTrackSetSampleFormat:far
+global	SoundMemTrackSetSampleManufactID:far
+
+global	SoundVMTrackSetType:far
+global	SoundVMTrackSetTrackPriority:far
+global	SoundVMTrackSetProtocol:far
+global	SoundVMTrackSetSynthVoices:far
+global	SoundVMTrackSetSampleRate:far
+global	SoundVMTrackSetSampleFormat:far
+global	SoundVMTrackSetSampleManufactID:far
+
+global	SoundMemPlaySong:far
+
+EndLibrary	soundex

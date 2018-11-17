@@ -1,0 +1,710 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+FILE:		driver.def
+
+DECLARER:	Kernel
+
+DESCRIPTION:
+	This file defines geode structures and routines.
+
+	$Id: driver.def,v 1.1 97/04/04 14:23:27 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__DRIVER
+
+include lmem.def
+
+StartKernel
+
+global GeodeUseDriver:far
+global GeodeUseDriverPermName:far
+global GeodeFreeDriver:far
+global GeodeInfoDriver:far		; DriverInfoStruct
+
+global GeodeGetDefaultDriver:far	; Default device drivers loaded
+global GeodeSetDefaultDriver:far	; Set default device driver vars
+
+global GEODEUSEDRIVER_OLD:far
+global GEODEUSEDRIVER:far
+global GEODEUSEDRIVERPERMNAME:far
+global GEODEFREEDRIVER:far
+global GEODEINFODRIVER:far
+global GEODEGETDEFAULTDRIVER:far
+global GEODESETDEFAULTDRIVER:far
+
+;------------------------------------------------------------------------
+;	Geode driver types
+
+DriverType 		etype word, 1
+
+DRIVER_TYPE_VIDEO 		enum DriverType
+DRIVER_TYPE_INPUT 		enum DriverType
+DRIVER_TYPE_MASS_STORAGE 	enum DriverType
+DRIVER_TYPE_STREAM 		enum DriverType
+DRIVER_TYPE_FONT 		enum DriverType
+DRIVER_TYPE_OUTPUT 		enum DriverType
+DRIVER_TYPE_LOCALIZATION 	enum DriverType
+DRIVER_TYPE_FILE_SYSTEM 	enum DriverType
+DRIVER_TYPE_PRINTER 		enum DriverType
+DRIVER_TYPE_SWAP		enum DriverType
+DRIVER_TYPE_POWER_MANAGEMENT 	enum DriverType
+DRIVER_TYPE_TASK_SWITCH 	enum DriverType
+DRIVER_TYPE_NETWORK		enum DriverType
+DRIVER_TYPE_SOUND		enum DriverType
+DRIVER_TYPE_PAGER		enum DriverType
+DRIVER_TYPE_PCMCIA		enum DriverType
+DRIVER_TYPE_FEP			enum DriverType
+DRIVER_TYPE_MAILBOX_DATA	enum DriverType
+DRIVER_TYPE_MAILBOX_TRANSPORT	enum DriverType
+DRIVER_TYPE_SOCKET		enum DriverType
+DRIVER_TYPE_SCAN		enum DriverType
+DRIVER_TYPE_OTHER_PROCESSOR	enum DriverType
+DRIVER_TYPE_MAILBOX_RECEIVE	enum DriverType
+DRIVER_TYPE_MODEM		enum DriverType
+DRIVER_TYPE_CONNECT_TRANSLATE	enum DriverType
+DRIVER_TYPE_CONNECT_TRANSFER	enum DriverType
+
+;	Geode driver attributes
+
+DriverAttrs	record
+	DA_FILE_SYSTEM:1,		; Driver is for file access
+	DA_CHARACTER:1,			; Driver is for character-oriented
+					;  device
+	DA_HAS_EXTENDED_INFO:1,		; Driver has DriverExtendedInfo
+					;  structure, with attendant mandatory
+					;  functions.
+	:13
+DriverAttrs	end
+
+;--------------------------------------------------------------------------
+;		Flags passed to Geode{Get,Set}DefaultDriver
+;--------------------------------------------------------------------------
+
+GeodeDefaultDriverType	etype word, 0, 2
+GDDT_FILE_SYSTEM	enum GeodeDefaultDriverType
+GDDT_KEYBOARD		enum GeodeDefaultDriverType
+GDDT_MOUSE		enum GeodeDefaultDriverType
+GDDT_VIDEO		enum GeodeDefaultDriverType
+GDDT_MEMORY_VIDEO	enum GeodeDefaultDriverType
+GDDT_POWER_MANAGEMENT	enum GeodeDefaultDriverType
+GDDT_TASK		enum GeodeDefaultDriverType
+
+;--------------------------------------------------------------------------
+;			Structure of a driver info table
+;--------------------------------------------------------------------------
+
+DriverInfoStruct	struct
+    DIS_strategy	fptr.far	;seg:off of strategy routine
+    DIS_driverAttributes DriverAttrs	;device attributes for driver,
+						;see "Geode Attr and Types"
+    DIS_driverType	DriverType	;driver type
+DriverInfoStruct	ends
+
+;--------------------------------------------------------------------------
+;			Driver function calls
+;--------------------------------------------------------------------------
+
+;	See geode.doc in the "Spec" directory for details
+
+;	Generic driver calls. All drivers must respond to these.
+;
+;	To call a driver:
+;	- Get the address of its "strategy" routine using
+;	  GeodeInfoDriver. 
+;
+;	- Call the strategy routine, passing the DriverFunction in DI
+;
+
+DriverFunction 	etype protominor word, 0, 2
+
+DR_INIT 		enum DriverFunction	;Initialize driver
+;	PASS:	cx	= di passed to GeodeLoad. Garbage if loaded via
+;			  GeodeUseDriver
+;		dx	= bp passed to GeodeLoad. Garbage if loaded via
+;			  GeodeUseDriver
+;	RETURN:	carry set if driver initialization failed. Driver will be
+;			unloaded by the system.
+;		carry clear if initialization successful.
+;
+;	DESTROYS:	bp, ds, es, ax, di, si, cx, dx
+;
+
+	protominor	KernelDR_INITWithGeodeHandle	; etype
+
+DR_INIT_WITH_GEODE_HANDLE	enum DriverFunction, DR_INIT
+;	PASS:	cx	= di passed to GeodeLoad. Garbage if loaded via
+;			  GeodeUseDriver
+;		dx	= bp passed to GeodeLoad. Garbage if loaded via
+;			  GeodeUseDriver
+;		bx	= handle of driver
+;	RETURN:	carry set if driver initialization failed. Driver will be
+;			unloaded by the system.
+;		carry clear if initialization successful.
+;
+;	DESTROYS:	bp, ds, es, ax, di, si, cx, dx, bx
+;
+
+	protoreset	; etype
+
+DR_EXIT 		enum DriverFunction	;Exit driver
+;	PASS:	nothing
+;	RETURN:	nothing
+;	DESTROYS:	ax, bx, cx, dx, si, di, ds, es
+;
+;	NOTES:	If the driver has GA_SYSTEM set, the handler for this function
+;		*must* be in fixed memory and may not use anything in movable
+;		memory.
+
+DRIVER_SUSPEND_ERROR_BUFFER_SIZE	equ	128
+
+DR_SUSPEND		enum DriverFunction
+;	SYNOPSIS:	Prepare the device for going into stasis while PC/GEOS
+;			is task-switched out. Typical actions include disabling
+;			interrupts or returning to text-display mode.
+;
+;	PASS:	cx:dx	= buffer in which to place reason for refusal, if
+;			  suspension refused (DRIVER_SUSPEND_ERROR_BUFFER_SIZE
+;			  bytes long)
+;	RETURN:	carry set if suspension refused:
+;			cx:dx	= buffer filled with null-terminated reason,
+;				  standard PC/GEOS character set.
+;		carry clear if suspension approved
+;	DESTROYS:	ax, di
+;
+
+DR_UNSUSPEND		enum DriverFunction
+;	SYNOPSIS:	Reconnect to the device when PC/GEOS is task-switched
+;			back in.
+;
+;	PASS:	nothing
+;	RETURN:	nothing
+;	DESTROYS:	ax, di
+;
+
+
+;
+; Protocol number for "DriverFunction" interface. All other driver protocols
+; will be based on this number.
+;
+DRIVER_PROTO_MAJOR	equ	2
+DRIVER_PROTO_MINOR	equ	0
+
+;--------------------------------------------------------------------------
+;			Extended driver definitions
+;--------------------------------------------------------------------------
+
+;
+; Protocol number for the extended driver interface. The final numbers in the
+; expressions below are the "actual" protocol numbers for the interface; the
+; other components are for automatically adjusting to a change in the
+; "generic" driver interface, above.
+;
+DRIVER_EXT_PROTO_MAJOR	equ DRIVER_PROTO_MAJOR+1
+DRIVER_EXT_PROTO_MINOR 	equ DRIVER_PROTO_MINOR+0
+
+;
+; An extended driver is one that can handle multiple types of devices,
+; identified by ascii strings that the driver provides. The specific device
+; to be supported is specified by a DRE_SET_DEVICE call after the driver
+; is loaded.
+;
+
+DevicePresent	etype	word
+DP_NOT_PRESENT	enum	DevicePresent, 0xffff	; Driver knows device not there
+DP_CANT_TELL	enum	DevicePresent, 0	; Driver hasn't a clue
+DP_PRESENT	enum	DevicePresent, 1	; Driver knows device is there
+DP_INVALID_DEVICE enum	DevicePresent, 0xfffe	; Unknown device string passed
+
+DriverExtendedFunction	etype	word, DriverFunction, 2
+DRE_TEST_DEVICE		enum	DriverExtendedFunction
+;	PASS:		dx:si	= pointer to null-terminated device name string
+;	RETURN:		ax	= DevicePresent
+;			carry set if DP_INVALID_DEVICE, clear otherwise
+;	DESTROYS:	di
+;
+;	This function tests the existence of a particular device the driver
+;	supports.
+
+DRE_SET_DEVICE		enum	DriverExtendedFunction
+;	PASS:		dx:si	= pointer to null-terminated device name string
+;	RETURN:		nothing
+;	DESTROYS:	di
+;
+;	This function informs the driver which of its many devices it is to
+;	support.
+;
+
+
+;-------------------------------------------------------------------------
+;		Structure of an extended driver info table
+;
+; An extended driver is one that can handle multiple types of devices,
+; identified by ascii strings that the driver provides. The specific device
+; to be supported is specified by a DRE_SET_DEVICE call after the driver
+; is loaded.
+;
+; The DriverExtendedInfoTable is stored in a separate resource to keep
+; the amount of fixed memory required to a minimum...
+;-------------------------------------------------------------------------
+
+DriverExtendedInfoStruct	struct
+    DEIS_common		DriverInfoStruct	; Regular driver info
+    DEIS_resource	hptr.DriverExtendedInfoTable; Resource of additional
+						;  info for the driver. The
+						;  resource must be shareable
+						;  so other geodes can lock
+						;  it down. It should also
+						;  be read-only.
+DriverExtendedInfoStruct	ends
+
+;
+;		Maximum size of device name strings (see DEIT_nameTable, below).
+;
+GEODE_MAX_DEVICE_NAME_LENGTH	equ 64
+if DBCS_PCGEOS
+GEODE_MAX_DEVICE_NAME_SIZE	equ GEODE_MAX_DEVICE_NAME_LENGTH*(size wchar)
+else
+GEODE_MAX_DEVICE_NAME_SIZE	equ GEODE_MAX_DEVICE_NAME_LENGTH
+endif
+
+DriverExtendedInfoTable		struct
+    DEIT_common		LMemBlockHeader	; Common LMem header info. Just use
+					;  {} to define this field and Esp will
+					;  skip this field when defining the
+					;  structure.
+    DEIT_numDevices	word		; Number of device types supported
+					;  by the driver
+    DEIT_nameTable	nptr.lptr.char	; Pointer to table of DEIT_numDevices
+					;  pointers to the device names
+					;  themselves. As indicated by this
+					;  being an nptr, the table and the
+					;  names lie in this same resource.
+    DEIT_infoTable	nptr.word	; Pointer to table of DEIT_numDevices
+					;  extra words containing driver-
+					;  specific data for each device.
+					;  The type of data stored here is
+					;  specified by the driver-type-specific
+					;  interface .def file (e.g.
+					;  mouseDriver.def)
+DriverExtendedInfoTable		ends
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		EnumerateDevice
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Maps a device string to an integer table position
+
+ARGUMENT:	infoRes	- resource name containing extended driver info
+
+ASSUMES:	dx:si	- pointer to null-terminated device name string
+		
+RETURN:		carry	- SET if string did not map to any supported device.  
+			  	AX = DP_INVALID_DEVICE
+			- CLEAR if string did map successfully
+				DI = Device number.  Device numbers start at 
+				     0 and increase by two for each entry.  
+
+		bx	- handle of passed argument 'infoRes'
+		es	- pointer to locked 'infoRes'
+
+DESTROYED:	ax,di,cx,ds,es
+
+NOTES:		caller should MemUnlock the block UNLESS CARRY IS SET (ax
+		is DP_INVALID_DEVICE)
+
+REVISION HISTORY:
+		Name	Date		Description
+		----	----		-----------
+		Jim	09/90		Initial version 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+EnumerateDevice	macro	infoRes
+		local	checkNextString
+		local	invalidDevice
+		local	foundIt
+
+		; set up source string pointer in es:di temporarily
+		; so we can get a character count on the passed string
+
+		mov	ds, dx				; ds -> string
+		mov	es, dx				; es -> string
+		mov	di, si				; es:di -> string
+		LocalStrLength				; cx <- length w/o NULL
+
+		; get a pointer to a table of pointers to device name strings
+
+		mov	bx, handle infoRes
+		call	MemLock
+		mov	es, ax				; es -> driver info
+
+		; set es:di to point at the tables
+
+		mov	di, es:[DEIT_nameTable]		; get pointer to table
+		mov	ax, cx				; save count in ax
+
+		; loop through the entries, comparing the strings
+checkNextString:
+		mov	cx, ax				; cx = count
+		push	di, si				; save ptrs
+		mov	di, es:[di]			; get string pointer
+		mov	di, es:[di]			; deref chunk pointer
+SBCS <		repe	cmpsb				; strings same ? >
+DBCS <		repe	cmpsw				; strings same ? >
+		pop	di, si				; restore ptrs
+		jz	foundIt				;  yes, exit loop.
+		inc	di				; bump to next string
+		inc	di
+		cmp	{word} es:[di], 0		; check for end of tab
+		jnz	checkNextString			;  no, keep going
+
+		call	MemUnlock
+		; didn't find it, out of table entries.
+invalidDevice::
+		mov	ax, DP_INVALID_DEVICE		; return invalid code
+		clr	di				; force setting of carry
+							;  by "sub" instruction
+							;  below, since DEIT_-
+							;  nameTable must be > 0
+
+		; found it.  calc enum to return
+foundIt:
+		sub	di, es:[DEIT_nameTable]		; calc index into tab
+							; (can't wrap, so carry
+							; is clear)
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DefEscapeTable, DefEscape
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Define a driver escape table and table entries
+
+PASS:		DefEscapeTable:
+		    nEntries - number of entries in table
+		DefEscape:
+		    ESC_CODE - constant for escape code
+		    Handler  - name of routine to handle escape
+		    SegName  - optional segment name, default uses dgroup
+
+PSEUDO CODE/STRATEGY:
+		Define a few labels for the start of two tables, escCodes and
+		escRoutines.  Also define a constant NUM_ESC_ENTRIES. Fill
+		the table with invocations of DefEscape
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Jim	05/89		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+DefEscapeTable	macro	nEntries
+
+	escCodes	label	word
+	org	$ + 2* nEntries 		;; define next table out aways
+	escRoutines	label	word
+	org	$ + 2* nEntries			;; reset counter past tables
+	_escTabEnd	= $			;; set up value to use later
+	_numEscEntries	= nEntries
+	NUM_ESC_ENTRIES	= 0			;; initialize counter
+
+endm
+
+
+DefEscape	macro	Handler, ESC_CODE, SegName
+
+	_dot = $
+	org	escCodes + 2*NUM_ESC_ENTRIES	;; set loc to next table entry
+	word	ESC_CODE
+	org	escRoutines + 2*NUM_ESC_ENTRIES ;; set handler table entry
+	ifnb	<SegName>
+	    word	offset &SegName:&Handler
+	else
+	    word	offset &Handler
+	endif
+	NUM_ESC_ENTRIES	= NUM_ESC_ENTRIES+1	;; bump counter
+	org	_dot				;; reset loc counter
+
+	if	NUM_ESC_ENTRIES gt _numEscEntries
+	.err
+	PrintMessage <Error -- Not enough slots allocated for driver DefEscapeTable>
+	endif
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		BeginFarEscapeTable
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Begin the definition of a table for handling escape codes.
+		This table is filled in by DefFarEscape macros, finished 
+		with the EndFarEscapeTable macro, and processed by including
+		HandleFarEscape at the start of the driver strategy routine.
+
+PASS:		prefix	= string to use to make labels for the table unique
+			  among loaded drivers, for aiding in Swat
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	1/25/95		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+BeginFarEscapeTable macro	prefix
+prefix&EscTable	label	word
+prefix&_NUM_ESCAPES = 0
+prefix&_next_esc	= $
+		endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DefFarEscape
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Add another supported escape to the driver.
+
+PASS:		prefix	= string to use to make labels for the table unique
+			  among loaded drivers, for aiding in Swat
+		esc_code= escape code to handle
+		routine	= routine to handle the escape code
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	1/25/95		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+DefFarEscape	macro	prefix, esc_code, routine
+;; Make sure we're in the right point in the table (i.e. just after the previous
+;; entry in the table...)
+.assert $ eq prefix&_next_esc
+		word	esc_code
+
+;; Adjust the next_esc label for the next time
+prefix&_next_esc = $
+
+;; Up the number of escapes in the table
+prefix&_NUM_ESCAPES = prefix&_NUM_ESCAPES + 1
+
+;; Add the routine to the end of the string constant that we're building up
+;; to initialize the routine table in MBTDEndEscapeTable
+ifdef prefix&_esc_routines
+	prefix&_esc_routines catstr prefix&_esc_routines, <, >, <routine>
+else
+	prefix&_esc_routines equ <routine>
+endif
+	.assert (type (routine)) eq far, <Escape handler routine must be a FAR procedure>
+		endm
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		EndFarEscapeTable
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Finish off the escape table for the driver, defining the
+		routine table to hold virtual far pointers to the various
+		escape routines defined with DefFarEscape
+
+PASS:		prefix	= string to use to make labels for the table unique
+			  among loaded drivers, for aiding in Swat
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	1/25/95		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+EndFarEscapeTable macro	prefix
+.assert	$ eq prefix&_next_esc
+
+if prefix&_NUM_ESCAPES
+prefix&EscRoutineTable	vfptr	prefix&_esc_routines
+endif
+		endm
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		HandleFarEscape
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Consult the escape table for the driver and call any
+		routine for the given escape code, if such it is.
+
+PASS:		prefix	= string to use to make labels for the table unique
+			  among loaded drivers, for aiding in Swat
+		done	= label to branch to to leave the strategy routine
+			  once the escape code has been handled.
+		
+		di	= escape or function code (escape code has high
+			  bit set)
+
+PSEUDO CODE/STRATEGY:
+		carry is returned set if DI is an escape code that's not
+		handled by the driver.
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	1/25/95		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+HandleFarEscape	macro	prefix, done
+		local	toDone
+	;
+	; Check for high bit set, which means it's an escape code.
+	;
+		or	di, di
+		jns	notEscape
+    ifdef prefix&_NUM_ESCAPES
+	if prefix&_NUM_ESCAPES
+	;
+	; Save registers we need for the search and call
+	;
+		push	cx, ax, di, es, bp	; (order & # of registers are
+						;  depended on by xchgs below)
+	;
+	; Look for the code in the table of codes.
+	;
+		cmp	di, DRV_ESC_QUERY_ESC
+		je	loadTable		; => code being queried is
+						;  in ax, so just use that
+						;  and avoid a separate routine
+						;  to scan the table...
+		mov_tr	ax, di
+loadTable:
+		segmov	es, cs
+		assume	es:@CurSeg
+		mov	di, offset es:prefix&EscTable
+		mov	cx, prefix&_NUM_ESCAPES
+		repne	scasw
+		jne	popDone
+	;
+	; Found it. Compute the location in the escape table so we can
+	; fetch the corresponding routine. Remember that di points one word
+	; beyond the found code...
+	;
+		sub	di, offset prefix&EscTable+2
+		shl	di
+	;
+	; Now fetch the routine to call out of the routine table and swap it
+	; with the ax & cx we saved on the stack, so we can call
+	; PROCCALLFIXEDORMOVABLE_PASCAL once we pop the other registers.
+	;
+		mov	bp, sp
+		mov	cx, cs:[prefix&EscRoutineTable][di].segment
+		xchg	ss:[bp+8], cx
+		mov	ax, cs:[prefix&EscRoutineTable][di].offset
+		xchg	ss:[bp+6], ax
+		pop	di, es, bp
+
+		cmp	di, DRV_ESC_QUERY_ESC
+		je	querySuccess		; => thing is supported, and we
+						;  don't want to call the
+						;  handler
+		call	PROCCALLFIXEDORMOVABLE_PASCAL
+		jmp	done
+querySuccess:
+		add	sp, 4			; throw away routine that
+						;  handles the escape being
+						;  queried
+toDone:
+		jmp	done
+popDone:
+		pop	cx, ax, di, es, bp
+		assume	es:nothing
+		cmp	di, DRV_ESC_QUERY_ESC
+		stc
+		jne	toDone			; => just regular unsupported
+						;  escape. Return carry set
+						;  to signal error
+		clr	ax			; ax <- escape not supported
+		jmp	done
+	else
+	;
+	; No entries in the escape table, so just handle the query-escape
+	; escape by saying nothing is supported. Everything else yields a
+	; carry-set response.
+	;
+		cmp	di, DRV_ESC_QUERY_ESC
+		stc
+		jne	toDone
+		clr	ax
+toDone:
+		jmp	done
+		ForceRef	prefix&EscRoutineTable
+		ForceRef	prefix&EscTable
+	endif
+    else
+	;
+	; No escape table defined, so just handle the query-escape escape by
+	; saying nothing is supported. Everything else yields a carry-set
+	; response.
+	;
+		cmp	di, DRV_ESC_QUERY_ESC
+		stc
+		jne	toDone
+		clr	ax
+toDone:
+		jmp	done
+    endif
+notEscape:
+		endm
+;--------------------------------------------------------------------------
+;			Driver standard escape codes
+;--------------------------------------------------------------------------
+
+DriverEscCode etype word, 8000h, 1
+
+DRV_ESC_QUERY_ESC enum DriverEscCode	; query for esc support
+;	Desc:	See if the driver supports a particular escape code.
+;
+;	Pass:	ax	= escape code for which support is being sought
+;	Return:	ax	= unchanged if supported
+;			= 0 if escape code not supported
+;
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		DefDriver
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Include a driver-definition file as its definer. 
+
+PASS:		File to include.
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	ardeb	12/14/88	Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+DefDriver	macro	file
+_DECLARER_	= TRUE
+include		file
+		endm
+
+EndKernel

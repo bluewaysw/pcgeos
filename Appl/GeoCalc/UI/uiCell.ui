@@ -1,0 +1,205 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1990 -- All Rights Reserved
+ *
+ * PROJECT:	  PCGEOS
+ * MODULE:	  
+ * FILE:	  uiAttrs.ui
+ *
+ * AUTHOR:  	  Gene Anderson: Feb  7, 1991
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	2/ 7/91	  gene	    Initial version
+ *
+ * DESCRIPTION:
+ *	UI descriptions for attributes gadgetry ("Cell" menu)
+ *
+ * 	$Id: uiCell.ui,v 1.1 97/04/04 15:48:50 newdeal Exp $
+ *
+ ***********************************************************************/
+
+start Interface;
+
+/****************************************************************************
+ *	"Cell" menu
+ ***************************************************************************/
+
+CellMenu = GenInteraction {
+	moniker = 'C', "Cell";
+	children =
+
+		GCColumnWidthControl,
+		GCRowHeightControl,
+#if _CELL_NOTE
+		GCNoteControl,
+#endif
+#if _HEADER_FOOTER
+		GCHeaderFooterControl,
+#endif
+#if !_VIEW_CTRL
+		GCEditBarControl,
+#endif
+#if _PROTECT_CELL
+		GCCellProtection,
+#endif
+		GCFillControl
+
+	;	/* Guess where the semicolon came from :) */
+
+	visibility = popup;
+}
+
+
+end Interface;
+
+start CellSizeUI;
+
+GCColumnWidthControl = SSColumnWidthControl {
+
+	hints = {
+		HINT_GEN_CONTROL_SCALABLE_UI_DATA {
+			GenControlScalableUIEntry <
+			GCSUIC_SET_NORMAL_FEATURES_IF_APP_FEATURE_OFF,
+				mask GCF_COMPLEX_CELL_ATTRIBUTES,
+				mask SSCWCF_NARROWER or \
+				mask SSCWCF_WIDER or \
+				mask SSCWCF_BEST_FIT>
+		}
+	}
+}
+
+
+
+GCRowHeightControl = SSRowHeightControl {
+	moniker = 'H', "Row Height";
+	type = properties;
+	visibility = dialog;
+}
+
+#if _HEADER_FOOTER
+GCHeaderFooterControl = SSHeaderFooterControl {
+	moniker = 'e', "Header/Footer";
+	visibility = popup;
+}
+#endif
+
+end CellSizeUI;
+
+/****************************************************************************
+ *	"Notes" DB
+ ***************************************************************************/
+
+start	MenuUI;
+
+#if _CELL_NOTE
+
+GCNoteControl = SSNoteControl {
+
+	moniker = 't', "Notes";
+	type = properties;
+	visibility = dialog;
+}
+#endif	/* _CELL_NOTE */
+
+
+/****************************************************************************
+ *	"Fill Right", "Fill Down" and "Fill Series" DB
+ ***************************************************************************/
+
+GCFillControl = SSFillControl {
+}
+
+end	MenuUI;
+
+#if _PROTECT_CELL
+start	Interface;
+/******************************************************************************
+	Cell Protection
+******************************************************************************/
+GCCellProtection = GenInteraction {
+	children = CellProtectionBox,
+			ProtectTrigger,
+			UnprotectTrigger;
+	moniker = 'P', "Protection";
+	type = command;
+	visibility = dialog;
+	hints = {
+		ATTR_GEN_INTERACTION_OVERRIDE_INPUT_RESTRICTIONS,
+		HINT_INTERACTION_SINGLE_USAGE
+	}
+}
+
+
+/******************************************************************************
+	Cell Protection Group
+******************************************************************************/
+CellProtectionBox = GenInteraction {
+	moniker = 'R', "Range";
+	children = CellProtectionGroup;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, 200>
+			SpecHeight <>
+		},
+		HINT_ALIGN_LEFT_MONIKER_EDGE_WITH_CHILD,
+		HINT_DRAW_IN_BOX,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+	}
+}
+
+CellProtectionGroup = GenItemGroup {
+	behaviorType = exclusive;
+	numSelections = 1;
+	selection = SPO_SELECTED_CELLS;
+	children = SelectedCells, AllCells;
+	destination = process;
+	applyMsg = MSG_GEOCALC_PROCESS_SET_PROTECTION_TRIG_VAL;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+SelectedCells = GenItem {
+	moniker = "Selected cells";
+	identifier = SPO_SELECTED_CELLS;
+}
+
+AllCells = GenItem {
+	moniker = "All cells";
+	identifier = SPO_ALL_CELLS;
+}
+
+
+/******************************************************************************
+	Cell Protection Reply Buttons
+******************************************************************************/
+ProtectTrigger = GenTrigger {
+	moniker = 'P', "Protect";
+	genAttributes = default +signalInteractionComplete;
+	action = MSG_SPREADSHEET_PROTECT_RANGE, "TO_APP_TARGET";
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			byte SPO_SELECTED_CELLS
+		},
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+UnprotectTrigger = GenTrigger {
+	moniker = 'U', "Unprotect";
+	genAttributes = default +signalInteractionComplete;
+	action = MSG_SPREADSHEET_UNPROTECT_RANGE, "TO_APP_TARGET";
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			byte SPO_SELECTED_CELLS
+		},
+		HINT_SEEK_REPLY_BAR
+	}
+}
+
+end	Interface;
+#endif

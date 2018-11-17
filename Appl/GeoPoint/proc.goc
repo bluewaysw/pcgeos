@@ -1,0 +1,1902 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT: Breadbox GeoPoint
+ * FILE:      proc.goc
+ * AUTHOR:  John F. Howard,   08/03
+ *
+ * DESCRIPTION:
+ *  This file has the process class code
+ *     and some other smaller classes
+ *
+ *
+ ***********************************************************************/
+
+ @include "geopoint.goh"
+
+ @extern object NextTool;
+ @extern object PrevTool;
+ @extern object ScrapListDBox;
+ @extern object ScrapView;
+ @extern object ScrapBody;
+ @extern object ScrapNameListGroup;
+ @extern object ScrapNameListGlyph;
+ @extern object WindowGroup;
+ @extern object ScrapNameList;
+ @extern object ScrapName;
+ @extern object ScrapNumber;
+ @extern object NavToolGroup;
+
+ @extern object SlideControl;
+ @extern object SlideShowOptionsDBox;
+ @extern object SlideTransitionsDBox;
+ @extern object SlideColorControl;
+ @extern object ShowCycleMode;
+ @extern object SlideTransText;
+ @extern object SlideTransType;
+ @extern object SlideTransWipe;
+ @extern object SlideTransSpeed;
+ @extern object SlideAdvanceMode;
+ @extern object SlideTimerGroup;
+ @extern object SlideTimer;
+
+ @extern object MainToolbar;
+ @extern object ToolBarOptTrigger;
+ @extern visMoniker ShowToolBarMoniker;
+ @extern visMoniker HideToolBarMoniker;
+
+ @extern object ViewPageToggle;
+ @extern visMoniker ShowListMoniker;
+ @extern visMoniker HideListMoniker;
+
+ @extern object ListTool;
+ @extern object NoListTool;
+
+ @extern object PasteTrigger;
+ @extern object PasteAtEndTrigger;
+ @extern object PasteTool;
+ @extern object PasteEndTool;
+
+ @extern object ReorderDBox;
+ @extern object ReorderText;
+ @extern object ReorderUp;
+ @extern object ReorderDown;
+ @extern chunk ReorderString1;
+ @extern chunk ReorderString2;
+
+ @extern object ScrapAppDocControl;
+
+ @extern chunk DefaultScrapName;
+ @extern chunk NoCopyErrorString;
+ @extern chunk MaxSlidesMsg;
+ @extern chunk SlideTransMsg;
+
+ @extern chunk GPFolderTxt;
+
+ @extern visMoniker DatafileMonikerList;
+
+ word g_warningSize = 0;
+ word g_errorSize = 0;
+ FileHandle g_currentScrapFile = 0;
+ optr g_currentDoc = 0;
+ ClipboardItemFormat g_currentFormat = CIF_BITMAP;
+ WindowHandle g_gStringWindow = 0;
+ word g_canPaste = FALSE;
+ word g_currentScrap = 0;
+ Boolean g_closing = FALSE;
+ Boolean g_showInProg = FALSE;
+ Boolean g_nameMayHaveChanged = FALSE;
+ SemaphoreHandle g_transThreadIsRunning = 0;
+ SemaphoreHandle g_transThreadShouldExit = 0;
+ Boolean g_tools = TRUE;
+ Boolean g_list = TRUE;
+
+
+/* ----------------------------------------------------------------------------
+	ScrapBookClass Code  (process)
+-----------------------------------------------------------------------------*/
+
+ @classdecl  ScrapBookClass, neverSaved;
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_GEN_PROCESS_OPEN_APPLICATION for ScrapBookClass
+ *               (AppAttachFlags	attachFlags,
+ *			  			MemHandle		launchBlock,
+ *			  			MemHandle 		extraState)
+ *
+ * DESCRIPTION:  do some opening stuff
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+ Boolean			initError;
+
+
+	/* init some stuff */
+	g_currentScrapFile = 0;
+	g_currentFormat = CIF_BITMAP;
+	g_gStringWindow = 0;
+	g_canPaste = FALSE;
+	g_showInProg = FALSE;
+
+	initError = InitFileReadBoolean("GeoPoint", "ToolBar", &g_tools);
+	if (initError || g_tools) {
+		@send ToolBarOptTrigger::MSG_GEN_USE_VIS_MONIKER(
+								OptrToChunk(@HideToolBarMoniker), VUM_DELAYED_VIA_APP_QUEUE);
+		@send MainToolbar::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+	else  {
+		@send ToolBarOptTrigger::MSG_GEN_USE_VIS_MONIKER(
+								OptrToChunk(@ShowToolBarMoniker), VUM_DELAYED_VIA_APP_QUEUE);
+		@send MainToolbar::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+		}
+
+	/* slide name bolding */
+//	@send ScrapName::MSG_VIS_TEXT_SET_TEXT_STYLE(0,0,0,TS_BOLD,TEXT_ADDRESS_PAST_END, 0);
+
+	@callsuper();
+
+	/* we want to be notified about normal transfer items  */
+	ClipboardAddToNotificationList(HandleToOptr(GeodeGetProcessHandle()));
+
+	/* disable stuff, opening a file will re-enable */
+	DisableScrapBook();
+	@send SlideColorControl::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+	/* needed to install app tiny token in newUI */
+	@call application::MSG_GEN_APPLICATION_INSTALL_TOKEN();
+
+	/* needed to install doc token */
+	@call process::MSG_GEN_PROCESS_INSTALL_TOKEN();
+
+	/* Allocate trans semaphores so only 1 thread can grab each */
+	g_transThreadIsRunning = ThreadAllocSem(1);
+	g_transThreadShouldExit = ThreadAllocSem(1);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_GEN_PROCESS_CLOSE_APPLICATION for ScrapBookClass
+ *
+ * DESCRIPTION:  do some closing stuff
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+
+	/* make sure the slide show window is closed */
+	@call SlideControl::MSG_SLIDE_SHOW_END();
+
+	/* remove from transfer notification */
+	ClipboardRemoveFromNotificationList(HandleToOptr(GeodeGetProcessHandle()));
+
+	@callsuper();
+
+	return NULL;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_META_DETACH for ScrapBookClass
+ *
+ * DESCRIPTION:  dump our transition thread & sems
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_META_DETACH
+{
+
+	/* Is the transition thread still running? */
+	if ( ThreadPTimedSem(g_transThreadIsRunning, 1) == SE_TIMEOUT ) {
+		/*
+		 * Yes, a procedural thread is running!
+		 * Tell the new thread it's time to go!
+		 */
+		ThreadPSem(g_transThreadShouldExit);
+
+		/* Wait for the new thread to say it's done! */
+		ThreadPSem(g_transThreadIsRunning);
+		/*
+		 * When we get newThreadExited, then the thread is done:
+		 * release the semaphores
+		 */
+		ThreadVSem(g_transThreadShouldExit);
+		}
+
+	/* Release the newThreadIsRunning semaphore that we grabbed */
+	ThreadVSem(g_transThreadIsRunning);
+	/* Free the semaphores */
+	ThreadFreeSem(g_transThreadIsRunning);
+	ThreadFreeSem(g_transThreadShouldExit);
+
+	@callsuper();
+
+} /* End of MSG_META_DETACH */
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_GEN_PROCESS_INSTALL_TOKEN for ScrapBookClass
+ *
+ * DESCRIPTION: Associates token with docs
+ *
+ *              needs token.h include
+ ***********************************************************************/
+@method ScrapBookClass, MSG_GEN_PROCESS_INSTALL_TOKEN
+{
+ dword   tokenChars;
+ TokenFlags  tokenFlags;
+
+	@callsuper();
+
+	tokenChars = TOKEN_CHARS('G', 'P', (dword) 't', (dword) 'd');
+	if (!TokenGetTokenInfo(tokenChars, 16431, &tokenFlags))
+		TokenDefineToken(tokenChars, 16431, @DatafileMonikerList, 0);
+
+}
+
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE for ScrapBookClass
+ *       optr		document,
+ *       FileHandle		file);
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_META_DOC_OUTPUT_INITIALIZE_DOCUMENT_FILE
+{
+ VMBlockHandle		vmbh;
+ MemHandle			mh;
+ ScrapBookIndexHeader	*header;
+
+
+	/* save the doc file info */
+	g_currentScrapFile = file;
+	g_currentDoc = document;
+
+	/* We want to be notified when the block is dirty, and we also want
+		the block to be asynchronously updated, so set/clear those bits... */
+	VMSetAttributes(file, VMA_NOTIFY_DIRTY, VMA_SYNC_UPDATE);
+
+	/* create index block */
+	vmbh = VMAlloc(file, sizeof(ScrapBookIndexHeader), 0);
+	VMSetMapBlock(file, vmbh);
+	header = VMLock(file, vmbh, &mh);
+	/* store new file's default info */
+	header->SBIH_numScraps = 0;
+	header->SBIH_color.CQ_info = C_BLACK;
+	header->SBIH_color.CQ_redOrIndex = CF_INDEX;
+	header->SBIH_color.CQ_green = 0;
+	header->SBIH_color.CQ_blue = 0;
+	header->SBIH_cycleThru = FALSE;
+
+	VMDirty(mh);
+	VMUnlock(mh);
+	VMSave(file);
+
+	/* set up stuff for new scrapbook file */
+	ClearScrapView();
+
+	return(FALSE);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT for ScrapBookClass
+ *       optr		document,
+ *       FileHandle		file);
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_META_DOC_OUTPUT_ATTACH_UI_TO_DOCUMENT
+{
+ ColorQuad			color;
+ Boolean				cycle;
+
+
+	/* save the doc file info */
+	g_currentScrapFile = file;
+	g_currentDoc = document;
+   g_closing = FALSE;
+	g_showInProg = FALSE;
+
+	/* display first scrap */
+	g_currentScrap = 0;
+	ShowCurrentScrap();
+
+	/* activate the UI stuff */
+	EnableScrapBook();
+	color = @call oself::MSG_SCRAPBOOK_GET_SHOW_BACKGROUND();
+	@send SlideColorControl::MSG_COLOR_SELECTOR_SET_COLOR(color, FALSE);
+	cycle = @call oself::MSG_SCRAPBOOK_GET_CYCLE_THRU_MODE();
+	if (cycle)
+		@send ShowCycleMode::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
+	else
+		@send ShowCycleMode::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+
+	/* reset scrap name list */
+	ResetScrapNameList();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_META_DOC_OUTPUT_SAVE_AS_COMPLETED for ScrapBookClass
+ *       optr		document,
+ *       FileHandle		file);
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_META_DOC_OUTPUT_SAVE_AS_COMPLETED
+{
+
+	g_currentScrapFile = file;
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT for ScrapBookClass
+ *       optr		document,
+ *       FileHandle		file);
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_META_DOC_OUTPUT_DETACH_UI_FROM_DOCUMENT
+{
+
+	g_closing = TRUE;
+	SaveCurrentScrapName();
+
+	g_currentScrapFile = 0;
+	g_currentScrap = 0;
+	ClearScrapView();
+
+	/* de-activate UI stuff */
+	DisableScrapBook();
+
+	g_showInProg = FALSE;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_SCRAPBOOK_TOGGLE_PAGE_LIST for ScrapBookClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_TOGGLE_PAGE_LIST
+{
+ CompSizeHintArgs		sizeArg;
+
+	if (g_list) {
+		/* hide the list - put it in a dialog */
+		@send ViewPageToggle::MSG_GEN_USE_VIS_MONIKER(
+								OptrToChunk(@ShowListMoniker), VUM_NOW);
+		g_list = FALSE;
+		@send ScrapNameListGlyph::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+		@send ScrapNameList::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+
+		/*  Remove the GenDynamic list from the main window */
+		@send WindowGroup::MSG_GEN_REMOVE_CHILD(@ScrapNameList, CCF_MARK_DIRTY);
+
+		/*  Add the GenDynamic list to the dialog box */
+		@send ScrapListDBox::MSG_GEN_ADD_CHILD(@ScrapNameList, CCF_MARK_DIRTY);
+
+		/*  Set the GenDynamic List usable  */
+		@send ScrapNameList::MSG_GEN_SET_USABLE(VUM_NOW);
+
+		/* set the the list's vardata */
+		sizeArg.CSHA_width = (SST_AVG_CHAR_WIDTHS | 32);
+		sizeArg.CSHA_height = (SST_LINES_OF_TEXT | 5);
+		sizeArg.CSHA_count = 5;
+		@send ScrapNameList::MSG_META_ADD_VAR_DATA(
+			(HINT_FIXED_SIZE | VDF_SAVE_TO_STATE),
+			sizeof( CompSizeHintArgs ),
+			&sizeArg );
+
+		@send NavToolGroup::MSG_GEN_SET_USABLE(VUM_NOW);
+		/* and the tools */
+		@send NoListTool::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		@send ListTool::MSG_GEN_SET_ENABLED(VUM_NOW);
+		}
+
+	else {
+		/* show the list in the main window */
+		@send ViewPageToggle::MSG_GEN_USE_VIS_MONIKER(
+								OptrToChunk(@HideListMoniker), VUM_NOW);
+		g_list = TRUE;
+		@send NavToolGroup::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+		@send ScrapNameList::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+
+		/* Remove the GenDynamic list from the dialog box */
+		@send ScrapListDBox::MSG_GEN_REMOVE_CHILD(@ScrapNameList, CCF_MARK_DIRTY);
+
+		/* Add the GenDynamic list to the main window */
+		@send WindowGroup::MSG_GEN_ADD_CHILD(@ScrapNameList, CCF_MARK_DIRTY);
+
+		/* set the list's vardata */
+		sizeArg.CSHA_width = (SST_AVG_CHAR_WIDTHS | 25);
+		sizeArg.CSHA_height = 0;
+		sizeArg.CSHA_count = 0;
+		@send ScrapNameList::MSG_META_ADD_VAR_DATA(
+			(HINT_FIXED_SIZE | VDF_SAVE_TO_STATE),
+			sizeof( CompSizeHintArgs ),
+			&sizeArg );
+
+		/* Set the GenDynamic List usable */
+		@send ScrapNameListGlyph::MSG_GEN_SET_USABLE(VUM_NOW);
+		@send ScrapNameList::MSG_GEN_SET_USABLE(VUM_NOW);
+
+		/* and the tools */
+		@send NoListTool::MSG_GEN_SET_ENABLED(VUM_NOW);
+		@send ListTool::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:		MSG_SCRAPBOOK_PAGE_LIST_TRIGGER for ScrapBookClass
+ *                (GEN_TRIGGER_ACTION)
+ *                 optr  trigger
+ * DESCRIPTION:
+ *
+ *
+ *
+ ***********************************************************************/
+/*@method ScrapBookClass, MSG_SCRAPBOOK_PAGE_LIST_TRIGGER
+{
+
+	if (trigger == @NoListTool) {
+		/* hide the list */
+/*		@send ViewPageToggle::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
+		}
+	else {
+		/* show the list */
+/*		@send ViewPageToggle::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+		}
+	@send ViewPageToggle::MSG_GEN_ITEM_GROUP_SET_MODIFIED_STATE(TRUE);
+	@send ViewPageToggle::MSG_GEN_APPLY();
+
+}
+*/
+/***********************************************************************
+ *
+ * MESSAGE:		MSG_SCRAPBOOK_PREV_NEXT for ScrapBookClass
+ *                (GEN_TRIGGER_ACTION)
+ *                 optr  trigger
+ * DESCRIPTION:	last wraps-around to first and vice versa
+ *
+ * PARAMETERS:
+ *
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_PREV_NEXT
+{
+ word					numScraps;
+
+
+	if (!g_currentScrapFile) return;
+
+	SaveCurrentScrapName();
+
+	numScraps = GetNumScraps();
+
+	if (trigger == @NextTool) {
+		g_currentScrap++;
+		/* wrap if at last scrap */
+		if (g_currentScrap == numScraps) g_currentScrap = 0;
+		}
+
+	else {
+		/* wrap if at first scrap */
+		if (g_currentScrap == 0) g_currentScrap = numScraps - 1;
+		else g_currentScrap--;
+		}
+
+	ShowCurrentScrap();
+
+   /* and keep the dlist current */
+	@send ScrapNameList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+								g_currentScrap, FALSE);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:		MSG_SCRAPBOOK_OPEN_NAMEBOX for ScrapBookClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ * PARAMETERS:
+ *
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_OPEN_NAMEBOX
+{
+
+	SaveCurrentScrapName();
+
+	@send ScrapListDBox::MSG_GEN_INTERACTION_INITIATE();
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:		MSG_SCRAPBOOK_SCRAP_DLIST_MONIKER_QUERY for ScrapBookClass
+ *              (GEN_DYNAMIC_LIST_QUERY_MSG)
+ *
+ * DESCRIPTION:
+ *
+ * PARAMETERS:  	void (optr list, word item)
+ *
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_SCRAP_DLIST_MONIKER_QUERY
+{
+ VMBlockHandle		vmbh, evmbh;
+ MemHandle			mh;
+ ScrapBookIndexHeader	*headerPtr;
+ ScrapBookIndexEntry		*entryPtr;
+ ClipboardItemHeader		*clipHeaderPtr;
+ char					scrapName[CLIPBOARD_ITEM_NAME_LENGTH + 10];
+ GStateHandle		gstate;
+ word					width, room, eWidth;
+ dword				avgWidth, eWidthDW;
+
+
+	/* first put the appropriate number in the string */
+	UtilHex32ToAscii(scrapName, (dword)(item + 1), UHTAF_NULL_TERMINATE);
+	strcat(scrapName, ". ");
+
+   /* now get the scrap name */
+	vmbh = VMGetMapBlock(g_currentScrapFile);
+	headerPtr = VMLock(g_currentScrapFile, vmbh, &mh);
+	entryPtr = headerPtr + 1;
+
+	entryPtr += item;
+
+	evmbh = entryPtr->SBIE_vmBlock;
+	VMUnlock(mh);
+
+	clipHeaderPtr = VMLock(g_currentScrapFile, evmbh, &mh);
+	strcat(scrapName, clipHeaderPtr->CIH_name);
+	VMUnlock(mh);
+
+	/* truncate and add elipsis if we need to */
+	gstate = @call list::MSG_VIS_VUP_CREATE_GSTATE();
+	width = GrTextWidth(gstate, scrapName, strlen(scrapName));
+	avgWidth = GrFontMetrics(gstate, GFMI_AVERAGE_WIDTH_ROUNDED);
+	/* where is the list? (it's wider in the dbox) */
+	if (@call NavToolGroup::MSG_GEN_GET_USABLE())
+		room = (word)avgWidth * 32;
+	else
+		room = (word)avgWidth * 25;
+	if (width > room) {
+		/* we need to truncate */
+		eWidthDW = GrCharWidth(gstate, C_ELLIPSIS);
+      eWidth = (eWidthDW >> 16);
+		while (width > (room - eWidth)) {
+			scrapName[strlen(scrapName) - 1] = 0;
+			width = GrTextWidth(gstate, scrapName, strlen(scrapName));
+			}
+		scrapName[strlen(scrapName)] = C_ELLIPSIS;
+		scrapName[strlen(scrapName) + 1] = 0;
+		}
+   GrDestroyState(gstate);
+
+	@call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, scrapName);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:		MSG_SCRAPBOOK_SHOW_SCRAP_STATUS for ScrapBookClass
+ *              (GEN_ITEM_GROUP_STATUS_MSG)
+ *
+ * DESCRIPTION:
+ *
+ * PARAMETERS:
+ *		  (word	selection,
+ *		  word	numSelections,
+ *		  byte	stateFlags)
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_SHOW_SCRAP_STATUS
+{
+
+
+	/* only if list is in main window - show scrap */
+	if (@call WindowGroup::MSG_GEN_FIND_CHILD(@ScrapNameList) != GIGS_NONE) {
+		SaveCurrentScrapName();
+		g_currentScrap = selection;
+		ShowCurrentScrap();
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:		MSG_SCRAPBOOK_SHOW_SCRAP for ScrapBookClass
+ *
+ *
+ * DESCRIPTION:	The list double press (& View button) when it's a
+ *						dialog (when the list view is toggled off.
+ *
+ *                When list view is on we'll open up the slide trans
+ *                dbox
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_SHOW_SCRAP
+{
+ word		sel;
+
+
+	/* list view is on */
+	if (@call ScrapListDBox::MSG_GEN_FIND_CHILD(@ScrapNameList) == GIGS_NONE) {
+      @send process::MSG_SCRAPBOOK_OPEN_TRANSITION_DBOX();
+		}
+
+	/* list view is off */
+	else {
+		/* get selected scrap from list */
+		sel = @call ScrapNameList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+		if (sel == GIGS_NONE) return;
+		else  {
+			SaveCurrentScrapName();
+			g_currentScrap = sel;
+			ShowCurrentScrap();
+			}
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_SCRAPBOOK_SCRAPNAME_CR for ScrapBookClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_SCRAPNAME_CR
+{
+
+   g_nameMayHaveChanged = TRUE;
+	SaveCurrentScrapName();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_META_EXPOSED for ScrapBookClass
+ *            (WindowHandle win)
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_META_EXPOSED
+{
+
+	if(!g_showInProg) {
+		g_gStringWindow = win;
+		DrawScrap(win);
+      }
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_META_CLIPBOARD_NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED for
+ *				          ScrapBookClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_META_CLIPBOARD_NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED
+{
+ ClipboardQueryArgs	query;
+ Boolean		goodItem = FALSE;
+
+
+	if (g_canPaste)  {
+		/* any transfer item? */
+		ClipboardQueryItem(TIF_NORMAL, &query);
+		if (query.CQA_numFormats) {
+			if ((ClipboardTestItemFormat(query.CQA_header,
+						FormatIDFromManufacturerAndType(MANUFACTURER_ID_GEOWORKS,
+						CIF_GRAPHICS_STRING))) ||
+						(ClipboardTestItemFormat(query.CQA_header,
+						FormatIDFromManufacturerAndType(MANUFACTURER_ID_GEOWORKS,
+						CIF_BITMAP)))) {
+				goodItem = TRUE;
+				}
+			}
+		ClipboardDoneWithItem(query.CQA_header);
+		}
+
+	if (goodItem) {
+		@send PasteTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+		@send PasteAtEndTrigger::MSG_GEN_SET_ENABLED(VUM_NOW);
+		@send PasteTool::MSG_GEN_SET_ENABLED(VUM_NOW);
+		@send PasteEndTool::MSG_GEN_SET_ENABLED(VUM_NOW);
+		}
+	else {
+		@send PasteTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		@send PasteAtEndTrigger::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		@send PasteTool::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		@send PasteEndTool::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_META_CLIPBOARD_PASTE for ScrapBookClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_META_CLIPBOARD_PASTE
+{
+
+	if (GetNumScraps() >= MAX_SLIDES) {
+		NotifyDBox (0, @MaxSlidesMsg);
+		return;
+		}
+	PasteCommon(FALSE);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_SCRAPBOOK_PASTE_AT_END for ScrapBookClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_PASTE_AT_END
+{
+
+	if (GetNumScraps() >= MAX_SLIDES) {
+		NotifyDBox (0, @MaxSlidesMsg);
+		return;
+		}
+	PasteCommon(TRUE);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_META_CLIPBOARD_CUT for ScrapBookClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_META_CLIPBOARD_CUT
+{
+
+	DeleteCutCommon(TRUE);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_META_DELETE for ScrapBookClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_META_DELETE
+{
+
+	DeleteCutCommon(FALSE);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_META_CLIPBOARD_COPY for ScrapBookClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_META_CLIPBOARD_COPY
+{
+ VMBlockHandle		vmbh, copyVMBlock, scrapBlockHan;
+ VMFileHandle		clipFile;
+ MemHandle			mh, cmh;
+ ScrapBookIndexHeader	*headerPtr;
+ word					numScraps, i;
+ ScrapBookIndexEntry		*entryPtr, *copyPtr;
+ ClipboardItemHeader		*clipHeaderPtr;
+ VMChain					chainCopy;
+
+
+	/* grab the map info */
+	vmbh = VMGetMapBlock(g_currentScrapFile);
+	headerPtr = VMLock(g_currentScrapFile, vmbh, &mh);
+	numScraps = headerPtr->SBIH_numScraps;
+	if (!numScraps) {
+		VMUnlock(mh);
+		return;
+		}
+	entryPtr = headerPtr + 1;
+	copyPtr = entryPtr + g_currentScrap;
+	copyVMBlock = copyPtr->SBIE_vmBlock;
+   VMUnlock(mh);
+
+	/* create transfer item block from current scrap */
+	clipFile = ClipboardGetClipboardFile();
+	scrapBlockHan = VMCopyVMBlock(g_currentScrapFile,
+										  copyVMBlock,
+										  clipFile);
+	clipHeaderPtr = VMLock(clipFile, scrapBlockHan, &cmh);
+
+	/* fill in transfer item info */
+	clipHeaderPtr->CIH_owner = GeodeGetAppObject(0);
+	clipHeaderPtr->CIH_sourceID = 0;
+
+	/* create mem blocks for each transfer item format block in scrap */
+	for (i = 0; i < clipHeaderPtr->CIH_formatCount; i++)  {
+		chainCopy = VMCopyVMChain(g_currentScrapFile,
+									 clipHeaderPtr->CIH_formats[i].CIFI_vmChain,
+									 clipFile);
+		clipHeaderPtr->CIH_formats[i].CIFI_vmChain = chainCopy;
+		}
+
+	VMUnlock(cmh);
+
+	/* register newly created transfer item */
+	if (!ClipboardRegisterItem(
+							 BlockIDFromFileAndBlock(clipFile, scrapBlockHan), 0)) {
+		/* Not enough disk space */
+		NotifyDBox(0, @NoCopyErrorString);
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_META_KBD_CHAR for ScrapBookClass
+ *       word 	character,
+ *       word 	flags,
+ *       word 	state);
+ *
+ * DESCRIPTION:	let's kbd accelerators work
+ *                and does show navigation
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_META_KBD_CHAR
+{
+ Boolean	keyUsed = FALSE;
+
+
+	if (g_showInProg) {
+		if (flags & CF_FIRST_PRESS) {
+			if (((character & 0xFF) == C_ESCAPE) ||
+											  ((character & 0xFF) == VC_DOWN)) {
+				StopTransition();
+				@send SlideControl::MSG_SLIDE_SHOW_END();
+				}
+			else if ((character == C_SPACE) ||
+											  ((character & 0xFF) == VC_RIGHT)) {
+				@send SlideControl::MSG_SLIDE_SHOW_NEXT(StopTransition());
+				}
+			else if (((character & 0xFF) == VC_LEFT) ||
+											  ((character & 0xFF) == VC_BACKSPACE)) {
+				@send SlideControl::MSG_SLIDE_SHOW_PREVIOUS(StopTransition());
+				}
+			}
+		}
+
+	else  {
+		if (flags & CF_FIRST_PRESS) {
+			if (((character & 0xFF) == VC_DOWN) ||
+											  ((character & 0xFF) == VC_RIGHT)) {
+				@send oself::MSG_SCRAPBOOK_PREV_NEXT(@NextTool);
+				keyUsed = TRUE;
+				}
+			else if (((character & 0xFF) == VC_LEFT) ||
+											  ((character & 0xFF) == VC_UP)) {
+				@send oself::MSG_SCRAPBOOK_PREV_NEXT(@PrevTool);
+				keyUsed = TRUE;
+				}
+			}
+		if (!keyUsed)
+			@call ScrapView::MSG_META_FUP_KBD_CHAR(character, flags, state);
+		}
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_META_CONTENT_VIEW_WIN_CLOSED for ScrapBookClass
+ *
+ *
+ * DESCRIPTION:	reset the global
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_META_CONTENT_VIEW_WIN_CLOSED
+{
+
+	g_gStringWindow = 0;
+	@callsuper();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_SCRAPBOOK_DRAW_SLIDE_WINDOW for ScrapBookClass
+ *                 (WindowHandle win)
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_DRAW_SLIDE_WINDOW
+{
+
+	DrawScrap(win);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:		MSG_META_COLORED_OBJECT_SET_COLOR for ScrapBookClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ * PARAMETERS:
+ *		  (ColorQuad colorQuad)
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_META_COLORED_OBJECT_SET_COLOR
+{
+ VMBlockHandle		vmbh;
+ MemHandle			mh;
+ ScrapBookIndexHeader	*headerPtr;
+// ScrapBookIndexEntry		*entryPtr;
+
+
+	/*	grab the map info */
+	vmbh = VMGetMapBlock(g_currentScrapFile);
+	headerPtr = VMLock(g_currentScrapFile, vmbh, &mh);
+//	entryPtr = headerPtr + 1;
+
+	/* entry for desired slide in index block  */
+//	entryPtr += g_currentScrap;
+
+	/*	set slide transition info */
+	headerPtr->SBIH_color = colorQuad;
+	VMDirty(mh);
+	VMUnlock(mh);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:		MSG_SCRAPBOOK_SET_CYCLE_THRU_MODE; for ScrapBookClass
+ *               (GEN_ITEM_GROUP_APPLY_MSG)
+ *
+ * DESCRIPTION:
+ *
+ * PARAMETERS:
+ *		  (word	selection,
+ *		  word	numSelections,
+ *		  byte	stateFlags)
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_SET_CYCLE_THRU_MODE
+{
+ VMBlockHandle		vmbh;
+ MemHandle			mh;
+ ScrapBookIndexHeader	*headerPtr;
+
+
+	/*	grab the map info */
+	vmbh = VMGetMapBlock(g_currentScrapFile);
+	headerPtr = VMLock(g_currentScrapFile, vmbh, &mh);
+
+	/*	set slide transition info */
+	if (selection == GIGS_NONE)
+		headerPtr->SBIH_cycleThru = FALSE;
+	else
+		headerPtr->SBIH_cycleThru = TRUE;
+	VMDirty(mh);
+	VMUnlock(mh);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_SCRAPBOOK_GET_CYCLE_THRU_MODE for ScrapBookClass
+ *
+ *
+ * DESCRIPTION:   returns Boolean
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_GET_CYCLE_THRU_MODE
+{
+ VMBlockHandle		vmbh;
+ MemHandle			mh;
+ ScrapBookIndexHeader	*headerPtr;
+ Boolean				cycle;
+
+
+	/*	grab the map info */
+	vmbh = VMGetMapBlock(g_currentScrapFile);
+	headerPtr = VMLock(g_currentScrapFile, vmbh, &mh);
+
+	/*	get info  */
+	cycle = headerPtr->SBIH_cycleThru;
+	VMUnlock(mh);
+
+	return(cycle);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:		MSG_SCRAPBOOK_SHOW_OPTIONS_APPLY for ScrapBookClass
+ *
+ *
+ * DESCRIPTION:	To keep the apply behavior but add a close on apply
+ *
+ * PARAMETERS:
+ *
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_SHOW_OPTIONS_APPLY
+{
+
+	@send SlideShowOptionsDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_APPLY);
+	@send SlideShowOptionsDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:		MSG_SCRAPBOOK_OPEN_TRANSITION_DBOX for ScrapBookClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ * PARAMETERS:
+ *
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_OPEN_TRANSITION_DBOX
+{
+ VMBlockHandle		vmbh;
+ MemHandle			mh, emh;
+ ScrapBookIndexHeader	*headerPtr;
+ ScrapBookIndexEntry		*entryPtr;
+ ClipboardItemHeader		*clipHeaderPtr;
+
+
+	SaveCurrentScrapName();
+
+	/*	grab the map info */
+	vmbh = VMGetMapBlock(g_currentScrapFile);
+	headerPtr = VMLock(g_currentScrapFile, vmbh, &mh);
+	entryPtr = headerPtr + 1;
+
+	/* entry for desired slide in index block  */
+	entryPtr += g_currentScrap;
+
+	/* show the name of the slide we're working on */
+	MemLock(OptrToHandle(@SlideTransMsg));
+	@call SlideTransText::MSG_VIS_TEXT_REPLACE_ALL_PTR(LMemDeref(@SlideTransMsg), 0);
+	MemUnlock(OptrToHandle(@SlideTransMsg));
+	clipHeaderPtr = VMLock(g_currentScrapFile, entryPtr->SBIE_vmBlock, &emh);
+	@call SlideTransText::MSG_VIS_TEXT_APPEND_PTR(clipHeaderPtr->CIH_name, 0);
+	VMUnlock(emh);
+
+	/*	set slide transition info from index block */
+//	@send SlideColorControl::MSG_COLOR_SELECTOR_SET_COLOR(
+//															headerPtr->SBIH_color, FALSE);
+	@send SlideTransType::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+															entryPtr->SBIE_trans, FALSE);
+	@send SlideTransWipe::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(
+															entryPtr->SBIE_wipe, FALSE);
+	@send SlideTransSpeed::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+															entryPtr->SBIE_fadeSpeed, FALSE);
+
+	/* and set the wipe & speed usable or not */
+	if (entryPtr->SBIE_trans == TRANS_TYPE_NONE ||
+									  entryPtr->SBIE_trans == TRANS_TYPE_FADE)
+		@send SlideTransWipe::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	else
+		@send SlideTransWipe::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+	if (entryPtr->SBIE_trans == TRANS_TYPE_NONE)
+		@send SlideTransSpeed::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	else
+		@send SlideTransSpeed::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+	/* and the slide advance timer stuff */
+	if (entryPtr->SBIE_delayTime) {
+		@send SlideTimer::MSG_GEN_VALUE_SET_INTEGER_VALUE(
+														  entryPtr->SBIE_delayTime, FALSE);
+		@send SlideTimerGroup::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		@send SlideAdvanceMode::MSG_GEN_ITEM_GROUP_SET_NONE_SELECTED(FALSE);
+		}
+	else {
+		@send SlideTimer::MSG_GEN_VALUE_SET_INTEGER_VALUE(2, FALSE);
+		@send SlideTimerGroup::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+		@send SlideAdvanceMode::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(0, FALSE);
+		}
+
+	VMUnlock(mh);
+
+   /* and open the dbox */
+	@send SlideTransitionsDBox::MSG_GEN_INTERACTION_INITIATE();
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:		MSG_SCRAPBOOK_TRANSITIONS_APPLY for ScrapBookClass
+ *
+ *
+ * DESCRIPTION:	To keep the apply behavior but add a close on apply
+ *
+ * PARAMETERS:
+ *
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_TRANSITIONS_APPLY
+{
+
+	@send SlideTransitionsDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_APPLY);
+	@send SlideTransitionsDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:		MSG_SCRAPBOOK_TRANSITIONS_APPLY_ALL for ScrapBookClass
+ *
+ *
+ * DESCRIPTION:	Applies the settings to all the slides
+ *
+ * PARAMETERS:
+ *
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_TRANSITIONS_APPLY_ALL
+{
+ VMBlockHandle		vmbh;
+ MemHandle			mh;
+ ScrapBookIndexHeader	*headerPtr;
+ ScrapBookIndexEntry		*firstEntryPtr;
+ ScrapBookIndexEntry		*entryPtr;
+ word					type, wipe, delay, mode, speed, i;
+
+
+	/*	grab the map info */
+	vmbh = VMGetMapBlock(g_currentScrapFile);
+	headerPtr = VMLock(g_currentScrapFile, vmbh, &mh);
+	firstEntryPtr = headerPtr + 1;
+
+	/* grab the settings */
+	type = @call SlideTransType::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	if (type == TRANS_TYPE_WIPE)
+		wipe = @call SlideTransWipe::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+	if (type != TRANS_TYPE_NONE)
+		speed = @call SlideTransSpeed::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	mode = @call SlideAdvanceMode::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+   if (mode == 0)
+		delay = 0;
+	else
+		delay = @call SlideTimer::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+	@send SlideTransitionsDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+	for (i = 0; i < GetNumScraps(); i++) {
+		/* entry for desired slide in index block  */
+		entryPtr = firstEntryPtr + i;
+		/* set the trans info */
+		entryPtr->SBIE_trans = type;
+		if (type == TRANS_TYPE_WIPE)
+			entryPtr->SBIE_wipe = wipe;
+		if (type != TRANS_TYPE_NONE)
+			entryPtr->SBIE_fadeSpeed = speed;
+		entryPtr->SBIE_delayTime = delay;
+		}
+	VMDirty(mh);
+	VMUnlock(mh);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_SCRAPBOOK_GET_SHOW_BACKGROUND for ScrapBookClass
+ *
+ *
+ * DESCRIPTION:   returns ColorQuad
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_GET_SHOW_BACKGROUND
+{
+ VMBlockHandle		vmbh;
+ MemHandle			mh;
+ ScrapBookIndexHeader	*headerPtr;
+// ScrapBookIndexEntry		*entryPtr;
+ ColorQuad			color;
+
+
+	/*	grab the map info */
+	vmbh = VMGetMapBlock(g_currentScrapFile);
+	headerPtr = VMLock(g_currentScrapFile, vmbh, &mh);
+//	entryPtr = headerPtr + 1;
+
+	/* entry for desired slide in index block  */
+//	entryPtr += slide;
+
+	/*	get slide transition info from index block */
+	color = headerPtr->SBIH_color;
+	VMUnlock(mh);
+
+	return(color);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_SCRAPBOOK_GET_SLIDE_TRANSITION_TYPE for ScrapBookClass
+ *                 (word slide)
+ *
+ * DESCRIPTION:   returns word
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_GET_SLIDE_TRANSITION_TYPE
+{
+ VMBlockHandle		vmbh;
+ MemHandle			mh;
+ ScrapBookIndexHeader	*headerPtr;
+ ScrapBookIndexEntry		*entryPtr;
+ word			type;
+
+
+	/*	grab the map info */
+	vmbh = VMGetMapBlock(g_currentScrapFile);
+	headerPtr = VMLock(g_currentScrapFile, vmbh, &mh);
+	entryPtr = headerPtr + 1;
+
+	/* entry for desired slide in index block  */
+	entryPtr += slide;
+
+	/*	get slide transition info from index block */
+	type = entryPtr->SBIE_trans;
+	VMUnlock(mh);
+
+	return(type);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_SCRAPBOOK_GET_SLIDE_TRANSITION_WIPE for ScrapBookClass
+ *                 (word slide)
+ *
+ * DESCRIPTION:   returns word
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_GET_SLIDE_TRANSITION_WIPE
+{
+ VMBlockHandle		vmbh;
+ MemHandle			mh;
+ ScrapBookIndexHeader	*headerPtr;
+ ScrapBookIndexEntry		*entryPtr;
+ word			wipe;
+
+
+	/*	grab the map info */
+	vmbh = VMGetMapBlock(g_currentScrapFile);
+	headerPtr = VMLock(g_currentScrapFile, vmbh, &mh);
+	entryPtr = headerPtr + 1;
+
+	/* entry for desired slide in index block  */
+	entryPtr += slide;
+
+	/*	get slide transition info from index block */
+	wipe = entryPtr->SBIE_wipe;
+	VMUnlock(mh);
+
+	return(wipe);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_SCRAPBOOK_GET_SLIDE_TRANSITION_SPEED for ScrapBookClass
+ *                 (word slide)
+ *
+ * DESCRIPTION:   returns word
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_GET_SLIDE_TRANSITION_SPEED
+{
+ VMBlockHandle		vmbh;
+ MemHandle			mh;
+ ScrapBookIndexHeader	*headerPtr;
+ ScrapBookIndexEntry		*entryPtr;
+ word			speed;
+
+
+	/*	grab the map info */
+	vmbh = VMGetMapBlock(g_currentScrapFile);
+	headerPtr = VMLock(g_currentScrapFile, vmbh, &mh);
+	entryPtr = headerPtr + 1;
+
+	/* entry for desired slide in index block  */
+	entryPtr += slide;
+
+	/*	get slide transition info from index block */
+	speed = entryPtr->SBIE_fadeSpeed;
+	VMUnlock(mh);
+
+	return(speed);
+
+}
+/***********************************************************************
+ *
+ * MESSAGE: MSG_SCRAPBOOK_GET_SLIDE_TRANSITION_DELAY for ScrapBookClass
+ *                 (word slide)
+ *
+ * DESCRIPTION:   returns word
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_GET_SLIDE_TRANSITION_DELAY
+{
+ VMBlockHandle		vmbh;
+ MemHandle			mh;
+ ScrapBookIndexHeader	*headerPtr;
+ ScrapBookIndexEntry		*entryPtr;
+ word			delay;
+
+
+	/*	grab the map info */
+	vmbh = VMGetMapBlock(g_currentScrapFile);
+	headerPtr = VMLock(g_currentScrapFile, vmbh, &mh);
+	entryPtr = headerPtr + 1;
+
+	/* entry for desired slide in index block  */
+	entryPtr += slide;
+
+	/*	get slide transition info from index block */
+	delay = entryPtr->SBIE_delayTime;
+
+	VMUnlock(mh);
+	return(delay);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:		MSG_SCRAPBOOK_SET_TRANSITION_TYPE for ScrapBookClass
+ *              (GEN_ITEM_GROUP_APPLY_MSG)
+ *
+ * DESCRIPTION:
+ *
+ * PARAMETERS:
+ *		  (word	selection,
+ *		  word	numSelections,
+ *		  byte	stateFlags)
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_SET_TRANSITION_TYPE
+{
+ VMBlockHandle		vmbh;
+ MemHandle			mh;
+ ScrapBookIndexHeader	*headerPtr;
+ ScrapBookIndexEntry		*entryPtr;
+
+
+	/*	grab the map info */
+	vmbh = VMGetMapBlock(g_currentScrapFile);
+	headerPtr = VMLock(g_currentScrapFile, vmbh, &mh);
+	entryPtr = headerPtr + 1;
+
+	/* entry for desired slide in index block  */
+	entryPtr += g_currentScrap;
+
+	/*	set slide transition info */
+	entryPtr->SBIE_trans = selection;
+	VMDirty(mh);
+	VMUnlock(mh);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:		MSG_SCRAPBOOK_TRANSITION_TYPE_STATUS for ScrapBookClass
+ *              (GEN_ITEM_GROUP_STATUS_MSG)
+ *
+ * DESCRIPTION:
+ *
+ * PARAMETERS:
+ *		  (word	selection,
+ *		  word	numSelections,
+ *		  byte	stateFlags)
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_TRANSITION_TYPE_STATUS
+{
+
+	if (selection == TRANS_TYPE_NONE || selection == TRANS_TYPE_FADE)
+		@send SlideTransWipe::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	else
+		@send SlideTransWipe::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+	if (selection == TRANS_TYPE_NONE)
+		@send SlideTransSpeed::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	else
+		@send SlideTransSpeed::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:		MSG_SCRAPBOOK_SET_TRANSITION_WIPE for ScrapBookClass
+ *              (GEN_BOOLEAN_GROUP_APPLY_MSG)
+ *
+ * DESCRIPTION:
+ *
+ * PARAMETERS:
+ *		  (word	selectedBooleans,
+ *       word	indeterminateBooleans,
+ *		  word	modifiedBooleans)
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_SET_TRANSITION_WIPE
+{
+ VMBlockHandle		vmbh;
+ MemHandle			mh;
+ ScrapBookIndexHeader	*headerPtr;
+ ScrapBookIndexEntry		*entryPtr;
+
+
+	/*	grab the map info */
+	vmbh = VMGetMapBlock(g_currentScrapFile);
+	headerPtr = VMLock(g_currentScrapFile, vmbh, &mh);
+	entryPtr = headerPtr + 1;
+
+	/* entry for desired slide in index block  */
+	entryPtr += g_currentScrap;
+
+	/*	set slide transition info */
+	entryPtr->SBIE_wipe = selectedBooleans;
+	VMDirty(mh);
+	VMUnlock(mh);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:		MSG_SCRAPBOOK_SET_TRANSITION_SPEED for ScrapBookClass
+ *              (GEN_ITEM_GROUP_APPLY_MSG)
+ *
+ * DESCRIPTION:
+ *
+ * PARAMETERS:
+ *		  (word	selection,
+ *		  word	numSelections,
+ *		  byte	stateFlags)
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_SET_TRANSITION_SPEED
+{
+ VMBlockHandle		vmbh;
+ MemHandle			mh;
+ ScrapBookIndexHeader	*headerPtr;
+ ScrapBookIndexEntry		*entryPtr;
+
+
+	/*	grab the map info */
+	vmbh = VMGetMapBlock(g_currentScrapFile);
+	headerPtr = VMLock(g_currentScrapFile, vmbh, &mh);
+	entryPtr = headerPtr + 1;
+
+	/* entry for desired slide in index block  */
+	entryPtr += g_currentScrap;
+
+	/*	set slide transition info */
+	entryPtr->SBIE_fadeSpeed = selection;
+	VMDirty(mh);
+	VMUnlock(mh);
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:		MSG_SCRAPBOOK_SET_ADVANCE_MODE for ScrapBookClass
+ *              (GEN_ITEM_GROUP_APPLY_MSG)
+ *
+ * DESCRIPTION:
+ *
+ * PARAMETERS:
+ *		  (word	selection,
+ *		  word	numSelections,
+ *		  byte	stateFlags)
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_SET_ADVANCE_MODE
+{
+ VMBlockHandle		vmbh;
+ MemHandle			mh;
+ ScrapBookIndexHeader	*headerPtr;
+ ScrapBookIndexEntry		*entryPtr;
+
+
+	/*	grab the map info */
+	vmbh = VMGetMapBlock(g_currentScrapFile);
+	headerPtr = VMLock(g_currentScrapFile, vmbh, &mh);
+	entryPtr = headerPtr + 1;
+
+	/* entry for desired slide in index block  */
+	entryPtr += g_currentScrap;
+
+	/*	set slide transition info */
+	if (selection == GIGS_NONE)
+		entryPtr->SBIE_delayTime =
+		              @call SlideTimer::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+	else
+		entryPtr->SBIE_delayTime = 0;
+
+	VMDirty(mh);
+	VMUnlock(mh);
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:		MSG_SCRAPBOOK_SET_TIMER for ScrapBookClass
+ *              (GEN_VALUE_APPLY_MSG)
+ *
+ * DESCRIPTION:
+ *
+ * PARAMETERS:
+ *		  (WWFixedAsDWord		value,
+ *       word		stateFlags)
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_SET_TIMER
+{
+ VMBlockHandle		vmbh;
+ MemHandle			mh;
+ ScrapBookIndexHeader	*headerPtr;
+ ScrapBookIndexEntry		*entryPtr;
+ word					sel;
+
+
+	sel = @call SlideAdvanceMode::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	/*	grab the map info */
+	vmbh = VMGetMapBlock(g_currentScrapFile);
+	headerPtr = VMLock(g_currentScrapFile, vmbh, &mh);
+	entryPtr = headerPtr + 1;
+
+	/* entry for desired slide in index block  */
+	entryPtr += g_currentScrap;
+
+	/*	set slide transition info */
+	if (sel == GIGS_NONE)
+		entryPtr->SBIE_delayTime = IntegerOf(value);
+	else
+		entryPtr->SBIE_delayTime = 0;
+
+	VMDirty(mh);
+	VMUnlock(mh);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:		MSG_SCRAPBOOK_ADVANCE_MODE_STATUS for ScrapBookClass
+ *              (GEN_ITEM_GROUP_STATUS_MSG)
+ *
+ * DESCRIPTION:
+ *
+ * PARAMETERS:
+ *		  (word	selection,
+ *		  word	numSelections,
+ *		  byte	stateFlags)
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_ADVANCE_MODE_STATUS
+{
+
+	if (selection == 0)
+		@send SlideTimerGroup::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+	else
+		@send SlideTimerGroup::MSG_GEN_SET_ENABLED(VUM_NOW);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:		MSG_SCRAPBOOK_OPEN_REORDER_DBOX for ScrapBookClass
+ *
+ *
+ * DESCRIPTION:
+ *
+ * PARAMETERS:
+ *
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_OPEN_REORDER_DBOX
+{
+ VMBlockHandle		vmbh;
+ MemHandle			mh, emh;
+ ScrapBookIndexHeader	*headerPtr;
+ ScrapBookIndexEntry		*entryPtr;
+ ClipboardItemHeader		*clipHeaderPtr;
+
+
+	SaveCurrentScrapName();
+
+	/*	grab the map info */
+	vmbh = VMGetMapBlock(g_currentScrapFile);
+	headerPtr = VMLock(g_currentScrapFile, vmbh, &mh);
+	entryPtr = headerPtr + 1;
+	VMUnlock(mh);
+
+	/* entry for selected slide in index block  */
+	entryPtr += g_currentScrap;
+
+	/* show the name of the slide we're working on */
+	MemLock(OptrToHandle(@ReorderString1));
+	@call ReorderText::MSG_VIS_TEXT_REPLACE_ALL_PTR(LMemDeref(@ReorderString1), 0);
+	clipHeaderPtr = VMLock(g_currentScrapFile, entryPtr->SBIE_vmBlock, &emh);
+	@call ReorderText::MSG_VIS_TEXT_APPEND_PTR(clipHeaderPtr->CIH_name, 0);
+	VMUnlock(emh);
+	@call ReorderText::MSG_VIS_TEXT_APPEND_PTR(LMemDeref(@ReorderString2), 0);
+	MemUnlock(OptrToHandle(@ReorderString1));
+
+	/* and buttons usable or not */
+	if (!g_currentScrap)
+		@send ReorderUp::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	else
+		@send ReorderUp::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+	if (g_currentScrap == GetNumScraps() - 1)
+		@send ReorderDown::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	else
+		@send ReorderDown::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+
+	@send ReorderDBox::MSG_GEN_INTERACTION_INITIATE();
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:		MSG_SCRAPBOOK_REORDER_SLIDES for ScrapBookClass
+ *                (GEN_TRIGGER_ACTION)
+ *                 optr  trigger
+ *
+ * DESCRIPTION:	Moves the selected slide up or down one slot
+ *
+ *
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_REORDER_SLIDES
+{
+ VMBlockHandle		vmbh;
+ MemHandle			mh;
+ ScrapBookIndexHeader	*headerPtr;
+ word					numScraps;
+ ScrapBookIndexEntry		*entryPtr, *swapPtr;
+ ScrapBookIndexEntry		temp;
+
+
+	/* grab the map info */
+	vmbh = VMGetMapBlock(g_currentScrapFile);
+	headerPtr = VMLock(g_currentScrapFile, vmbh, &mh);
+	numScraps = headerPtr->SBIH_numScraps;
+	entryPtr = headerPtr + 1;
+
+	/* and the selected entry */
+	entryPtr += g_currentScrap;
+
+	/* are we moving up or down? */
+	if (trigger == @ReorderUp) swapPtr = entryPtr - 1;
+	else swapPtr = entryPtr + 1;
+
+	/* copy out the destination data... */
+	temp = *swapPtr;
+	/* put in our mover... */
+	swapPtr->SBIE_vmBlock = entryPtr->SBIE_vmBlock;
+	swapPtr->SBIE_trans = entryPtr->SBIE_trans;
+	swapPtr->SBIE_wipe = entryPtr->SBIE_wipe;
+	swapPtr->SBIE_fadeSpeed = entryPtr->SBIE_fadeSpeed;
+	swapPtr->SBIE_delayTime = entryPtr->SBIE_delayTime;
+	/* and swap the temp back in */
+	entryPtr->SBIE_vmBlock = temp.SBIE_vmBlock;
+	entryPtr->SBIE_trans = temp.SBIE_trans;
+	entryPtr->SBIE_wipe = temp.SBIE_wipe;
+	entryPtr->SBIE_fadeSpeed = temp.SBIE_fadeSpeed;
+	entryPtr->SBIE_delayTime = temp.SBIE_delayTime;
+
+	VMDirty(mh);
+	VMUnlock(mh);
+
+	/* redraw our current selection in the dlist */
+	@send oself::MSG_SCRAPBOOK_SCRAP_DLIST_MONIKER_QUERY(
+											  @ScrapNameList, g_currentScrap);
+	/* update the current selection */
+	if (trigger == @ReorderUp) g_currentScrap--;
+	else g_currentScrap++;
+	/* and the swapped selection */
+	@send oself::MSG_SCRAPBOOK_SCRAP_DLIST_MONIKER_QUERY(
+											  @ScrapNameList, g_currentScrap);
+   /* move our selection with the moved slide */
+	@send ScrapNameList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(
+	                             g_currentScrap, FALSE);
+	ShowCurrentScrap();
+
+	/* and reset our up/down triggers if we need to */
+	/* and buttons usable or not */
+	if (!g_currentScrap)
+		@send ReorderUp::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	else
+		@send ReorderUp::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+	if (g_currentScrap == numScraps - 1)
+		@send ReorderDown::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	else
+		@send ReorderDown::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_SCRAPBOOK_TOGGLE_TOOL_BAR for ScrapBookClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method ScrapBookClass, MSG_SCRAPBOOK_TOGGLE_TOOL_BAR
+{
+
+
+	if (g_tools) {
+		@send ToolBarOptTrigger::MSG_GEN_USE_VIS_MONIKER(
+								OptrToChunk(@ShowToolBarMoniker), VUM_NOW);
+		g_tools = FALSE;
+		@send MainToolbar::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+		}
+	else  {
+		@send ToolBarOptTrigger::MSG_GEN_USE_VIS_MONIKER(
+								OptrToChunk(@HideToolBarMoniker), VUM_NOW);
+		g_tools = TRUE;
+		@send MainToolbar::MSG_GEN_SET_USABLE(VUM_NOW);
+		}
+
+	InitFileWriteBoolean("GeoPoint", "ToolBar", g_tools);
+	InitFileCommit();
+
+}
+
+/* ----------------------------------------------------------------------------
+	NameGenTextClass code
+-----------------------------------------------------------------------------*/
+
+@classdecl NameGenTextClass;
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_VIS_TEXT_SET_USER_MODIFIED for NameGenTextClass
+ *
+ * PARAMETERS:  
+ *                    
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method NameGenTextClass, MSG_VIS_TEXT_SET_USER_MODIFIED
+{
+
+	g_nameMayHaveChanged = TRUE;
+
+	@callsuper();
+
+}
+
+/* ----------------------------------------------------------------------------
+	GPointDocumentControlClass code
+-----------------------------------------------------------------------------*/
+
+@classdecl GPointDocumentControlClass;
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_GEN_DOCUMENT_CONTROL_CONFIGURE_FILE_SELECTOR
+ *                                     for GPointDocumentControlClass
+ *
+ * DESCRIPTION:	To direct saves to Presentations folder.
+ *              
+ *
+ ***********************************************************************/
+
+@method GPointDocumentControlClass, MSG_GEN_DOCUMENT_CONTROL_CONFIGURE_FILE_SELECTOR
+{
+ Boolean		notThere;
+
+
+    @callsuper();
+
+	 MemLock (OptrToHandle(@GPFolderTxt));
+    notThere = @call fileSelector::MSG_GEN_PATH_SET
+					 (LMemDeref(@GPFolderTxt),
+					 SP_DOCUMENT);
+    MemUnlock (OptrToHandle(@GPFolderTxt));
+
+    if(notThere)  @call fileSelector::MSG_GEN_PATH_SET(".", SP_DOCUMENT);
+
+}
+
+

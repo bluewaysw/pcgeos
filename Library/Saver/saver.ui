@@ -1,0 +1,142 @@
+/*
+ *	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+ *
+ * Project:	PC GEOS
+ * Module:	
+ * File:	saver.ui
+ *
+ * Author:	John Wedgwood, Mar 24, 1991
+ *
+ * Revision History:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	John	 3/24/91	Initial revision
+ *	stevey	1/7/93		port to 2.0
+ *
+ * Description:
+ *			UI for the password stuff.
+ *
+ *	$Id: saver.ui,v 1.1 97/04/07 10:44:17 newdeal Exp $
+ *
+ */
+
+#include "generic.uih"
+#include "saver.uih"
+
+class SaverContent = VisContent {
+    state = bitFieldComp byte {
+	acceptInputOnClose
+    } : {};
+}
+
+/*****************************************************************************/
+
+start	Interface;
+
+SaverUnlock = GenInteraction {
+	visibility = dialog;
+	genStates = default -usable;
+	attributes =
+		default +sysModal, +notUserInitiatable,	-modal;
+	children =
+		PasswordTopSpacer,
+		PasswordView,
+		PasswordUnlockEntryGroup,
+		PasswordErrorGlyph;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_WINDOW_NO_TITLE_BAR,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_SIZE_WINDOW_AS_RATIO_OF_FIELD {
+			SpecWinSizePair <mask SWSS_RATIO or PCT_100, \
+					mask SWSS_RATIO or PCT_100>
+		},
+	}
+}
+
+/*-----------------------------------------------------------------------------
+			PasswordTopSpacer
+-----------------------------------------------------------------------------*/
+
+PasswordTopSpacer = GenInteraction {
+	type	= organizational;
+	attributes = default +notUserInitiatable;
+	hints = {
+	    HINT_FIXED_SIZE {
+		    SpecWidth  <SST_PCT_OF_FIELD_WIDTH, PCT_10>
+		    SpecHeight <SST_PCT_OF_FIELD_HEIGHT, PCT_10>
+	    }
+	}
+}
+
+PasswordErrorGlyph = GenGlyph {
+	genStates = default - usable;
+	moniker = "Incorrect password";
+}
+
+/*-----------------------------------------------------------------------------
+			PasswordView
+-----------------------------------------------------------------------------*/
+
+PasswordView = GenView {
+	backColorR = C_BLACK;
+	output = PasswordContent;
+	viewAttributes = scaleToFit, dontSendPtrEvents, dontSendKbdReleases;
+	hints = {
+		HINT_FIXED_SIZE {
+			SpecSizeSpec <SST_PCT_OF_FIELD_WIDTH, PCT_65>
+			SpecSizeSpec <SST_PCT_OF_FIELD_HEIGHT, PCT_65>
+		}
+	}
+}
+
+PasswordContent = SaverContent {
+	view = PasswordView;
+	contentAttrs = default +sameWidthAsSubview, +sameHeightAsSubview,
+		+viewDocBoundsSetManually, +viewDoesNotWinScroll;
+}
+
+/*-----------------------------------------------------------------------------
+			Stuff below the view.
+-----------------------------------------------------------------------------*/
+
+PasswordUnlockEntryGroup = GenInteraction {
+	type = organizational;
+	children = PasswordUnlockText,
+		   PasswordLockGlyph;
+	hints = {
+	    HINT_ORIENT_CHILDREN_VERTICALLY,
+	    HINT_CENTER_CHILDREN_HORIZONTALLY
+	}
+}
+
+chunk SaverPasswordStyle = data {
+	CHAR_ATTR_FONT_SIZE_STYLE_COLOR(2, FID_BISON, 13, 0, C_BLACK)
+}
+
+PasswordUnlockText = GenText vardataReloc ignoreDirty {
+	moniker = "Enter password to unlock:";
+	maxLength = "SAVER_MAX_PASSWORD";
+	textDisplayAttributes = singleLineText;
+	applyMsg = MSG_SAVER_APP_CHECK_PASSWORD;
+	destination = "TO_APP_MODEL";
+	hints = {
+		HINT_PLACE_MONIKER_TO_LEFT,
+		ATTR_GEN_DESTINATION_CLASS {
+			UN_DD SaverApplicationClass
+		},
+		ATTR_GEN_TEXT_CHAR_ATTR {
+			word SaverPasswordStyle
+		},
+#ifdef DO_PIZZA
+		ATTR_GEN_TEXT_NO_FEP,
+#endif
+		ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED
+	}
+}
+
+PasswordLockGlyph = GenGlyph ignoreDirty {
+	moniker = "Click in window to lock";
+}
+
+end	Interface;

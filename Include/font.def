@@ -1,0 +1,224 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+FILE:		font.def
+
+DECLARER:	Kernel
+
+DESCRIPTION:
+	This file defines font structures & constants
+
+	$Id: font.def,v 1.1 97/04/04 14:24:10 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__FONT
+
+include fontID.def
+
+StartKernel
+
+global GrEnumFonts:far
+global GrCheckFontAvail:far
+global GrFindNearestPointsize:far
+global GrGetDefFontID:far
+global GrCharMetrics:far
+global GrFontMetrics:far
+global GrGetFontName:far
+
+;------------------------------------------------------------------------------
+;	FONT CONSTANTS
+;------------------------------------------------------------------------------
+
+DEFAULT_FONT_ID		equ	FID_BERKELEY	; default default font
+DEFAULT_FONT_SIZE	equ	10		; default default size
+
+FONT_NAME_LEN		equ	20		; maximum font name length
+
+;	Range of allowable point sizes
+
+MIN_POINT_SIZE		equ 4
+if DBCS_PCGEOS
+MAX_POINT_SIZE		equ 432
+else
+MAX_POINT_SIZE		equ 792
+endif
+
+;
+; the following are returned by GrFontMetrics:
+;
+GFMI_ROUNDED	equ 1				;set: round returned info
+
+GFM_info		etype	word, 0, 2
+GFMI_HEIGHT		enum	GFM_info	;height of font box
+GFMI_MEAN		enum	GFM_info	;top of lowers
+GFMI_DESCENT		enum	GFM_info	;descent of lowers
+GFMI_BASELINE		enum	GFM_info	;baseline offset
+GFMI_LEADING		enum	GFM_info	;external leading
+GFMI_AVERAGE_WIDTH	enum	GFM_info	;average char width
+GFMI_ASCENT		enum	GFM_info	;ascent line to baseline
+GFMI_MAX_WIDTH		enum	GFM_info	;widest char width
+GFMI_MAX_ADJUSTED_HEIGHT enum 	GFM_info	;ht, adjusted, with above/below
+GFMI_UNDER_POS		enum	GFM_info	;offset to underline
+GFMI_UNDER_THICKNESS	enum	GFM_info	;thickness of underline
+GFMI_ABOVE_BOX		enum	GFM_info	;height of above box
+GFMI_ACCENT		enum	GFM_info	;height of accent
+GFMI_DRIVER		enum	GFM_info	;driver ID
+GFMI_KERN_COUNT		enum	GFM_info	;# of kerning pairs
+GFMI_FIRST_CHAR		enum	GFM_info	;first character in font
+GFMI_LAST_CHAR		enum	GFM_info	;last character in font
+GFMI_DEFAULT_CHAR	enum	GFM_info	;default character for font
+GFMI_STRIKE_POS		enum	GFM_info	;strikethrough position
+GFMI_BELOW_BOX		enum	GFM_info	;height of below box
+
+;
+; the following are returned by GrCharMetrics:
+;
+GCMI_ROUNDED	equ 1				;set: round returned info
+
+GCM_info		etype	word, 0, 2
+GCMI_MIN_X		enum	GCM_info	;min x (left side bearing)
+GCMI_MIN_Y		enum	GCM_info	;min y (descent)
+GCMI_MAX_X		enum	GCM_info	;max x
+GCMI_MAX_Y		enum	GCM_info	;max y (ascent)
+
+;------------------------------------------------------------------------------
+;	Font Manufacturers
+;------------------------------------------------------------------------------
+
+;	Do not change this without changing VisTextFontMaker
+
+FontIDRecord	record
+    FIDR_maker:4
+    FIDR_ID:12
+FontIDRecord	end
+
+;------------------------------------------------------------------------------
+;
+;	Font Type
+;
+;------------------------------------------------------------------------------
+FontUseful	etype	byte
+FU_NOT_USEFUL	enum	FontUseful		; not for menus
+FU_USEFUL	enum	FontUseful		; useful for menus
+
+FontPitch	etype	byte
+FP_PROPORTIONAL	enum	FontPitch		; proportional font.
+FP_FIXED	enum	FontPitch		; Fixed pitch font.
+
+FontOrientation	etype	byte
+FO_NORMAL	enum	FontOrientation		; normal straight up & down font
+FO_LANDSCAPE	enum	FontOrientation		; rotated 90 degrees
+
+FontSource	etype	byte
+FS_BITMAP	enum	FontSource		; bitmap data
+FS_OUTLINE	enum	FontSource		; outline data
+
+FontAttrs	record
+	FA_USEFUL 	FontUseful:1		;TRUE: "useful" font
+	FA_FIXED_WIDTH	FontPitch:1		;TRUE: fixed width
+	FA_ORIENT	FontOrientation:1	;TRUE: landscape orientation
+	FA_OUTLINE	FontSource:1		;TRUE: outline defined
+	FA_FAMILY	FontFamily:4		;font family
+FontAttrs	end
+
+
+;------------------------------------------------------------------------------
+;	Font Weights (% of normal)
+;------------------------------------------------------------------------------
+
+FontWeight		etype	byte
+FW_MINIMUM		enum FontWeight, 75
+FW_NORMAL		enum FontWeight, 100
+FW_MAXIMUM		enum FontWeight, 125
+
+;------------------------------------------------------------------------------
+;	Font Widths (% of normal)
+;------------------------------------------------------------------------------
+
+FontWidth		etype	byte
+FWI_MINIMUM		enum FontWidth, 25
+FWI_NARROW		enum FontWidth, 75
+FWI_CONDENSED		enum FontWidth, 85
+FWI_MEDIUM		enum FontWidth, 100
+FWI_WIDE		enum FontWidth, 125
+FWI_EXPANDED		enum FontWidth, 150
+FWI_MAXIMUM		enum FontWidth, 200
+
+;------------------------------------------------------------------------------
+;	values for superscript and subscript
+;
+;	display superior:	95 in "$7.95"
+;	footnote superior:	3 in "see footnote 3"
+;	alpha superior:		lle in "Mlle" (abbreviation for Mademoiselle)
+;	numerator:		5 in "5/6"
+;
+;	chemical inferior:	2 in "H20"
+;	denominator:		6 in "5/6"
+;
+;------------------------------------------------------------------------------
+
+SuperscriptPosition	etype	byte
+SPP_DISPLAY		enum SuperscriptPosition, 50
+SPP_FOOTNOTE		enum SuperscriptPosition, 40
+SPP_ALPHA		enum SuperscriptPosition, 45
+SPP_NUMERATOR		enum SuperscriptPosition, 50
+SPP_DEFAULT		enum SuperscriptPosition, 50
+
+SuperscriptSize		etype	byte
+SPS_DISPLAY		enum SuperscriptSize, 55
+SPS_FOOTNOTE		enum SuperscriptSize, 65
+SPS_ALPHA		enum SuperscriptSize, 75
+SPS_NUMERATOR		enum SuperscriptSize, 60
+SPS_DEFAULT		enum SuperscriptSize, 50
+
+SubscriptPosition	etype	byte
+SBP_CHEMICAL		enum SubscriptPosition, 30
+SBP_DENOMINATOR		enum SubscriptPosition, 0
+SBP_DEFAULT		enum SubscriptPosition, 50
+
+SubscriptSize		etype	byte
+SBS_CHEMICAL		enum SubscriptSize, 65
+SBS_DENOMINATOR		enum SubscriptSize, 60
+SBS_DEFAULT		enum SubscriptSize, 50
+
+;------------------------------------------------------------------------------
+;		Flags passed to GrEnumFonts and GrCheckFontAvail
+;------------------------------------------------------------------------------
+
+;
+; Number of fonts files that can be fonts in the font directory:
+;
+MAX_FONTS		equ	400
+;
+; Number of fonts that should go in a fonts menu:
+;
+MAX_MENU_FONTS		equ	10
+
+FontEnumFlags	record
+    FEF_ALPHABETIZE:1			;TRUE: alphabetize list
+    FEF_USEFUL:1			;TRUE: find "useful" fonts only
+    FEF_FIXED_WIDTH:1			;TRUE: find fixed-width fonts only
+    FEF_FAMILY:1			;TRUE: match FontFamily
+    FEF_STRING:1			;TRUE: match string
+    FEF_DOWNCASE:1			;TRUE: downcase returned strings
+    FEF_BITMAPS:1			;TRUE: find fonts with bitmaps
+    FEF_OUTLINES:1			;TRUE: find fonts with outlines
+FontEnumFlags	end
+
+;------------------------------------------------------------------------------
+;		Structure returned by GrEnumFonts
+;------------------------------------------------------------------------------
+
+FontEnumStruct	struct
+    FES_ID	FontID				;font ID
+if DBCS_PCGEOS
+    FES_name	wchar	FONT_NAME_LEN	dup(?)	;null terminated string
+else
+    FES_name	char	FONT_NAME_LEN	dup(?)	;null terminated string
+endif
+FontEnumStruct	ends
+
+EndKernel

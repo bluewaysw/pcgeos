@@ -1,0 +1,673 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GlobalPC 1998 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		VGA16 Video Driver
+FILE:		vga16Macro.def
+
+AUTHOR:		Jim DeFrisco
+
+REVISION HISTORY:
+	Name	Date	Description
+	----	----	-----------
+	jim	9/90	initial
+
+	$Id: vga16Macro.def,v 1.2$
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SetVSeg
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Utility to set up correct segment for video operations
+
+PASS:		nothing
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jim	6/ 7/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SetVSeg		macro
+	dgseg	= 	ss
+ifidn @CurSeg, <idata>
+	dgseg	=	cs
+endif
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		SetBuffer
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set up segment address of video buffer. 
+
+PASS: 		segreg 		- segment register to set
+		trashReg 	- register that can be trashed
+				  (not trashed by memory driver version)
+
+RETURN: 	segreg 		- set
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+		none
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Jim	08/89		Initial version (for memory drvier)
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetBuffer	macro	segreg, trashReg
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		NextScan
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Increment to next scan line
+
+PASS:		dest - register with scan line address
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jim	2/11/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+NextScan	macro	dest, sSize
+		local	newWin, done
+		SetVSeg
+
+ifb <sSize>
+		add	dest, dgseg:[modeInfo].VMI_scanSize
+else
+		add	dest, sSize
+endif
+		jc	newWin
+		cmp	dgseg:[lastWinPtr], dest
+                ja      done
+		clc
+newWin:
+ifdif <dest>, <di>
+		xchg	di, dest
+endif
+		call	SetNextWin
+ifdif <dest>, <di>
+		xchg	di, dest
+endif
+done: 
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		NextScanSrc
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Increment to next scan line
+
+PASS:		dest - register with scan line address
+		nLeftReg - [optional] byte reg with count of scan lines left.
+		sSize	 - [optional] word reg with size of scan line
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jim	2/11/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+NextScanSrc     macro   dest, sSize
+		local	newWin, done
+		SetVSeg
+
+ifb <sSize>
+		add	dest, dgseg:[modeInfo].VMI_scanSize
+else
+		add	dest, sSize
+endif
+		jc	newWin
+                cmp     dgseg:[lastWinPtrSrc], dest
+                ja     done
+		clc
+newWin:
+ifdif <dest>, <di>
+		xchg	di, dest
+endif
+		call	SetNextWinSrc
+ifdif <dest>, <di>
+		xchg	di, dest
+endif
+done: 
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		NextScanBoth
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Increment to next scan line in source and dest windows
+
+PASS:		dest - register with scan line address
+		sSize	- register holding scan size (optional)
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jim	2/11/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+NextScanBoth	macro	dest, sSize
+		local	newWin, done
+		SetVSeg
+
+ifnb	<sSize>
+		add	dest, sSize
+else
+		add	dest, dgseg:[modeInfo].VMI_scanSize
+endif
+		jc	newWin
+		cmp	dgseg:[lastWinPtr], dest
+                ja      done
+		clc
+newWin:
+ifdif <dest>, <di>
+		xchg	di, dest
+endif
+		push	di
+		pushf
+		call	SetNextWinSrc
+		popf
+		pop	di
+		call	SetNextWin
+ifdif <dest>, <di>
+		xchg	di, dest
+endif
+done: 
+endm
+
+
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		PrevScan
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Decrement to previous scan line
+
+PASS:		dest 	- location with scan line address
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jim	2/11/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+PrevScan        macro   dest, sSize
+		local	done
+		SetVSeg
+
+ifnb	<sSize>
+                sub     dest, sSize
+else
+                sub     dest, dgseg:[modeInfo].VMI_scanSize
+endif
+		jnc	done
+ifdif <dest>, <di>
+		xchg	dest, di
+endif
+		call	SetPrevWin
+ifdif <dest>, <di>
+		xchg	dest, di
+endif
+
+done:
+endm
+		
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		PrevScanSrc
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Decrement to previous scan line
+
+PASS:		dest 	- location with scan line address
+		segReg 	- segment register that contains pointer to bitmap 
+			  data block
+			  (if blank, es is assumed)
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jim	2/11/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+PrevScanSrc     macro   dest, sSize
+		local	done
+		SetVSeg
+
+ifnb	<sSize>
+                sub     dest, sSize
+else
+                sub     dest, dgseg:[modeInfo].VMI_scanSize
+endif
+		jnc	done
+ifdif <dest>, <di>
+		xchg	dest, di
+endif
+		call	SetPrevWinSrc
+ifdif <dest>, <di>
+		xchg	dest, di
+endif
+
+done:
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                PrevScanBoth
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:       Decrement to previous scanline
+
+PASS:		dest - register with scan line address
+		sSize	- register holding scan size (optional)
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jim	2/11/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+PrevScanBoth    macro   dest, sSize
+                local   done
+		SetVSeg
+
+ifnb	<sSize>
+                sub     dest, sSize
+else
+                sub     dest, dgseg:[modeInfo].VMI_scanSize
+endif
+                jnc     done
+
+ifdif <dest>, <di>
+		xchg	di, dest
+endif
+		push	di
+		pushf
+                call    SetPrevWinSrc
+		popf
+		pop	di
+                call    SetPrevWin
+ifdif <dest>, <di>
+		xchg	di, dest
+endif
+done: 
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		CalcScanLine
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Calculate the beginning scan line position
+
+PASS:		reg 	- register containing line number
+		offReg	- offset into scan line
+		segReg	- segment which should be set to point at frame buff
+			    at the end of the macro
+
+RETURN: 	segReg:reg - far pointer into frame buffer
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+CalcScanLine	macro	reg, offReg, segReg
+		push	dx
+	ifb	<offReg>
+		clr	dx
+	else
+	    ifdif <offReg>, <dx>
+		mov	dx, offReg
+	    endif
+	endif
+	ifdif	<reg>, <ax>
+		push	ax
+		mov	ax, reg
+	endif
+		call	SetVESAWin	
+	ifdif	<reg>, <ax>
+		mov	reg, ax
+		pop	ax
+	endif
+	ifb	<segReg>
+		mov	es, dx
+	else
+		mov	segReg, dx
+	endif
+		pop	dx
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		CalcScanLineSrc
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Calculate the beginning scan line position
+
+PASS:		reg 	- register containing line number
+		offReg	- offset into scan line
+		segReg	- segment which should be set to point at frame buff
+			    at the end of the macro
+
+RETURN: 	segReg:reg - far pointer into frame buffer
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+CalcScanLineSrc	macro	reg, offReg, segReg
+		push	dx
+	ifb	<offReg>
+		clr	dx
+	else
+	    ifdif <offReg>, <dx>
+		mov	dx, offReg
+	    endif
+	endif
+	ifdif	<reg>, <ax>
+		push	ax
+		mov	ax, reg
+	endif
+		call	SetVESAWinSrc
+	ifdif	<reg>, <ax>
+		mov	reg, ax
+		pop	ax
+	endif
+	ifb	<segReg>
+		mov	es, dx
+	else
+		mov	segReg, dx
+	endif
+		pop	dx
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		CalcScanLineBoth
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Calculate the beginning scan line position
+
+PASS:		reg 	- register containing line number
+		offReg	- offset into scan line
+		segReg	- segment which should be set to point at frame buff
+			    at the end of the macro
+
+RETURN: 	segReg:reg - far pointer into frame buffer
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+CalcScanLineBoth macro	reg, offReg, segReg, segRegRead
+		push	ax, dx
+	ifb	<offReg>
+		clr	dx
+	else
+	    ifdif <offReg>, <dx>
+		mov	dx, offReg
+	    endif
+	endif
+		mov	ax, reg
+		push	ax, dx
+		call	SetVESAWinSrc
+		mov	reg, ax
+	ifb	<segRegRead>
+		mov	ds, dx
+	else
+		mov	segRegRead, dx
+	endif
+		pop	ax, dx
+		call	SetVESAWin
+	ifb	<segReg>
+		mov	es, dx
+	else
+		mov	segReg, dx
+	endif
+		pop	ax, dx
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		FirstWinScan
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:	Set di to start of scan line after a new win transition
+
+PASS:		
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jim	10/ 8/92		Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+FirstWinScan		macro
+		SetVSeg
+		mov	di, dgseg:[modeInfo].VMI_scanSize
+		sub	di, dgseg:[pixelsLeft]
+                sub     di, dgseg:[pixelsLeft]
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                CheckSetDither
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:       Checks if the currents dither equals the current color.
+                If not then set the new dither matrix.
+                For TrueColor it only set the current color.
+
+PASS:		
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	jim	10/ 8/92		Initial version
+        FR      11/10/97                Created TrueColor version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+CheckSetDither	macro	vidSeg, attrOffset
+
+		mov	dl, ds:[GS_mixMode]		; get draw mode
+                mov     vidSeg:currentDrawMode, dl      ; save it
+
+                push    ax
+
+ifnb	<attrOffset>
+                mov     dl, ds:[attrOffset].CA_colorRGB.RGB_red
+                mov     ax, {word}ds:[attrOffset].CA_colorRGB.RGB_green
+else
+                mov     dl, ds:[si].CA_colorRGB.RGB_red
+                mov     ax, {word}ds:[si].CA_colorRGB.RGB_green
+endif
+		xchg	al, ah
+		shr	ah, 2
+		shr	ax, 3
+		andnf	dl, 0xf8
+		ornf	ah, dl
+                mov     vidSeg:[currentColor], ax
+
+                pop     ax
+endm
+
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                BltQuickBuffer
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:       Check if it is a one windows system and allocate blt
+                buffer if needed for 16 bit per pixel.
+
+PASS:		
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+        FR      11/10/97        Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+BltQuickBuffer            macro
+                local   usemem, done
+
+                ; allocate memory, if 1 window system
+
+                push    ax
+                mov     ax,{word} ss:[writeWindow]      ; read both windows    
+                cmp     al,ah                           ; read and write the
+                                                        ; same?
+                jz      usemem                          ; if the alloc mem
+
+                call    BltQuick
+                pop     ax
+                jmp     done
+
+usemem:
+                push    bx, cx
+                mov     ax, ss:[d_dx]                   ; get max pix count
+                shl     ax, 1                           ; 2 bytes per pixel
+                mov     cx,0080h
+                call    MemAlloc
+
+                mov     ss:[bltBufHandle], bx
+                mov     ss:[bltBufSeg], ax
+
+                pop     cx
+                pop     bx
+                pop     ax
+
+                jc      done                            ; error, so simply
+                                                        ; do nothing
+
+                call    BltQuick                        ; call blt
+
+                ; free memory
+
+                push    bx
+                mov     bx, ss:[bltBufHandle]
+                call    MemFree
+                pop     bx
+done:
+    
+endm
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                CLR24GetPixel
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+SYNOPSIS:       Get screen pixel
+
+PASS:		ax	= scanline offset
+
+RETURN:		al	= Red
+		bl	= Green
+		bh	= Blue
+
+PSEUDO CODE/STRATEGY:
+
+KNOWN BUGS/SIDE EFFECTS/IDEAS:
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+        FR      11/10/97        Initial version
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+CLR24GetPixel   macro   
+
+                shl     ax
+                NextScanSrc     si, ax
+                lodsw
+
+		mov	bx, ax
+		shl	bx, 3				; bl = blue
+		shl	bh, 2				; bh = green
+		andnf	ah, 0xf8			; ah = red
+		mov	al, ah				; al = red
+		xchg	bl, bh				; bl = green
+							; bh = blue
+endm
+
+;
+; Call into the dll to tell it we are done with a video operation.
+CALL_VIDEO	macro
+	local	notLoaded, doCall
+if	NT_DRIVER
+	push	ax, ds, bx, cx
+	;
+	; If the library hasn't been loaded yet, don't
+	; call into it or you will die.
+	segmov	ds, dgroup, ax
+	mov	ax, ds:[vddHandle]
+	cmp	ax, 0
+	je	notLoaded
+
+doCall::
+	; Flush the last scanline to memory and the screen.
+	; before telling the screen to redraw	
+	mov	bx, 201 ; Set Window
+;	mov	cx, dx  ; window to set.		
+	DispatchCall
+notLoaded::
+	pop	ax, ds, bx, cx
+else
+	int	VIDEO_BIOS
+endif		
+endm

@@ -1,0 +1,910 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994 -- All Rights Reserved
+
+PROJECT:	GEOS
+MODULE:		System Inbox/Outbox
+FILE:		mailbox.goh
+
+AUTHOR:		Chung Liu, Nov 20, 1994
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CL	11/20/94   	Initial version.
+
+DESCRIPTION:
+	Interface definition for system Mailbox library, which controls the
+	System Inbox / Outbox.
+
+	$Id: mailbox.goh,v 1.1 97/04/04 15:59:45 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+@optimize
+
+@ifndef _MAILBOX_GOH_
+@define _MAILBOX_GOH_
+
+@include <Objects/gItemGC.goh>	/* for GenItemGroupStateFlags */
+
+@deflib	mailbox
+
+@include <Objects/metaC.goh> 	/* MetaMailboxMessages */
+#include <medium.h>		/* for MediumType */
+
+/* The token for a mailbox message. */
+typedef	dword	MailboxMessage;		
+
+/* 
+ * MESSAGE BODY STORAGE
+ */
+
+/* Geoworks-defined storage types */
+
+/* enum GeoworksMailboxStorageID */
+typedef enum {
+    GMSID_FILE = 0x0,
+    GMSID_VM_TREE,
+} GeoworksMailboxStorageID;
+
+#define GMSID_HUGE_ARRAY	GMSID_VM_TREE
+
+typedef struct {		
+    word		MS_id;
+    ManufacturerID	MS_manuf;
+} MailboxStorage;
+
+/* 
+ *  MESSAGE BODY FORMAT
+ */
+
+/* enum GeoworksMailboxDataFormatID */
+typedef enum {	
+    GMDFID_INVALID = 0x0,
+    GMDFID_STREAM_GSTRING,
+    GMDFID_VM_GSTRING,
+    GMDFID_TRANSFER_ITEM,
+    GMDFID_TEXT_CHAIN,
+    GMDFID_TEXT_FILE,
+    GMDFID_DOCUMENT,
+    GMDFID_ADDRESS_CARD,
+    GMDFID_APPOINTMENT,
+    GMDFID_INK,
+    GMDFID_VM_COMPOSITE,
+    GMDFID_FAX_FILE,
+    GMDFID_SHORT_MESSAGE,
+    GMDFID_FOAM_FILE,
+    GMDFID_TEXT_ARRAY
+} GeoworksMailboxDataFormatID;
+
+#define	GMDFID_END_OF_LIST	GMDFID_INVALID
+
+typedef struct {		
+    word		MDF_id;
+    ManufacturerID	MDF_manuf;
+} MailboxDataFormat;
+
+/* 
+ *  TRANSPORT MECHANISMS
+ */
+
+/* enum GeoworksMailboxTransportID */
+typedef enum {	
+    GMTID_LOCAL = 0x0,		/* Message goes in the inbox. Transport 
+				 * address may be a null pointer. */
+    GMTID_NET_LIBRARY,
+    GMTID_PRINT_SPOOLER,
+    GMTID_FAX_SEND,
+    GMTID_ZOOMER,
+    GMTID_SM,
+    GMTID_SKELETON,
+    GMTID_SMTP
+} GeoworksMailboxTransportID;
+
+typedef struct {		
+    unsigned		MT_id;
+    ManufacturerID	MT_manuf;
+} MailboxTransport;
+
+typedef	unsigned	MailboxTransportOption;
+
+typedef struct {
+    MailboxTransport		MTAO_transport;
+    MailboxTransportOption	MTAO_transOption;
+} MailboxTransportAndOption;
+
+#define MAILBOX_ANY_TRANSPORT_OPTION	(-1)
+
+typedef ByteEnum MailboxMessagePriority;	
+#define MMP_EMERGENCY	0x0
+/*
+ *  User should be notified immediately and not allowed to do anything but
+ *  receive the message.
+ */
+    
+#define MMP_URGENT	0x1
+/*
+ *  User should be notified immediately, but does not need to read the message
+ *  right away. The notification will mention the message's urgency, however.
+ */
+    
+#define MMP_FIRST_CLASS	0x2
+/*
+ *  User should be notified on next periodic check of the inbox. No 
+ *  constraints on when the user should read the message (other than the
+ *  ending time-bound of the message itself).
+ */
+    
+#define MMP_THIRD_CLASS	0x3
+/*
+ *  User should not be notified of the message's arrival, except as required
+ *  by the receiving application.
+ */
+
+typedef ByteEnum MailboxDeliveryVerb;		
+#define MDV_DELIVER	0x0
+/*  Default, vanilla verb */
+    
+#define MDV_VIEW	0x1
+/*
+ *  Message contains some sort of image that can be viewed. For example, a
+ *  received fax.
+ */
+    
+#define MDV_PLAY	0x2
+/*
+ *  Message contains some sort of continuous something that has a definite
+ *  starting point and a stopping point. Examples of this would be a voice
+ *  recording or MPEG movie.
+ */
+    
+#define MDV_ACCEPT	0x3
+/*  Another generic verb */
+    
+#define MDV_READ	0x4
+/*
+ *  Closely related to MDV_VIEW, but useful for email and other things that
+ *  are more textual (faxes can be graphical, you know...)
+ */
+    
+#define MDV_FILE	0x5
+/*
+ *  Message contains some unit that can be stored inside a document that
+ *  holds multiple such units. For example, an address card or a notebook
+ *  page.
+ */
+
+typedef WordFlags MailboxMessageFlags;		
+/* 8 bits unused 
+ *  Bits used internally to the Mailbox library. 
+ */
+
+#define MMF_BODY_DATA_VOLATILE	(0x0080)
+/*
+ *  Set if the body data will be deleted by the registering geode once the
+ *  message has been registered. The data driver must copy the message body
+ *  to preserve it.
+ * 
+ *  NOTE: IF THE MailboxStorage is MANUFACTURER_ID_GEOWORKS/GMSID_VM_TREE AND
+ *  THE VM FILE USED IN THE BODY REFERENCE IS *NOT* A VM FILE RETURNED BY
+ *  MailboxGetVMFile, YOU *MUST* PASS MMF_BODY_DATA_VOLATILE SET.
+ */
+    
+#define MMF_SEND_WITHOUT_QUERY	(0x0040)
+/*
+ *  Set if the message should be sent whenever possible, without asking the
+ *  user about it. This means if a connection is available or could be
+ *  created, it will be used (or created, if the medium is available, and
+ *  then used).
+ */
+    
+#define MMF_PRIORITY 		(0x0020 | 0x0010)
+#define MMF_PRIORITY_OFFSET	4
+/*
+ * type MailboxMessagePriority
+ * The priority at which the message should travel. 
+ */
+    
+#define MMF_VERB		(0x0008 | 0x0004 | 0x0002)
+#define MMF_VERB_OFFSET		1
+/* 
+ * type MailboxDeliveryVerb
+ * How the user will think of what happens when the message gets delivered 
+ */
+
+#define MMF_DELETE_BODY_AFTER_TRANSMISSION	(0x0001)
+/*
+ *  Set if the data driver should delete the message body after
+ *  transmitting.  Note that if MMF_BODY_DATA_VOLATILE is set, then
+ *  the data driver will always delete the copy of the body it made
+ *  at the time the message was registered, and leave the body of the
+ *  original app-ref alone, regardless of how MMF_DELETE_BODY_AFTER_
+ *  TRANSMISSION is set. 
+ */
+
+typedef struct {
+    const void	*MTA_transAddr;		/* Data known to the transport driver
+					 *   indicating the destination	 */
+    unsigned	MTA_transAddrLen;	/*  Number of bytes in that address */
+    const char	*MTA_userTransAddr;	/*  User-readable form of the address.
+					 *  If 0:0, empty string is assumed. */
+} MailboxTransAddr;
+
+/* 
+ * EXPORTED ROUTINES
+ */
+
+/* enum MailboxError */
+#define ME_UNRECOVERABLE	0x8000
+typedef enum {	
+    ME_SUCCESS = 0x0,
+    ME_NOT_ENOUGH_MEMORY,
+    ME_CANNOT_LOAD_DATA_DRIVER,
+    ME_CANNOT_LOAD_TRANSPORT_DRIVER,
+    ME_UNABLE_TO_CREATE_TRANSMIT_THREAD,
+    ME_CANNOT_ENQUEUE_MESSAGE,
+    ME_USER_CANCELED,
+    ME_LOST_CONNECTION,
+    ME_CANNOT_CREATE_MESSAGE_FILE,
+    ME_CANNOT_RESIZE_MBOX_REF,
+    ME_CANNOT_SAVE_MESSAGE_FILE,
+    ME_CANCELLED_BY_RECEIVER,
+    ME_MESSAGE_BLOCKS_ARE_MISMATCHED,
+
+/*
+ *  The data driver could not store away its copy of the message body.
+ *  Perhaps the MMF_BODY_DATA_VOLATILE flag was passed, indicating that
+ *  the driver should copy the body to its storage area but the data could
+ *  not be copied for some reason.  Another possibility is that the data 
+ *  driver could not store an incoming message during a DR_MBDD_WRITE_*
+ *  call.
+ */
+    ME_DATA_DRIVER_CANNOT_STORE_MESSAGE_BODY,
+
+/*  Not enough disk space to store the message. */
+    ME_INSUFFICIENT_DISK_SPACE,
+    
+    /* Temporary failure to connect */
+    ME_CANNOT_CONNECT,
+
+/*-------------------- Start of Unrecoverable errors */
+
+    ME_ADDRESS_INVALID=ME_UNRECOVERABLE,
+    ME_DATA_DRIVER_CANNOT_ACCESS_MESSAGE_BODY,
+    ME_UNSUPPORTED_BODY_FORMAT,
+    ME_MESSAGE_BODY_INVALID,
+    ME_INVALID_MESSAGE,
+    ME_REPLY_ADDRESS_NOT_AVAILABLE,
+    ME_DESTINATION_APPLICATION_UNKNOWN,
+    ME_UNKNOWN_DISK_ERROR,
+    ME_APP_REF_BUF_TOO_SMALL,
+    ME_CANNOT_OPEN_MESSAGE_FILE,
+    ME_CANNOT_READ_MESSAGE_FILE,
+
+    /* Permanent failure to connect */
+    ME_CAN_NEVER_CONNECT,
+
+} MailboxError;
+
+typedef struct {
+    MailboxStorage		MRA_bodyStorage;
+    MailboxDataFormat		MRA_bodyFormat;
+    const void 			*MRA_bodyRef;
+    word			MRA_bodyRefLen;
+    MailboxTransport		MRA_transport;
+    MailboxTransportOption	MRA_transOption;
+    MailboxTransAddr		*MRA_transAddrs;
+    word			MRA_numTransAddrs;
+    dword			MRA_transData;
+    MailboxMessageFlags		MRA_flags;
+    const char			*MRA_summary;
+/* longest MRA_summary string allowed */
+#define MAILBOX_MAX_SUBJECT	(1024)
+
+    GeodeToken			MRA_destApp;
+    FileDateAndTime		MRA_startBound;
+    FileDateAndTime		MRA_endBound;
+} MailboxRegisterMessageArgs;
+
+/*
+ *  value to pass for MRA_endBound and MRTMA_endBound to have no deadline.
+ */
+#define MAILBOX_ETERNITY	-1
+
+/*
+ * value to pass for MRA_startBound and MRTMA_standBound to have message
+ * available for sending now.
+ */
+#define MAILBOX_NOW 		0
+
+extern MailboxError
+	_pascal MailboxRegisterMessage(MailboxRegisterMessageArgs *mrmArgs, 
+					MailboxMessage *msg);
+/* not implemented */
+extern Boolean 
+	_pascal MailboxCheckStorageTypeSupported(MailboxStorage storage);
+
+/* not implemented */
+extern word /* returns FileError, or 0 if no errors */
+	_pascal MailboxCreateStreamGString(FileLongName name, 
+				GStateHandle *gstate, GString *gs);
+extern VMFileHandle
+        _pascal MailboxGetAdminFile(void);
+
+extern VMFileHandle /* If error, returns 0 and sets *vmStatusp */
+	_pascal MailboxGetVMFile(word expectedNumBlocks, word *vmStatusp);
+
+extern VMFileHandle /* If error, returns 0; *vmStatusp is always set. */
+	_pascal MailboxOpenVMFile(FileLongName *namep, word *vmStatusp);
+
+extern void
+	_pascal MailboxGetVMFileName(VMFileHandle file, FileLongName *namep);
+
+extern void 
+	_pascal MailboxDoneWithVMFile(VMFileHandle file);
+
+extern Boolean
+	_pascal MailboxCheckMediumAvailable(MediumType mediumType, 
+				word unitNum, MediumUnitType unitType);
+
+extern Boolean
+	_pascal MailboxCheckMediumConnected(MediumType mediumType, 
+				word unitNum, MediumUnitType unitType);
+
+extern word
+	_pascal MailboxGetFirstMediumUnit(MediumType mediumType, 
+				MediumUnitType *unitType);
+
+@prototype void MAILBOX_CANCEL_NOTIFY (MailboxCancelAction action = cx);
+
+extern MailboxError
+        _pascal MailboxGetUserTransAddrLMem(MailboxMessage msg, 
+					    word addrNumber,
+					    MemHandle lmemBlock,
+					    ChunkHandle *addrChunk);
+
+extern MailboxError
+	_pascal MailboxGetNumTransAddrs(MailboxMessage msg, 
+				word *numAddresses);
+
+extern Boolean /* returns FALSE if error */
+	_pascal MailboxGetTransAddr(MailboxMessage msg, word addrNumber,
+				    void *addressBuffer,
+				    word *bufSizePtr);
+
+extern MailboxError 
+	_pascal	MailboxSetTransAddr(MailboxMessage msg, word addrNumber,
+				    const void *newAddress,
+				    word addrSize);
+
+extern MailboxError
+	_pascal MailboxGetTransData(MailboxMessage msg, dword *transData);
+
+extern MailboxError
+	_pascal MailboxSetTransData(MailboxMessage msg, dword transData);
+
+extern MailboxError
+	_pascal MailboxGetStorageType(MailboxMessage msg,
+				 MailboxStorage *storage);
+
+/* not implemented */
+extern MailboxError
+	_pascal MailboxGetTransport(MailboxMessage msg,
+				MailboxTransport *transport);
+
+extern MailboxError
+	_pascal MailboxGetBodyMboxRefBlock(MailboxMessage msg,
+				MemHandle *mboxRefHandle);
+
+extern MailboxError
+	_pascal MailboxGetDestApp(MailboxMessage msg,
+				GeodeToken *tokenBuf);
+
+extern MailboxError
+	_pascal MailboxGetStartBound(MailboxMessage msg,
+				FileDateAndTime *dateTime);
+
+extern MailboxError
+	_pascal	MailboxGetEndBound(MailboxMessage msg,
+				FileDateAndTime *dateTime);
+
+extern void
+	_pascal MailboxAcknowledgeMessageReceipt(MailboxMessage msg);
+
+extern void
+	_pascal MailboxDeleteMessage(MailboxMessage msg);
+
+extern MailboxError
+	_pascal MailboxGetSubjectLMem(MailboxMessage msg, 
+				MemHandle lmemBlock, ChunkHandle *subjectChunk);
+extern MailboxError
+	_pascal MailboxGetSubjectBlock(MailboxMessage msg, 
+				MemHandle *subjHandle);
+
+extern MailboxError
+	_pascal MailboxGetMessageFlags(MailboxMessage msg,
+				MailboxMessageFlags *flags);
+
+extern MailboxError
+	_pascal MailboxGetBodyFormat(MailboxMessage msg,
+				MailboxDataFormat *dataFormat);
+
+extern MailboxError
+	_pascal MailboxGetBodyRef(MailboxMessage msg,
+				void *appRefBuf, word *appRefBufSize);
+
+typedef struct {	
+    MailboxStorage	MCBFA_bodyStorage;
+    MailboxDataFormat	MCBFA_bodyFormat;
+    const void		*MCBFA_bodyRef;
+    unsigned		MCBFA_bodyRefLen;
+    MailboxMessageFlags	MCBFA_newBodyFlags;
+} MailboxChangeBodyFormatArgs;
+
+extern MailboxError
+	_pascal MailboxChangeBodyFormat(MailboxMessage msg,
+				const MailboxChangeBodyFormatArgs *mcbfArgs);
+
+extern MailboxError
+	_pascal MailboxBodyReformatted(MailboxMessage msg,
+				       MailboxDataFormat newFormat,
+				       MailboxMessageFlags newBodyFlags);
+
+extern MailboxError
+	_pascal MailboxStealBody(MailboxMessage msg,
+				void *appRefBuf, word *appRefBufSize);
+
+extern void
+	_pascal MailboxDoneWithBody(MailboxMessage msg,
+				const void *appRef, word appRefSize);
+
+extern GeodeHandle
+	_pascal	MailboxLoadDataDriver(MailboxStorage storage,
+				GeodeLoadError *error);
+
+extern GeodeHandle
+	_pascal MailboxLoadDataDriverWithError(MailboxStorage storage,
+				GeodeLoadError *error);
+
+extern GeodeHandle
+	_pascal MailboxLoadTransportDriver(MailboxTransport transport,
+				GeodeLoadError *error);
+
+extern void
+	_pascal MailboxFreeDriver(GeodeHandle driverHandle);
+
+extern void
+	_pascal MailboxPushToMailboxDir(void);
+
+extern void
+	_pascal MailboxChangeToMailboxDir(void);
+
+/* untested */
+extern void
+	_pascal MailboxConvertToMailboxTransferItem(VMFileHandle clipboardFile,
+				VMBlockHandle clipboardBlock, 
+				VMFileHandle vmFile, word userID, 
+				MemHandle nameLMemBlock,
+				ChunkHandle nameChunk,
+				VMFileHandle *transferItemBlock);
+
+/* untested */
+extern void
+	_pascal MailboxConvertToClipboardTransferItem(VMFileHandle mailboxFile,
+				VMBlockHandle mailboxBlock,
+				VMFileHandle clipboardFile,
+				word userID,
+				VMBlockHandle *clipboardBlock);
+
+typedef struct {
+    MailboxMessage		MRTMA_message;
+    MailboxStorage		MRTMA_bodyStorage;
+    MailboxDataFormat		MRTMA_bodyFormat;
+    const void 			*MRTMA_bodyRef;
+    word			MRTMA_bodyRefLen;
+    dword			MRTMA_transData;
+    MailboxMessageFlags		MRTMA_flags;
+    const char			*MRTMA_summary;
+    GeodeToken			MRTMA_destApp;
+    FileDateAndTime		MRTMA_startBound;
+    FileDateAndTime		MRTMA_endBound;
+} MailboxReplyToMessageArgs;
+
+/* untested */
+extern MailboxError
+	_pascal MailboxReplyToMessage(MailboxReplyToMessageArgs *mrtmArgs,
+					MailboxMessage *msg);
+
+
+/*
+ * SST_MAILBOX Notification Types
+ */
+
+/* enum MailboxSubsystemNotification */
+typedef enum {		
+
+    MSN_APP_LOADED = 0x0,
+    MSN_NEW_FOCUS_APP,
+    MSN_NEW_IACP_BINDING,
+    MSN_REMOVE_IACP_BINDING,
+} MailboxSubsystemNotification;
+
+/* 
+ * EXPORTED OBJECT CLASSES
+ */
+@class  MailboxSendControlClass, GenControlClass;
+
+typedef WordFlags MSCFeatures;	
+#define MSCF_POOF_LIST		(0x0002)
+#define MSCF_TRANSPORT_LIST 	(0x0001)
+
+#define MSC_DEFAULT_FEATURES	(MSCF_POOF_LIST|MSCF_TRANSPORT_LIST)
+
+typedef WordFlags MSCToolboxFeatures;	
+#define MSCTF_SEND_DIALOG	(0x0001)
+
+#define MSC_DEFAULT_TOOLBOX_FEATURES	(MSCTF_SEND_DIALOG)
+
+/*
+ * To define new object types in your application, use something like:
+ *
+ * typedef enum {
+ *         MOT_CURRENT_CARD=_FIRST_GeoDexSendControlClass,
+ *         MOT_WHOLE_SHEBANG,
+ *         MOT_WHATEVER
+ * } GeoDexMailboxObjectType;
+ */
+
+typedef enum {		
+    MOT_DOCUMENT = _FIRST_MailboxSendControlClass,
+    MOT_PAGE_RANGE,
+    MOT_CURRENT_PAGE,
+    MOT_SELECTION,
+    MOT_CLIPBOARD,
+    MOT_FILE,
+    MOT_QUICK_MESSAGE,
+} MailboxObjectType;
+
+#define _FIRST_MAILBOX_OBJECT_TYPE  _FIRST_MailboxSendControlClass
+
+/*  none of the above */
+#define MOT_OTHER		(MOT_SELECTION + 1)
+    
+#define MOT_FIRST_APP_TYPE 	(_FIRST_MAILBOX_OBJECT_TYPE + DEFAULT_CLASS_MESSAGES)
+ 
+typedef struct {
+    MailboxObjectType	MSCN_objectType;
+    /* label byte		MSCN_data; */
+} MailboxSendContextNotification;
+
+@message void MSG_MAILBOX_SEND_CONTROL_OBJECT_TYPE_SELECTED
+				(MailboxObjectType objType = cx);
+
+@message void MSG_MAILBOX_SEND_CONTROL_ENABLE_DATA_OBJECT_UI
+	 			(optr treeRoot = cx:dx);  /* private */
+					
+@message dword MSG_MAILBOX_SEND_CONTROL_GET_PAGE_RANGE
+	 (word transHandle = bp) = cx:dx;
+				
+/* returns 0 if error */
+@message MailboxDataFormat MSG_MAILBOX_SEND_CONTROL_CHOOSE_FORMAT
+	(MailboxDataFormat *format = cx:dx, word transHandle = bp) = cx:dx;
+
+@message void MSG_MAILBOX_SEND_CONTROL_CANCEL_MESSAGE(word transHandle = bp, word notifyFlag = dx);
+
+/* returns 0 if error, or MSCTransaction */
+@message optr MSG_MAILBOX_SEND_CONTROL_CREATE_TRANSACTION();  /* private */
+
+typedef struct {
+    word		MSCPRD_start;
+    word		MSCPRD_end;
+} MSCPageRangeData;
+
+typedef union {		
+    MSCPageRangeData	MSCOD_pageRange;
+} MSCObjectData;
+
+typedef WordFlags MSCTFlags;
+/* set if transport driver + option may not be used to create another
+ * transaction until this one is complete.
+ */
+#define MSCTF_DIALOG_COMPLETE	    (0x0008)
+#define MSCTF_CREATION_PENDING	    (0x0004)
+#define MSCTF_NOTIFY_AFTER_REGISTER (0x0002)
+#define MSCTF_NON_REENTRANT	    (0x0001)
+
+typedef struct {	
+    ChunkHandle			MSCT_next;
+    word			MSCT_size;
+    MailboxTransport		MSCT_transport;
+    MailboxTransportOption	MSCT_transOption;
+    MemHandle			MSCT_dataBlock;
+    word			MSCT_addresses;
+    word			MSCT_addrControl;
+    optr			MSCT_feedback;
+    MSCTFlags			MSCT_flags;
+    dword			MSCT_transData;
+    MailboxObjectType		MSCT_objType;
+    MSCObjectData		MSCT_objData;
+    MailboxStorage  	    	MSCT_bodyStorage;
+    MailboxDataFormat		MSCT_bodyFormat;
+    MailboxMessageFlags		MSCT_messageFlags;
+    GeodeToken			MSCT_destApp;
+    FileDateAndTime		MSCT_startBound;
+    FileDateAndTime		MSCT_endBound;
+    ChunkHandle			MSCT_bodyRef;
+    ChunkHandle			MSCT_summary;
+} MSCTransaction;
+
+@message void MSG_MAILBOX_SEND_CONTROL_TWEAK_PARAMS
+			(MailboxRegisterMessageArgs *mrmArgs = cx:dx,
+			ChunkHandle transChunk = bp); 
+
+@message void MSG_MAILBOX_SEND_CONTROL_TRANSACTION_FINISHED
+	 				(ChunkHandle transChunk = bp); 
+
+@importMessage MetaMailboxMessages, void MSG_META_MAILBOX_CREATE_MESSAGE
+			(optr sendControl = cx:dx, word transHandle = bp);
+
+/* MSCRegisterMessageArgs */
+typedef struct {		
+    MailboxStorage		MSCRMA_bodyStorage;
+    MailboxDataFormat		MSCRMA_bodyFormat;
+    const void 			*MSCRMA_bodyRef;
+    word			MSCRMA_bodyRefLen;
+    MailboxMessageFlags		MSCRMA_flags;
+    const char 			*MSCRMA_summary;
+    GeodeToken			MSCRMA_destApp;
+    FileDateAndTime		MSCRMA_startBound;
+    FileDateAndTime		MSCRMA_endBound;
+} MSCRegisterMessageArgs;
+
+@message void MSG_MAILBOX_SEND_CONTROL_REGISTER_MESSAGE
+	 		(MSCRegisterMessageArgs *mscRMArgs = cx:dx, 
+			word transHandle = bp) = dx:ax;
+
+typedef struct {
+	MailboxError	    MSCMRA_error;
+	MailboxMessage	    MSCMRA_message;
+	MailboxStorage	    MSCMRA_bodyStorage;
+	MailboxDataFormat   MSCMRA_bodyFormat;
+	word		    MSCMRA_bodyRefLen;
+} MSCMessageRegisteredArgs;
+
+#define MSCMRA_BODY_REF(argsPtr, refType) ((const refType *)((argsPtr)+1))
+
+@importMessage MetaMailboxMessages, void MSG_META_MAILBOX_MESSAGE_REGISTERED 
+	       		(MemHandle args = cx);
+
+@message void MSG_MAILBOX_SEND_CONTROL_REPLY_TO_MESSAGE
+				(MailboxMessage msg = cx:dx);
+
+typedef struct {
+    MailboxTransAddr		*MSCSAA_transAddrs;
+    word			MSCSAA_numTransAddrs;
+    MailboxTransportAndOption	MSCSAA_transportAndOption;
+} MSCSetAddressesArgs;
+
+@message void MSG_MAILBOX_SEND_CONTROL_SET_ADDRESSES
+				(MSCSetAddressesArgs *mscsaArgs = cx:dx);
+
+@message void MSG_MAILBOX_SEND_CONTROL_SET_AVAILABLE_FORMATS
+				(const MailboxDataFormat *formats = cx:dx);
+
+@message MailboxObjectType MSG_MAILBOX_SEND_CONTROL_GET_OBJECT_TYPE (word transHandle = bp) = ax;
+
+@message void MSG_MAILBOX_SEND_CONTROL_CREATE_BODY(ChunkHandle transHandle=
+bp);
+@message void MSG_MAILBOX_SEND_CONTROL_SET_DATA_OBJECT_VALID (Boolean isValid = cx);
+@message Boolean MSG_MAILBOX_SEND_CONTROL_SAVE_TRANSACTION(word *retVal = multipleax, VMFileHandle destFile = cx, word transHandle = bp) = carry;
+
+@message void MSG_MAILBOX_SEND_CONTROL_COMPLETE_TRANSACTION(word transHandle = bp);
+
+@reserveMessages 28;
+
+/*
+ *  Private Messages
+ */
+@message void MSG_MAILBOX_SEND_CONTROL_GET_ADDRESSES(); /* private */
+
+@message void MSG_MAILBOX_SEND_CONTROL_TRANSPORT_SELECTED
+	 			(word transIndex = cx);	/* private */
+
+typedef struct {
+    MediumType			MMT_medium;
+    MailboxTransport		MMT_transport;
+    MailboxTransportOption	MMT_transOption;
+} MailboxMediaTransport;
+
+@message void MSG_MAILBOX_SEND_CONTROL_INITIATE_DIALOG_WITH_TRANSPORT
+				(@stack MailboxMediaTransport mediaTransport);
+
+@message void MSG_MAILBOX_SEND_CONTROL_GET_CONTENTS_MONIKER
+				(word transIndex = cx); /* private */
+
+@message optr MSG_MAILBOX_SEND_CONTROL_GET_CONTENTS_STRING(word index = cx,
+				MemHandle lmemBlock = dx) = dx:ax;
+
+@message void MSG_MAILBOX_SEND_CONTROL_SET_CONTENTS(word index = cx,
+				word numSelections = bp, 
+				GenItemGroupStateFlags itemFlags = dl);
+
+typedef enum {
+    MDT_APPLICATION, MDT_FILE, MDT_CLIPBOARD, MDT_QUICK_MESSAGE
+} MailboxDialogType;
+
+@message void MSG_MAILBOX_SEND_CONTROL_POOF_SELECTED(MailboxDialogType type=dx);
+
+	@vardata void HINT_MAILBOX_SEND_CONTROL_INCORPORATE_ADDRESS_CONTROL;
+	@vardata void HINT_MAILBOX_SEND_CONTROL_SEPARATE_ADDRESS_CONTROL;
+
+typedef struct {
+    MemHandle		TMDD_block;
+    MailboxDialogType	TMDD_type;
+} TempMailboxDialogData;
+
+	@vardata TempMailboxDialogData TEMP_MAILBOX_SEND_CONTROL_CURRENT_DIALOG;
+	@vardata void TEMP_MAILBOX_SEND_CONTROL_DESTROY_DIALOG_PENDING;
+	@vardata void ATTR_MAILBOX_SEND_CONTROL_SEND_PAGES;
+	@vardata void ATTR_MAILBOX_SEND_CONTROL_SEND_DOCUMENT;
+	@vardata void ATTR_MAILBOX_SEND_CONTROL_SEND_SELECTION;
+	@vardata MailboxTransportAndOption
+				ATTR_MAILBOX_SEND_CONTROL_TRANSPORT_HINT;
+	@vardata MailboxMediaTransport
+				ATTR_MAILBOX_SEND_CONTROL_SINGLE_TRANSPORT;
+
+typedef struct {
+    ChunkHandle			MSCAAT_addresses;
+				/* chunk array of MBACAddress entries */
+    MailboxTransportAndOption	MSCAAT_transport;
+				/* transport + option for addrs */
+} MSCAddressesAndTransport;
+
+	@vardata MSCAddressesAndTransport
+			TEMP_MAILBOX_SEND_CONTROL_ADDRESSES_AND_TRANSPORT;
+
+	@vardata MailboxDataFormat ATTR_MAILBOX_SEND_CONTROL_AVAILABLE_FORMATS[];
+
+	@vardata void ATTR_MAILBOX_SEND_CONTROL_SAVES_TRANSACTIONS;
+
+typedef struct {
+	MailboxTransport              FTHD_transport;
+        MailboxTransportOption        FTHD_transOption;
+        optr                          FTHD_pc;
+} MailboxTransportHintOptr;
+
+        @vardataAlias (ATTR_MAILBOX_SEND_CONTROL_TRANSPORT_HINT)
+        MailboxTransportHintOptr ATTR_MAILBOX_SEND_CONTROL_TRANSPORT_HINT_OPTR;
+
+/* MailboxSendObjectType */
+typedef struct {		
+    MailboxObjectType		MSOT_id;
+    word			MSOT_feature;
+    ChunkHandle			MSOT_desc;
+} MailboxSendObjectType;
+
+	@instance ChunkHandle MSCI_dataTypes = 0;
+	@instance ChunkHandle MSCI_transactions	= 0;
+	@instance MailboxObjectType MSCI_defBodyType;
+	@instance MailboxObjectType MSCI_curBodyType;
+
+	@default GI_states = (@default | GS_ENABLED);
+	@default GII_type = GIT_ORGANIZATIONAL;
+	@default GII_visibility = GIV_SUB_GROUP;
+
+@endc	/* MailboxSendControlClass */
+
+
+
+@importMessage	MetaMailboxMessages,
+	Boolean MSG_META_MAILBOX_NOTIFY_MESSAGE_AVAILABLE
+					(MailboxMessage msg = cx:dx) = carry;
+
+@class	MailboxOutboxControlClass, GenControlClass;
+
+/*
+ * Messages sent out:
+ * 	none
+ *
+ * GenApplication GCN lists to be placed on (will add itself to these when
+ * it's interactible):
+ * 	none (adds itself to MGCNLT_OUTBOX_CHANGE on the Mailbox library's
+ *	      application object, but you don't need to worry about that)
+ *
+ * Notification types responded to:
+ * 	none
+ */
+
+/*
+ * Constants
+ */
+
+typedef WordFlags MOCFeatures;
+#define    MOCF_DELETE_MESSAGE	0x0004
+#define    MOCF_STOP_SENDING	0x0002
+#define    MOCF_START_SENDING	0x0001
+
+#define MOC_DEFAULT_FEATURES	(MOCF_DELETE_MESSAGE)
+
+typedef WordFlags MOCToolboxFeatures;
+
+#define MOC_DEFAULT_TOOLBOX_FEATURES	0
+
+/*
+ *	Messages sent by the controller's UI gadgetry. Not to be sent by
+ *	anything else...
+ */
+
+@message void MSG_MAILBOX_OUTBOX_CONTROL_ENABLE_FEATURES
+	(MOCFeatures normal = cx, MOCToolboxFeatures toolbox = dx);
+/* Enables only those features currently defined whose feature flags are
+ * passed. Any feature defined for the controller whose flag is not set in
+ * the passed register is set not-enabled.
+ *
+ * Context:	Sent by message list as different items are selected.
+ * Source:	message list
+ * Destination:	MailboxOutboxControl
+ * Interception:	no point
+ *
+ */
+
+@endc;
+
+#ifdef __HIGHC__
+
+pragma Alias (MailboxRegisterMessage, "MAILBOXREGISTERMESSAGE");
+pragma Alias (MailboxCheckStorageTypeSupported, 
+       "MAILBOXCHECKSTORAGETYPESUPPORTED");
+pragma Alias (MailboxCreateStreamGString, "MAILBOXCREATESTREAMGSTRING");
+pragma Alias (MailboxGetAdminFile, "MAILBOXGETADMINFILE");
+pragma Alias (MailboxGetVMFile, "MAILBOXGETVMFILE");
+pragma Alias (MailboxOpenVMFile, "MAILBOXOPENVMFILE");
+pragma Alias (MailboxGetVMFileName, "MAILBOXGETVMFILENAME");
+pragma Alias (MailboxDoneWithVMFile, "MAILBOXDONEWITHVMFILE");
+pragma Alias (MailboxCheckMediumAvailable, "MAILBOXCHECKMEDIUMAVAILABLE");
+pragma Alias (MailboxCheckMediumConnected, "MAILBOXCHECKMEDIUMCONNECTED");
+pragma Alias (MailboxGetFirstMediumUnit, "MAILBOXGETFIRSTMEDIUMUNIT");
+pragma Alias (MailboxGetNumTransAddrs, "MAILBOXGETNUMTRANSADDRS");
+pragma Alias (MailboxGetTransAddr, "MAILBOXGETTRANSADDR");
+pragma Alias (MailboxSetTransAddr, "MAILBOXSETTRANSADDR");
+pragma Alias (MailboxGetTransData, "MAILBOXGETTRANSDATA");
+pragma Alias (MailboxSetTransData, "MAILBOXSETTRANSDATA");
+pragma Alias (MailboxGetStorageType, "MAILBOXGETSTORAGETYPE");
+pragma Alias (MailboxGetTransport, "MAILBOXGETTRANSPORT");
+pragma Alias (MailboxGetBodyMboxRefBlock, "MAILBOXGETBODYMBOXREFBLOCK");
+pragma Alias (MailboxGetDestApp, "MAILBOXGETDESTAPP");
+pragma Alias (MailboxGetStartBound, "MAILBOXGETSTARTBOUND");
+pragma Alias (MailboxGetEndBound, "MAILBOXGETENDBOUND");
+pragma Alias (MailboxAcknowledgeMessageReceipt, 
+       "MAILBOXACKNOWLEDGEMESSAGERECEIPT");
+pragma Alias (MailboxDeleteMessage, "MAILBOXDELETEMESSAGE");
+pragma Alias (MailboxGetSubjectLMem, "MAILBOXGETSUBJECTLMEM");
+pragma Alias (MailboxGetSubjectBlock, "MAILBOXGETSUBJECTBLOCK");
+pragma Alias (MailboxGetMessageFlags, "MAILBOXGETMESSAGEFLAGS");
+pragma Alias (MailboxGetBodyFormat, "MAILBOXGETBODYFORMAT");
+pragma Alias (MailboxGetBodyRef, "MAILBOXGETBODYREF");
+pragma Alias (MailboxChangeBodyFormat, "MAILBOXCHANGEBODYFORMAT");
+pragma Alias (MailboxBodyReformatted, "MAILBOXBODYREFORMATTED");
+pragma Alias (MailboxStealBody, "MAILBOXSTEALBODY");
+pragma Alias (MailboxDoneWithBody, "MAILBOXDONEWITHBODY");
+pragma Alias (MailboxLoadDataDriver, "MAILBOXLOADDATADRIVER");
+pragma Alias (MailboxLoadDataDriverWithError,
+       "MAILBOXLOADDATADRIVERWITHERROR");
+pragma Alias (MailboxLoadTransportDriver, "MAILBOXLOADTRANSPORTDRIVER");
+pragma Alias (MailboxFreeDriver, "MAILBOXFREEDRIVER");
+pragma Alias (MailboxPushToMailboxDir, "MAILBOXPUSHTOMAILBOXDIR");
+pragma Alias (MailboxChangeToMailboxDir, "MAILBOXCHANGETOMAILBOXDIR");
+pragma Alias (MailboxConvertToMailboxTransferItem, 
+       "MAILBOXCONVERTTOMAILBOXTRANSFERITEM");
+pragma Alias (MailboxConvertToClipboardTransferItem, 
+       "MAILBOXCONVERTTOCLIPBOARDTRANSFERITEM");
+pragma Alias (MailboxReplyToMessage, "MAILBOXREPLYTOMESSAGE");
+#endif /* __HIGHC__ */
+
+@endlib
+
+@endif

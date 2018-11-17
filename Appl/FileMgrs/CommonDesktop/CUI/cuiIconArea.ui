@@ -1,0 +1,557 @@
+/*
+ *
+ * Project:	PC GEOS
+ * Module:	desktop
+ * File:	UI/uiIconArea.ui
+ *
+ * Author:	Brian Chin
+ *
+ *	This file contains the user Interface description for the
+ * desktop.
+ *
+ *	$Id: cuiIconArea.ui,v 1.3 98/08/20 05:09:12 joon Exp $
+ *
+ */
+
+
+/*-----------------------------------------------------------------------------
+	Icon Area
+-----------------------------------------------------------------------------*/
+
+start IconAreaResource;
+
+#if _DOCMGR
+IconArea = ToolArea {
+	children =
+		Wastebasket,
+		QuickViewDoc,
+		QuickViewArchive;
+	hints = {
+		HINT_TOOLBOX,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_INCLUDE_ENDS_IN_CHILD_SPACING,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+		HINT_ALLOW_CHILDREN_TO_WRAP,
+	}
+}
+
+chunk FloppyIconName = "Floppy";
+
+#else
+
+IconArea = ToolArea {
+	children =
+#ifdef	GEOLAUNCHER
+		Wastebasket,
+		OpenCloseDirectory,
+		HelpTrigger;			/* last one for GEOLAUNCHER */
+#else
+		Wastebasket,
+#if	_WINDOW_MENU
+		QuickViewToggle,
+#endif
+
+#if _CONNECT_TO_REMOTE && !_CONNECT_ICON
+		/* An icon that appears only when in file transfer
+		   mode.  Clicking on it terminates the connection. */
+		ConnectionActive,
+#endif
+
+#if _PREFERENCES_LAUNCH
+		PreferencesLaunch,
+#endif
+
+		QuickViewDirectories		
+
+#if _CONNECT_TO_REMOTE && _CONNECT_ICON
+		,ConnectionConnect,
+		ConnectionDisconnect
+#endif
+
+#if _ZMGR
+		/* ZManager has floating drives button in icon area */
+		,FloatingDrivesDialog,
+		FloatingDrivesDialogButton	/* last one for ZMGR */
+#endif
+		;
+
+#endif
+	visibility = popout;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ALLOW_CHILDREN_TO_WRAP,
+		HINT_TOOLBOX,
+		HINT_LEFT_JUSTIFY_CHILDREN,
+		ATTR_GEN_INTERACTION_POPOUT_NOT_CLOSABLE
+	}
+}
+
+QuickViewDirectories = GenInteraction ignoreDirty {	
+	children =
+#ifdef	GEOLAUNCHER
+		QuickViewDoc;
+#else
+#if	_ZMGR
+		QuickViewAppl,
+		QuickViewDoc;
+#else
+		QuickViewAppl,
+		QuickViewDoc,
+		QuickViewDosRoom;
+#endif
+#endif
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+#endif  /* #if _DOCMGR */
+
+#ifdef GEOLAUNCHER	/* GeoLauncher has open/close directory buttons */
+OpenCloseDirectory = GenInteraction ignoreDirty {
+	children = OpenDirectory, CloseDirectory,
+		   FileMenuCreateFolder, QuickViewDirectories;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+OpenDirectory = TitledGenTrigger ignoreDirty {
+	title = "Open Dir";
+	pictureNumber = PN_OPEN_DIR;
+	action = MSG_OPEN_DIRECTORY, process;
+	genAttributes = default +initiatesBusyState;
+	genStates = default -enabled;	/* enabled if single folder selected */
+}
+/*CloseDirectory = TitledGenTrigger ignoreDirty { */
+CloseDirectory = DirTool ignoreDirty {
+	title = "Close Dir";
+	pictureNumber = PN_CLOSE_DIR;
+	toolType = DIRTOOL_UPDIR;
+	action = MSG_CLOSE_DIRECTORY, process;
+	genAttributes = default +initiatesBusyState;
+	genStates = default -enabled;	/* enabled if non-DOCUMENT dir */
+}
+#endif
+
+#ifndef GEOLAUNCHER		/* no World button for GeoLauncher */
+QuickViewAppl = DirTool ignoreDirty {
+	toolType = DIRTOOL_APPLDIR;
+	moniker = list {
+#if _TINY
+		WorldDirButtonYMMoniker
+#else
+		WorldDirButtonSCMoniker,
+		WorldDirButtonSMMoniker,
+		WorldDirButtonSCGAMoniker
+#endif
+	}
+	diskHandle = SP_APPLICATION;
+	action = MSG_QUICK_APPL, process;
+	genAttributes = default +initiatesBusyState;
+	kbdAccelerator = control 'w';
+	hints = { HINT_DRAW_SHORTCUT_BELOW }
+}
+#endif
+
+#if _DOCMGR
+visMoniker QuickViewDocTextMoniker = "Documents";
+chunk QuickViewDocFocusHelp = "Show contents of the \\\"Documents\\\" folder";
+#endif
+QuickViewDoc = DirTool ignoreDirty {
+#ifdef GEOLAUNCHER
+	title = "Documents";
+	pictureNumber = PN_DOCUMENTS;
+#else
+	moniker = list {
+#if _DOCMGR
+		DMDocumentSCMoniker,
+		QuickViewDocTextMoniker
+#else  ; _DOCMGR
+#if _TINY
+		DocDirButtonYMMoniker
+#else
+		DocDirButtonSCMoniker,
+		DocDirButtonSMMoniker,
+		DocDirButtonSCGAMoniker
+#endif
+#endif  ; _DOCMGR
+	}
+	diskHandle = SP_DOCUMENT;
+#endif
+	toolType = DIRTOOL_DOCDIR;
+	action = MSG_QUICK_DOC, process;
+	genAttributes = default +initiatesBusyState;
+	kbdAccelerator = control 'd';
+#if _DOCMGR
+	hints = {
+	    HINT_DRAW_SHORTCUT_BELOW,
+	    HINT_USE_ICON_TEXT_COMBINATION_MONIKER {
+		word mask ITMF_POSITION_ICON_ABOVE_TEXT
+		word 0
+	    },
+	    ATTR_GEN_FOCUS_HELP {
+		optr QuickViewDocFocusHelp
+	    }
+	}
+#else
+	hints = { HINT_DRAW_SHORTCUT_BELOW }
+#endif
+}
+
+#if _DOCMGR
+visMoniker QuickViewArchiveTextMoniker = "Archive";
+chunk QuickViewArchiveFocusHelp = "Show contents of the \\\"Archive\\\" folder";
+QuickViewArchive = DirTool ignoreDirty {
+	moniker = list {
+		DMArchiveSCMoniker,
+		QuickViewArchiveTextMoniker
+	}
+	diskHandle = SP_DOCUMENT;
+	toolType = DIRTOOL_DOCDIR;
+	action = MSG_QUICK_ARCHIVE, process;
+	genAttributes = default +initiatesBusyState;
+	kbdAccelerator = control 'a';
+	hints = {
+	    HINT_DRAW_SHORTCUT_BELOW,
+	    HINT_USE_ICON_TEXT_COMBINATION_MONIKER {
+		word mask ITMF_POSITION_ICON_ABOVE_TEXT
+		word 0
+	    },
+	    ATTR_GEN_FOCUS_HELP {
+		optr QuickViewArchiveFocusHelp
+	    }
+	}
+}
+#endif
+
+#ifndef GEOLAUNCHER
+/* dynamically set not-usable if .ini file says so */
+QuickViewDosRoom = DirTool ignoreDirty {
+	toolType = DIRTOOL_DOSROOMDIR;
+	moniker = list {
+#if _TINY
+		DosApplYMMoniker
+#else
+		DosApplSCMoniker,
+		DosApplSMMoniker,
+		DosApplSCGAMoniker
+#endif
+	}
+	diskHandle = SP_DOS_ROOM;
+	action = MSG_QUICK_DOS_ROOM, process;
+	genAttributes = default +initiatesBusyState;
+	kbdAccelerator = control 'o';
+	hints = { HINT_DRAW_SHORTCUT_BELOW }
+}
+#endif
+
+#if _FORCE_DELETE
+Wastebasket = DeskTool ignoreDirty {
+	toolType = DESKTOOL_WASTEBASKET;
+	moniker = list {
+#if _TINY
+		MessyWasteCanYMMoniker
+#else
+		MessyWasteCanSCMoniker,
+		MessyWasteCanSMMoniker,
+		MessyWasteCanSCGAMoniker
+#endif
+	}
+}
+#else
+#if _DOCMGR
+visMoniker WastebasketTextMoniker = "Wastebasket";
+chunk WastebasketFocusHelp = "Show contents of the \\\"Wastebasket\\\"";
+#endif
+Wastebasket = DirTool ignoreDirty {
+	toolType = DIRTOOL_WASTEDIR;
+	moniker = list {
+#if _DOCMGR
+		NDWasteBasketSCMoniker,
+		WastebasketTextMoniker
+#else  ; _DOCMGR
+#if _TINY
+		MessyWasteCanYMMoniker
+#else
+		MessyWasteCanSCMoniker,
+		MessyWasteCanSMMoniker,
+		MessyWasteCanSCGAMoniker
+#endif
+#endif  ; _DOCMGR
+	}
+	diskHandle = SP_WASTE_BASKET;
+	action = MSG_QUICK_WASTEBASKET, process;
+	genAttributes = default +initiatesBusyState;
+	kbdAccelerator = control 'x';
+#if _DOCMGR
+	hints = {
+	    HINT_DRAW_SHORTCUT_BELOW,
+	    HINT_USE_ICON_TEXT_COMBINATION_MONIKER {
+		word mask ITMF_POSITION_ICON_ABOVE_TEXT
+		word 0
+	    },
+	    ATTR_GEN_FOCUS_HELP {
+		optr WastebasketFocusHelp
+	    }
+	}
+#else
+	hints = { HINT_DRAW_SHORTCUT_BELOW }
+#endif
+}
+#endif	/* if _FORCE_DELETE */
+
+
+#if _PREFERENCES_LAUNCH
+
+PreferencesLaunch = GenTrigger ignoreDirty {
+	moniker = list {
+		PrefMgrButtonSCMoniker,
+		PrefMgrButtonSMMoniker,
+		PrefMgrButtonSCGAMoniker
+	}
+	action = MSG_DESKTOP_LAUNCH_PREFERENCES, process;
+	genAttributes = default +initiatesBusyState;
+}
+
+#endif
+
+
+#if _WINDOW_MENU
+QuickViewToggle = GenItemGroup {
+	children = QuickViewMax, QuickViewRestore;
+	selection = "mask QVTI_FULL_SIZED";
+	numSelections = 1;
+	applyMsg = MSG_OVERLAPPING_FULL_SIZED_TOGGLE;
+	destination = process;
+	genAttributes = default +initiatesBusyState;
+	hints = {
+		HINT_TOOLBOX,
+		ATTR_GEN_SEND_APPLY_MSG_ON_APPLY_EVEN_IF_NOT_MODIFIED,
+		ATTR_GEN_ITEM_GROUP_CUSTOM_DOUBLE_PRESS {
+			word	0
+		}
+	}
+}
+QuickViewMax = GenItem {
+	moniker = list {
+#if _TINY
+		MonoFolderYMMoniker
+#else
+		MonoFolderSCMoniker,
+		MonoFolderSMMoniker,
+		MonoFolderSCGAMoniker
+#endif
+	}
+	identifier = "mask QVTI_FULL_SIZED";
+	kbdAccelerator = specificUI control F10;
+	hints = { HINT_DRAW_SHORTCUT_BELOW }
+}
+QuickViewRestore = GenItem {
+	moniker = list {
+#if _TINY
+		MultiFolderYMMoniker
+#else
+		MultiFolderSCMoniker,
+		MultiFolderSMMoniker,
+		MultiFolderSCGAMoniker
+#endif
+	}
+	identifier = "mask QVTI_OVERLAPPING";
+	kbdAccelerator = specificUI control F5;
+	hints = { HINT_DRAW_SHORTCUT_BELOW }
+}
+
+#endif
+
+
+#ifdef GEOLAUNCHER		/* Help brings up the help dialog box */
+HelpTrigger = TitledGenTrigger {
+	title = " ";		/* null strings are not handled very well */
+	pictureNumber = PN_HELP;	/* see deskdisplayTitledTrigger.asm */
+/*	action = MSG_GEN_INITIATE_INTERACTION, HelpBox;			*/
+				/* see uiMisc.ui for help GenSummons */
+}
+#endif
+
+#if _ZMGR
+FloatingDrivesDialogButton = GenTrigger {
+#if _PMGR	/* no drives button for PManager, icons are in the icon area */
+	genStates = default -usable;
+#else	/* reference the ZoomerDriveYMMoniker only if using it */
+	moniker = list {
+		ZoomerDrivesYMMoniker
+	}
+#endif
+	action = MSG_GEN_INTERACTION_INITIATE, FloatingDrivesDialog;
+}
+#endif
+
+#if _CONNECT_TO_REMOTE && !_CONNECT_ICON
+ConnectionActive = GenTrigger {
+	moniker = list {
+		ConnectNotifyButtonYMMoniker
+	}
+	action = MSG_DESKTOP_CLOSE_CONNECTION, process;
+	genStates = default -usable;
+}
+
+#endif /* _CONNECT_TO_REMOTE && !_CONNECT_ICON */
+
+#if _CONNECT_TO_REMOTE && _CONNECT_ICON
+
+ConnectionConnect = GenTrigger {
+	moniker = list {
+#if _TINY
+		ConnectButtonYMMoniker
+#else
+		ConnectButtonSCMoniker,
+		ConnectButtonSMMoniker,
+		ConnectButtonSCGAMoniker
+#endif
+	}
+	action = MSG_DESKTOP_OPEN_CONNECTION, process;
+	hints = {
+		ATTR_GEN_TRIGGER_ACTION_DATA {
+			word	CT_FILE_LINKING
+		}
+	}
+}
+
+ConnectionDisconnect = GenTrigger {
+	moniker = list {
+#if _TINY
+		DisconnectButtonYMMoniker
+#else
+		DisconnectButtonSCMoniker,
+		DisconnectButtonSMMoniker,
+		DisconnectButtonSCGAMoniker
+#endif
+	}
+	action = MSG_DESKTOP_CLOSE_CONNECTION, process;
+	genStates = default -usable;
+}
+
+#endif /* _CONNECT_TO_REMOTE && _CONNECT_ICON */
+
+end IconAreaResource;
+
+
+
+start IconAreaTemplates, notDetachable;
+
+/*
+ * A moniker list that's as small as it can be while still telling us
+ * which bitmap we should use when building the real moniker for a
+ * DriveTool
+ */
+visMoniker EmptySCMoniker = {
+        size = standard;
+        color = color4;
+        aspectRatio = normal;
+	gstring {
+		GSBeginString
+		GSEndString
+	}
+}
+
+visMoniker EmptySMMoniker = {
+        size = standard;
+        color = gray1;
+        aspectRatio = normal;
+	gstring {
+		GSBeginString
+		GSEndString
+	}
+}
+
+visMoniker EmptySCGAMoniker = {
+        size = standard;
+        color = gray1;
+        aspectRatio = verySquished;
+	gstring {
+		GSBeginString
+		GSEndString
+	}
+}
+
+/*
+ * Can't share moniker lists, unfortunately, so #define a constant instead
+ */
+#define EMPTY_MONIKER_LIST list {\
+	EmptySCMoniker, EmptySMMoniker, EmptySCGAMoniker\
+}
+
+/*
+ * Templates for the possible drive types
+ */
+Floppy525Template = DriveTool ignoreDirty {
+	genStates = default -usable;
+	driveType = DRIVETYPE_FLOPPY_525;
+	driveNumber = -1;	/* flag invalid */
+	moniker = EMPTY_MONIKER_LIST
+	hints = { HINT_DRAW_SHORTCUT_BELOW }
+}
+
+Floppy35Template = DriveTool ignoreDirty {
+	genStates = default -usable;
+	driveType = DRIVETYPE_FLOPPY_35;
+	driveNumber = -1;	/* flag invalid */
+	moniker = EMPTY_MONIKER_LIST
+	hints = { HINT_DRAW_SHORTCUT_BELOW }
+}
+
+#ifndef GEOLAUNCHER		/* only floppies for GeoLauncher */
+HardDiskTemplate = DriveTool ignoreDirty {
+	genStates = default -usable;
+	driveType = DRIVETYPE_HARDDISK;
+	driveNumber = -1;	/* flag invalid */
+	moniker = EMPTY_MONIKER_LIST
+	hints = { HINT_DRAW_SHORTCUT_BELOW }
+}
+
+RamDiskTemplate = DriveTool ignoreDirty {
+	genStates = default -usable;
+	driveType = DRIVETYPE_RAMDISK;
+	driveNumber = -1;	/* flag invalid */
+	moniker = EMPTY_MONIKER_LIST
+	hints = { HINT_DRAW_SHORTCUT_BELOW }
+}
+
+CDRomTemplate = DriveTool ignoreDirty {
+	genStates = default -usable;
+	driveType = DRIVETYPE_CDROMDISK;
+	driveNumber = -1;	/* flag invalid */
+	moniker = EMPTY_MONIKER_LIST
+	hints = { HINT_DRAW_SHORTCUT_BELOW }
+}
+
+NetDiskTemplate = DriveTool ignoreDirty {
+	genStates = default -usable;
+	driveType = DRIVETYPE_NETDISK;
+	driveNumber = -1;	/* flag invalid */
+	moniker = EMPTY_MONIKER_LIST
+	hints = { HINT_DRAW_SHORTCUT_BELOW }
+}
+
+RemovableDiskTemplate = DriveTool ignoreDirty {
+	genStates = default -usable;
+	driveType = DRIVETYPE_REMOVABLEDISK;
+	driveNumber = -1;	/* flag invalid */
+	moniker = EMPTY_MONIKER_LIST
+	hints = { HINT_DRAW_SHORTCUT_BELOW }
+}
+
+/*#if _ZMGR	made generally available 10/4/93, as PCMCIA hardware will
+		become more prevalent -- ardeb */
+PCMCIADiskTemplate = DriveTool ignoreDirty {
+	genStates = default -usable;
+	driveType = DRIVETYPE_PCMCIADISK;
+	driveNumber = -1;	/* flag invalid */
+	moniker = EMPTY_MONIKER_LIST
+	hints = { HINT_DRAW_SHORTCUT_BELOW }
+}
+/*#endif */
+#endif
+
+end IconAreaTemplates;

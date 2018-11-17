@@ -1,0 +1,249 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		User Interface
+FILE:		ObjectCreateDestroy
+
+DESCRIPTION:
+
+	$Id: ObjectCreateDestroy.doc,v 1.3.21.1 97/03/29 03:37:02 canavese Exp $
+
+------------------------------------------------------------------------------@
+
+This file not-yet-ready-for-prime-time.  So far this is just a collection
+of notes on the subject.
+
+Creation techniques
+-------------------
+Individual objects:			ObjInstantiate	
+Visible branch in existing block:	<none other than above>
+Generic branch in existing block:	MSG_GEN_COPY_TREE	*
+Create a new, empty object block:	UserAllocObjBlock
+Copy of ".ui" resource template block:	ObjDuplicateResource	*
+
+* most common approaches
+
+Getting create objects "alive"
+------------------------------
+Generic branch/object:			Must add into generic tree via
+					MSG_ADD_GEN_CHILD, then set "usable"
+					via MSG_GEN_SET_USABLE.  Dialogs,
+					primary's & displays won't appear until
+					MSG_GEN_INITIATE_INTERACTION is
+					additionally sent.
+
+Visible branch/object:			Must add into visible tree, set bounds
+					(or setup geometry flags), then visually
+					updated (MSG_MARK_INVALID).
+
+
+Destruction techniques
+----------------------
+Generic branch residing completely within one block:
+					MSG_GEN_DESTROY_AND_FREE_BLOCK
+Generic branch: 			MSG_GEN_DESTROY
+Visible branch:				MSG_VIS_DESTROY
+Individual object (NOT IN ANY TREE):	MSG_META_OBJ_FREE
+Block created via UserAllocObjBlock or ObjDuplicateResource (NOT IN ANY TREE):
+					ObjFreeObjBlock, or send
+					MSG_META_BLOCK_FREE to any object in
+					block
+
+Common FatalError you might run into:
+
+FLOW_MOUSE_GRAB_NOT_RELEASED_BY_DYING_OBJECT                   enum FatalErrors
+; Most common cause:   Destruction of a generic object which is still
+; GS__USABLE & attached to the generic tree, or a visible object which
+; is still in the visible tree.  This can happen if LMemFree, MSG_META_OBJ_FREE,
+; or MSG_META_BLOCK_FREE are called on the chunk/object/block
+; that the object resides in, while it is still active.  These primitives may
+; only be used AFTER the object/block has been properly shutdown, i.e. set
+; NOT_USABLE & removed from the generic tree for generic objects, &
+; MSG_VIS_REMOVE'd from the visual tree for vis objects.   Note that if the 
+; intent is to destroy only individual objects or branches, & not an entire
+; block, MSG_GEN_DESTROY & MSG_VIS_DESTROY do the job quite nicely, performing
+; the pre-requisite shutdown procedures before nuking the objects chunks.
+
+
+Destruction -- detail
+---------------------
+
+Objects must be created using a kernel routine, simply because there does not
+yet exist an object to send a MSG_PROCESS_INSTANTIATE to.  To destroy an object
+however, you may use the following methods:
+
+For generic objects:
+
+MSG_GEN_DESTROY              method
+;
+; Sets object branch NOT_USABLE, removes it from the generic tree,
+; & destroys it, including any chunks associated with the objects,
+; including hints, monikers, active list chunks, text, etc.  Leave the
+; block(s) that the objects lie in intact.  Any chunks coming from resources
+; are marked dirty & resized to zero.
+;
+; Pass:         cx      - ?
+;               dl      - VisUpdateMode to use when updating parent
+;               bp      - mask CCF_MARK_DIRTY if we want to mark the parent
+;                         as dirty
+; Return:       nothing
+;               ax, cx, dx, bp - destroyed
+
+For visible objects:
+
+MSG_VIS_DESTROY                              method
+;
+;       High level routine for VISIBLE-only object branch.
+; Closes & destroys a visible (non-generic) branch.  If realized,
+; VIS_CLOSES's, then removes from visible tree.  Old parent is marked as
+; invalid (geometry & image), & it is visually updated using VisUpdateMode
+; passed.
+;
+; Pass:         dl      - VisUpdateMode
+; Reutrn:       Nothing
+;
+
+
+Low level approach, for objects no longer in trees, & no longer active:
+
+MSG_META_OBJ_FREE                 method
+;
+;       MSG_META_OBJ_FREE causes an object to be freed (via LMemFree) after
+; clearing out the queues of the process that owns the block and the thread
+; the executes the block.
+;
+; Pass:
+;       none
+;
+; Return:
+;       none
+
+------------------------------------------------------------------------------
+	"USABLE"
+------------------------------------------------------------------------------
+
+When any object which is NOT_USABLE becomes completely USABLE again,
+all specific instance data is thrown out, & the object is resolved
+just as if it had just come from a resource, where it has generic instance
+data only.  There's no possibility of leftover specific instance data
+interfering with an object set USABLE again -- not even in V1.2.
+
+Corollary:  Before any generic object is resolved & its specific instance
+data initialized, all generic objects up the tree are automatically resolved
+& initialized.  This is necessary because the specific implementation of
+a generic object is often based in part on how its parents have been
+specifically implemented.
+
+One problem that DOES exist in V1.2, which is being corrected for V2.0,
+is that messages sent to NOT_USABLE objects continue to get processed in
+the specific UI.  For V2.0, the uigroup is changing this so that messages which
+change generic state are handled in the generic UI (so that it is possible to
+set up instance data while an object is NOT_USABLE), & those which don't
+are discarded.
+
+Doug
+
+------------------------------------------------------------------------------
+	Destruction philosphy
+------------------------------------------------------------------------------
+
+DETACH	- make sure there are no persistant references to that which is
+	  non-persistant.  Prep for app state save & shutdown.
+
+NOT_USABLE - nuke anything that isn't persistant, (excepting the generic object
+	     itself if it is non-persistant, i.e. IGNORE_DIRTY)
+
+FREE	- nuke the object & everything belonging to it.  Can only be done once
+	  the object is completely disconnected from the world.
+
+When things must be destroyed...
+
+					Proposed			Proposed
+				DETACH	NTFY_BLCK_DSTRY	NOT_USABLE	BNU
+				------	-------------	---------	---
+generic instance, i.e		no	no		no
+	object, references
+	found in generic
+	instance data (for
+	example to chunks)
+
+visible instance portion	no *1	no		no *2		no
+	of object
+
+visible linkage, image, 	no	yes		yes		top only
+	geometry
+
+created objects/chunks in 	no *1	no		yes		no
+	same block, whether
+	visible or generic
+
+Gadget, FTVMC, exclusive	no	top only	yes		top only
+					(if node			(if node
+					or bot)				or bot)
+
+created object blocks		no *1	yes		yes
+
+allocated memory blocks		no	yes		yes
+
+Global GCN references		yes	yes		yes
+
+App GCN references		*3	yes		yes
+
+VM files			yes	yes		yes
+
+System semaphores		yes	yes		yes
+
+Other sys resources		yes	yes		yes
+
+*1 Created objects must be marked as "IGNORE_DIRTY", so that they will not be
+   saved to state, but rather discarded when the app shuts down.  The visible
+   portions of generic objects are marked in this way, & are discarded before
+   reaching the state file when an application is shut down.
+
+   Likewise, the persistant portion of the application must be made to have
+   no reference to any of the non-persisten portion.  For example, the following
+   must be made not to exist:
+
+	- Generic linkage across persistant to non-persistant boundaries.  This
+	  is typically solved by having the lower objects have a one-way ptr
+	  to their parent, persistant object (possible for dialog boxes, but
+	  not gadgets or control areas)
+
+	- Stored optr references in persistant objects to non-persistant objects
+
+*2 Objects not fully usable theoretically have no specific implementation,
+   as they can freely removed from the tree, have their ownership changed, etc.
+   meaning they have no specific UI even associated with them.  At this time,
+   however, the visible (& specific) portion of the object is left intact
+   when set not usable.  This state should NOT be depedant on, i.e. no
+   assumption should be made that visible data will be preserved.  A future
+   version will hopefully nuke this data, to make its non-use a non-issue.
+
+*3 References intended to be non-persistant should be nuked, as app GCN lists
+   themselves are persistant.
+
+Thoughts:
+	* UserDestroyDialog :
+ 	    If no objects in block on app active list:
+		- dialog is dismissed (this removes vis linkage, changes gen
+		  linkage to one-way, remove FTVMC, window GCN entry, etc.)
+		- block is freed
+	    If any objects in block on app active list:
+		 - calls GEN_REMOVE(SBF_BLOCK_DESTROY_PREP when available) 
+		 - block is freed
+
+	* MSG_META_GCN_LIST_TEST, GCNListTest
+
+	* new SpecBuildFlags:  SBF_TOP	-- top obj getting message
+			     SBF_BLOCK_DESTROY_PREP -- set if everything
+						  in block
+						  is to be destroyed, i.e.
+						  inter-block destruction.
+						  releasing/ungrabbing
+						  need not take place.
+
+	"BLOCK_DESTROY_PREP" would be able to be passed to GEN_REMOVE
+
+

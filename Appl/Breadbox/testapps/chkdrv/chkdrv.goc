@@ -1,0 +1,212 @@
+/***********************************************************************
+ *
+ *
+ * PROJECT:	Test Applications
+ * MODULE:	Drive checker
+ * FILE:		chkdrv.goc
+ * AUTHOR:	jfh  2/02
+ *
+ * DESCRIPTION:
+ *
+ *
+ *
+ *
+ *
+ *
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+#include <ansi/string.h>
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+
+@class	TestProcessClass, GenProcessClass ;
+	@message void MSG_TEST_GET_STATUS();
+
+@endc
+
+@classdecl	TestProcessClass, neverSaved ;
+
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+@start	AppResource;
+
+@object GenApplicationClass TestApp = {
+	 GI_visMoniker = list { @TestTextMoniker }
+    GI_comp = @TestPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @TestPrimary;
+}
+
+@visMoniker TestTextMoniker = "Drive Checker";
+
+@end	AppResource
+
+@start	Interface;
+
+@object GenPrimaryClass TestPrimary  = {
+	 GI_comp = @DriveEntryWindow, @DriveStatusWindow;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+}
+
+@object GenTextClass DriveEntryWindow = {
+	 GI_visMoniker = "Enter Drive Number:";
+	 GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT;
+	 GTXI_maxLength = 1;
+	 GTXI_destination = process;
+	 GTXI_applyMsg = MSG_TEST_GET_STATUS;
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    HINT_TEXT_WHITE_WASH_COLOR;
+}
+
+@object GenTextClass DriveStatusWindow = {
+	 GI_visMoniker = "Drive Information:";
+	 HINT_PLACE_MONIKER_ABOVE;
+    HINT_INITIAL_SIZE = {0, SST_LINES_OF_TEXT | 12, 0};
+	 HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+	 HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+	 HINT_TEXT_WHITE_WASH_COLOR;
+}
+
+@end Interface
+
+/*
+ ***************************************************************************
+ *		Code for TestProcessClass
+ ***************************************************************************
+ */
+
+  /***********************************************************************
+ *
+ * MESSAGE:	MSG_TEST_GET_STATUS for TestProcessClass
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+@method TestProcessClass, MSG_TEST_GET_STATUS
+{
+ word		driveStatus;
+ dword	driveNum;
+ byte		type;
+ char		driveNumText[3], buffer[100];
+
+
+	if (@call DriveEntryWindow::MSG_VIS_TEXT_GET_ALL_PTR(driveNumText)) {
+		UtilAsciiToHex32(driveNumText, &driveNum);
+		driveStatus = DriveGetExtStatus((word)driveNum);
+
+		/* show the info */
+		@send DriveStatusWindow::MSG_VIS_TEXT_DELETE_ALL();
+		strcpy(buffer, "  Drive ");
+		driveNumText[0] = 'A' + (word)driveNum;
+		driveNumText[1] = 0;
+		strcat(buffer, driveNumText);
+		strcat(buffer, "\r\r");
+		@call DriveStatusWindow::MSG_VIS_TEXT_REPLACE_ALL_PTR(buffer, 0);
+
+		strcpy(buffer, "Type: ");
+		type = driveStatus & DS_TYPE;
+		switch (type) {
+			case DRIVE_5_25:
+				strcat(buffer, "5 1/4\r");
+				break;
+			case DRIVE_3_5:
+				strcat(buffer, "3 1/2\r");
+				break;
+			case DRIVE_FIXED:
+				strcat(buffer, "Fixed\r");
+				break;
+			case DRIVE_RAM:
+				strcat(buffer, "RAM\r");
+				break;
+			case DRIVE_CD_ROM:
+				strcat(buffer, "CD-ROM\r");
+				break;
+			case DRIVE_8:
+				strcat(buffer, "8\r");
+				break;
+			default:
+				strcat(buffer, "Unknown\r");
+			}
+		@call DriveStatusWindow::MSG_VIS_TEXT_APPEND_PTR(buffer, 0);
+
+		strcpy(buffer, "Present: ");
+		if(driveStatus & DS_PRESENT)
+			strcat(buffer, "Yes\r");
+		else
+			strcat(buffer, "No\r");
+		@call DriveStatusWindow::MSG_VIS_TEXT_APPEND_PTR(buffer, 0);
+
+		strcpy(buffer, "Removable: ");
+		if(driveStatus & DS_MEDIA_REMOVABLE)
+			strcat(buffer, "Yes\r");
+		else
+			strcat(buffer, "No\r");
+		@call DriveStatusWindow::MSG_VIS_TEXT_APPEND_PTR(buffer, 0);
+
+		strcpy(buffer, "Network: ");
+		if(driveStatus & DS_NETWORK)
+			strcat(buffer, "Yes\r");
+		else
+			strcat(buffer, "No\r");
+		@call DriveStatusWindow::MSG_VIS_TEXT_APPEND_PTR(buffer, 0);
+
+		strcpy(buffer, "Busy: ");
+		if(driveStatus & DES_BUSY)
+			strcat(buffer, "Yes\r");
+		else
+			strcat(buffer, "No\r");
+		@call DriveStatusWindow::MSG_VIS_TEXT_APPEND_PTR(buffer, 0);
+
+		strcpy(buffer, "Alias: ");
+		if(driveStatus & DES_ALIAS)
+			strcat(buffer, "Yes\r");
+		else
+			strcat(buffer, "No\r");
+		@call DriveStatusWindow::MSG_VIS_TEXT_APPEND_PTR(buffer, 0);
+
+		strcpy(buffer, "Formattable: ");
+		if(driveStatus & DES_FORMATTABLE)
+			strcat(buffer, "Yes\r");
+		else
+			strcat(buffer, "No\r");
+		@call DriveStatusWindow::MSG_VIS_TEXT_APPEND_PTR(buffer, 0);
+
+		strcpy(buffer, "Read Only: ");
+		if(driveStatus & DES_READ_ONLY)
+			strcat(buffer, "Yes\r");
+		else
+			strcat(buffer, "No\r");
+		@call DriveStatusWindow::MSG_VIS_TEXT_APPEND_PTR(buffer, 0);
+
+		strcpy(buffer, "Local Only: ");
+		if(driveStatus & DES_LOCAL_ONLY)
+			strcat(buffer, "Yes\r");
+		else
+			strcat(buffer, "No\r");
+		@call DriveStatusWindow::MSG_VIS_TEXT_APPEND_PTR(buffer, 0);
+		} /* end of drive number there if */
+
+}
+
+
+
+
+

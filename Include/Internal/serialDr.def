@@ -1,0 +1,771 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1990 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		Include
+FILE:		serialDr.def
+
+DECLARER:	Serial Driver
+INTENDED USERS:	
+OVERRIDE CONST:	-
+
+AUTHOR:		Adam de Boor, Jan 12, 1990
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Adam	1/12/90		Initial revision
+
+
+DESCRIPTION:
+	Header for users of the serial port driver. Most of the function
+	and type definitions are found in streamDriver.def. Only the added
+	functions and types are defined here.
+		
+	$Id: serialDr.def,v 1.20 97/09/22 19:22:50 jang Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__SERIALDR
+
+StartDriver	serial
+
+UseDriver Internal/streamDr.def
+
+;
+; Protocol number for this interface
+;
+SERIAL_PROTO_MAJOR	equ STREAM_PROTO_MAJOR+1
+SERIAL_PROTO_MINOR	equ STREAM_PROTO_MINOR+0
+
+;------------------------------------------------------------------------------
+;		     ADDITIONAL DRIVER FUNCTIONS
+;
+; NOTE: All stream driver functions are valid for the serial driver and take
+; the same parameters except where noted below. Where streamDriver.def refers
+; to a "stream token", you should pass the unit number (a member of the
+; SerialPortNum enumerated type)
+;
+;------------------------------------------------------------------------------
+
+;DR_STREAM_OPEN		Alias for DR_STREAM_CREATE defined in streamDriver.def
+;
+;	The complete initial state of the port is preserved by the open and
+;	restored when the port is closed again. This includes baud rate, line
+;	format, modem-control signals, etc. The caller need not do any of that.
+;
+;	By default, though, flow control is turned off.  In order to do flow
+;	control at driver level, you need to call DR_SERIAL_SET_FLOW_CONTROL,
+;	DR_SERIAL_ENABLE_FLOW_CONTROL, and DR_SERIAL_SET_ROLE( for H/W fc ).
+;
+;  When opening an active port:
+;	PASS:	ax	= StreamOpenFlags. SOF_NOBLOCK and SOF_TIMEOUT
+;			  are mutually exclusive...
+;		bx	= unit number to open
+;		cx	= input buffer size
+;		dx	= output buffer size
+;		bp	= timeout value if SOF_TIMEOUT
+;
+;	RETURN:	carry set if port couldn't be opened
+;		 (in-use/timed-out/non-existent)
+;
+;  When opening a passive port:
+;	PASS:	bx	= unit number to open
+;		cx	= input buffer size
+;
+;	RETURN:	carry set and ax set to one of the following:
+;		  ax 	= STREAM_NO_DEVICE if device doesn't exist
+;			= STREAM_DEVICE_IN_USE if the passive port is in use.
+;			= STREAM_ACTIVE_IN_USE if the passive port was opened
+;			    in a PREEMPTED state.
+;		carry clear if the port opened with no problems.
+;
+;	Passive port use:
+;		* There are no StreamOpenFlags; passive opens are always
+;		  SOF_NOBLOCK. 
+; 		* There is no output buffer in passive port connections.
+;
+
+;DR_STREAM_CLOSE	Alias for DR_STREAM_DESTROY defined in streamDriver.def
+;	PASS:	ax 	= STREAM_LINGER if should wait for all data to
+;			  make it out the port, or STREAM_DISCARD if any
+;			  pending data should be discarded. Any waiting
+;			  incoming data are automatically discarded.
+;			  (ax is ignored if the port is passive)
+;		bx	= unit number
+;	RETURN:	nothing
+;
+;	Restores the hardware device to the state it was in before the port
+;	was opened.
+;
+;	Passive port use:
+;		* ax is ignored when closing a passive port.  It will
+;		  behave as if STREAM_DISCARD is set.
+
+;DR_STREAM_READ (extension of stream-driver version)
+;	PASS:	ax	= STREAM_BLOCK/STREAM_NOBLOCK to tell whether to
+;			  block waiting for the full request to be filled or
+;			  to return as many bytes as are currently available.
+;		bx	= stream token
+;		cx	= number of bytes to read
+;		ds:si	= buffer to which to read
+;	RETURN:	cx	= number of bytes read
+;
+;	Passive port use:
+;		Keep in mind that the buffer is NOT flushed after
+;		reads, so consecutive reads will return the same data
+;		again and again until the buffer is flushed through
+;		DR_STREAM_FLUSH.
+;
+
+;DR_STREAM_FLUSH (extension of stream-driver version)
+;	PASS:	ax	= STREAM_READ if incoming data should be flushed
+;			  STREAM_WRITE if outgoing data should be flushed
+;			  STREAM_BOTH if both incoming and outgoing data
+;			  should be flushed.
+;			  (ax is ignored if the port is passive)
+;		bx	= unit number
+;	RETURN:	nothing
+;
+;	Passive port use:
+;		Passive ports have only an incoming data buffer, which will be
+;		cleared.  Thus, ax will be ignored.
+;
+
+;DR_STREAM_GET_ERROR (extension of stream-driver version)
+;	PASS:	ax	= STREAM_READ if error for incoming stream should be
+;			  fetched (this is where the error is normally posted)
+;			  STREAM_WRITE if error for the outgoing stream should
+;			  be fetched (the error will only be posted here if
+;			  there is no incoming stream, as may happen in future
+;			  versions of the driver).
+;			  (ax is ignored if the port is passive)
+;		bx	= unit number
+;	RETURN:	ax	= posted error (0 if none)
+;
+;	Passive port use:
+;		ax is always considered to be STREAM_READ
+
+;DR_STREAM_SET_ERROR (extension of stream-driver version)
+;	PASS:	ax	= STREAM_READ if error should be posted on incoming
+;			  stream.
+;			  STREAM_WRITE if error should be posted on outgoing
+;			  stream.
+;		bx	= unit number
+;		cx	= error word
+;	RETURN:	nothing
+;	
+;	The driver pays no attention to any errors posted by the user of the
+;	port, so you needn't bother, though this may become useful at some
+;	point.
+
+;DR_STREAM_SET_THRESHOLD (extension of stream-driver version)
+;	PASS:	ax	= STREAM_READ if threshold for incoming data should be
+;			  set.
+;			  STREAM_WRITE if threshold for outgoing data should be
+;			  set.
+;			  STREAM_BOTH if threshold should be set for both
+;			  incoming and outgoing data.
+;		bx	= unit number
+;		cx	= threshold (bytes)
+;	RETURN:	nothing
+;
+;	Passive port use:
+;		Always sets for STREAM_READ, so ax is ignored.
+;		
+
+;DR_STREAM_SET_NOTIFY (extension of stream-driver version)
+;	Arguments are the same, but the serial driver defines two other events:
+;
+;		SNE_MODEM	the state of the modem-control lines changed.
+;				The notification routine is called with CX
+;				containing the modem status register (type
+;				SerialModemStatus). The modem status interrupt
+;				is only enabled for the port if this event has
+;				a notifier registered for it. There is no
+;				other way to obtain this information. The
+;				SNT_READER bit in the StreamNotifyType is
+;				ignored when this event is registered.
+;
+;		SNE_PASSIVE	the state of a passive connection
+;				changed.  The notification routine is
+;				called with CX containing the passive
+;				connection status (type
+;				SerialPassiveStatus) and BP containing
+;				the port number.  The SNT_READER bit
+;				in the StreamNotifyType is ignored
+;				when this event is registered.
+;
+;	RETURN: carry set if the stream/port has been closed
+;
+	
+;DR_STREAM_QUERY (extension of stream-driver version)
+;	PASS:	ax	= STREAM_READ to get bytes available for reading
+;			  STREAM_WRITE to get bytes available for writing
+;		bx	= unit number
+;	RETURN:	ax	= number of bytes available for requested operation
+;
+;	Passive port use:
+;		Always returns for STREAM_READ, so ax is ignored.
+;
+
+;DR_STREAM_GET_DEVICE_MAP (definition of return value)
+;	PASS:	nothing
+;	RETURN:	ax	= SerialDeviceMap of available serial ports. For each
+;			  member of SerialPortNum, the port exists if
+;			  AX AND (1 SHL SERIAL_COM?) is true.
+;
+
+SerialFunction	etype	protominor word, StreamFunction, 2
+
+
+DR_SERIAL_SET_FORMAT	enum	SerialFunction
+;	PASS:	al	= SerialFormat record
+;		ah	= SM_RAW/SM_RARE/SM_COOKED to control how
+;			  the driver treats incoming data. In cooked mode, the
+;			  driver provides XON/XOFF flow control and limits
+;			  characters to 7 bits (to deal with errant parity
+;			  bits masquerading as 8-bit, no-parity data). In rare
+;			  mode, flow control is still provided, but incoming
+;			  data are untouched (except for the stripping of XON
+;			  and XOFF bytes from the input stream). In raw mode,
+;			  flow control is disabled.
+;		bx	= unit number
+;		cx	= baud rate (SerialBaud)
+;	RETURN:	carry set if given an invalid format 
+;
+
+DR_SERIAL_GET_FORMAT	enum	SerialFunction
+;	PASS:	bx	= unit number
+;	RETURN:	al	= data format (SerialFormat)
+;		ah	= SM_RAW/SM_RARE/SM_COOKED
+;		cx	= baud rate (SerialBaud)
+;
+
+DR_SERIAL_SET_MODEM	enum	SerialFunction
+;	PASS:	al	= modem control bits (SerialModem)
+;		bx	= unit number
+;	RETURN:	nothing
+;
+
+DR_SERIAL_GET_MODEM	enum	SerialFunction
+;	PASS:	bx	= unit number
+;	RETURN:	al	= modem control bits (SerialModem)
+;
+
+DR_SERIAL_OPEN_FOR_DRIVER enum	SerialFunction
+;	PASS:	ax	= StreamOpenFlags
+;		bx	= unit number to open (SerialPortNum)
+;		cx	= input buffer size
+;		dx	= output buffer size
+;		si	= handle of geode to own the streams
+;		bp	= timeout value if SOF_TIMEOUT
+;	RETURN:	carry set if port couldn't be opened.
+;			ax = error code (StreamError)
+;		carry clear if port open
+;	This function is intended for drivers that are opening serial ports
+;	and don't want the stream blocks owned by whomever loaded the driver
+;	(e.g. the kernel or the config program).
+;
+;	By default, flow control is turned off.  In order to do flow control
+;	at driver level, you need to call DR_SERIAL_SET_FLOW_CONTROL,
+;	DR_SERIAL_ENABLE_FLOW_CONTROL, and DR_SERIAL_SET_ROLE( for H/W fc ).
+;
+
+DR_SERIAL_SET_FLOW_CONTROL enum	SerialFunction
+;	PASS:	ax	= type of flow control desired (SerialFlowControl). Both
+;			  hardware and software flow control may be enabled
+;			  for the same port. Note, however, that the mode
+;			  passed to DR_SERIAL_SET_FORMAT affects whether
+;			  software flow-control is enabled for the port.
+;		bx	= unit number
+;		cl	= signal(s) to use to tell remote to stop sending
+;			  (SerialModem) if SF_HARDWARE is set
+;		ch	= signal(s) to watch to determine if remote wants us
+;			  to stop sending (SerialModemStatus). If any of signals
+;			  is de-asserted, output will be stopped until the
+;			  signal changes state again. Valid only if SF_HARDWARE
+;			  is set in AX
+;	RETURN:	nothing
+;
+
+DR_SERIAL_DEFINE_PORT	enum	SerialFunction
+;	PASS:	ax	= base I/O port of device
+;		bx	= PCMCIA socket # if port is on a PCMCIA card. -1 if
+;			  not.
+;		cl	= interrupt level for device (-1 => turn off existing
+;			  port)
+;	RETURN:	bx	= unit number for later calls
+;		carry set if port couldn't be defined:
+;			ax	= STREAM_NO_DEVICE if the device doesn't
+;				  exist at that address.
+;				= STREAM_DEVICE_IN_USE if the device is
+;				  currently open.
+;				= STREAM_NO_FREE_PORTS
+;
+;	This function was originally created to deal with the Mouse Systems
+;	bus mouse, which is simply an msys serial mouse with an 8250 with
+;	a base port in the bus-mouse range (238-23f or 338-33f).
+;
+
+DR_SERIAL_STAT_PORT	enum	SerialFunction
+;	PASS:	bx	= unit number (SerialPortNum)
+;	RETURN:	carry set if port doesn't exist.
+;		carry clear if port is known:
+;			al	= interrupt level (-1 => unknown => not
+;				  opened this session)
+;			ah	= non-zero if port is currently open
+;
+
+DR_SERIAL_CLOSE_WITHOUT_RESET enum SerialFunction
+;	PASS:	bx	= unit number (SerialPortNum)
+;		ax	= STREAM_LINGER if close should be delayed until all
+;			  data have been written.
+;			  STREAM_DISCARD if any pending data should be
+;			  discarded.
+;			  In either case, any data waiting to be read are
+;			  discarded.
+;	RETURN:	port interrupts turned off but all other attributes of the
+;		port remain untouched. The interrupt level may be masked out
+;		in the 8259.
+;
+;	XXX: stream driver returns this, but we don't...
+;	RETURN:	carry set if port couldn't be closed
+;			ax	= StreamError (STREAM_CLOSING)
+;
+
+		protominor	SerialPCMCIASupport
+
+DR_SERIAL_REESTABLISH_STATE	enum SerialFunction
+;	PASS:	bx	= unit number
+;	RETURN:	carry clear if ok
+;		carry set if error:
+;			ax	= STREAM_NO_DEVICE if the indicated unit
+;				  doesn't exist.
+;				= STREAM_CLOSED if the unit isn't open,
+;				  so there's no state to establish.
+;
+;	This function exists to handle PCMCIA serial ports that lose their
+;	state during power-downs or when the card is removed. The driver will
+;	remember the state last programmed into the port and reset the port
+;	to that state when this function is invoked.
+;
+
+DR_SERIAL_PORT_ABSENT		enum SerialFunction
+;	PASS:	bx	= unit number
+;	RETURN:	carry clear if ok
+;		carry set if error:
+;			ax	= STREAM_NO_DEVICE if the indicated unit
+;				  doesn't exist.
+;				= STREAM_CLOSED if the unit isn't open,
+;				  so there's no worry about the port being gone
+;				  (any attempt to open while it's gone will
+;				  yield a STREAM_NO_DEVICE error)
+;
+;	This function exists to handle PCMCIA serial ports that can be taken
+;	out at arbitrary moments and then be put back in again. Any data
+;	gotten from the now-absent port is garbage, and the driver must be
+;	told to ignore it. Invoking DR_SERIAL_REESTABLISH_STATE will reset
+;	the port-absent flag.
+;
+
+		protominor	SerialPassivePortSupport
+
+DR_SERIAL_GET_PASSIVE_STATE	enum SerialFunction
+;	PASS:	bx	= unit number
+;	RETURN:	carry clear if the port exists and is available for passive use
+;		carry set otherwise, with details in ax:
+;			ax	= STREAM_NO_DEVICE if the indicated unit
+;				  doesn't exist.
+;				= STREAM_PASSIVE_IN_USE if the unit is
+;				  currently passively allocated.  An attempted
+;				  SerialOpen will be unsuccessful.
+;				= STREAM_ACTIVE_IN_USE if the unit is
+;				  actively allocated, which means that
+;				  a passive allocation is allowed (but
+;				  will immediately block).
+;				= STREAM_PASSIVE_BUFFER_FULL if the
+;				  unit is passively allocated and its
+;				  input buffer is full (and incoming
+;				  data is/will be discarded).
+;
+		protominor	SerialMediumSupport
+
+SERIAL_MAX_MEDIA	equ	2	; the greatest number of medium types
+					;  that can be bound to a single port
+
+DR_SERIAL_GET_MEDIUM		enum	SerialFunction
+;	PASS:	bx	= unit number
+;		cx	= medium # to fetch
+;	RETURN:	carry clear if port exists:
+;		      dxax	= MediumType (see medium.def) bound to the port
+;		carry set if there's a problem:
+;		      ax	= STREAM_NO_DEVICE if the indicated unit
+;				  doesn't exist
+;				= STREAM_NO_SUCH_MEDIUM if the indicated unit
+;				  doesn't have that many media types bound
+;				  to it
+;
+
+DR_SERIAL_SET_MEDIUM		enum	SerialFunction
+;	PASS:	bx	= unit number
+;		dx:ax	= array of MediumTypes (see medium.def) for device at
+;			  the other end of the serial port. Media must use
+;			  MUT_INT unit numbers (SerialPortNum will be used).
+;		cx	= # of types in the array
+;	RETURN:	carry clear if medium set ok
+;		carry set if there's a problem:
+;			ax	= STREAM_NO_DEVICE if the indicated unit doesn't
+;				  exist.
+;
+;	If the port existed and had a MediumType bound to it, notification
+;	will be sent out saying the former unit of media no longer exists.
+;
+;	In any case, notification will be sent out saying this unit now does
+;	exist.
+;
+
+		protominor	SerialResizeSupport
+
+DR_SERIAL_SET_BUFFER_SIZE	enum	SerialFunction
+;	PASS:	bx	= unit number
+;		ax	= STREAM_READ/STREAM_WRITE
+;		cx	= new size
+;	RETURN:	carry set if couldn't enlarge
+;		      	ax	= STREAM_CANNOT_ALLOC
+;				= STREAM_BUSY
+;		carry clear if ok
+;			ax	= destroyed
+;
+;	If the buffer size is made smaller than the number of bytes currently
+;	in it, the most-recently added bytes will be discarded.
+;
+;	If changing the input buffer size, incoming bytes may be lost without
+;	any error indication being received.
+;
+;	In either case, a STREAM_READ or STREAM_WRITE call performed on another
+;	thread can return 0 bytes read/written while a call to this routine
+;	is in progress. It would behoove the caller to provide additional
+;	synchronization to prevent such weirdness.
+;
+
+DR_SERIAL_ENABLE_FLOW_CONTROL	enum	SerialFunction
+;	PASS:	bx	= unit number
+;		ax	= STREAM_READ/STREAM_WRITE/STREAM_BOTH
+;	RETURN:	carry set on error:
+;			ax	= STREAM_NO_DEVICE if the indicated unit doesn't
+;				  exist.
+;		carry clear if ok
+;
+;	Specifies whether a previously or subsequently specified flow control
+;	setting should apply to input only, output only, or both.
+;
+
+		protominor	SerialRoleSupport
+
+DR_SERIAL_SET_ROLE	enum	SerialFunction
+;	PASS:	bx	= unit number
+;		al	= SerialRole
+;	RETURN:	carry set on error:
+;			ax	= STREAM_NO_DEVICE if the indicated unit doesn't
+;				  exist.
+;		carry clear if ok
+;
+;	Sets the role to either SR_DTE or SR_DCE.
+;
+
+		protoreset
+;------------------------------------------------------------------------------
+;		     VARIOUS AND SUNDRY CONSTANTS
+;------------------------------------------------------------------------------
+
+; Additional StreamError codes returned by Serial driver
+;
+StreamError	equ	STREAM_FIRST_DEV_ERROR
+
+STREAM_NO_FREE_PORTS	enum	StreamError	; Attempting to define a new
+						;  port, but the driver has no
+						;  room in its internal tables
+						;  to keep track of it.
+STREAM_PASSIVE_IN_USE	enum	StreamError	; The requested action is not
+						;  possible because the port has
+						;  already been passively al-
+						;  located. 
+STREAM_ACTIVE_IN_USE	enum	StreamError	; The requested action will be
+						;  delayed because the port is
+						;  currently being used via an
+						;  active connection.
+						;  This error only applies to
+						;  passive operations.
+STREAM_PASSIVE_BUFFER_FULL enum	StreamError	; The passive buffer is full,
+						;  so any incoming data will be
+						;  unceremoniously dropped on
+						;  the floor.
+STREAM_UNSUPPORTED_FORMAT  enum StreamError	; The requested serial format
+						;  cannot be supported by the
+						;  device
+
+STREAM_NO_SUCH_MEDIUM	enum StreamError	; Asked for a MediumType index
+						;  that's not defined for a port
+
+STREAM_BUSY		enum StreamError	; Attempting to perform some
+						;  action while some other
+						;  thread is using the port.
+						;  Try again later.
+
+;
+; Error word reported by the driver.
+;
+SerialError	record
+    SE_BREAK:1,			; Break condition detected on line
+    SE_FRAME:1,			; Framing error (improper # stop bits, e.g.)
+    SE_PARITY:1,		; Parity error in received character (may be
+    				;  garbage)
+    SE_OVERRUN:1,		; New byte received before old byte read -- old
+    				;  byte discarded.
+    :1
+SerialError	end
+
+;
+; Constant for SerialDefinePort
+;
+SERIAL_PORT_DOES_NOT_EXIST	equ	-1
+;
+; Constants for DR_STREAM_OPEN and everyone else.
+;
+
+SerialPortNum		etype	word, 0, 2
+SERIAL_COM1		enum	SerialPortNum
+SERIAL_COM2		enum	SerialPortNum
+SERIAL_COM3		enum	SerialPortNum
+SERIAL_COM4		enum	SerialPortNum
+SERIAL_COM5		enum	SerialPortNum	; only on exceptional systems
+SERIAL_COM6		enum	SerialPortNum	; only on exceptional systems
+SERIAL_COM7		enum	SerialPortNum	; only on exceptional systems
+SERIAL_COM8		enum	SerialPortNum	; only on exceptional systems
+
+LAST_ACTIVE_SERIAL_PORT	equ	SERIAL_COM8
+
+;
+; The bit to indicate that a serial port is being accessed passively.
+; NOTE: If you change this value, be sure to update the value in
+; Driver/Power/Common/powerCommon.def as well.
+;
+SERIAL_PASSIVE		equ	0x8000
+
+; Here are the passive connection versions of the above.  The only
+; difference is that the high bit is set, indicating that the port in
+; question is being accessed passively (i.e., the connection is
+; read-only and is preemptible by someone opening up the same port
+; without the SERIAL_PASSIVE bit set).
+
+SERIAL_COM1_PASSIVE enum SerialPortNum, (SERIAL_COM1 or SERIAL_PASSIVE)
+SERIAL_COM2_PASSIVE enum SerialPortNum, (SERIAL_COM2 or SERIAL_PASSIVE)
+SERIAL_COM3_PASSIVE enum SerialPortNum, (SERIAL_COM3 or SERIAL_PASSIVE)
+SERIAL_COM4_PASSIVE enum SerialPortNum, (SERIAL_COM4 or SERIAL_PASSIVE)
+SERIAL_COM5_PASSIVE enum SerialPortNum, (SERIAL_COM5 or SERIAL_PASSIVE)
+SERIAL_COM6_PASSIVE enum SerialPortNum, (SERIAL_COM6 or SERIAL_PASSIVE)
+SERIAL_COM7_PASSIVE enum SerialPortNum, (SERIAL_COM7 or SERIAL_PASSIVE)
+SERIAL_COM8_PASSIVE enum SerialPortNum, (SERIAL_COM8 or SERIAL_PASSIVE)
+
+;
+; Definitions for DR_SERIAL_SET_FORMAT and DR_SERIAL_GET_FORMAT
+;
+SerialParity 	etype 	byte, 0			; Parity selection
+    SP_NONE	enum	SerialParity, 0	; No parity generated or expected
+    SP_ODD	enum	SerialParity, 1	; Odd parity
+    SP_EVEN	enum	SerialParity, 3	; Even parity
+    SP_ONE	enum	SerialParity, 5	; Always-One parity
+    SP_MARK	enum	SerialParity, 5	; Same, but using fancy EE name
+    SP_ZERO	enum	SerialParity, 7	; Always-Zero parity
+    SP_SPACE	enum	SerialParity, 7	; Same, but using fancy EE name
+
+SerialLength	etype	byte, 0			; Word-length selection
+    SL_5BITS	enum	SerialLength
+    SL_6BITS	enum	SerialLength
+    SL_7BITS	enum	SerialLength
+    SL_8BITS	enum	SerialLength
+
+SerialFormat	record
+    SF_DLAB:1=0,		; FOR INTERNAL USE ONLY (MUST BE ZERO)
+    SF_BREAK:1,			; If set, causes a BREAK condition to be
+			    	;  asserted on the line. The bit must be cleared
+			    	;  again to return to normal function.
+    SF_PARITY SerialParity:3,	; Parity to expect on receive and use on
+				;  transmit
+    SF_EXTRA_STOP:1,		; Set if should generate an extra stop bit. One
+				;  stop bit is always generated. If this bit is
+				;  set, however, an extra 1/2 bit is generated
+				;  when the word-length is 5 bits, while a whole
+				;  extra stop bit is generated when the word-
+				;  length is 6, 7 or 8
+    SF_LENGTH SerialLength:2	; Word-length specifier
+SerialFormat  	end
+
+SerialMode	etype	byte
+    SM_RAW	enum	SerialMode	; Pass input through untouched
+    SM_RARE	enum	SerialMode	; Ditto, but obey XON/XOFF flow-control
+    					;  and use it on input
+    SM_COOKED	enum	SerialMode	; Flow-control, 7-bit input bytes.
+
+SerialBaud	etype	word
+    SB_115200	enum	SerialBaud, 1
+    SB_57600	enum	SerialBaud, 2
+    SB_38400	enum	SerialBaud, 3
+    SB_19200	enum	SerialBaud, 6
+    SB_14400	enum	SerialBaud, 8
+    SB_9600	enum	SerialBaud, 12
+    SB_7200	enum	SerialBaud, 16
+    SB_4800	enum	SerialBaud, 24
+    SB_3600	enum	SerialBaud, 32
+    SB_2400	enum	SerialBaud, 48
+    SB_2000	enum	SerialBaud, 58
+    SB_1800	enum	SerialBaud, 64
+    SB_1200	enum	SerialBaud, 96
+    SB_600	enum	SerialBaud, 192
+    SB_300	enum	SerialBaud, 384
+
+;
+; Parameter for DR_SERIAL_SET_MODEM/DR_SERIAL_GET_MODEM
+;
+SerialModem record
+    :4
+    SMC_OUT2:1=1		; INTERNAL TO DRIVER
+    SMC_OUT1:1			; INTERNAL TO DRIVER
+    SMC_RTS:1			; Request-To-Send (1 asserts it)
+    SMC_DTR:1			; Data-Terminal Ready (1 asserts it)
+SerialModem end
+
+;
+; For DCE role:
+;
+    SMC_DSR	equ <SMC_DTR>
+    SMC_CTS equ <SMC_RTS>
+    SMC_DCD equ <SMC_OUT1>
+    SMC_RI  equ <SMC_OUT2>
+
+;
+; Parameters for DR_SERIAL_GET_PASSIVE_STATUS
+;
+SerialPassiveStatus record
+    :5
+    SPS_PREEMPTED:1		; set if a passive connection has been
+				;  preempted by an active one
+    SPS_BUFFER_FULL:1		; set if the input buffer is full and the owner
+				;  has been notified
+    SPS_PASSIVE:1		; set if this is a passive serial port
+SerialPassiveStatus end
+
+;
+; Additional StreamNotifyEvents defined for the serial driver. May be passed
+; in a StreamNotifyType record to DR_STREAM_SET_NOTIFY.
+;
+SNE_MODEM	enum	StreamNotifyEvent	; Notify when modem input
+						;  signals change.
+SNE_PASSIVE	enum	StreamNotifyEvent	; Notify when passive input
+						;  signals change.
+
+SerialModemStatus record			; Passed in CX when SNE_MODEM
+		  				;  notifier is triggered.
+    ;
+    ; Current state of signals
+    ;
+    SMS_DCD:1		; Carrier Detect
+    SMS_RING:1		; Ring Detect
+    SMS_DSR:1		; Data-Set Ready (modem is happy)
+    SMS_CTS:1		; Clear to send (modem will accept data)
+    ;
+    ; Signal-change indicators. Notification will occur whenever one of these
+    ; becomes set. They are set when the corresponding signal has changed since
+    ; the last notification.
+    ;
+    SMS_DCD_CHANGED:1	; Carrier Detect changed
+    SMS_RING_CHANGED:1	; Activated only when the SMS_RING indicator changes
+    			;  from active to inactive (signals the end of a
+			;  RING signal on the incoming phone line)
+    SMS_DSR_CHANGED:1	; Data-Set Ready changed
+    SMS_CTS_CHANGED:1	; Clear to send changed
+SerialModemStatus end
+
+;
+; For DCE role:
+;
+    SMS_DTR equ <SMS_DSR>
+    SMS_RTS equ <SMS_CTS>
+    SMS_DTR_CHANGED equ <SMS_DSR_CHANGED>
+    SMS_RTS_CHANGED equ <SMS_CTS_CHANGED>
+
+;
+; Modem status change mask
+;
+MODEM_STATUS_CHANGE_MASK equ (mask SMS_DSR_CHANGED or mask SMS_CTS_CHANGED or \
+			      mask SMS_DCD_CHANGED or mask SMS_RING_CHANGED)
+
+
+
+SerialPassiveNotificationStatus record ; Passed in CX when SNE_PASSIVE
+		  				;  notifier is triggered.
+    ;
+    ; Current state of signals
+    ;
+    SPNS_PREEMPTED:1	; Indicates that the connection has been
+			; preempted by an active allocation of the
+			; port
+    SPNS_BUFFER_FULL:1	; Indicates that the input data buffer is full, so all
+			; incoming data will be dropped on the floor.
+    ;
+    ; Signal-change indicators. Notification will occur whenever one of these
+    ; becomes set. They are set when the corresponding signal has changed since
+    ; the last notification.
+    ;
+    SPNS_PREEMPTED_CHANGED:1 ; The port either was preempted or has just
+			     ; become available once again.
+    SPNS_BUFFER_FULL_CHANGED:1 ; The port's buffer has filled up (or has been
+			       ; emptied, but this is not likely to be the
+			       ; case.)
+
+SerialPassiveNotificationStatus end
+
+;
+; Flow-control parameters
+;
+SerialFlowControl	record
+    SFC_SOFTWARE:1,	; If set, obey XON/XOFF characters
+    SFC_HARDWARE:1,	; If set, obey hardware signals passed in cl and ch
+SerialFlowControl	end
+
+; Reset to initial value for any other driver definitions files that are
+; included.
+StreamNotifyEvent = SNE_MODEM
+
+;
+; Record returned by DR_STREAM_GET_DEVICE_MAP
+;
+SerialDeviceMap	record
+    :1,
+    SDM_COM8:1,		; COM8 exists
+    :1,
+    SDM_COM7:1,		; COM7 exists
+    :1,
+    SDM_COM6:1,		; COM6 exists
+    :1,
+    SDM_COM5:1,		; COM5 exists
+    :1,
+    SDM_COM4:1,		; COM4 exists
+    :1,
+    SDM_COM3:1,		; COM3 exists
+    :1,
+    SDM_COM2:1,		; COM2 exists
+    :1,
+    SDM_COM1:1,		; COM1 exists
+SerialDeviceMap	end
+
+
+SerialRole	etype	byte
+	SR_DTE	enum	SerialRole	; computer; transmit on 2 receive on 3
+	SR_DCE	enum	SerialRole	; modem; transmit on 3 receive on 2
+
+
+
+EndDriver	serial

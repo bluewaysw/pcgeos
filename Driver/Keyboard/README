@@ -1,0 +1,265 @@
+/*****************************************************************************
+ *
+ * README
+ * Don Reeves	8/30/91
+ *
+ *    How to create a new foreign keyboard driver, step by step.
+ *
+ * Background:
+ *    A keyboard driver can be creating using KMEdit, but it should be moved
+ *    under RCS control to ensure that data is not lost. Below is a series
+ *    of steps that can be followed by anyone wishing to install a new
+ *    keyboard driver into 1.2X & the trunk (referred to here as 2.0).
+ *
+ * People to see if this doesn't work:
+ *	Don, Gene, Adam
+ *
+ *	$Id: README,v 1.11.18.1 97/03/29 07:20:23 canavese Exp $
+ *
+ ****************************************************************************/
+
+Creating the directories
+========================
+(0) Create the necessary directories that you will use later.  If there are
+    multiple drivers of this class, such as a non-extended and extended
+    driver for a country, there will be two levels of directories, one for
+    the country, and one below it for each variation.  For example, the
+    Spanish keyboard drivers are in:
+	/staff/pcgeos/Driver/Keyboard/Spanish/Extended
+	/staff/pcgeos/Driver/Keyboard/Spanish/NonExtended
+    If, however, there is just a single variation, there will be just a
+    single directory.  For example, the Dvorak keyboard driver is in:
+	/staff/pcgeos/Driver/Keyboard/Dvorak.
+
+    The necessary directories are:
+     (a) source directories:
+	/staff/pcgeos/Driver/Keyboard/<country>/<type>
+	/staff/pcgeos/Release12X/Driver/Keyboard/<country>/<type>
+     (b) RCS directory:
+	/staff/pcgeos/Driver/Keyboard/<country>/<type>/RCS
+     (c) object directories:
+	/staff/pcgeos/Installed/Driver/Keyboard/<country>/<type>
+	/staff/pcgeos/Release12X/Installed/Driver/Keyboard/<country>/<type>
+     (d) your directory:
+	/staff/pcgeos/<login>/Driver/Keyboard/<country>/<type>
+     (e) your Installed directory:
+	/staff/pcgeos/<login>/Installed
+
+Creating the keyboard map
+=========================
+(1) Use KMEdit, and create the new keyboard driver. Test it thoroughly.
+    It will appear in Preferences as "U.S. Keyboard".
+
+(2) Attach 1.2 to swat. Use KMEdit to open your new keyboard driver.
+
+(3) Stop swat and switch to kmedit
+
+(4) Load pkmap.tcl (you may need font.tcl for a subroutine or two)
+
+(5) Type "pkmap keyMap <filename>". <filename> should be a complete
+    path description to your directory, and the file should be in
+    the format:
+		kmap[COUNTRY][EXT].def.
+
+	Example: German Extended    - kmapGermanExt.def
+		 French NonExtended - kmapFrench.def
+
+Creating the keyboard driver, using templates
+=============================================
+(6) Go copy the following files from any foreign keyboard driver, like
+    Release12X/Dutch/Extended, to your directory:
+		keyboard.asm
+		local.mk
+		kbde_be.gp
+NOTE: Be sure to clean out the RCS Id fields (ie. since these are going
+    to be new files, the fields should be empty: \$\I\d\$)
+    (the backslashes are there to keep RCS from mucking with *this* string;
+    in the real file they won't be there)
+NOTE: The files you copy will be write-protected since they represent
+    source files under RCS.  You'll need to chmod the copies to make them
+    writable, e.g.:
+	chmod +w keyboard.asm
+
+(7) Modify the kmap*.def file  by adding a standard file header to it.
+    (including an RCS Id)
+
+(8) Modify the local.mk with the actual name of the geode. Look at the
+    DOS file name of your current keyboard driver if this is unclear.
+    KMEdit will create the DOS name appropriately of the form:
+	kbd{e,n}_{us,sv,sf,sg,...}.geo
+
+	keyboard type:
+	--------------
+	e - extended keyboard
+	n - non-extended keyboard
+
+	country (matches DOS "keyb" command argument):
+	----------------------------------------------
+	be - Belgium
+	cf - Canadian-French
+	df - Denmark
+	fr - France
+	gr - Germany
+	it - Italy
+	la - Latin America
+	nl - Netherlands
+	no - Norway
+	po - Portugal
+	sf - Swiss-French
+	sg - Swiss-German
+	sp - Spain
+	su - Finland
+	sv - Sweden
+	uk - United Kingdom
+	us - United States
+
+    Not every keyboard follows this exactly (eg. the Dutch keyboard is
+    actually the Belgian keyboard, and the French have a separate PS/1
+    keyboard, etc.), but you get the general idea.  SETUP.EXE uses this
+    name to determine which keyboard driver to set initially when the
+    user installs, and is determined from the DOS "keyb" command.   If
+    DOS doesn't have a different keyboard set, then the U.S. keyboard
+    is used.
+
+(8a) If this is a single variation keyboard driver, then you will also
+     need to change the .PATH lines in the local.mk file 
+     from "../../" to just "../"
+
+(9) Modify the keyboard.asm file with the name of the driver (eg.
+    "French Extended Keyboard Driver")
+
+(9a) If this is a single variation keyboard driver, then you will also
+     need to change the include lines in the keyboard.asm file
+     from "../../" to just "../"
+
+(10) Change kbde_be.gp to the geode name you found in step 8. Modify
+     the header, and the name & longname keyword strings.
+
+(11) Type mkmf to create the Makefile. Ensure things make properly, by
+     doing a pmake in your directory.
+
+(12) Install the keyboard driver into Release12X & the trunk. This
+     works if the development tree you're working in has a BRANCH file
+     with Release12X inside.  Type:
+	"ginstall `fui`"
+     to install all the files (4) you've created/copied.  For each of
+     the files, RCS will prompt you for a file description. Make the file
+     descriptions accurate and descriptive, or we'll burn your house down.
+
+Creating the .rev file
+======================
+(13) Go to /staff/pcgeos/Driver/Keyboard/<whatever>.
+
+(14) Type "grev new <filename>", where <filename> is the completely
+     lower-cased name of the directory your are in (eg. French/Extended ->
+     extended.rev)
+
+(15) Type "grev newrev <filename> 1.2" to get to the Release12X branch.
+
+(16) Type "grev newbranch <filename> Release12X 100" to create the
+     Release12X branch.
+
+(17) Now the job is to get to the current release number in the
+     branch. At the time of this writing, it was 1.2.5.x. So, type
+	"grev -BRelease12X nc <filename>"
+     to up the release number upped on the V1.2X branch. You'll need as
+     to type this once for each number or use UNIX magic.You're almost done,
+     so hang in there.
+
+Making 1.2
+==========
+(18) Now go to /staff/pcgeos/Release12X/Driver/Keyboard/<whatever>.
+     Type "getbranch". Four files and a symbolic link should magically
+     appear. If they don't, stop. Talk to someone like Don or Adam.
+
+(19) Now type "mkmf" to create the Makefile & dependencies.
+
+(20a) Go to /staff/pcgeos/Release12X/Installed/Driver/Keyboard/<whatever>:
+	"cd /staff/pcgeos/Release12X/Installed/Driver/Keyboard/<whatever>"
+
+(20b) Link to the Makefile in the 1.2X source tree
+	"ln -s /staff/pcgeos/Release12X/Driver/Keyboard/<whatever>/Makefile"
+
+(20c) Make the 1.2X version of the keyboard driver:
+	"pmake full"
+
+(21a) Go to your own Installed directory:
+	"cd /staff/pcgeos/<login>/Installed"
+
+(21b) Lock the 12X send & Makefile:
+	"lock send"
+	"lock Makefile"
+
+(21c) Add the new keyboard driver.  If you're not familiar with the format
+     of a Makefile, this can be a tricky step.  Seek professional help.
+
+(21d) Install these files:
+	"ginstall -M send"
+	"ginstall -M Makefile"
+
+(21e) Send mail to installs to let people know what you've done:
+	"mail installs"
+
+Fixing up 2.0
+=============
+(22) Time to fix up 2.0. The only difference* at this writing between
+     1.2X & 2.0 was the fact that the Input library had been folded in to
+     the Kernel. Lock the 2.0 .gp file, and remove the "library im" line.
+     Install the file.
+
+(22a) Another difference is in the keyboard maps.  The entry for the
+      space bar (scancode 0x39) has been changed from:
+	    KEY_NONALPHA or KD_EXTENDED or KD_ACCENTABLE,
+	    <C_BSW C_SPACE>,
+	    <C_BSW C_SPACE>,
+	    0x5 
+      to:
+	    KEY_SOLO or KD_EXTENDED or KD_ACCENTABLE,
+	    <C_BSW C_SPACE>,
+	    <C_BSW C_BSW>,
+	    0x5 
+
+
+(23) Type "mkmf" in /staff/pcgeos/Driver/Keyboard/<whatever> to create
+      the Makefile & dependencies.
+
+(24a) Go to the Installed directory:
+	"cd /staff/pcgeos/Installed/Driver/Keyboard/<whatever>"
+
+(24b) Link to the Makefile you just created:
+	"ln -s /staff/pcgeos/Driver/Keyboard/<whatever>/Makefile"
+
+(24c) Make the 2.0 keyboard driver:
+	"pmake full"
+
+(25a) Go to your own Installed directory:
+	"cd /staff/pcgeos/<login>/Installed"
+
+(25b) NOTE: you *must* delete your branch file at this point, or do this
+      in a V2.0 development tree, or else know what you're doing.
+
+(25c) Lock the V2.0 send & Makefile:
+	"lock send"
+	"lock Makefile"
+
+(25d) Add the new keyboard driver.  If you're not familiar with the format
+     of a Makefile, this can be a tricky step.  Seek professional help.
+
+(25e) Install these files:
+	"ginstall -M send"
+	"ginstall -M Makefile"
+
+(26f) Send mail to installs to let people know what you've done:
+	"mail installs"
+
+(26) You're done!  Go drink a beer or two or five...
+
+
+-----------------
+* Two other differences between the 1.X and 2.X keyboard driver have no effect
+on your making a driver, but they are worth of note. The function
+DR_KBD_SET_MAP has been deleted (as being untenable of implementation) and the
+function DR_KBD_CHANGE_OUTPUT has been added. This last is implemented in
+keyboardProcess.asm and consists of an xchg and a return. Since
+keyboardProcess.asm is one of the files that's common to all the drivers, it
+matters not.

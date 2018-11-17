@@ -1,0 +1,737 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GlobalPC 1998 -- All Rights Reserved
+ *
+ * PROJECT:	Internet Dial-up & Configure  Applications
+ * MODULE:	
+ * FILE:	
+ *
+ * AUTHOR:	mzhu: Nov 23, 1998
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      mzhu    11/23/98        Initial version
+ *
+ * DESCRIPTION:
+ *
+ *	$Id: $
+ *
+ ***********************************************************************/
+@include <stdapp.goh>
+@include <system.h>
+@include <gcnlist.goh>
+#include <geoworks.h>
+@include <geoMisc.h>
+@include <socket.goh>
+#include <sockmisc.h>
+@include "IDialup.goh"
+@include "IDialUI.goh"
+#include "IDialppp.h"
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>
+#include <Ansi/stdio.h>
+#include <Internal/ppp.h>
+#include <Internal/socketDr.h>
+#include <sockmisc.h>
+@include <accpnt.goh>
+#include <initfile.h>
+#include <sem.h>
+
+@classdecl	IDialupAppClass;
+
+@classdecl IDialupPrimaryClass;
+
+@extern method IDialupAppClass, MSG_META_NOTIFY;
+
+static MediumAndUnit socketMedium;
+static TCHAR tcpDomain[] = _TEXT("TCPIP");
+
+Boolean bErrorDialogFlag = FALSE;
+
+extern PPPStatus pppStatus;
+extern TimerHandle timerHandle;
+extern word timerId;
+extern Boolean connectSent;
+extern Boolean disconnectRequested;
+
+extern MemHandle connectionHandle;
+extern ChunkHandle connectionChunk;
+extern ChunkHandle iAppChunk;
+
+extern word connectionNum;
+extern word currentAccpnt;
+extern word defaultAccpnt;
+
+// void _far _pascal IDialupCallback(void *data);
+Boolean _pascal IDialupConnect (void);
+Boolean _pascal IDialupDisconnect (void);
+word GetBaudRate(void);
+void RegisterToPPP(void);
+void UnregisterToPPP(void);
+Boolean IAppRunning(void);
+
+static void SendFlashNotification(void);
+
+/***********************************************************************
+ *	MSG_IDA_VIEW_INFO for IDialupAppClass
+ ***********************************************************************
+ * SYNOPSIS:     open statistics view
+ *
+ * PARAMETERS:  
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/23/98	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupAppClass, MSG_IDA_VIEW_INFO
+{
+  word datalen;
+  TCHAR name[MAX_TEXT_LEN];
+
+  // Get the Network Connection name and display it in the dialog header.
+  memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
+  AccessPointGetStringPropertyBufferDirect(currentAccpnt, (char*)APSP_NAME, name, &datalen);
+
+  @call IDialupPrimary::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(name, VUM_DELAYED_VIA_UI_QUEUE);
+
+  @send IDConnectionGroup::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+  @send IDInfoGroup::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+  @send IDialupPrimary::MSG_GEN_RESET_TO_INITIAL_SIZE(VUM_DELAYED_VIA_UI_QUEUE);
+  @send IDModifyConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+  @send IDAddConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+  @send IDDeleteConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+  @call IDDialingOptionsButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+/*#if _NDO2000
+/*#else
+  @call IDNewNumbers::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+/*#endif  */
+}
+
+/***********************************************************************
+ *	MSG_IDA_VIEW_CONNECTION for IDialupAppClass
+ ***********************************************************************
+ * SYNOPSIS:     open connection setting view
+ *
+ * PARAMETERS:  
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/23/98	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupAppClass, MSG_IDA_VIEW_CONNECTION
+{
+  TCHAR *str;
+
+  MemLock(OptrToHandle(@idialStr));
+  str = LMemDeref(@idialStr);
+  @call IDInfoGroup::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+  @call IDialupPrimary::MSG_GEN_REPLACE_VIS_MONIKER_TEXT(str, VUM_DELAYED_VIA_UI_QUEUE);
+  MemUnlock(OptrToHandle(@idialStr));
+
+  @call IDConnectionGroup::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+  @send IDialupPrimary::MSG_GEN_RESET_TO_INITIAL_SIZE(VUM_DELAYED_VIA_UI_QUEUE);
+  if(connectionNum)
+    {
+      @call IDModifyConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+      @call IDDeleteConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+      @call IDConnectButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+/*#if _NDO2000
+/*#else
+      @call IDNewNumbers::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+/*#endif */
+    }
+  else
+    {
+      @call IDModifyConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+      @call IDDeleteConnectionButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+      @call IDConnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+/*#if _NDO2000
+/*#else
+      @call IDNewNumbers::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+/*#endif */
+    }
+  @call IDAddConnectionButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_UI_QUEUE);
+  @call IDDialingOptionsButton::MSG_GEN_SET_ENABLED(VUM_NOW);
+}
+
+static void
+SendFlashNotification()
+{
+    /* Send a hacked PPP notification that the AUI will receive and
+     * cause the PPP icon to flash. */
+    EventHandle event;
+
+    if ( !(@call IDialupPrimary::MSG_GEN_DISPLAY_GET_MINIMIZED()) )
+    {
+	event = @record null::MSG_META_NOTIFY( MANUFACTURER_ID_GEOWORKS,
+					       GWNT_PPP_STATUS_NOTIFICATION,
+					       0xfeed );
+	GCNListSend( MANUFACTURER_ID_GEOWORKS, GCNSLT_PPP_STATUS_NOTIFICATIONS,
+		     event, NULL, 0 );
+    }
+}
+
+/***********************************************************************
+ *	MSG_META_QUIT for IDialupAppClass
+ ***********************************************************************
+ * SYNOPSIS:     Quit or hide the application.
+ *
+ * PARAMETERS:  
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/23/98	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupAppClass, MSG_META_QUIT
+{
+  PUSHDS;
+  SET_DS_LIB_DGROUP;
+
+  if(pppStatus != PPP_STATUS_CLOSED || connectSent)
+    {
+	/* just hide */
+      @call IDialupPrimary::MSG_GEN_DISPLAY_SET_MINIMIZED();
+      POPDS;
+    }
+  else
+    {
+      if ( UserGetDefaultUILevel() != UIIL_INTRODUCTORY )
+	  SendFlashNotification();
+      POPDS;
+      @callsuper();
+    }
+}
+
+/***********************************************************************
+ *	MSG_IDA_CONNECTION_LIST_MONIKER_QUERY for IDialupAppClass
+ ***********************************************************************
+ * SYNOPSIS:     Edit the current Network Connection setting.
+ *
+ * PARAMETERS:   void (optr list, word item)
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/23/98	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupAppClass, MSG_IDA_CONNECTION_LIST_MONIKER_QUERY
+{
+  word *id, datalen;
+  TCHAR name[MAX_TEXT_LEN];
+
+  if (connectionHandle) {
+
+      MemLock(connectionHandle);
+  
+      id = ChunkArrayElementToPtrHandles(connectionHandle, connectionChunk, item, &datalen);
+
+      datalen = MAX_TEXT_LEN;
+      memset(name, 0, sizeof(TCHAR)*MAX_TEXT_LEN);
+
+      if(AccessPointGetStringPropertyBufferDirect(*id, (char*)APSP_NAME, name, &datalen))
+	  AccessPointGetStringPropertyBufferDirect(*id, (char*)APSP_PHONE, name, &datalen);
+
+      MemUnlock(connectionHandle);
+
+      if(name && datalen)
+      {
+	  @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, name);
+      }
+
+  }
+
+}
+
+
+/***********************************************************************
+ *	MSG_IDA_CONNECTION_LIST_APPLY for IDialupAppClass
+ ***********************************************************************
+ * SYNOPSIS:     Edit the current Network Connection setting.
+ *
+ * PARAMETERS:  
+ *    	    word selection = cx,
+ *	    word numSelections = bp,
+ *	    GenItemGroupStateFlags stateFlags = dl
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	mzhu	11/23/98	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupAppClass, MSG_IDA_CONNECTION_LIST_APPLY
+{
+  word *id, datalen;
+
+  // now display the new selection
+  MemLock(connectionHandle);
+  
+  id = ChunkArrayElementToPtrHandles(connectionHandle, connectionChunk, selection, &datalen);
+
+  MemUnlock(connectionHandle);
+
+  currentAccpnt = *id;
+
+  @send process::MSG_IDP_CONNECTION_SET_CURRENT();
+}
+
+/***********************************************************************
+ *	MSG_IDA_DISCONNECT for IDialupAppClass
+ ***********************************************************************
+ * SYNOPSIS:     Handle the disconnect (handled on UI thread).
+ *		 If a normal disconnect is required, the process
+ *		 thread will do it with IDP_DISCONNECT.  This is only
+ *		 here to help disconnecting when dialing.
+ *
+ * PARAMETERS:   word accpnt 
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	JimG	9/9/99	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupAppClass, MSG_IDA_DISCONNECT
+{
+    connectSent = FALSE;
+    disconnectRequested = TRUE;
+    @call IDDisconnectButton::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+
+    if(timerHandle)
+    {
+	TimerStop(timerHandle, timerId) ;
+	timerHandle = 0 ;
+        timerId = 0;
+    }
+
+    // If we are opening or dialing, this will force the modem to stop
+    // dialing and bail from the call.
+    if( pppStatus == PPP_STATUS_OPENING ||
+	pppStatus == PPP_STATUS_DIALING )
+    {
+	CallPPPDriver(PPP_ID_FORCE_DISCONNECT, 0);
+    }
+
+    // if connecting or open, let the process handle it the old fashioned
+    // way.. Calling PPP to force the disconnect while connecting doesn't
+    // always work so well.  Best to just queue up the disconnect.
+    else if ( pppStatus == PPP_STATUS_OPEN ||
+	      pppStatus == PPP_STATUS_CONNECTING )
+	@send process::MSG_IDP_DISCONNECT();
+}
+
+/***********************************************************************
+ *	MSG_GEN_DISPLAY_SET_MINIMIZED for IDialupPrimaryClass
+ ***********************************************************************
+ * SYNOPSIS:     Flash for AUI
+ *
+ * PARAMETERS:   
+ *
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:	    
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	brianc  04/21/99	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupPrimaryClass, MSG_GEN_DISPLAY_SET_MINIMIZED
+{
+    if ( UserGetDefaultUILevel() != UIIL_INTRODUCTORY )
+	SendFlashNotification();
+
+    @callsuper();
+    @call IDialupApp::MSG_GEN_LOWER_TO_BOTTOM();
+}
+
+
+/***********************************************************************
+ *		MSG_IDA_SHOW_DETAILS for IDialupAppClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Display or hide the IDInfoDataBox group.
+ *
+ * PARAMETERS:	    word selection = cx,
+ *                  word numSelections = bp,
+ *                  GenItemGroupStateFlags stateFlags = dl;
+ *
+ * SIDE EFFECTS:    Possibly causes primary to resize/reposition itself
+ *
+ * STRATEGY:        Set IDInfoDataBox usable or not usable
+ *                  If IDInfoGroup is usable, reset the primary's size
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dhunter	5/12/00   	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupAppClass, MSG_IDA_SHOW_DETAILS
+{
+    Message msgForGroup = MSG_GEN_SET_USABLE;
+
+    if (!selection)
+	msgForGroup ++;     /* = MSG_GEN_SET_NOT_USABLE */
+    @send IDInfoDataBox::{MSG_GEN_SET_USABLE} msgForGroup(
+	VUM_DELAYED_VIA_UI_QUEUE);
+
+    if (@call IDInfoGroup::MSG_GEN_GET_USABLE())
+	@send IDialupPrimary::MSG_GEN_RESET_TO_INITIAL_SIZE(VUM_DELAYED_VIA_UI_QUEUE);
+}	/* End of MSG_IDA_SHOW_DETAILS.	*/
+
+
+/***********************************************************************
+ *		MSG_IDA_ERROR_DIALOG_DISMISSED for IDialupProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Upon dismissal of an error dialog, set a flag so
+ *		    we may raise another one.
+ * PARAMETERS:	    InteractionCommand response
+ * SIDE EFFECTS:    none
+ *
+ * STRATEGY:	    Set flag
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	dhunter	6/23/00   	Initial Revision
+ *
+ ***********************************************************************/
+@method IDialupAppClass, MSG_IDA_ERROR_DIALOG_DISMISSED
+{
+    bErrorDialogFlag = FALSE;
+}	/* End of MSG_IDP_ERROR_DIALOG_DISMISSED.	*/
+
+/***********************************************************************
+ *		IDialupConnect
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	TRUE if link is up else FALSE.
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	12/03/98   	Initial Revision
+ *	
+ ***********************************************************************/
+Boolean _pascal
+IDialupConnect ()
+{
+    Boolean ret = FALSE;
+    struct Caveat {
+	/* Used to force the order of the following two items */
+        SocketAddress sa;
+	TcpAccPntResolvedAddress xa; /* Must follow SocketAddress */
+    };
+    struct Caveat ca;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    ca.sa.SA_port.SP_port = 80;
+    ca.sa.SA_port.SP_manuf =  MANUFACTURER_ID_SOCKET_16BIT_PORT;
+    ca.sa.SA_domainSize = sizeof(tcpDomain)-1*sizeof(TCHAR);
+    ca.sa.SA_domain = tcpDomain;
+    ca.sa.SA_addressSize = sizeof(TcpAccPntResolvedAddress);
+
+    ca.xa.TAPRA_linkSize = 3;
+    ca.xa.TAPRA_linkType = LT_ID;
+    ca.xa.TAPRA_accPntID = 1; //here we must use 1!!!, so other app wont disconnect
+                              // us when they try to connect.
+
+
+    if ((SocketOpenDomainMedium(&(ca.sa), 3600)==SE_NORMAL)) {
+	ret = TRUE;
+    }
+
+    POPDS;
+    return ret;
+}	/* End of IDialupConnect.	*/
+
+
+/***********************************************************************
+ *		IDialupDisConnect
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	12/03/98   	Initial Revision
+ *	
+ ***********************************************************************/
+Boolean _pascal
+IDialupDisconnect ()
+{
+    struct Caveat {
+	/* Used to force the order of the following two items */
+        SocketAddress sa;
+	TcpAccPntResolvedAddress xa; /* Must follow SocketAddress */
+    };
+    struct Caveat ca;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    ca.sa.SA_port.SP_port = 80;
+    ca.sa.SA_port.SP_manuf =  MANUFACTURER_ID_SOCKET_16BIT_PORT;
+    ca.sa.SA_domainSize = sizeof(tcpDomain)-1*sizeof(TCHAR);
+    ca.sa.SA_domain = tcpDomain;
+    ca.sa.SA_addressSize = sizeof(TcpAccPntResolvedAddress);
+
+    ca.xa.TAPRA_linkSize = 3;
+    ca.xa.TAPRA_linkType = LT_ID;
+    ca.xa.TAPRA_accPntID = 1;
+
+    if(SocketGetAddressMedium(&(ca.sa), &socketMedium) == SE_NORMAL)
+      {
+	SocketCloseDomainMedium(tcpDomain, &socketMedium, TRUE);
+      }
+
+    POPDS;
+
+    return TRUE;
+}	/* End of IDIalupDisconnect.	*/
+
+/***********************************************************************
+ *		SendPing
+ ***********************************************************************
+ *
+ * SYNOPSIS:	send nothing to keep connection alive
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	brianc    	8/02/99   	Initial Revision
+ *	
+ ***********************************************************************/
+void SendPing()
+{
+  struct Caveat {
+      /* force order */
+      SocketAddress sa;
+      TcpAccPntResolvedAddress xa;
+  };
+  struct Caveat pingAddr;
+  char *pingData = "a";
+  Socket pingSocket;
+  TCHAR dnsBuf[30], *dns1Ptr = 0, *dns2Ptr = 0, *dns3Ptr = 0;
+  int dnsBufSize = sizeof(dnsBuf);
+
+  pingAddr.sa.SA_port.SP_port = DISCARD;
+  pingAddr.sa.SA_port.SP_manuf = MANUFACTURER_ID_SOCKET_16BIT_PORT;
+  pingAddr.sa.SA_domainSize = sizeof(tcpDomain)-1*sizeof(TCHAR);
+  pingAddr.sa.SA_domain = tcpDomain;
+  pingAddr.sa.SA_addressSize = sizeof(TcpAccPntResolvedAddress);
+  pingAddr.xa.TAPRA_linkSize = 3;
+  pingAddr.xa.TAPRA_linkType = LT_ID;
+  pingAddr.xa.TAPRA_accPntID = 1;
+
+  pingSocket = SocketCreate(SDT_DATAGRAM);
+  if (pingSocket) {
+      if (AccessPointGetStringPropertyBuffer(1, (char *)APSP_DNS1,
+					     dnsBuf, &dnsBufSize)) {
+	  /* if no DNS, use well-known address from RFC1340 */
+	  strcpy(dnsBuf, _TEXT("14.0.0.1"));
+      }
+      dns1Ptr = strchr(dnsBuf, '.');
+      if (dns1Ptr) dns2Ptr = strchr(dns1Ptr+1, '.');
+      if (dns2Ptr) dns3Ptr = strchr(dns2Ptr+1, '.');
+      if (!dns1Ptr || !dns2Ptr || !dns3Ptr) {
+	  pingAddr.xa.TAPRA_ipAddr[0] = 14;
+	  pingAddr.xa.TAPRA_ipAddr[1] = 0;
+	  pingAddr.xa.TAPRA_ipAddr[2] = 0;
+	  pingAddr.xa.TAPRA_ipAddr[3] = 1;
+      } else {
+	  pingAddr.xa.TAPRA_ipAddr[0] = atoi(dnsBuf);
+	  pingAddr.xa.TAPRA_ipAddr[1] = atoi(dns1Ptr+1);
+	  pingAddr.xa.TAPRA_ipAddr[2] = atoi(dns2Ptr+1);
+	  pingAddr.xa.TAPRA_ipAddr[3] = atoi(dns3Ptr+1);
+      }
+      if (SocketBind(pingSocket, pingAddr.sa.SA_port, 0) == SE_NORMAL) {
+	  SocketSend(pingSocket, pingData, sizeof(pingData),
+		     SSF_ADDRESS, (SocketAddress *)&pingAddr);
+      }
+      SocketClose(pingSocket);
+  }
+}
+
+/***********************************************************************
+ *		IAppRunning
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	12/03/98   	Initial Revision
+ *	
+ ***********************************************************************/
+Boolean IAppRunning()
+{
+  GeodeHandle geodeHandle;
+  word i, count, size;
+  char *name;
+
+  if(connectionHandle && iAppChunk)
+    {
+      MemLock(connectionHandle);
+      count = ChunkArrayGetCountHandles(connectionHandle, iAppChunk);
+      if(count)
+	{
+	  for(i=0; i<count; i++)
+	    {
+	      name = ChunkArrayElementToPtrHandles(connectionHandle, iAppChunk, i, &size);
+	      if(name && size)
+		{
+		  geodeHandle = GeodeFind(name, size-1, 0, 0);
+		  if(geodeHandle)
+		    {
+		      MemUnlock(connectionHandle);
+		      return TRUE;
+		    }
+		}
+	    }
+	}
+      MemUnlock(connectionHandle);
+    }
+  return FALSE;
+}
+
+/***********************************************************************
+ *		GetBaudRate
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	12/03/98   	Initial Revision
+ *	
+ ***********************************************************************/
+word GetBaudRate()
+{
+  word r=0;
+
+  r = CallPPPDriver(PPP_ID_GET_BAUD_RATE, 0);
+
+  return r;
+}
+
+/***********************************************************************
+ *		RegisterToPPP
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	12/03/98   	Initial Revision
+ *	
+ ***********************************************************************/
+void RegisterToPPP()
+{
+  CallPPPDriver(PPP_ID_REGISTER, 0);
+}
+/***********************************************************************
+ *		UnregisterToPPP
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ *	
+ * STRATEGY:	
+ *	
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *	mzhu    	12/03/98   	Initial Revision
+ *	
+ ***********************************************************************/
+void UnregisterToPPP()
+{
+  CallPPPDriver(PPP_ID_UNREGISTER, 0);
+}
+
+// Usually, for C code running only on a thread that belongs to its geode,
+// you can assume that DS points to its dgroup.  However, for C code that's
+// called from assembly code, you can't make this assumption.  So you need
+// to set DS to dgroup here.  Otherwise, when the compiler assumes that DS
+// points to dgroup and uses DS to pass the "%d" string to sprintf, sprintf
+// will get a wrong pointer.  --- AY
+//PUSHDS;
+//SET_DS_LIB_DGROUP;
+
+// Since you are passing a pointer to somewhere on your stack to a different
+// thread, you need to do an @call.  Otherwise, by the time the destination
+// thread handles the message, the content on your stack may have already
+// been overwritten.  --- AY
+
+
+// You need to restore DS, because a C routine or C stub is supposed to
+// preserve DS.
+//POPDS;
+

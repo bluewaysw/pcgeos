@@ -1,0 +1,408 @@
+<HTML><HEAD>
+<!--
+	$Id: protocol.htm,v 2.22 2000/01/23 15:51:02 crosser Exp $
+
+	Copyright (c) 1997,1998 Eugene G. Crosser
+	Copyright (c) 1998 Bruce D. Lightner (DOS/Windows support)
+
+	You may distribute and/or use for any purpose modified or unmodified
+	copies of this software if you preserve the copyright notice above.
+
+	THIS SOFTWARE IS PROVIDED AS IS AND COME WITH NO WARRANTY OF ANY
+	KIND, EITHER EXPRESSED OR IMPLIED.  IN NO EVENT WILL THE
+	COPYRIGHT HOLDER BE LIABLE FOR ANY DAMAGES RESULTING FROM THE
+	USE OF THIS SOFTWARE.
+
+	$Log: protocol.htm,v $
+	Revision 2.22  2000/01/23 15:51:02  crosser
+	work in progress on folder tree support
+	
+	Revision 2.21  2000/01/21 15:03:25  crosser
+	Experimenting with support for models with folder structure
+	
+	Revision 2.20  1999/11/04 11:15:45  crosser
+	typo
+	
+	Revision 2.19  1999/11/04 07:10:23  crosser
+	More infor about folders on new models
+	
+	Revision 2.18  1999/10/31 19:39:48  crosser
+	New information about the protocol from various correspondents
+	
+	Revision 2.17  1999/10/09 10:52:47  crosser
+	make filetime honor usetimezone flag.
+	set reg4 in every place (I hope) before other registers are
+	used that depend on the frame number.
+	
+	Revision 2.16  1999/09/26 19:32:48  crosser
+	correct typo
+	
+	Revision 2.15  1999/07/28 20:43:49  crosser
+	info about Sanyo animations
+
+	Revision 2.14  1999/06/03 04:47:28  crosser
+	command 08
+
+	Revision 2.13  1999/03/15 05:59:17  crosser
+	reg50
+
+	Revision 2.12  1999/02/26 23:54:42  crosser
+	Correct JFIF vs. Exif vs. JPEG things
+
+	Revision 2.11  1998/12/10 22:13:51  crosser
+	more info about reg. 47
+
+	Revision 2.10  1998/12/08 22:34:08  crosser
+	add info about sound stuff
+
+	Revision 2.9  1998/10/18 13:18:27  crosser
+	Put RCS logs and I.D. into the source
+
+	Revision 2.8  1998/08/08 14:00:33  crosser
+	New registers
+	
+	Revision 2.7  1998/08/01 12:30:50  crosser
+	new register meaning
+	
+	Revision 2.6  1998/06/11 07:23:26  crosser
+	reg 41 details
+	
+	Revision 2.5  1998/06/07 18:41:40  crosser
+	frame intervals, digital zoom
+	
+	Revision 2.4  1998/03/01 18:57:04  crosser
+	preview command
+	
+	Revision 2.3  1998/02/27 08:38:06  crosser
+	remove obsolete references and out-of-date ramblings
+	
+	Revision 2.2  1998/01/27 21:52:55  crosser
+	commands for uploading
+	
+	Revision 2.1  1998/01/04 13:55:57  crosser
+	New register 39 and protect command 9
+	
+	Revision 2.0  1998/01/03 00:46:51  crosser
+	add windows support
+	
+	Revision 1.4  1998/01/03 00:41:23  crosser
+	add command 9
+	
+	Revision 1.3  1997/12/24 00:19:13  crosser
+	describe more registers
+	correct errors
+	add reference to a WWW page
+	
+	Revision 1.2  1997/11/03 23:25:11  crosser
+	add immediate session finish command
+	
+	Revision 1.1  1997/08/17 09:07:26  crosser
+	Initial revision
+	
+-->
+<TITLE>Serial Protocol of Some Digital Cameras</TITLE></HEAD>
+<BODY BGCOLOR=#fffff0>
+
+<BLOCKQUOTE><HR><FONT SIZE=-1>
+
+<B>Disclaimer:</B> This description is completely unofficial, Epson even
+does not know about its existance.  Most of the informaion presented
+here is discovered by me, <A HREF="http://www.average.org/~crosser/">
+Eugene Crosser</A>, while snooping the serial line and by trial and
+error.  I never had an official protocol description, have never seen
+any related software source code, and have never done reverse
+engineering of any related software.  This description may be
+incomplete, inaccurate or completely wrong.  You are warned.
+
+<P>
+Some information is taken from `camediaplay' package by Jun-ichiro Itoh
+&lt;itojun@itojun.org&gt;, from the findings of Thierry Bousch
+&lt;bousch%linotte.uucp@topo.math.u-psud.fr&gt; TsuruZoh Tachibanaya
+&lt;tsuruzoh@butaman.ne.jp&gt; and from other (open) sources and not
+checked by me.
+
+</FONT><HR></BLOCKQUOTE>
+
+<H1>Serial Protocol of Some Digital Cameras</H1>
+
+Several models of digital cameras, namely Epson, Sanyo, Agfa and Olympus
+cameras, seem to use the same protocol for communication with the host.
+Follows the description of the high-level protocol they use over the
+serial line.
+
+<H2>Protocol Basics</H2>
+
+The host and the camera exchange with data packets and individual bytes.
+Serial line paramaters used are: 8bit, no parity.  No flow control is
+used.  All arithmetic data is transmitted least significant byte first
+("little endian").
+
+<H2>Protocol Elements</H2>
+
+The elementary units of the protocol are:
+
+<TABLE BORDER=1>
+<TR><TD>Initialization Byte</TD><TD>NUL</TD><TD> 0x00</TD></TR>
+<TR><TD>Action Complete Notification</TD><TD>ENQ</TD><TD> 0x05</TD></TR>
+<TR><TD>Positive Achnowledgement</TD><TD>ACK</TD><TD> 0x06</TD></TR>
+<TR><TD>Unable to Execute Command</TD><TD>DC1</TD><TD> 0x11</TD></TR>
+<TR><TD>Negative Acknowledgement,<BR>also Camera Signature</TD><TD>NAK</TD><TD> 0x15</TD></TR>
+<TR><TD>Packet</TD><TD COLSPAN=2>Variable length sequence of bytes</TD></TR>
+<TR><TD>Termination Byte</TD><TD><BR></TD><TD> 0xff</TD></TR>
+</TABLE>
+
+<H3>Packet structure</H3>
+
+The packet has the following structure:
+
+<TABLE BORDER=1>
+<TR><TH>Offset</TH><TH>Length</TH><TH>Meaning</TH></TR>
+<TR><TD>0</TD><TD>1</TD><TD>Packet type</TD></TR>
+<TR><TD>1</TD><TD>1</TD><TD>Packet subtype/sequence</TD></TR>
+<TR><TD>2</TD><TD>2</TD><TD>Length of data</TD></TR>
+<TR><TD>4</TD><TD>variable</TD><TD>Data</TD></TR>
+<TR><TD>-2</TD><TD>2</TD><TD>checksum</TD></TR>
+</TABLE>
+
+<P>
+Known packet types are:
+<TABLE BORDER=1>
+<TR><TH>Type</TH><TH>Description</TH></TR>
+<TR><TD>0x02</TD><TD>Data packet that is not last in sequence</TD></TR>
+<TR><TD>0x03</TD><TD>Data packet that is last in sequence</TD></TR>
+<TR><TD>0x1b</TD><TD>Command packet</TD></TR>
+</TABLE>
+
+<P>
+Data packets that are sent in responce to a single command are numbered
+starting from zero.  If all requested data fits in one packet, it has
+type 0x03 and sequence 0.
+
+<P>
+Command packet has subtype 0x43 or 0x53.  Only the first command packet
+in a session has subtype 0x53.
+
+<P>
+Maximum length of data field in a packet is 2048 bytes, which yields in
+2054 total packet length.
+
+<P>
+Checksum is a simple 16 bit arithmetic sum of all bytes in the data field. As
+already mentioned above, length and checksum values are transmitted least
+significant byte first.
+
+<H2>Flow of Control</H2>
+
+A communication session flow is as follows:
+<TABLE BORDER=1>
+<TR><TH>Host</TH><TH>Camera</TH></TR>
+<TR><TD COLSPAN=2 ALIGN=center>Port speed set to 19200 baud</TD></TR>
+<TR><TD>Host sends init byte 0x00</TD><TD></TD></TR>
+<TR><TD></TD><TD>Camera responds with signature 0x15</TD></TR>
+<TR><TD>Host sends command packet with subtype 0x53 and "set speed" command</TD><TD></TD></TR>
+<TR><TD></TD><TD>Camera sends ACK 0x06</TD></TR>
+<TR><TD COLSPAN=2 ALIGN=center>Port speed set to the new value</TD></TR>
+<TR><TD>Host sends command</TD><TD></TD></TR>
+<TR><TD></TD><TD>Camera responds with either ACK plus optionally "action taken" notifier or data packet sequence</TD></TR>
+<TR><TD>Host sends ACK to every data packet</TD><TD></TD></TR>
+<TR><TD COLSPAN=2 ALIGN=center>... Command - reply cycle repeated ...</TD></TR>
+<TR><TD></TD><TD>Camera sends 0xff and resets after a few seconds (value is model-dependant) of inactivity</TD></TR>
+</TABLE>
+
+<P>
+If the camera does not respond to a command in reasonable time, or
+responds with a NAK, the command can be resent.  If the camera does not
+provide a complete data packet in reasonable time, or the data packet is
+corrupt (checksum does not match), the host can request resending of the
+packet by sending NAK instead of ACK.
+
+<H2>Command format and codes</H2>
+
+Command is a sequance of bytes sent in the data field of a command packet.
+Command format is as follows:
+<TABLE BORDER=1>
+<TR><TH>Offset</TH><TH>Length</TH><TH>Description</TH></TR>
+<TR><TD>0</TD><TD>1</TD><TD>Command code</TD></TR>
+<TR><TD>1</TD><TD>1</TD><TD>Register number or subcode</TD></TR>
+<TR><TD>2</TD><TD>variable</TD><TD>Optional argument</TD></TR>
+</TABLE>
+
+<P>
+Five command codes are known:
+<TABLE BORDER=1>
+<TR><TH>Code</TH><TH>Argument</TH><TH>Description</TH></TR>
+<TR><TD>0</TD><TD>int32</TD><TD>Set value of integer register</TD></TR>
+<TR><TD>1</TD><TD>none</TD><TD>Read value of integer register</TD></TR>
+<TR><TD>2</TD><TD>vdata</TD><TD>Take action unrelated to registers</TD></TR>
+<TR><TD>3</TD><TD>vdata</TD><TD>Set value of vdata register</TD></TR>
+<TR><TD>4</TD><TD>none</TD><TD>Read value of vdata register</TD></TR>
+</TABLE>
+
+<P>
+Commands 0 and 3 are replied with a single ACK 0x06.  Command 2 is
+replied with an ACK 0x06 followed by an "action complete" notifier
+0x05.  Commands 1 and 4 are replied with a sequence of data packets,
+each of them must be ACK'ed by the host.
+
+<P>
+Command 0 must be issued with a 4 byte argument containg the new value
+for the register (bytes in "LSB first" order).  Command 2 typically is
+issued with a single zero byte as an argument.  Command 3 is issued with
+an argument of variable number of bytes.  If this is a printable string,
+it should <B>not</B> include the trailing zero byte.
+
+<P>
+Camera replies to the command 1 with a single data packet containing 4
+bytes of a 32bit integer (in "LSB first" order).  Camera replies to the
+command 4 with a sequence of data packets with variable number of data
+bytes. Note that if a printable string is returned, it <B>is</B>
+terminated with a zero byte, and thus may be safely printed or otherwise
+treated as a normal C language character string.
+
+<H2>Registers</H2>
+
+The following registers are known (read/writablity info is inaccurate):
+<TABLE BORDER=1>
+<TR><TH>No.</TH><TH>Type</TH><TH>R/W</TH><TH>Description</TH></TR>
+<TR><TD> 1</TD><TD>int32</TD><TD>R/W</TD><TD>Resolution: 1 - Std, 2 - Hi, 3 - Ext, other values possible</TD></TR>
+<TR><TD> 2</TD><TD>int32</TD><TD>R/W</TD><TD>Clock in UNIX time_t format</TD></TR>
+<TR><TD> 3</TD><TD>int32</TD><TD>R/W</TD><TD>Shutter speed (microseconds), 0 - auto</TD></TR>
+<TR><TD> 4</TD><TD>int32</TD><TD>  W</TD><TD>Current frame number (or animation number if hi order byte is 0xff)</TD></TR>
+<TR><TD> 5</TD><TD>int32</TD><TD>R/W</TD><TD>Aperture: 1 - Low, 2 - Mid, 3 - Hi</TD></TR>
+<TR><TD> 6</TD><TD>int32</TD><TD>R/W</TD><TD>Color mode: 1 - Color, 2 - B/W</TD></TR>
+<TR><TD> 7</TD><TD>int32</TD><TD>R/W</TD><TD>Flash mode: 0 - Auto, 1 - Force, 2 - Off, 3 - Anti RedEye, 4 - Slow sync</TD></TR>
+<TR><TD> 8</TD><TD>int32</TD><TD>R/W</TD><TD>Unknown (128)</TD></TR>
+<TR><TD> 9</TD><TD>int32</TD><TD>R/W</TD><TD>Unknown (128)</TD></TR>
+<TR><TD>10</TD><TD>int32</TD><TD>R  </TD><TD>No. of frames in current folder</TD></TR>
+<TR><TD>11</TD><TD>int32</TD><TD>R  </TD><TD>No. of frames left</TD></TR>
+<TR><TD>12</TD><TD>int32</TD><TD>R  </TD><TD>Length of current frame *</TD></TR>
+<TR><TD>13</TD><TD>int32</TD><TD>R  </TD><TD>Length of current thumbnail *</TD></TR>
+<TR><TD>14</TD><TD>vdata</TD><TD>R  </TD><TD>Current frame data *</TD></TR>
+<TR><TD>15</TD><TD>vdata</TD><TD>R  </TD><TD>Current thumbnail data *</TD></TR>
+<TR><TD>16</TD><TD>int32</TD><TD>R  </TD><TD>Battery capacity percentage</TD></TR>
+<TR><TD>17</TD><TD>int32</TD><TD>R/W</TD><TD>Communication speed 1 - 9600 .. 5 - 115200, 6 - 230400, 256 - 9600 .. 264 - 911600 (sync?)</TD></TR>
+<TR><TD>18</TD><TD>int32</TD><TD>R  </TD><TD>Unknown (1)</TD></TR>
+<TR><TD>19</TD><TD>int32</TD><TD>R/W</TD><TD>Bright/Contrast: 0 - Normal, 1 - Bright+, 2 - Bright-, 3 - Contrast+, 4 - Contrast-</TD></TR>
+<TR><TD>20</TD><TD>int32</TD><TD>R/W</TD><TD>White balance: 0 - Auto, 1 - Skylight, 2 - Fluorescent, 3 - Tungsten, 255 - Cloudy</TD></TR>
+<TR><TD>21</TD><TD>vdata</TD><TD>R/W</TD><TD>Unused</TD></TR>
+<TR><TD>22</TD><TD>vdata</TD><TD>R/W</TD><TD>Camera I.D.</TD></TR>
+<TR><TD>23</TD><TD>int32</TD><TD>R/W</TD><TD>Autoshut on host timer (seconds)</TD></TR>
+<TR><TD>24</TD><TD>int32</TD><TD>R/W</TD><TD>Autoshut in field timer (seconds)</TD></TR>
+<TR><TD>25</TD><TD>vdata</TD><TD>R/W</TD><TD>Serial No. (string)</TD></TR>
+<TR><TD>26</TD><TD>vdata</TD><TD>R  </TD><TD>Version</TD></TR>
+<TR><TD>27</TD><TD>vdata</TD><TD>R/W</TD><TD>Model</TD></TR>
+<TR><TD>28</TD><TD>int32</TD><TD>R  </TD><TD>Available memory left</TD></TR>
+<TR><TD>29</TD><TD>vdata</TD><TD>R/W</TD><TD>Upload image data to this register</TD></TR>
+<TR><TD>30</TD><TD>int32</TD><TD>  W</TD><TD>LED: 0 - Off, 1 - On, 2 - Blink</TD></TR>
+<TR><TD>31</TD><TD>vdata</TD><TD>R  </TD><TD>Unknown ("\0")</TD></TR>
+<TR><TD>32</TD><TD>int32</TD><TD>R  </TD><TD>Put "magic spell" 0x0FEC000E here before uploading image data</TD></TR>
+<TR><TD>33</TD><TD>int32</TD><TD>R/W</TD><TD>Lens mode: 1 - Macro, 2 - Normal, 3 - Infinity/fisheye</TD></TR>
+<TR><TD>34</TD><TD>int32</TD><TD>R  </TD><TD>Unknown (0)</TD></TR>
+<TR><TD>35</TD><TD>int32</TD><TD>R/W</TD><TD>LCD brightness 1 to 7</TD></TR>
+<TR><TD>36</TD><TD>int32</TD><TD>R  </TD><TD>Unknown (3)</TD></TR>
+<TR><TD>37</TD><TD>vdata</TD><TD>R  </TD><TD>Unknown ("\0")</TD></TR>
+<TR><TD>38</TD><TD>int32</TD><TD>R  </TD><TD>LCD autoshut timer (seconds)</TD></TR>
+<TR><TD>39</TD><TD>int32</TD><TD>R  </TD><TD>Protection state of current frame *</TD></TR>
+<TR><TD>40</TD><TD>int32</TD><TD>R  </TD><TD>Unknown (0)</TD></TR>
+<TR><TD>41</TD><TD>int32</TD><TD>R/W</TD><TD>LCD date format: 1 - 'YY MM DD, 2 - DD MM 'HH</TD></TR>
+<TR><TD>42</TD><TD>vdata</TD><TD>R  </TD><TD>Unknown ("")</TD></TR>
+<TR><TD>43</TD><TD>vdata</TD><TD>R  </TD><TD>Audio data description block *
+	<BR>0: expanded .wav length
+	<BR>1: compressed .wav length
+	<BR>3: Unknown (0)
+	<BR>4: Unknown (0)
+	<BR>5: Unknown (0)
+	<BR>6: Unknown (0)
+	<BR>7: Unknown (0)
+</TD></TR>
+<TR><TD>44</TD><TD>vdata</TD><TD>R  </TD><TD>Audio data *</TD></TR>
+<TR><TD>45</TD><TD>vdata</TD><TD>R  </TD><TD>Unknown ("")</TD></TR>
+<TR><TD>46</TD><TD>vdata</TD><TD>R  </TD><TD>Camera summary data: 32 bytes with copies of 8 other registers
+	<BR>0: Reg 1 (Resolution)
+	<BR>1: Reg 35 (LCD brightness) or Reg 7 (Flash mode)
+	<BR>2: Reg 10 (Frames taken) or Unknown
+	<BR>3: Unknown (0) or Unknown
+	<BR>4: Unknown (0) or Reg 16 (Battery capacity)
+	<BR>5: Unknown (0) or Reg 10 (Frames taken)
+	<BR>6: Unknown (0) or Reg 11 (Frames left)
+	<BR>7: Number of animations taken
+</TD></TR>
+<TR><TD>47</TD><TD>vdata</TD><TD>R  </TD><TD>Picture summary data: 32 bytes or 8 int32's *
+	<BR>0: Hi order byte: unknown, next 3 bytes: Length of current image
+	<BR>1: Length of current thumbnail
+	<BR>2: Audio data length (expanded)
+	<BR>3: Resolution
+	<BR>4: Protection state
+	<BR>5: TimeDate
+	<BR>6: Unknown (0)
+	<BR>7: Animation type: 1 - 10ms, 2 - 20ms
+</TD></TR>
+<TR><TD>48</TD><TD>vdata</TD><TD>R  </TD><TD>Manufacturer</TD></TR>
+<TR><TD>49-52</TD><TD>vdata</TD><TD>R  </TD><TD>Unknown ("")</TD></TR>
+<TR><TD>53</TD><TD>int32</TD><TD>R/W</TD><TD>Language:  4 - french, 5 - german, 6 - italian, 8 - spanish, 10 - dutch</TD></TR>
+<TR><TD>54-69</TD><TD>vdata</TD><TD>R  </TD><TD>Unknown ("")</TD></TR>
+<TR><TD>70</TD><TD>int32</TD><TD>R/W</TD><TD>Exp. meter: 2 - Center weighted, 3 - Spot, 5 - Multi element matrix</TD></TR>
+<TR><TD>71</TD><TD>vdata</TD><TD>R  </TD><TD>Unknown ("")</TD></TR>
+<TR><TD>72</TD><TD>int32</TD><TD>R/W</TD><TD>Bitmap: 1 - AEL/WBL, 2 - Fisheye, 4 - Wide, 8 - Digital zoom, 16 - B/W</TD></TR>
+<TR><TD>73-76</TD><TD>vdata</TD><TD>R  </TD><TD>Unknown ("")</TD></TR>
+<TR><TD>77</TD><TD>int32</TD><TD>  W</TD><TD>Unknown (write 1 here)</TD></TR>
+<TR><TD>78</TD><TD>vdata</TD><TD>R  </TD><TD>Unknown ("")</TD></TR>
+<TR><TD>79</TD><TD>vdata</TD><TD>R  </TD><TD>Filename of current frame *</TD></TR>
+<TR><TD>80-81</TD><TD>vdata</TD><TD>R  </TD><TD>Unknown ("")</TD></TR>
+<TR><TD>82</TD><TD>int32</TD><TD>  W</TD><TD>Unknown (enable folder features? Write 60 here)</TD></TR>
+<TR><TD>83</TD><TD>int32</TD><TD>R/W</TD><TD>Folder navigation
+	<BR>When read, return number of folders on the card.
+	<BR>When written <B>without</B> data, reset folder system (?)
+	<BR>Or select current folder by its number
+</TD></TR>
+<TR><TD>84</TD><TD>vdata</TD><TD>R/W</TD><TD>Current folder name (may read or set)
+</TD></TR>
+<TR><TD>85-90</TD><TD>vdata</TD><TD>R  </TD><TD>Unknown ("")</TD></TR>
+<TR><TD>91</TD><TD>vdata</TD><TD>R  </TD><TD>Current folder I.D. and name</TD></TR>
+</TABLE>
+<B>* Note:</B> Marked registers only become useful for reading after
+setting register 4.  If value of 0 assigned to register 4 after doing
+action 5, subsequent retrieval of picture data gives the "live preview".
+
+<P>
+For command 2, the second byte is action code not register number.
+The following action codes are known:
+<TABLE BORDER=1>
+<TR><TH>Code</TH><TH>Argument</TH><TH>Description</TH></TR>
+<TR><TD>0</TD><TD>single zero byte</TD><TD>Erase last picure</TD></TR>
+<TR><TD>1</TD><TD>single zero byte</TD><TD>Erase all picures (but not animations)</TD></TR>
+<TR><TD>2</TD><TD>single zero byte</TD><TD>Take picture</TD></TR>
+<TR><TD>4</TD><TD>single zero byte</TD><TD>Finish session immediately</TD></TR>
+<TR><TD>5</TD><TD>single zero byte</TD><TD>Take preview snapshot (retreivable as frame zero)</TD></TR>
+<TR><TD>6</TD><TD>single byte</TD><TD>Autofocus calibration or testing (?)</TD></TR>
+<TR><TD>7</TD><TD>single zero byte</TD><TD>Erase current frame *</TD></TR>
+<TR><TD>8</TD><TD>single byte</TD><TD>Switch LCD mode.  Arg value:
+	<BR>1 - off
+	<BR>2 - viewfinder
+	<BR>3 - preview whole
+	<BR>4 - preview thumbnails)
+</TD></TR>
+<TR><TD>9</TD><TD>single byte</TD><TD>Set protection state of current frame to the value of parameter (binary 0 or 1)*</TD></TR>
+<TR><TD>11</TD><TD>single zero byte</TD><TD>Store freshly uploaded image into NVRAM</TD></TR>
+<TR><TD>12</TD><TD>single byte</TD><TD>LCD colours. Arg value:
+	<BR>0 - white
+	<BR>1 - gray
+	<BR>2 - black
+	<BR>3 - red
+	<BR>4 - green
+	<BR>5 - blue
+	<BR>6 - test pattern
+</TD></TR>
+</TABLE>
+<B>* Note:</B> actions 7 and 9 only useful after setting register 0x04.
+
+Please mail your corrections/additions to
+<A HREF="mailto:crosser@average.org"><I>&lt;crosser@average.org&gt;</I></A>
+<BR>
+See
+<A HREF="http://www.average.org/digicam/">http://www.average.org/digicam/</A>
+for possible updates.
+
+<HR>
+
+</BODY></HTML>

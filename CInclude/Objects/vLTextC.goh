@@ -1,0 +1,373 @@
+/***********************************************************************
+ *
+ *  Copyright (c) GeoWorks 1991 -- All Rights Reserved
+ *
+ * PROJECT: PC GEOS
+ * FILE:    vLTextC.goh
+ * AUTHOR:  Tony Requist: February 12, 1991
+ *
+ * DECLARER:    Text
+ *
+ * DESCRIPTION:
+ *  This file defines VisLargeTextClass
+ *
+ *  $Id: vLTextC.goh,v 1.1 97/04/04 15:51:39 newdeal Exp $
+ *
+ ***********************************************************************/
+
+@optimize
+@deflib text
+
+@include <Objects/vTextC.goh>
+
+/*
+ * VisLargeTextClass is a subclass of VisText used for large objects.  Almost
+ * all of VisLargeTextClass is implemented in VisTextClass, but having the
+ * subclass allows adding instance data for large text objects only.
+ */
+@class VisLargeTextClass, VisTextClass;
+
+@message void MSG_VIS_LARGE_TEXT_CREATE_DATA_STRUCTURES();
+/*
+ *  Create the VM based data structures for a newly instantiated (or
+ *  duplicated) VisLargeText object.
+ *
+ *  Pass:
+ *  none
+ *  Return:
+ *  none
+ *  Compat:
+ *  Can only be used with small text objects that have no text,
+ *  runs or elements.
+ */
+
+/*----------------------------------------------------------------------------
+ *  Region messages
+ *---------------------------------------------------------------------------*/
+
+typedef WordFlags VisLargeTextRegionFlags;
+#define VLTRF_ENDED_BY_COLUMN_BREAK 0x8000
+#define VLTRF_EMPTY         0x4000
+
+typedef struct {
+    /* # characters in region */
+    dword           VLTRAE_charCount;
+
+    /* # lines in region */
+    dword           VLTRAE_lineCount;
+
+    /* section number */
+    word            VLTRAE_section;
+
+    /* position (in 32 bit space) */
+    PointDWord          VLTRAE_spatialPosition;
+
+    /* region size */
+    XYSize          VLTRAE_size;
+
+    /* computed height of text */
+    WBFixed         VLTRAE_calcHeight;
+
+    /* DBItem containing region or 0 for rectangular */
+    dword           VLTRAE_region;
+
+    VisLargeTextRegionFlags VLTRAE_flags;
+    byte            VLTRAE_reserved[3];
+} VisLargeTextRegionArrayElement;
+
+
+/*
+ *  Coordinate systems:
+ *
+ *  Regions are in general a device level construct that work with a somewhat
+ *  unique coordinate system.  Normally the rectangle (10,10),(20,20) is
+ *  represented by the region:
+ *
+ *  9 $         ;from infinity thru 9 is empty
+ *  19 10 19 $      ;from 10 (9+1) to 19 is 10 thru 19 inclusive
+ *  $ $         ;from 20 (19+1) to infinity is empty
+ *
+ *  Passing this region to GrGetPtrRegBounds returns bounds of (10,10),(19,19)
+ *
+ *  The text object in general uses document coordinates for everything.  Thus
+ *  the region for the rectangle (10,10),(20,20) is the text object world is:
+ *
+ *  10 $            ;from infinity to line 10 is empty
+ *  20 10 20 $      ;from 10 to 20 is 10 thru 20
+ *  $ $         ;from 20 to infinity is empty
+ */
+
+@message void MSG_VIS_LARGE_TEXT_APPEND_REGION(word region = cx);
+/*
+ *  The text object sends this message to itsself to create a new text region.
+ *
+ *  Pass:
+ *  region - region number to append after
+ *  Return:
+ *  none
+ */
+
+@message void MSG_VIS_LARGE_TEXT_REGION_IS_LAST(word region = cx);
+/*
+ *  The text object sends this message to itsself to notify that a text region
+ *  has become the last one in the section.
+ *
+ *  Pass:
+ *  region - region number that is the last one
+ *  Return:
+ *  none
+ */
+
+
+@message void MSG_VIS_LARGE_TEXT_CURRENT_REGION_CHANGED(word region = cx);
+/*
+ *  The text object sends this message to itself to notify that the region
+ *  containing the cursor (or start-select if the selection is a range) has
+ *  moved between regions.
+ *
+ *  PASS:   region  - New region containing cursor or start-select
+ */
+
+
+/*
+ *  The display mode affects how regions are displayed and calculated.
+ *  Changing display modes allows the user to view a document in various
+ *  ways.  In display modes other than page mode the text object ignores
+ *  some of the data in the region array and calculates it instead.  The
+ *  fields thus calculated are:
+ *
+ *  - VLTRAE_spatialPosition
+ *  - VLTRAE_size
+ *  - VLTRAE_region
+ *
+ *  The display mode is stored in vardata, along with additional data
+ *  used in some modes.  If the vardata does not exist, page mode is
+ *  used.
+ */
+
+@message void MSG_VIS_LARGE_TEXT_REGION_CHANGED(word region = cx);
+/*
+ *  Recalculate because a region changed
+ *
+ *  Pass:
+ *  region - region number
+ *  Return:
+ *  none
+ */
+
+
+/*---------------------------------------------------------------------------
+ *  Display mode messages
+ *---------------------------------------------------------------------------*/
+
+typedef enum {
+/*
+ *  In page mode the values stored in the region array are used.
+ */
+    VLTDM_PAGE,
+
+/*
+ *  In condensed mode all text regions are put vertically one after the
+ *  other.  Calculated fields are:
+ *  - VLTRAE_spatialPosition
+ *  The x position is taken from vardata.  The y position is the
+ *  sum of the region heights (VLTRAE_size.XYS_height) for all
+ *  preceeding regions plus the offset stored in vardata plus the
+ *  page spacing stored in vardata.
+ */
+    VLTDM_CONDENSED,
+
+/*
+ *  In galley mode all text regions are put vertically one after the
+ *  other as in condensed mode, except that the computed heights are
+ *  used (so that the regions are jammed right next to each other).
+ *  Calculated fields are:
+ *  - VLTRAE_spatialPosition
+ *  The x position is taken from vardata.  The y position is the
+ *  sum of the region calculated heights (VLTRAE_calcHeight) for all
+ *  preceeding regions plus the offset stored in vardata plus the
+ *  page spacing stored in vardata.
+ *  - VLTRAE_size.XYS_height
+ *  Taken from VLTRAE_calcHeight when being used to clear
+ */
+    VLTDM_GALLEY,
+
+/*
+ *  In draft mode all text regions are forced to a standard size and are
+ *  then put one after the other as in galley mode.  Calculated fields
+ *  are:
+ *  - VLTRAE_spatialPosition
+ *  Same as galley mode
+ *  - VLTRAE_size
+ *  Taken from VTDMD_draftRegionSize
+ *  - VLTRAE_region
+ *  Always 0 (rectangular region)
+ */
+    VLTDM_DRAFT_WITH_STYLES,
+    VLTDM_DRAFT_WITHOUT_STYLES
+} VisLargeTextDisplayModes;
+
+
+@message void MSG_VIS_LARGE_TEXT_SET_DISPLAY_MODE(
+            VisLargeTextDisplayModes mode = cx);
+/*
+ *  Set the display mode.
+ *
+ *  Pass:
+ *  mode - VisLargeTextDisplayModes
+ */
+
+
+@message void MSG_VIS_LARGE_TEXT_SET_DRAFT_REGION_SIZE(word width = cx,
+                               word height = dx);
+/*
+ *  Set the draft region size
+ *
+ *  Pass:
+ *   width
+ *   height
+ */
+
+@message XYValueAsDWord MSG_VIS_LARGE_TEXT_GET_DRAFT_REGION_SIZE(
+                           word region = cx) = dx.cx;
+/*
+ *  Get the draft region size
+ *
+ *  Pass:
+ *  region - region number
+ *
+ *  Return:
+ *  XYValueAsDWord - use DWORD_X to get width,
+ *                       DWORD_Y to get height
+ */
+
+
+@message word MSG_VIS_LARGE_TEXT_GET_REGION_COUNT() = cx;
+/*
+ *  Get the region count
+ *
+ *  Return:
+ *   region count
+ */
+
+
+typedef struct {
+    word    VLTGRPRS_unused;
+    sdword      VLTGRPRS_yPosition;
+    word        VLTGRPRS_height;
+} VisLargeTextGetRegionPosReturnStruct;
+
+@message void MSG_VIS_LARGE_TEXT_GET_REGION_POS(
+                    VisLargeTextGetRegionPosReturnStruct
+                    *retVal = bpaxdxcx, word region = cx);
+/*
+ *  Get position and size of a region
+ *
+ *  Pass:
+ *  region - region number
+ *
+ *  Return:
+ *  *retVal filled in
+ */
+
+@message void MSG_VIS_LARGE_TEXT_REGION_FROM_POINT(); /* XXX */
+/*
+ *  Given a point, return the region in which it lies
+ *
+ *  WARNING: THIS MESSAGE CANNOT BE SENT FROM GOC.
+ *
+ *  Use the function MsgVisLargeTextRegionFromPoint() to send this message.
+ */
+
+typedef struct {
+    word     VLTRFPP_region;            /* region number */
+    sword    VLTRFPP_xPosition;         /* relative X position */
+    sword    VLTRFPP_yPosition;         /* relatvie Y position */
+} VisLargeTextRegionFromPointParams;
+
+extern void
+    _pascal MsgVisLargeTextRegionFromPoint(
+            VisLargeTextRegionFromPointParams *retValue,
+            optr object,
+            PointDWFixed point);
+/*
+ *  @call object::MSG_VIS_LARGE_TEXT_REGION_FROM_POINT();
+ *
+ *  Pass:   retValue - VisLargeTextRegionFromPointParams
+ *          object - optr of VisLargeText object to send message to
+ *          point - PointDWFixed
+ *  Return:     *retValue filled with return values
+ *
+ */
+
+@message void MSG_VIS_LARGE_TEXT_PURGE_REGION_CACHE() ;
+/*
+ * Purge the cache used with regions are stored in a huge array
+ */
+
+typedef struct {
+    VisLargeTextRegionArrayElement VLTCR_region ;
+    word VLTCR_num ;
+} VisLargeTextCachedRegion ;
+
+@vardata VisLargeTextCachedRegion ATTR_VIS_LARGE_TEXT_LOCAL_REGION ;
+
+/* Internal structures used to cache walking computations */
+typedef struct {
+    word VLTCLACC_lineRegionIndex ;
+    dword VLTCLACC_lineSum ;
+
+    word VLTCLACC_lineToRegionRegionIndex ;
+    dword VLTCLACC_lineToRegionSum ;
+
+    word VLTCLACC_regionFromLineRegionIndex ;
+    dword VLTCLACC_regionFromLineLineSum ;
+    dword VLTCLACC_regionFromLineCharSum ;
+
+    word VLTCLACC_regionFromOffsetRegionIndex ;
+    dword VLTCLACC_regionFromOffsetLineSum ;
+    dword VLTCLACC_regionFromOffsetCharSum ;
+} VisLargeTextCachedLineAndCharCount ;
+
+@vardata VisLargeTextCachedLineAndCharCount ATTR_VIS_LARGE_TEXT_LOCAL_LINE_AND_CHAR_COUNT ;
+
+@vardata word ATTR_VIS_LARGE_TEXT_ONLY_DRAW_X_REGIONS ;
+
+@message void MSG_VIS_LARGE_TEXT_PURGE_CACHED_INFO() ;
+
+/*----------------------------------------------------------------------------
+ *  Instance data
+ *---------------------------------------------------------------------------*/
+
+typedef WordFlags VisLargeTextFlags;
+#define VLTF_HEIGHT_NOTIFY_PENDING  0x8000
+
+typedef WordFlags VisLargeTextAttrs;
+#define VLTA_EXACT_HEIGHT           0x8000
+#define VLTA_REGIONS_IN_HUGE_ARRAY  0x4000 /* added 8/31/99 by tony */
+#define VLTA_CACHE_REGION_CALCS     0x2000 /* added 4/22/00 by lshields */
+
+    @instance ChunkHandle       VLTI_regionArray;
+    @instance VisLargeTextDisplayModes  VLTI_displayMode = VLTDM_PAGE;
+    @instance word          VLTI_regionSpacing;
+    @instance XYSize            VLTI_draftRegionSize = {0, 4000};
+
+    /* object height */
+    @instance dword         VLTI_totalHeight;
+
+    /* width for non-page mode */
+    @instance word          VLTI_displayModeWidth;
+
+    @instance VisLargeTextFlags     VLTI_flags;
+    @instance VisLargeTextAttrs     VLTI_attrs;
+
+@endc
+
+
+@ifdef __HIGHC__
+
+pragma Alias(MsgVisLargeTextRegionFromPoint, "MSGVISLARGETEXTREGIONFROMPOINT");
+
+@endif
+
+@endlib

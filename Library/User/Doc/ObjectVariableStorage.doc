@@ -1,0 +1,416 @@
+COMMENT @MECHANISM DESCRIPTION-------------------------------------------------
+
+
+			 Object Variable Data Storage
+
+$Id: ObjectVariableStorage.doc,v 1.4.34.1 97/03/29 03:37:05 canavese Exp $
+
+Synopsis
+--------
+	The Object Variable Data Storage mechanism (VarData for short)
+	allows objects to store a variable amount of typed data within
+	the lmem chunk containing the object.
+
+	Data is stored in the form of "variable data entries", either just
+	a single word-sized "data type" identifier (that can be used to
+	indicate some attribute of the object), or a data type word plus
+	some amount of "extra data" (that can serve as either additional
+	instance data, or as temporary data).
+
+	Entries can be marked as needing to be saved to state file when
+	the application is shutdown or can be allowed to be removed when
+	shutting down.
+
+	Routines are available to add, remove, and examine an object's
+	variable data.  Additionally, messages are provided for the add and
+	remove functionality.
+
+	The system uses the object variable storage mechanism for Generic UI
+	hints and for temporary build and detach data.  The Generic UI hints
+	will be used in some of the examples of how to use this mechanism.
+
+	Another potential usage of this mechanism is to extend functionality
+	of existing Generic UI objects by adding attributes or "instance-data",
+	that is stored as variable data, without changing the API.
+
+Limitations
+-----------
+	There are some limitations on the usage of the variable data
+	storage mechanism:
+
+	- The data that can be handled by the mechanism must be typed and
+	relatively structured.  There can be distinct pieces of data, but
+	each must be identifiable by a word-sized value and each may have
+	some amount of associated data.
+	
+	- It is up to the object to interpret the meaning of any variable
+	data it has.  Other objects and processes can add and remove data,
+	but the object is responsible for processing the data.
+
+Alternatives
+------------
+	There are several alternatives for storing data associated with an
+	object:
+
+	- Store a small amount of data directly as object instance data.  If
+	the object is a Generic UI object, this will require subclassing the
+	object to add the instance data fields.  A few bytes or words of
+	storage can be added to an object in this way.
+
+	- Allocate a seperate lmem chunk to hold data.  This will also require
+	a new instance data field in the object to hold the lmem chunk handle.
+	This allows a larger amount of data, and the structure of the data
+	is completely up to the programmer.  A disadvantage is that the lmem
+	chunk imposes some amount of space overhead.
+
+	Note that for these alternatives, efficient use of the new storage
+	space is made only if data is actually stored.  With the variable
+	storage mechanism, if there is data, storage space is used, if there
+	is no data, no storage space is used.
+
+Implementation Status
+---------------------
+	Finished as of 10/18/91.
+
+See Also
+--------
+	Object documentation - discussion of object storage in lmem chunks,
+		master levels, instance data, etc.
+	LMem documentation - general discussion of local memory chunks.
+
+;------------------------------------------------------------------------------
+;	Description
+;------------------------------------------------------------------------------
+
+Terminology
+-----------
+	Variable Data - general term to refer to data stored in addition
+		to an object's fixed-size instance data, made possible with
+		the mechanism detailed here.
+
+	Variable Data Entry - a specific piece of variable data.   Consists
+		of a data type, & optional extra data.
+
+	Variable Data Type -
+		the word-sized identifier that indicates what kind of
+		data this is.  The data type is associated with a specific
+		master level and master class in that the data type value
+		determines to which master level it level belongs.  The
+		data type also includes two flags in the low two bits of
+		the word that indicate if the data entry for this data type
+		has extra data and if the data entry for this data type
+		should be saved to state file when shutting down.
+
+	Extra Data - the additional data (if any) associated with a data type.
+
+Relationships/Context
+---------------------
+	This mechanism is closely tied with the object system, the local
+	memory mechanism, and the way objects are stored in local memory
+	chunks.
+
+Conceptual Overview
+-------------------
+	The variable data mechanism provides an efficient and easy way for
+	objects to store object-specific data.  The data must be in the
+	form of data entries that are keyed (identified) by a data type word.
+	It is suitable for data that is variable in size and for small amounts
+	(tens of bytes) of temporary data.  For example, the generic UI hints
+	and temporary build and detach information are stored as variable data.
+
+	The mechanism provides several routines and messages to add, remove,
+	and process variable data, along with some internal management in the
+	object system:
+
+		ObjVarAddData
+		ObjVarDeleteData
+		ObjVarFindData
+		ObjVarDerefData
+		ObjVarScanData
+		ObjVarDeleteDataAt
+		ObjVarDeleteDataRange
+		ObjVarCopyDataRange
+
+		MSG_META_ADD_VAR_DATA
+		MSG_META_DELETE_VAR_DATA
+
+	To maintain synchronous access to object blocks, only the thread
+	that runs the object should have access to the object's variable data.
+	Furthermore, since variable data is part of an object's instance data,
+	only the object itself should have access to it.  For this reason, the
+	ObjVar routines all take an object segment:chunk (for assembly) or
+	locked-block-handle:chunk (for C).   They are thus normally called
+	from method handlers for the object.  For example, many of the
+	specific UI objects scan the generic UI hints in their MSG_META_RESOLVE_VARIANT_SUPERCLASS or
+	MSG_META_INITIALIZE handlers.  However, just like instance data can be set
+	or retrieved with messages, messages are provided for adding and
+	removing variable data.
+	
+	Variable data is part of an object, so when objects are copied,
+	duplicated, or freed, any variable data for that object will be
+	appropriately copied, duplicated, or freed.
+
+	The data types that key data entries are associated with a certain
+	master class.  This is important because data entries are removed
+	from an object when the associated master level is freed.  So, for
+	example, when the specific UI class implementations of generic objects
+	are thrown out when those objects are saved to state, any data entries
+	associated with those specific UI classes are thrown out.  If variable
+	data should persist across shutdowns, they should be defined for a
+	master class that is not marked CLASSF_DISCARD_ON_SAVE, and the data
+	itself should be added with the VDF_SAVE_TO_STATE flag.
+
+Warnings
+--------
+	ObjVarAddData, ObjVarFindData, and ObjVarDerefData return
+	an offset to an object's variable data.  This offset is only valid
+	until the next lmem operation on the object, as this operation
+	can cause the object to move.
+
+Usage: Defining variable data in .GOC or .UI files
+--------------------------------------------------
+	Since most objects are statically defined in .GOC or .UIC files, it
+	is convenient to define any static variable data for these objects
+	there as well.  Variable data is treated as just another field in an
+	object's definition:
+
+	.GOC
+	----
+|	@object GenInteractionClass BoxedGroup = {
+|		GI_visMoniker = "Boxed Group";
+|		GI_comp = ItemOne, ItemTwo, ItemThree;
+|		HINT_DRAW_IN_BOX;
+|		HINT_ALLOW_CHILDREN_TO_WRAP;
+|		HINT_WRAP_AFTER_CHILD_COUNT = {
+|			2
+|		};
+
+	.UI
+	---
+|	BoxedGroup = GenInteraction {
+|		moniker = "Boxed Group";
+|		children = ItemOne, ItemTwo, ItemThree;
+|		HINT_DRAW_IN_BOX,
+|		HINT_ALLOW_CHILDREN_TO_WRAP,
+|		HINT_WRAP_AFTER_CHILD_COUNT = {
+|			word	2
+|		};
+
+
+Usage: Using the Variable Data area to extend instance data
+------------------------------------------------------------
+	Objects can use variable data mechanism for instance data outside
+	of the fixed instance data area, useful for new versions of an
+	object library which is intended to be backwards compatible, or
+	for private use, simply by defining the new data type and then using
+	ObjVarDerefData to access the data.  ObjVarDerefData always returns
+	a pointer to the data;  if it does not yet exist, 
+	MSG_META_INITIALIZE_VAR_DATA is called on the object, which is 
+	responsible for adding the new data type & initializing it.
+
+Usage: Adding and Deleting Variable Data
+----------------------------------------
+	Rather than having an object's variable data defined statically, there
+	are often times when variable data needs to dynamically added and
+	deleted.  For example, variable data may be used for some temporary
+	purpose.  In this case, the data may need to be added, then deleted as
+	soon as it is processed.
+
+	Adding
+	------
+	Variable data can be added to an object with the ObjVarAddData
+	routine.  the following two examples show the addition of variable
+	data entries that have no extra data:
+	
+|	ObjVarAddData(SplitOptr(oself), HINT_DRAW_IN_BOX|VDF_SAVE_TO_STATE, 0);
+|	ObjVarAddData(SplitOptr(oself), HINT_ALLOW_CHILDREN_TO_WRAP, 0);
+
+	The VDF_SAVE_TO_STATE flag is passed if the new variable data should
+	be saved to state file when the object is detached.  Note the usage of
+	the 'SplitOptr' macro with 'oself'.  'oself' is passed to an object's
+	method handler and is an optr to the object itself.
+	
+	ObjVarAddData may also be used to add a data type with extra data.
+	The caller is reponsible for initializing the extra data, if any
+	initialization is required.
+
+|	CompSizeHintArgs *extraData;
+|
+|	extraData = ObjVarAddData(SplitOptr(oself),
+|				HINT_FIXED_SIZE | VDF_SAVE_TO_STATE,
+|				sizeof(CompSizeHintArgs));
+|	extraData->CSHA_width = 
+|		((SST_PIXELS << SSS_TYPE_OFFSET) | (200 << SSS_DATA_OFFSET));
+|	extraData->CSHA_height = 
+|		((SST_PIXELS << SSS_TYPE_OFFSET) | (200 << SSS_DATA_OFFSET));
+|	extraData->CSHA_count = 0;
+
+
+	If you add a data type that already exists, the new extra data
+	(if any) and VDF_SAVE_TO_STATE flag will overwrite the old data
+	and flags.  VDF_EXTRA_DATA doesn't need to be passed --
+	ObjVarAddData will set it correctly based on the size passed.
+	Note that when adding a data type which has extra data, null
+	may be passed for the ptr to initialization data if the desired
+	initial state is all zeros.
+
+	As an alternative to the ObjVarAddData routine, which can only
+	be called from the same thread as the object is run by, data may
+	be added using MSG_META_ADD_VAR_DATA:
+
+|	/*
+|	 * Allocate a CompSizeHintArgs structure
+|	 * (width = 200, height = 100)
+|	 */
+|
+|	CompSizeHintArgs data = {
+|		((SST_PIXELS << SSS_TYPE_OFFSET) | (200 << SSS_DATA_OFFSET)),
+|		((SST_PIXELS << SSS_TYPE_OFFSET) | (100 << SSS_DATA_OFFSET)),
+|		0
+|	}
+|
+|    	@call AnyCompositeObject::MSG_META_ADD_VAR_DATA(
+|		HINT_WRAP_AFTER_CHILD_COUNT | VDF_SAVE_TO_STATE,
+|		sizeof(CompSizeHintArgs), &data);
+
+
+	Deleting
+	--------
+	There is a single routine to delete either a data type or a data entry:
+
+|	ObjVarDeleteData(HINT_ALLOW_CHILDREN_TO_WRAP);
+|	ObjVarDeleteData(HINT_FIXED_SIZE);
+
+	If the passed data type has associated extra data, it will be deleted
+	as well.  ObjVarDeleteData ignores any VarDataFlags passed with the
+	data type.  It returns TRUE if the data type was found and deleted,
+	else it returns FALSE.
+
+	Other ways to add or remove
+	---------------------------
+	A specific data entry can be deleted with ObjVarDeleteDataAt.  This
+	is normally used with ObjVarFindData or ObjVarDerefData
+	(see "Usage: Finding and Scanning Variable Data" section).
+
+	A range of data types can be deleted from an object with
+	ObjVarDeleteDataRange.  This routine is used to throw out all
+	the data types associated with a master level when that master
+	level is thrown out when preparing to save the object to state file.
+
+Usage: Finding and Scanning Variable Data
+-----------------------------------------
+	Use ObjVarFindData to test to see if variable data of a certain type
+	exists, & to get a pointer to it, if it exists.
+	ObjVarScanData may be used to access a large number of data types
+	all at once;  a routine may be specified to be called for each
+	data type you are interested in processing.
+
+	Need more info here...
+
+In-Depth: Defining New Variable Data Types
+------------------------------------------
+	As described above, variable data types are associated with a master
+	level and class.  Given a master level, the range of possible data
+	types for that level are known.
+
+	Need more info here...
+
+See Also
+--------
+	<related objects, mechanisms, modules, other documentation>
+
+;------------------------------------------------------------------------------
+;	Assembling & Debugging
+;------------------------------------------------------------------------------
+
+
+Sample Code/Programming Tips
+----------------------------
+	Appl/SDK_C/VarData - C sample application that shows how the
+	object variable data routines and messages can be used to
+	interact with generic UI hints.
+
+Include Files Needed
+--------------------
+	Include/object.def (or CInclude/object.h for C)
+		- for object variable data structures and routines
+	Include/Objects/metaC.def (or CInclude/Objects/metaC.goh for C)
+		- for object variable data messages
+
+	These are normally included for all applications.
+
+Assembly Tips
+-------------
+
+Debugging Tools & Tips
+----------------------
+	pvardata - swat TCL command to print the variable data for a given
+		object, defaults to *ds:si.
+
+	pvardentry - swat TCL command to print a single variable data entry
+		at a given address, defaults to ds:bx (useful after a
+		ObjVarFindData and at the VarDataHandler for ObjVarScanData).
+
+See Also
+--------
+	<Sample apps, related tools, other documentation>
+
+;------------------------------------------------------------------------------
+;	Internal Structure
+;------------------------------------------------------------------------------
+
+	Variable storage is allocated at the end of an object's chunk,
+	past the last master level:
+
+		+-----------------------+ <-------
+	0 - 3	|     Class (dword)     |     \   \
+		+-----------------------+      |   |
+	4 - 5	|   Vis offset (word)   |      |   |
+		+-----------------------+      |   |
+	6 - 7	|   Gen offset (word)   |      |   |
+		+-----------------------+      |   |
+	8 -	| other master offsets  |      |   |
+		+-----------------------+      |   |
+		|			|      +- object w/o variable data
+		|        Vis part       |      |   |
+		|			|      |   +- object w/variable data
+		+-----------------------+      |   |
+		|			|      |   |
+		|        Gen part       |      |   |
+		|			|      |   |
+		+-----------------------+      |   |
+		|  other master levels  |     /    |
+		+-----------------------+ <---     |
+		|			|          |
+		|      Extra data       |          |
+		|			|         /
+		+-----------------------+ <-------
+
+;------------------------------------------------------------------------------
+;	Most frequently asked questions
+;------------------------------------------------------------------------------
+
+	<anytime someone asks you a question about this object, clear up
+	 the documentation above to explain it, or add an entry here>
+
+;------------------------------------------------------------------------------
+;	Declaration
+;------------------------------------------------------------------------------
+
+	NOTE: The section between "Declaration" and "End Declaration" is
+	      copied into uilib.def by "pmake def"
+
+Declaration
+-----------
+
+;------------------------------------------------------------------------------
+;	Constants & Structures
+;------------------------------------------------------------------------------
+
+	<Use this section only for files which actually make declarations
+	 relative to the mechansism, i.e. are code & not just documentation>
+
+End Declaration
+---------------
+
+------------------------------------------------------------------------------@

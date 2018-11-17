@@ -1,0 +1,124 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1991 -- All Rights Reserved
+ *
+ * PROJECT:	  PCGEOS
+ * MODULE:	  saver.uih
+ * FILE:	  saver.uih
+ *
+ * AUTHOR:  	  Adam de Boor: Apr 12, 1991
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	4/12/91	  ardeb	    Initial version
+ *
+ * DESCRIPTION:
+ *	Definition of special classes provided by the generic Saver
+ *	library.
+ *
+ * 	$Id: saver.uih,v 1.1 97/04/04 14:25:12 newdeal Exp $
+ *
+ ***********************************************************************/
+
+
+/***********************************************************************
+This SaverSpeedList will automatically throw an OptList into your
+UI file, and set everything up JUST right. To use it, just add the
+line:
+
+CREATE_SAVER_SPEED_LIST(MySpeedList,MySpeedRoutine, \
+				SLOW_VALUE, MED_VALUE, FAST_VALUE)
+
+MAKE SURE THERE'S NO SEMICOLON AT THE END OF THE LINE!
+
+*************************************************************************/
+
+#define CREATE_SAVER_SPEED_LIST(name, msg, dest, slow, med, fast) \
+name = PrefItemGroup {  \
+		moniker = "Speed:"; \
+		children = SSSlow, SSMed, SSFast; \
+		applyMsg = msg; \
+		destination = dest; \
+		hints = { ATTR_GEN_INIT_FILE_KEY {char "speed", 0}} \
+		selection = med; \
+} \
+SSSlow = GenItem { \
+	moniker = "Slow"; \
+	identifier = slow;\
+}\
+SSMed = GenItem { \
+	moniker = "Medium"; \
+	identifier = med;\
+}\
+SSFast = GenItem { \
+	moniker = "Fast"; \
+	identifier = fast; \
+}
+
+/**********************************************************************
+	
+CREATE_SAVER_CLEAR_LIST:  "name" is the name of the list (as specified 
+in the Interaction, and routine is the routine name to call).
+
+Example:
+
+CREATE_SAVER_CLEAR_LIST(MyClearList, MyClearModeRoutine)
+
+(no final semicolon)!
+
+**********************************************************************/
+#define CREATE_SAVER_CLEAR_LIST(name, msg, dest) \
+name =	PrefItemGroup { \
+		hints = {ATTR_GEN_INIT_FILE_KEY { char "clearScreen", 0 }} \
+		moniker = "Clear Screen First:"; \
+		children = SCLYes, SCLNo; \
+		applyMsg = msg; \
+		destination = dest; \
+		selection = 0; \
+		numSelections = 1; \
+} \
+\
+SCLYes = GenItem { \
+	moniker = "Yes";\
+	identifier = 0;\
+}\
+\
+SCLNo = GenItem {\
+	moniker = "No";\
+	identifier = "mask WCF_TRANSPARENT";\
+}
+
+
+class SaverApplication = GenApplication {
+
+	lockMode = wordComp : "SLM_MANUAL";
+	inputOptions = bitFieldComp byte {
+		reducePriority, neverOn, consumeKeypresses
+	} : {};
+	wakeupOptions = bitFieldComp byte {
+		mouseMove, mousePress, keyPress
+	} : mouseMove, mousePress, keyPress;
+	static /* password */ byteComp : "SAVER_MAX_PASSWORD dup(?)";
+	static /* passwordLen */ wordComp : 0;
+	static /* parentWin */ wordComp : 0;
+	static /* curWindow */ wordComp : 0;
+	static /* curGState */ wordComp : 0;
+	drawBounds = typeComp "Rectangle" : "";
+	saverID = wordComp : "SID_MASTER_SAVER";
+	static /* expressMenus */ nptrComp : null;
+	saverState = bitFieldComp word {
+		lockScreen, justTesting
+	} : {};
+	saverMode = bitFieldComp byte {
+		onNetwork
+	} : {};
+
+	passwordBlock = wordComp : 0;
+
+	default appState = default +notUserInteractable, 
+			+avoidTransparentDetach,
+			-focusable, 
+			-modelable;
+	default genAttributes = default -targetable;
+}

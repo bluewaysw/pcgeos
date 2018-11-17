@@ -1,0 +1,521 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+ *
+ * PROJECT:	  PCGEOS
+ * MODULE:	  Clock
+ * FILE:	  clock.ui
+ *
+ * AUTHOR:  	  Gene Anderson: January 22, 1991
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	1/2/91    gene	    Initial version
+ *
+ * DESCRIPTION:
+ *	Interface for the clock
+ *
+ * 	$Id: clock.ui,v 1.2 98/04/28 19:11:22 joon Exp $
+ *
+ ***********************************************************************/
+#include <generic.uih>
+#include <Objects/colorC.uih>
+
+  #define _NIKE			0
+  #define _OPTIONS_MENU		-1
+  #define _FIXED_CLOCK_POSITION	0
+
+class	ClockApp = GenApplication {
+	curClock = optrComp : null;
+	clockOptrs = nptrComp : null;
+#ifdef DO_PIZZA 
+	fixedPosition = typeComp "Point" : "VC_RIGHT_EDGE, VC_TOP_EDGE";
+	horizJust = byteComp : "J_RIGHT";
+	vertJust = byteComp : "J_TOP";
+#else
+	fixedPosition = typeComp "Point" : "VC_RIGHT_EDGE, VC_BOTTOM_EDGE";
+	horizJust = byteComp : "J_RIGHT";
+	vertJust = byteComp : "J_BOTTOM";
+#endif
+	interval = wordComp : "60";
+}
+
+class	VisClock = VisComp, master {
+	static /* timer */ wordComp : 0;
+	static /* timerID */ wordComp : 0;
+	static /* flags */ byteComp : 0;
+	static /* clickPoint */ typeComp "Point" : "<>";
+	static /* regionCopy */ hptrComp : null;
+	static /* colorGroup */ optrComp : null;
+	static /* colorList */ optrComp : null;
+
+	region = nptrComp : null;	/* chunk holding region definition for
+					 * window, if any */
+
+	interval = wordComp : "60*60";	/* Clock interval, in ticks */
+
+	/* Initial position: default to lower-right corner */
+
+
+#ifdef DO_PIZZA
+	fixedPosition = typeComp "Point" : "VC_RIGHT_EDGE, VC_TOP_EDGE";
+	horizJust = byteComp : "J_RIGHT";
+	vertJust = byteComp : "J_TOP";
+#else
+	fixedPosition = typeComp "Point" : "VC_RIGHT_EDGE, VC_BOTTOM_EDGE";
+	horizJust = byteComp : "J_RIGHT";
+	vertJust = byteComp : "J_BOTTOM";
+#endif
+	/* Options */
+	optionTree = optrComp : null;
+	category = nptrComp : null;
+ 	selectedPart = wordComp : 0;
+	colorsPtr = wordComp : 0;
+	numParts = wordComp : 0;
+	firstPartString = nptrComp : null;
+
+	default typeFlags = default +window, +composite, +winGroup;
+}
+
+class ClockLocationList = GenInteraction {
+	static /* regionSet */ wordComp : 0;
+}
+
+class ClockColorSelector = ColorSelector {
+}
+
+start ApplicationUI;
+
+ClockAppObj = ClockApp {
+	appState = default +avoidTransparentDetach;
+	appOptFlags = default +multipleInitFileCategories;
+	moniker = list {
+		ClockTextMoniker,
+		ClockSCMoniker, ClockSMMoniker, ClockSCGAMoniker,
+		ClockTinyTCMoniker, ClockTinyTMMoniker, ClockTinyTCGAMoniker
+	}
+	children = ClockPrimary;
+	windows_list = ClockPrimary;
+	startup_load_options_list = OptionsDB;
+	clockOptrs = data {
+		UN_OPTR	DigitalClock	; CF_DIGITAL
+		UN_OPTR HermanClock	; CF_HERMAN
+		UN_OPTR AnalogClock	; CF_ANALOG
+		UN_OPTR SkeletonClock	; CF_SKELETON
+	}
+
+#if _FIXED_CLOCK_POSITION
+	hints = {
+		ATTR_GEN_INIT_FILE_CATEGORY {
+			char "Clock options", 0
+		},
+		ATTR_GEN_INIT_FILE_KEY {
+			char NULL
+		}
+	}
+#endif
+}
+
+visMoniker ClockTextMoniker = "Clock";
+
+end ApplicationUI;
+
+#include "Art/mkrClock.ui"
+#include "Art/mkrClockTiny.ui"
+
+start Interface;
+
+ClockPrimary = GenPrimary {
+	children =
+		OptionsDB,
+		ReplyBar;
+	hints = {
+		HINT_SIZE_WINDOW_AS_DESIRED/*,
+  		ATTR_GEN_HELP_CONTEXT { char "TOC", 0 }  */
+	}
+}
+
+end Interface;
+
+/*****************************************************************************
+ *	Reply Bar
+ *****************************************************************************/
+start Interface;
+
+
+ReplyBar = GenInteraction {
+	children =
+		SaveOptions,
+		BanishPrimary;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY,
+		HINT_INCLUDE_ENDS_IN_CHILD_SPACING,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+SaveOptions = GenTrigger {
+	moniker = 'S', "Save Options";
+	action = MSG_META_SAVE_OPTIONS, ClockAppObj;
+	hints = { HINT_SEEK_REPLY_BAR }
+}
+
+BanishPrimary = GenTrigger {
+	moniker = 'H', "Hide This Window";
+	action = MSG_CLOCK_BANISH_PRIMARY, process;
+	hints = { HINT_SEEK_REPLY_BAR }
+}
+
+end Interface;
+
+/****************************************************************************
+*	Options DB
+****************************************************************************/
+
+start Interface;
+
+OptionsDB = GenInteraction {
+	/* category is duplicated in clockApplication.asm; change it both
+	 * places if you change it at all */
+	hints = {
+		ATTR_GEN_INIT_FILE_CATEGORY {
+			char "Clock options", 0
+		},
+		ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+	children = GlobalOptions
+		   , FaceOptions
+		   ;
+}
+
+GlobalOptions = GenInteraction {
+	children = ModeLocationAndIntervalGroup 
+		   , LocationListGroup
+		   ;
+	moniker = "General Options";
+	hints = {
+		HINT_DRAW_IN_BOX,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN
+	}
+}
+
+ModeLocationAndIntervalGroup = GenInteraction {
+	children = ModeAndLocationGroup, IntervalOption;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN
+	}
+}
+
+ModeAndLocationGroup = GenInteraction {
+	children = 
+			ModeList
+			, LocationGlyph
+			;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN
+	}
+}
+
+ModeList = GenItemGroup {
+	moniker = "Clock Face:";
+	children =
+		DigitalModeEntry
+		, AnalogModeEntry
+		, SkeletonModeEntry
+		, HermanModeEntry
+		;
+	applyMsg = MSG_CAPP_SET_CLOCK;
+	destination = ClockAppObj;
+	hints = {
+		ATTR_GEN_INIT_FILE_KEY {
+			char	"clock face", 0
+		},
+		HINT_ITEM_GROUP_SCROLLABLE,
+		HINT_IF_SYSTEM_ATTRS {
+			SystemAttrs mask SA_VERTICALLY_TINY
+		},
+		    HINT_FIXED_SIZE {
+			CompSizeHintArgs <
+				<SST_AVG_CHAR_WIDTHS, 10>,
+				<SST_LINES_OF_TEXT, 3>,
+				3
+			>
+		    },
+		HINT_ELSE,
+		    HINT_FIXED_SIZE {
+			CompSizeHintArgs <
+				<SST_AVG_CHAR_WIDTHS, 10>,
+				<SST_LINES_OF_TEXT, 5>,
+				5
+			>
+		    },
+		HINT_ENDIF
+	}
+	selection = "CF_DIGITAL";
+	numSelections = 1;
+}
+
+DigitalModeEntry = GenItem {
+	moniker = "Digital";
+	identifier = "CF_DIGITAL";
+}
+
+HermanModeEntry = GenItem {
+	moniker = "Herman";
+	identifier = "CF_HERMAN";
+}
+
+AnalogModeEntry = GenItem {
+	moniker = "Analog";
+	identifier = "CF_ANALOG";
+}
+
+SkeletonModeEntry = GenItem {
+	moniker = "Skeleton";
+	identifier = "CF_SKELETON";
+}
+
+
+
+LocationGlyph = GenGlyph {
+	moniker = "Location:";
+}
+
+
+IntervalOption = GenItemGroup vardataReloc {
+	moniker = "Show Seconds:";
+	applyMsg = MSG_CAPP_SET_INTERVAL;
+	destination = ClockAppObj;
+	children =
+		IntervalSeconds,
+		IntervalMinutes;
+	hints = {
+		ATTR_GEN_INIT_FILE_KEY {
+			char "interval", 0
+		},
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+	selection = "60";
+}
+
+IntervalSeconds = GenItem {
+	moniker = "Yes";
+	identifier = "1";
+}
+
+IntervalMinutes = GenItem {
+	moniker = "No";
+	identifier = "60";
+}
+
+
+LocationListGroup = ClockLocationList {
+	children = LocationList;
+	hints = { ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN }
+}
+
+LocationList = GenItemGroup {
+	applyMsg = MSG_CAPP_SET_FIXED_POSITION;
+	destination = ClockAppObj;
+	children = 
+		   LocationNW, 
+		   LocationW, 
+		   LocationSW,
+		   LocationN, 
+		   LocationC, 
+		   LocationS,
+		   LocationNE, 
+		   LocationE,  
+		   LocationSE;
+	hints = {
+#if !_FIXED_CLOCK_POSITION
+		ATTR_GEN_INIT_FILE_KEY {
+			char "location", 0
+		},
+#endif
+		HINT_ITEM_GROUP_TOOLBOX_STYLE,
+		HINT_ALLOW_CHILDREN_TO_WRAP,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_WRAP_AFTER_CHILD_COUNT {
+			word	3		; wrap @ 3 kids
+		}
+	}
+#ifdef DO_PIZZA
+	selection = CFP_NORTH_EAST;		/* avoid FEP */
+#else
+	selection = CFP_SOUTH_EAST;
+#endif
+
+#if _FIXED_CLOCK_POSITION
+	stateFlags = default +indeterminate;
+#endif
+}
+
+#define LOCATION_ENTRY(l,d)	\
+Location##l = GenItem { \
+	moniker = list { SCClock##l##Moniker, SMClock##l##Moniker, SCGAClock##l##Moniker } \
+	identifier	= CFP_##d; \
+}
+
+LOCATION_ENTRY(NW,NORTH_WEST)
+LOCATION_ENTRY(N,NORTH)
+LOCATION_ENTRY(NE,NORTH_EAST)
+LOCATION_ENTRY(W,WEST)
+LOCATION_ENTRY(C,CENTER)
+LOCATION_ENTRY(E,EAST)
+LOCATION_ENTRY(SW,SOUTH_WEST)
+LOCATION_ENTRY(S,SOUTH)
+LOCATION_ENTRY(SE,SOUTH_EAST)
+
+
+end Interface;
+
+start AppSCMonikerResource;
+
+
+#include "Art/mkrSCClockNW.ui"
+#include "Art/mkrSCClockN.ui"
+#include "Art/mkrSCClockNE.ui"
+#include "Art/mkrSCClockW.ui"
+#include "Art/mkrSCClockC.ui"
+#include "Art/mkrSCClockE.ui"
+#include "Art/mkrSCClockSW.ui"
+#include "Art/mkrSCClockS.ui"
+#include "Art/mkrSCClockSE.ui"
+
+
+end AppSCMonikerResource;
+
+start AppSMMonikerResource;
+
+
+#include "Art/mkrSMClockNW.ui"
+#include "Art/mkrSMClockN.ui"
+#include "Art/mkrSMClockNE.ui"
+#include "Art/mkrSMClockW.ui"
+#include "Art/mkrSMClockC.ui"
+#include "Art/mkrSMClockE.ui"
+#include "Art/mkrSMClockSW.ui"
+#include "Art/mkrSMClockS.ui"
+#include "Art/mkrSMClockSE.ui"
+
+
+end AppSMMonikerResource;
+
+start AppSCGAMonikerResource;
+
+#include "Art/mkrSCGAClockNW.ui"
+#include "Art/mkrSCGAClockN.ui"
+#include "Art/mkrSCGAClockNE.ui"
+#include "Art/mkrSCGAClockW.ui"
+#include "Art/mkrSCGAClockC.ui"
+#include "Art/mkrSCGAClockE.ui"
+#include "Art/mkrSCGAClockSW.ui"
+#include "Art/mkrSCGAClockS.ui"
+#include "Art/mkrSCGAClockSE.ui"
+
+end AppSCGAMonikerResource;
+
+start Interface;
+
+FaceOptions = GenInteraction {
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_DRAW_IN_BOX,
+		ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN
+	}
+}
+
+visMoniker FaceOptionsTemplateMoniker = "\\1 Options";
+
+/******************************************************************************
+ *
+ *			 TEMPLATE COLOR GROUP
+ *
+ ******************************************************************************/
+/* Options tree to duplicate if firstColorString specified, but optionTree
+ * isn't */
+TemplateOptions = GenInteraction {
+	genStates = default -usable;
+	hints = { 
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN
+	}
+}
+
+/* Tree to duplicate when firstColorString specified */
+TemplateColorGroup = GenInteraction {
+	moniker = "Set Color Of:";
+	children = TemplatePartList, TemplateColorList;
+	hints = {
+		HINT_PLACE_MONIKER_TO_LEFT,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		ATTR_GEN_INIT_FILE_PROPAGATE_TO_CHILDREN
+	}
+}
+
+TemplateColorList = ClockColorSelector vardataReloc {
+	output = "TO_CUR_CLOCK";
+	toolboxPrefs = indexOrientation areaOriented;
+	hints = {
+		HINT_IF_SYSTEM_ATTRS {
+			SystemAttrs mask SA_VERTICALLY_TINY
+		},
+		    ATTR_GEN_CONTROL_PROHIBIT_UI {
+			    word mask CSF_DRAW_MASK or mask CSF_PATTERN or \
+				    mask CSF_FILLED_LIST or mask CSF_RGB
+		    },
+		    ATTR_GEN_CONTROL_REQUIRE_UI {
+			    word mask CSF_INDEX
+		    },
+		HINT_ELSE,
+		    ATTR_GEN_CONTROL_PROHIBIT_UI {
+			    word mask CSF_DRAW_MASK or mask CSF_PATTERN or \
+				    mask CSF_FILLED_LIST
+		    },
+		    ATTR_GEN_CONTROL_REQUIRE_UI {
+			    word mask CSF_INDEX or mask CSF_RGB
+		    },
+		HINT_ENDIF,
+		ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI {
+			word mask CSTF_DRAW_MASK or mask CSTF_PATTERN
+		},
+		ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI {
+			word mask CSTF_INDEX
+		},
+		ATTR_GEN_OUTPUT_TRAVEL_START {
+			UN_OPTR	ClockAppObj
+		}
+	}
+}
+TemplatePartList = GenItemGroup vardataReloc {
+	applyMsg = MSG_VC_SET_PART;
+	destination = "TO_CUR_CLOCK";
+	hints = {
+		ATTR_GEN_OUTPUT_TRAVEL_START {
+			UN_OPTR	ClockAppObj
+		},
+		HINT_ITEM_GROUP_MINIMIZE_SIZE,
+		HINT_ITEM_GROUP_DISPLAY_CURRENT_SELECTION
+	}
+}
+end Interface;
+
+/******************************************************************************
+ *
+ * 				CLOCK FACES
+ *
+ ******************************************************************************/
+#include "digitalClock.ui"
+#include "hermanClock.ui"
+#include "analogClock.ui"
+#include "skeletonClock.ui"
+

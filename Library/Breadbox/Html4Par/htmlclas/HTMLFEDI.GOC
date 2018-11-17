@@ -1,0 +1,2049 @@
+/***********************************************************************
+ *
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+ * PROJECT:       HTMLView
+ * FILE:          HTMLClRt.goc
+ *
+ * AUTHOR:        Marcus Gr”ber
+ *
+ * NOTES:         More methods for HTMLTextClass, mainly used for
+ *                display and user interaction.
+ ***********************************************************************/
+
+@include <stdapp.goh>
+@include <Objects/Text/tCtrlC.goh>
+
+#include <Ansi\string.h>
+#include <Ansi\stdio.h>
+#include <Ansi\stdlib.h>
+
+@include <fixes.goh>
+@include "options.goh"
+@include <html4par.goh>
+#include "regiont.h"
+#include "internal.h"
+@include <extgraph.goh>
+
+/* keep control on select list block size */
+#define POPUP_SELECT_LIST_MAX_NUM_ITEMS 100
+#define POPUP_SELECT_LIST_ITEM_SIZE 56  /* size of one item */
+#define SELECT_LIST_MAX_BLOCK_SIZE 30000
+
+extern word FindRegionAtPosition(optr regionArray, dword pos) ;
+extern void FormElementInvalidate(
+               optr oself,
+               HTMLformData *p_formData,
+               word formElement) ;
+
+#include "htmlclas\formset.h"
+
+@class FormElementSelectListClass, GenDynamicListClass ;
+    @instance optr FESLI_tokenList = NullHandle ;
+    @message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_FORM_ELEMENT_SELECT_LIST_QUERY_MONIKER ;
+    @message void MSG_FORM_ELEMENT_SELECT_LIST_CREATE_TOKEN_LIST() ;
+    @message Boolean MSG_FORM_ELEMENT_SELECT_LIST_APPEND_ITEM(TCHAR *buf) ;
+@endc
+@classdecl FormElementSelectListClass ;
+
+@ifdef IN_PLACE_SELECT_LIST
+@class FormElementSelectPopupListClass, FormElementSelectListClass ;
+    @instance optr FESPLI_formArray;
+    @instance word FESPLI_selectElement;
+    @instance word FESPLI_formNumber;
+    @instance optr FESPLI_namePool;
+    @instance optr FESPLI_urlTextObj;
+    @message void MSG_FORM_ELEMENT_SELECT_POPUP_LIST_INIT(optr formArray,
+                              word selectElement,
+                              word formNumber,
+                              optr NamePool,
+                              optr urlTextObj);
+    @message (GEN_ITEM_GROUP_APPLY_MSG) MSG_FORM_ELEMENT_SELECT_POPUP_LIST_APPLY;
+@endc
+@classdecl FormElementSelectPopupListClass ;
+@endif
+
+@ifdef IN_PLACE_TEXT_ENTRY
+@class InPlaceTextEntryClass, VisTextClass;
+    @message void MSG_IN_PLACE_TEXT_ENTRY_INIT(optr formArray,
+                           word formElement,
+                           optr NamePool,
+                           optr urlTextObj,
+			   Boolean dummy);
+    @message void MSG_IN_PLACE_TEXT_ENTRY_SET_SIZE(word width, word height);
+    @message void MSG_IN_PLACE_TEXT_ENTRY_SET_POS(word xPos, word yPos);
+    @message void MSG_IN_PLACE_TEXT_ENTRY_SAVE();
+    @message void MSG_IN_PLACE_TEXT_ENTRY_REMOVE();
+    @message void MSG_IN_PLACE_TEXT_ENTRY_UPDATE_POS();
+@ifdef JAVASCRIPT_SUPPORT
+    @message void MSG_IN_PLACE_TEXT_ENTRY_FIRE_EVENT();
+@endif
+
+    @instance word IPTEI_width;
+    @instance word IPTEI_height;
+    @instance word IPTEI_xPos;
+    @instance word IPTEI_yPos;
+    @instance optr IPTEI_formArray;
+    @instance word IPTEI_formElement;
+    @instance optr IPTEI_namePool;
+    @instance optr IPTEI_urlTextObj;
+    @instance Boolean IPTEI_dummy;
+@endc
+@classdecl InPlaceTextEntryClass;
+@class InPlaceTextAreaEntryClass, InPlaceTextEntryClass;
+@endc
+@classdecl InPlaceTextAreaEntryClass;
+@endif
+
+@start FormElementSelectListResource ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass FormElementEditSelectListDialog = {
+@ifdef COMPILE_OPTION_TEXT_PROMPT
+        GI_comp = @FESLD_prompt, @FESLD_area, @FESLD_OK ;
+@else
+        GI_comp = @FESLD_area, @FESLD_OK ;
+@endif
+        GI_states = @default & (~GS_USABLE) ;
+        GII_attrs = @default | GIA_MODAL
+                             | GIA_INITIATED_VIA_USER_DO_DIALOG
+                             | GIA_NOT_USER_INITIATABLE ;
+        GII_type = GIT_COMMAND;
+        GII_visibility = GIV_DIALOG ;
+        HINT_SAME_CATEGORY_AS_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+@ifdef COMPILE_OPTION_TEXT_PROMPT
+    @object GenTextClass FESLD_prompt = {
+        GTXI_text = "Please select one:" ;
+    GI_attrs = @default | GA_READ_ONLY;
+    }
+@endif
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass FESLD_area = {
+        GI_comp = @FESLD_List ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object FormElementSelectListClass FESLD_List = {
+        GDLI_queryMsg = MSG_FORM_ELEMENT_SELECT_LIST_QUERY_MONIKER ;
+        GIGI_destination = @FESLD_List;
+        HINT_DEFAULT_FOCUS ;
+        HINT_ITEM_GROUP_SCROLLABLE;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass FESLD_OK = {
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        HINT_DEFAULT_DEFAULT_ACTION ;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_OK ;
+        HINT_SEEK_REPLY_BAR ;
+    }
+    /*---------------------------------------------------------------------*/
+@end FormElementSelectListResource ;
+
+@ifdef IN_PLACE_SELECT_LIST
+@start FormElementSelectListPopupResource ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass FormElementEditSelectListPopup = {
+        GI_comp = @FESLP_area;
+        GI_states = @default & (~GS_USABLE) ;
+        GII_attrs = @default | GIA_NOT_USER_INITIATABLE ;
+        GII_visibility = GIV_POPUP ;
+        HINT_SAME_CATEGORY_AS_PARENT ;
+    HINT_INFREQUENTLY_USED;
+    HINT_AVOID_MENU_BAR;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass FESLP_area = {
+        GI_comp = @FESLP_List ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object FormElementSelectPopupListClass FESLP_List = {
+        GDLI_queryMsg = MSG_FORM_ELEMENT_SELECT_LIST_QUERY_MONIKER ;
+    GIGI_applyMsg = MSG_FORM_ELEMENT_SELECT_POPUP_LIST_APPLY ;
+        GIGI_destination = @FESLP_List;
+        HINT_DEFAULT_FOCUS ;
+        HINT_EXPAND_WIDTH_TO_FIT_PARENT ;
+        HINT_EXPAND_HEIGHT_TO_FIT_PARENT ;
+@if JAVASCRIPT_SUPPORT
+	ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION;
+@endif
+    }
+    /*---------------------------------------------------------------------*/
+@end FormElementSelectListPopupResource ;
+@endif
+
+@ifdef IN_PLACE_TEXT_ENTRY
+@start FormElementTextEntryResource ;
+    /*---------------------------------------------------------------------*/
+    @object InPlaceTextEntryClass FormElementEditTextEntry = {
+    VTI_text = "";
+        VTI_maxLength = 512 ;
+    VTI_state = @default | VTS_EDITABLE | VTS_ONE_LINE | VTS_SELECTABLE;
+    VTI_storageFlags = VTSF_DEFAULT_CHAR_ATTR | VTSF_DEFAULT_PARA_ATTR;
+    VTI_filters = VTF_NO_TABS;
+    }
+    /*---------------------------------------------------------------------*/
+@end FormElementTextEntryResource ;
+
+@start FormElementTextAreaEntryResource ;
+    /*---------------------------------------------------------------------*/
+    @object InPlaceTextAreaEntryClass FormElementEditTextAreaEntry = {
+    VTI_text = "";
+        VTI_maxLength = FORM_MAX_CHARACTERS_IN_TEXT_AREA ;
+    VTI_state = @default | VTS_EDITABLE | VTS_SELECTABLE;
+    VTI_storageFlags = VTSF_DEFAULT_CHAR_ATTR | VTSF_DEFAULT_PARA_ATTR;
+    VTI_filters = VTF_NO_TABS;
+    }
+    /*---------------------------------------------------------------------*/
+@end FormElementTextAreaEntryResource ;
+
+@start FormElementDummyDialogResource;
+@object GenInteractionClass FormElementDummyDialog = {
+    GI_comp = @FormElementDummyView;
+    GI_states = @default & (~GS_USABLE);
+        GII_attrs = @default | GIA_NOT_USER_INITIATABLE ;
+    GII_visibility = GIV_DIALOG;
+    HINT_DONT_KEEP_INITIALLY_ONSCREEN;
+    HINT_DONT_KEEP_PARTIALLY_ONSCREEN;
+    HINT_POSITION_WINDOW_AT_RATIO_OF_PARENT = {
+	SWSS_RATIO | PCT_100,
+	SWSS_RATIO | PCT_100
+    };
+}
+@object GenViewClass FormElementDummyView = {
+    GVI_content = @FormElementDummyContent;
+}
+@object VisContentClass FormElementDummyContent = {
+    VCNI_view = @FormElementDummyView;
+}
+@end FormElementDummyDialogResource;
+@endif
+
+@start FormElementTextDialogResource ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass FormElementEditTextDialog = {
+@ifdef COMPILE_OPTION_TEXT_PROMPT
+        GI_comp = @FEETD_Prompt, @FEETD_Text, @FEETD_Password, @FEETD_OK
+@else
+        GI_comp = @FEETD_Text, @FEETD_Password, @FEETD_OK
+@endif
+@ifdef COMPILE_OPTION_SYM_BUTTON
+            , @FEETD_SYM
+@endif
+            , @FormElementEditTextEditControl
+          ;
+        GI_states = @default & (~GS_USABLE) ;
+        GI_attrs = @default | GA_TARGETABLE | GA_KBD_SEARCH_PATH;
+        GII_attrs = @default | GIA_MODAL
+                             | GIA_INITIATED_VIA_USER_DO_DIALOG
+                             | GIA_NOT_USER_INITIATABLE ;
+        GII_type = GIT_COMMAND;
+        GII_visibility = GIV_DIALOG ;
+        HINT_SAME_CATEGORY_AS_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+@object GenEditControlClass FormElementEditTextEditControl = {
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+    ATTR_GEN_CONTROL_PROHIBIT_UI =
+      GECF_UNDO|GECF_CLIP_ART|GECF_CHAR_MAP;
+    ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI =
+      GECTF_UNDO;
+}
+    /*---------------------------------------------------------------------*/
+@ifdef COMPILE_OPTION_TEXT_PROMPT
+    @object GenTextClass FEETD_Prompt = {
+        GTXI_text = "Please enter your data:" ;
+    GI_attrs = @default | GA_READ_ONLY;
+    }
+@endif
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass FEETD_Text = {
+@ifndef COMPILE_OPTION_TEXT_PROMPT
+        GI_visMoniker = "Text:" ;
+@endif
+        GI_attrs = @default | GA_TARGETABLE;
+        GTXI_maxLength = 512 ;
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT ;
+        HINT_DEFAULT_FOCUS ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass FEETD_Password = {
+@ifndef COMPILE_OPTION_TEXT_PROMPT
+        GI_visMoniker = "Text:" ;
+@endif
+        GI_states = (@default) & ~GS_USABLE;
+        GI_attrs = @default | GA_TARGETABLE;
+        GTXI_maxLength = 512 ;
+        GTXI_attrs = @default | GTA_SINGLE_LINE_TEXT ;
+        ATTR_GEN_TEXT_CHAR_ATTR = @PasswordFont ;
+        HINT_DEFAULT_FOCUS ;
+    }
+    /*---------------------------------------------------------------------*/
+    @chunk VisTextCharAttr PasswordFont = CHAR_ATTR_FONT_SIZE(FID_BISON, 13) ;
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass FEETD_OK = {
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        HINT_DEFAULT_DEFAULT_ACTION ;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_OK ;
+        HINT_SEEK_REPLY_BAR ;
+    }
+    /*---------------------------------------------------------------------*/
+@ifdef COMPILE_OPTION_SYM_BUTTON
+    @object GenTriggerClass FEETD_SYM = {
+        GI_visMoniker = " SYM ";
+        GTI_destination = (TO_APP_TARGET);
+        GTI_actionMsg = MSG_GEN_APPLICATION_TOGGLE_FLOATING_KEYBOARD;
+        ATTR_GEN_DESTINATION_CLASS = { (ClassStruct *)&GenApplicationClass };
+        HINT_SEEK_TITLE_BAR_RIGHT ;
+    }
+@endif
+    /*---------------------------------------------------------------------*/
+@end FormElementTextDialogResource ;
+
+@start FormElementTextareaDialogResource ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass FormElementEditTextareaDialog = {
+@ifdef COMPILE_OPTION_TEXT_PROMPT
+        GI_comp = @FEETAD_Prompt, @FEETAD_Text, @FEETAD_OK
+@else
+        GI_comp = @FEETAD_Text, @FEETAD_OK
+@endif
+@ifdef COMPILE_OPTION_SYM_BUTTON
+            , @FEETAD_SYM
+@endif
+            , @FormElementEditTextareaEditControl
+          ;
+        GI_states = @default & (~GS_USABLE) ;
+        GI_attrs = @default | GA_TARGETABLE | GA_KBD_SEARCH_PATH;
+        GII_attrs = @default | GIA_MODAL
+                             | GIA_INITIATED_VIA_USER_DO_DIALOG
+                             | GIA_NOT_USER_INITIATABLE ;
+        GII_type = GIT_COMMAND;
+        GII_visibility = GIV_DIALOG ;
+        HINT_SAME_CATEGORY_AS_PARENT ;
+    }
+    /*---------------------------------------------------------------------*/
+@object GenEditControlClass FormElementEditTextareaEditControl = {
+    GI_attrs = @default | GA_KBD_SEARCH_PATH;
+    GII_visibility = GIV_DIALOG;
+    GII_attrs = @default | GIA_NOT_USER_INITIATABLE;
+    ATTR_GEN_CONTROL_PROHIBIT_UI =
+      GECF_UNDO|GECF_CLIP_ART|GECF_CHAR_MAP;
+    ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI =
+      GECTF_UNDO;
+}
+    /*---------------------------------------------------------------------*/
+@ifdef COMPILE_OPTION_TEXT_PROMPT
+    @object GenTextClass FEETAD_Prompt = {
+        GTXI_text = "Please enter your data:" ;
+    GI_attrs = @default | GA_READ_ONLY;
+    }
+@endif
+    /*---------------------------------------------------------------------*/
+    @object GenTextClass FEETAD_Text = {
+        GI_attrs = @default | GA_TARGETABLE;
+        GTXI_maxLength = FORM_MAX_CHARACTERS_IN_TEXT_AREA ;
+        GTXI_attrs = @default | GTA_INIT_SCROLLING ;
+        HINT_FIXED_SIZE = { SST_PIXELS | 400, SST_PIXELS | 200 } ;
+        HINT_DEFAULT_FOCUS ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass FEETAD_OK = {
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE ;
+        HINT_DEFAULT_DEFAULT_ACTION ;
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_OK ;
+        HINT_SEEK_REPLY_BAR ;
+    }
+    /*---------------------------------------------------------------------*/
+@ifdef COMPILE_OPTION_SYM_BUTTON
+    @object GenTriggerClass FEETAD_SYM = {
+        GI_visMoniker = " SYM ";
+        GTI_destination = (TO_APP_TARGET);
+        GTI_actionMsg = MSG_GEN_APPLICATION_TOGGLE_FLOATING_KEYBOARD;
+        ATTR_GEN_DESTINATION_CLASS = { (ClassStruct *)&GenApplicationClass };
+        HINT_SEEK_TITLE_BAR_RIGHT ;
+    }
+@endif
+    /*---------------------------------------------------------------------*/
+@end FormElementTextareaDialogResource ;
+
+@start FormElementEditFileDialogResource ;
+    /*---------------------------------------------------------------------*/
+    @object GenInteractionClass FormElementEditFileDialog = {
+        GI_comp = @FormFileSelect, @FormFileOK, @FormFileCANCEL;
+        GI_visMoniker = "File selection";
+        GI_states = @default & (~GS_USABLE) ;
+        GII_attrs = @default | GIA_MODAL
+                             | GIA_INITIATED_VIA_USER_DO_DIALOG
+                             | GIA_NOT_USER_INITIATABLE ;
+        GII_type = GIT_ORGANIZATIONAL;
+        GII_visibility = GIV_DIALOG;
+
+        HINT_NOT_MOVABLE;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass FormFileOK = {
+        GI_visMoniker = "OK";
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_OK ;
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        HINT_SEEK_REPLY_BAR;
+        HINT_DEFAULT_DEFAULT_ACTION ;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenTriggerClass FormFileCANCEL = {
+        GI_visMoniker = "Cancel";
+        ATTR_GEN_TRIGGER_INTERACTION_COMMAND = IC_DISMISS ;
+        GI_attrs = @default | GA_SIGNAL_INTERACTION_COMPLETE;
+        HINT_SEEK_REPLY_BAR;
+    }
+    /*---------------------------------------------------------------------*/
+    @object GenFileSelectorClass FormFileSelect = {
+/*
+        GFSI_destination = process;
+        GFSI_notificationMsg = MSG_GW_FORM_SEL_FILE;
+*/
+        HINT_FILE_SELECTOR_NUMBER_OF_FILES_TO_SHOW = 8;
+    }
+    /*---------------------------------------------------------------------*/
+@end FormElementEditFileDialogResource ;
+
+
+@start FormButtonResource, data ;
+    /*---------------------------------------------------------------------*/
+    @chunk TCHAR FormButtonTextSubmit[] = _TEXT("Submit") ;
+    @chunk TCHAR FormButtonTextReset[] = _TEXT("Reset") ;
+    /*---------------------------------------------------------------------*/
+@end FormButtonResource ;
+
+
+@method FormElementSelectListClass,
+        MSG_FORM_ELEMENT_SELECT_LIST_QUERY_MONIKER
+{
+    TCHAR *p_string ;
+    TCHAR buf[MAX_FORM_ELEMENT_OPTION_LENGTH+1] ;
+
+    /* Must have block of indexes and a pool of names to work */
+    if ((pself->FESLI_tokenList != NullHandle)) {
+        /* Get the NameToken we are going to look up */
+        p_string = ChunkArrayElementToPtr(
+                      pself->FESLI_tokenList,
+                      item,
+                      NULL) ;
+        strncpy(buf, p_string, sizeof(buf)/sizeof(TCHAR)-1) ;
+        @call oself::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(
+                  item,
+                  buf) ;
+        pself = ObjDerefGen(oself);
+    }
+}
+
+@method FormElementSelectListClass,
+        MSG_FORM_ELEMENT_SELECT_LIST_CREATE_TOKEN_LIST
+{
+    pself->FESLI_tokenList = ConstructOptr(
+        OptrToHandle(oself),
+        ChunkArrayCreate(OptrToHandle(oself), 0, 0, OCF_DIRTY)) ;
+}
+
+@method FormElementSelectListClass,
+        MSG_FORM_ELEMENT_SELECT_LIST_APPEND_ITEM
+{
+    TCHAR *p_string;
+    Boolean added = FALSE;
+
+    if (MemGetInfo(OptrToHandle(pself->FESLI_tokenList), MGIT_SIZE) < SELECT_LIST_MAX_BLOCK_SIZE) {
+    p_string = ChunkArrayAppend(pself->FESLI_tokenList, (strlen(buf)+3)*sizeof(TCHAR)) ;
+    strcpy(p_string, buf) ;
+    added = TRUE;
+    }
+    return added;
+}
+
+@ifdef IN_PLACE_SELECT_LIST  /********************************************/
+
+/* local prototypes */
+extern SizeAsDWord FormElementGetSize(
+                HTMLformData *p_formData,
+                word formElement,
+                optr formArray,
+                optr NamePool);
+
+@method FormElementSelectPopupListClass, MSG_FORM_ELEMENT_SELECT_POPUP_LIST_INIT
+{
+    pself->FESPLI_formArray = formArray;
+    pself->FESPLI_selectElement = selectElement;
+    pself->FESPLI_formNumber = formNumber;
+    pself->FESPLI_namePool = NamePool;
+    pself->FESPLI_urlTextObj = urlTextObj;
+}
+
+@method FormElementSelectPopupListClass, MSG_FORM_ELEMENT_SELECT_POPUP_LIST_APPLY
+{
+    word count;
+    word i, num;
+    word size;
+    HTMLformData *p_option;
+    optr formArray = pself->FESPLI_formArray;
+    word selectElement = pself->FESPLI_selectElement;
+
+    MemLock(OptrToHandle(formArray));
+
+    /* Note which items are selected and record them in */
+    /* the system */
+    count = 0 ;
+    num = ChunkArrayGetCount(formArray) ;
+    for(i=0; i<num; i++)  {
+    p_option = ChunkArrayElementToPtr(formArray, i, &size) ;
+    /* Only bother with options in the same form */
+    if ((p_option->HFD_itemType == HTML_FORM_OPTION) &&
+        (p_option->HFD_formNumber == pself->FESPLI_formNumber) &&
+        (p_option->HFD_var.option.menuElement == selectElement) &&
+	!(p_option->HFD_var.option.flags & HTML_OPTION_DELETED) &&
+        (p_option->HFD_value != NAME_POOL_NONE))  {
+        /* Append this option's id to the end of the list */
+        if (@call oself::MSG_GEN_ITEM_GROUP_IS_ITEM_SELECTED(
+        count))  {
+        /* Item is selected */
+        p_option->HFD_runtimeState |= HTML_OPTION_SELECTED ;
+        } else {
+        /* Item is not selected */
+        p_option->HFD_runtimeState &= (~HTML_OPTION_SELECTED) ;
+        }
+        count++ ;
+    }
+    }
+
+    /* invalidate select button to show new selection */
+    /* (MUST @send to avoid deadlock) */
+    @send pself->FESPLI_urlTextObj::MSG_HTML_TEXT_FORM_ELEMENT_INVALIDATE(
+	selectElement);
+
+@ifdef JAVASCRIPT_SUPPORT
+    /* fire change event */
+    @send pself->FESPLI_urlTextObj::MSG_HTML_TEXT_FIRE_EVENT(
+      HTML_EVENT_CHANGE, HTML_EVENT_OBJECT_ELEMENT, selectElement);
+@endif
+    MemUnlock(OptrToHandle(formArray));
+}
+
+/*
+ * free popup list when closed
+ */
+@method FormElementSelectPopupListClass, MSG_VIS_CLOSE
+{
+    optr popupObj;
+
+    @callsuper();
+
+    popupObj = ConstructOptr(OptrToHandle(oself),
+                 OptrToChunk(@FormElementEditSelectListPopup));
+    /* always destroy when closing */
+    @send, forceQueue popupObj::MSG_GEN_REMOVE(VUM_NOW, CCF_MARK_DIRTY);
+    @send, forceQueue oself::MSG_META_BLOCK_FREE();
+}
+
+int FormElementCountSelectListItems(optr formArray, word formNumber, word selectElement)
+{
+    int numSelect = 0, numForm, i;
+    word size;
+    HTMLformData *p_option;
+
+    if (formArray) {
+	numForm = ChunkArrayGetCount(formArray) ;
+	for(i=0; i<numForm; i++)  {
+	    p_option = ChunkArrayElementToPtr(formArray, i, &size) ;
+	    /* Only bother with options in the same form */
+	    if ((p_option->HFD_itemType == HTML_FORM_OPTION) &&
+		(p_option->HFD_formNumber == formNumber) &&
+		(p_option->HFD_var.option.menuElement == selectElement) &&
+		!(p_option->HFD_var.option.flags & HTML_OPTION_DELETED) &&
+		(p_option->HFD_value != NAME_POOL_NONE))  {
+		numSelect++ ;
+	    }
+        }
+    }
+    return numSelect;
+}
+
+word FormElementGetSelectListBlockSize(optr formArray, word formNumber, word selectElement, optr NamePool)
+{
+    int numForm, i;
+    word size, blockSize = 0;
+    HTMLformData *p_option;
+
+    if (formArray) {
+	numForm = ChunkArrayGetCount(formArray) ;
+	for(i=0; i<numForm; i++)  {
+	    p_option = ChunkArrayElementToPtr(formArray, i, &size) ;
+	    /* Only bother with options in the same form */
+	    if ((p_option->HFD_itemType == HTML_FORM_OPTION) &&
+		(p_option->HFD_formNumber == formNumber) &&
+		(p_option->HFD_var.option.menuElement == selectElement) &&
+		!(p_option->HFD_var.option.flags & HTML_OPTION_DELETED) &&
+		(p_option->HFD_value != NAME_POOL_NONE))  {
+		blockSize += NamePoolStrLength(NamePool, p_option->HFD_value)*sizeof(TCHAR) + POPUP_SELECT_LIST_ITEM_SIZE;
+	    }
+        }
+    }
+    return blockSize;
+}
+
+void FormElementPopUpSelectList(
+         HTMLformData *p_formData,
+         optr NamePool,
+         optr formArray,
+         word selectElement,
+     optr urlTextObj)
+{
+    optr popupObj, listObj, areaObj ;
+    TCHAR buf[MAX_FORM_ELEMENT_EDIT_TEXT_CHARS+1] ;
+    word num ;
+    word numTokens ;
+    word count ;
+    word i;
+    HTMLformData *p_option ;
+    word size ;
+    word maxlen;
+    CompSizeHintArgs minSize;
+    RectDWord fBounds;
+    WindowHandle fWin;
+    PointDWord fPos;
+    SizeAsDWord fSize;
+
+    popupObj = ConstructOptr(
+	ObjDuplicateResource(
+	    /* must be run by UI thread (-1) */
+	    OptrToHandle(@FormElementEditSelectListPopup), 0, -1),
+	OptrToChunk(@FormElementEditSelectListPopup));
+    @call application::MSG_GEN_ADD_CHILD(popupObj, CCO_LAST);
+    @call popupObj::MSG_GEN_SET_USABLE(VUM_NOW);
+    listObj = ConstructOptr(OptrToHandle(popupObj), OptrToChunk(@FESLP_List)) ;
+    areaObj = ConstructOptr(OptrToHandle(popupObj), OptrToChunk(@FESLP_area)) ;
+
+    /* store data for later */
+    @call listObj::MSG_FORM_ELEMENT_SELECT_POPUP_LIST_INIT(formArray,
+                               selectElement,
+                               p_formData->HFD_formNumber,
+                               NamePool,
+                               urlTextObj);
+
+    /* Create a block of list items */
+    @call listObj::MSG_FORM_ELEMENT_SELECT_LIST_CREATE_TOKEN_LIST() ;
+
+    MemLock(OptrToHandle(formArray)) ;
+
+    /* Go through all the form elements and find all the options */
+    /* and put them into a list to make the list faster. */
+    num = ChunkArrayGetCount(formArray) ;
+    numTokens = 0 ;
+    maxlen = MIN_LIST_WIDTH ;
+    for(i=0; i<num; i++)  {
+        p_option = ChunkArrayElementToPtr(formArray, i, &size) ;
+        /* Only bother with options in the same form */
+        if ((p_option->HFD_itemType == HTML_FORM_OPTION) &&
+            (p_option->HFD_formNumber == p_formData->HFD_formNumber) &&
+            (p_option->HFD_var.option.menuElement == selectElement) &&
+	    !(p_option->HFD_var.option.flags & HTML_OPTION_DELETED) &&
+            (p_option->HFD_value != NAME_POOL_NONE))  {
+            /* Append this token's string to the end of the list */
+            NamePoolCopy(
+                      NamePool,
+                      buf,
+                      sizeof(buf)-1*sizeof(TCHAR),
+                      p_option->HFD_value,
+                      NULL);
+
+            if(strlen(buf) > maxlen)    /* collect maximum length of items */
+              maxlen = strlen(buf);
+
+            if (@call listObj::MSG_FORM_ELEMENT_SELECT_LIST_APPEND_ITEM(buf))
+	    numTokens++ ;
+        }
+    }
+
+    minSize.CSHA_width = SST_AVG_CHAR_WIDTHS | maxlen;
+    minSize.CSHA_height = 0;
+    minSize.CSHA_count = 0;
+
+    @call areaObj::MSG_META_ADD_VAR_DATA(
+      HINT_MINIMUM_SIZE, sizeof(minSize), &minSize);
+
+    /* Now initialize the list */
+    @send listObj::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numTokens) ;
+    count = 0 ;
+    for(i=0; i<num; i++)  {
+        p_option = ChunkArrayElementToPtr(formArray, i, &size) ;
+        /* Only bother with options in the same form */
+        if ((p_option->HFD_itemType == HTML_FORM_OPTION) &&
+            (p_option->HFD_formNumber == p_formData->HFD_formNumber) &&
+            (p_option->HFD_var.option.menuElement == selectElement) &&
+	    !(p_option->HFD_var.option.flags & HTML_OPTION_DELETED) &&
+            (p_option->HFD_value != NAME_POOL_NONE))  {
+            /* Append this option's id to the end of the list */
+            if (p_option->HFD_runtimeState & HTML_OPTION_SELECTED)
+                @call listObj::MSG_GEN_ITEM_GROUP_SET_ITEM_STATE(
+                          count,
+                          TRUE) ;
+            count++ ;
+        }
+    }
+
+    /* open the popup list below the "list button" */
+    /* (this is running in the HTMLText thread, so it is okay to @call it) */
+    @call urlTextObj::MSG_HTML_TEXT_GET_REGION_POSITION(
+    p_formData->HFD_pos, &fBounds);
+    fWin = @call urlTextObj::MSG_VIS_QUERY_WINDOW();
+    WinTransformDWord(fWin,
+		      fBounds.RD_left + p_formData->x,
+		      fBounds.RD_top + p_formData->y,
+		      &fPos);
+    fSize = FormElementGetSize(p_formData, selectElement, formArray, NamePool);
+    @call popupObj::MSG_VIS_SET_POSITION((word)fPos.PD_x,
+					 (word)fPos.PD_y +
+					 DWORD_HEIGHT(fSize));
+    @call popupObj::MSG_GEN_INTERACTION_INITIATE();
+
+    MemUnlock(OptrToHandle(formArray)) ;
+}
+
+/*
+ * remove text entry object
+ */
+void FormElementRemoveSelectList()
+{
+    optr focusObj = NullOptr, sizeInt = NullOptr, selectList = NullOptr;
+
+    /* if select list opened, it has focus under app object */
+    /* select list
+     * -> sizing interaction
+     *    -> FormElementSelectList
+     */
+    if (@call application::MSG_META_GET_FOCUS_EXCL(&focusObj)) {
+    if (focusObj &&
+        @call focusObj::MSG_META_IS_OBJECT_IN_CLASS(
+        &GenInteractionClass)) {
+        sizeInt = @call focusObj::MSG_GEN_FIND_CHILD_AT_POSITION(0);
+        if (sizeInt) {
+        selectList = @call sizeInt::MSG_GEN_FIND_CHILD_AT_POSITION(0);
+        if (selectList &&
+            @call selectList::MSG_META_IS_OBJECT_IN_CLASS(
+            &FormElementSelectListClass)) {
+            @call focusObj::MSG_GEN_GUP_INTERACTION_COMMAND(
+                IC_DISMISS);
+        }
+        }
+    }
+    }
+}
+
+@endif  /* IN_PLACE_SELECT_LIST *****************************************/
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_FORM_ELEMENT_INVALIDATE
+{
+    HTMLformData *p_formData;
+    optr formArray = pself->HTI_formArray;
+    word size;
+    RectDWord fBounds;
+    SizeAsDWord fSize;
+    GStateHandle gstate;
+
+    MemLock(OptrToHandle(formArray));
+    p_formData = ChunkArrayElementToPtr(formArray, formElement, &size);
+    if (p_formData->HFD_itemType != HTML_FORM_IMAGE) {
+	@call self::MSG_HTML_TEXT_GET_REGION_POSITION(
+	    p_formData->HFD_pos, &fBounds);
+	fBounds.RD_left += p_formData->x;
+	fBounds.RD_top += p_formData->y;
+	fSize = FormElementGetSize(p_formData, formElement, formArray, pself->HTI_namePool);
+	fBounds.RD_right = fBounds.RD_left + DWORD_WIDTH(fSize);
+	fBounds.RD_bottom = fBounds.RD_top + DWORD_HEIGHT(fSize);
+
+	fBounds.RD_left -= FORM_SIZE_SELECT_EDGE ;
+	fBounds.RD_right += FORM_SIZE_SELECT_EDGE ;
+	fBounds.RD_top -= FORM_SIZE_SELECT_EDGE ;
+	fBounds.RD_bottom += FORM_SIZE_SELECT_EDGE ;
+	gstate = @call self::MSG_VIS_VUP_CREATE_GSTATE();
+	GrInvalRectDWord(gstate, &fBounds);
+	GrDestroyState(gstate);
+    }
+    MemUnlock(OptrToHandle(formArray));
+}
+
+@ifdef JAVASCRIPT_SUPPORT
+void FormElementEditSelectList(
+         HTMLformData *p_formData,
+         optr NamePool,
+         optr formArray,
+         word selectElement,
+	 optr urlTextObj)
+@else
+void FormElementEditSelectList(
+         HTMLformData *p_formData,
+         optr NamePool,
+         optr formArray,
+         word selectElement)
+@endif
+{
+    optr box ;
+    word result ;
+    optr listObj, areaObj ;
+    TCHAR buf[MAX_FORM_ELEMENT_EDIT_TEXT_CHARS+1] ;
+    MemHandle mem ;
+    word num ;
+    word numTokens ;
+    word count ;
+    word i;
+    HTMLformData *p_option ;
+    word size ;
+    word maxlen;
+    CompSizeHintArgs minSize;
+
+    box = UserCreateDialog(@FormElementEditSelectListDialog) ;
+    mem = OptrToHandle(box) ;
+    listObj = ConstructOptr(mem, OptrToChunk(@FESLD_List)) ;
+    areaObj = ConstructOptr(mem, OptrToChunk(@FESLD_area)) ;
+
+    /* Create a block of list items */
+    @call listObj::MSG_FORM_ELEMENT_SELECT_LIST_CREATE_TOKEN_LIST() ;
+
+    MemLock(OptrToHandle(formArray)) ;
+
+    /* Go through all the form elements and find all the options */
+    /* and put them into a list to make the list faster. */
+    num = ChunkArrayGetCount(formArray) ;
+    numTokens = 0 ;
+    maxlen = MIN_LIST_WIDTH ;
+    for(i=0; i<num; i++)  {
+        p_option = ChunkArrayElementToPtr(formArray, i, &size) ;
+        /* Only bother with options in the same form */
+        if ((p_option->HFD_itemType == HTML_FORM_OPTION) &&
+            (p_option->HFD_formNumber == p_formData->HFD_formNumber) &&
+            (p_option->HFD_var.option.menuElement == selectElement) &&
+	    !(p_option->HFD_var.option.flags & HTML_OPTION_DELETED) &&
+            (p_option->HFD_value != NAME_POOL_NONE))  {
+            /* Append this token's string to the end of the list */
+            NamePoolCopy(
+                      NamePool,
+                      buf,
+                      sizeof(buf)-1*sizeof(TCHAR),
+                      p_option->HFD_value,
+                      NULL);
+
+            if(strlen(buf) > maxlen)    /* collect maximum length of items */
+              maxlen = strlen(buf);
+
+            if (@call listObj::MSG_FORM_ELEMENT_SELECT_LIST_APPEND_ITEM(buf))
+	    numTokens++ ;
+        }
+    }
+
+@ifdef COMPILE_OPTION_TEXT_PROMPT
+    /* Set prompt */
+     if (p_formData->HFD_prompt) {
+        NamePoolCopy(
+                  NamePool,
+                  buf,
+                  sizeof(buf)-1*sizeof(TCHAR),
+                  p_formData->HFD_prompt,
+                  NULL);
+        @call ConstructOptr(mem, OptrToChunk(@FESLD_prompt))::
+        MSG_VIS_TEXT_REPLACE_ALL_PTR(buf, 0) ;
+     }
+@endif
+
+    /* Is this a single or multiple field item? */
+    if (p_formData->HFD_var.select.flags & HTML_SELECT_MULTI)
+        /* Multiple selections are allowed */
+        @call listObj::MSG_GEN_ITEM_GROUP_SET_BEHAVIOR_TYPE(
+            GIGBT_NON_EXCLUSIVE) ;
+
+    minSize.CSHA_width = SST_AVG_CHAR_WIDTHS | maxlen;
+    minSize.CSHA_height = 0;
+    minSize.CSHA_count = 0;
+
+    @call areaObj::MSG_META_ADD_VAR_DATA(
+      HINT_MINIMUM_SIZE, sizeof(minSize), &minSize);
+
+    /* Now initialize the list */
+    @send listObj::MSG_GEN_DYNAMIC_LIST_INITIALIZE(numTokens) ;
+    count = 0 ;
+    for(i=0; i<num; i++)  {
+        p_option = ChunkArrayElementToPtr(formArray, i, &size) ;
+        /* Only bother with options in the same form */
+        if ((p_option->HFD_itemType == HTML_FORM_OPTION) &&
+            (p_option->HFD_formNumber == p_formData->HFD_formNumber) &&
+            (p_option->HFD_var.option.menuElement == selectElement) &&
+	    !(p_option->HFD_var.option.flags & HTML_OPTION_DELETED) &&
+            (p_option->HFD_value != NAME_POOL_NONE))  {
+            /* Append this option's id to the end of the list */
+            if (p_option->HFD_runtimeState & HTML_OPTION_SELECTED)
+                @call listObj::MSG_GEN_ITEM_GROUP_SET_ITEM_STATE(
+                          count,
+                          TRUE) ;
+            count++ ;
+        }
+    }
+
+    result = UserDoDialog(box) ;
+
+    /* Only record the changes if an OK option was selected */
+    if (result == IC_OK)  {
+        /* Note which items are selected and record them in */
+        /* the system */
+        count = 0 ;
+        for(i=0; i<num; i++)  {
+            p_option = ChunkArrayElementToPtr(formArray, i, &size) ;
+            /* Only bother with options in the same form */
+            if ((p_option->HFD_itemType == HTML_FORM_OPTION) &&
+                (p_option->HFD_formNumber == p_formData->HFD_formNumber) &&
+                (p_option->HFD_var.option.menuElement == selectElement) &&
+		!(p_option->HFD_var.option.flags & HTML_OPTION_DELETED) &&
+                (p_option->HFD_value != NAME_POOL_NONE))  {
+                /* Append this option's id to the end of the list */
+                if (@call listObj::MSG_GEN_ITEM_GROUP_IS_ITEM_SELECTED(
+                              count))  {
+                    /* Item is selected */
+                    p_option->HFD_runtimeState |= HTML_OPTION_SELECTED ;
+                } else {
+                    /* Item is not selected */
+                    p_option->HFD_runtimeState &= (~HTML_OPTION_SELECTED) ;
+                }
+                count++ ;
+            }
+        }
+@ifdef JAVASCRIPT_SUPPORT
+        /* fire change event */
+        @call urlTextObj::MSG_HTML_TEXT_FIRE_EVENT(HTML_EVENT_CHANGE, 
+          HTML_EVENT_OBJECT_ELEMENT, selectElement);
+@endif
+    }
+
+    MemUnlock(OptrToHandle(formArray)) ;
+    UserDestroyDialog(box) ;
+}
+
+@ifdef IN_PLACE_TEXT_ENTRY
+
+/* local prototypes */
+extern SizeAsDWord FormElementGetSize(
+                HTMLformData *p_formData,
+                word formElement,
+                optr formArray,
+                optr NamePool);
+
+@alias (MSG_VIS_TEXT_SET_POINT_SIZE) \
+void MSG_VIS_TEXT_SET_POINT_SIZE_DWORD(@stack dword rSize, \
+                  dword rEnd, dword rStart);
+
+extern void FormElementRemoveTextEntry(optr urlTextObj);
+
+/*
+ * text entry form element selected
+ */
+void LOCAL FormElementEnableTextEntry(HTMLformData *p_formData, optr NamePool,
+                      word formElement, optr formArray,
+                      optr urlTextObj)
+{
+    optr textObj, content;
+    TCHAR buf[MAX_FORM_ELEMENT_EDIT_TEXT_CHARS+1] ;
+    word maxlen ;
+    SizeAsDWord dwordSize;
+    RectDWord bounds;
+
+    /* remove any existing text object first */
+    FormElementRemoveTextEntry(urlTextObj);
+
+    textObj = ConstructOptr(
+    ObjDuplicateResource(
+        OptrToHandle(@FormElementEditTextEntry), 0, 0),
+    OptrToChunk(@FormElementEditTextEntry));
+
+    /* set position */
+    @call urlTextObj::MSG_HTML_TEXT_GET_REGION_POSITION(
+	p_formData->HFD_pos, &bounds);
+    @call textObj::MSG_IN_PLACE_TEXT_ENTRY_SET_POS(
+	bounds.RD_left + p_formData->x + 2,
+	bounds.RD_top + p_formData->y + 2);
+    /* set size */
+    dwordSize = FormElementGetSize(p_formData, formElement,
+                   formArray, NamePool);
+    @call textObj::MSG_IN_PLACE_TEXT_ENTRY_SET_SIZE(
+    DWORD_WIDTH(dwordSize) - 3,
+    DWORD_HEIGHT(dwordSize) - 3);
+
+    /* attach to vis tree */
+    content = @call urlTextObj::MSG_VIS_FIND_PARENT();
+    @call content::MSG_VIS_ADD_CHILD(textObj, CCF_MARK_DIRTY | CCO_LAST);
+    /* this will use position and size set above */
+    @call textObj::MSG_VIS_MARK_INVALID(VOF_WINDOW_INVALID, VUM_NOW);
+
+    /* Decide which of the two fields to use */
+    if (p_formData->HFD_itemType == HTML_FORM_PASSWORD) {
+        @call textObj::MSG_VIS_TEXT_SET_FONT_ID(
+            FID_BISON, TEXT_ADDRESS_PAST_END, 0);
+        @call textObj::MSG_VIS_TEXT_SET_POINT_SIZE_DWORD(
+            MakeWWFixed(13), TEXT_ADDRESS_PAST_END, 0);
+    } else {
+        @call textObj::MSG_VIS_TEXT_SET_FONT_ID(
+            FormGetFont(), TEXT_ADDRESS_PAST_END, 0);
+        @call textObj::MSG_VIS_TEXT_SET_POINT_SIZE_DWORD(
+            MakeWWFixed(FormGetPointSize()), TEXT_ADDRESS_PAST_END, 0);
+    }
+
+    /* Put a limit on the size of the text entries */
+    maxlen = p_formData->HFD_var.text_password.maxlen ;
+    if ((maxlen == 0) || (maxlen > FORM_MAX_CHARACTERS_IN_TEXT_LINE))
+        maxlen = FORM_MAX_CHARACTERS_IN_TEXT_LINE ;
+    @call textObj::MSG_VIS_TEXT_SET_MAX_LENGTH(maxlen) ;
+
+    /* Put the info in the text box */
+    if (p_formData->HFD_runtimeState)  {
+        NamePoolCopy(
+                  NamePool,
+                  buf,
+                  sizeof(buf)-1*sizeof(TCHAR),
+                  p_formData->HFD_runtimeState,
+                  NULL);
+        @call textObj::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+                  buf, 0) ;
+    }
+
+    /* select form element in url text object for navigation ops */
+    @call urlTextObj::MSG_VIS_TEXT_SELECT_RANGE(
+        p_formData->HFD_pos,
+        p_formData->HFD_pos);
+
+    /* grab focus and target (for clipboard operations),
+       released on completion */
+    @call textObj::MSG_META_GRAB_FOCUS_EXCL();
+    @call textObj::MSG_META_GRAB_TARGET_EXCL();
+
+    /* add hook to detect completion */
+    @call textObj::MSG_IN_PLACE_TEXT_ENTRY_INIT(formArray,
+                        formElement, NamePool,
+                        urlTextObj, FALSE);
+}
+
+optr FormElementEnableTextAreaEntry(HTMLformData *p_formData,
+				    optr NamePool,
+				    word formElement, optr formArray,
+				    optr urlTextObj,
+				    Boolean dummy)
+{
+    optr textObj, content;
+    SizeAsDWord dwordSize;
+    RectDWord bounds;
+    optr appObj = GeodeGetAppObject(0);
+    MemHandle uiThread = MemGetInfo(OptrToHandle(appObj), MGIT_EXEC_THREAD);
+    optr box;
+
+    /* remove any existing text object first */
+    if (!dummy)
+	FormElementRemoveTextEntry(urlTextObj);
+
+    textObj = ConstructOptr(
+    ObjDuplicateResource(
+        OptrToHandle(@FormElementEditTextAreaEntry), 0, dummy ? uiThread : 0),
+    OptrToChunk(@FormElementEditTextAreaEntry));
+
+    /* set position */
+    if (dummy) {
+	/* sits in special dialog, so origin is okay */
+	@call textObj::MSG_IN_PLACE_TEXT_ENTRY_SET_POS(0, 0);
+    } else {
+	@call urlTextObj::MSG_HTML_TEXT_GET_REGION_POSITION(
+	    p_formData->HFD_pos, &bounds);
+	@call textObj::MSG_IN_PLACE_TEXT_ENTRY_SET_POS(
+	    bounds.RD_left + p_formData->x + 2,
+	    bounds.RD_top + p_formData->y + 2);
+    }
+    /* set size */
+    dwordSize = FormElementGetSize(p_formData, formElement,
+                   formArray, NamePool);
+    if (dummy) {
+	/* hopefully, taller than ever necessary */
+	dwordSize = MAKE_SIZE_DWORD(DWORD_WIDTH(dwordSize), MAX_COORD-1);
+    }
+    @call textObj::MSG_IN_PLACE_TEXT_ENTRY_SET_SIZE(
+	DWORD_WIDTH(dwordSize) - 3,
+	DWORD_HEIGHT(dwordSize) - 3);
+
+    /* add hook to detect completion (before invalidating) */
+    @call textObj::MSG_IN_PLACE_TEXT_ENTRY_INIT(formArray,
+                        formElement, NamePool,
+                        urlTextObj, dummy);
+
+    /* attach to vis tree */
+    if (dummy) {
+	/* dummy object must be added elsewhere to avoid causing urlTextObj
+	   to grow, as we could be in it's VIS_DRAW handler */
+	box = UserCreateDialog(@FormElementDummyDialog);
+	@call box::MSG_GEN_INTERACTION_INITIATE();
+	@call ConstructOptr(OptrToHandle(box), OptrToChunk(@FormElementDummyContent))::MSG_VIS_ADD_CHILD(textObj, CCF_MARK_DIRTY | CCO_LAST);
+    } else {
+	/* attach to HTML area */
+	content = @call urlTextObj::MSG_VIS_FIND_PARENT();
+	@call content::MSG_VIS_ADD_CHILD(textObj, CCF_MARK_DIRTY | CCO_LAST);
+    }
+    /* this will use position and size set above */
+    @call textObj::MSG_VIS_MARK_INVALID(VOF_WINDOW_INVALID, VUM_NOW);
+
+    /* Set up font and size */
+    @call textObj::MSG_VIS_TEXT_SET_FONT_ID(
+        FormGetFont(), TEXT_ADDRESS_PAST_END, 0);
+    @call textObj::MSG_VIS_TEXT_SET_POINT_SIZE_DWORD(
+        MakeWWFixed(FormGetPointSize()), TEXT_ADDRESS_PAST_END, 0);
+
+    /* Put the info in the text box */
+    if (p_formData->HFD_runtimeState)  {
+        @call textObj::MSG_VIS_TEXT_REPLACE_ALL_BLOCK(
+                  p_formData->HFD_runtimeState, 0) ;
+        @call textObj::MSG_VIS_TEXT_SELECT_START();
+    }
+
+    if (!dummy) {
+	/* select form element in url text object for navigation ops */
+	@call urlTextObj::MSG_VIS_TEXT_SELECT_RANGE(
+	    p_formData->HFD_pos,
+	    p_formData->HFD_pos);
+
+	/* grab focus and target (for clipboard operations),
+       released on completion */
+	@call textObj::MSG_META_GRAB_FOCUS_EXCL();
+	@call textObj::MSG_META_GRAB_TARGET_EXCL();
+    }
+    return textObj;
+}
+
+void GetLineInfo(optr textObj, HTMLformData *p_formData)
+{
+    VisTextGetLineInfoParameters lParams;
+    VisTextGetLineInfoReturnValues lRet;
+    LineInfo lineInfo;
+    MemHandle lineInfoBlock;
+    int cCount = 0;
+    int *lPtr;
+
+    /* allocate line info block */
+    lineInfoBlock = MemAlloc(100, HF_DYNAMIC, HAF_STANDARD_LOCK);
+    if (!lineInfoBlock) {
+	/* if error, keep old line info */
+	return;
+    }
+    lParams.VTGLIP_buffer = &lineInfo;
+    lParams.VTGLIP_bsize = sizeof(LineInfo);
+    lParams.VTGLIP_line = 0;
+    /* contrary to docs, 0 is returned on success */
+    while ((@call textObj::MSG_VIS_TEXT_GET_LINE_INFO(&lRet, &lParams)) == 0) {
+	/* make sure our buffer is big enough (plus null) */
+	if (MemGetInfo(lineInfoBlock, MGIT_SIZE)+1 < (lParams.VTGLIP_line+1)*2) {
+	    if (MemReAlloc(lineInfoBlock,
+			   MemGetInfo(lineInfoBlock, MGIT_SIZE) + 100,
+			   HAF_STANDARD) == 0) {
+		/* mem error, just stop */
+		break;
+	    }
+	}
+	/* add line info to our buffer */
+	cCount += lineInfo.LI_count.WAAH_low;
+	lPtr = MemDeref(lineInfoBlock);
+	lPtr[lParams.VTGLIP_line] = cCount;
+	/* next line */
+	lParams.VTGLIP_line++;
+    }
+    /* null-terminate */
+    lPtr = MemDeref(lineInfoBlock);
+    lPtr[lParams.VTGLIP_line] = 0;
+    MemUnlock(lineInfoBlock);
+    if (p_formData->HFD_var.textarea.lines) {
+	MemFree(p_formData->HFD_var.textarea.lines);
+    }
+    p_formData->HFD_var.textarea.lines = lineInfoBlock;
+}
+
+/*
+ * finished interaction with text entry
+ */
+void FormEntryDisableTextEntry(optr oself,
+			       optr formArray, word formElement,
+			       optr namePool)
+{
+    TCHAR buf[MAX_FORM_ELEMENT_EDIT_TEXT_CHARS+1] ;
+    HTMLformData *p_formData;
+    int size;
+
+    MemLock(OptrToHandle(formArray));
+    p_formData = ChunkArrayElementToPtr(formArray, formElement, &size);
+
+    if (@call oself::MSG_META_IS_OBJECT_IN_CLASS(InPlaceTextAreaEntryClass)) {
+	/* Get rid of the old text (if any) */
+	if (p_formData->HFD_runtimeState)
+	    MemFree(p_formData->HFD_runtimeState);
+	/* Put in the new text */
+	p_formData->HFD_runtimeState =
+	    (dword)(@call oself::MSG_VIS_TEXT_GET_ALL_BLOCK(0));
+	/* get line info */
+	GetLineInfo(oself, p_formData);
+    } else {
+	/* Get rid of the old text (if any) */
+	if (p_formData->HFD_runtimeState)
+	    NamePoolReleaseToken(namePool, p_formData->HFD_runtimeState);
+	/* Put in the new text */
+	@call oself::MSG_VIS_TEXT_GET_ALL_PTR(buf) ;
+	p_formData->HFD_runtimeState =
+	    NamePoolTokenize(namePool, buf, FALSE);
+    }
+
+    MemUnlock(OptrToHandle(formArray));
+
+@ifdef JAVASCRIPT_SUPPORT
+    /* fire change event - TBD: only fire if content really changed */
+    @call oself::MSG_IN_PLACE_TEXT_ENTRY_FIRE_EVENT();
+@endif
+
+    /* remove it */
+    @call oself::MSG_IN_PLACE_TEXT_ENTRY_REMOVE();
+}
+
+/*
+ * remove active text entry object
+ */
+void FormElementRemoveTextEntry(optr urlTextObj)
+{
+    optr content = 0, view = 0, display = 0, dFocus = 0;
+    EventHandle removeEv;
+
+    /* only if we are focused view */
+    view = @call urlTextObj::MSG_HTML_TEXT_GET_VIEW_OBJ();
+    if (view)
+	/* can't make this check when exiting as tree is invalid,
+	   or if our tree has been torn down */
+	if (!((@call application::MSG_GEN_APPLICATION_GET_STATE()) & AS_QUITTING) && (@call view::MSG_GEN_VIEW_GET_CONTENT()))
+	    display = @call view::MSG_GEN_GUP_FIND_OBJECT_OF_CLASS(@GenDisplayClass);
+    if (display)
+	@call display::MSG_META_GET_FOCUS_EXCL(&dFocus);
+    if (view == dFocus) {
+	/* text entry object sits under content */
+	content = @call urlTextObj::MSG_VIS_FIND_PARENT();
+	if (content) {
+	    removeEv = @record InPlaceTextEntryClass::MSG_IN_PLACE_TEXT_ENTRY_SAVE();
+	    @call content::MSG_VIS_SEND_TO_CHILDREN(removeEv);
+	    removeEv = @record InPlaceTextEntryClass::MSG_IN_PLACE_TEXT_ENTRY_REMOVE();
+	    @call content::MSG_VIS_SEND_TO_CHILDREN(removeEv);
+	}
+	@call urlTextObj::MSG_META_GRAB_FOCUS_EXCL();
+	@call urlTextObj::MSG_META_GRAB_TARGET_EXCL();
+    }
+}
+
+/*
+ * update position of text entry object
+ */
+void FormElementUpdateTextEntryPos(optr urlTextObj)
+{
+    optr content = 0;
+    EventHandle updateEv;
+
+    /* text entry object sits under content */
+    content = @call urlTextObj::MSG_VIS_FIND_PARENT();
+    if (content) {
+        updateEv = @record InPlaceTextEntryClass::MSG_IN_PLACE_TEXT_ENTRY_UPDATE_POS();
+        @call content::MSG_VIS_SEND_TO_CHILDREN(updateEv);
+    }
+}
+
+/*
+ * InPlaceTextEntryClass handlers
+ */
+
+/*
+ * initialize values needed later
+ */
+@method InPlaceTextEntryClass, MSG_IN_PLACE_TEXT_ENTRY_INIT
+{
+    pself->IPTEI_formArray = formArray;
+    pself->IPTEI_formElement = formElement;
+    pself->IPTEI_namePool = NamePool;
+    pself->IPTEI_urlTextObj = urlTextObj;
+    pself->IPTEI_dummy = dummy;
+}
+
+/*
+ * set position
+ */
+@method InPlaceTextEntryClass, MSG_IN_PLACE_TEXT_ENTRY_SET_POS
+{
+    pself->IPTEI_xPos = xPos;
+    pself->IPTEI_yPos = yPos;
+}
+
+/*
+ * set size
+ */
+@method InPlaceTextEntryClass, MSG_IN_PLACE_TEXT_ENTRY_SET_SIZE
+{
+    pself->IPTEI_width = width;
+    pself->IPTEI_height = height;
+}
+
+/*
+ * update position of text entry object
+ */
+@method InPlaceTextEntryClass, MSG_IN_PLACE_TEXT_ENTRY_UPDATE_POS
+{
+    HTMLformData *p_formData;
+    word eSize;
+    RectDWord bounds;
+    SizeAsDWord dwordSize;
+    Point relPos;
+
+    MemLock(OptrToHandle(pself->IPTEI_formArray));
+    p_formData = ChunkArrayElementToPtr(pself->IPTEI_formArray,
+					pself->IPTEI_formElement,
+					&eSize);
+    @call pself->IPTEI_urlTextObj::MSG_HTML_TEXT_GET_REGION_POSITION(
+	p_formData->HFD_pos, &bounds);
+    dwordSize = FormElementGetSize(p_formData, pself->IPTEI_formElement,
+				   pself->IPTEI_formArray,
+				   pself->IPTEI_namePool);
+    if ((pself->IPTEI_xPos != (bounds.RD_left + p_formData->x + 2)) ||
+	(pself->IPTEI_yPos != (bounds.RD_top + p_formData->y + 2)) ||
+	(pself->IPTEI_width != (DWORD_WIDTH(dwordSize) - 3)) ||
+	(pself->IPTEI_height != (DWORD_HEIGHT(dwordSize) - 3))) {
+	/* re-focus to get new position */
+	relPos.P_x = 0;
+	relPos.P_y = 0;
+	@send, forceQueue pself->IPTEI_urlTextObj::
+	    MSG_HTML_TEXT_FORM_ELEMENT_START(pself->IPTEI_formElement, relPos);
+    }
+    MemUnlock(OptrToHandle(pself->IPTEI_formArray));
+}
+
+/*
+ * save text entry contents
+ */
+@method InPlaceTextEntryClass, MSG_IN_PLACE_TEXT_ENTRY_SAVE
+{
+    TCHAR buf[MAX_FORM_ELEMENT_EDIT_TEXT_CHARS+1] ;
+    HTMLformData *p_formData;
+    int size;
+
+    MemLock(OptrToHandle(pself->IPTEI_formArray));
+    p_formData = ChunkArrayElementToPtr(pself->IPTEI_formArray,
+					pself->IPTEI_formElement, &size);
+
+    if (@call oself::MSG_META_IS_OBJECT_IN_CLASS(InPlaceTextAreaEntryClass)) {
+	/* Get rid of the old text (if any) */
+	if (p_formData->HFD_runtimeState)
+	    MemFree(p_formData->HFD_runtimeState);
+	/* Put in the new text */
+	p_formData->HFD_runtimeState =
+	    (dword)(@call oself::MSG_VIS_TEXT_GET_ALL_BLOCK(0));
+    } else {
+	/* Get rid of the old text (if any) */
+	if (p_formData->HFD_runtimeState)
+	    NamePoolReleaseToken(pself->IPTEI_namePool,
+				 p_formData->HFD_runtimeState);
+	/* Put in the new text */
+	@call oself::MSG_VIS_TEXT_GET_ALL_PTR(buf) ;
+	p_formData->HFD_runtimeState =
+	    NamePoolTokenize(pself->IPTEI_namePool, buf, FALSE);
+    }
+
+    MemUnlock(OptrToHandle(pself->IPTEI_formArray));
+
+@ifdef JAVASCRIPT_SUPPORT
+    /* fire change event - TBD: only fire if content really changed */
+    @call oself::MSG_IN_PLACE_TEXT_ENTRY_FIRE_EVENT();
+@endif
+}
+
+/*
+ * remove text entry
+ */
+@method InPlaceTextEntryClass, MSG_IN_PLACE_TEXT_ENTRY_REMOVE
+{
+    EventHandle evt;
+
+    /* if dummy object, free containing dialog */
+    if (pself->IPTEI_dummy) {
+	evt = @record GenInteractionClass::MSG_GEN_DESTROY_AND_FREE_BLOCK();
+	@call oself::MSG_VIS_VUP_SEND_TO_OBJECT_OF_CLASS(evt);
+    }
+
+    /* unhook it */
+    @call oself::MSG_VIS_REMOVE(VUM_NOW);
+
+	/* free it */
+    @send, forceQueue oself::MSG_META_BLOCK_FREE();
+}
+
+@ifdef JAVASCRIPT_SUPPORT
+@method InPlaceTextEntryClass, MSG_IN_PLACE_TEXT_ENTRY_FIRE_EVENT
+{
+    /* send to avoid deadlock */
+    @send (pself->IPTEI_urlTextObj)::MSG_HTML_TEXT_FIRE_EVENT(HTML_EVENT_CHANGE, 
+      HTML_EVENT_OBJECT_ELEMENT, pself->IPTEI_formElement);
+}
+@endif
+
+/*
+ * realize desired size
+ */
+@method InPlaceTextEntryClass, MSG_VIS_RECALC_SIZE
+{
+    return(MAKE_SIZE_DWORD(pself->IPTEI_width, pself->IPTEI_height));
+}
+
+/*
+ * realize desired position
+ */
+@method InPlaceTextEntryClass, MSG_VIS_POSITION_BRANCH
+{
+    xOrigin = pself->IPTEI_xPos;
+    yOrigin = pself->IPTEI_yPos;
+    @callsuper();
+}
+
+/*
+ * set and remove pre-passive on open and close
+ */
+@method InPlaceTextEntryClass, MSG_VIS_OPEN
+{
+    @call oself::MSG_VIS_ADD_BUTTON_PRE_PASSIVE();
+    @callsuper();
+}
+@method InPlaceTextEntryClass, MSG_VIS_CLOSE
+{
+    @call oself::MSG_VIS_REMOVE_BUTTON_PRE_PASSIVE();
+    @callsuper();
+}
+
+/*
+ * handle click when text entry is active
+ */
+@method InPlaceTextEntryClass, MSG_META_PRE_PASSIVE_BUTTON
+{
+    Rectangle bounds;
+
+    /* always allow press through */
+    retVal->flags = 0;
+    /* if outside bounds, we are done */
+    @call oself::MSG_VIS_GET_BOUNDS(&bounds);
+    if ((GET_BUTTON_INFO(inputState) & BI_PRESS) &&
+    (xPosition < bounds.R_left || xPosition > bounds.R_right ||
+    yPosition < bounds.R_top || yPosition > bounds.R_bottom)) {
+    FormEntryDisableTextEntry(oself,
+                  pself->IPTEI_formArray,
+                  pself->IPTEI_formElement,
+                  pself->IPTEI_namePool);
+    }
+}
+
+/*
+ * handle pointer events when text entry is active
+ */
+@method InPlaceTextEntryClass, MSG_META_LARGE_PTR
+{
+    Rectangle bounds;
+
+    /* if outside bounds, forward to urlTextObj */
+    @call oself::MSG_VIS_GET_BOUNDS(&bounds);
+    if (largeMouseDataStruct->LMD_location.PDF_x.DWF_int < bounds.R_left ||
+    largeMouseDataStruct->LMD_location.PDF_x.DWF_int > bounds.R_right ||
+    largeMouseDataStruct->LMD_location.PDF_y.DWF_int < bounds.R_top ||
+    largeMouseDataStruct->LMD_location.PDF_y.DWF_int > bounds.R_bottom) {
+    @call pself->IPTEI_urlTextObj::MSG_META_LARGE_PTR(
+        retVal, largeMouseDataStruct);
+    } else {
+    /* else, handle ourself */
+    @callsuper();
+    }
+}
+
+/*
+ * handle TAB when text entry is active
+ */
+/* prototype doesn't do what we expect */
+@alias (MSG_META_TEXT_TAB_FILTERED) void MSG_META_VOID_TEXT_TAB_FILTERED(word character = cx, word flags = dx, word state = bp);
+@method InPlaceTextEntryClass, MSG_META_VOID_TEXT_TAB_FILTERED
+{
+    if ((flags & (SS_LSHIFT << 8)) || (flags & (SS_RSHIFT << 8))) {
+        /* always accept entered text first */
+        FormEntryDisableTextEntry(oself,
+                      pself->IPTEI_formArray,
+                      pself->IPTEI_formElement,
+                      pself->IPTEI_namePool);
+        /* there could be lmem movement, rederef */
+        pself = ObjDerefVis(oself);
+        /* navigate to previous input field or link */
+        @send pself->IPTEI_urlTextObj::MSG_HTML_TEXT_PREV_HOTSPOT();
+    } else {
+        /* always accept entered text first */
+        FormEntryDisableTextEntry(oself,
+                      pself->IPTEI_formArray,
+                      pself->IPTEI_formElement,
+                      pself->IPTEI_namePool);
+        /* there could be lmem movement, rederef */
+        pself = ObjDerefVis(oself);
+        /* navigate to next input field or link */
+        @send pself->IPTEI_urlTextObj::MSG_HTML_TEXT_NEXT_HOTSPOT();
+    }
+}
+
+/*
+ * arrows for navigation
+ */
+@method InPlaceTextEntryClass, MSG_META_KBD_CHAR
+{
+    if (@call oself::MSG_META_IS_OBJECT_IN_CLASS(InPlaceTextAreaEntryClass)) {
+	@callsuper();
+    } else if ((flags & (CF_FIRST_PRESS | CF_REPEAT_PRESS)) &&
+	       ((byte)character == VC_UP)) {
+	/* always accept entered text first */
+	FormEntryDisableTextEntry(oself,
+				  pself->IPTEI_formArray,
+				  pself->IPTEI_formElement,
+				  pself->IPTEI_namePool);
+	/* there could be lmem movement, rederef */
+	pself = ObjDerefVis(oself);
+	@send pself->IPTEI_urlTextObj::MSG_HTML_TEXT_PREV_HOTSPOT();
+    } else if ((flags & (CF_FIRST_PRESS | CF_REPEAT_PRESS)) &&
+	       ((byte)character == VC_DOWN)) {
+	/* always accept entered text first */
+	FormEntryDisableTextEntry(oself,
+				  pself->IPTEI_formArray,
+				  pself->IPTEI_formElement,
+				  pself->IPTEI_namePool);
+	/* there could be lmem movement, rederef */
+	pself = ObjDerefVis(oself);
+	@send pself->IPTEI_urlTextObj::MSG_HTML_TEXT_NEXT_HOTSPOT();
+    } else {
+	@callsuper();
+    }
+}
+
+/*
+ * submit on CR if single submit item in current form
+ */
+/* prototype doesn't do what we expect */
+@alias (MSG_META_TEXT_CR_FILTERED) void MSG_META_VOID_TEXT_CR_FILTERED();
+@method InPlaceTextEntryClass, MSG_META_VOID_TEXT_CR_FILTERED
+{
+    HTMLformData *thisElement, *curElement;
+    optr formArray = pself->IPTEI_formArray;
+    int size;
+    int submitNum = -1;  /* no submit items found yet */
+    int formCount, i;
+    Point relPos;
+
+    /* this should not be sent for TextArea, but we'll handle anyway */
+    if (@call oself::MSG_META_IS_OBJECT_IN_CLASS(InPlaceTextAreaEntryClass)) {
+	@callsuper();
+	return;
+    }
+
+    /* always accept entered text first */
+    FormEntryDisableTextEntry(oself,
+                  formArray,
+                  pself->IPTEI_formElement,
+                  pself->IPTEI_namePool);
+    /* there could be lmem movement, rederef */
+    pself = ObjDerefVis(oself);
+    MemLock(OptrToHandle(formArray));
+    thisElement = ChunkArrayElementToPtr(formArray,
+                     pself->IPTEI_formElement,
+                     &size);
+    formCount = ChunkArrayGetCount(formArray);
+    /* find submit items in same form as text entry */
+    for (i = 0; i < formCount; i++) {
+        curElement = ChunkArrayElementToPtr(formArray, i, &size);
+        if ((curElement->HFD_formNumber == thisElement->HFD_formNumber) &&
+            ((curElement->HFD_itemType == HTML_FORM_SUBMIT) ||
+             (curElement->HFD_itemType == HTML_FORM_IMAGE))) {
+            if (submitNum == -1) {
+                submitNum = i;
+            } else {
+                submitNum = -2;  /* indicate more than one submit field */
+            }
+        }
+    }
+    MemUnlock(OptrToHandle(formArray));
+    /* (assumes less than 32767 submit items in single form) */
+    if (submitNum > 0) {
+        /* submit with relative coord (0, 0) */
+        relPos.P_x = 0;
+        relPos.P_y = 0;
+        @call pself->IPTEI_urlTextObj::MSG_HTML_TEXT_FORM_ELEMENT_START(
+            submitNum, relPos);
+    }
+}
+
+/* support for printing -- forward to urlTextObj */
+@method InPlaceTextEntryClass, MSG_PRINT_GET_DOC_NAME
+{
+    @call pself->IPTEI_urlTextObj::MSG_PRINT_GET_DOC_NAME(printCtrlOD);
+}
+
+/* support for printing -- forward to urlTextObj */
+@method InPlaceTextEntryClass, MSG_PRINT_START_PRINTING
+{
+    @call pself->IPTEI_urlTextObj::MSG_PRINT_START_PRINTING(printCtrlOD, gstate);
+}
+
+/*
+ * end of InPlaceTextEntryClass handlers
+ */
+
+/*
+ * InPlaceTextAreaEntryClass handlers
+ */
+@method InPlaceTextAreaEntryClass, MSG_VIS_TEXT_HEIGHT_NOTIFY
+{
+    HTMLformData *p_formData;
+    word size;
+    VisTextRange vtr;
+    Point relPos;
+
+    @callsuper();
+    if (pself->IPTEI_formArray &&
+	(newHeight > pself->IPTEI_height)) {
+	MemLock(OptrToHandle(pself->IPTEI_formArray));
+	p_formData = ChunkArrayElementToPtr(pself->IPTEI_formArray,
+					    pself->IPTEI_formElement,
+					    &size);
+	@call oself::MSG_VIS_TEXT_GET_SELECTION_RANGE(&vtr);
+	p_formData->HFD_var.textarea.selStart = vtr.VTR_start;
+	p_formData->HFD_var.textarea.selEnd = vtr.VTR_end;
+	/* remove current in-place text area entry */
+	FormElementRemoveTextEntry(pself->IPTEI_urlTextObj);
+	/* re-focus to use dialog */
+	relPos.P_x = 0;
+	relPos.P_y = 0;
+	@send, forceQueue pself->IPTEI_urlTextObj::
+	    MSG_HTML_TEXT_FORM_ELEMENT_START(pself->IPTEI_formElement, relPos);
+	MemUnlock(OptrToHandle(pself->IPTEI_formArray));
+    }
+}
+
+@endif  /* IN_PLACE_TEXT_ENTRY */
+
+
+void LOCAL FormElementEditText(HTMLformData *p_formData, optr NamePool)
+{
+    optr box ;
+    word result ;
+    optr textObj, hidObj ;
+    TCHAR buf[MAX_FORM_ELEMENT_EDIT_TEXT_CHARS+1] ;
+    word maxlen ;
+
+    box = UserCreateDialog(@FormElementEditTextDialog) ;
+    @call application::MSG_META_GCN_LIST_ADD(ConstructOptr(
+	OptrToHandle(box), OptrToChunk(@FormElementEditTextEditControl)),
+					     GAGCNLT_SELF_LOAD_OPTIONS,
+					     MANUFACTURER_ID_GEOWORKS);
+
+    /* Decide which of the two fields to show */
+    if(p_formData->HFD_itemType == HTML_FORM_PASSWORD)
+    {
+      textObj = ConstructOptr(OptrToHandle(box), OptrToChunk(@FEETD_Password)) ;
+      hidObj = ConstructOptr(OptrToHandle(box), OptrToChunk(@FEETD_Text)) ;
+    }
+    else
+    {
+      textObj = ConstructOptr(OptrToHandle(box), OptrToChunk(@FEETD_Text)) ;
+      hidObj = ConstructOptr(OptrToHandle(box), OptrToChunk(@FEETD_Password)) ;
+    }
+
+    @send textObj::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+    @send hidObj::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+
+    /* Put a limit on the size of the text entries */
+    maxlen = p_formData->HFD_var.text_password.maxlen ;
+    if ((maxlen == 0) || (maxlen > FORM_MAX_CHARACTERS_IN_TEXT_LINE))
+        maxlen = FORM_MAX_CHARACTERS_IN_TEXT_LINE ;
+    @call textObj::MSG_VIS_TEXT_SET_MAX_LENGTH(maxlen) ;
+
+@ifdef COMPILE_OPTION_TEXT_PROMPT
+    /* Set prompt */
+     if (p_formData->HFD_prompt) {
+        NamePoolCopy(
+                  NamePool,
+                  buf,
+                  sizeof(buf)-1*sizeof(TCHAR),
+                  p_formData->HFD_prompt,
+                  NULL);
+        @call ConstructOptr(OptrToHandle(box), OptrToChunk(@FEETD_Prompt))::
+        MSG_VIS_TEXT_REPLACE_ALL_PTR(buf, 0) ;
+     }
+@endif
+
+    /* Put the info in the text box */
+    if (p_formData->HFD_runtimeState)  {
+        NamePoolCopy(
+                  NamePool,
+                  buf,
+                  sizeof(buf)-1*sizeof(TCHAR),
+                  p_formData->HFD_runtimeState,
+                  NULL);
+        @call textObj::MSG_VIS_TEXT_REPLACE_ALL_PTR(
+                  buf, 0) ;
+        @call textObj::MSG_VIS_TEXT_SELECT_ALL();
+    }
+
+    result = UserDoDialog(box) ;
+    if (result == IC_OK)  {
+        /* Get rid of the old text (if any) */
+        if (p_formData->HFD_runtimeState)
+            NamePoolReleaseToken(
+                      NamePool,
+                      p_formData->HFD_runtimeState);
+
+        /* Put in the new text */
+        @call textObj::MSG_VIS_TEXT_GET_ALL_PTR(buf) ;
+        p_formData->HFD_runtimeState =
+            NamePoolTokenize(NamePool, buf, FALSE);
+    }
+    @call application::MSG_META_GCN_LIST_REMOVE(ConstructOptr(
+	OptrToHandle(box), OptrToChunk(@FormElementEditTextEditControl)),
+					     GAGCNLT_SELF_LOAD_OPTIONS,
+					     MANUFACTURER_ID_GEOWORKS);
+    UserDestroyDialog(box) ;
+}
+
+void LOCAL FormElementEditTextarea(HTMLformData *p_formData, optr NamePool)
+{
+    optr box ;
+    word result ;
+    optr textObj ;
+    MemHandle mem ;
+@ifdef COMPILE_OPTION_TEXT_PROMPT
+    TCHAR buf[MAX_FORM_ELEMENT_EDIT_TEXT_CHARS+1] ;
+@endif
+
+    box = UserCreateDialog(@FormElementEditTextareaDialog) ;
+    @call application::MSG_META_GCN_LIST_ADD(ConstructOptr(
+	OptrToHandle(box), OptrToChunk(
+	    @FormElementEditTextareaEditControl)),
+					     GAGCNLT_SELF_LOAD_OPTIONS,
+					     MANUFACTURER_ID_GEOWORKS);
+    textObj = ConstructOptr(OptrToHandle(box), OptrToChunk(@FEETAD_Text)) ;
+
+@ifdef COMPILE_OPTION_TEXT_PROMPT
+    /* Set prompt */
+     if (p_formData->HFD_prompt) {
+        NamePoolCopy(
+                  NamePool,
+                  buf,
+                  sizeof(buf)-1*sizeof(TCHAR),
+                  p_formData->HFD_prompt,
+                  NULL);
+        @call ConstructOptr(OptrToHandle(box), OptrToChunk(@FEETAD_Prompt))::
+        MSG_VIS_TEXT_REPLACE_ALL_PTR(buf, 0) ;
+     } else {
+	 /* remove default prompt if readonly */
+	 if (p_formData->HFD_var.textarea.flags & HTML_TEXTAREA_READONLY) {
+	     @call ConstructOptr(OptrToHandle(box), OptrToChunk(@FEETAD_Prompt))::
+		 MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_UI_QUEUE);
+	 }
+     }
+@endif
+
+     /* make readonly if readonly */
+     if (p_formData->HFD_var.textarea.flags & HTML_TEXTAREA_READONLY) {
+	 @call ConstructOptr(OptrToHandle(box), OptrToChunk(@FEETAD_Text))::
+	     MSG_VIS_TEXT_MODIFY_EDITABLE_SELECTABLE(0, VTS_EDITABLE);
+     }
+
+    /* Put the info in the text box */
+    if (p_formData->HFD_runtimeState)  {
+        @call textObj::MSG_VIS_TEXT_REPLACE_ALL_BLOCK(
+                  p_formData->HFD_runtimeState,
+                  0) ;
+@ifdef IN_PLACE_TEXT_ENTRY
+        if (p_formData->HFD_var.textarea.selStart == 0xffff &&
+	    p_formData->HFD_var.textarea.selEnd == 0xffff) {
+	    @call textObj::MSG_VIS_TEXT_SELECT_START();
+	} else {
+	    @call textObj::MSG_VIS_TEXT_SELECT_RANGE_SMALL(
+		p_formData->HFD_var.textarea.selStart,
+		p_formData->HFD_var.textarea.selEnd);
+	    /* next time, select start, can't use 0xffff as we want
+	       to continue using dialog */
+	    p_formData->HFD_var.textarea.selStart = 0;
+	    p_formData->HFD_var.textarea.selEnd = 0;
+	}
+@else
+        @call textObj::MSG_VIS_TEXT_SELECT_START();
+@endif
+    }
+
+    result = UserDoDialog(box) ;
+    if (result == IC_OK)  {
+        /* Get rid of the old text (if any) */
+        mem = (MemHandle)p_formData->HFD_runtimeState ;
+        if (mem != NullHandle)  {
+            MemFree(mem) ;
+            mem = NullHandle ;
+        }
+
+        /* Put in the new text */
+        mem = @call textObj::MSG_VIS_TEXT_GET_ALL_BLOCK(0) ;
+        p_formData->HFD_runtimeState = (dword)mem ;
+	/* get line info */
+	GetLineInfo(textObj, p_formData);
+    }
+    @call application::MSG_META_GCN_LIST_REMOVE(ConstructOptr(
+	OptrToHandle(box), OptrToChunk(
+	    @FormElementEditTextareaEditControl)),
+					     GAGCNLT_SELF_LOAD_OPTIONS,
+					     MANUFACTURER_ID_GEOWORKS);
+    UserDestroyDialog(box) ;
+}
+
+void LOCAL FormElementEditFile(HTMLformData *p_formData, optr NamePool)
+{
+    optr box ;
+    word result ;
+    optr fileSel ;
+    TCHAR buf[MAX_FORM_ELEMENT_EDIT_TEXT_CHARS+1] ;
+    TCHAR path[MAX_FORM_ELEMENT_EDIT_TEXT_CHARS+1] ;
+    DiskHandle disk ;
+    dword ret ;
+    TCHAR *p_buffer ;
+
+    box = UserCreateDialog(@FormElementEditFileDialog) ;
+    fileSel = ConstructOptr(OptrToHandle(box), OptrToChunk(@FormFileSelect)) ;
+
+    /* If no file is given,  start in the document directory */
+    @call fileSel::MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH(
+            _TEXT("\\"), SP_DOCUMENT);
+
+    if (p_formData->HFD_runtimeState)  {
+        /* Get the current file */
+        NamePoolCopy(
+                  NamePool,
+                  buf,
+                  sizeof(buf)-1*sizeof(TCHAR),
+                  p_formData->HFD_runtimeState,
+                  NULL);
+        /* If not an absolute path, make relative to the doc dir */
+        if ((buf[1] != ':') || (buf[0] == '\0'))
+            disk = SP_DOCUMENT;
+        else
+            disk = SP_NOT_STANDARD_PATH ;
+        @call fileSel::MSG_GEN_FILE_SELECTOR_SET_FULL_SELECTION_PATH(
+                buf, disk);
+    }
+
+    /* Now show a list of items */
+    result = UserDoDialog(box) ;
+
+    if (result == IC_OK)  {
+        /* Get rid of the old text (if any) */
+        if (p_formData->HFD_runtimeState)
+            NamePoolReleaseToken(NamePool, p_formData->HFD_runtimeState);
+
+        /* Put in the new text */
+        ret = @call fileSel::MSG_GEN_FILE_SELECTOR_GET_FULL_SELECTION_PATH(path) ;
+        disk = GFS_GET_FULL_SELECTION_PATH_DISK_HANDLE(ret) ;
+        p_buffer = buf ;
+        FileConstructFullPath(
+            &p_buffer,
+            sizeof(buf)-1*sizeof(TCHAR),
+            disk,
+            path,
+            TRUE) ;
+        *p_buffer = '\0' ;
+        p_formData->HFD_runtimeState = NamePoolTokenize(NamePool, buf, FALSE);
+    }
+
+    /* Done, get rid of the duplicate dialog. */
+    UserDestroyDialog(box) ;
+}
+
+@extern method HTMLTextClass, MSG_HTML_TEXT_FORM_ELEMENT_START
+{
+    word size ;
+    optr array ;
+    HTMLformData *p_formData ;
+    HTMLformData *p_item ;
+    word i ;
+#ifdef IN_PLACE_TEXT_ENTRY
+    RectDWord bounds;
+#endif
+@ifdef JAVASCRIPT_SUPPORT
+    Boolean change = FALSE;
+@endif
+
+    EC_ERROR_IF(formElement==CA_NULL_ELEMENT, -1) ;
+
+    array = pself->HTI_formArray ;
+    if (array)  {
+        @call self::MSG_META_SUSPEND();
+
+        MemLock(OptrToHandle(array)) ;
+        p_formData = ChunkArrayElementToPtr(array, formElement, &size) ;
+        EC_BOUNDS(p_formData) ;
+        pself = ObjDerefVis(oself);
+        switch(p_formData->HFD_itemType)  {
+            case HTML_FORM_PASSWORD:
+            case HTML_FORM_TEXT:
+#ifdef IN_PLACE_TEXT_ENTRY
+		/* use in-place text entry if we are in normal space,
+		   use dialog if we in large-coordinate space */
+		@call self::MSG_HTML_TEXT_GET_REGION_POSITION(
+		    p_formData->HFD_pos, &bounds);
+		if (bounds.RD_top < MAX_COORD-1) {
+		    FormElementEnableTextEntry(p_formData, pself->HTI_namePool,
+					       formElement, array, oself) ;
+		} else {
+		    FormElementEditText(p_formData, pself->HTI_namePool) ;
+# if JAVASCRIPT_SUPPORT
+                    change = TRUE;
+# endif
+		}
+#else
+                FormElementEditText(p_formData, pself->HTI_namePool) ;
+# if JAVASCRIPT_SUPPORT
+                change = TRUE;
+# endif
+#endif
+                break ;
+            case HTML_FORM_CHECKBOX:
+                if (p_formData->HFD_runtimeState)
+                    p_formData->HFD_runtimeState = FALSE ;
+                else
+                    p_formData->HFD_runtimeState = TRUE ;
+#if JAVASCRIPT_SUPPORT
+                change = TRUE;
+#endif
+                break ;
+            case HTML_FORM_RADIO:
+                for (i=ChunkArrayGetCount(array)-1; (int)i>=0; i--)  {
+                    p_item = ChunkArrayElementToPtr(array, i, &size) ;
+                    /* Find matching form radio buttons */
+                    /* Must be same form, same variable, and a radio */
+                    /* button. */
+                    if ((p_formData->HFD_formNumber == p_item->HFD_formNumber) &&
+                        (p_formData->HFD_name == p_item->HFD_name) &&
+                        (p_item->HFD_itemType == HTML_FORM_RADIO))  {
+                        /* Is this the one we are clicking on? */
+                        if (i==formElement)  {
+                            /* Turn it on! */
+                            p_item->HFD_runtimeState |= HTML_BOOLEAN_SELECTED ;
+
+                            /* It will get redrawn in the end */
+                        } else {
+                            /* Turn off any selected radio buttons */
+                            if (p_item->HFD_runtimeState & HTML_BOOLEAN_SELECTED)  {
+                                p_item->HFD_runtimeState &=
+                                    (~HTML_BOOLEAN_SELECTED) ;
+                                FormElementInvalidate(oself, p_item, i) ;
+                            }
+                        }
+                    }
+                }
+#if JAVASCRIPT_SUPPORT
+                change = TRUE;
+#endif
+                break ;
+            case HTML_FORM_RESET:
+                @call oself::MSG_HTML_TEXT_FORM_RESET(
+                    p_formData->HFD_formNumber) ;
+                break ;
+            case HTML_FORM_SELECT:
+#ifdef IN_PLACE_SELECT_LIST
+                if (!(p_formData->HFD_var.select.flags & HTML_SELECT_MULTI) &&
+	            (FormElementCountSelectListItems(array, p_formData->HFD_formNumber, formElement) <= POPUP_SELECT_LIST_MAX_NUM_ITEMS) &&
+	            (FormElementGetSelectListBlockSize(array, p_formData->HFD_formNumber, formElement, pself->HTI_namePool) < SELECT_LIST_MAX_BLOCK_SIZE)) {
+                    FormElementPopUpSelectList(p_formData, pself->HTI_namePool,
+                                   array, formElement, oself);
+                    break;
+                }
+#endif
+@ifdef JAVASCRIPT_SUPPORT
+                FormElementEditSelectList(p_formData, pself->HTI_namePool, array, formElement, oself) ;
+@else
+                FormElementEditSelectList(p_formData, pself->HTI_namePool, array, formElement) ;
+@endif
+                break ;
+            case HTML_FORM_TEXTAREA:
+#ifdef IN_PLACE_TEXT_ENTRY
+		/* use in-place text area entry if we are in normal space,
+		   use dialog if we in large-coordinate space */
+		/* or if we grew too big from user text entry */
+		@call self::MSG_HTML_TEXT_GET_REGION_POSITION(
+		    p_formData->HFD_pos, &bounds);
+		if (bounds.RD_top < MAX_COORD-1 &&
+		    p_formData->HFD_var.textarea.selStart == 0xffff &&
+		    p_formData->HFD_var.textarea.selEnd == 0xffff &&
+		    /* only if not read-only */
+		    ((p_formData->HFD_var.textarea.flags & HTML_TEXTAREA_READONLY) == 0)) {
+		    (void)FormElementEnableTextAreaEntry(p_formData,
+							 pself->HTI_namePool,
+							 formElement,
+							 array, oself,
+							 FALSE) ;
+		} else {
+		    FormElementEditTextarea(p_formData, pself->HTI_namePool) ;
+# if JAVASCRIPT_SUPPORT
+                    change = TRUE;
+# endif
+		}
+#else
+                FormElementEditTextarea(p_formData, pself->HTI_namePool) ;
+# if JAVASCRIPT_SUPPORT
+                change = TRUE;
+# endif
+#endif
+                break ;
+            case HTML_FORM_IMAGE:
+            case HTML_FORM_SUBMIT:
+                p_formData->HFD_var.submit.flags |= HTML_SUBMIT_PRESSED;
+                p_formData->HFD_var.submit.rel.P_x = rel.P_x;
+                p_formData->HFD_var.submit.rel.P_y = rel.P_y;
+                @call oself::MSG_HTML_TEXT_FORM_SUBMIT(
+                    p_formData->HFD_formNumber, TRUE) ;
+                break ;
+            case HTML_FORM_BUTTON:
+                /* do nothing */
+                break;
+            case HTML_FORM_FILE:
+                FormElementEditFile(p_formData, pself->HTI_namePool) ;
+#if JAVASCRIPT_SUPPORT
+                change = TRUE;
+#endif
+                break ;
+            default:
+                /* Stop here if we are trying to start an invalid element */
+                EC_ERROR(-1) ;
+                break ;
+        }
+
+        /* Redraw this form element */
+        FormElementInvalidate(oself, p_formData, formElement) ;
+
+        MemUnlock(OptrToHandle(array)) ;
+
+        @call self::MSG_META_UNSUSPEND();
+
+@ifdef JAVASCRIPT_SUPPORT
+        if(change)                      // Fire change event if necessary
+          @call self::MSG_HTML_TEXT_FIRE_EVENT(HTML_EVENT_CHANGE,
+            HTML_EVENT_OBJECT_ELEMENT, formElement);
+@endif
+    }
+}
+

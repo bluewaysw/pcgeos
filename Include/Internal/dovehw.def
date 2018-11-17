@@ -1,0 +1,250 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1996.  All rights reserved.
+
+PROJECT:	Dove
+MODULE:		Hardware constants
+FILE:		dovehw.def
+
+AUTHOR:		Allen Yuen, Nov 10, 1996
+
+MACROS:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	allen	11/10/96   	Initial revision
+
+DESCRIPTION:
+
+	A bunch of equates for the dove hardware
+		
+	$Id: dovehw.def,v 1.1 97/04/04 14:17:24 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SetDef	__DOVEHW
+
+include	Internal/E3G.def
+
+; EMS registers.
+
+DOVE_EMS_REGISTER_0	equ	E3G_EMST0
+DOVE_EMS_REGISTER_1	equ	E3G_EMST1
+DOVE_EMS_REGISTER_2	equ	E3G_EMST2
+DOVE_EMS_REGISTER_3	equ	E3G_EMST3
+
+
+; EMS window segment.
+;
+; These are defined here because they can be relocated (and they may well be
+; moved later..).  So, knowing that, please use these constants whenever
+; possible.
+;
+
+DOVE_EMS_WINDOW_0	equ	0xb000
+DOVE_EMS_WINDOW_1	equ	0xb400
+DOVE_EMS_WINDOW_2	equ	0xb800
+DOVE_EMS_WINDOW_3	equ	0xbc00
+
+; Locations of certain key points in the physical address space.  Note that
+; the "_END" constants are really, of course, the next byte PAST the last
+; byte in that area.
+;
+
+;;;DOVE_PHYSICAL_ADDR_FLASH		equ	0x3c00000
+DOVE_PHYSICAL_ADDR_FIXED_XIP_AREA	equ	0x3cc0000
+DOVE_PHYSICAL_ADDR_FIXED_XIP_AREA_END	equ	0x3cea000
+;;;DOVE_PHYSICAL_ADDR_DOS_BIOS		equ	0x3cee000
+;;;		PENE_PHYSICAL_ADDR_FIXED_XIP_AREA_END
+;;;DOVE_PHYSICAL_ADDR_FLASH_END		equ	0x4000000
+
+; Locations of key pages in the physical address space.
+;
+
+DOVE_XIP_PAGE_START_1			equ	(0x3c00000 shr 14)
+DOVE_XIP_PAGE_END_1			equ	((0x3cc0000 shr 14) - 1)
+DOVE_XIP_PAGE_START_2			equ	(0x3d02000 shr 14)
+DOVE_XIP_PAGE_END_2			equ	((0x3ed0000 shr 14) - 1)
+
+DOVE_BOTTOM_OF_SWAP_AREA		equ	100000h	; tentative
+DOVE_TOP_OF_SWAP_AREA			equ	220000h
+
+
+
+;
+; LAST_IRQ_INTERCEPT_LEVEL_ONE_IC, from Library/Kernel/Sys/sysVariable.def
+;
+LAST_IRQ_INTERCEPT_LEVEL_ONE_IC	equ	7
+
+
+
+DOVE_IRQSTS1		equ	0x1010		; 8-bit, DoveIrqSts1Flags
+DOVE_IRQINT		equ	0x1012		; 16-bit, DoveIrqIntFlags
+DOVE_IRQMSK		equ	0x1014		; 16-bit, DoveIrqMskFlags
+
+DOVE_POWCTRL		equ	0x1020		; 16-bit, DovePowCtrlFlags
+DOVE_POWCTRL1		equ	DOVE_POWCTRL
+DOVE_POWCTRL2		equ	(DOVE_POWCTRL + 1)
+
+DOVE_TPCCTRL		equ	0x1070		; 8-bit, DoveTpcCtrlFlags
+DOVE_TP4BYTEX		equ	0x1074		; 16-bit, DoveTp4ByteFlags
+DOVE_TP4BYTEY		equ	0x1076		; 16-bit, DoveTp4ByteFlags
+DOVE_LCDCONT		equ	0x1080		; 8-bit, 0x00 - 0x1f
+
+DOVE_BUZVOL		equ	0x10b0		; 8-bit, 0x00 - 0x03
+
+DOVE_IRQ13MSK		equ	0x10e0		; 8-bit, DoveIrq13MskFlags
+DOVE_IRQ13ST		equ	0x10e4		; 8-bit, DoveIrq13StFlags
+DOVE_SUBWDT		equ	0x10e6		; 8-bit, 0x00 - 0x04
+
+
+
+;
+; For DOVE_IRQSTS1
+;
+DoveIrqSts1Flags	record
+	DIS1F_PDCRST:1
+	DIS1F_PDCTCHF:1
+	DIS1F_SUBLOW:1
+	DIS1F_ACIN:1
+	DIS1F_LIDSW:1
+	DIS1F_TPONINT:1
+	DIS1F_PDCSEND:1
+	DIS1F_PDCEND:1
+DoveIrqSts1Flags	end
+
+
+
+;
+; For DOVE_IRQINT
+;
+DoveIrqIntFlags	record
+	; for DOVE_IRQINT2
+	:3
+	DIIF_DZWUFLG:1
+	DIIF_SLWUFLG:1
+	DIIF_PHMCFLG:1
+	:1
+	DIIF_TPDOKFLG:1
+
+	; for DOVE_IRQINT1
+	DIIF_PHRSTFLG:1
+	DIIF_PHTCHFLG:1
+	DIIF_SUBLWFLG:1
+	DIIF_ACINFLG:1
+	DIIF_LIDSWFLG:1
+	DIIF_TPONFLG:1
+	DIIF_PHSNDFLG:1
+	DIIF_PHENDFLG:1
+DoveIrqIntFlags	end
+
+; Using this, we only need 13 spaces for handlers instead of 16.  :-)
+DOVE_IRQ_INT_FLAGS_WIDTH	equ	(offset DIIF_DZWUFLG + 1)
+.assert 1 shl DOVE_IRQ_INT_FLAGS_WIDTH gt DoveIrqIntFlags
+
+
+
+;
+; For DOVE_IRQMSK
+;
+DoveIrqMskFlags	record
+	; for DOVE_IRQMSK2
+	:3
+	DIMF_DZWUMSK:1
+	DIMF_SLWUMSK:1
+	DIMF_PHMCMSK:1
+	:1
+	DIMF_TPDOKMSK:1
+
+	; for DOVE_IRQMSK1
+	DIMF_PHRSTMSK:1
+	DIMF_PHTCHMSK:1
+	DIMF_SUBLWMSK:1
+	DIMF_ACINMSK:1
+	DIMF_LIDSWMSK:1
+	DIMF_TPONMSK:1
+	DIMF_SENDMSK:1
+	DIMF_ENDMSK:1
+DoveIrqMskFlags	end
+
+
+
+;
+; For DOVE_POWCTRL
+;
+DovePowCtrlFlags	record
+	; for DOVE_POWCTRL2
+	:1
+	DPCF_SUBRST:1
+	DPCF_14MON:1
+	DPCF_PWBOOST:1
+	:1
+	DPCF_FLSHON1:1
+	:1
+	DPCF_BCHKSW1:1
+
+	; for DOVE_POWCTRL1
+	:3
+	DPCF_SEPCSTBY:1
+	DPCF_IRON:1
+	DPCF_MODEMON:1
+	DPCF_PICOON:1
+	:1
+DovePowCtrlFlags	end
+
+
+
+;
+; For DOVE_TPCCTRL
+;
+TpcMode	etype	byte
+	TM_CONTINUE		enum	TpcMode
+	TM_MAKE			enum	TpcMode
+	TM_MAKE_AND_BREAK	enum	TpcMode
+	TM_REQUEST		enum	TpcMode
+
+DoveTpcCtrlFlags	record
+	:4
+	DTCF_TPDATASEL:1		; 0: 1-byte method, 1: 4-byte method
+	DTCF_TPDREQ:1
+	DTCF_TPCMODE	TpcMode:2
+DoveTpcCtrlFlags	end
+
+
+
+;
+; For DOVE_TP4BYTEX and DOVE_TP4BYTEY
+;
+DoveTp4ByteFlags	record
+	:5
+	DTBF_RELEASE:1			; 0 = touch, 1 = release
+	DTBF_DATA:10
+DoveTp4ByteFlags	end
+
+
+
+;
+; For DOVE_IRQ13MSK
+;
+DoveIrq13MskFlags	record
+	:6
+	DI13MF_WDTMSK:1
+	DI13MF_BATMSK:1
+DoveIrq13MskFlags	end
+
+
+
+;
+; For DOVE_IRQ13ST
+;
+DoveIrq13StFlags	record
+	:6
+	DI13SF_WDTST:1
+	DI13SF_BATST:1
+DoveIrq13StFlags	end
+
+; Using this, we only need 2 spaces for handlers instead of 8.  :-)
+DOVE_IRQ_13_ST_FLAGS_WIDTH	equ	(offset DI13SF_WDTST + 1)
+.assert 1 shl DOVE_IRQ_13_ST_FLAGS_WIDTH gt DoveIrq13StFlags

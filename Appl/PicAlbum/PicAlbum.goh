@@ -1,0 +1,372 @@
+/**************************************************************************
+ *
+ * PROJECT:	Picture Album
+ * FILE:		picalbum.goc
+ * AUTHOR:	John F. Howard    10/03
+ *
+ * DESCRIPTION:
+ *		This is based on the PicAlbum code first written by Falk for the GPC
+ *
+ * WHATS NEW:
+ *		full updates in uimain.goc
+ *
+ *   
+ *
+ *
+ *
+ *
+ *
+ *************************************************************************/
+
+@ifndef __PICALBUM_GOH
+@define __PICALBUM_GOH
+
+@include <StdApp.goh>
+
+#define PA_LIGHT_GRAY_LEVEL		215
+
+#define PA_SOURCE_DOCUMENTS			1
+#define PA_SOURCE_FLOPPY_DRIVE		2
+#define PA_SOURCE_DIGITAL_CAMERA	3
+
+#define PA_DEST_DOCUMENTS			1
+#define PA_DEST_FLOPPY_DRIVE		2
+#define PA_DEST_ALBUM				3
+
+#define PA_BUTTON_SPACE				5
+
+#define PA_THUMBNAIL_UNSELECT_COLOR	C_WHITE
+#define PA_THUMBNAIL_SELECTED_COLOR	C_YELLOW
+#define PA_THUMBNAIL_FRAME_COLOR	C_BLACK
+
+#define PA_PICTURES_NOTES_TEXT_LEN	200
+
+
+/*************************************************************************/
+
+typedef ByteFlags PAAlbumFlags;
+#define PAAF_STORE_NOTES			0x01
+
+typedef struct {
+	
+	byte			PAAA_width, PAAA_height;
+	PAAlbumFlags	PAAA_flags;
+
+} PAAlbumAttrs;
+
+typedef struct {
+
+	DiskHandle		PAAD_disk;
+	PathName		PAAD_path;
+
+	MemHandle		PAAD_tempList;
+	FileHandle		PAAD_indexFile;
+	word			PAAD_tempItemCount;		/* virutal item to see for the user */
+	word			PAAD_itemCount;			/* item count in the index file */
+
+	MemHandle		PAAD_bufferBlock;
+	PAAlbumAttrs	PAAD_attrs;
+
+} PAAlbumData;
+
+typedef ByteFlags PAAlbumEntryFlags;
+#define PAAEF_THUMBNAIL_EXISTS			0x01
+#define PAAEF_SIZE_KNOWN				0x02
+#define PAAEF_ERROR						0x04
+
+typedef struct {
+
+	FileLongName		PAAIE_fileName;
+	FileDateAndTime		PAAIE_date;
+	dword				PAAIE_size;
+	PAAlbumEntryFlags	PAAIE_flags;
+	SizeAsDWord			PAAIE_imageSize;
+	TCHAR				PAAIE_notes[PA_PICTURES_NOTES_TEXT_LEN + 1];
+	byte				PAAIE_thumbnail[84*84+6];
+
+} PAAlbumIndexEntry;
+
+
+word PAAlbumOpen(PAAlbumData *data, DiskHandle disk, TCHAR *path, PAAlbumAttrs *attrs);
+word PAAlbumClose(PAAlbumData *data);
+word PAAlbumUpdate(PAAlbumData *data);
+word PAAlbumDeleteItem(PAAlbumData *data, word item);
+word PAAlbumSwapItem(PAAlbumData *data, word item1, word item2);
+word PAAlbumGetItem(PAAlbumData *data, word item, PAAlbumIndexEntry *buffer);
+word PAAlbumSetItem(PAAlbumData *data, word item, PAAlbumIndexEntry *buffer);
+word PAAlbumGetItemCount(PAAlbumData *data);
+word PAAlbumGetIndex(PAAlbumData *data, word item);
+Boolean PAAlbumRename(TCHAR *oldName, TCHAR *newName);
+
+/*************************************************************************/
+
+word		/* 0 if no error */
+PACameraRetrieve(void);
+
+/*************************************************************************/
+
+typedef MemHandle PAImportHandle;
+
+@prototype void PA_IMPORT_STATUS_MSG(VMBlockHandle vmb, Boolean finished, Boolean success);
+
+PAImportHandle
+PAImportStart(
+	DiskHandle		aDisk,
+	TCHAR			*aPath,
+	TCHAR			*aName,
+	VMFileHandle	aVMFile,
+	GeodeHandle		aImpGraph,
+	optr			aStatDest,
+	Message			aStatMsg
+);
+
+Boolean
+PAImportStop(
+	PAImportHandle aHandle
+);
+
+Boolean
+PAImportDestroy(
+	PAImportHandle aHandle
+);
+
+
+/*************************************************************************/
+
+/* The Doc, Floppy & Albums buttons  in the Copy Pix DBox to intercept
+	MSG_VIS_RECALC_SIZE */
+//@class PAButtonItemClass, GenItemClass;
+//@endc;
+
+/* to intercept MSG_META_KBD_CHAR in slide show */
+@class PASlideShowDialogClass, GenInteractionClass;
+@endc;
+
+
+typedef ByteEnum PAThumbnailListAttrs;
+#define PATLA_SHOW_DESC_TEXT		0x01
+#define PATLA_TEMP_CACHE			0x02
+
+@class PAThumbnailListClass, VisContentClass;
+
+	@prototype void PATL_SELECTION_MSG(word item, Boolean newState,
+												  word selCount, Boolean doublePress);
+
+	@message word MSG_PATL_GET_OFFSET();
+	@message word MSG_PATL_GET_ITEMS_PER_LINE();
+	@message word MSG_PATL_CALC_ITEMS_PER_LINE(word width);
+	@message void MSG_PATL_GET_ITEM_AREA(word item, Rectangle* rect);
+	@message void MSG_PATL_GET_ITEM_DATA_AREA(word item, Rectangle* rect);
+	@message Boolean MSG_PATL_IS_ITEM_SELECTED(word item);
+	@message void MSG_PATL_DRAW_DESC_TEXT(GStateHandle gstate, word item,
+													  Rectangle* rect, TCHAR *text);
+	@message void MSG_PATL_INIT(word itemCount);
+	@message void MSG_PATL_INIT_FILE_LIST(DiskHandle disk, TCHAR *path,
+															Boolean notes);
+	@message void MSG_PATL_INIT_CAMERA();
+
+	@message void MSG_PATL_IMPORT_THUMBNAIL(word item, word importSession);
+	@message void MSG_PATL_CREATE_THUMBNAIL_FROM_BITMAP(word item,
+																			VMBlockHandle block);
+	@message Boolean MSG_PATL_FIND_CACHE_THUMBNAIL(word item, word *cachePos);
+
+	@message VMBlockHandle MSG_PATL_IMPORT(VMFileHandle vmf, word item);
+	@message VMBlockHandle MSG_PATL_IMPORT_CURRENT_SELECTION(VMFileHandle vmf);
+
+	@message void MSG_PATL_DRAW_ITEM(GStateHandle gstate, word item, word textHeight);
+	@message void MSG_PATL_REDRAW_ITEM(word item);
+
+	@message word MSG_PATL_GET_NUM_SELECTIONS();
+	@message word MSG_PATL_GET_NUM_ITEMS();
+	@message word MSG_PATL_GET_CURRENT_SELECTION();
+
+	@message void MSG_PATL_SET_ITEM_SELECTION(word item, Boolean selected,
+															Boolean update);
+	@message void MSG_PATL_SWITCH_ITEM_SELECTION(word item);
+	@message void MSG_PATL_UNSELECT_ALL();
+
+	@message void MSG_PATL_COPY_IMAGE(word item, Boolean fuzzy);
+
+	@message void MSG_PATL_GET_ITEM_NOTES(word item, TCHAR *buffer);
+	@message void MSG_PATL_GET_ITEM_FILENAME(word item, TCHAR *buffer);
+	@message word MSG_PATL_GET_CURRENT_ITEM_NOTES(TCHAR *buffer);
+	@message word MSG_PATL_GET_CURRENT_ITEM_SIZE_STRING(TCHAR *buffer);
+	@message word MSG_PATL_GET_CURRENT_ITEM_FILENAME(TCHAR *buffer);
+	@message word MSG_PATL_DELETE_CURRENT_ITEM();
+	@message void MSG_PATL_SET_CURRENT_ITEM_NOTES(TCHAR *buffer, word item);
+	@message Boolean MSG_PATL_GET_ITEM_SIZE(word item, SizeAsDWord *size);
+
+	@message Boolean MSG_PATL_SWAP_ITEMS(word item1, word item2, Boolean update);
+	@message (PA_IMPORT_STATUS_MSG) MSG_PATL_IMPORT_STATUS;
+	@message void MSG_PATL_EXIT();
+	@message void MSG_PATL_PROGRESS_STEP();
+
+	@message word MSG_PATL_DELETE_SELECTED_ITEMS();
+
+	@message DiskHandle MSG_PATL_GET_FILE_PATH(TCHAR *pathBuf);
+
+	@instance optr PATLI_destination;
+	@instance Message PATLI_selectionMsg;
+
+	@instance word PATLI_itemCount = 0;
+	@instance byte PATLI_vertBorder = 5;
+	@instance byte PATLI_horizBorder = 5;
+	@instance byte PATLI_vertSpace = 5;
+	@instance byte PATLI_horizSpace = 3;
+	@instance byte PATLI_cornerIndent = 2;
+	@instance byte PATLI_thumbHorizBorder = 2;
+	@instance byte PATLI_thumbVertBorder = 2;
+	@instance byte PATLI_thumbWidth = 42;
+	@instance byte PATLI_thumbHeight = 42;
+	@instance PAThumbnailListAttrs PATLI_attrs = 0;
+	@instance byte PATLI_textHeight = 2;
+
+	@instance Boolean		PATLI_multiSelect = FALSE;
+
+	@instance ChunkHandle PATLI_cacheList = 0;
+	@instance word PATLI_cachePos = 0;
+
+	@instance GeodeHandle PATLI_importGeode = 0;
+	@instance Boolean PATLI_open = FALSE;
+
+	@instance word PATLI_numSelections = 1;
+	@instance word PATLI_currentSelection = 0xFFFF;
+	@instance ChunkHandle PATLI_selectionList = 0;
+
+	@instance PAAlbumData	PATLI_indexData;
+
+	@instance PAImportHandle	PATLI_importHandle = 0;
+				/* if there is an import this is not 0 */
+
+	@instance TimerHandle	PATLI_progressTimer = 0;
+	@instance word			PATLI_progressTimerId = 0;
+	@instance word			PATLI_progressStep = 0;
+	@instance word			PATLI_progressItem = 0;
+
+	@instance word			PATLI_currentSession = 0;
+	@instance word			PATLI_importSession = 0;
+
+	@default VCNI_attrs = @default | VCNA_SAME_WIDTH_AS_VIEW;
+
+@endc;
+
+word PADeleteTree(TCHAR *folderName);
+
+@class PAProcessClass, GenProcessClass;
+
+	@message void MSG_PA_INIT_ALBUM_SCREEN();
+	@message void MSG_PA_INIT_VIEW_SCREEN();
+	@message (GEN_TRIGGER_ACTION) MSG_PA_VIEW_PICTURE_FROM_ALBUM;
+	@message void MSG_PA_CALC_AND_SET_VIEW();
+
+	@message (GEN_TRIGGER_ACTION) MSG_PA_ROTATE_90_CLOCKWISE;
+	@message (GEN_TRIGGER_ACTION) MSG_PA_ROTATE_180;
+	@message (GEN_TRIGGER_ACTION) MSG_PA_ROTATE_90_COUNTERCLOCKWISE;
+	@message (GEN_TRIGGER_ACTION) MSG_PA_FLIP_LEFT_RIGHT;
+	@message (GEN_TRIGGER_ACTION) MSG_PA_FLIP_TOP_BOTTOM;
+	@message (GEN_TRIGGER_ACTION) MSG_PA_VIEW_BACK;
+
+	@message MemHandle MSG_PA_READ_ALBUM_LIST(TCHAR *currentName,
+													 word *currentIndex, word *retItems);
+	@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_PA_QUERY_ALBUM_LIST;
+	@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_PA_APPLY_ALBUM_LIST;
+
+	@message void MSG_PA_INIT_ALBUM_LIST();
+	@message void MSG_PA_INIT_CURRENT_ALBUM();
+
+	@message (GEN_TRIGGER_ACTION) MSG_PA_CREATE_ALBUM;
+	@message (GEN_TRIGGER_ACTION) MSG_PA_DELETE_ALBUM;
+	@message (GEN_TRIGGER_ACTION) MSG_PA_RENAME_ALBUM;
+
+	@message void MSG_PA_ADJUST_BUTTONS();
+
+	@message (PATL_SELECTION_MSG) MSG_PA_ALBUM_ITEM_SELECTION;
+	@message (PATL_SELECTION_MSG) MSG_PA_GET_PICTURES_SELECTION_CHANGED;
+
+	@message (GEN_TRIGGER_ACTION) MSG_PA_OPEN_GET_PICTURES;
+
+	@message (GEN_TRIGGER_ACTION) MSG_PA_GET_PICTURES_APPLY;
+
+	@message (GEN_TRIGGER_ACTION) MSG_PA_ADD_NOTES;
+	@message (GEN_TRIGGER_ACTION) MSG_PA_ADD_NOTES_APPLY;
+
+	@message (GEN_TRIGGER_ACTION) MSG_PA_SHUFFLE_LEFT;
+	@message (GEN_TRIGGER_ACTION) MSG_PA_SHUFFLE_RIGHT;
+	@message (GEN_TRIGGER_ACTION) MSG_PA_MOVE_TO_FRONT;
+	@message (GEN_TRIGGER_ACTION) MSG_PA_MOVE_TO_END;
+
+	@message (GEN_TRIGGER_ACTION) MSG_PA_START_SLIDE_SHOW;
+	@message void MSG_PA_NEXT_SLIDE();
+	@message void MSG_PA_IMPORT_NEXT();
+	@message (GEN_VISIBILITY_OUTPUT) MSG_PA_SLIDE_VISIBILITY_NOTIFICATION;
+
+	@message (GEN_TRIGGER_ACTION) MSG_PA_DELETE_PICTURE;
+	@message (GEN_TRIGGER_ACTION) MSG_PA_COPY_PICS_FROM_ALBUM;
+	@message (GEN_TRIGGER_ACTION) MSG_PA_COPY_PICS_FROM_VIEW;
+	@message void MSG_PA_OPEN_COPY_PICS();
+	@message (GEN_TRIGGER_ACTION) MSG_PA_COPY_PICTURES_APPLY;
+	@message (PA_IMPORT_STATUS_MSG) MSG_PA_EXT_IMPORT_STATUS;
+
+	@message (GEN_ITEM_GROUP_STATUS_MSG) MSG_PA_SLIDE_SHOW_AUTO_STATUS;
+	@message (GEN_ITEM_GROUP_STATUS_MSG) MSG_PA_SLIDE_SHOW_MANUAL_STATUS;
+
+	@message void MSG_PA_COPY_TO_DOCUMENT();
+	@message void MSG_PA_COPY_TO_ALBUM();
+
+	@message void MSG_PA_INITIATE_PRINT();
+	@message (GEN_BOOLEAN_GROUP_STATUS_MSG) MSG_PA_PRINT_SIZE_ASPECT_STATUS;
+	@message (GEN_VALUE_STATUS_MSG) MSG_PA_PRINT_SIZE_WIDTH_STATUS;
+	@message (GEN_VALUE_STATUS_MSG) MSG_PA_PRINT_SIZE_HEIGHT_STATUS;
+
+
+	@message (GEN_TRIGGER_ACTION) MSG_PA_NEXT_SLIDE_TRIGGER;
+	@message (GEN_TRIGGER_ACTION) MSG_PA_PREV_SLIDE;
+
+	@message (GEN_FILE_SELECTOR_NOTIFICATION_MSG) MSG_PA_GET_PICTURES_PATH_CHANGED;
+	@message void MSG_PA_GET_PICTURES_FROM_DOCUMENT();
+	@message void MSG_PA_GET_PICTURES_FROM_CAMERA();
+
+	@message (GEN_FILE_SELECTOR_NOTIFICATION_MSG) MSG_PA_COPY_PICTURES_DEST_PATH;
+
+	@message void MSG_PA_SUSPEND_WINDOW(WindowHandle win);
+	@message void MSG_PA_UNSUSPEND_WINDOW(WindowHandle win);
+
+@endc;
+
+word PACopyFileFlexible(DiskHandle srcDisk, TCHAR *srcPath, TCHAR *destName,
+								Boolean fuzzy);
+
+
+/* the list of albums in the Album View screen */
+@class PAVerticalDynListClass, GenDynamicListClass ;
+	@message void MSG_NEWS_GROUP_INIT_VIEW(optr visChild) ;
+	@instance Boolean PAVDLI_resolved = FALSE;
+@endc;
+
+@class PAVerticalDynListItemClass, GenItemClass ;
+@endc;
+
+/* simulates the path drop down list of a filesel in the Copy Pix dbox */
+@class PAPathPopupClass, GenFileSelectorClass;
+	@instance word PAPPI_type;
+	@instance Boolean PAPPI_noUpdate = FALSE;
+	@message void MSG_PA_PATH_POPUP_NO_UPDATE();
+	@message void MSG_PA_PATH_POPUP_UPDATE();
+	@message void MSG_PA_PATH_POPUP_SET_PATH(PathName *path, DiskHandle diskH);
+@endc;
+
+/* simulates the drive drop down list of a filesel in the Copy Pix dbox */
+@class PADrivePopupClass, GenFileSelectorClass;
+	@instance word PADPI_type;
+	@instance Boolean PADPI_noUpdate = FALSE;
+	@message void MSG_PA_DRIVE_POPUP_NO_UPDATE();
+	@message void MSG_PA_DRIVE_POPUP_UPDATE();
+	@message void MSG_PA_DRIVE_POPUP_SET_DRIVE(PathName *path, DiskHandle diskH);
+@endc;
+
+@class PACameraProgressClass, GenInteractionClass;
+	@message void MSG_PA_CAMERA_PROGRESS_STOP();
+@endc
+
+
+@endif

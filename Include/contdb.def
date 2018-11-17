@@ -1,0 +1,1259 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994,1995 -- All Rights Reserved
+			GEOWORKS CONFIDENTIAL
+
+PROJECT:	Foam
+FILE:		contdb.def
+
+
+REVISION HISTORY:
+	
+	Name	Date		Description
+	----	----		-----------
+	atw	11/10/94	Initial revision
+
+
+DESCRIPTION:
+	Contains equates, etc for the contdb library.
+		
+	$Id: contdb.def,v 1.1 97/04/04 14:22:00 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SetDef __CONTDB
+
+
+StartLibrary	contdb
+
+UseLib foam.def
+
+;	ContdbFieldType is the enumerated type that defines the type of data
+;	stored in a contact database.
+;
+;	Note: CFT_TEL_FAX & CFT_TEL_DATA types work just like Tel
+;	fields. You can set speed dials, phone numbers will match to
+;	these fields, phone directory will allow contacts to be
+;	selectable based on these fields too.
+;
+ContdbFieldType		etype	byte
+	CFT_NAME	enum	ContdbFieldType
+	CFT_COMPANY	enum	ContdbFieldType
+	CFT_TITLE	enum	ContdbFieldType
+	CFT_ADDRESS	enum	ContdbFieldType
+	CFT_PHONE	enum	ContdbFieldType
+	CFT_FAX		enum	ContdbFieldType
+	CFT_EMAIL	enum	ContdbFieldType
+	CFT_DTMF	enum	ContdbFieldType
+	CFT_NOTES	enum	ContdbFieldType
+; Only available in Communicator products after Feb 1997:
+	CFT_URL		enum	ContdbFieldType
+	CFT_PASSWORD	enum	ContdbFieldType
+	CFT_TEL_FAX	enum	ContdbFieldType
+	CFT_TEL_DATA 	enum	ContdbFieldType
+
+ContdbRecordFlags	record
+	:4	
+	; Used by FoamDBRecordFlags
+
+	:3
+	CRF_SPECIAL_RINGING_TONE:1
+	;Has a special ringing tone
+ContdbRecordFlags	end
+
+ContdbSpeedDialEntry	struct
+	CSDE_recordID	dword
+	CSDE_fieldID	word
+ContdbSpeedDialEntry	ends
+
+CONTACT_DB_MAX_SPEED_DIALS	equ	9
+MAX_SPEED_DIAL_ENTRY_DIGITS	equ	2
+MAX_SPEED_DIAL_WARNING_STRING	equ	1000
+
+CONTACT_DB_MAJOR_PROTOCOL	equ	9
+CONTACT_DB_MINOR_PROTOCOL	equ	0
+;Protocol # of the database file - change this if the map block size changes
+; or order of the fields or whatever
+
+ContactExportStatus	etype	word
+	CES_NO_ERROR		enum	ContactExportStatus
+	CES_FILE_ERROR		enum	ContactExportStatus
+
+;
+; Use this constant to export all records in
+; ContactExportDBToTextFile.
+;
+CONTACT_EXPORT_ALL_RECORDS	equ	-1
+
+global ContactGetDBHandle:far
+;
+; Returns the handle of the database file used to hold contacts, blocking if
+; the file is in use (is being saved to state/restored from state). After
+; accessing the DB file, the client should call ContactReleaseDBHandle.
+;
+; Pass: nothing
+; Return: bx - DB handle
+;
+
+ContactGetDBHandleNoBlock	equ	CONTACTGETDBHANDLENOBLOCK
+global CONTACTGETDBHANDLENOBLOCK:far
+;
+; Returns the handle of the database file used to hold contacts, or 0 if
+; the file is in use (is being saved to state/restored from state)
+;
+; If a non-zero handle is returned, the caller needs to call
+; ContactReleaseDBHandle
+;
+; Pass: nothing
+; Return: ax - DB handle
+;
+
+ContactCloseDBFile	equ	CONTACTCLOSEDBFILE	
+global CONTACTCLOSEDBFILE:far
+;
+; Routine called to close the file, for backing up and restoring data
+;
+; Pass: nothing
+; Return: nothing
+;
+ContactReOpenDBFile	equ	CONTACTREOPENDBFILE
+global CONTACTREOPENDBFILE:far
+;
+; Routine called to open the file, for backing up and restoring data
+;
+; Pass: nothing
+; Return: ax - file handle, or 0 if error (TPD_error is set)
+;
+
+ContactReleaseDBHandle	equ	CONTACTRELEASEDBHANDLE
+global CONTACTRELEASEDBHANDLE:far
+;
+; Releases the DB handle, so the file can be closed
+;
+; Pass: nothing
+; Return: nothing
+;
+
+ContactCreateRecordFromTemplate	equ	CONTACTCREATERECORDFROMTEMPLATE
+global	CONTACTCREATERECORDFROMTEMPLATE:far
+;
+; Creates a copy of the record template - should either be saved to the
+; database using ContactSaveRecord, destroyed using FoamDBDiscardRecord, or
+; set as the *new* template by calling ContactSetTemplateRecord. This record
+; cannot have any data - all the fields must be empty.
+;
+; Pass: nothing
+; Return: ax - handle of record
+;
+
+global	ContactEnsureField:far
+;
+; Ensures a field with the given type and name is in the passed record. If one
+; doesn't exist, it adds the new field to the template.
+;
+; Pass: ax - handle of record
+;	dl - ContdbFieldType
+;	bx:di - ptr to name
+;		OR bx = 0, if default name
+; Return: dx - Field ID
+;
+
+global	ContactEnsureEmptyField:far
+;
+; Ensures an empty field with the given type and name is in the record. If one
+; doesn't exist, it adds the new field to the template.
+;
+; Pass: ax - handle of record
+;	dl - ContdbFieldType
+;	bx:di - ptr to name
+;		OR bx = 0, if default name
+; Return: dx - Field ID
+;
+
+global	ContactSetTemplateRecord:far
+;
+; Given a record, sets it as the default template
+;
+; Pass: ax - handle of record
+; Return: nothing
+;
+
+global ContactSaveRecord:far
+;
+; Inserts the passed record into the contact database
+;
+; Pass: ax - handle of record
+; Return: dx.ax - index of position in database where item was inserted
+;  		  (-1 if it isn't visible)
+;
+
+ContactGetUserDataID	equ	CONTACTGETUSERDATAID
+global CONTACTGETUSERDATAID:far
+;
+; Gets the record ID of the user data card. The secret record
+; contains the user info.
+;
+; Pass: nothing
+; Return: dx:ax - record id
+;
+
+global ContactGetUserDataName:far
+;
+; Get the name field from the user data card.
+;
+; Pass: es:di - buffer where name should be copied to
+;	cx - size of buffer 
+;	     	must be at least (MAX_NAME_DATA_LEN * size TCHAR) bytes
+; Return: cx - size of name in buffer 
+;	
+
+ContdbCallType	etype	byte
+	CCT_PHONE	enum	ContdbCallType
+	CCT_SMS		enum	ContdbCallType
+					; this implies Tel(GSM) and Tel(PCN)
+	CCT_FAX		enum	ContdbCallType
+	CCT_EMAIL	enum	ContdbCallType
+	CCT_GSM_FAX	enum	ContdbCallType
+					; this implies Fax(GSM) and Fax(PCN)
+	CCT_SMS_ONLY	enum	ContdbCallType	; Tel(GSM) only
+	CCT_PCN_SMS_ONLY enum	ContdbCallType	; Tel(PCN) only
+	CCT_GSM_FAX_ONLY enum	ContdbCallType	; Fax(GSM) only
+	CCT_PCN_FAX_ONLY enum	ContdbCallType	; Fax(PCN) only
+	CCT_ANY		enum	ContdbCallType, 255
+
+global ContactMatchNumber:far
+;
+; Looks up a phone number in the contact database
+;
+; Pass: es:di - pointer to phone number to match
+; 	dl - ContdbCallType (type of call being sought)
+; Return: carry set if no match found
+;	  else, carry clear:
+;		dx.ax - ID of first record match was found in 
+;		  cx - ID of field within record (if match found)
+;		  bx - # matches found
+;
+
+global ContactMatchName:far
+;
+; Looks up a name in the contact database
+;
+; Uses LocalCmpStringsNoCase to do compares.
+;
+; Pass: es:di - pointer to name to match
+; 	dl = ContdbFieldType
+;	bx = true if stop after first match, else will scan all entries
+; Return: carry set if no match found
+;	  else, carry clear:
+;		dx.ax - ID of first record match was found in 
+;		  cx - ID of field within record (if match found)
+;		  bx - # matches found
+;
+
+global ContactGetName:far
+;
+; Gets the appropriate name for the passed record, or "Unnamed" if none
+; exists.
+;
+; Pass: ax - handle of record to get name from
+;	es:di - ptr to buffer to store null-terminated data in
+;		(should be MAX_FIELD_DATA_SIZE+2 bytes)
+; Return: carry set if the record was unnamed
+;
+
+global ContactGetTruncatedName:far
+;
+; Gets the appropriate null-terminated name for the passed record, or
+; "Unnamed" if none exists. Will truncate the name to fit in the passed buffer.
+;
+; Example: if bufferSize=10, ContactGetTruncatedName can return 9 chars + 1
+; 	   null	
+;
+; Pass: ax - handle of record to get name from
+;	es:di - ptr to buffer to store null-terminated data in
+;		(should be MAX_NAME_DATA_LEN+1 * sizeof TCHAR bytes)
+;	cx - buffer size
+; Return: carry set if the record was unnamed
+;
+
+global SpeedDialGetSlot:far
+;
+; Gets the slot # for the passed record/field ID.
+;
+; Pass: dx.ax 	- record ID
+; 	cx	- field ID
+; Return: ax	- -1 (BW_TRUE) if not in slots
+;		      else, ax = slot # (1 .. CONTACT_DB_MAX_SPEED_DIALS)
+;
+
+global SpeedDialGetRecord:far
+;
+; Gets the record & field ID, given a slot #.
+;
+; Pass:	ax	- slot #
+;
+; Return: carry set if error, 
+;	      else carry clear and:
+;		dx.ax	- record ID 
+;		cx	- field ID
+;
+
+global SpeedDialSetRecord:far
+;
+; Sets the slot # with the passed record/field ID.
+;
+; Pass: dx.ax 	- record ID
+; 	cx	- field ID
+;	bp	- slot #
+; Return: carry set if slot wasn't empty previously
+;
+
+global SpeedDialGetNumber:far
+;
+; Gets the phone number associated with a given slot
+;
+; Pass: ax	- slot #
+;	es:di	- fptr to buffer to fill in phone number
+; Return: carry set if empty slot
+;
+
+global ContactImportDBFromTextFile:far
+;
+; Exports the contact db into a text file
+;
+; Pass: bx	- handle of file
+;
+; Return:
+;
+
+global ContactExportDBToTextFile:far
+;
+; Exports the contact db into a text file
+; If you want to export all records, use
+;	start = 0,
+;	number to process = CONTACT_EXPORT_ALL_RECORDS
+; Pass: bx	- handle of file
+;	On stack:
+;		Element to start at	dword (pushed first)
+;		Number to process	dword (pushed second)
+; Return: ax 	- ContactExportStatus (CES_NO_ERROR/CES_FILE_ERROR)
+;	  carry set if error
+;
+
+global ContdbRecreateFieldLabel:far
+;
+; Creates a valid field label given a sub-label, and a field type. This
+; routine will also handle clipping the final string so it will not be any
+; more than MAX_FIELD_LABEL_PIXEL_WIDTH pixels wide
+;
+; Pass:	ds:si - field sub label, possibly translated to English
+;	cl - ContdbFieldType
+;	es:di - destination for translation (must be able to hold
+;			MAX_FIELD_LABEL_LEN chars)
+;
+; Return:
+;	es:di - field label, appropriately translated
+;
+
+global ContdbTranslateSubFieldLabelToEnglish:far
+;
+; Pass:	ds:si - field label to translate
+;	es:di - destination for translation (must be able to
+;		hold MAX_FIELD_LABEL_LEN chars)
+;
+; Returns:
+;	es:di - field sub label - translated, if possible, else
+;		unchanged
+;
+
+global ContactCompareNumbers:far
+;
+; Pass: ds:si - ptr to null-terminated number to compare
+;	es:di - ptr to null-terminated number to compare
+;
+; Return: ax - non-zero if they did *not* match
+;
+
+ContactNetworkVersionType	etype byte, 0
+	CNVT_GSM		enum ContactNetworkVersionType
+	CNVT_PCN		enum ContactNetworkVersionType
+
+global ContactChangeNetworkVersion:far
+; 
+; The cellular network version has been determined and we should
+; change the default Tel & Fax GSM-like field labels to the appropiate
+; type. This will affect the default template and user data card.
+;
+; Pass: ax - ContactNetworkVersionType
+; Return: nothing
+;
+
+;
+; C Stubs
+;
+global CONTACTGETDBHANDLE:far
+global CONTACTSAVERECORD:far
+global CONTACTSETTEMPLATERECORD:far
+global CONTACTENSUREFIELD:far
+global CONTACTENSUREEMPTYFIELD:far
+global CONTACTMATCHNUMBER:far
+global CONTACTMATCHNAME:far
+global CONTACTGETNAME:far
+global CONTACTGETTRUNCATEDNAME:far
+global SPEEDDIALGETRECORD:far
+global SPEEDDIALSETRECORD:far
+global SPEEDDIALGETSLOT:far
+global SPEEDDIALGETNUMBER:far
+global CONTACTIMPORTDBFROMTEXTFILE:far
+global CONTACTEXPORTDBTOTEXTFILE:far
+global CONTDBTRANSLATESUBFIELDLABELTOENGLISH:far
+global CONTDBRECREATEFIELDLABEL:far
+global CONTACTCOMPARENUMBERS:far
+global CONTACTCHANGENETWORKVERSION:far
+global CONTACTGETUSERDATANAME:far
+
+ContactListClass	class	GenControlClass
+
+; ContentList Features flags (used with ATTR_GEN_CONTROL_REQUIRE_UI and
+; ATTR_GEN_CONTROL_PROHIBIT_UI)
+
+ContactListFeatures	record
+    :14
+    CLF_SELECT_CONTACT_NUMBER:1
+	;Displays a "select" trigger, which allows the user to select a
+	; contact
+    CLF_SEARCH:1
+ContactListFeatures	end
+
+CL_DEFAULT_FEATURES		equ	mask CLF_SEARCH
+
+;MAX_FIELD_DATA_SIZE	equ	255
+;MAX_FIELD_DATA_LEN	equ	(MAX_FIELD_DATA_SIZE/(size TCHAR))
+
+MAX_NAME_DATA_LEN	equ	100
+MAX_COMPANY_DATA_LEN	equ	100
+MAX_JOB_TITLE_DATA_LEN	equ	150
+MAX_ADDRESS_DATA_LEN	equ	150
+MAX_NUMBER_FIELD_DATA_LEN	equ	30
+MAX_EMAIL_DATA_LEN	equ	1024
+MAX_NOTE_DATA_LEN	equ	400
+MAX_URL_DATA_LEN	equ 	400
+BOOKING_PWD_LENGTH	equ	8
+
+MAX_NUM_CHARS_IN_ANY_FIELD	equ	1024
+
+MAX_SEARCH_STRING_LEN	equ	MAX_ADDRESS_DATA_LEN
+
+MAX_FIELD_LABEL_LEN_NO_NULL	equ	31
+MAX_FIELD_LABEL_LEN	equ	(MAX_FIELD_LABEL_LEN_NO_NULL+1)
+MAX_FIELD_LABEL_SIZE	equ	(MAX_FIELD_LABEL_LEN * size TCHAR)
+
+MSG_CONTACT_LIST_QUERY_ENTRY_MONIKER		message
+;
+; Internal - creates a moniker for an item in the contact list
+;
+; Pass: ^lcx:dx - contact list
+;	bp - position to get moniker for
+;
+; Return: nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+MSG_CONTACT_LIST_SELECTION_CHANGED		message
+;
+; Internal - responds to selection change in contact list
+;
+; Pass: cx - current selection, or GIGS_NONE if no selection
+;
+; Return: nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+
+MSG_CONTACT_LIST_SEARCH_TEXT_LOST_FOCUS		message
+;
+; Notification when the search text object has lost the focus - in most cases,
+; we want to reset the current search.
+;
+; Pass: nothing
+;
+; Return: nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+MSG_CONTACT_LIST_GET_ID_OF_SELECTED_RECORD	message
+;
+; Gets the ID of the currently selected record, or -1 if none
+; selected. If more than one selection was selected, it returns the
+; first one.
+;
+; Pass: nothing
+;
+; Return: dx:ax - ID of selected item (or -1 if none selected)
+; 	cx, bp - destroyed
+;
+
+MSG_CONTACT_LIST_SEARCH_TEXT_TIMEOUT_MSG	message
+;
+; Internal, search text edit has timed out, so a search should occur
+;
+; Pass: nothing
+;
+; Return: nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+MSG_CONTACT_LIST_QUERY_NUMBER_LIST_MONIKER	message
+;
+; Internal - creates a moniker for an item in the list of contact numbers
+;
+; Pass: ^lcx:dx - contact list
+;	bp - position to get moniker for
+;
+; Return: nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+MSG_CONTACT_LIST_SELECT_CURRENT_CONTACT		message
+;
+; Internal - Sends a notification message callback when user has
+; selected a contact, either in alternate or regular select mode.
+;
+; Pass: nada
+; Return: nada
+;	ax, cx, dx, bp - destroyed
+;
+
+MSG_CONTACT_LIST_SELECT_CONTACT_NUMBER		message
+;
+; Internal - sent out when the user chooses "Select" in the dialog box
+; listing all the contact numbers for a person	
+;
+; Pass: nothing
+; Return: nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+MSG_CONTACT_LIST_CLOSE_CONTACT_NUMBER_POPUP	message
+;
+; Internal - closes the "select-a-number" popup and sets the list
+; selection to what it should be.
+;
+; Pass: nothing
+; Return: nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+MSG_CONTACT_LIST_HANDLE_SELECTION_CHANGE_NOTIFICATION	message
+;
+; Internal message used to delay setting the selection until after the
+; GCN list has been unlocked.
+;
+; Pass: bp - selection
+; Return: nothing
+; 	ax, cx, dx, bp - destroyed
+;
+
+MSG_CONTACT_LIST_COMPLETE_SEARCH	message
+;
+; Internal message sent to the list object when the user hits enter, to perform
+; a search immediately instead of waiting for the normal timeout.
+;
+; Pass: nothing
+; Return: nothing
+; 	ax, cx, dx, bp - destroyed
+;
+
+;----------------------------------------------------------------------------
+; Messages available only in Communicator products after Feb 1997:
+;----------------------------------------------------------------------------
+
+MSG_CONTACT_LIST_PRESERVE_SEARCH_ON_NEXT_LOST_FOCUS	message
+;
+; Tells the contact list not to reset the search list when the focus
+; is lost the very next time.
+;
+; Pass: nothing
+; Return: nothing
+; 	ax, cx, dx, bp - destroyed
+;
+
+MSG_CONTACT_LIST_GET_IDS_OF_SELECTED_RECORDS 	message
+;
+; Returns the current list of contact selections. The caller must
+; allocate a buffer for the entries and pass the size of the buffer.
+; If there is insufficient space in the passed buffer for the
+; selections, the buffer will not be filled in. Use this message if
+; you've set the list to be non-exclusive.
+;
+; Pass: nothing
+; Return: cx - block handle containing IDs. Should be freed by caller,
+; 		unless 0 IDs returned
+;	ax - number of contact IDs filled in
+;	bp - destroyed
+;
+
+MSG_CONTACT_LIST_NOTIFY_CONTACT_SELECTED	message
+;
+; Internal - sent out when the user selects the "Select" trigger
+;
+; Pass: nada
+; Return: nada
+;	ax, cx, dx, bp - destroyed
+;
+
+MSG_CONTACT_LIST_ALTERNATE_NOTIFY_CONTACT_SELECTED	message
+;
+; Internal - Asks us to send out the callback message when the user
+; has selected a contact and pressed F1 long enough to select that
+; contact in alternate select mode.
+;
+; Pass: nothing
+; Return: nothing
+; Destroyed: nothing
+; 	ax, cx, dx, bp - destroyed
+;
+
+MSG_CONTACT_LIST_CANCEL_CONTACT_NUMBER_POPUP	message
+;
+; Internal - sent out when the user chooses "cancel" in the dialog box
+; listing all the contact numbers for a person
+;
+; Pass: nothing
+; Return: nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+MSG_CONTACT_LIST_SET_EMERGENCY_NUMBERS		message
+;
+; Sets the special emergency numbers for which we will never find a
+; match in our database. Usually used by type CCT_PHONE.
+;
+; Pass: cx:dx - buffer containing contiguous null-terminated numbers.
+;	bp - # of numbers in block
+; Return: nothing
+; Destroyed: nothing
+;
+
+	ATTR_CONTACT_LIST_MONIKER		vardata	lptr.char
+	; The text string for the contact list moniker
+
+	ATTR_CONTACT_LIST_STATUS_MSG		vardata	word
+	; This field contains the message that is sent out whenever the
+	; contact list selection changes
+	;
+	; Pass: cx - number of items selected (only useful of
+	; 		HINT_CONTACT_LIST_NON_EXCLUSIVE_LIST present)
+	;
+
+	TEMP_CONTACT_LIST_TAB_BOUNDS		vardata Rectangle
+	; Used temporarily to store the bounds of the tab on the list
+	;
+
+	TEMP_CONTACT_LIST_DO_NOT_SEND_NOTIFICATIONS	vardata
+	; If present, the contact list will not send notifications to the
+	; GCN list of any selection changes.
+
+	ATTR_CONTACT_LIST_CALL_TYPE		vardata	ContdbCallType
+	; Contains the type of items to display in the list (will disable
+	; the items if they don't have an entry of the given type)
+	;
+	ATTR_CONTACT_LIST_NOTIFY_CONTACT_SELECTED_MSG	vardata	word
+	; The message sent out when the user selects a contact from the
+	; list (REQUIRED IF CLF_SELECT_CONTACT SET). If more than one
+	; selection was selected, then it returns the first selection.
+	;
+	; Message has the following params:
+	;	Pass: cx.dx - record ID
+	;	      bp    - field ID
+	;
+
+	TEMP_CONTACT_LIST_SELECTED_CONTACT	vardata	dword
+	; The handle of the selected contact
+
+	;--------------------------------------------------------------------
+	; Vardata available only in Communicator products after Feb 1997:
+	;--------------------------------------------------------------------
+
+	TEMP_CONTACT_LIST_PRESERVE_SEARCH	vardata
+	; If present, then the search list won't be reset the next time the
+	; focus is lost.
+
+	ATTR_CONTACT_LIST_NUM_ITEMS		vardata	word
+	; Keeps track of # of currently selected items
+
+	HINT_CONTACT_LIST_NON_EXCLUSIVE_LIST	vardata
+	; User can select more than one contact (or none) at any time.
+	; Default is exclusive list.
+
+	ATTR_CONTACT_LIST_NOTIFY_NUMBER_ENTERED_MSG	vardata	word
+	; The message sent out when there are no matches in the
+	; Contact List AND the user has entered a valid phone number
+	; in the search field. Only useful if CLF_SELECT_CONTACT set.
+	;
+	; Message has the following params:
+	;	Pass: ^hcx - block containing null-terminated phone
+	;		number. BLOCK MUST BE FREED BY RECEPIENT.
+	;
+
+	ATTR_CONTACT_LIST_EMERGENCY_NUMBERS	vardata
+	; A list of special numbers which will never be matched to
+	; contact cards, in the search box. Contains 1 or more nptrs to
+	; null-terminated numbers.
+	; The numbers can either be set dynamically using
+	; MSG_CONTACT_LIST_SET_EMERGENCY_NUMBERS, or be used
+	; statically like: 
+	;
+	; ...
+	; @chunk Number1 = "911";
+	; @chunk Number2 = "112";
+	; ...
+	; 	ATTR_CONTACT_LIST_EMERGENCY_NUMBERS {
+	;		nptr	Number1,
+	;		nptr 	Number2,
+	;		...
+	; 	}
+	;
+
+	ATTR_CONTACT_LIST_ALTERNATE_NOTIFY_CONTACT_SELECTED_MSG	vardata	word
+	; The message sent out when the user selects a contact from the
+	; list. AND user has cause us to send out an alternate
+	; notification message. If more than one selection was
+	; selected, then it returns the first selection. Works when we
+	; are of type CCT_PHONE
+	;
+	; Message has the following params:
+	;	Pass: cx.dx - record ID
+	;	      bp    - field ID
+	;
+	ATTR_CONTACT_LIST_ALTERNATE_NOTIFY_NUMBER_ENTERED_MSG	vardata
+	; The message sent out when there are no matches in the
+	; Contact List AND the user has entered a valid phone number
+	; in the search field. And user has cause us to send out an
+	; alternate notification message. Only useful if
+	; CLF_SELECT_CONTACT set. Works when we are of type CCT_PHONE.
+	;
+	; Message has the following params:
+	;	Pass: ^hcx - block containing null-terminated phone
+	;		number. BLOCK MUST BE FREED BY RECEPIENT.
+	;
+
+	TEMP_CONTACT_LIST_ALTERNATE_SELECTION_MODE	vardata
+	; If present, we should send out an alternate notify contact
+	; selected message. Works when we are of type CCT_PHONE.
+
+ContactListSelectionData	struct
+   	CLSD_contactsBlock	hptr	; ptr to block containing
+					; GenItemGroup id's of
+					; selected contacts
+	CLSD_contactsTotal	word	; # of selected contacts
+	CLSD_contactsIndex	word	; index to contact being
+					; processed in CLSD_contactsBlock
+	CLSD_selectedBlock	hptr	; block containing sets of
+					; ContactListSelectedEntry
+	CLSD_selectedTotal	word	; total # ContactListSelectedEntry
+					; in CLSD_selectedBlock
+ContactListSelectionData	ends
+
+ContactListSelectedEntry	struct
+	CLSE_recordID		dword
+	CLSE_fieldID		word
+ContactListSelectedEntry	ends
+
+	TEMP_CONTACT_LIST_SELECTED_INFO	vardata ContactListSelectionData
+	; The contacts that have been selected in a non-exclusive list
+	; and have to be displayed in the number bubble popup.
+	;
+
+	ATTR_CONTACT_LIST_NOTIFY_MULTIPLE_CONTACTS_SELECTED_MSG	vardata	word
+	; The message sent out when the user selects 1 or more
+	; contacts from the list (REQUIRED IF CLF_SELECT_CONTACT SET
+	; and HINT_NON_EXCLUSIVE_LIST is present). 
+	;
+	; More than one contact and more than one field per contact
+	; can be selected.
+	;
+	; Message has the following params:
+	;	^hcx - block handle containing sets of: 
+	;	       ContactListSelectedEntry.
+	;		BLOCK MUST BE FREED BY RECEPIENT.
+	;	dx - number of sets in the block
+	;
+	
+	ATTR_CONTACT_LIST_ALTERNATE_NOTIFY_MULTIPLE_CONTACTS_SELECTED_MSG vardata	word
+	; The message sent out when the user selects 1 or more
+	; contacts from the list (REQUIRED IF CLF_SELECT_CONTACT SET
+	; and HINT_NON_EXCLUSIVE_LIST is present). Works when we are
+	; of type CCT_PHONE.
+	;
+	; More than one contact and more than one field per contact
+	; can be selected.
+	;
+	; Message has the following params:
+	;	^hcx - block handle containing sets of
+	;	       ContactListSelectedEntry.
+	;	       BLOCK MUST BE FREED BY RECEPIENT.
+	;	dx - number of sets in the block
+	;
+
+	CLI_searchResult	word
+	;Handle of block containing search result chunk array (or 0 if no
+	; search active)
+
+	CLI_timerID	word
+	CLI_timerHandle	hptr
+	;Handle/ID of timer used to determine when to start a search
+
+	CLI_curItem	word
+	;Keeps track of currently selected item, or if this is a
+	;non-exclusive list, it keeps track of the first item selected.
+
+ContactListClass	endc
+
+ContactEditClass	class	GenControlClass
+ContactEditFeatures	record
+
+	CEF_MENU:1
+	;Whether the Menu option is available
+
+	CEF_SAVE:1
+	;Whether the field data can be closed
+	
+	CEF_FIELDS:1
+	;Whether the field names can be modified, and whether fields can be
+	; added or deleted
+
+	CEF_MARK_SECRET:1
+	;Whether or not the secret bit can be modified
+	
+	CEF_SPECIAL_RINGING_TONE:1
+	;Whether or not a special ringing tone can be set
+	
+	CEF_SPEED_DIAL:1
+	;Whether or not speed dial settings can be changed
+
+
+ContactEditFeatures	end
+
+CE_DEFAULT_FEATURES		equ	(mask ContactEditFeatures and not (mask CEF_SPECIAL_RINGING_TONE or mask CEF_MARK_SECRET))
+
+MSG_CONTACT_EDIT_DISPLAY_RECORD		message
+;
+; Displays the passed record for editing
+;
+; Pass: cx - handle of record to display
+; Return: nothing
+; Destroyed: ax, cx, dx, bp
+;
+
+MSG_CONTACT_EDIT_DELETE_RECORD		message
+;
+; Deletes the record being viewed
+;
+; Pass: nothing
+; Return: nothing
+; Destroyed: ax, cx, dx, bp
+;
+
+MSG_CONTACT_EDIT_SAVE_RECORD_DATA		message
+;
+; Saves the record being viewed, but displays warnings if the record will
+; be deleted, not enough space, etc. If the record is empty, it will be
+; deleted. If the record is saved or deleted, CEI_record is cleared
+;
+; Pass: nothing
+; Return: nothing
+; Destroyed: ax, cx, dx, bp
+;
+
+MSG_CONTACT_EDIT_SAVE_RECORD_DATA_SILENTLY	message
+;
+; Saves the record being viewed, even if there is not sufficient disk space,
+; if the record is empty, etc.
+;
+; Pass: cx - record being saved
+; Return: nothing
+; Destroyed: ax, cx, dx, bp
+;
+
+ContactEditSecretStatus	etype	word
+	CESS_NOT_SECRET		enum	ContactEditSecretStatus
+	CESS_SECRET		enum	ContactEditSecretStatus
+
+MSG_CONTACT_EDIT_SET_SECRET_STATUS	message
+;
+; Sets the current record as secret, or not secret
+;
+; Pass: cx - ContactEditSecretStatus
+; Return: nothing
+; Destroyed: ax, cx, dx, bp
+;
+
+MSG_CONTACT_EDIT_SET_RINGING_TONE	message
+;
+; Sets the current ringing tone
+;
+; Pass: cx - ContactEditRingingTone
+;
+
+ContactEditRingingTone	etype	word
+	CERT_NONE		enum	ContactEditRingingTone
+	; No special tone
+
+	CERT_SPECIAL_TONE	enum	ContactEditRingingTone
+	; Has a special tone
+
+
+MSG_CONTACT_EDIT_ADD_FIELD		message
+;
+; Adds a field to the current record
+;
+; Pass: cx - ContactFieldType to add
+; Return: nothing
+; Destroyed: ax, cx, dx, bp
+;
+
+MSG_CONTACT_EDIT_ADD_FIELD_TYPE_SELECTED	message
+;
+; Message sent out when the user selects a type of field to add, so we can
+; disable the "select" trigger appropriately
+;
+; Pass: cx - ContactFieldType selected
+; Return: nothing
+; Destroyed: ax, cx, dx, bp
+;
+
+MSG_CONTACT_EDIT_DELETE_FIELD			message
+;
+; Deletes the selected field from the record
+;
+; Pass: nothing
+; Return: nothing
+; Destroyed: ax, cx, dx, bp
+;
+
+MSG_CONTACT_EDIT_CHANGE_FIELD_LABEL		message
+;
+; Changes the label of the currently selected field
+;
+; Pass: nothing
+; Return: nothing
+; Destroyed: ax, cx, dx, bp
+;
+
+MSG_CONTACT_EDIT_FIELD_HAS_FOCUS		message
+;
+; Tells the contact edit object which field has the focus
+;
+; Pass: cx - field ID
+; Return: nothing
+; Destroyed: ax, cx, dx, bp
+;
+
+MSG_CONTACT_EDIT_INITIATE_ADD_FIELD_DIALOG	message
+;
+; Brings up the "Add field" dialog box
+;
+; Pass: nothing
+; Return: nothing
+; Destroyed: ax, cx, dx, bp
+;
+
+MSG_CONTACT_EDIT_GET_CHANGE_FIELD_LABEL_MONIKER	message
+;
+; Internal - creates a moniker for an item in the ChangeFieldLabel dynamic list
+;
+; Pass: CX:DX - list to send reply to
+;	BP - index of item to fetch moniker for
+;
+; Return: nothing
+; Destroyed: ax, cx, dx, bp
+;
+
+
+MSG_CONTACT_EDIT_CHANGE_LABEL_OF_FOCUSED_FIELD	message
+;
+; Internal - changes the field label of the focused field to that of the
+;	     selected item in the list
+;
+; Pass: nothing
+; Return: nothing
+; Destroyed: nothing
+;
+
+MSG_CONTACT_EDIT_FIELD_LABEL_SELECTED		message
+;
+; Internal - message sent off when the selection changes in the
+;	     Change Field Label dialog
+;
+; Pass: cx - index of item selected
+; Return: nothing
+; Destroyed: nothing
+;
+
+MSG_CONTACT_EDIT_INITIATE_OPTIONS_DIALOG	message
+;
+; Internal - message sent to ourselves when the "Options" trigger is
+; pressed, so we can initiate the speed dial controller.
+;
+; Pass: nothing
+; Return: nothing
+; Destroyed: nothing
+;
+
+MSG_CONTACT_EDIT_MARK_MODIFIED			message
+;
+; Internal - message sent to ourselves to mark ourselves user-modified
+;
+; Pass: nothing
+; Return: nothing
+; Destroyed: ax, cx, dx, bp
+;
+
+MSG_CONTACT_EDIT_CORRECT_TEL_HALF_LINES	message
+MSG_CONTACT_EDIT_CORRECT_FAX_HALF_LINES	message
+;
+; Fixes half-line inconsistencies among telephone and fax
+; fields.
+;
+; Pass: nothing
+; Return: nothing
+; Destroyed: ax,cx,dx,bp
+;
+MSG_CONTACT_EDIT_ADD_FIELD_SPEED_DIAL   message
+;
+; Updates speed dial icons next to fields in the 
+; Contact card.  Destroys all speed dial icons 
+; then broadcasts message to all telephone fields to create
+; speed dial icons if they have a speed dial associated
+; with them.
+;
+; Pass: nothing
+; Return: nothing
+; Destroyed: ax,cx,dx,bp
+;
+
+MSG_CONTACT_EDIT_SAVE_AND_CLOSE		message
+;
+; Used internally when the user selects the "Close" trigger in the contact
+; edit dialog.
+;
+; Pass: nothing
+; Return: nothing
+; Destroyed: ax, cx, dx, bp
+;
+
+MSG_CONTACT_EDIT_GET_RECORD_HANDLE	message
+;
+; Used internally by the ContactFieldEdit objects to get the current
+; record handle
+;
+; Pass: nothing
+; Return: cx - record handle
+; Destroyed: cx, dx, bp
+;
+
+MSG_CONTACT_EDIT_SET_FOCUS_TO_TOP_FIELD	message
+;
+; Set the focus back to the top field.
+;
+; Pass: nothing
+; Return: nothing
+; Destroyed: ax, cx, dx, bp
+;
+
+;----------------------------------------------------------------------------
+; Messages available only in Communicator products after Feb 1997:
+;----------------------------------------------------------------------------
+
+MSG_CONTACT_EDIT_INITIATE_MENU_DIALOG	message
+;
+; Internal: Sent to us by the Menu trigger
+;
+; Pass: nothing
+; Return: nothing
+; Destroyed: ax, cx, dx, bp
+;
+
+MSG_CONTACT_EDIT_DISPLAY_NEXT_RECORD	message
+;
+; Load the next record, relative to the one being displayed
+;
+; Pass: nothing
+; Return: carry set if next record doesn't exist
+;	  carry clear otherwise
+; Destroyed: ax, cx, dx, bp
+;
+
+MSG_CONTACT_EDIT_DISPLAY_PREVIOUS_RECORD message
+;
+; Load the previous record, relative to the one being displayed
+;
+; Pass: nothing
+; Return: carry set if previous record doesn't exist
+;	  carry clear otherwise
+; Destroyed: ax, cx, dx, bp
+;
+
+MSG_CONTACT_EDIT_COPY_RECORD		message
+;
+; Internal: Sent to us by the copy card trigger
+;
+; Pass: nothing
+; Return: nothing
+; Destroyed: ax, cx, dx, bp
+;
+
+MSG_CONTACT_EDIT_COPY_FIELDS_TO_CLIPBOARD message
+;
+; Internal: Sent to us by the Copy To Clipboard trigger in the menu
+;
+; Pass: nothing
+; Return: nothing
+; Destroyed: ax, cx, dx, bp
+;
+
+MSG_CONTACT_EDIT_CORRECT_TEL_FAX_HALF_LINES	message
+MSG_CONTACT_EDIT_CORRECT_TEL_DATA_HALF_LINES	message
+;
+; Fixes half-line inconsistencies among tel/fax & tel/data
+; fields.
+;
+; Pass: nothing
+; Return: nothing
+; Destroyed: ax, cx, dx, bp
+;
+
+MSG_CONTACT_EDIT_COPY_FIELD_TO_HOTLIST		message
+;
+; Internal: The "Copy to hotlist" trigger sends this to us.
+;
+; Pass: nothing
+; Return: nothing
+; Destroyed: ax, cx, dx, bp
+;
+
+MSG_CONTACT_EDIT_SET_SELECTION_TO_TOP_FIELD	message
+;
+; Sets focus to the top field and select its contents. 
+;
+; Pass: nothing
+; Return: nothing
+; Destroyed: ax, cx, dx, bp
+;
+
+;
+;	Vardata
+;
+
+ATTR_CONTACT_EDIT_NO_FIELD_DATA_ALLOWED	vardata
+; If present, no field data can be added (used for editing templates)
+;
+
+ATTR_CONTACT_EDIT_RECORD_WAS_EMPTY	vardata
+; Set by the handler for MSG_CONTACT_EDIT_DISPLAY_RECORD, if the record
+; being displayed had no data.
+
+TEMP_CONTACT_EDIT_DB_HANDLE		vardata	hptr
+; This is kept cached so we can tell when the contact DB is being closed
+
+ContactEditStateAttr	struct
+   CESA_fieldId		word		; ID of the field
+   CESA_selection	VisTextRange	; current selection range
+ContactEditStateAttr	ends
+
+ATTR_CONTACT_EDIT_RECOVER_FROM_STATE	vardata ContactEditStateAttr
+;
+; This attribute will be checked in contact editor's handler for
+; MSG_META_NOTIFY_OBJ_BLOCK_INTERACTIBLE to determine if this controller
+; was recovered from state file.  We cannot really use MSG_META_ATTACH since
+; at that point, we don't know whether contact editor is realized(or even will
+; be realized).  This vardata is added only in DETACH handler and removed in
+; MSG_META_NOTIFY_OBJ_BLOCK_INTERACTIBLE handler.
+;
+
+ATTR_CONTACT_EDIT_CTRLNP_SAVE_ALLOWED	vardata
+; If present, we can save the record using ctrl-n or ctrl-p
+;
+
+TEMP_CONTACT_EDIT_RECORD_MODIFIED	vardata
+; If present, this means that the record was modified, so it needs to be
+; saved out
+
+TEMP_CONTACT_EDIT_ORIGINAL_BLOCK_SIZE	vardata	word
+; Used to store the original size of the data block pointed by
+; CEI_record. So we know how much extra diskspace is required when
+; saving/auto-saving. 
+
+;	Instance data
+;
+	CEI_record	hptr.RecordHeader
+	; The handle of the record being edited
+	; 0 in this field means that the record is not valid
+	; any other value means that the record is valid
+
+	CEI_recordID	dword
+	; The ID of the currently edited record
+
+	noreloc	CEI_record
+
+ContactEditClass	endc
+
+DEFAULT_COMPONENT_WIDTH		equ	378
+; The default width of components in the apps, like the contact list
+
+SpeedDialControlClass	class	GenControlClass
+;
+; Controller to handle the "Set Log Length" dialog in CMgr Settings.
+;
+	SpeedDialControlFeatures	record
+		SDCF_UI:1
+	SpeedDialControlFeatures	end
+
+	SD_DEFAULT_FEATURES	equ	mask SDCF_UI
+
+MSG_SPEED_DIAL_QUERY_LIST_ENTRY		message
+;
+; Internal: message sent by our dynamic list to query for items.
+;
+
+MSG_SPEED_DIAL_OPEN_LIST		message
+;
+; Internal: message sent by the speed dial item trigger to open the
+; list in wedge dialog.
+;
+
+MSG_SPEED_DIAL_REPLACE_ENTRY		message
+;
+; Internal: message applied by the list, when user selects a speed
+; dial entry to replace.
+;
+
+MSG_SPEED_DIAL_DISPLAY_CONTACT		message
+;
+; This message is to initalize the controller to display the speed
+; dial records for a particular contact.
+;
+; Pass: cx:dx - contact ID
+; Return: nothing
+;
+
+TEMP_SPEED_DIAL_DB_HANDLE		vardata hptr
+;
+; Internal: This is kept cached so we can tell when the contact DB is
+; being closed.
+;
+
+	SDCI_recordID	dword
+	; the record ID of the contact we are displaying
+
+	SDCI_fieldID	word
+	; the field ID associated with the record ID, that brought up
+	; the speed dial entry list
+
+	SDCI_triggerObject	optr
+	; the trigger which initiated the speed dial entry list
+SpeedDialControlClass	endc
+
+EndLibrary	contdb
+
+

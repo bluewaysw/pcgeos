@@ -1,0 +1,99 @@
+
+#ifndef _STUDENT_DB_H_
+#define _STUDENT_DB_H_
+
+@include "password.goh"
+@include "mathflsh.goh"
+
+#define MAX_STUDENTS  100
+#define MAX_STUDENT_NAME  60
+#define STUDENT_DB_PASSWORD_LEN 16
+#define MAX_HISTORY   100
+
+#define SIR_DEFAULT       ((StudentIndex)0)
+#define SIR_GUEST         ((StudentIndex)1)
+#define SIR_TEACHER       ((StudentIndex)2)
+
+typedef word StudentIndex ;
+#define BAD_STUDENT ((StudentIndex)-1)
+
+#define STUDENT_DB_FILENAME "Math Flash Students"
+
+
+typedef struct {
+    TimerDateAndTime SHE_startTime ;
+    TimerDateAndTime SHE_endTime ;
+    word SHE_numProblems ;
+    Boolean SHE_allowSigns ;
+    T_number SHE_range1Low ;
+    T_number SHE_range1High ;
+    T_number SHE_range2Low ;
+    T_number SHE_range2High ;
+    T_problemType SHE_problemType ;
+    word SHE_numCorrect ;
+    word SHE_numIncorrect ;
+    word SHE_numUnanswered ;
+    word SHE_numCorrected ;
+} StudentHistoryEntry ;
+
+typedef struct {
+    /* Handle to self */
+    word SR_memHandle ;
+
+    char SR_name[MAX_STUDENT_NAME+1] ;
+
+    /* Settings */
+    T_problemType SR_problemType ;
+    word SR_numProblems ;
+    Boolean SR_allowSigns ;
+    T_number SR_range1Low ;
+    T_number SR_range1High ;
+    T_number SR_range2Low ;
+    T_number SR_range2High ;
+    Boolean SR_useDefault ;
+    Boolean SR_allowChanges ;
+
+    /* History (follows this record) */
+    word SR_numHistoryItems ;
+} StudentRecord ;
+
+typedef struct {
+    char SIR_name[MAX_STUDENT_NAME+1] ;
+    dword SIR_index ;
+} StudentIndexRecord ;
+
+typedef struct {
+    VMFileHandle SDB_file ;
+    VMBlockHandle SDB_array ;
+} StudentDB ;
+
+typedef struct {
+    word SDBH_numStudents ;
+    StudentIndexRecord SDBH_nameArray[MAX_STUDENTS] ;
+
+    /* Memory only */
+    StudentDB *SDBH_db ;
+    T_password SDBH_password ;
+} StudentDBHeader ;
+
+Boolean StudentDBOpenOrCreate(FileLongName name, StudentDB *db, char *dirname) ;
+void StudentDBClose(StudentDB *db) ;
+
+StudentIndex StudentDBCreateStudent(StudentDB *db) ;
+StudentRecord *StudentDBGetStudent(StudentDB *db, StudentIndex index) ;
+void StudentDBPutStudent(StudentDB *db, StudentIndex index, StudentRecord *record) ;
+void StudentDBDeleteStudent(StudentDB *db, StudentIndex index) ;
+void StudentDBDiscardStudentRecord(StudentRecord *record) ;
+void StudentDBGetName(StudentDB *db, StudentIndex index, char *name) ;
+void StudentDBRename(StudentDB *db, StudentIndex index, char *name) ;
+
+void StudentDBAppendHistoryEntryToStudent(StudentDB *db, StudentIndex index, StudentHistoryEntry *entry) ;
+void StudentDBClearHistory(StudentDB *db, StudentIndex index) ;
+word StudentDBGetCount(StudentDB *db) ;
+
+/* Really more for internal */
+StudentDBHeader *StudentDBLockHeader(StudentDB *db) ;
+void StudentDBUnlockHeader(StudentDBHeader *header, Boolean IsDirty) ;
+
+
+#endif _STUDENT_DB_H_

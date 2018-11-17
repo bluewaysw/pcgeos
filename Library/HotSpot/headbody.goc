@@ -1,0 +1,1328 @@
+/***************************************************************************
+ *
+ *      Copyright (c)   GeoWorks 1994   -- All Rights Reserved
+ *
+ *  PROJECT:            GEOS
+ *  FILE:               headbody.goc
+ *  AUTHOR:             Edwin Yu
+ *
+ *  REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      Edwin  4/13/94         Initial version.
+ *
+ *  DESCRIPTION:    This file contains code for HotSpotManagerClass
+ *                  and HotSpotHeadClass
+ *
+ *  $Id: headbody.goc,v 1.1 97/04/04 18:09:06 newdeal Exp $
+ *
+ ***************************************************************************/
+
+@include <stdapp.goh>
+@include <hotspot.goh>
+#include <object.h>
+#include "hserrors.h"
+
+@classdecl      HotSpotHeadClass ;
+@classdecl      HotSpotManagerClass ;
+
+/* -------------------------------------------------------------------------
+	    Forward Declarations of routines in hotspot.goc
+---------------------------------------------------------------------------*/
+optr HSManagerGetText(optr HotSpot);
+
+/* -------------------------------------------------------------------------
+			Methods for HotSpotHeadClass
+---------------------------------------------------------------------------*/
+/***************************************************************************
+ *              MSG_GH_SET_CURRENT_TOOL for HotSpotHeadClass
+ *************************************************************************** 
+ *  SYNOPSIS:   Intercept MSG_GH_SET_CURRENT_TOOL and translate the 
+ *              grobj class to the corresponding hotspot subclass.
+ *  CALLED BY:
+ *  PARAMETERS: void (ClassStruct *toolClass = cx:dx, word iniData = bp);
+ *
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   -------                 ----------------
+ *      Edwin   4/19/94                 Initial Revision
+ *
+ ***************************************************************************/
+@method HotSpotHeadClass, MSG_GH_SET_CURRENT_TOOL
+{
+    word    dummy, groupHandle=0, groupChunk=0;
+    optr    grobj;
+
+    /*  
+     *  When we select a new tool, we must make sure that the HotSpotGroup 
+     *  object ungroups its hotspots and send each hotspot's positions
+     *  to the text.  If we don't do it, unknown effects will happen for
+     *  each hotspot in the group doesn't have its document position.
+     *  (They only have the offsets from the center of the group.)
+     */
+    if(pself->GH_currentBody != NULL) {
+        ObjLockObjBlock(OptrToHandle(pself->GH_currentBody));
+        GrObjBodyProcessSelectedGrObjsCommonPassFlag(pself->GH_currentBody,
+            MSG_HSGROUP_GET_OPTR,0,0,0,OCCT_DONT_SAVE_PARAMS_DONT_TEST_ABORT,
+            &dummy,&groupHandle,&groupChunk,&dummy);
+        if (groupHandle != NULL && groupChunk != NULL) {
+            @call pself->GH_currentBody::MSG_GB_UNGROUP_SELECTED_GROUPS();
+            GrObjBodyProcessSelectedGrObjsCommonPassFlag(pself->GH_currentBody,
+                MSG_GHS_NOTIFY_TEXT_RESIZE,0,0,0,
+                OCCT_DONT_SAVE_PARAMS_DONT_TEST_ABORT,
+                &dummy,&dummy,&dummy,&dummy);
+        }
+        MemUnlock(OptrToHandle(pself->GH_currentBody));
+        /*
+         * Now see if an open spline is created.  Delete it if so.
+         */
+        grobj = @call pself->GH_currentBody::
+            MSG_HOT_SPOT_MANAGER_GET_MOUSEGRAB();
+        if (grobj != NULL)
+            @call pself->GH_currentBody::
+		MSG_HOT_SPOT_MANAGER_CHECK_OPEN_SPLINE(grobj);
+    }
+
+    /*
+     *  Translate from grobj tools to hotspot tools
+     */
+    if(toolClass == (ClassStruct *) &RectClass)
+	    toolClass = &HotSpotRectClass;
+    else if(toolClass == (ClassStruct *) &SplineGuardianClass)
+	    toolClass = &HotSpotSplineGuardianClass;
+    else if(toolClass == (ClassStruct *) &PointerClass)
+        toolClass = &HotSpotPointerClass; 
+    @callsuper();
+}
+
+/***************************************************************************
+ *          MSG_GH_SEND_NOTIFY_CURRENT_TOOL for HotSpotHeadClass
+ *************************************************************************** 
+ *  SYNOPSIS:   Intercept MSG_GH_SEND_NOTIFY_CURRENT_TOOL and translate the 
+ *              hotspot subclass to the grobj class, callsuper, then 
+ *              translate the grobj class back to the hotspot subclass.  The
+ *              reason is that the UI doesn't know the hotspot subclasses.
+ *  CALLED BY:
+ *  PARAMETERS: void ();
+ *
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   -------                 ----------------
+ *      Edwin   5/6/94                  Initial Revision
+ *
+ ***************************************************************************/
+@method HotSpotHeadClass, MSG_GH_SEND_NOTIFY_CURRENT_TOOL
+{
+    /* 
+     * To assign the hotspot classes back to its orignal grobj class because
+     * the UI doesn't recognize the hotspot classes.
+     */
+    if(pself->GH_currentTool == (ClassStruct *) &HotSpotRectClass)
+	    pself->GH_currentTool = &RectClass;
+    else if(pself->GH_currentTool == 
+	    (ClassStruct *) &HotSpotSplineGuardianClass)
+	    pself->GH_currentTool = &SplineGuardianClass; 
+    else if(pself->GH_currentTool == (ClassStruct *) &HotSpotPointerClass)
+	    pself->GH_currentTool = &PointerClass;
+
+    @callsuper();
+
+    /* 
+     * Now change the classes back 
+     */
+    if(pself->GH_currentTool == (ClassStruct *) &RectClass)
+	    pself->GH_currentTool = &HotSpotRectClass;
+    else if(pself->GH_currentTool == (ClassStruct *) &SplineGuardianClass)
+	    pself->GH_currentTool = &HotSpotSplineGuardianClass;
+    else if(pself->GH_currentTool == (ClassStruct *) &PointerClass)
+	    pself->GH_currentTool = &HotSpotPointerClass;
+
+}
+
+/* -------------------------------------------------------------------------
+		    Methods for HotSpotManagerClass
+---------------------------------------------------------------------------*/
+
+/***************************************************************************
+ *              MSG_META_SEND_CLASSED_EVENT
+ *************************************************************************** 
+ *  SYNOPSIS:   Look for MetaTextMessages which will be handled specially.
+ *  CALLED BY:
+ *  PARAMETERS: void (EventHandle event = cx, TravelOption whereTo = dx);
+ *
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Cassie  9/8/94                  Initial Revision
+ *	jenny	10/ 6/94		Send set hyperlink to ourselves
+ *
+ ***************************************************************************/
+@method HotSpotManagerClass, MSG_META_SEND_CLASSED_EVENT
+{
+    optr    dest;
+    Message msg;
+
+    if (whereTo == TO_TARGET) {
+	/*
+	 * Get the message. If it's a follow hyperlink, we send it on
+	 * to the selected hotspot.
+	 */
+	msg = ObjGetMessageInfo(event, &dest);
+	if (msg == MSG_META_TEXT_FOLLOW_HYPERLINK) {
+	    @call self::MSG_GB_SEND_CLASSED_EVENT_TO_SELECTED_GROBJS(event);
+	/*
+	 * If it's a set hyperlink, we want to investigate it
+	 * ourselves before passing it on to anyone else.
+	 */
+	} else if (msg == MSG_META_TEXT_SET_HYPERLINK) {
+	    MessageSetDestination(event, oself);
+	    CMessageDispatch(event, 0, 0);
+	/*
+	 * Non-hyperlink events go to our superclass.
+	 */
+	} else {
+	    @callsuper();	
+	}
+    }
+    else
+        @callsuper();	
+    return;
+}
+
+/***************************************************************************
+ *              MSG_META_TEXT_SET_HYPERLINK
+ *************************************************************************** 
+ *  SYNOPSIS:   Send a set hyperlink message to either the text object
+ * 		or the selected hotspot, as appropriate.
+ *  CALLED BY:
+ *  PARAMETERS:	void (VisTextSetContextFlags flags, word file,
+ *			word context, dword rangeEnd, dword rangeStart);
+ *
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      jenny	10/ 6/94		Initial version
+ *
+ ***************************************************************************/
+@method HotSpotManagerClass, MSG_META_TEXT_SET_HYPERLINK
+{
+    optr Text;
+    EventHandle event;
+
+    /*
+     * If the message was not intended specifically for
+     * the current selection, as it won't be when all hyperlinks are
+     * being cleared, we just send it on to the text object.
+     * Otherwise, we send it to the selected hotspots.
+     */
+    if ((rangeStart >> 16) != VIS_TEXT_RANGE_SELECTION_HIGH) {
+	Text = HSManagerGetText(oself);
+	@call Text::MSG_META_TEXT_SET_HYPERLINK(flags, file, context,
+						rangeEnd, rangeStart);
+    } else {
+	event = @record MetaClass::MSG_META_TEXT_SET_HYPERLINK(
+						flags, file, context,
+						rangeEnd, rangeStart);
+	@call self::MSG_GB_SEND_CLASSED_EVENT_TO_SELECTED_GROBJS(event);
+    }
+}
+
+/***************************************************************************
+ *              MSG_META_LARGE_START_SELECT for HotSpotManagerClass
+ *************************************************************************** 
+ *  SYNOPSIS:   Intercept MSG_META_LARGE_START_SELECT
+ *              If the mouse event is within the boundaries of a graphic,
+ *              pass on the message to start creating a HotSpot(grobj).
+ *  CALLED BY:
+ *  PARAMETERS: void (MouseReturnParams *retVal, 
+ *                    LargeMouseData *largeMouseDataStruct)
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Edwin   4/7/94                  Initial Revision
+ ***************************************************************************/
+@method HotSpotManagerClass, MSG_META_LARGE_START_SELECT
+{
+    CurrentToolValues currentTool;
+    optr        GHead, Text, group, targetGrobj = pself->GBI_mouseGrab;
+    word        *varToken, token, dum, groupHandle=0, groupChunk=0, close;
+    RectDWFixed dummy;
+    PointDWFixed position;
+    MemHandle   data;
+    EvaluatePositionRatingAndNotes  retArg;
+    Boolean     TorF;
+
+    GHead = pself->GBI_head;
+    @call GHead::MSG_GH_GET_CURRENT_TOOL(&currentTool);
+    /* 
+     *  Here we assume that if no group is found, 
+     *  GrObjBodyProcessSelectGrObjsCommon doesn't trash groupHandle and
+     *  groupChunk, so they are still 0.
+     */
+    GrObjBodyProcessSelectedGrObjsCommonPassFlag(oself,
+        MSG_HSGROUP_GET_OPTR,0,0,0,OCCT_DONT_SAVE_PARAMS_DONT_TEST_ABORT,
+        &dum,&groupHandle,&groupChunk,&dum);
+
+    /* 
+     * Get graphic run token at the current mouse position.
+     */
+    Text = HSManagerGetText(oself);
+    token = @call Text::MSG_HSTEXT_GET_GRAPHIC_AT_POSITION(
+			largeMouseDataStruct->LMD_location,&dummy);
+
+    if(token != NULL_HOT_SPOT_TOKEN) {  
+   	/*
+         * A graphic has been found at mouse position.  Thus, it's OK to
+         * create a hotspot. Add the graphic's run token in HotSpotManager,
+         * and callsuper no matter what the current tool is.
+         */                             
+        varToken = (word *)ObjVarAddData(oself,
+		    ATTR_HOT_SPOT_MANAGER_GRAPHIC_TOKEN, sizeof(word));
+        *varToken = token;
+
+        /*
+         *  If the user clicks inside a graphic but not on any hotspot
+         *  or handles, we treat the click as an unselecting click.
+         */
+        if(groupHandle != NULL && groupChunk != NULL) {
+            group = ConstructOptr(groupHandle, groupChunk);
+            @call group::MSG_GO_EVALUATE_PARENT_POINT_FOR_SELECTION(&retArg, 
+                &(largeMouseDataStruct->LMD_location));
+            TorF = @call self::MSG_GB_EVALUATE_POINT_FOR_HANDLE(
+                &(largeMouseDataStruct->LMD_location));
+            if (retArg.EPRAN_rating == EVALUATE_NONE && !TorF) {
+                /*
+                 * the click is not on any hotspot or any handles
+                 */
+                @call self::MSG_GB_UNGROUP_SELECTED_GROUPS();
+                GrObjBodyProcessSelectedGrObjsCommonPassFlag(oself, 
+                    MSG_GHS_NOTIFY_TEXT_RESIZE,0,0,0,
+		    OCCT_DONT_SAVE_PARAMS_DONT_TEST_ABORT,
+                    &dum,&dum,&dum,&dum);
+            }
+        }
+     
+        @callsuper();
+        /*
+         * If the user finished creating an open spline hotspot, give 
+         * a warning and delete the spline.  It doesn't make sense to 
+         * create an open spline to act as a hotspot.
+         * Note: by checking mouseGrab == NULL, we can tell whether the
+         * user has finished creation.
+         */
+        if (pself->GBI_mouseGrab == NULL && targetGrobj != NULL) {
+            /* 
+             * NOTE: if the user finished creation of a spline, mouseGrab 
+             * becomes NULL after callsuper.  By then I can't catch the optr
+             * the spline.  Thus I get mouseGrab before callsuper. 
+             */
+            close = 
+                @call self::MSG_HOT_SPOT_MANAGER_CHECK_OPEN_SPLINE(
+								targetGrobj);
+            if (close) {
+                @call targetGrobj::MSG_GHS_GET_TOKEN(&token);
+                data =  @call targetGrobj::MSG_GHS_GET_INSTANCE_DATA();
+                @call targetGrobj::
+                MSG_GHS_GET_UPPERLEFT_CORNER(&position);
+                @call Text::MSG_HSTEXT_UPDATE_HOT_SPOT(token,data,position);
+                @call process::MSG_GEN_PROCESS_UNDO_FLUSH_ACTIONS();
+           }
+        }
+        return; 
+    } 
+    else {
+	/*
+	 * The mouse position is outside any graphics.  If we are in the
+	 * middle of creating a HotSpot(in the process of creating a spline),
+	 * callsuper.  Otherwise, ignore the mouse events and delete the 
+	 *  graphic's run token in HotSpotManager if it exists. 
+	 */ 
+        if(pself->GBI_mouseGrab != NULL) {
+	        @callsuper(); 
+            return;
+        }
+        if(currentTool.CTV_toolClass == (ClassStruct *)&HotSpotPointerClass) {
+            /*  
+             *  The click outside any graphic is considered to be an
+             *  unselecting click.  if a group exits, ungroup it.   
+             *  NOTE:  After ungrouping the HotSpotGroup, its hotspots' 
+             *  OT_centers become the actual document positions, no longer be 
+             *  the offsets from the center of the group.  Thus, we need to
+             *  notify text with the actual positions of the hotspots.
+             */
+            if (groupHandle != NULL && groupChunk != NULL) {
+                @call self::MSG_GB_UNGROUP_SELECTED_GROUPS();
+                GrObjBodyProcessSelectedGrObjsCommonPassFlag(oself, 
+                    MSG_GHS_NOTIFY_TEXT_RESIZE,0,0,0,
+		    OCCT_DONT_SAVE_PARAMS_DONT_TEST_ABORT,
+                    &dum,&dum,&dum,&dum);
+            }
+            /* remove all the hotspots from the selection array */
+            @call self::MSG_GB_REMOVE_ALL_GROBJS_FROM_SELECTION_LIST();
+        }
+        ObjVarDeleteData(oself, ATTR_HOT_SPOT_MANAGER_GRAPHIC_TOKEN);
+        EC_ERROR_IF(currentTool.CTV_toolClass != 
+            	    (ClassStruct *)&EditTextGuardianClass && 
+		    currentTool.CTV_toolClass != 
+            	    (ClassStruct *)&HotSpotPointerClass && 
+		    currentTool.CTV_toolClass != 
+            	    (ClassStruct *)&HotSpotRectClass && 
+		    currentTool.CTV_toolClass != 
+            	    (ClassStruct *)&HotSpotSplineGuardianClass, 
+            	    WARNING_MESSAGE_HOT_SPOT_UNSUPPORTED_TOOL);
+        retVal->flags = MRF_PROCESSED;
+    }
+}
+
+
+/***************************************************************************
+ *      MSG_GB_ADD_GROBJ_TO_SELECTION_LIST for HotSpotManagerClass
+ *************************************************************************** 
+ *  SYNOPSIS:   send a notification to text about the change of selection
+ *  CALLED BY:
+ *  PARAMETERS: void (optr grobjOD, HandleUpdateMode mode)
+ *                    
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Edwin   5/29/94                 Initial Revision
+ ***************************************************************************/
+@method HotSpotManagerClass, MSG_GB_ADD_GROBJ_TO_SELECTION_LIST
+{
+    @callsuper();
+    /* 
+     *  The reason to 'send' instead of 'call' is that the hotspot's token 
+     *  hasn't been set, and causes the following handler to obtain an
+     *  invalid hotspot token.
+     */
+    @send, forceQueue self::MSG_HOT_SPOT_MANAGER_SELECTION_CHANGE_NOTIFICATION();
+}
+
+
+/***************************************************************************
+ *      MSG_GB_REMOVE_ALL_GROBJS_FROM_SELECTION_LIST for HotSpotManagerClass
+ *************************************************************************** 
+ *  SYNOPSIS:   send a notification to text about the change of selection
+ *  CALLED BY:
+ *  PARAMETERS: void ()
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Edwin   5/29/94                 Initial Revision
+ ***************************************************************************/
+@method HotSpotManagerClass, MSG_GB_REMOVE_ALL_GROBJS_FROM_SELECTION_LIST
+{
+    @callsuper();
+    /* 
+     *  The reason to 'send' instead of 'call' is that the hotspot's token 
+     *  hasn't been set, and causes the following handler to obtain and
+     *  invalid hotspot token.
+     */
+    @send, forceQueue self::
+	MSG_HOT_SPOT_MANAGER_SELECTION_CHANGE_NOTIFICATION();
+}
+
+/***************************************************************************
+ *              MSG_HOT_SPOT_MANAGER_CHECK_CORNERS for HotSpotManagerClass
+ *************************************************************************** 
+ *  SYNOPSIS:   Determine if the four corners of the HotSpot(grobj) are 
+ *              within the boundaries of a graphic
+ *  
+ *  PARAMETERS: word(RectDWFixed *grobjBound)
+ *              Return: run token of the graphic if all four corners of the
+ *                      HotSpot are within the boundaries of the graphic.
+ *                      NULL_HOT_SPOT_TOKEN otherwise
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   -------                 ----------------
+ *      Edwin   4/11/94                 Initial Revision
+ **************************************************************************/
+@method HotSpotManagerClass, MSG_HOT_SPOT_MANAGER_CHECK_CORNERS
+{
+    word            token;          /* graphic token */
+    PointDWFixed    corner;         /* corner of the grobj to be checked */
+    optr            Text;
+    RectDWFixed     dummy;
+
+    /* upper left corner */
+    corner.PDF_x = grobjBound->RDWF_left;
+    corner.PDF_y = grobjBound->RDWF_top;
+    Text = HSManagerGetText(oself);
+    token = @call Text::MSG_HSTEXT_GET_GRAPHIC_AT_POSITION(corner,&dummy); 
+    if (token == NULL_HOT_SPOT_TOKEN)
+        return token;
+
+    /* lower left corner */
+    corner.PDF_y = grobjBound->RDWF_bottom;
+    if(token != @call Text::MSG_HSTEXT_GET_GRAPHIC_AT_POSITION(corner,&dummy))
+	return NULL_HOT_SPOT_TOKEN; 
+
+    /* lower right corner */
+    corner.PDF_x = grobjBound->RDWF_right;
+    if(token != @call Text::MSG_HSTEXT_GET_GRAPHIC_AT_POSITION(corner,&dummy))
+	return NULL_HOT_SPOT_TOKEN; 
+
+    /* upper right corner */
+    corner.PDF_y = grobjBound->RDWF_top;
+    if(token != @call Text::MSG_HSTEXT_GET_GRAPHIC_AT_POSITION(corner,&dummy))
+	return NULL_HOT_SPOT_TOKEN; 
+
+    return token;                           
+}
+
+/***************************************************************************
+ *      MSG_HOT_SPOT_MANAGER_MOVE_HOT_SPOT() for HotSpotManagerClass
+ *************************************************************************** 
+ *  SYNOPSIS:   Move hotspot object to "flow" with the embedded graphic when
+ *              the hotspot's C_GRAPHIC text positoin changes
+ *
+ *  PARAMETERS: void (word token)
+ *
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   -------                 ----------------
+ *      Edwin   4/19/94                 Initial Revision
+ *
+ **************************************************************************/
+/*
+ * The following structure is used as a parameter to ObjComProcessChildren 
+ */
+typedef struct {
+    word    	    CBD_token;        /* token of the HotSpot which moved */
+} CallbackData;
+
+Boolean _pascal
+CallbackRoutineSetPosition(optr parent, optr child, void *cbData)
+{
+    CallbackData *params;
+    word token = NULL_HOT_SPOT_TOKEN;
+
+    params = (CallbackData *)cbData;
+    @call child::MSG_GHS_GET_TOKEN(&token);
+
+    if (token == params->CBD_token) {
+	@call child::MSG_GHS_SET_POSITION();
+	return TRUE;	    	    /* return true to stop processing 	   */
+    }
+    return FALSE;   	    	    /* return false to continue processing */
+}
+
+@method HotSpotManagerClass, MSG_HOT_SPOT_MANAGER_MOVE_HOT_SPOT
+{
+    CallbackData data, *dataPtr = &data;
+	
+/*
+ * let the hotspot calculate if its position has changed, if a hotspot
+ * with the passed token is actually found, because by the time we get
+ * this message it may have been deleted -cah 7/30/94
+ */
+
+    dataPtr->CBD_token    = token;
+    ObjCompProcessChildren(oself, (optr)NULL, 
+			    OCCT_SAVE_PARAMS_TEST_ABORT, 
+			    (void *) &data,
+			    word_offsetof(GrObjBase, GrObj_offset),
+			    word_offsetof(GrObjBodyInstance, GBI_drawComp),
+			    word_offsetof(GrObjInstance, GOI_drawLink),
+			    &CallbackRoutineSetPosition);
+}
+
+
+/***************************************************************************
+ *              MSG_HOT_SPOT_MANAGER_ABORT_CREATING_HOTSPOT
+ *************************************************************************** 
+ *  SYNOPSIS:   Delete the passed grobj from the HotSpotManager
+ *                                      
+ *  PARAMETERS: void (optr grobj);
+ *                                      
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   -------                 ----------------
+ *      Edwin   4/12/94                 Initial Revision
+ *
+ **************************************************************************/
+@method HotSpotManagerClass, MSG_HOT_SPOT_MANAGER_ABORT_CREATING_HOTSPOT
+{
+    optr    Text;
+    word    token;
+
+    Text = HSManagerGetText(oself);
+    @call grobj::MSG_GHS_GET_TOKEN(&token);
+    @call grobj::MSG_GO_UNDRAW_SPRITE(0);
+    @call grobj::MSG_GO_CLEAR_SANS_UNDO();
+    @call Text::MSG_HSTEXT_DELETE_HOT_SPOT(token);
+    @call process::MSG_GEN_PROCESS_UNDO_FLUSH_ACTIONS();
+}
+
+
+/****************************************************************************
+ *      MSG_HOT_SPOT_MANAGER_DESTROY_HOT_SPOT() for HotSpotManagerClass
+ **************************************************************************** 
+ *  SYNOPSIS:   Destroy the grobj(hotspot) associated with the given hotspot 
+ *              object token.
+ *                                      
+ *  CALLED BY:  HotSpotTextClass
+ *  PARAMETERS: void (word token)
+ *                                      
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Edwin   5/4/94                  Initial Revision
+ *
+ ***************************************************************************/
+Boolean _pascal
+CallbackRoutineDestroyHotSpot(optr parent, optr child, void *cbData)
+{
+    CallbackData *params;
+    word    	  token = NULL_HOT_SPOT_TOKEN;  
+
+    params = (CallbackData *)cbData;
+    @call child::MSG_GHS_GET_TOKEN(&token);
+    if (token == params->CBD_token) {
+	@call child::MSG_GHS_DELETE_HOT_SPOT();
+	return TRUE;
+    }
+    return FALSE;
+}
+
+@method HotSpotManagerClass, MSG_HOT_SPOT_MANAGER_DESTROY_HOT_SPOT
+{
+    CallbackData    data, *dataPtr = &data;
+	
+    dataPtr->CBD_token      = token;
+    ObjCompProcessChildren(oself, (optr)NULL, 
+			   OCCT_SAVE_PARAMS_TEST_ABORT, 
+			   (void *)dataPtr,
+			   word_offsetof(GrObjBase, GrObj_offset),
+			   word_offsetof(GrObjBodyInstance, GBI_drawComp),
+			   word_offsetof(GrObjInstance, GOI_drawLink),
+			   &CallbackRoutineDestroyHotSpot);
+}
+
+
+/****************************************************************************
+ *      MSG_HOT_SPOT_MANAGER_INVALIDATE_HOT_SPOT() for HotSpotManagerClass
+ **************************************************************************** 
+ *  SYNOPSIS:   Send MSG_GO_INVALIDATE to the grobj(hotspot) with the 
+ *	    	given hotspot object token.
+ *                                      
+ *  CALLED BY:  HotSpotTextClass
+ *  PARAMETERS: void (word token)
+ *                                      
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Edwin   5/4/94                  Initial Revision
+ *
+ ***************************************************************************/
+Boolean _pascal
+CallbackRoutineInvalidateHotSpot(optr parent, optr child, void *cbData)
+{
+    CallbackData *params;
+    word    	  token = NULL_HOT_SPOT_TOKEN;  
+
+    params = (CallbackData *)cbData;
+    @call child::MSG_GHS_GET_TOKEN(&token);
+    if (token == params->CBD_token) {
+	@call child::MSG_GO_INVALIDATE();
+	return TRUE;
+    }
+    return FALSE;
+}
+
+@method HotSpotManagerClass, MSG_HOT_SPOT_MANAGER_INVALIDATE_HOT_SPOT
+{
+    CallbackData    data, *dataPtr = &data;
+	
+    dataPtr->CBD_token      = token;
+    ObjCompProcessChildren(oself, (optr)NULL, 
+			   OCCT_SAVE_PARAMS_TEST_ABORT, 
+			   (void *)dataPtr,
+			   word_offsetof(GrObjBase, GrObj_offset),
+			   word_offsetof(GrObjBodyInstance, GBI_drawComp),
+			   word_offsetof(GrObjInstance, GOI_drawLink),
+			   &CallbackRoutineInvalidateHotSpot);
+}
+
+
+/****************************************************************************
+ *      MSG_HOT_SPOT_MANAGER_CREATE_HOT_SPOT() for HotSpotManagerClass
+ **************************************************************************** 
+ *  SYNOPSIS:   Instantiate a HotSpot object with the passed instance data
+ *                                      
+ *  CALLED BY:  HotSpotTextClass
+ *  PARAMETERS: void (word token, MemHandle dataHandle, 
+ *                    ChunkHandle dataChunk, PointDWFixed point)
+ *              token - token to assign to the new HotSpot object
+ *              dataHandle - data block 
+ *              dataChunk  - chunck containing instance data            
+ *              point - upper left corner of HotSpot's position
+ *                                      
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Edwin   5/24/94                 Initial Revision
+ *
+ ***************************************************************************/
+@method HotSpotManagerClass, MSG_HOT_SPOT_MANAGER_CREATE_HOT_SPOT
+{
+    GenHotSpotDataStruct *HSParams;
+    optr        newGrobj, ward;
+    word        height, width, arraySize;
+    MemHandle   block;
+    byte        *Source_ptr;
+    word        x1, x2, y1, y2;
+
+/*    @call self::MSG_META_SUSPEND(); */
+    @call self::MSG_GB_IGNORE_UNDO_ACTIONS_AND_SUSPEND();
+    @call self::MSG_GB_REMOVE_ALL_GROBJS_FROM_SELECTION_LIST();
+
+    MemLock(dataHandle);
+    HSParams = (GenHotSpotDataStruct *)LMemDerefHandles(dataHandle, dataChunk);
+    height = HSParams->GHSDS_instData.BI_height.WWF_int;
+    width  = HSParams->GHSDS_instData.BI_width.WWF_int;
+
+    /*
+     * Instantiate a new grobj! 
+     */
+    if (HSParams->GHSDS_type == HST_RECT) 
+	    newGrobj = @call self::MSG_GB_INSTANTIATE_GROBJ(&HotSpotRectClass);
+    else {
+	    newGrobj = @call self::MSG_GB_INSTANTIATE_GROBJ(
+	        &HotSpotSplineGuardianClass);
+        block = @call self::MSG_GB_GET_BLOCK_FOR_ONE_GROBJ();
+        ward = @call newGrobj::MSG_GOVG_CREATE_VIS_WARD(block);
+        @call ward::MSG_VIS_SET_SIZE(width, height);
+        arraySize = HSParams->GHSDS_size - sizeof(GenHotSpotDataStruct);
+        Source_ptr = (byte *)HSParams + sizeof(GenHotSpotDataStruct);
+        @call ward::MSG_HSSW_COPY_SPLINE_POINTS(arraySize, Source_ptr);
+    }
+
+    /*
+     * calculate the position of the new hotspot, approximately
+     */
+    x1 = point.PDF_x.DWF_int + HSParams->GHSDS_parentWidth.WWF_int/2;
+    HSParams->GHSDS_instData.BI_center.PDF_x.DWF_int = x1;
+    x2 = point.PDF_x.DWF_frac + HSParams->GHSDS_parentWidth.WWF_frac/2;;
+    HSParams->GHSDS_instData.BI_center.PDF_x.DWF_frac = x2;
+    y1 = point.PDF_y.DWF_int + HSParams->GHSDS_parentHeight.WWF_int/2;
+    HSParams->GHSDS_instData.BI_center.PDF_y.DWF_int = y1;
+    y2 = point.PDF_y.DWF_frac + HSParams->GHSDS_parentHeight.WWF_frac/2;;
+    HSParams->GHSDS_instData.BI_center.PDF_y.DWF_frac = y2;
+
+    /*
+     * initialize the instance data (grobj's dimension & geometry)
+     */
+    @call newGrobj::MSG_GO_INIT_BASIC_DATA(&(HSParams->GHSDS_instData));
+    @call newGrobj::MSG_GO_INIT_TO_DEFAULT_ATTRS();
+    @call newGrobj::MSG_GHS_SET_TOKEN(token);
+
+    /*
+     * draw and notify.  If we are creating a spline, we need to the extra 
+     * work of initilalizing the spline points with the passed data.  Note, 
+     * we don't add the ward to the body's selection list, only the Guardian
+     */
+    @call newGrobj::MSG_GO_NOTIFY_GROBJ_VALID();
+
+    @call self::MSG_GB_ADD_GROBJ_THEN_DRAW(newGrobj, 
+		    	(GOBAGOR_LAST | GOBAGOF_DRAW_LIST_POSITION));
+
+    if (HSParams->GHSDS_type == HST_SPLINE)
+	@call ward::MSG_SPLINE_CLOSE_CURVE(); 
+    else 
+	@call self::MSG_GB_ADD_GROBJ_TO_SELECTION_LIST(newGrobj, HUM_NOW);
+
+    MemFree(dataHandle);
+/*    @call self::MSG_META_UNSUSPEND(); */
+    @call self::MSG_GB_UNSUSPEND_AND_ACCEPT_UNDO_ACTIONS();
+}
+
+
+/****************************************************************************
+ *              MSG_GB_CREATE_GROBJ
+ **************************************************************************** 
+ *  SYNOPSIS:   Intercept MSG_GB_CREATE_GROBJ and translate the grobj to 
+ *              its subclass(hotspot grobj class).
+ *
+ *  PARAMETERS: optr (GrObjBodyCreateGrObjParams *params == ss:bp) = cx:dx
+ *                  GrObjBodyCreateGrObjParams = {
+ *                      fptr.ClassStruct    GBCGP_class;
+ *                      word                padding1;
+ *                      word                padding2;
+ *                      word                padding3;
+ *                      word                padding4;
+ *                      WWFixed             GBCGP_width;
+ *                      WWFixed             GBCGP_height;
+ *                  }
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   -------                 ----------------
+ *      Edwin   4/18/94                 Initial Revision
+ *
+ ***************************************************************************/
+ @method HotSpotManagerClass, MSG_GB_CREATE_GROBJ
+{
+    if(params->GBCGP_class == (ClassStruct *)&HotSpotRectClass)
+	params->GBCGP_class = &HotSpotRectClass;
+    else if(params->GBCGP_class == (ClassStruct *)&SplineGuardianClass)
+	params->GBCGP_class = &HotSpotSplineGuardianClass;
+    else 
+        FatalError(ERROR_GENERAL_FAILURE);
+
+    return @callsuper();
+}
+
+
+/****************************************************************************
+ *              MSG_GB_INSTANTIATE_GROBJ
+ **************************************************************************** 
+ *  SYNOPSIS:   If we're creating a GroupClass object, replace it with 
+ *              HotSpotGroupClass
+ *
+ *  PARAMETERS: optr (ClassStruct *class)
+ *
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   -------                 ----------------
+ *      Edwin   6/13/94                 Initial Revision
+ *
+ ***************************************************************************/
+ @method HotSpotManagerClass, MSG_GB_INSTANTIATE_GROBJ
+{
+    optr    child;
+    if(class == (ClassStruct *)&GroupClass) {
+        class = &HotSpotGroupClass;
+    }
+    child = @callsuper();
+    return child;
+}
+
+
+/****************************************************************************
+ *              MSG_GB_REMOVE_GROBJ_FROM_SELECTION_LIST
+ **************************************************************************** 
+ *  SYNOPSIS:   If we're removing a group object, ungroup it first and 
+ *              send updated positions of the hotspots in the group to the 
+ *              text.
+ *
+ *  PARAMETERS: void (optr grobjOD)
+ *
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   -------                 ----------------
+ *      Edwin   6/20/94                 Initial Revision
+ ***************************************************************************/
+@method HotSpotManagerClass, MSG_GB_REMOVE_GROBJ_FROM_SELECTION_LIST
+{
+    @callsuper();
+    @send, forceQueue self::
+	MSG_HOT_SPOT_MANAGER_SELECTION_CHANGE_NOTIFICATION();
+}
+
+
+/****************************************************************************
+ *              MSG_HOT_SPOT_MANAGER_GET_LAST_POINTER_EVENT
+ **************************************************************************** 
+ *  SYNOPSIS:   Get GBI_lastPtr, which is the last mouse event position 
+ *                                      
+ *  CALLED BY:  MSG_META_PTR for HotSpotSplineWardClass
+ *  PARAMETERS: void (PointDWFixed *position)
+ *                                      
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Edwin   5/3/94                  Initial Revision
+ ***************************************************************************/
+@method HotSpotManagerClass, MSG_HOT_SPOT_MANAGER_GET_LAST_POINTER_EVENT
+{
+    *position = pself->GBI_lastPtr;
+}
+
+/****************************************************************************
+ * MSG_HOT_SPOT_MANAGER_SELECTION_CHANGE_NOTIFICATION for HotSpotManagerClass
+ **************************************************************************** 
+ *  SYNOPSIS:   This method is called when the user has changed the 
+ *              hotspot selection.  Send the hyperlink information and
+ *	        the hotspot token to HotSpotText so it can generate 
+ *	    	the selection change notification.
+ *                                      
+ *  CALLED BY:  
+ *  PARAMETERS: void ();
+ *                                      
+ *  SIDE EFFECTS:
+ *    GrObjBodyProcessSelectedGrObjsCommonPassFlag has trouble getting
+ *    the returned value in ax!
+ *  STRATEGY:
+ *	If none or more than one HotSpots are selected, pass the NULL
+ *	token to HSText.  If only one is selected but it is a group,
+ *	pass the NULL token.  Else pass the selected hotspot's token.
+ *
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Edwin   6/24/94                 Initial Revision
+ *
+ ***************************************************************************/
+@method HotSpotManagerClass, MSG_HOT_SPOT_MANAGER_SELECTION_CHANGE_NOTIFICATION
+{
+    word    number, dummy, groupHandle=0, groupChunk=0, 
+    	    token = NULL_HOT_SPOT_TOKEN;
+    optr    Text;
+
+    /*
+     * Is there only one object selected? 
+     */
+    number = @call self::MSG_GB_GET_NUM_SELECTED_GROBJS();
+    if (number == 1) {
+	/*
+	 * Is the selected object a group? 
+	 */
+	GrObjBodyProcessSelectedGrObjsCommonPassFlag(oself,
+	    MSG_HSGROUP_GET_OPTR,0,0,0,OCCT_DONT_SAVE_PARAMS_DONT_TEST_ABORT,
+            &dummy,&groupHandle,&groupChunk,&dummy);
+	/*
+	 * If not a group, get its token
+	 */
+	if (groupHandle == NULL && groupChunk == NULL) {
+            GrObjBodyProcessSelectedGrObjsCommonPassFlag(oself,
+                MSG_GHS_GET_TOKEN,PtrToSegment(&token),PtrToOffset(&token),
+	        0,OCCT_DONT_SAVE_PARAMS_DONT_TEST_ABORT,
+                &dummy,&dummy,&dummy,&dummy);
+	}
+    }
+
+    Text = HSManagerGetText(oself);
+    @call Text::MSG_HSTEXT_FOLLOW_HYPERLINK_NOTIFICATION(token);
+    return;
+}
+
+
+/****************************************************************************
+ *  MSG_HOT_SPOT_MANAGER_CHECK_OPEN_SPLINE for HotSpotManagerClass
+ **************************************************************************** 
+ *  SYNOPSIS:   If the passed grobj is an open spline, give a warning and
+ *              delete it.
+ *                                      
+ *  CALLED BY:  HotSpotHeadClass
+ *  PARAMETERS: word (optr targetGrobj);
+ *              Pass:   targetGrobj - the grobj in question
+ *              Return: 1   if the spline is closed
+ *                      0   if the spline is open or no spline that is
+ *                          currently edited
+ *                                      
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Edwin   7/5/94                  Initial Revision
+ ***************************************************************************/
+@method HotSpotManagerClass, MSG_HOT_SPOT_MANAGER_CHECK_OPEN_SPLINE
+{
+    optr ward;
+
+    ObjLockObjBlock(OptrToHandle(targetGrobj));
+
+    if (ObjIsObjectInClass(targetGrobj, 
+        (ClassStruct *)&HotSpotSplineGuardianClass)) {
+        ward = @call targetGrobj::MSG_GOVG_GET_VIS_WARD_OD();
+        if (!@call ward::MSG_SPLINE_GET_CLOSED_STATE() ||
+		    @call ward::MSG_SPLINE_GET_NUMBER_OF_POINTS() < 3) {
+            UserStandardDialog((char *)0, (char *)0,(char *)0,(char *)0,
+		"The hotspot must be a closed shape", 
+                (CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+                (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET));
+            @call self::
+		MSG_HOT_SPOT_MANAGER_ABORT_CREATING_HOTSPOT(targetGrobj);
+        }
+        else {
+            MemUnlock(OptrToHandle(targetGrobj));
+            return 1;
+        }
+    }
+    MemUnlock(OptrToHandle(targetGrobj));
+    return 0;
+}
+
+
+/****************************************************************************
+ *      MSG_HOT_SPOT_MANAGER_GET_MOUSEGRAB for HotSpotManagerClass
+ **************************************************************************** 
+ *  SYNOPSIS:   Get GBI_mouseGrab
+ *                                      
+ *  CALLED BY:  HotSpotHeadClass
+ *  PARAMETERS: optr ();
+ *              Pass:   nothing
+ *              Return: GBI_mouseGrab
+ *                                      
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Edwin   7/5/94                  Initial Revision
+ ***************************************************************************/
+@method HotSpotManagerClass, MSG_HOT_SPOT_MANAGER_GET_MOUSEGRAB
+{
+    return pself->GBI_mouseGrab;
+}
+
+
+/****************************************************************************
+ *      MSG_HOT_SPOT_MANAGER_HS_IN_GROUP_MOVE for HotSpotManagerClass
+ **************************************************************************** 
+ *  SYNOPSIS:   A group of hotspots has been moved to a different graphic
+ *              So notify the text about it                                      
+ *  CALLED BY:  
+ *  PARAMETERS: void (CallBackMessageData *callbackData = ss:bp)
+ *              Pass:   
+ *          	CallBackMessage:
+ *				    CBMD_groupOD
+ *				    CBMD_childOD
+ *				    CBMD_extraData1 - token of the new graphic
+ *				    CBMD_extraData2 - unused
+ *              Return: nothing
+ *                                      
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Edwin   7/6/94                  Initial Revision
+ **************************************************************************/
+@method HotSpotManagerClass, MSG_HOT_SPOT_MANAGER_HS_IN_GROUP_MOVE
+{
+    optr            child = callbackData->CBMD_childOD;
+
+    @call child::MSG_GHS_NOTIFY_TEXT_MOVE(callbackData->CBMD_extraData1);
+}
+
+/****************************************************************************
+ *      MSG_GB_UPDATE_UI_CONTROLLERS for HotSpotManagerClass
+ **************************************************************************** 
+ *  SYNOPSIS:   Disable some items in the Edit Menu
+ *                                      
+ *  CALLED BY:  
+ *  PARAMETERS: void (GrObjUINotificationTypes types);
+ *              Pass:   GrObjUINotificationTypes
+ *              Return: nothing
+ *                                      
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Edwin   7/6/94                  Initial Revision
+ **************************************************************************/
+@method HotSpotManagerClass, MSG_GB_UPDATE_UI_CONTROLLERS
+{
+    optr                GHead = pself->GBI_head;
+    CurrentToolValues   currentTool;
+
+    @call GHead::MSG_GH_GET_CURRENT_TOOL(&currentTool);
+
+    if(currentTool.CTV_toolClass != (ClassStruct *)&EditTextGuardianClass) {
+        types = types & ~GOUINT_SELECT;
+        @call self::MSG_HOT_SPOT_MANAGER_UPDATE_EDIT_CONTROLLER();
+	@call self::MSG_HOT_SPOT_MANAGER_UPDATE_HYPERLINK_CONTROLLER();
+    }
+    @callsuper();
+}
+
+
+/****************************************************************************
+ *      MSG_HOT_SPOT_MANAGER_UPDATE_EDIT_CONTROLLERS for HotSpotManagerClass
+ **************************************************************************** 
+ *  SYNOPSIS:   update the EDIT Controller
+ *                                      
+ *  CALLED BY:  
+ *  PARAMETERS: void ();
+ *              Pass:   nothing
+ *              Return: nothing
+ *                                      
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Edwin   7/6/94                  Initial Revision
+ **************************************************************************/
+@method HotSpotManagerClass, MSG_HOT_SPOT_MANAGER_UPDATE_EDIT_CONTROLLER
+{
+    word        number;
+    MemHandle   data;
+    NotifySelectStateChange *nsscPtr;
+    EventHandle notifyEvent;
+
+    if (OptrToHandle(pself->GBI_targetExcl.HG_OD) == 0) {
+        data = MemAlloc(sizeof(NotifySelectStateChange), 
+                HF_DYNAMIC|HF_SHARABLE, HAF_STANDARD_NO_ERR);
+        nsscPtr = (NotifySelectStateChange *)MemLock(data);
+
+        nsscPtr->NSSC_selectionType = SDT_GRAPHICS;
+        nsscPtr->NSSC_selectAllAvailable = FALSE;
+        nsscPtr->NSSC_clipboardableSelection =
+        nsscPtr->NSSC_deleteableSelection =
+        nsscPtr->NSSC_pasteable = FALSE;
+
+        number = @call self::MSG_GB_GET_NUM_SELECTED_GROBJS();
+        if (number >= 1) 
+            nsscPtr->NSSC_deleteableSelection = TRUE;
+
+        MemUnlock(data);
+        MemInitRefCount(data,1);
+
+        notifyEvent = @record null::MSG_META_NOTIFY_WITH_DATA_BLOCK(
+            MANUFACTURER_ID_GEOWORKS, GWNT_SELECT_STATE_CHANGE, data);
+
+        @call application::MSG_META_GCN_LIST_SEND(GCNLSF_SET_STATUS,
+            notifyEvent, data, 
+            GAGCNLT_APP_TARGET_NOTIFY_SELECT_STATE_CHANGE,
+            MANUFACTURER_ID_GEOWORKS);
+    }
+}
+
+/****************************************************************************
+ *  MSG_HOT_SPOT_MANAGER_UPDATE_HYPERLINK_CONTROLLER 
+ **************************************************************************** 
+ *  SYNOPSIS:   Send a GWNT_TEXT_HYPERLINKABILITY_CHANGE notification
+ *                                      
+ *  PARAMETERS: void (void);
+ *                                      
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      jenny   7/27/94                 Initial Revision
+ **************************************************************************/
+@method HotSpotManagerClass, MSG_HOT_SPOT_MANAGER_UPDATE_HYPERLINK_CONTROLLER
+{
+    word        number;
+    MemHandle   data;
+    VisTextNotifyHyperlinkabilityChange *vtnhcPtr;
+    EventHandle notifyEvent;
+
+    if (OptrToHandle(pself->GBI_targetExcl.HG_OD) == 0) {
+ 	/*
+	 * Allocate and lock a block for notification data.
+	 */
+       	data = MemAlloc(sizeof(VisTextNotifyHyperlinkabilityChange), 
+                HF_DYNAMIC|HF_SHARABLE, HAF_STANDARD_NO_ERR);
+        vtnhcPtr = (VisTextNotifyHyperlinkabilityChange *)MemLock(data);
+	/*
+	 * If we have exactly one hotspot selected, the selection is
+	 * hyperlinkable; otherwise, not.
+	 */
+        number = @call self::MSG_GB_GET_NUM_SELECTED_GROBJS();
+        if (number == 1) {
+            vtnhcPtr->VTNHC_hyperlinkable = TRUE;
+	} else {
+            vtnhcPtr->VTNHC_hyperlinkable = FALSE;
+	}
+	/*
+	 * Unlock the block and give it a reference count.
+	 */
+        MemUnlock(data);
+        MemInitRefCount(data,1);
+	/*
+	 * Record and send the notification.
+	 */
+        notifyEvent = @record null::MSG_META_NOTIFY_WITH_DATA_BLOCK(
+            MANUFACTURER_ID_GEOWORKS, GWNT_TEXT_HYPERLINKABILITY_CHANGE, data);
+
+        @call application::MSG_META_GCN_LIST_SEND(GCNLSF_SET_STATUS,
+            notifyEvent, data, 
+            GAGCNLT_APP_TARGET_NOTIFY_TEXT_HYPERLINKABILITY_CHANGE,
+            MANUFACTURER_ID_GEOWORKS);
+    }
+}
+
+
+/****************************************************************************
+ *      MSG_HOT_SPOT_MANAGER_GROUP_SET_HYPERLINK 
+ **************************************************************************** 
+ *  SYNOPSIS:   This message is sent to HotSpotManager once for each 
+ *	    	hotspot in a group.  Send MSG_META_TEXT_SET_HYPERLINK
+ *	    	to the hotspot, who will then call HotSpotText to set
+ *	    	a hyperlink on it.
+ *              
+ *  CALLED BY:  HotSpotGroupClass::MSG_META_TEXT_SET_HYERLINK
+ *  PARAMETERS: void (CallBackMessageData *callbackData = ss:bp)
+ *              Pass:   
+ *            CallBackMessage:
+ *                    CBMD_groupOD
+ *                    CBMD_childOD
+ *                    CBMD_extraData1 - file token
+ *                    CBMD_extraData2 - context token
+ *              Return: nothing
+ *                                      
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Edwin   7/28/94                  Initial Revision
+ *
+ **************************************************************************/
+@method HotSpotManagerClass, MSG_HOT_SPOT_MANAGER_GROUP_SET_HYPERLINK
+{
+    optr child = callbackData->CBMD_childOD;
+
+    /* the 0 parameters will be decided in HotSpotText */
+    @call child::MSG_META_TEXT_SET_HYPERLINK(0,
+      callbackData->CBMD_extraData1, callbackData->CBMD_extraData2,0,0);
+    return;
+}
+
+
+/****************************************************************************
+ *	MSG_META_CLIPBOARD_NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED
+ **************************************************************************** 
+ *  SYNOPSIS:   update the EDIT Controller
+ *                                      
+ *  CALLED BY:  
+ *  PARAMETERS: void ();
+ *              Pass:   nothing
+ *              Return: nothing
+ *                                      
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Edwin   7/6/94                  Initial Revision
+ **************************************************************************/
+@method HotSpotManagerClass, MSG_META_CLIPBOARD_NOTIFY_NORMAL_TRANSFER_ITEM_CHANGED
+{
+    optr                GHead = pself->GBI_head;
+    CurrentToolValues   currentTool;
+
+    @call GHead::MSG_GH_GET_CURRENT_TOOL(&currentTool);
+
+    if(currentTool.CTV_toolClass == (ClassStruct *)&EditTextGuardianClass) {
+        @callsuper();
+    }
+    return;
+}
+
+
+/****************************************************************************
+ *	    	MSG_GB_DELETE_SELECTED_GROBJS
+ **************************************************************************** 
+ *  SYNOPSIS:   If deleting a group, ignore undo actions because we
+ *	    	can't undo a group delete.
+ *                                      
+ *  CALLED BY:  
+ *  PARAMETERS: void ();
+ *              Pass:   nothing
+ *              Return: nothing
+ *                                      
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Edwin   7/6/94                  Initial Revision
+ **************************************************************************/
+@method HotSpotManagerClass, MSG_GB_DELETE_SELECTED_GROBJS
+{
+    word    number, dummy, groupHandle=0, groupChunk=0;
+
+    /*
+     * Is there only one object selected? 
+     */
+    number = @call self::MSG_GB_GET_NUM_SELECTED_GROBJS();
+    if (number == 1) {
+	/*  Here we assume that if no group is found, 
+	 *  GrObjBodyProcessSelectGrObjsCommon doesn't trash groupHandle and
+	 *  groupChunk, so they are still 0.
+	 */
+	GrObjBodyProcessSelectedGrObjsCommonPassFlag(oself,
+	    MSG_HSGROUP_GET_OPTR,0,0,0,OCCT_DONT_SAVE_PARAMS_DONT_TEST_ABORT,
+            &dummy, &groupHandle, &groupChunk, &dummy);
+	/*
+	 * Is the selected object a group? 
+	 */
+	if (groupHandle != NULL && groupChunk != NULL) {
+	    if (UserStandardDialog((char *)0, (char *)0,(char *)0,(char *)0,
+	       "Deletion of more than one hotspot at a time cannot be undone."
+	       "  Are you sure you want to do this?",
+                (CDT_WARNING << CDBF_DIALOG_TYPE_OFFSET) |
+                (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET)) == IC_YES) {
+
+	    	@call process::MSG_GEN_PROCESS_UNDO_IGNORE_ACTIONS(0);
+		@callsuper();
+		@call process::MSG_GEN_PROCESS_UNDO_ACCEPT_ACTIONS();
+	    }
+	    return;
+	}
+    }
+    @callsuper();
+    return;
+}
+
+
+/****************************************************************************
+ *	    	MSG_META_LARGE_***_MOVE_COPY
+ **************************************************************************** 
+ *  SYNOPSIS:   Ignore all quick move copy events.
+ *                                      
+ *  CALLED BY:  
+ *  PARAMETERS: void (MouseReturnParams *retVal, 
+ *                    LargeMouseData *largeMouseDataStruct)
+ *                                      
+ *  SIDE EFFECTS:
+ *  STRATEGY:
+ *  REVISION HISTORY:
+ *      Name    Date                    Description
+ *      -----   ------                  ----------------
+ *      Edwin   7/6/94                  Initial Revision
+ **************************************************************************/
+@method HotSpotManagerClass, MSG_META_LARGE_START_MOVE_COPY,
+    	    	    	     MSG_META_LARGE_DRAG_MOVE_COPY,
+    	    	    	     MSG_META_LARGE_END_MOVE_COPY
+{
+    retVal->flags = MRF_PROCESSED;
+    return;
+}
+
+optr HSManagerGetText(optr GBody) 
+{
+    return(@call GBody::MSG_VIS_VUP_FIND_OBJECT_OF_CLASS(&HotSpotTextClass)); 
+}
+

@@ -1,0 +1,402 @@
+/***********************************************************************
+ *
+ *	Copyright (c) Geoworks 1991-92 -- All Rights Reserved
+ *
+ * PROJECT:	Sample Applications
+ * MODULE:	Generic Attributes Sample
+ * FILE:	genattrs.goc
+ *
+ * AUTHOR:	brianc, 9/4/91
+ *
+ * REVISION HISTORY:
+ *      Name    Date            Description
+ *      ----    ----            -----------
+ *      brianc  9/4/91          Initial version
+ *
+ * DESCRIPTION:
+ *	This application demonstrates what can be done with the GenStates
+ *	and GenAttrs of a generic object.
+ *
+ *	(Throughout this file you will see references like this: [Con 7.2.1]
+ *	This is a reference to chapter 7, section 7.2.1 of the Concepts
+ *	manual. [Obj 7.2.1] is a reference to chapter 7, section 7.2.1 of the
+ *	Objects manual. You should use these references to locate further
+ *	information about the topic being discussed if anything is unclear.)
+ *
+ *	A generic object's GenStates flags encode the current state of
+ *	the object, as you'd expect from the name. By their very nature,
+ *	they are changeable things. The two state flags currently defined
+ *	(GS_USABLE and GS_ENABLED) are described in greater detail by the
+ *	GenTrigger objects that demonstrate them, below.
+ *
+ *	GenAttrs, by contrast, are set when the object is instantiated and
+ *	do not change during the course of the object's life. Three of the
+ *	eight attributes are demonstrated by this application. The other
+ *	five are described in [Obj 2.3.4].
+ *
+ * RCS STAMP:
+ *	$Id: genattrs.goc,v 1.1 97/04/04 16:37:23 newdeal Exp $
+ *
+ ***********************************************************************/
+
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+@class GenAttrsProcessClass, GenProcessClass;
+
+/* these messages are sent by the triggers */
+@message void MSG_GENATTRS_SET_ENABLED();
+@message void MSG_GENATTRS_SET_NOT_ENABLED();
+@message void MSG_GENATTRS_SET_USABLE();
+@message void MSG_GENATTRS_SET_NOT_USABLE();
+@message void MSG_GENATTRS_WAIT();
+
+@endc;
+
+@classdecl GenAttrsProcessClass, neverSaved;
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+/*
+ *	    	Application Object
+ */
+@start	AppResource;
+
+@object GenApplicationClass GenAttrsApp = {
+    GI_visMoniker = list { @GenAttrsTextMoniker };
+    GI_comp = @GenAttrsPrimary;
+    gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @GenAttrsPrimary;
+}
+
+@visMoniker GenAttrsTextMoniker = "C GenAttrs Sample Application";
+
+@end	AppResource;
+
+/*
+ *	Primary window
+ */
+
+@start	Interface;		/* this resource is for misc UI objects */
+
+@object GenPrimaryClass GenAttrsPrimary  = {
+    GI_comp = @GenStatesGroup, @GenAttrsGroup;
+    HINT_SIZE_WINDOW_AS_DESIRED;
+
+}
+
+/*
+ * An interaction to contain the things that demonstrate what the GenStates
+ * flags can do to an object.
+ */
+@object GenInteractionClass GenStatesGroup = {
+    GI_visMoniker = "GenStates";
+    GI_comp = @GenStatesSetEnabled, @GenStatesSetNotEnabled,
+		@GenStatesSetUsable, @GenStatesSetNotUsable;
+    HINT_DRAW_IN_BOX;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenInteractionClass GenAttrsGroup = {
+    GI_visMoniker = "GenAttrs";
+    GI_comp = @GenAttrsInitiatesBusyState,
+		@GenAttrsInitiatesInputHoldUp,
+		@GenAttrsInitiatesInputIgnore;
+    HINT_DRAW_IN_BOX;
+    HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+/*
+ *	Triggers to demonstrate generic states
+ *	(see the individual method for the messages sent to the process)
+ *
+ * These first two triggers conspire to demonstrate the GS_ENABLED flag. A
+ * generic object that doesn't have GS_ENABLED set in its GI_states instance
+ * variable cannot be manipulated by the user (it appears "greyed out" in most
+ * specific UI implementations). You can manipulate this flag by sending
+ * MSG_GEN_SET_ENABLED and MSG_GEN_SET_NOT_ENABLED to the object.
+ */
+
+@object GenTriggerClass GenStatesSetEnabled = {
+    GI_visMoniker = "Enable 'Disable This Trigger'";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GENATTRS_SET_ENABLED;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass GenStatesSetNotEnabled = {
+    GI_visMoniker = "Disable This Trigger";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GENATTRS_SET_NOT_ENABLED;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    /*
+     * By default, all generic objects start out as usable and enabled.  We'll
+     * mark this one disabled, so that it starts "greyed out".  It can be
+     * enabled with the "Enable 'Disable This Trigger'" option.
+     *
+     * In general, an object is enabled only if it and all its generic
+     * ancestors are enabled. If any ancestor has GS_ENABLED cleared, the
+     * object will appear disabled, regardless of the state of its GS_ENABLED
+     * flag.
+     */
+    GI_states = @default & ~GS_ENABLED;
+}
+
+/*
+ * These next two triggers demonstrate the GS_USABLE flag. A generic object that
+ * doesn't have GS_USABLE set in its GI_states instance variable doesn't even
+ * appear on the screen. You can manipulate this flag by sending
+ * MSG_GEN_SET_USABLE and MSG_GEN_SET_NOT_USABLE to the object.
+ */
+@object GenTriggerClass GenStatesSetUsable = {
+    GI_visMoniker = "Set 'Set This Trigger Not Usable' Usable";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GENATTRS_SET_USABLE;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+@object GenTriggerClass GenStatesSetNotUsable = {
+    GI_visMoniker = "Set This Trigger Not Usable";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GENATTRS_SET_NOT_USABLE;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+}
+
+/*
+ *	Triggers to demonstrate generic attributes
+ *
+ * Two of the three attributes demonstrated here (GA_INITIATES_INPUT_HOLD_UP and
+ * GA_INITIATES_INPUT_IGNORE) are useful only if you've got a separate UI thread
+ * in your application (as created by marking a resource as ui-object in your
+ * .gp file). Together, they allow you to restrict the user's access to your
+ * application's interface while your application thread is busy doing
+ * something.
+ *
+ * GA_INITIATES_BUSY_STATE is useful in both single-threaded applications and
+ * those with a separate thread for managing their UI, as it serves only to
+ * indicate to the user that your application is busy; the user can continue
+ * to interact with the UI as before.
+ */
+
+@object GenTriggerClass GenAttrsInitiatesBusyState = {
+    GI_visMoniker = "Intiate Busy State (for 3 seconds)";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GENATTRS_WAIT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    /*
+     * GA_INITIATES_BUSY_STATE indicates that this generic object starts
+     * a long enough operation that we'd like to change the cursor to show
+     * busy.  Input is accepted as usual.
+     */
+    GI_attrs = @default | GA_INITIATES_BUSY_STATE;
+}
+
+@object GenTriggerClass GenAttrsInitiatesInputHoldUp = {
+    GI_visMoniker = "Initiate Input Hold Up (for 3 seconds)";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GENATTRS_WAIT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    /*
+     * GA_INITIATES_INPUT_HOLD_UP indicates that this trigger invokes
+     * an action that results in the application thread modifying the
+     * UI gadgetry slightly (such as enabling and disabling options).
+     * This attribute causes any input to be help up until the application
+     * has completed the action (the message sent by this object has been
+     * completely processed), after which the held-up input is allowed to
+     * flow to its destination. Input hold-up affects only this application;
+     * the user is able to interact with other applications as usual.
+     */
+    GI_attrs = @default | GA_INITIATES_INPUT_HOLD_UP;
+}
+
+@object GenTriggerClass GenAttrsInitiatesInputIgnore = {
+    GI_visMoniker = "Initiate Input Ignore (for 3 seconds)";
+    GTI_destination = process;
+    GTI_actionMsg = MSG_GENATTRS_WAIT;
+    HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+    /*
+     * GA_INITIATES_INPUT_IGNORE indicates that this trigger starts up
+     * a long enough operation that we want to change the mouse cursor to
+     * show that the application is busy and can't accept input. Any attempt
+     * to give the application input will result in the normal beep-and-drop-
+     * the-thing-on-the-floor response that one sees when one clicks outside a
+     * modal dialog box.
+     */
+    GI_attrs = @default | GA_INITIATES_INPUT_IGNORE;
+}
+
+@end Interface;
+
+/*
+ ***************************************************************************
+ *		Code for GenAttrsProcessClass
+ ***************************************************************************
+ */
+
+
+/***********************************************************************
+ *		MSG_GENATTRS_SET_ENABLED for GenAttrsProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Set the disabled trigger enabled. This message is
+ *	    	    sent when the user clicks on the GenStatesSetEnabled
+ *	    	    trigger.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    the GenStatesSetNotEnabled trigger is enabled,
+ *		    indicating to the user that it is once again an option.
+ *
+ * STRATEGY:	    Send MSG_GEN_SET_ENABLED to GenStatesSetNotEnabled,
+ *		        telling it to update its appearance immediately.
+ *	    	    	If we were going to enable or disable a whole
+ *			bunch of objects, we might pass
+ *			VUM_DELAYED_VIA_APP_QUEUE instead, thereby cutting
+ *			down on the overall work that needs to be done, as
+ *			several of them might be updatable by the UI at
+ *			once (we'd delay it via the application queue as
+ *			that's the thread on which we're executing here).
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	4/91		Initial Revision
+ *
+ ***********************************************************************/
+@method GenAttrsProcessClass, MSG_GENATTRS_SET_ENABLED
+{
+    @call GenStatesSetNotEnabled::MSG_GEN_SET_ENABLED(VUM_NOW);
+}
+
+
+/***********************************************************************
+ *		MSG_GENATTRS_SET_NOT_ENABLED for GenAttrsProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Set the enabled trigger disabled. This message is
+ *	    	    sent when the user clicks on the GenStatesSetNotEnabled
+ *	    	    trigger.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    the GenStatesSetNotEnabled trigger is disabled,
+ *		    indicating to the user that it is not an option.
+ *
+ * STRATEGY:	    Send MSG_GEN_SET_NOT_ENABLED to GenStatesSetNotEnabled,
+ *		        telling it to update its appearance immediately.
+ *			This clears the GS_ENABLED flag in GI_states for
+ *	    	    	the object. If the receiving object had generic
+ *			children, those children would be implicitly
+ *			disabled, though their GS_ENABLED flags would
+ *			remain untouched.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	4/91		Initial Revision
+ *
+ ***********************************************************************/
+@method GenAttrsProcessClass, MSG_GENATTRS_SET_NOT_ENABLED
+{
+    @call GenStatesSetNotEnabled::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+}
+
+
+/***********************************************************************
+ *		MSG_GENATTRS_SET_USABLE for GenAttrsProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Make the GenStatesSetNotUsable trigger usable again.
+ *	    	    This message is sent when the user clicks on the
+ *	    	    GenStatesSetUsable trigger.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    The GenStatesSetNotUsable trigger appears on-screen
+ * 	    	        (again).
+ *
+ * STRATEGY:	    Send MSG_GEN_SET_USABLE to the GenStatesSetNotUsable
+ *	    	        trigger. This demonstrates how this message can
+ *			be used to make a generic object that is part of
+ *			the user interface of an application available to
+ *			the user. It undoes the effects of
+ *			MSG_GEN_SET_NOT_USABLE.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	4/91		Initial Revision
+ *
+ ***********************************************************************/
+@method GenAttrsProcessClass, MSG_GENATTRS_SET_USABLE
+{
+    @call GenStatesSetNotUsable::MSG_GEN_SET_USABLE(VUM_NOW);
+}
+
+
+/***********************************************************************
+ *		MSG_GENATTRS_SET_NOT_USABLE for GenAttrsProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Make the GenStatesSetNotUsable trigger unusable again.
+ *	    	    This message is sent when the user clicks on the
+ *	    	    GenStatesSetNotUsable trigger.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    The GenStatesSetNotUsable trigger is removed from
+ *		    	the screen.
+ *
+ * STRATEGY:	    Send MSG_GEN_SET_NOT_USABLE to the GenStatesSetNotUsable
+ *	    	        trigger. This demonstrates how this message can
+ *			be used to temporarily remove a generic object
+ *			from the user interface of an application while
+ *			keeping it in the generic tree. Setting
+ *			an object not-usable is also the first step in
+ *			the process of removing a generic object from the
+ *			generic tree, but we don't do that here.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	4/91		Initial Revision
+ *
+ ***********************************************************************/
+@method GenAttrsProcessClass, MSG_GENATTRS_SET_NOT_USABLE
+{
+    @call GenStatesSetNotUsable::MSG_GEN_SET_NOT_USABLE(VUM_NOW);
+}
+
+
+/***********************************************************************
+ *		MSG_GENATTRS_WAIT for GenAttrsProcessClass
+ ***********************************************************************
+ * SYNOPSIS:	    Pause for a bit (3 seconds) to allow the effects
+ *		    of the various GenAttrs to be seen.
+ * PARAMETERS:	    void (void)
+ * SIDE EFFECTS:    The process thread of the application sleeps for
+ *	    	        3 seconds, ignoring all incoming events until
+ *			it wakes up, at which point it will process
+ *			anything that backed up for it.
+ *
+ * STRATEGY:	    Just call TimerSleep to block for 3 seconds. TimerSleep
+ *		        works with "ticks," of which there are 60 in
+ *			a second. To wait 3 seconds, therefore, we
+ *			pass 3*60 to TimerSleep.
+ *
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	tony	4/91		Initial Revision 
+ *
+ ***********************************************************************/
+@method GenAttrsProcessClass, MSG_GENATTRS_WAIT
+{
+    /*
+     * Sleep for three seconds.
+     */
+    TimerSleep(60*3);
+}
+

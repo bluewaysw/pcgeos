@@ -1,0 +1,972 @@
+COMMENT @----------------------------------------------------------------------
+
+	Copyright (c) GeoWorks 1989 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+FILE:		Objects/gCtrlC.def
+
+DECLARER:	UI
+
+DESCRIPTION:
+	This file defines GenControlClass
+
+	$Id: gCtrlC.def,v 1.1 97/04/04 14:18:39 newdeal Exp $
+
+------------------------------------------------------------------------------@
+
+SetDef	__GCTRLC
+
+StartLibrary	ui
+
+include Objects/gInterC.def
+
+GenControlClass	class	GenInteractionClass
+
+global GenControlOutputActionRegs:far		;asm only utility routine
+global GenControlOutputActionStack:far		;asm only utility routine
+global GenControlSendToOutputRegs:far		;asm only utility routine
+global GenControlSendToOutputStack:far		;asm only utility routine
+
+;-----------------------------------------------------------------------------
+;		Messages
+;-----------------------------------------------------------------------------
+
+MSG_GEN_CONTROL_GET_INFO	message
+;
+; The GenControl object calls the message to get information about the
+; controller.  The structure returned allows GenControlClass to implement
+; a wide range of default behavior.
+;
+; Context:
+; 	Part of custom UI controller API
+; Source:
+;	Called by many default GenControlClass methods as well as methods
+;	from other objects (such as the toolbox).
+; Interception:
+;	The UI controller should intercept this message and fill in the
+;	structure passed.  This allows GenControl to implement the normal
+;	behavior of a UI controller.  There is no need to pass this to
+;	one's superclass.
+; Pass:
+;	cx:dx - GenControlDupInfo structure to fill in
+; Return:
+;	none
+
+; This table is used to map from bit positions to objects (and names).  The
+; first entry in the table corresponds to bit 0.
+
+GenControlFeatureFlags	record
+    :8
+GenControlFeatureFlags	end
+
+GenControlFeaturesInfo	struct
+    GCFI_object		lptr		;associated object
+    GCFI_name		optr		;chunk containing a reference to the
+					;name of the feature (if the feature
+					;is allowed be changed)
+    GCFI_flags		GenControlFeatureFlags
+GenControlFeaturesInfo	ends
+
+; The child table is used to add children to the UI controller.
+
+GenControlChildFlags	record
+    GCCF_NOTIFY_WHEN_ADDING:1		;When set, notifies the controller 
+					;before the feature object is added
+					;and set usable with MSG_GEN_CONTROL-	
+					;NOTIFY_ADDING_FEATURE.
+    GCCF_ALWAYS_ADD:1
+    GCCF_IS_DIRECTLY_A_FEATURE:1
+GenControlChildFlags	end
+
+GenControlChildInfo	struct
+    GCCI_object		lptr
+    GCCI_featureMask	word		;bitmask of feature that this object
+					;or bitmask of combination of tools
+					;that compose this object
+    GCCI_flags		GenControlChildFlags
+GenControlChildInfo	ends
+
+GenControlBuildFlags	record
+    GCBF_SUSPEND_ON_APPLY:1		;Sent MSG_META_{SUSPEND,UNSUSPEND} at
+					;the beginning/end of MSG_APPLY
+
+    GCBF_USE_GEN_DESTROY:1		;Marks that unused objects cannot
+					;be destroyed using LMemFree
+
+    GCBF_SPECIFIC_UI:1			;Marks that the controller is at least
+					;possibly implemented in the specific
+					;UI and therefore needs special
+					;treatment
+
+    GCBF_CUSTOM_ENABLE_DISABLE:1	;Causes GenControl to not set itsself
+					;enabled/disabled on
+					;MSG_GEN_CONTROL_ENABLE_DISABLE
+					;NOTE: controllers that have this bit
+					;set and have keyboard shortcuts
+					;must be marked enabled initially.
+
+    GCBF_ALWAYS_UPDATE:1		;Causes MSG_GEN_CONTROL_UPDATE_UI to
+					;always be sent, even if the data
+					;block is 0
+
+    GCBF_EXPAND_TOOL_WIDTH_TO_FIT_PARENT:1 ;Expand the width of the tool 
+					   ;  control so that children can take
+					   ;  advantage of extra space.
+
+    GCBF_ALWAYS_INTERACTABLE:1		;Causes the controller to always be
+					;on the GCN lists, even if no part
+					;of it is visible.
+					;** requires GCBF_IS_ON_ACTIVE_LIST **
+
+    GCBF_ALWAYS_ON_GCN_LIST:1		;Always keep the controller on the GCN
+					;lists
+					;** requires GCBF_IS_ON_ACTIVE_LIST **
+
+    GCBF_MANUALLY_REMOVE_FROM_ACTIVE_LIST:1 ;Don't remove from the active list
+					    ;in DETACH handler
+
+	; These bits are here mainly for EC purposes
+
+    GCBF_IS_ON_ACTIVE_LIST:1		;This controller is on the active list
+					;in the .ui file
+    GCBF_IS_ON_START_LOAD_OPTIONS_LIST:1 ;This controller goes on the start
+					 ;load options list
+    GCBF_NOT_REQUIRED_TO_BE_ON_SELF_LOAD_OPTIONS_LIST:1 ;This controller does
+							;not have to be on any
+							;load-options list
+    GCBF_DO_NOT_DESTROY_CHILDREN_WHEN_CLOSED:1	;This controller's children
+    						; will not be discarded when
+						; it is closed.	
+
+    :3
+GenControlBuildFlags	end
+
+GenControlBuildInfo	struct
+
+	; General information
+
+    GCBI_flags		GenControlBuildFlags
+    GCBI_initFileKey	vfptr.char	;key to store data in
+    GCBI_gcnList	vfptr.GCNListType ;list of gcn lists to add to
+    GCBI_gcnCount	word		;size of gcn list
+    GCBI_notificationList vfptr.NotificationType	;list of supported types
+    GCBI_notificationCount word
+    GCBI_controllerName	optr
+
+	; Information for building normal visual representation
+
+    GCBI_dupBlock	hptr		;handle of UI resource to duplicate
+					;or 0 for none
+    GCBI_childList	vfptr.GenControlChildInfo
+    GCBI_childCount	word		;number of children to add
+    GCBI_featuresList	vfptr.GenControlFeaturesInfo
+    GCBI_featuresCount	word		;size of features list
+
+    GCBI_features	word		;bitmask for default features
+
+	;Information for building toolbox
+
+    GCBI_toolBlock	hptr		;handle of UI resource containing
+					;tools
+    GCBI_toolList	vfptr.GenControlChildInfo
+    GCBI_toolCount	word		;number of tools to add
+    GCBI_toolFeaturesList vfptr.GenControlFeaturesInfo
+    GCBI_toolFeaturesCount word		;size of tools features list
+
+    GCBI_toolFeatures word		;bitmask for default features
+
+    GCBI_helpContext	vfptr.char	;if non-zero then add
+					;ATTR_GEN_HELP_CONTEXT with this string
+					;being the context
+
+    GCBI_reserved	byte 8 dup (0)	;reserved for future expansion
+
+GenControlBuildInfo	ends
+
+MSG_GEN_CONTROL_GENERATE_UI		message
+;
+; Generate the UI for the controller.
+;
+; Context:
+; 	Part of custom UI controller API.
+; Source:
+;	Sent by GenControlClass as part of the spec-build mechanism.
+; Interception:
+;	A subclass can intercept this to add UI dynamically.  If subclassed,
+;	the superclass should be called at the beginning of the handler.
+;	Once called on the superclass, all UI will be built, attached, & set
+;	GENS_USABLE (though the visual update is unlikely to have happened
+;	yet).
+; Pass:
+;	none
+; Return:
+;	none
+
+MSG_GEN_CONTROL_DESTROY_UI		message
+;
+; Destroy the UI for the controller.
+;
+; Context:
+; 	Part of custom UI controller API.
+; Source:
+;	Sent by GenControlClass as part of the spec-unbuild mechanism.
+; Interception:
+;	A subclass that sends or intercepts MSG_GEN_CONTROL_GENERATE_UI should
+;	send or intercept this message to provide the inverse of the generate
+;	functionality.
+;	A subclass intercepts this to remove UI added dynamically in
+;	MSG_GEN_CONTROL_GENERATE_UI.  If subclassed, the superclass should be
+;	called at the end of the handler.
+; Pass:
+;	none
+; Return:
+;	none
+
+MSG_GEN_CONTROL_GENERATE_TOOLBOX_UI		message
+;
+; Generate the UI for the toolbox part of the controller.
+;
+; Context:
+; 	Part of custom UI controller API.
+; Source:
+;	Sent by the toolbox object (via the active list) as part of
+;	its spec-build mechanism.
+; Interception:
+;	A subclass can intercept this to add toolbox UI dynamically.  If
+;	subclassed,the superclass should be called at the beginning of
+;	the handler.
+;	Once called on the superclass, all UI will be built, attached, & set
+;	GENS_USABLE (though the visual update is unlikely to have happened
+;	yet).
+; Pass:		^lcx:dx	- GenInteraction to build tools into
+; Return:
+;	none
+
+
+MSG_GEN_CONTROL_DESTROY_TOOLBOX_UI		message
+;
+; Destroy the UI for the toolbox part of the controller.
+;
+; Context:
+; 	Part of custom UI controller API.
+; Source:
+;	Sent by the toolbox object (via the active list) as part of
+;	its spec-unbuild mechanism.
+; Interception:
+;	A subclass that sends or intercepts
+;	MSG_GEN_CONTROL_GENERATE_TOOLBOX_UI should send or intercept this
+;	message to provide the inverse of the generate functionality.  If
+;	subclassed, the superclass should be called at the end of the handler.
+; Pass:
+;	none
+; Return:
+;	none
+
+MSG_GEN_CONTROL_UPDATE_UI		message
+;
+; Update UI components via a notification structure.  GenControl calls this
+; message if MSG_META_NOTIFY_WITH_DATA_BLOCK is received with a recognized
+; notification type.
+;
+; Context:
+; 	Part of custom UI controller API.
+; Source:
+;	Sent by GenControlClass in the default handler for
+;	MSG_META_NOTIFY_WITH_DATA_BLOCK.
+; Interception:
+;	The subclass should intercept this and no appropriate updating.  There
+;	is no default behavior.
+; Pass:
+;	ss:bp - GenControlUpdateUIParams
+; Return:
+;	none
+
+GenControlUpdateUIParams	struct
+    GCUUIP_manufacturer		ManufacturerID
+    GCUUIP_changeType		word
+    GCUUIP_dataBlock		hptr
+    GCUUIP_features		word	;from TEMP_GEN_CONTROL_INSTANCE,
+					;but clear if GCIF_NORMAL_UI not set
+					;in TEMP_GEN_CONTROL_INSTANCE
+    GCUUIP_toolboxFeatures	word	;from TEMP_GEN_CONTROL_INSTANCE,
+					;but clear if GCIF_TOOLBOX_UI not set
+					;in TEMP_GEN_CONTROL_INSTANCE
+    GCUUIP_childBlock		hptr	;from TEMP_GEN_CONTROL_INSTANCE
+    GCUUIP_toolBlock		hptr
+GenControlUpdateUIParams	ends
+
+MSG_GEN_CONTROL_ENABLE_DISABLE		message
+;
+; Enable or disable the controller.  Default behavior enables or disables
+; the normal UI and the toolbox UI.
+;
+; Context:
+; 	Part of custom UI controller API.
+; Source:
+;	Sent by GenControlClass in the default handler for
+;	MSG_META_NOTIFY_WITH_DATA_BLOCK.
+; Interception:
+;	This message should generally not be subclassed.
+; Pass:
+;	cx - message: MSG_GEN_SET_ENABLED or MSG_GEN_SET_NOT_ENABLED
+;	dl - VisualUpdateMode
+; Return:
+;	none
+
+MSG_GEN_CONTROL_SCAN_FEATURE_HINTS	message
+;
+; Scan the feature hints for the UI controller to find the required
+; and prohibited features.
+;
+; Context:
+; 	Part of custom UI controller API.
+; Source:
+;	Sent by various methods in GenControlClass.
+; Interception:
+;	This message is not intended to be intercepted.
+; Pass:
+;	cx - GenControlUIType
+;	dx:bp	- ptr to GenControlScanInfo struct to fill in
+; Return:
+;	dx:bp	- GenControlScanInfo structure filled in
+;
+;
+GenControlScanInfo	struct
+    GCSI_userAdded	word
+    GCSI_userRemoved	word
+    GCSI_appRequired	word
+    GCSI_appProhibited	word
+GenControlScanInfo	ends
+
+
+
+MSG_GEN_CONTROL_ADD_FEATURE	message
+;
+; Add a feature.  This causes the component to be visually added and causes
+; the object to add an attribute to that this state is saved in the state
+; file.  This is done by unbuilding and rebuilding the controller.
+;
+; Context:
+; 	Part of custom UI controller API.
+; Source:
+;	Sent by the toolbox object.
+; Interception:
+;	This message should generally not be subclassed.
+; Pass:
+;	cx - flag for feature to add
+; Return:
+;	none
+
+MSG_GEN_CONTROL_REMOVE_FEATURE	message
+;
+; Remove a feature.  This causes the component to be visually removed and
+; causes the object to add an attribute to that this state is saved in
+; the state file.
+;
+; Context:
+; 	Part of custom UI controller API.
+; Source:
+;	Sent by the toolbox object.
+; Interception:
+;	This message should generally not be subclassed.
+; Pass:
+;	cx - flag for toolbox component to remove
+; Return:
+;	none
+
+MSG_GEN_CONTROL_ADD_TOOLBOX_FEATURE	message
+;
+; Add a feature or features.
+; This causes the component to be visually added and causes
+; the object to add an attribute to that this state is saved in the state
+; file.  This is done by unbuilding and rebuilding the controller.
+;
+; Context:
+; 	Part of custom UI controller API.
+; Source:
+;	Sent by the toolbox object.
+; Interception:
+;	This message should generally not be subclassed.
+; Pass:
+;	cx - flag for feature to add
+; Return:
+;	none
+
+MSG_GEN_CONTROL_REMOVE_TOOLBOX_FEATURE	message
+;
+; Remove a feature or features.
+; This causes the component to be visually removed and
+; causes the object to add an attribute to that this state is saved in
+; the state file.
+;
+; Context:
+; 	Part of custom UI controller API.
+; Source:
+;	Sent by the toolbox object.
+; Interception:
+;	This message should generally not be subclassed.
+; Pass:
+;	cx - flag for feature to add
+; Return:
+;	none
+
+GenControlInteractableFlags	record
+    GCIF_CONTROLLER:1		;Controller object itself is interactable, & 
+				;may need to be enabled/disabled
+    :13
+    GCIF_TOOLBOX_UI:1		;Toolbox UI is interactable
+    GCIF_NORMAL_UI:1		;Normal UI is interactable
+GenControlInteractableFlags	end
+
+MSG_GEN_CONTROL_NOTIFY_INTERACTABLE		message
+;
+; GenControl objects will receive this notification message before the user
+; can visually see the components of the controller or activate any of its
+; elements.  Default behavior for this message will be to add the controller
+; to any notification list(s) that it should reside on, so that it may 
+; properly update the enable/disable status, and update the state of any
+; information being displayed.
+;
+; Context:	Part of custom UI controller API
+; Source:	Generated internally by the generic and/or specific user
+;		interface library.  Do NOT generate this yourself.
+; Destination:	GenControl object (self)
+; Interception:	May be intercepted to replace default behavior, or to 
+;		extend the conditions under which the default handler
+;		is warned that it must be interactable.
+; Pass:		cx - GenControlInteractableFlags
+; Return:	nothing
+;		ax, cx, dx, bp  - destroyed
+
+
+MSG_GEN_CONTROL_NOTIFY_NOT_INTERACTABLE		message
+;
+; Opposite of MSG_GEN_CONTROL_NOTIFY_INTERACTABLE --  this message is sent to
+; GenControl objects when the UI has determined that the user can neither
+; visually see the controller's gadgets nor can be interacted with in any
+; way before receipt of a MSG_GEN_CONTROL_NOTIFY_INTERACTABLE.  Default
+; behavior will be to remove the controller from any notification lists
+; that it added itself to in MSG_GEN_CONTROL_NOTIFY_INTERACTABLE.
+;
+; Context:	Part of custom UI controller API
+; Source:	Generated internally by the generic and/or specific user
+;		interface library.  Do NOT generate this yourself.
+; Destination:	GenControl object (self)
+; Interception:	May be intercepted to replace default behavior, or to 
+;		extend the conditions under which the default handler
+;		is warned that it must be interactable.
+; Pass:		cx - GenControlInteractableFlags
+; Return:	nothing
+;		ax, cx, dx, bp  - destroyed
+
+
+MSG_GEN_CONTROL_UNBUILD_NORMAL_UI_IF_POSSIBLE	message
+;
+; Internal message to request that the normal UI gadgets be removed & destroyed
+; if not in use, to spare the PC/GEOS swap space the burden of holding around
+; these gadgets.  Since the UI would have to be build out again if requested
+; by the user, the pros & cons of this message should be weighed before using.
+; GenControl itself will have code to make this determination based on machine
+; characteristics.  --  Originally designed for palmtop machine scenerio
+; where swap space is limited.
+;
+; Context:	Internal message of custom UI controller API
+; Source:	Generated internally by the generic and/or specific user
+;		interface library, based on system configuration & performance.
+; 		Do NOT generate this yourself.  Since this message can end
+;		up destroying & SPEC_UNBUILDING the object branch, it should
+;		not be called from inside a visual update, nor from inside a
+;		MSG_META_NOTIFY_OBJ_BLOCK_NOT_IN_USE handler.
+; Destination:	GenControl object (self)
+; Interception: May need to be intercepted if UI was created by a subclass
+;		intercepting MSG_GEN_CONTROL_GENERATE_UI.  May either be
+;		intercepted to simply prevent the optimization effort performed
+;		by the default handler, or may be replaced to work properly
+;		with new UI components created in MSG_GEN_CONTROL_GENERATE_UI.
+; Pass:		cx - child block
+; Return:	nothing
+;		ax, cx, dx, bp  - destroyed
+
+
+MSG_GEN_CONTROL_ADD_TO_GCN_LISTS		message
+MSG_GEN_CONTROL_REMOVE_FROM_GCN_LISTS		message
+;
+; Messages the controller calls on itself to add/remove itself from GCN lists
+; it should be on.  Provided to allow interception for replacement of 
+; default behavior.  Needed for GenToolControl, which monitors a GCN List for
+; which status is not kept.  On MSG_GEN_CONTROL_ADD_TO_GCN_LISTS, it
+; calls MSG_GEN_CONTROL_FORCE_STATUS_UPDATE on all controllers to get current
+; status.
+;
+; Context:	Part of custom UI controller API
+; Source:	Generated internally by GenControl
+; Destination:	self
+; Interception:	May be intercepted to know when the controller is going on
+;		or coming off of GCN lists.  Call superclass to perform actual
+;		addition/removal of lists referred to in info table.  This
+;		behavior may be replaced, if desired, in which case the 
+;		superclass would not be called.
+; Pass:		nothing
+; Return:	nothing
+;		ax, cx, dx, bp  - destroyed
+
+
+MSG_GEN_CONTROL_GET_NORMAL_FEATURES		message
+;
+; Returns masks indicating what normal features the controller supports,
+; what features the application requires & prohibits, and what the
+; current feature set is, taking into account all this info plus
+; controller & user preferences.  Called by GenToolControl to get
+; info needed to be able to display current setup & control what
+; the user is allowed to change
+;
+; Context:	Part of custom UI controller API
+; Source:	GenToolControl, or other toolbox customization object
+; Destination:	GenControl object
+; Interception:	Not generally intercepted, as GenControlClass default handler
+;		returns information.
+; Pass:		nothing
+; Return:	ax	- current normal feature set
+;		cx	- required normal features
+;		dx	- prohibited normal features
+;		bp	- normal features supported by controller
+
+MSG_GEN_CONTROL_GET_TOOLBOX_FEATURES		message
+;
+; Returns masks indicating what toolbox features the controller supports,
+; what features the application requires & prohibits, and what the
+; current feature set is, taking into account all this info plus
+; controller & user preferences.  Called by GenToolControl to get
+; info needed to be able to display current setup & control what
+; the user is allowed to change
+;
+; Context:	Part of custom UI controller API
+; Source:	GenToolControl, or other toolbox customization object
+; Destination:	GenControl object
+; Interception:	Not generally intercepted, as GenControlClass default handler
+;		returns information.
+; Pass:		nothing
+; Return:	ax	- current toolbox feature set
+;		cx	- required toolbox features
+;		dx	- prohibited toolbox features
+;		bp	- toolbox features supported by controller
+
+MSG_GEN_CONTROL_ADD_APP_UI	message
+MSG_GEN_CONTROL_ADD_APP_TOOLBOX_UI	message
+;
+; Add the passed app ui object to the controllers generic tree.
+; By default, the app ui object is added as the last child of the
+; controller.
+;
+; Context: 	Part of custom UI controller API.
+; Source: 	Generated as part of the GENERATE_UI message handler.
+; Interception: This message should be subclassed by controllers that
+;		have a special place they want to put app-supplied UI.
+; Pass: 	^lCX:DX <- app ui to add
+; Return:	nothing
+;
+
+MSG_GEN_CONTROL_REBUILD_NORMAL_UI	message
+;
+; Force the normal UI for a controller to be re-built. Will cause the
+; current components to be destroyed and re-added.
+;
+; Context: 	Part of custom UI controller API.
+; Source:	Unrestricted
+; Interception:	This message should generally not be subclassed.
+; Pass:		nothing
+; Return:	none
+;
+
+MSG_GEN_CONTROL_REBUILD_TOOLBOX_UI	message
+;
+; Force the toolbox UI for a controller to be re-built. Will cause the
+; current components to be destroyed and re-added.
+;
+; Context: 	Part of custom UI controller API.
+; Source:	Unrestricted
+; Interception:	This message should generally not be subclassed.
+; Pass:		nothing
+; Return:	none
+;
+
+MSG_GEN_CONTROL_ADD_TO_UI			message
+;
+; Add the controller to the GCN lists that it needs to be on to fuction
+; correctly (usually SELF_LOAD_OPTIONS or STARTUP_LOAD_OPTIONS and
+; occasionally ACTIVE)
+;
+; Context: 	Part of custom UI controller API.
+; Source:	Unrestricted.  Usually sent just after making a controller
+;		usable.
+; Interception:	This message should generally not be subclassed.
+; Pass:		nothing
+; Return:	none
+
+MSG_GEN_CONTROL_REMOVE_FROM_UI			message
+;
+; Remove the controller from the GCN lists that it needs to be on to fuction
+; correctly (usually SELF_LOAD_OPTIONS or STARTUP_LOAD_OPTIONS and
+; occasionally ACTIVE)
+;
+; Context: 	Part of custom UI controller API.
+; Source:	Unrestricted.  Usually sent just after making a controller
+;		usable.
+; Interception:	This message should generally not be subclassed.
+; Pass:		nothing
+; Return:	none
+
+MSG_GEN_CONTROL_OUTPUT_ACTION			message
+;
+; Sends the passed event off to the output of this controller.
+;
+; Context: 	Part of custom UI controller API.
+; Source:	Unrestricted. Usually sent by a child of the controller
+; Interception:	This message should generally not be subclassed.
+; Pass:		bp - ClassedEvent
+; Return:	none
+;
+
+MSG_GEN_CONTROL_TWEAK_DUPLICATED_UI			message
+; 
+; Provides a point at which duplicated UI can be manipulated before added
+; into the generic tree & set USABLE.
+;
+; Context: 	Part of custom UI controller API.
+; Source:	Called from within standard GENERATE_UI handler
+; Interception:	Subclassed only to tweak the UI object block BEFORE
+;		it is hooked into the tree & set usable, (i.e. while it
+;		is efficient to change attributes, monikers, states, etc.)
+; Pass:		cx - duplicated block handle
+;		dx - features mask
+; Return:	nothing
+
+MSG_GEN_CONTROL_TWEAK_DUPLICATED_TOOLBOX_UI		message
+; 
+; Provides a point at which duplicated UI can be manipulated before added
+; into the generic tree & set USABLE.
+;
+; Context: 	Part of custom UI controller API.
+; Source:	Called from within standard GENERATE_TOOLBOX_UI handler
+; Interception:	Subclassed only to tweak the UI object block BEFORE
+;		it is hooked into the tree & set usable, (i.e. while it
+;		is efficient to change attributes, monikers, states, etc.)
+; Pass:		cx - duplicated block handle
+;		dx - features mask
+; Return:	nothing
+
+MSG_GEN_CONTROL_NOTIFY_ADDING_FEATURE		message
+;
+; A message sent before a controller adds a feature to itself.  This is only
+; sent if GCCF_NOTIFY_ADDING_FEATURE is set for the feature.  This is primarily
+; useful for setting attributes in a feature that need to be done before the 
+; feature is added and visually built.
+;
+; Context:	Sent when controller adds a feature to itself.
+; Source:	The controller
+; Destination:	Itself
+; Interception:	This can be intercepted by subclasses of a controller to set
+;		attributes in a feature before the feature is built out.
+; Pass:		^lcx:dx -- the feature
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+;
+
+MSG_GEN_CONTROL_FREE_OBJ_BLOCK			message private
+;
+; A message sent out when the controller wants to free up one of its UI
+; blocks. We want to flush the queue first, so we don't just call
+; ObjFreeObjBlock
+;
+; Context:	Sent when controller is destroying its children
+; Source:	The controller
+; Destination:	Itself
+; Interception:	Should not be intercepted
+; Pass: 	CX - block to free
+; Return:	nothing
+;		ax, cx, dx, bp -- destroyed
+
+;MSG_META_UI_FORCE_CONTROLLER_UPDATE		message MetaUIMessages
+;
+; see documentation in ui.def
+;
+
+;MSG_META_LOAD_OPTIONS				message MetaUIMessages
+;MSG_META_SAVE_OPTIONS				message MetaUIMessages
+;MSG_META_RESET_OPTIONS				message MetaUIMessages
+;
+; see documentation in metaC.def
+;
+; These are handled by GenControlClass to provide .ini storage of the
+; feature & tool options that the controller supports.  They may be subclassed,
+; to provide additional option support, though the superclass must be called
+; to allow GenControlClass to continue to do its thing.  GenControlClass eats
+; these messages, meaning that superclasses of GenControlClass are not allowed
+; to have .ini options (subclasses yes, superclasses no).
+;
+
+
+;-----------------------------------------------------------------------------
+;		Constants and Structures
+;-----------------------------------------------------------------------------
+
+GenControlUIType	etype	word
+GCUIT_NORMAL			enum	GenControlUIType
+; "Normal UI" component set, generally menu items or features in a dialog.
+
+GCUIT_TOOLBOX			enum	GenControlUIType
+; "Toolbox" component set, generally "Tiny" sized triggers or items, popup lists
+; or small type-in fields.
+
+
+; Constants used to update Application GCNList associated w/Controller status
+; (GAGCNLT_GEN_CONTROL_STATUS_CHANGE)
+
+GenControlStatusChange	record
+	:13
+
+	GCSF_HIGHLIGHTED_TOOLGROUP_SELECTED:1
+	; Set if user has clicked, or in some other manner, "selected" the
+	; toolgroup of a particular controller.  Used by GenToolControl to
+	; provide the shortcut for the user of scrolling the ToolGroup list
+	; to this selection.
+
+	GCSF_TOOLBOX_FEATURES_CHANGED:1
+	; Set if toolbox features have been added or removed
+
+	GCSF_NORMAL_FEATURES_CHANGED:1
+	; Set if normal features have been added or removed
+
+GenControlStatusFlags	end
+
+NotifyGenControlStatusChange	struct
+	NGCS_controller		optr
+	; optr of GenControl object itself, so that messages may be sent
+	; to it to fetch info or to add/remove features
+
+	NGCS_statusChange	GenControlStatusChange
+	; See declaration of GenControlStatusChange
+
+NotifyGenControlStatusChange	ends
+
+;-----------------------------------------------------------------------------
+;		Variable instance data
+;-----------------------------------------------------------------------------
+
+TempGenControlInstance	struct
+    TGCI_interactableFlags	GenControlInteractableFlags
+    ; Holds current status of whether various portions of the controller
+    ; are interactable by the user or not.
+    ; These bits may be changed by the default handlers for
+    ; MSG_GEN_CONTROL_NOTIFY_INTERACTABLE and 
+    ; MSG_GEN_CONTROL_NOTIFY_NOT_INTERACTABLE only.
+    ; If any bits become set, the controller adds itself to the notification
+    ; list, so that it will be able to update the interactable areas.
+    ; The controller then remains on the lists until all bits become clear.
+
+    TGCI_childBlock		hptr
+    TGCI_toolBlock		hptr
+
+    TGCI_toolParent		optr
+    ; Object passed in "MSG_GEN_CONTROL_GENERATE_TOOLBOX_UI", that tools were
+    ; added to, if any
+
+    TGCI_features		word
+    TGCI_toolboxFeatures	word
+    TGCI_activeNotificationList	GCNListType
+
+    TGCI_upToDate		GenControlInteractableFlags
+    ; Holds the status of GenControlInteractableFlags at the point that
+    ; the last notification update came in, i.e. what portions of the 
+    ; controller's UI was up to date.  This way, if some part of the UI
+    ; becomes not interactable, then interactable again, before another update,
+    ; we can detect the scenario & avoid a redundant update.
+
+TempGenControlInstance	ends
+
+TEMP_GEN_CONTROL_INSTANCE	vardata TempGenControlInstance
+;
+; Temporary instance data for GenControlClass.  Should be accessed using
+; ObjVarDerefData only, which will ensure that the data will be created
+; & initialized if not yet existing.  -- Doug
+
+;-----------------------------------------------------------------------------
+;		Attrs
+;-----------------------------------------------------------------------------
+
+;-----------------------------------------------------------------------------
+;		Hints
+;-----------------------------------------------------------------------------
+
+; How feature hints work:
+;
+; There are various ways for programmers to affect the normal features and the
+; toolbox features that appear for a controller.
+;
+
+; This is the structure written to the .ini file
+
+GenControlUserFlags	record
+    :14
+    GCUF_USER_TOOLBOX_UI:1
+    GCUF_USER_UI:1
+GenControlUserFlags end
+
+GenControlUserData	struc
+    GCUD_flags			GenControlUserFlags
+    GCUD_userAddedUI		word
+    GCUD_userRemovedUI		word
+    GCUD_userAddedToolboxUI	word
+    GCUD_userRemovedToolboxUI	word
+GenControlUserData	ends
+
+HINT_GEN_CONTROL_MODIFY_INITIAL_UI	vardata GenControlUserData
+;
+; An application can have this attribute to modify the initial UI for a
+; dialog box.  Note that if the app uses HINT_GEN_CONTROL_SCALABLE_UI_DATA
+; then this hint would normally not be used.
+
+HINT_GEN_CONTROL_USER_MODIFIED_UI	vardata GenControlUserData
+;
+; GenControl uses this internally to record the user's changes
+;
+HINT_GEN_CONTROL_TOOLBOX_ONLY		vardata
+;
+; This hint requests that only a toolbox be created
+
+;---
+
+ATTR_GEN_CONTROL_REQUIRE_UI		vardata	word
+ATTR_GEN_CONTROL_REQUIRE_TOOLBOX_UI	vardata	word
+;
+; This attribute causes certain UI elements to be required. The word of data
+; stored with the attribute is the mask of features (the relevant bits are
+; defined in the appropriate subclass of this class) that are required from
+; the controller.
+
+ATTR_GEN_CONTROL_PROHIBIT_UI		vardata	word
+ATTR_GEN_CONTROL_PROHIBIT_TOOLBOX_UI	vardata	word
+;
+; This attribute causes certain UI elements to be turned off.  The word of data
+; stored with the attribute is the mask of features (the relevant bits are
+; defined in the appropriate subclass of this class) that should not be
+; provided to the user by the controller.
+;
+; The above four attributes are altered/generated when the user chooses to turn
+; a feature on or off. It is saved to state files.
+
+ATTR_GEN_CONTROL_APP_UI			vardata	optr
+ATTR_GEN_CONTROL_APP_TOOLBOX_UI		vardata	optr
+;
+; This attribute causes app-supplied UI to be added to the controller.
+;
+
+;
+; This hint has an array of entries that describe various changes to the
+; controller's features based on the UI level.
+;
+; These entries are processed in the order they are defined in.  This
+; is important if you are mixing setting vs. adding commands.
+;
+
+;
+; NOTE: if you add more commands, even entries must be "normal", and
+; odd entries must be "toolbox".
+;
+
+GenControlScalableUICommand	etype	byte
+GCSUIC_SET_NORMAL_FEATURES_IF_APP_FEATURE_ON	enum GenControlScalableUICommand
+;
+; if (GCSUIE_appFeature is ON)
+;     menu features = GCSUIE_newFeatures
+;
+GCSUIC_SET_TOOLBOX_FEATURES_IF_APP_FEATURE_ON	enum GenControlScalableUICommand
+;
+; if (GCSUIE_appFeature is ON)
+;     tool features = GCSUIE_newFeatures
+;
+GCSUIC_SET_NORMAL_FEATURES_IF_APP_FEATURE_OFF	enum GenControlScalableUICommand
+;
+; if (GCSUIE_appFeature is OFF)
+;     menu features = GCSUIE_newFeatures
+;
+GCSUIC_SET_TOOLBOX_FEATURES_IF_APP_FEATURE_OFF	enum GenControlScalableUICommand
+;
+; if (GCSUIE_appFeature is OFF)
+;     tool features = GCSUIE_newFeatures
+;
+GCSUIC_SET_NORMAL_FEATURES_IF_APP_LEVEL		enum GenControlScalableUICommand
+;
+; if (app level >= GCSUIE_appFeature)
+;     menu features = GCSUIE_newFeatures
+;
+GCSUIC_SET_TOOLBOX_FEATURES_IF_APP_LEVEL	enum GenControlScalableUICommand
+;
+; if (app level >= GCSUIE_appFeature)
+;     tool features = GCSUIE_newFeatures
+;
+GCSUIC_ADD_NORMAL_FEATURES_IF_APP_FEATURE_ON	enum GenControlScalableUICommand
+;
+; if (GCSUIE_appFeature is ON)
+;     menu features |= GCSUIE_newFeatures
+;
+GCSUIC_ADD_TOOLBOX_FEATURES_IF_APP_FEATURE_ON	enum GenControlScalableUICommand
+;
+; if (GCSUIE_appFeature is ON)
+;     tool features |= GCSUIE_newFeatures
+;
+
+GenControlScalableUIEntry	struct
+    GCSUIE_command	GenControlScalableUICommand
+    GCSUIE_appFeature	word			;feature bit to check
+    GCSUIE_newFeatures	word			;new features bits to use
+GenControlScalableUIEntry	ends
+
+HINT_GEN_CONTROL_SCALABLE_UI_DATA	vardata GenControlScalableUIEntry
+
+;---
+
+TEMP_GEN_CONTROL_OPTIONS_LOADED		vardata
+;
+; Flag denoting that options have been loaded
+
+ATTR_GEN_CONTROL_DO_NOT_USE_LIBRARY_NAME_FOR_HELP		vardata
+;
+; Normally GenControl objects use the name of the library they are defined
+; in as the name of the help file.  If this attribute is set, the library
+; name will not be used and it will continue to go up the generic tree.
+;
+
+HINT_GEN_CONTROL_DESTROY_CHILDREN_WHEN_NOT_INTERACTABLE			vardata
+;
+; GenControl objects will un-spec-build and destroy their child blocks when
+; they are no longer interactible if the controller has the SA_DUAL_BUILD
+; flag set. In some cases, applications will want to have non-dual build
+; controllers destroy themselves as well. If this attr is present, whenever
+; a non-dual-build controller becomes completely not-interactible, it will
+; cause the win group in which it lies to be unbuilt. This allows controllers
+; within dialogs to become unbuilt, which results in memory savings for the
+; application. If multiple controllers are present in a single wingroup,
+; this attribute should only be present on *one* of them.
+;
+; If this attr is present on a dual-build controller, it will cause the
+; controller to unbuild its win group (children) even if the app has
+; provided extra UI. This allows the application to override the default
+; behavior provided by the controller of not unbuilding the child block if
+; application-supplied UI has been added.
+;
+; Needless to say, this is an attr that should be used with care, as it can
+; have many unintentional side-effects. This is very-much a no-bozo option -
+; if it doesn't work in a given circumstance, then take the hint out.
+;
+
+;-----------------------------------------------------------------------------
+;		Instance Data
+;-----------------------------------------------------------------------------
+
+    GCI_output		optr		; Target that this instance of the
+					; controller will operate on.
+
+GenControlClass	endc
+
+EndLibrary	ui

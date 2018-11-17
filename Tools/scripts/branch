@@ -1,0 +1,123 @@
+#!/bin/sh -
+##############################################################################
+#
+# 	Copyright (c) Geoworks 1995 -- All Rights Reserved
+#
+# PROJECT:	
+# MODULE:	
+# FILE: 	branch, a SH script
+# AUTHOR: 	Jim Guggemos, Jan 18, 1995
+#
+# REVISION HISTORY:
+#	Name	Date		Description
+#	----	----		-----------
+#	JimG	1/18/95   	Initial Revision
+#
+# DESCRIPTION:
+#	Displays what the BRANCH file contains that applies to the current
+#	directory.  Can also set the BRANCH file.
+#
+# USAGE:
+#	branch
+#		- display contents of BRANCH file
+#
+#	branch -q
+#		- displays just the BRANCH name, or Trunk, or nothing if not
+#		  in valid tree.
+#
+#	branch <newBranch>
+#		- sets the BRANCH file to <newBranch>
+#		- if <newBranch> is "trunk", "Trunk", or "-", the BRANCH
+#		    file is erased.
+#
+#	$Id: branch,v 1.2 95/08/16 13:00:04 guggemos Exp $
+#
+###############################################################################
+
+usage() {
+    echo "usage:"
+    echo "branch"
+    echo "  Displays contents of BRANCH file"
+    echo "branch -q"
+    echo "  Displays just the BRANCH name, or Trunk, or nothing if not in valid tree"
+    echo "branch <newBranch>"
+    echo "  Sets the branch file to <newBranch>"
+    echo "  To set to trunk, use '-' or 'trunk' or 'Trunk'."
+    exit 1
+}
+
+if [ $# -gt 0 ]; then
+    if [ $# -gt 1 ]; then usage; fi
+
+    case $1 in
+	-q)	quietMode=1;;
+	-)	: okay;;
+	-*)	usage;;
+    esac
+fi
+
+notQuiet() {
+    if [ ! "$quietMode" ]; then
+	echo "$@"
+    fi
+} 
+
+p=`pwd`
+
+root=`expr $p : '\(.*/pcgeos/[^/]*\)'`
+
+if [ $? = 1 ]; then
+    notQuiet "Not in valid tree."
+    exit 1
+fi
+
+# If the directory name after pcgeos starts with a capital letter, then
+# this is a source tree.  You cannot change the BRANCH file in a source tree!
+if expr $root : '.*/pcgeos/[A-Z]' > /dev/null 2>&1; then
+    inSourceTree=1
+    notQuiet "This directory is in a source tree"
+fi
+
+# displayBranch <string>
+displayBranch() {
+
+    if [ -f $root/BRANCH ]; then
+	echo "$1 BRANCH for $root: `cat $root/BRANCH`"
+    else
+	echo "$1 BRANCH for $root: TRUNK"
+    fi
+}
+
+if [ "$quietMode" ]; then
+    if [ -f $root/BRANCH ]; then
+	cat $root/BRANCH
+    else
+	echo Trunk
+    fi
+
+    exit 0
+fi
+
+displayBranch Current
+
+if [ $# -gt 0 ]; then
+    if [ "$inSourceTree" ]; then
+	echo "Cannot change BRANCH file in a source tree"
+	exit 1
+    fi
+    if [ "$1" = "-" -o "$1" = "trunk" -o "$1" = "Trunk" ]; then
+	rm -f $root/BRANCH
+    elif [ "$1" = "20x" -o "$1" = "20X" ]; then
+    	echo Release20X > $root/BRANCH
+    elif [ ! -d /staff/pcgeos/$1 ]; then
+	if [ -d /staff/pcgeos/Release$1 ]; then
+	    echo Release$1 > $root/BRANCH
+	else
+	    echo "Warning: No directory /staff/pcgeos/$1.. probably not a legal branch"
+	    echo $1 > $root/BRANCH
+	fi
+    else
+	echo $1 > $root/BRANCH
+    fi
+    displayBranch New
+fi

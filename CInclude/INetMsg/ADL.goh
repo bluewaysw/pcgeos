@@ -1,0 +1,178 @@
+/**************************************************************************
+*
+*   Copyright (C) 1999  Breadbox Computer Company
+*                       All Right Reserved
+*
+*   PROJECT:    Automatic Decoder Library
+*   FILE:       ADL.goh
+*   AUTHOR:     FR, 26th April, 1999
+*
+*   DESCRIPTION:
+*       This is the Automatic Decoder Library header file.
+*
+**************************************************************************/
+
+
+@deflib enetmsg
+
+
+@ifndef __ADL_GOH
+@define __ADL_GOH
+
+
+/**************************************************************************
+*   INCLUDES
+**************************************************************************/
+
+/* standard include file for GEOS applications */
+@include <stdapp.goh> 
+
+/* ANSI C functions */
+#include <Ansi/stdio.h>  
+#include <Ansi/string.h> 
+
+
+/**************************************************************************
+*   TYPE DEFINITIONS
+**************************************************************************/
+
+#define AD_MAX_IN_LINE_LENGTH   1000
+#define AD_MAX_MESSAGE_LEVEL    20
+
+typedef MemHandle ADHandle ;
+
+typedef ByteEnum ADVariable ;
+#define ADV_FILENAME        0
+#define ADV_BOUNDARY        ADV_FILENAME + AD_MAX_MESSAGE_LEVEL
+#define ADV_MIME_ID         ADV_BOUNDARY + AD_MAX_MESSAGE_LEVEL
+#define ADV_NUMBER          ADV_MIME_ID + AD_MAX_MESSAGE_LEVEL
+#define ADV_TOTAL           ADV_NUMBER + AD_MAX_MESSAGE_LEVEL
+#define ADV_CONTENT_TYPE    ADV_TOTAL + AD_MAX_MESSAGE_LEVEL
+#define ADV_CHAR_SET        ADV_CONTENT_TYPE + AD_MAX_MESSAGE_LEVEL
+#define ADV_FIRST_FREE      ADV_CHAR_SET + AD_MAX_MESSAGE_LEVEL
+
+typedef enum {
+    ADE_NO_ERROR,               /* this is no error state, no error
+                                 * accured */
+
+    ADE_LINE_TOO_LONG,          /* the given input line is too long */
+    
+    ADE_ILLEGAL_UU_BEGIN        /* is UU BEGIN line is of a wrong syntax
+                                 * basically contains no file name at
+                                 * the expected position */
+} ADError ;
+
+typedef WordFlags ADLevelStateFlags ;
+#define ADLSF_MULTIPART         0x0001
+#define ADLSF_PARTIAL           0x0002
+#define ADLSF_INLINE            0x0004
+
+typedef WordFlags ADStateFlags ;
+#define ADSF_NEW                0x0001
+#define ADSF_LINE_CONT          0x0002
+#define ADSF_MIME               0x0004
+#define ADSF_LEVEL_END          0x0008
+
+typedef ByteEnum ADEncoding ;
+#define ADEN_NONE       0    
+#define ADEN_PLAIN      1
+#define ADEN_BASE64     2
+#define ADEN_UU         3   /* dynamically determined from "BEGIN"  */
+#define ADEN_QP         4   /* Quoted-printable transfer encoding   */
+
+typedef struct {
+
+    ADLevelStateFlags   ADLS_flags ;
+    ADEncoding          ADLS_encoding ;
+
+} ADLevelState ;
+
+typedef struct {
+
+    ADLevelState    ADS_level ;
+    ADStateFlags    ADS_flags ;
+    word            ADS_length ;
+    byte            ADS_lev ;
+
+} ADState ;
+
+typedef WordFlags ADPutLineFlags ;
+#define ADPLF_DECODE        0x0001  /* set if the lib user need the
+                                     * the decoded data */
+#define ADPLF_CHAR_SET      0x0002  /* set if the lib user want char set
+                                     * to be decoded if given */
+
+
+/**************************************************************************
+*   FUNCTION DECLARATION
+**************************************************************************/
+
+/*-------------------------------------------------------------------------
+ *  Creates a new decoder and returns an handle
+ *-----------------------------------------------------------------------*/
+ extern _pascal
+ ADHandle                   /* handle of sucessful created decoder or
+                             * 0 if the creation failed and an error
+                             * error code is returned */
+
+ADCreate(
+    ADError     *error      /* place to return a creation error code,
+                             * if 0 no error code is required */
+) ;
+
+/*-------------------------------------------------------------------------
+ *  This function puts in one line of the input document and decoder
+ *  extract needed structure and data information. If the user want
+ *  to really decode data the result will be returned into the buffer
+ *  given.
+ *-----------------------------------------------------------------------*/
+ extern _pascal
+ ADError                        /* error code if operation fails */
+
+ADPutLine(
+    ADHandle        handle,     /* handle of decoder */
+    TCHAR           *p_in,      /* text line of input data, maximum 1024 
+                                 * characters long */
+    byte            *p_out,     /* buffer for deocded data, length 
+                                 * 1025 byte */ 
+    ADState         *p_state,   /* place to return status information */
+    ADPutLineFlags  flags       /* flags for decoding handling */
+) ;
+
+/*-------------------------------------------------------------------------
+ *  This function gets an variables string content in a allocated block
+ *  which is locked. 
+ *-----------------------------------------------------------------------*/
+ extern _pascal
+ MemHandle                          /* handle of allocated and locked 
+                                     * containing the string information,
+                                     * 0 if variable is not set */
+ADGetVar(
+    ADHandle    handle, 
+    ADVariable  var,
+    ADError     *error
+) ;
+
+/*-------------------------------------------------------------------------
+ *  Destroys the decoder if we finsihed using it after the document
+ *  was decoded sucessfully or an error stoped the decoding process.
+ *-----------------------------------------------------------------------*/
+ extern _pascal
+ ADError                    /* error code if operation fails */
+
+ADDestroy(
+    ADHandle handle         /* handle to destroy */
+) ;
+
+
+/*************************************************************************/
+
+
+@endif /* __ADL_GOH */
+
+@endlib
+
+
+/***************************************************************************
+ *  EOF:  ADL.GOH
+ ***************************************************************************/

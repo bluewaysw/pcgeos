@@ -1,0 +1,450 @@
+/***********************************************************************
+ *
+ *	Copyright (c) GeoWorks 1993 -- All Rights Reserved
+ *
+ * PROJECT:	  
+ * MODULE:	  UI Specification
+ * FILE:	  prefcomp.ui
+ *
+ * AUTHOR:  	  Adam de Boor: Jan  18, 1993
+ *
+ * REVISION HISTORY:
+ *	Name	  Date	    Description
+ *	----	  ----	    -----------
+ *	ardeb	  1/18/93  Initial version
+ *
+ * DESCRIPTION:
+ *	UI for Computer preferences module
+ *
+ *
+ * 	$Id: prefcomp.ui,v 1.2 98/03/24 22:13:54 gene Exp $
+ *
+ ***********************************************************************/
+
+
+#include "generic.uih"
+#include "config.uih"
+
+#include "Art/mkrComputer.ui"
+
+class PrefCompMemItem = PrefStringItem {
+    driverName = nptrComp : null;		/* SBCS string */
+}
+
+class PrefCompMemItemGroup = PrefItemGroup {
+}
+
+class PrefCompSerialValue = PrefValue {
+    default Pref = GenValue;
+    default minimum = 1;
+    default maximum = 7;
+    default increment = 1;
+
+    default prefAttrs = default +saveIfChanged;
+
+    portNum = wordComp : 0;
+    base = wordComp : 0;
+    state = bitFieldComp byte {
+	specialValue:2 = { known, off, unknown },
+	origSpecialValue:2 = { known, off, unknown }
+    } : specialValue unknown;
+}
+
+class PrefCompParallelItemGroup = PrefItemGroup {
+    default prefAttrs = default +saveIfChanged;
+    portNum = wordComp : 0;
+}
+
+
+/**************************************************************************
+ *	UI FOR Computer
+ **************************************************************************/ 
+start	ComputerUI;
+
+PrefCompRoot = PrefDialog {
+	moniker = "Computer";
+	attributes = default +notUserInitiatable;
+	visibility = dialog;
+	type = properties;
+	genStates = default -usable;
+	children = CompTitleGroup, MemoryItemGroup, IntLevelOptions;
+	hints = {
+		ATTR_GEN_INIT_FILE_CATEGORY {
+			char	"Computer", 0
+		},
+		HINT_INTERACTION_SINGLE_USAGE,
+		HINT_INTERACTION_COMPLEX_PROPERTIES,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_CUSTOM_CHILD_SPACING {
+			SpecSizeSpec <SST_PIXELS, 1>
+		},
+		ATTR_GEN_HELP_CONTEXT {
+			char "dbComputer",0
+		} 
+	}
+}
+
+
+CompTitleGroup = GenInteraction {
+	children = CompTitle, CompHelp;
+	hints = {HINT_ORIENT_CHILDREN_HORIZONTALLY}
+}
+
+CompTitle = TitledGlyph {
+	moniker = list {
+		CompTextMoniker,
+		ComputerLCMoniker,
+		ComputerLMMoniker,
+		ComputerLCGAMoniker
+	}
+}
+
+CompHelp = GenText {
+	genAttributes = readOnly;
+	text = "Change the Extra Memory Type to make use of additional memory.  Change the Interrupt Levels if your computer has unusual port configurations.";
+	hints = {
+		  HINT_MINIMUM_SIZE {
+			SpecWidth <SST_PIXELS, 425>
+			SpecHeight <>
+		  },
+		  HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+/*
+ *	MemoryItemGroup
+ */
+
+MemoryItemGroup = PrefCompMemItemGroup vardataReloc {
+	initFileFlags = default +useItemStrings, +absentKeyOverridesDefaults;
+	behaviorType = nonExclusive;
+	moniker = "Extra Memory Types";
+	numSelections  = 1;
+	selection = MT_NONE;
+	prefAttrs = default +rebootIfChanged, +saveIfChanged;
+	children = MemoryNoneItem,
+			MemoryEmmItem, 
+			MemoryXMSItem, 
+			MemoryExtItem;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CUSTOM_CHILD_SPACING {
+			SpecSizeSpec <SST_PIXELS, 1>
+		},
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_DRAW_IN_BOX,
+		HINT_ALLOW_CHILDREN_TO_WRAP,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		ATTR_GEN_INIT_FILE_CATEGORY {
+			char "system",0
+		},
+		ATTR_GEN_INIT_FILE_KEY {
+			char "memory",0
+		},
+		ATTR_PREF_ITEM_GROUP_OVERRIDE {
+			word MT_NONE
+		},
+		ATTR_PREF_ITEM_GROUP_EXTRA_STRING_SECTION {
+#if DO_DBCS
+EC <			wchar	"diskec.geo",0		>
+NEC <			wchar	"disk.geo",0		>
+#else
+EC <			char	"diskec.geo",0		>
+NEC <			char	"disk.geo",0		>
+#endif
+		},
+		ATTR_PREF_REBOOT_STRING {
+			UN_OPTR	MemoryRebootString
+		}
+	}
+}
+
+MemoryNoneItem = PrefStringItem {
+	moniker = "None";
+	identifier = MT_NONE;
+}
+
+MemoryEmmItem = PrefCompMemItem {
+	moniker = "Expanded (LIM EMS)";
+	identifier = MT_EMS;
+	initFileString = MemoryEmmString;
+	driverName = EmmDriverName;
+}
+
+chunk EmmDriverName = data {
+	char	"emm     ",0
+}
+
+chunk MemoryEmmString = data {
+#if DO_DBCS
+EC <	wchar	"emmec.geo",0		>
+NEC <	wchar 	"emm.geo",0		>
+#else
+EC <	char	"emmec.geo",0		>
+NEC <	char 	"emm.geo",0		>
+#endif
+}
+
+MemoryXMSItem = PrefCompMemItem {
+	moniker = "XMS/HIMEM.SYS";
+	identifier = MT_XMS;
+	initFileString = MemoryXMSString;
+	driverName = XMSDriverName;
+}
+chunk XMSDriverName = data {
+	char	"xms     ",0
+}
+chunk MemoryXMSString = data {
+#if DO_DBCS
+EC <	wchar	"xmsec.geo",0		>
+NEC <	wchar	"xms.geo",0		>
+#else
+EC <	char	"xmsec.geo",0		>
+NEC <	char	"xms.geo",0		>
+#endif
+}
+
+MemoryExtItem = PrefCompMemItem vardataReloc {
+	moniker = "Extended (Above 1 Mb)";
+	identifier = MT_EXTENDED;
+	initFileString = MemoryExtString;
+	driverName = ExtDriverName;
+	hints = {
+		ATTR_PREF_COMP_MEM_ITEM_CHECK_KEY {
+			char	"extmem disabled", 0
+		},
+		ATTR_PREF_COMP_MEM_ITEM_CHECK_MESSAGE {
+			UN_OPTR	ExtMemDisabledConfirmationString
+		}
+	}
+}
+
+chunk ExtDriverName = data {
+	char	"extMem  ",0
+}
+
+chunk MemoryExtString = data {
+#if DO_DBCS
+EC <  	wchar	"extmemec.geo",0	>
+NEC <	wchar	"extmem.geo",0		>
+#else
+EC <  	char	"extmemec.geo",0	>
+NEC <	char	"extmem.geo",0		>
+#endif
+}
+/*
+ *	IntLevelOptions
+ */
+
+IntLevelOptions = PrefInteraction {
+	moniker = "Interrupt Level Options";
+	children = SerialIntLevelGroup, ParallelIntLevelGroup;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CUSTOM_CHILD_SPACING {
+			SpecSizeSpec <SST_PIXELS, 1>
+		},
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_DRAW_IN_BOX,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT
+	}
+}
+
+SerialIntLevelGroup = PrefInteraction {
+	moniker = "Serial Ports";
+	children = Com1IntLevel, Com2IntLevel, Com3IntLevel, Com4IntLevel;
+	hints = {
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_DRAW_IN_BOX,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		INIT_FILE_CATEGORY(serial)
+	}
+}
+
+Com1IntLevel = PrefCompSerialValue {
+	moniker = "COM1:";
+	base = "0x3f8";
+	value = 4;
+	hints = {
+		INIT_FILE_KEY(port1),
+		HINT_PLACE_MONIKER_ABOVE
+	}
+	portNum = SERIAL_COM1;
+}
+
+Com2IntLevel = PrefCompSerialValue {
+	moniker = "COM2:";
+	base = "0x2f8";
+	value = 3;
+	hints = {
+		INIT_FILE_KEY(port2),
+		HINT_PLACE_MONIKER_ABOVE
+	}
+	portNum = SERIAL_COM2;
+}
+
+Com3IntLevel = PrefCompSerialValue {
+	moniker = "COM3:";
+	base = "0x3e8";
+	value = 4;
+	hints = {
+		INIT_FILE_KEY(port3),
+		HINT_PLACE_MONIKER_ABOVE
+	}
+	portNum = SERIAL_COM3;
+	
+}
+
+Com4IntLevel = PrefCompSerialValue {
+	moniker = "COM4:";
+	base = "0x2e8";
+	value = 3;
+	hints = {
+		INIT_FILE_KEY(port4),
+		HINT_PLACE_MONIKER_ABOVE
+	}
+	portNum = SERIAL_COM4;
+}
+
+ParallelIntLevelGroup = PrefInteraction {
+	moniker = "Parallel Ports";
+	children = Lpt1IntLevel, 
+			Lpt2IntLevel, 
+			Lpt3IntLevel;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_CUSTOM_CHILD_SPACING {
+			SpecSizeSpec <SST_PIXELS, 1>
+		},
+		HINT_PLACE_MONIKER_ABOVE,
+		HINT_DRAW_IN_BOX,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		INIT_FILE_CATEGORY(parallel)
+	}
+}
+
+Lpt1IntLevel = PrefCompParallelItemGroup {
+	moniker = "LPT1:";
+	children = Lpt1IntBIOS, Lpt1IntDOS, Lpt1IntLevel5, Lpt1IntLevel7;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		INIT_FILE_KEY(port1)
+	}
+	portNum = PARALLEL_LPT1;
+}
+
+Lpt1IntBIOS = GenItem {
+	moniker = "BIOS";
+	identifier = 0;
+}
+
+Lpt1IntDOS = GenItem {
+	moniker = "DOS";
+	identifier = 1;
+}
+
+Lpt1IntLevel5 = GenItem {
+	moniker = "5";
+	identifier = 5;
+}
+
+Lpt1IntLevel7 = GenItem {
+	moniker = "7";
+	identifier = 7;
+}
+
+Lpt2IntLevel = PrefCompParallelItemGroup {
+	moniker = "LPT2:";
+	children = Lpt2IntBIOS, Lpt2IntDOS, Lpt2IntLevel5, Lpt2IntLevel7;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		INIT_FILE_KEY(port2)
+	}
+	portNum = PARALLEL_LPT2;
+}
+
+Lpt2IntBIOS = GenItem {
+	moniker = "BIOS";
+	identifier = 0;
+}
+
+Lpt2IntDOS = GenItem {
+	moniker = "DOS";
+	identifier = 1;
+}
+
+Lpt2IntLevel5 = GenItem {
+	moniker = "5";
+	identifier = 5;
+}
+
+Lpt2IntLevel7 = GenItem {
+	moniker = "7";
+	identifier = 7;
+}
+
+Lpt3IntLevel = PrefCompParallelItemGroup {
+	moniker = "LPT3:";
+	children = Lpt3IntBIOS, 
+			Lpt3IntDOS, 
+			Lpt3IntLevel5, 
+			Lpt3IntLevel7;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		INIT_FILE_KEY(port3)
+	}
+	portNum = PARALLEL_LPT3;
+}
+
+Lpt3IntBIOS = GenItem {
+	moniker = "BIOS";
+	identifier = 0;
+}
+
+Lpt3IntDOS = GenItem {
+	moniker = "DOS";
+	identifier = 1;
+}
+
+Lpt3IntLevel5 = GenItem {
+	moniker = "5";
+	identifier = 5;
+}
+
+Lpt3IntLevel7 = GenItem {
+	moniker = "7";
+	identifier = 7;
+}
+
+
+end	ComputerUI;
+
+start	Strings, data;
+
+
+visMoniker CompTextMoniker = "Computer";
+
+visMoniker CompMonikerList = list {
+		CompTextMoniker,
+		ComputerLCMoniker,
+		ComputerLMMoniker,
+		ComputerLCGAMoniker
+}
+
+chunk MemoryRebootString = "extra memory it uses";
+
+chunk SerialValueOffString = "Off";
+
+chunk SerialValueUnknownString = "?";
+
+chunk SerialNoSuchDevice = "\\1 doesn't appear to exist or is set for a different interrupt level than you specified.\\r\\rError Code: PRC-01";
+
+chunk SerialDeviceInUse = "\\1 is currently in use, so you may not change its interrupt level.\\r\\rError Code: PRC-02";
+
+chunk ParallelIntTaken = "You cannot assign the same interrupt level to more than one port, as you've attempted to do with \\1 and another parallel port.\\r\\rError Code: PRC-03";
+
+chunk   ExtMemDisabledConfirmationString = {WARNING: When you installed this software, the setup program detected a TSR or device driver in your CONFIG.SYS or AUTOEXEC.BAT that is incompatible with extended memory. Unless you are certain this TSR or device driver has been removed, you should not enable use of extended memory from this program. Are you sure you wish to enable extended memory? (Error Code: PRC-04)}
+
+end	Strings;

@@ -1,0 +1,1612 @@
+/***********************************************************************
+ *
+ *	Copyright (c) New Deal 1998 -- All Rights Reserved
+ *
+ * PROJECT:	  Mail
+ * MODULE:	  Mail
+ * FILE:	  mainProcess.goc
+ *
+ * AUTHOR:  	  Gene Anderson: 12/2/98
+ *
+ * REVISION HISTORY:
+ *	Date	  Name	    Description
+ *	----	  ----	    -----------
+ *	12/2/98    gene	    Initial version
+ *
+ * DESCRIPTION:
+ *	MailProcessClass for the Mail application
+ *
+ * 	$Id$
+ *
+ ***********************************************************************/
+
+
+@include "mail.goh"
+@include "class.goh"
+@include "global.goh"
+@include <mailhub.goh>
+@include <mailsmtp.goh>
+@include <mailpop3.goh>
+@include <objects/clipbrd.goh>
+#include <sem.h>
+
+@classdecl MailProcessClass, neverSaved;
+
+ThreadLockHandle TheMessageListLock = NULL;
+
+@ifdef KID_GUARD_SUPPORT
+Boolean startupPassword = FALSE;
+Boolean accessGranted = TRUE;
+@endif
+
+
+#ifdef __BORLANDC__
+#pragma codeseg InitCode
+#endif
+
+const char crashKey[] = "clnOnCrash";
+
+@ifdef CREATE_ISP_ACCOUNT
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	    CreateNewISPAccount
+ * PASS:            none
+ * RETURN:	    non-zero if error
+ * DESCRIPTION:
+ *        Create a new account based on ISP info
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *      gene            3/4/99          Initial Revision
+ *
+ ***********************************************************************/
+const char setupCat[] = "emailSetup";
+const char realKey[] = "realName";
+const char smtpKey[] = "smtp";
+const char popKey[] = "pop";
+const char emailKey[] = "email";
+const char loginKey[] = "loginName";
+const char secretKey[] = "secret";
+
+extern char defKey[];
+
+word
+CreateNewISPAccount(void)
+{
+    FileLongName acctName;
+    word dSize, err;
+    TCHAR buf[MAIL_NAME_MAX];
+    TCHAR loginBuf[MAIL_NAME_MAX];
+    TCHAR passwordBuf[MAIL_NAME_MAX];
+    TCHAR mailAddrBuf[MAIL_NAME_MAX];
+    TCHAR smtpServerBuf[MAIL_NAME_MAX];
+    TCHAR pop3ServerBuf[MAIL_NAME_MAX];
+
+    /*
+     * if [emailSetup]/realName exists, create a new account
+     */
+    if (InitFileReadStringBuffer(setupCat, loginKey, acctName, sizeof(FileLongName), &dSize)) {
+	/*
+	 * no .ini info, no ISP account, no error
+	 */
+	return(0);
+    }
+    InitFileReadStringBuffer(setupCat, smtpKey, smtpServerBuf, sizeof(MailName), &dSize);
+    InitFileReadStringBuffer(setupCat, popKey, pop3ServerBuf, sizeof(MailName), &dSize);
+    InitFileReadStringBuffer(setupCat, emailKey, mailAddrBuf, sizeof(MailName), &dSize);
+    InitFileReadStringBuffer(setupCat, loginKey, loginBuf, sizeof(MailName), &dSize);
+    InitFileReadDataBuffer(setupCat, secretKey, passwordBuf, sizeof(MailName), &dSize);
+
+    err = MailAddAccount(acctName, loginBuf, passwordBuf, mailAddrBuf, acctName, smtpServerBuf, pop3ServerBuf, MAIL_DEFAULT_APP_OPTIONS);
+    
+    /*
+     * delete the [emailSetup] category so we don't do this again
+     */
+    InitFileDeleteCategory(setupCat);
+    /*
+     * set [mail]/defacct so the rest of the program knows
+     */
+    @call MailAppObj::MSG_META_GET_INI_CATEGORY(buf);
+    InitFileWriteString(buf, defKey, acctName);
+
+    return(err);
+}
+
+@endif
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_GEN_PROCESS_OPEN_APPLICATION
+* PASS:            attachFlags - AppAttachFlags
+*                  launchBlock - handle of AppLaunchBlock
+*                  extraState - handle of extra state
+* RETURN:          none
+* DESCRIPTION:     Handle opening the application     
+*
+* REVISION HISTORY:
+*         Name      Date        Description
+*         ----      ----        -----------
+*         gene      12/2/98     Initial Revision
+
+***************************************************************/
+@method MailProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+        MailAccountError err;
+	Boolean crash;
+	TCHAR acctName[FILE_LONGNAME_BUFFER_SIZE];
+	TCHAR buf[MAIL_NAME_MAX];
+@ifdef  KID_GUARD_SUPPORT
+        AccessFlags		pcAccess;
+@endif
+@ifdef FIXED_POINTSIZE_FOR_PRINTING
+        WWFixed psize;
+@endif
+
+        FileSetCurrentPath(SP_PRIVATE_DATA, "");
+
+        /*
+	 * Allocate a lock to control access to the message list files
+	 */
+	TheMessageListLock = ThreadAllocThreadLock();
+	uidlLock = ThreadAllocThreadLock();
+
+@ifdef CREATE_ISP_ACCOUNT
+	/*
+	 * see if there is ISP setup info and create a new
+	 * default account
+	 */
+	err = CreateNewISPAccount();
+        if (err && err != MAE_ACCOUNT_EXISTS) {
+	    goto skipCreate;
+	}
+@endif
+	GetDefaultAccount(acctName);
+        err = MailAddAccount(acctName, NULL, NULL, NULL, NULL, NULL, NULL, MAIL_DEFAULT_APP_OPTIONS);
+
+skipCreate:
+	/*
+	 * initialize the large text objects
+	 */
+	@call PrintTextObject::MSG_MAIL_LARGE_TEXT_OPEN(NULL, VTSF_MULTIPLE_PARA_ATTRS|VTSF_MULTIPLE_CHAR_ATTRS|VTSF_TYPES);
+	@call ReadBodyText::MSG_MAIL_LARGE_TEXT_OPEN(@ReadBodyContent, VTSF_MULTIPLE_PARA_ATTRS|VTSF_MULTIPLE_CHAR_ATTRS|VTSF_TYPES);
+	@call ComposeBodyText::MSG_MAIL_LARGE_TEXT_OPEN(@ComposeBodyContent, VTSF_MULTIPLE_PARA_ATTRS|VTSF_MULTIPLE_CHAR_ATTRS|VTSF_TYPES);
+
+@ifdef FIXED_POINTSIZE_FOR_PRINTING
+	/*
+	 * if a fixed pointsize for printing, init the font and pointsize now
+	 */
+        @call PrintTextObject::MSG_VIS_TEXT_SET_FONT_ID(FID_DTC_URW_SANS, TEXT_ADDRESS_PAST_END, 0);
+        psize.WWF_int = 14;
+	psize.WWF_frac = 0;
+        @call PrintTextObject::MSG_VIS_TEXT_SET_POINT_SIZE(psize, TEXT_ADDRESS_PAST_END, 0);
+@endif
+
+	/*
+	 * configure UI elements in the Compose Message form
+	 */
+        @call MailAppObj::MSG_MAIL_APP_CONFIGURE_COMPOSE_FORM_UI();
+
+
+	/*
+	 * initialize the accounts list
+	 * this will build the folder list which will in turn
+	 * build the message list (if appropriate)
+	 */
+
+	/*
+	 * If we previously crashed, make sure we clean up the mail directories
+	 */
+	if (!err || err == MAE_ACCOUNT_EXISTS) {
+	    @call MailAppObj::MSG_META_GET_INI_CATEGORY(buf);
+	    if (InitFileReadBoolean(buf, crashKey, &crash) || crash)  {
+		@call TheMessageList::MSG_MAIL_LIST_CLOSE_MESSAGE_ARRAY();
+		@call TheFolderList::MSG_FOLDER_LIST_CLEAN_FOLDERS();
+		/* 
+		 * Initialize the mail folders.
+		 */
+		@call PfAccountList::MSG_ACCOUNT_LIST_REBUILD(-1);
+		@call TheFolderList::MSG_FOLDER_LIST_INIT_MSGLIST(); 
+	    } else {
+		@call PfAccountList::MSG_ACCOUNT_LIST_REBUILD(-1);
+	    }
+	    InitFileWriteBoolean(buf,crashKey,TRUE);
+	    InitFileCommit();
+	}
+	     
+callSuper:
+	@call MailSearchControl::MSG_GEN_CONTROL_NOTIFY_INTERACTABLE(GCIF_CONTROLLER|GCIF_NORMAL_UI);
+	@call MailSearchControl::MSG_GEN_CONTROL_ENABLE_DISABLE(MSG_GEN_SET_ENABLED, VUM_DLYD);
+
+@ifdef CHECK_MAIL_ON_INTERVALS
+        /*
+	 * add ourselves to the appropriate GCN lists so we know when
+	 * we're connected
+	 */
+         GCNListAdd(@SendReceiveDialog, MANUFACTURER_ID_GEOWORKS, GCNSLT_PPP_STATUS_NOTIFICATIONS);
+
+@endif
+
+@ifdef MULTIPLE_ACCOUNT_SUPPORT
+@ifdef GPC_PORTAL_SUPPORT
+        /*
+	 * have the account list recognize changes to the account database
+	 */
+        GCNListAdd(@PfAccountList, MANUFACTURER_ID_GEOWORKS, GCNSLT_EMAIL_DATABASE_CHANGE);
+@endif
+@endif
+
+@ifdef CUI_FILE_SELECTORS
+     /* 
+      * limit file selectors in CUI
+      */
+    if (UserGetDefaultUILevel() == UIIL_INTRODUCTORY) {
+	FileSelectorFileCriteria fsfc;
+	FileSelectorAttrs fsa;
+	fsfc = @call ComposeAttachFileSelector::MSG_GEN_FILE_SELECTOR_GET_FILE_CRITERIA();
+	fsa = @call ComposeAttachFileSelector::MSG_GEN_FILE_SELECTOR_GET_ATTRS();
+	@call ComposeAttachFileSelector::MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA(
+	    fsfc & ~FSFC_DIRS);
+	@call ComposeAttachFileSelector::MSG_GEN_FILE_SELECTOR_SET_ATTRS(
+	    fsa & ~(FSA_ALLOW_CHANGE_DIRS | FSA_HAS_CLOSE_DIR_BUTTON |
+		    FSA_HAS_DOCUMENT_BUTTON | FSA_HAS_CHANGE_DRIVE_LIST |
+		    FSA_HAS_OPEN_DIR_BUTTON | FSA_HAS_CHANGE_DIRECTORY_LIST));
+	fsfc = @call SaveAttachSelector::MSG_GEN_FILE_SELECTOR_GET_FILE_CRITERIA();
+	fsa = @call SaveAttachSelector::MSG_GEN_FILE_SELECTOR_GET_ATTRS();
+	@call SaveAttachSelector::MSG_GEN_FILE_SELECTOR_SET_FILE_CRITERIA(
+	    fsfc & ~FSFC_DIRS);
+	@call SaveAttachSelector::MSG_GEN_FILE_SELECTOR_SET_ATTRS(
+	    fsa & ~(FSA_ALLOW_CHANGE_DIRS | FSA_HAS_CLOSE_DIR_BUTTON |
+		    FSA_HAS_OPEN_DIR_BUTTON | FSA_HAS_CHANGE_DIRECTORY_LIST |
+		    FSA_HAS_DOCUMENT_BUTTON | FSA_HAS_CHANGE_DRIVE_LIST |
+		    FSA_HAS_FILE_LIST));
+@ifdef FILE_SELECTOR_PROMPTS
+	/* set prompt for save attach dialog */
+	@call SaveAttachPrompt::MSG_GEN_USE_VIS_MONIKER(OptrToChunk(@cuiSaveAttachPrompt), VUM_NOW);
+@endif
+    }
+@endif
+
+	/*
+	 * call our superclass to get the ball rolling
+	 */
+	@callsuper();
+
+
+@ifdef  KID_GUARD_SUPPORT
+        /*
+         * check for parental control 
+	 */
+
+        pcAccess = ParentalControlGetAccessInfo();
+	/* if no access, ask for password 
+	 */
+        if (pcAccess & AF_EMAIL)  {
+	    startupPassword = TRUE;
+	    accessGranted = FALSE;
+	    if (@call PCRoot::MSG_PC_CHECK_PASSWORD_DB(PC_EMAIL) == IC_OK) {
+		/* allow access 
+		 */
+		accessGranted = TRUE;
+	    }  else {
+		@send, forceQueue MailAppObj::MSG_META_QUIT();
+	    }
+	    startupPassword = FALSE;
+	}
+@endif
+
+@ifdef LAUNCH_HELP
+@ifdef KID_GUARD_SUPPORT
+    if (accessGranted)  /* encompasses entire following statement */
+@endif
+        if (@call application::MSG_MAIL_APP_GET_USER_LEVEL() == UIIL_INTRODUCTORY) {  /* only if User Level 1 */
+	    if (UserGetDefaultUILevel() == UIIL_INTRODUCTORY) {
+		ConditionalNotice(@launchHelpText, @launchHelp2CUIText, "noLaunchHelp", NULL, FALSE);
+	    } else {
+		ConditionalNotice(@launchHelpText, @launchHelp2Text, "noLaunchHelp", NULL, FALSE);
+	    }
+        }
+@endif
+
+        /*
+	 * deal with any error creating the default account
+	 */
+        if (err && err != MAE_ACCOUNT_EXISTS) {
+	    @send, forceQueue MailAppObj::MSG_MAIL_APP_DEFAULT_ACCOUNT_ERROR();
+	}
+
+}
+
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_GEN_PROCESS_TRANSITION_FROM_ENGINE_TO_APPLICATION_MODE
+* PASS:            attachFlags - AppAttachFlags
+*                  launchBlock - handle of AppLaunchBlock
+* RETURN:          none
+* DESCRIPTION:     Handle lazarus
+*
+* REVISION HISTORY:
+*         Name      Date        Description
+*         ----      ----        -----------
+*         brianc    6/20/00     Initial Revision
+
+***************************************************************/
+@method MailProcessClass, MSG_GEN_PROCESS_TRANSITION_FROM_ENGINE_TO_APPLICATION_MODE
+{
+	/*
+	 * initialize the large text objects
+	 */
+	@call PrintTextObject::MSG_MAIL_LARGE_TEXT_OPEN(NULL, VTSF_MULTIPLE_PARA_ATTRS|VTSF_MULTIPLE_CHAR_ATTRS|VTSF_TYPES);
+	@call ReadBodyText::MSG_MAIL_LARGE_TEXT_OPEN(@ReadBodyContent, VTSF_MULTIPLE_PARA_ATTRS|VTSF_MULTIPLE_CHAR_ATTRS|VTSF_TYPES);
+	@call ComposeBodyText::MSG_MAIL_LARGE_TEXT_OPEN(@ComposeBodyContent, VTSF_MULTIPLE_PARA_ATTRS|VTSF_MULTIPLE_CHAR_ATTRS|VTSF_TYPES);
+
+@ifdef CHECK_MAIL_ON_INTERVALS
+        /*
+	 * add ourselves to the appropriate GCN lists so we know when
+	 * we're connected
+	 */
+         GCNListRemove(@SendReceiveDialog, MANUFACTURER_ID_GEOWORKS, GCNSLT_PPP_STATUS_NOTIFICATIONS);  /* in case already there */
+         GCNListAdd(@SendReceiveDialog, MANUFACTURER_ID_GEOWORKS, GCNSLT_PPP_STATUS_NOTIFICATIONS);
+
+@endif
+
+@ifdef MULTIPLE_ACCOUNT_SUPPORT
+@ifdef GPC_PORTAL_SUPPORT
+        /*
+	 * have the account list recognize changes to the account database
+	 */
+        GCNListRemove(@PfAccountList, MANUFACTURER_ID_GEOWORKS, GCNSLT_EMAIL_DATABASE_CHANGE);  /* in case already there */
+        GCNListAdd(@PfAccountList, MANUFACTURER_ID_GEOWORKS, GCNSLT_EMAIL_DATABASE_CHANGE);
+@endif
+@endif
+
+	/*
+	 * call our superclass to get the ball rolling
+	 */
+	@callsuper();
+}
+
+
+
+/***********************************************************************
+ *		MSG_PROCESS_CREATE_UI_THREAD for MailProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:  Increase the size of the ui thread stack.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	12/30/98   	Initial Revision
+ *
+ ***********************************************************************/
+@method MailProcessClass, MSG_PROCESS_CREATE_UI_THREAD
+{
+  stackSize = 4048;     /* print controller need more stack size */
+  return @callsuper();
+}	/* End of MSG_PROCESS_CREATE_UI_THREAD.	*/
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_GEN_PROCESS_CLOSE_APPLICATION
+* PASS:            none
+* RETURN:          none
+* DESCRIPTION:     Handle closing the application
+*
+* REVISION HISTORY:
+*         Name      Date        Description
+*         ----      ----        -----------
+*         gene      1/1/99      Initial Revision
+
+***************************************************************/
+@method MailProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+    TCHAR buf[MAIL_NAME_MAX];
+    /*
+     * if the option is selected or in CUI, empty the trash
+     * XXX: need to deal with multiple accounts, or just current?
+     */
+    if (@call PfStartOptionList::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & MSEO_EMPTY_TRASH || @call MailAppObj::MSG_MAIL_APP_GET_USER_LEVEL() == UIIL_INTRODUCTORY) {
+        EmptyTrash();
+    }
+
+@ifdef EMAIL_ADS
+    @call TheAdvertisement::MSG_ADVERTISEMENT_STOP();
+@endif
+
+    /* not safe to delete the message list lock, until the trash has
+     * been emptied
+     */
+    ThreadFreeThreadLock(TheMessageListLock);
+    TheMessageListLock = NULL;
+    ThreadFreeThreadLock(uidlLock);
+    uidlLock = NULL;
+
+    /* If we crash after shutdown it does not matter, so turn the crashKey
+     * off (tells us to ignore system crash flag on startup);
+     */
+    @call MailAppObj::MSG_META_GET_INI_CATEGORY(buf);
+    InitFileWriteBoolean(buf,crashKey,FALSE);
+    InitFileCommit();
+
+@ifdef CHECK_MAIL_ON_INTERVALS
+    /*
+     * remove ourselves from the GCN list(s) we added oursevles to eariler
+     */
+     GCNListRemove(@SendReceiveDialog, MANUFACTURER_ID_GEOWORKS, GCNSLT_PPP_STATUS_NOTIFICATIONS);
+@endif
+@ifdef MULTIPLE_ACCOUNT_SUPPORT
+@ifdef GPC_PORTAL_SUPPORT
+     GCNListRemove(@PfAccountList, MANUFACTURER_ID_GEOWORKS, GCNSLT_EMAIL_DATABASE_CHANGE);
+@endif
+@endif
+
+    /*
+     * clean up the text objects
+     */
+    @call PrintTextObject::MSG_MAIL_LARGE_TEXT_CLOSE(NULL);
+    @call ReadBodyText::MSG_MAIL_LARGE_TEXT_CLOSE(@ReadBodyContent);
+    @call ComposeBodyText::MSG_MAIL_LARGE_TEXT_CLOSE(@ComposeBodyContent);
+    /*
+     * tell various things to clean up
+     */
+    @call TheFolderList::MSG_FOLDER_LIST_FREE();
+    @call PfAccountList::MSG_ACCOUNT_LIST_FREE();
+    @call ReadAttachList::MSG_ATTACH_LIST_FREE();
+    @call ComposeAttachList::MSG_ATTACH_LIST_FREE();
+    @call ComposeAddressDialog::MSG_ADDRESS_DIALOG_FREE();
+    /*
+     * return no extra state
+     */
+    return(0);
+}
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_MAIL_PROCESS_DO_MAIL
+* PASS:            iabh - handle of InternetAppBlock (0 if none)
+* RETURN:          none
+* DESCRIPTION:     Do a mail operation during start up.
+*                  Needs to be in the process thread to let stuff get
+*                  set up -- forceQueue isn't sufficient
+*
+* REVISION HISTORY:
+*         Name      Date        Description
+*         ----      ----        -----------
+*         gene      12/3/99     Initial Revision
+***************************************************************/
+
+@method MailProcessClass, MSG_MAIL_PROCESS_DO_MAIL
+{
+@ifdef MAIL_READ_IACP_SUPPORT
+    TCHAR *dataStr;
+    word acctNum;
+@endif
+    InternetAppBlock *iab;
+
+@ifdef  KID_GUARD_SUPPORT
+    if (accessGranted == FALSE) {
+	/* if access was not granted do nothing
+	 */
+	if (iabh) MemFree(iabh);
+	return;
+    }
+@endif
+
+    if (iabh) {
+	iab = MemLock(iabh);
+@ifdef MAIL_READ_IACP_SUPPORT
+	dataStr = (TCHAR *)((byte *)iab + sizeof(InternetAppBlock));
+@endif
+	switch (iab->IAB_type) {
+	case IADT_MAIL_TO:
+	    @send, forceQueue ComposeMailWin::MSG_MAIL_COMPOSER_MAIL_TO(iabh);
+	    break;
+@ifdef MAIL_READ_IACP_SUPPORT
+	case IADT_GET_NEW_MAIL:
+	    /*
+	     * if an account name, set the account and check mail
+	     */
+	    if (*dataStr) {
+	    acctNum = @call PfAccountList::MSG_ACCOUNT_LIST_GET_ACCOUNT_INDEX(dataStr);
+	    if (acctNum != GIGS_NONE) {
+		@call PfAccountList::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(acctNum, 0);
+		@call PfAccountList::MSG_GEN_ITEM_GROUP_SEND_STATUS_MSG(0);
+		@send SendReceiveDialog::MSG_MSR_RECEIVE_MESSAGES_IF_SETUP();
+	    } else {
+		ReportError(@noSuchAccountErr, dataStr);
+	    }
+	    } else {
+		/* just fetch new mail for default account */
+		@send SendReceiveDialog::MSG_MSR_RECEIVE_MESSAGES_IF_SETUP();
+	    }
+	    MemFree(iabh);
+	    break;
+@endif
+        default:
+	    MemFree(iabh);
+	}
+    } else {
+	/*
+	 * see if we should check for mail on startup
+	 */
+@ifdef CHECK_MAIL_ON_STARTUP
+        if (@call PfAppOptionList::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & MSEO_CHECK_ON_STARTUP) {
+	    @send SendReceiveDialog::MSG_MSR_RECEIVE_MESSAGES_IF_SETUP();
+	}
+@endif
+@ifdef CHECK_MAIL_ON_INTERVALS
+        if (@call PfCheckMailOptions::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & MCO_CHECK_ON_STARTUP) {
+	    @send SendReceiveDialog::MSG_MSR_RECEIVE_MESSAGES_IF_SETUP();
+	}
+@endif
+    }
+}
+
+@ifdef NO_STATE_FILE
+
+
+/**************************************************************
+*          
+* FUNCTION:        MSG_GEN_PROCESS_CLOSE_APPLICATION
+* PASS:            appInstanceReference - handle of app block
+* RETURN:          0 - no state file
+* DESCRIPTION:     Indicate we don't want to save state
+*
+* REVISION HISTORY:
+*         Name      Date        Description
+*         ----      ----        -----------
+*         gene      5/11/00     Initial Revision
+***************************************************************/
+@method MailProcessClass, MSG_GEN_PROCESS_CREATE_NEW_STATE_FILE
+{
+    return(0);
+}
+
+@endif
+
+
+/**************************************************************
+
+Code to send and receive mail messages
+
+**************************************************************/
+
+#ifdef __BORLANDC__
+#pragma codeseg SendCode
+#endif
+
+/***********************************************************************
+ *		OpenSMTPConnection
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Call the mail library to open a smtp connection for 
+ *              sending mail.
+ * CALLED BY:	MSG_MSR_SEND_MESSAGES
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	12/23/98   	Initial Revision
+ *
+ ***********************************************************************/
+MailError
+OpenSMTPConnection (OUTBOX *box)
+{
+    MemHandle smtpHandle, bufHandle;
+    char *smtp,*user;
+    OutboxStruct *oboxPtr;
+    MailError ret;
+@ifdef WRAP_OUTGOING_SUPPORT
+    word opts;
+@endif
+
+    smtpHandle = @call PfAccountList::MSG_ACCOUNT_LIST_GET_SMTP();
+    smtp = MemLock(smtpHandle);
+    bufHandle = @call PfAccountList::MSG_ACCOUNT_LIST_GET_USER_ACCOUNT();
+    user = MemLock(bufHandle);
+    ret = MailoutOpen(smtp,OUTB_PROTOCOL_ESMTP, user,box, 1);
+    oboxPtr = MemLock(*box);
+@ifdef WRAP_OUTGOING_SUPPORT
+    opts = @call PfMessageOptionList::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+    if (opts & MMO_WRAP_OUTGOING) {
+	oboxPtr->OB_wrapLength = WRAP_TEXT_LENGTH;
+    } else {
+	oboxPtr->OB_wrapLength = 0;
+    }
+@else
+    oboxPtr->OB_wrapLength = WRAP_TEXT_LENGTH;
+@endif
+    MemUnlock(*box);
+    MemFree(smtpHandle);
+    MemFree(bufHandle);
+    return ret;
+}	/* End of OpenSMTPConnection.	*/
+
+
+/***********************************************************************
+ *		OpenPOP3Connection
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	12/29/98   	Initial Revision
+ *
+ ***********************************************************************/
+TCHAR backSlashStr3[] = "\\";
+MailError 
+OpenPOP3Connection (INBOX *box)
+{
+    MemHandle pop3Handle, userHandle, passHandle, acctHandle;
+    char *pop3,*user,*pass,*acct;
+    PathName path;
+    MailError ret;
+    word curAcct;
+    TCHAR buf[MAIL_NAME_MAX*2];
+    TCHAR *mdName;
+
+    /* get Relavent account info */
+    pop3Handle = @call PfAccountList::MSG_ACCOUNT_LIST_GET_POP3();
+    pop3 = MemLock(pop3Handle);
+    userHandle = @call PfAccountList::MSG_ACCOUNT_LIST_GET_USER_ACCOUNT();
+    user = MemLock(userHandle);
+    curAcct = @call PfAccountList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    acctHandle=@call PfAccountList::MSG_ACCOUNT_LIST_GET_ACCOUNT_NAME(curAcct);
+    acct = MemLock(acctHandle);
+    passHandle = @call PfAccountList::MSG_ACCOUNT_LIST_GET_USER_PASSWORD();
+    pass = MemLock(passHandle);
+    /*
+     * if no password specified, prompt the user
+     */
+    if (!pass[0]) {
+	MemFree(passHandle);
+	LockStrings();
+	sprintf(buf, LMemDeref(@enterPasswordStr), user);
+	@call GPPrompt::MSG_VIS_TEXT_REPLACE_ALL_PTR(buf, 0);
+	UnlockStrings();
+	/*
+	 * see if the user already entered a password last time
+	 */
+	passHandle = @call GPPassword::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+	pass = MemLock(passHandle);
+	if (!pass[0]) {
+	    /*
+	     * prompt the user for a password
+	     */
+	    ret = UserDoDialog(@GetPasswordDB);
+	    if (ret != IC_OK) {
+		/*
+		 * if cancel, clear the dialog for next time
+		 */
+		@call GPPassword::MSG_VIS_TEXT_DELETE_ALL();
+		ret = ME_LOGIN_FAILED;
+		goto exitCancel;
+	    }
+	    passHandle = @call GPPassword::MSG_VIS_TEXT_GET_ALL_BLOCK(0);
+	    pass = MemLock(passHandle);
+	}
+    }
+
+    /* create the path for incoming files */
+    mdName = MailLockStdString(MSS_MAIL_DIR);
+    strcpy(path, mdName);
+    MailUnlockStdString(MSS_MAIL_DIR);
+    strcat(path, backSlashStr3);
+    strcat(path, acct);
+
+    ret = MailinOpen(pop3,IB_PROTOCOL_POP3,user,pass,path,box, 1);
+
+exitCancel:
+    MemFree(passHandle);
+    MemFree(pop3Handle);
+    MemFree(userHandle);
+    MemFree(acctHandle);
+    return ret;
+
+}	/* End of OpenPOP3Connection.	*/
+
+
+/***********************************************************************
+ *		CreateOutboxFilePath
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Pass a buffer with length PathName that contains the 
+ *              filename you want to send.  The buffer will be converted
+ *              to a path from PrivateData down to the filename.
+ * CALLED BY:	MSG_MSR_SEND_MESSAGES
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	12/23/98   	Initial Revision
+ *
+ ***********************************************************************/
+void
+CreateOutboxFilePath (char *fileName)
+{
+    MemHandle bufHandle;
+    char *data;
+    PathName tempFileName;
+    word curAcct;
+    TCHAR backSlash[] = "\\";
+    TCHAR *mdName;
+
+    strcpy(tempFileName, fileName);
+
+    /* create a path composed of
+     * [mailDirName]\[mail account name]\[outbox]\[filename]
+     */
+
+    mdName = MailLockStdString(MSS_MAIL_DIR);
+    strcpy(fileName,mdName);
+    MailUnlockStdString(MSS_MAIL_DIR);
+
+    strcat(fileName,backSlash);
+    curAcct = @call PfAccountList::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+    bufHandle=@call PfAccountList::MSG_ACCOUNT_LIST_GET_ACCOUNT_NAME(curAcct);
+    data = MemLock(bufHandle);
+    strcat(fileName,data);
+    MemFree(bufHandle);
+
+    strcat(fileName,backSlash);
+    mdName = MailLockStdString(MSS_OUTBOX_FOLDER);
+    strcat(fileName, mdName);
+    MailUnlockStdString(MSS_OUTBOX_FOLDER);
+
+    strcat(fileName,backSlash);
+    strcat(fileName,tempFileName);
+    
+}	/* End of CreateOutboxFilePath.	*/
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	    SetNewStatus
+ * PASS:            status - optr of status string
+ * RETURN:	    none
+ * DESCRIPTION:
+ *        Set a new status in the dialog and the progress to zero
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *      gene            8/4/99          Initial Revision
+ *
+ ***********************************************************************/
+void
+SetNewStatus(optr status)
+{
+    LockStrings();
+    @call SendReceiveDialog::MSG_MSR_UPDATE_STATUS(LMemDeref(status));
+    UpdateProgress(MakeWWFixed(0), " ", NULL);
+    UnlockStrings();
+}
+
+
+/***********************************************************************
+ *		MSG_MAIL_PROCESS_SEND_RECEIVE_MESSAGES for MailProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	1/08/99   	Initial Revision
+ *
+ ***********************************************************************/
+@method MailProcessClass, MSG_MAIL_PROCESS_SEND_RECEIVE_MESSAGES
+{
+    MailError ret;
+
+    ret = @call oself::MSG_MAIL_PROCESS_SEND_MESSAGES();
+    if (ret == ME_NONE) {
+	@call oself::MSG_MAIL_PROCESS_RECEIVE_MESSAGES();
+    }
+}	/* End of MSG_MAIL_PROCESS_SEND_RECEIVE_MESSAGES.	*/
+
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	    CheckAttachmentsExist
+ * PASS:            filename - ptr to filename (in Outbox)
+ * RETURN:	    TRUE if all attachments exist
+ * DESCRIPTION:
+ *        make sure attachments for a message exist
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	gene     	2/24/99   	Initial Revision
+ *
+ ***********************************************************************/
+
+typedef struct {
+    word CAE_err;
+} CAEStruct;
+
+
+Boolean
+_pascal CheckAttachmentCB(void *el, void *retVal)
+{
+    AttachFilePath *p1 = el;
+    CAEStruct *r1 = retVal;
+    FileHandle fh;
+
+    fh = FileOpen(p1->AFP_full, FILE_ACCESS_R|FILE_DENY_W);
+    if (fh) {
+	FileClose(fh, FALSE);
+    } else {
+	r1->CAE_err = ThreadGetError();
+    }
+    return(r1->CAE_err);
+}
+
+word
+CheckAttachmentsExist(TCHAR *filename)
+{
+    MemHandle mh;
+    FileHandle fileHan;
+    word retVal = TRUE;
+    CAEStruct caes;
+    TCHAR *oboxName;
+
+    FilePushDir();
+    oboxName = MailLockStdString(MSS_OUTBOX_FOLDER);
+    GotoMailDirectory(oboxName);
+    MailUnlockStdString(MSS_OUTBOX_FOLDER);
+    fileHan = FileOpen(filename, FILE_ACCESS_RW|FILE_DENY_W);
+    if (fileHan) {
+	mh = CreateChunkArrayBlock(sizeof(AttachFilePath));
+	ReadAttachments(mh, fileHan);
+	caes.CAE_err = 0;
+	ChunkArrayEnum(ME_FIRST_CHUNK, &caes, CheckAttachmentCB);
+	MemFree(mh);
+	FileClose(fileHan, FALSE);
+	retVal = !caes.CAE_err;
+    } else {
+	retVal = FALSE;
+    }
+    FilePopDir();
+    return(retVal);
+}
+
+
+
+/***********************************************************************
+ *		MSG_MAIL_PROCESS_SEND_MESSAGES for MailProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Call mail library to send the message, then make the 
+ *                  appropriate changes to the message lists.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	1/08/99   	Initial Revision
+ *
+ ***********************************************************************/
+typedef struct {
+    word SMCB_numMsgs;
+    word SMCB_curMsg;
+    word SMCB_vmf;
+    word SMCB_vmbh;
+    optr SMCB_chunkArray;
+    MailError SMCB_retVal;
+} SMCBStruct;
+#define MAX_STATUS_LENGTH 50
+Boolean _pascal SendMailCB(void *el, void*retVal) 
+{
+    OUTBOX obox;
+    OutboxStruct *oboxPtr;
+    word i, numMsgs;
+    TCHAR *fn, *dPtr;
+    MessageListStruct *mls;
+    MessageIndexStruct *mis=(MessageIndexStruct *)el;
+    char statusMsg[MAX_STATUS_LENGTH]; 
+    SMCBStruct *data = retVal;
+    MailError ret = ME_NONE;
+    MailMessage msg;
+    PathName path;
+    MemHandle mh;
+    FileLongName fns;
+    TCHAR *oboxName, *draftsName, *sentName;
+    word usrLevel;
+
+    HugeArrayLock(data->SMCB_vmf, data->SMCB_vmbh, mis->MIS_index,&mls,&i);
+
+    data->SMCB_curMsg += 1;
+    i = data->SMCB_curMsg;
+    numMsgs = data->SMCB_numMsgs;
+
+
+    fn = mls->MLS_filename;
+
+    if (!(@call SendReceiveDialog::MSG_MSR_SHOULD_STOP())) {
+	if (!CheckAttachmentsExist(fn)) {
+	    /*
+	     * one or more of the attachments does not exist.
+	     * see if the user wants to send it anyway
+	     */
+	    if (DoYesNo(@attachNoExistStr, NULL) == IC_NO) {
+		/*
+		 * don't send it; move it to Drafts instead
+		 */
+		oboxName = MailLockStdString(MSS_OUTBOX_FOLDER);
+		draftsName = MailLockStdString(MSS_DRAFTS_FOLDER);
+		MoveMessageFile(fn, oboxName, draftsName, &mh);
+		MailUnlockStdString(MSS_OUTBOX_FOLDER);
+		MailUnlockStdString(MSS_DRAFTS_FOLDER);
+		DeleteMessageListArrayName(MFID_OUTBOX, fn);
+		fn = MemLock(mh);
+		InsertMessageListArray(MFID_DRAFTS, fn);
+		strcpy(fns, fn);
+		fn = fns;
+		MemFree(mh);
+		HugeArrayUnlock(mls);
+		return FALSE;
+	    }
+	}
+	/*
+	 * tell the user we're connecting, then open a connection,
+	 * then tell them which message we're downloading
+	 */
+	LockStrings();
+	sprintf(statusMsg, LMemDeref(@sendProgress), i, numMsgs);
+	@call SendReceiveDialog::MSG_MSR_UPDATE_STATUS(statusMsg);
+	UnlockStrings();
+	ret = OpenSMTPConnection(&obox);
+
+	if (!ret) {
+	    MailMessageInit(&msg);
+	    msg.MM_progressRoutine = (UpdateProgress);
+	    strcpy(path,fn);
+	    CreateOutboxFilePath(path);
+	    ret = MailoutLoadHeader(&msg,path);
+	    if (!ret) {
+		ret = MailoutSendMail(obox, &msg);
+		if (!ret) {
+		    oboxName = MailLockStdString(MSS_OUTBOX_FOLDER);
+		    sentName = MailLockStdString(MSS_SENT_FOLDER);
+		    /*
+		     * move the message to the "Sent" folder if:
+		     * 1. we're at Level 2
+		     * 2. we're at Level 3 and the user wants us to
+		     * (or if CUI_SENT_FOLDER)
+		     */
+		    usrLevel = @call MailAppObj::MSG_MAIL_APP_GET_USER_LEVEL();
+@ifdef CUI_SENT_FOLDER
+		    if ((usrLevel <= UIIL_BEGINNING && (@call PfCUISentFolder::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & OGID_SENT_FOLDER)) || (usrLevel >= UIIL_INTERMEDIATE && (@call PfMessageOptionList::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & MMO_LOG_OUTGOING))) {
+@else
+		    if ((usrLevel == UIIL_BEGINNING) || (usrLevel >= UIIL_INTERMEDIATE && (@call PfMessageOptionList::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & MMO_LOG_OUTGOING))) {
+@endif
+			/*
+			 * if logging outgoing messages,
+			 * move it to the Sent directory
+			 */
+			MoveMessageFile(fn, oboxName, sentName,	&mh);
+			HugeArrayUnlock(mls);
+			mls = NULL;
+			DeleteMessageListArrayNL(data->SMCB_vmf, 
+						 data->SMCB_vmbh,
+						 data->SMCB_chunkArray,
+						 mis->MIS_index);
+			fn = MemLock(mh);
+			InsertMessageListArray(MFID_SENT,fn);
+			MemFree(mh);
+		    } else {
+			/*
+			 * else delete the message file
+			 */
+			FilePushDir();
+			GotoMailDirectory(oboxName);
+			DeleteMessageFile(fn);
+			HugeArrayUnlock(mls);
+			mls = NULL;
+			DeleteMessageListArrayNL(data->SMCB_vmf, 
+						 data->SMCB_vmbh,
+						 data->SMCB_chunkArray,
+						 mis->MIS_index);
+			FilePopDir();
+		    }
+		    MailUnlockStdString(MSS_OUTBOX_FOLDER);
+		    MailUnlockStdString(MSS_SENT_FOLDER);
+		} else {
+		    /* for some reason we failed to send the message
+		     * let the user know what happenned.
+		     */
+		    switch(ret) {
+		    case ME_SOME_BAD_RECIPIENTS:
+			oboxPtr = MemLock(obox);
+			dPtr = MemLock(oboxPtr->OB_errorData);
+			ReportWarning(@warnBadAddress, mls->MLS_subject, dPtr);
+			break;
+		    case ME_NO_RECIPIENTS:
+			ReportWarning(@warnBadAddress2, mls->MLS_subject, NULL);
+			break;
+		    default:
+			goto exitError;
+		    }
+		}
+	    }
+	    if (ret != ME_USER_INTERRUPTED) {
+		MailoutClose(obox);
+	    } else {
+		MailoutCloseFast(obox);
+		data->SMCB_retVal = ret;
+		HugeArrayUnlock(mls);
+		return TRUE;
+	    }
+	} else {
+	    /* we could not open a connection to the smtp server
+	     * so we want to stop now
+	     */
+	exitError:
+	    data->SMCB_retVal = ret;
+	    HugeArrayUnlock(mls);
+	    return TRUE;
+	}
+    } 
+
+    if (mls) {
+	HugeArrayUnlock(mls);
+    }
+    return FALSE;
+}
+
+@method MailProcessClass, MSG_MAIL_PROCESS_SEND_MESSAGES
+{
+    return(@call oself::MSG_MAIL_PROCESS_SEND_MESSAGE_RANGE(0, 0xffff));
+}
+
+
+/***********************************************************************
+ *		MSG_MAIL_PROCESS_SEND_MESSAGE_NOW
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Send passed message, or if multiple messages in
+ *                  outbox, ask user if passed or all should be sent.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	brianc     	6/13/00   	Initial revision
+ *
+ ***********************************************************************/
+
+@ifdef COMPOSE_SEND_NOW
+@method MailProcessClass, MSG_MAIL_PROCESS_SEND_MESSAGE_NOW
+{
+    word numMsgs;
+    MailError ret;
+
+    /* check if multiple messages in Outbox */
+    numMsgs = @call TheFolderList::MSG_FOLDER_LIST_GET_NUM_MESSAGES(MFID_OUTBOX);
+    if (numMsgs > 1) {
+	if (DoYesNo(@composeSendNowMultipleStr, NULL) == IC_YES) {
+	    /* send all in Outbox */
+	    ret = @call oself::MSG_MAIL_PROCESS_SEND_MESSAGES();
+	} else {
+	    /* send only this one */
+	    ret = @call oself::MSG_MAIL_PROCESS_SEND_MESSAGE_RANGE(messageNum, 1);
+	}
+    } else {
+	/* only our new email in Outbox, send it */
+	ret = @call oself::MSG_MAIL_PROCESS_SEND_MESSAGES();
+    }
+    if (ret == ME_NONE) {
+	@call oself::MSG_MAIL_PROCESS_RECEIVE_MESSAGES();
+    }
+}
+@endif
+
+
+/***********************************************************************
+ *		MSG_MAIL_PROCESS_SEND_MESSAGE_RANGE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Call mail library to send the message, then make the 
+ *                  appropriate changes to the message lists.
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	gene     	5/07/00   	Broke out from SEND_MESSAGES
+ *
+ ***********************************************************************/
+
+@method MailProcessClass, MSG_MAIL_PROCESS_SEND_MESSAGE_RANGE
+{
+    VMFileHandle vmf;
+    VMBlockHandle vmbh;
+    optr indexArray;
+    MailError ret = ME_NONE;
+    word numMsgs;
+    Boolean inuse = FALSE;
+
+    SMCBStruct data;
+    
+    if (@call SendReceiveDialog::MSG_MSR_SHOULD_STOP()) {
+	return ret;
+    }
+
+    LockStrings();
+    inuse = GetMessageArrays(MFID_OUTBOX, &vmf, &vmbh, &indexArray);
+    numMsgs = ChunkArrayGetCount(indexArray);
+    if (numMsgs) {
+	SetNewStatus(@sendingStatus);
+    }
+
+    if (count < numMsgs) {
+	numMsgs = count;
+    }
+    data.SMCB_numMsgs = numMsgs;
+    data.SMCB_curMsg = 0;
+    data.SMCB_vmf = vmf;
+    data.SMCB_vmbh = vmbh;
+    data.SMCB_chunkArray = indexArray;
+    data.SMCB_retVal = 0;
+    ChunkArrayEnumRange(indexArray, start, count, &data, SendMailCB);
+
+    UnlockStrings();
+
+    VMUnlock(OptrToHandle(indexArray));
+    if (!inuse) {
+	VMClose(vmf,FALSE);
+    }
+    ThreadReleaseThreadLock(TheMessageListLock);
+    if (numMsgs) {
+	RebuildFolderList(MFID_LEAVE_SELECTION, TRUE);
+    }
+
+    @call SendReceiveDialog::MSG_MSR_DEC_REF_COUNT();
+    /*
+     * if any error, report it
+     */
+    ret = data.SMCB_retVal;
+    if (ret != ME_NONE) {
+	@call SendReceiveDialog::MSG_MSR_REPORT_ERROR(ret);
+@ifdef CONFIRM_EMAIL_SENT
+    } else if (numMsgs) {
+	 ConditionalNotice(@confirmEmailSentText, 0, "noConfirmSentHelp", "dbNewMessage", TRUE);
+@endif
+    }
+
+    return(data.SMCB_retVal);
+}
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	    ReceiveOneMessage
+ * PASS:            ibox - INBOX
+ *                  i - zero-based message number
+ * RETURN:	    MailError - ME_NONE if none
+ *                  *warnLevel - 
+ * DESCRIPTION:
+ *        Download one message
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *      gene            2/23/00         broke out from MSG_MAIL_PROCESS_...
+ *
+ ***********************************************************************/
+
+@ifdef DELETE_MAIL_AFTER_CRASH
+
+const StandardDialog2ResponseTriggerTable deleteMessTrigs = {
+    2,
+    {@deleteMessMoniker, IC_YES}, \
+    {@downloadMessMoniker, IC_NO} \
+};
+
+@endif
+
+MailError
+ReceiveOneMessage(INBOX ibox, word i, word count, word *downCount, word *warnLevel)
+{
+    MailMessage msg;
+    TCHAR statusMsg[MAX_STATUS_LENGTH]; 
+    TCHAR *fileName;
+    MailError ret;
+    dword msize;
+    MailUIDL uidl;
+
+    /*
+     * init and get the size and UIDL
+     */
+    *warnLevel = 0;
+
+    MailMessageInit(&msg);
+    msg.MM_progressRoutine = (UpdateProgress);
+    MailinGetMessageSize(ibox, i, &msize);
+    if (msize == 0) {
+	return(ME_NONE);
+    }
+    msg.MM_size = msize;
+    ret = MailinGetUIDL(ibox, i, uidl);
+    if (ret == ME_UIDL_NOT_SUPPORTED) {
+        EC_WARNING(MAIL_UIDL_NOT_SUPPORTED);
+	goto getMessage;
+    }
+
+    /*
+     * delete the message if DELETE_MAIL_AFTER_CRASH and we crashed
+     * and the user really wants to
+     */
+@ifdef DELETE_MAIL_AFTER_CRASH
+    if (UIDLCheckFlag(MOSS_DELETE_FROM_SERVER, uidl)) {
+	if (DoCustomDB(@deleteMessStr, NULL, &deleteMessTrigs) == IC_YES) {
+	    EC_WARNING(MAIL_MESSAGE_DELETED_AFTER_CRASH);
+	    MailinMessageDelete(ibox, i);
+	    UIDLDeleteEntry(uidl);
+	    return(ME_NONE);
+	} else {
+	    goto getMessage;
+	}
+    }
+@endif
+
+@ifdef LEAVE_MAIL_ON_SERVER
+    /*
+     * if the message has already been downloaded, don't do it again
+     */
+    if (UIDLCheckFlag(MOSS_ON_SERVER, uidl)) {
+	return(ME_NONE);
+    }
+@endif
+
+@ifdef DELETE_MAIL_AFTER_CRASH
+    /*
+     * if deleting mail after a crash, mark this
+     * message as needing deletion in case we do crash
+     */
+    UIDLSetFlag(MOSS_DELETE_FROM_SERVER, uidl, TRUE);
+@endif
+
+    /*
+     * get the message
+     */
+getMessage:
+    UpdateProgress(MakeWWFixed(0), NULL, NULL);
+    LockStrings();
+    sprintf(statusMsg, LMemDeref(@receiveProgress), i+1, count);
+    @call SendReceiveDialog::MSG_MSR_UPDATE_STATUS(statusMsg);
+    UnlockStrings();
+
+    ret = MailinGetMessage(ibox,i,&msg);
+    if (ret) {
+@ifdef DELETE_MAIL_AFTER_CRASH
+        /*
+	 * if the user interrupted, don't delete the message from the server
+	 */
+	if (ret == ME_USER_INTERRUPTED) {
+	    UIDLDeleteEntry(uidl);
+	}
+@endif
+	return(ret);
+    }
+
+    /*
+     * one more message actually downloaded
+     */
+    (*downCount)++;
+
+    /*
+     * record the message in our cache
+     */
+    MemLock(msg.MM_storageBlock);
+    fileName = LMemDeref(ConstructOptr(msg.MM_storageBlock, msg.MM_fileName));
+    *warnLevel = InsertMessageListArray(MFID_INBOX,fileName);
+    MemUnlock(msg.MM_storageBlock);
+
+@ifdef LEAVE_MAIL_ON_SERVER
+    /*
+     * delete the message from the server if appropriate
+     */
+    if (@call PfCheckMailOptions::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS() & MCO_LEAVE_ON_SERVER) {
+	/*
+	 * add the message to the "left on server" list
+	 */
+	UIDLSetFlag(MOSS_ON_SERVER, uidl, TRUE);
+    } else {
+	MailinMessageDelete(ibox, i);
+	MailMessageClose(&msg);
+    }
+@else
+
+    /*
+     * delete the message from the server
+     */
+    MailinMessageDelete(ibox, i);
+    MailMessageClose(&msg);
+
+@ifdef DELETE_MAIL_AFTER_CRASH
+    /*
+     * successfully downloaded message, don't need to delete again
+     */
+    UIDLDeleteEntry(uidl);
+@endif // DELETE_MAIL_AFTER_CRASH
+
+@endif // LEAVE_MAIL_ON_SERVER
+
+    return(ME_NONE);
+}
+
+@ifdef LEAVE_MAIL_ON_SERVER
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	    DeleteOneMessage
+ * PASS:            ibox - INBOX
+ *                  i - zero-based message number
+ * RETURN:	    MailError - ME_NONE if none
+ *                  *warnLevel - 
+ * DESCRIPTION:
+ *        Download one message
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *      gene            2/25/00         Initial Revision
+ *
+ ***********************************************************************/
+
+MailError
+DeleteOneMessage(INBOX ibox, word i)
+{
+    TCHAR statusMsg[MAX_STATUS_LENGTH]; 
+    MailError ret = ME_NONE;
+    MailUIDL uidl;
+
+    ret = MailinGetUIDL(ibox, i, &uidl);
+    if (ret == ME_UIDL_NOT_SUPPORTED) {
+	goto exitError;
+    }
+
+    if (UIDLCheckFlag(MOSS_DELETE_FROM_SERVER, uidl)) {
+	/*
+	 * update the progress
+	 */
+	LockStrings();
+	sprintf(statusMsg, LMemDeref(@deleteProgress), i+1);
+	UpdateProgress(MakeWWFixed(0), statusMsg, NULL);
+	UnlockStrings();
+	/*
+	 * delete the message and the entry
+	 */
+	MailinMessageDelete(ibox, i);
+	UIDLDeleteEntry(uidl);
+    }
+
+exitError:
+    return(ret);
+}
+
+@endif
+
+
+/***********************************************************************
+ *		MSG_MAIL_PROCESS_RECEIVE_MESSAGES for MailProcessClass
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    
+ * PARAMETERS:	    
+ * SIDE EFFECTS:    
+ *
+ * STRATEGY:
+ *
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	1/08/99   	Initial Revision
+ *
+ ***********************************************************************/
+@method MailProcessClass, MSG_MAIL_PROCESS_RECEIVE_MESSAGES
+{
+    INBOX ibox;
+    MailError ret = ME_NONE;
+    word count, downCount, i, opts;
+    Boolean warnLevel;
+@ifdef RECEIVE_NOTIFY_OPTIONS
+    GeodeHandle geodeHan;
+    EventHandle eventHan;
+    GenGupFieldInfo fieldInfo;
+@endif
+
+    if (@call SendReceiveDialog::MSG_MSR_SHOULD_STOP()) {
+	return ret;
+    }
+
+    /* update the status dialog to let the user know we are now receiving
+     * mail
+     */
+    SetNewStatus(@connectingStatus);
+    ret = OpenPOP3Connection(&ibox);
+    SetNewStatus(@checkMailStatus);
+
+
+    if (ret == ME_NONE) {
+	MemLock(ibox);
+	MemUnlock(ibox);
+	ret = MailinGetMessageCount(ibox, &count);
+	for (i = 0, downCount = 0; i < count; ++i) {
+	    if (!(@call SendReceiveDialog::MSG_MSR_SHOULD_STOP())) {
+		ret = ReceiveOneMessage(ibox, i, count, &downCount,
+					&warnLevel);
+		if (ret != ME_NONE || warnLevel) {
+		    break;
+		} else {
+		    downCount++;
+		}
+	    }
+	}
+
+	if (ret == ME_NONE) {
+@ifdef LEAVE_MAIL_ON_SERVER
+            /*
+	     * check for messages on the server we can delete
+	     * we do this in a separate pass so that we if any messages
+	     * are still in our list afterwards, we can clean up the
+	     * list
+	     */
+            if (UIDLHasEntries() && count) {
+		LockStrings();
+		@call SendReceiveDialog::MSG_MSR_UPDATE_STATUS(LMemDeref(@deleteStatus));
+		UnlockStrings();
+		for (i = 0; i < count; i++) {
+		    if (!(@call SendReceiveDialog::MSG_MSR_SHOULD_STOP())) {
+			ret = DeleteOneMessage(ibox, i);
+			if (ret != ME_NONE) {
+			    break;
+			}
+		    }
+		}
+		/*
+		 * remove any entries that are still marked as on the server
+		 */
+		UIDLClean();
+	    }
+@endif
+	    MailinClose(ibox);
+	} else {
+	    /* we don't want to wait around for the 
+	     * other side to finish sending the mail 
+	     * before we close the connection
+	     */
+	    MailinCloseFast(ibox);
+	}
+    }
+
+    @call SendReceiveDialog::MSG_MSR_DEC_REF_COUNT();
+    /*
+     * if any error, report it
+     */
+    if (ret != ME_NONE) {
+	@call SendReceiveDialog::MSG_MSR_REPORT_ERROR(ret);
+	/*
+	 * rescan if we've download any messages
+	 */
+	if (downCount) {
+	    RebuildFolderList(MFID_LEAVE_SELECTION, TRUE);
+	}
+    } else {
+@ifdef RECEIVE_NOTIFY_OPTIONS
+        opts = @call PfNotifyOptionsList::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS();
+@else
+        opts = MAO_NOTIFY_SELECT_INBOX;
+@endif
+	/*
+	 * rebuild the folder list, and set the selection
+	 * to the Inbox so the user can see messages that arrived
+	 */
+	if (downCount) {
+	    if (opts & MAO_NOTIFY_SELECT_INBOX) {
+		/* at Level 1, make sure we are showing the main screen,
+		   before rescanning the inbox (we can't easily jump to the
+		   inbox, depending on where we are (i.e. drafts, outbox) */
+		/* if already at inbox, leave alone */
+		if ((@call application::MSG_MAIL_APP_GET_USER_LEVEL() == UIIL_INTRODUCTORY) && (@call TheFolderList::MSG_GEN_ITEM_GROUP_GET_SELECTION() != MFID_INBOX)) {
+		    @call TheFolderList::MSG_FOLDER_LIST_CUI_BACK();
+		    /* (maybe we can...) */
+		    /* no, stay at main screen, as too much visible jumping
+		       around, and possibly confusing to jump from one folder
+		       to another, without going to main screen first */
+		    /*@call TheFolderList::MSG_FOLDER_LIST_CUI_READ_EMAIL();*/
+		}
+		RebuildFolderList(MFID_INBOX, TRUE);
+		@call TheMessageList::MSG_MAIL_LIST_RESET_SELECTION(-2);
+	    } else {
+		RebuildFolderList(MFID_LEAVE_SELECTION, TRUE);
+	    }
+	}
+@ifdef RECEIVE_NOTIFY_OPTIONS
+        /*
+	 * notify the user however they requested
+	 */
+        if (opts & MAO_NOTIFY_BRING_TO_TOP) {
+	    if (downCount) {
+		@call MailAppObj::MSG_GEN_GUP_QUERY_FOR_FIELD(&fieldInfo,
+							      GUQT_FIELD);
+		geodeHan = GeodeGetProcessHandle();
+		eventHan = @record null::MSG_GEN_SYSTEM_BRING_GEODE_TO_TOP(
+		    geodeHan,
+		    geodeHan,
+		    fieldInfo.GGFI_window);
+		@call MailAppObj::MSG_GEN_CALL_SYSTEM(eventHan);
+		@call MailAppObj::MSG_META_NOTIFY_TASK_SELECTED();
+	    }
+
+	}
+        if (opts & MAO_NOTIFY_WITH_DIALOG) {
+	    if (downCount) {
+		ReportOK(@newMailStr, NULL);
+	    } else {
+		ReportOK(@noNewMailStr, NULL);
+	    }
+	}
+@endif
+@ifdef SIMPLE_RECEIVE_NONE_NOTIFY
+       if (downCount == 0) {
+	   ReportOK(@noNewMailStr, NULL);
+       }
+@endif
+    }
+    return ret;
+}	/* End of MSG_MAIL_PROCESS_RECEIVE_MESSAGES.	*/

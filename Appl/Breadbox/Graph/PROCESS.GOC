@@ -1,0 +1,1031 @@
+/********************************************************************
+ *
+ * Copyright (C) 1996 Blue Marsh Softworks -- All Rights Reserved.
+ *
+ * PROJECT:      COMP 413 Software Engineering Project
+ * MODULE:       Process Methods
+ * FILE:         process.goc
+ *
+ * AUTHOR:       Nathan Fiedler
+ *
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      03/07/96  Initial version
+ *
+ * DESCRIPTION:
+ *      These are the function definitions and method definitions
+ *      for the process object.
+ *
+ *******************************************************************/
+
+/********************************************************************
+ *                 Headers
+ *******************************************************************/
+    @include <stdapp.goh>
+    @include <objects/gviewcc.goh> /* GenViewControl */
+    #include "graph.h"             /* Ken's header file */
+    @include "app.goh"             /* Includes classes and constants. */
+    @include "global.goh"          /* Must be after app.goh. Includes
+                                    * globals, objects, prototypes. */
+    #include <stdio.h>             /* For sprintf */
+    #include <stdlib.h>            /* For atoi */
+    #include <math.h>              /* For atan */
+
+/********************************************************************
+ *                 Local Constants
+ *******************************************************************/
+    #define M_PI 3.141592654
+
+/********************************************************************
+ *                 Function Definitions
+ *******************************************************************/
+
+/********************************************************************
+ *                 CreateGState
+ ********************************************************************
+ * SYNOPSIS:     Create the graphics state to draw to.
+ * PARAMETERS:   none
+ * RETURNS:      nothing
+ * STRATEGY:     Use the global window handle and create a gstate
+ *               with GrCreateState.
+ * ERRORS:       Nothing to check
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      04/23/96  Initial version
+ *******************************************************************/
+void CreateGState
+  (
+  void
+  )
+{
+
+  gstate_g = GrCreateState( winHan_g );
+} /* CreateGState */
+
+/********************************************************************
+ *                 DestroyGState
+ ********************************************************************
+ * SYNOPSIS:     Destroy the global graphics state.
+ * PARAMETERS:   none
+ * RETURNS:      nothing
+ * STRATEGY:     Call GrDestroyState and null out the handle.
+ * ERRORS:       Nothing to check
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      04/23/96  Initial version
+ *******************************************************************/
+void DestroyGState
+  (
+  void
+  )
+{
+
+  GrDestroyState( gstate_g );
+  gstate_g = NullHandle;
+} /* DestroyGState */
+
+/********************************************************************
+ *                 drawLine
+ ********************************************************************
+ * SYNOPSIS:     Draw an edge on the screen, given the two endpoints.
+ * PARAMETERS:   x1 - X position of first endpoint
+ *               y1 - Y position of first endpoint
+ *               x2 - X position of second endpoint
+ *               y2 - Y position of second endpoint
+ *               es - State of the edge to draw
+ *               c - Color to draw edge in
+ *               cost - Cost of edge (if <0 will not be drawn)
+ * RETURNS:      nothing
+ * STRATEGY:     Call GrSetLineColor using c, then call GrDrawLine
+ *               using x1, y1, x2, and y2. If the edge is directed
+ *               draw a polygon for the arrow and rotate it to
+ *               make the angle of the edge.
+ * ERRORS:       Checks for divide by zero.
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      03/07/96  Initial version
+ *       NF      04/20/96  Combined drawLine and drawDirectedLine
+ *       NF      04/22/96  Translate to x2,y2; rotate; draw
+ *******************************************************************/
+void drawLine
+  (
+  int x1,
+  int y1,
+  int x2,
+  int y2,
+  EdgeState es,
+  ElementColor c,
+  Cost cost
+  )
+{
+  double angle;
+  Point  arrow[3];
+  sword  fTextX;
+  sword  fTextY;
+  char   achEdgeCost[5];
+
+  if ( es & ES_SELECTED ) {
+    GrSetLineColor( gstate_g, CF_INDEX, C_SELECTED, 0, 0 );
+  }
+  else {
+    GrSetLineColor( gstate_g, CF_INDEX, c, 0, 0 );
+  }
+  GrSetLineWidth( gstate_g, MakeWWFixed( EDGE_THICKNESS ) );
+  GrDrawLine( gstate_g, x1, y1, x2, y2 );
+  if ( es & ES_DIRECTED ) {
+    angle = (double)abs( y1 - y2 );
+    if ( x1 != x2 ) {
+      angle /= (double)abs( x1 - x2 );
+    }
+    angle = atan( angle ) * 180 / M_PI;
+    if ( ( x1 > x2 ) && ( y1 >= y2 ) ) {
+      angle = 90 - angle;
+    }
+    else {
+      if ( ( x1 >= x2 ) && ( y1 < y2 ) ) {
+        angle += 90;
+      }
+      else {
+        if ( ( x1 < x2 ) && ( y1 <= y2 ) ) {
+          angle = 270 - angle;
+        }
+        else {
+          if ( ( x1 <= x2 ) && ( y1 > y2 ) ) {
+            angle += 270;
+          }
+        }
+      }
+    }
+    GrSaveState( gstate_g );
+    GrApplyTranslation( gstate_g, MakeWWFixed( x2 ), MakeWWFixed( y2 ) );
+    GrApplyRotation( gstate_g, MakeWWFixed( angle ) );
+    arrow[0].P_x = 0;
+    arrow[0].P_y = VERTEX_RADIUS;
+    arrow[1].P_x = -( EDGE_ARROW_WIDTH / 2 );
+    arrow[1].P_y = EDGE_ARROW_HEIGHT + VERTEX_RADIUS;
+    arrow[2].P_x = EDGE_ARROW_WIDTH / 2;
+    arrow[2].P_y = EDGE_ARROW_HEIGHT + VERTEX_RADIUS;
+    GrDrawPolygon( gstate_g, &arrow[0], 3 );
+    GrRestoreState( gstate_g );
+    sprintf( achEdgeCost, "%d", cost );
+    if ( x1 < x2 ) {
+      fTextX = x1 + ( (float)abs( x1 - x2 ) / 2 );
+    }
+    else {
+      fTextX = x2 + ( (float)abs( x1 - x2 ) / 2 );
+    }
+    if ( y1 < y2 ) {
+      fTextY = y1 + ( (float)abs( y1 - y2 ) / 2 );
+    }
+    else {
+      fTextY = y2 + ( (float)abs( y1 - y2 ) / 2 );
+    }
+    GrSaveState( gstate_g );
+    GrDrawText( gstate_g, fTextX, fTextY, achEdgeCost, 0 );
+    GrRestoreState( gstate_g );
+  }
+} /* drawLine */
+
+/********************************************************************
+ *                 drawNode
+ ********************************************************************
+ * SYNOPSIS:     Draw vertex on screen, given the coordinates.
+ * PARAMETERS:   x - X position of node
+ *               y - Y position of node
+ *               c - Color to draw node in
+ *               s - State of the node to draw
+ *               n - Vertex number (If <0 it will not be drawn)
+ * RETURNS:      nothing
+ * STRATEGY:     Call GrSetLineColor using c, then call GrDrawEllipse,
+ *               using x and y.
+ * ERRORS:       Nothing to check.
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      03/07/96  Initial version
+ *******************************************************************/
+void drawNode
+  (
+  int          x,
+  int          y,
+  ElementColor c,
+  VertexState  s,
+  int          n
+  )
+{
+  char achVertexNumber[3];
+
+  GrSetLineWidth( gstate_g, MakeWWFixed( EDGE_THICKNESS ) );
+  if ( s & VS_SELECTED ) {
+    GrSetAreaColor( gstate_g, CF_INDEX, c, 0, 0 );
+    GrSetTextColor( gstate_g, CF_INDEX, C_WHITE, 0, 0 );
+    GrFillEllipse( gstate_g,
+                   x - VERTEX_RADIUS, y - VERTEX_RADIUS,
+                   x + VERTEX_RADIUS, y + VERTEX_RADIUS );
+  }
+  else {
+    GrSetAreaColor( gstate_g, CF_INDEX, C_WHITE, 0, 0 );
+    GrSetTextColor( gstate_g, CF_INDEX, C_BLACK, 0, 0 );
+    GrFillEllipse( gstate_g,
+                   x - VERTEX_RADIUS, y - VERTEX_RADIUS,
+                   x + VERTEX_RADIUS, y + VERTEX_RADIUS );
+    GrSetLineColor( gstate_g, CF_INDEX, c, 0, 0 );
+    GrDrawEllipse( gstate_g,
+                   x - VERTEX_RADIUS, y - VERTEX_RADIUS,
+                   x + VERTEX_RADIUS, y + VERTEX_RADIUS );
+  }
+  if ( n >= 0 ) {
+    sprintf( achVertexNumber, "%d", n );
+    GrDrawText( gstate_g,
+                x - ( VERTEX_RADIUS / 2 ),
+                y - ( VERTEX_RADIUS / 2 ), achVertexNumber, 0 );
+  }
+} /* drawNode */
+
+/********************************************************************
+ *                 ErrorMessage
+ ********************************************************************
+ * SYNOPSIS:     Displays an error message.
+ * PARAMETERS:   errorString - Message to be displayed (in)
+ * RETURNS:      nothing
+ * STRATEGY:     Call UserStandardDialog.
+ * ERRORS:       Nothing to check.
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      03/07/96  Initial version
+ *******************************************************************/
+void ErrorMessage
+  (
+  unsigned char * errorString
+  )
+{
+
+     /*
+      * Display dialog explaining error. Offer a help context
+      * ('fault') so user knows what to do next.
+      */
+  UserStandardDialog( "fault", (char*)0, (char*)0, (char*)0,
+                      errorString,
+                      ( ( CDT_ERROR <<
+                          CDBF_DIALOG_TYPE_OFFSET ) |
+                        ( GIT_NOTIFICATION <<
+                          CDBF_INTERACTION_TYPE_OFFSET ) ) );
+} /* ErrorMessage */
+
+/********************************************************************
+ *                 FileReadEOL
+ ********************************************************************
+ * SYNOPSIS:     Skip to end-of-line in the given file.
+ * PARAMETERS:   fileHan - Handle of the file to read (in)
+ * RETURNS:      nothing
+ * STRATEGY:     Call FileRead and read in one character at a time
+ *               until the end of line is reached.
+ * ERRORS:       Nothing to check.
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      04/22/96  Initial version
+ *******************************************************************/
+void FileReadEOL
+  (
+  unsigned fileHan
+  )
+{
+  char buf;
+
+  if ( fileHan != NullHandle ) {
+    buf = '\0';
+    while ( ( (int)FileRead( fileHan, &buf, 1, FALSE ) > 0 ) &&
+            ( buf != 10 ) ) {
+    }
+  }
+} /* FileReadEOL */
+
+/********************************************************************
+ *                 FileReadInt
+ ********************************************************************
+ * SYNOPSIS:     Read an integer from the given file.
+ * PARAMETERS:   fileHan - Handle of the file to read (in)
+ * RETURNS:      Integer read from file
+ * STRATEGY:     Call FileRead and read in exactly 6 characters.
+ *               Then turn this into an integer and return it. The
+ *               number must be stored in left-justified format,
+ *               otherwise the LocalAsciiToFixed will not work.
+ * ERRORS:       Nothing to check.
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      03/07/96  Initial version
+ *******************************************************************/
+unsigned FileReadInt
+  (
+  unsigned fileHan
+  )
+{
+  char buf[7];
+
+  if ( fileHan != NullHandle ) {
+    if ( (int)FileRead( fileHan, &buf, 6, FALSE ) > 0 ) {
+      buf[6] = '\0';
+      return( atoi( buf ) );
+    }
+    else {
+      return( 0 );
+    }
+  }
+  else {
+    return( 0 );
+  }
+} /* FileReadInt */
+
+/********************************************************************
+ *                 FileWriteEOL
+ ********************************************************************
+ * SYNOPSIS:     Write an end-of-line character to the given file.
+ * PARAMETERS:   fileHan - Handle of the file to write to (in)
+ * RETURNS:      nothing
+ * STRATEGY:     Write out an EOL character to the file.
+ * ERRORS:       Nothing to check.
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      04/22/96  Initial version
+ *******************************************************************/
+void FileWriteEOL
+  (
+  unsigned fileHan
+  )
+{
+  char buf[2];
+
+  if ( fileHan != NullHandle ) {
+    buf[0] = 13;
+    buf[1] = 10;
+    FileWrite( fileHan, &buf, 2, FALSE );
+  }
+} /* FileWriteEOL */
+
+/********************************************************************
+ *                 FileWriteInt
+ ********************************************************************
+ * SYNOPSIS:     Write an integer to the given file.
+ * PARAMETERS:   fileHan - Handle of the file to write to (in)
+ *               i - Integer to write out (in)
+ * RETURNS:      nothing
+ * STRATEGY:     Turn the integer into a string of six characters
+ *               and call FileWrite and write it out. The string
+ *               must be left justified so the read will work
+ *               correctly.
+ * ERRORS:       Nothing to check.
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      03/07/96  Initial version
+ *******************************************************************/
+void FileWriteInt
+  (
+  unsigned     fileHan,
+  unsigned int i
+  )
+{
+  char buf[7];
+
+  if ( fileHan != NullHandle ) {
+    sprintf( buf, "%-6u", i );
+    FileWrite( fileHan, &buf, 6, FALSE );
+  }
+} /* FileWriteInt */
+
+/********************************************************************
+ *                 TimeGetMinSec
+ ********************************************************************
+ * SYNOPSIS:     Return a dword that represents the current minutes
+ *               and seconds.
+ * PARAMETERS:   none
+ * RETURNS:      Minutes in high word and seconds in low word.
+ * STRATEGY:     Use TimerGetDateAndTime and make a long out of
+ *               it so the BetterRandom can use it to randomize
+ *               its seed value.
+ * ERRORS:       Nothing to check.
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      03/07/96  Initial version
+ *******************************************************************/
+long TimeGetMinSec
+  (
+  void
+  )
+{
+  TimerDateAndTime timedate;
+
+  TimerGetDateAndTime( &timedate );
+  return( timedate.TDAT_minutes << 16 | timedate.TDAT_seconds );
+} /* TimeGetMinSec */
+
+/********************************************************************
+ *                 Code for GProcessClass
+ *******************************************************************/
+
+/********************************************************************
+ *                 MSG_META_SAVE_OPTIONS
+ ********************************************************************
+ * SYNOPSIS:     Tells application to save configuration.
+ * CALLED BY:    GSaveOptsTrigger
+ * PARAMETERS:   none
+ * RETURNS:      nothing
+ * STRATEGY:     Call GenApplication to save it's options and then
+ *               call superclass.
+ * ERRORS:       Nothing to check.
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      03/07/96  Initial version
+ *******************************************************************/
+@extern method GProcessClass, MSG_META_SAVE_OPTIONS {
+
+     /* Make sure other options are saved, too. */
+  @send application::MSG_META_SAVE_OPTIONS();
+
+  @callsuper();
+} /* MSG_META_SAVE_OPTIONS */
+
+/********************************************************************
+ *                 MSG_G_PROCESS_VERTEX_ADD
+ ********************************************************************
+ * SYNOPSIS:     Lets user add another vertex to the graph.
+ * CALLED BY:    GVertexAddTrigger
+ * PARAMETERS:   none
+ * RETURNS:      nothing
+ * STRATEGY:     Bring up a dialog with two GenValues in it, then
+ *               grab values from them and call AMAddVertex. Force
+ *               Screen to draw and mark document dirty. Do this
+ *               over and over until the user clicks on Cancel.
+ * ERRORS:       Nothing to check.
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      03/07/96  Initial version
+ *******************************************************************/
+@extern method GProcessClass, MSG_G_PROCESS_VERTEX_ADD {
+  Point_t newPt;
+
+  if ( UserDoDialog( @GAddVertexBox ) == IC_OK ) {
+    newPt.P_x = IntegerOf( @call GAddVertexXValue::
+                    MSG_GEN_VALUE_GET_VALUE() );
+    newPt.P_y = IntegerOf( @call GAddVertexYValue::
+                    MSG_GEN_VALUE_GET_VALUE() );
+    AMAddVertex( newPt );
+    @send GViewControl::MSG_GVC_REDRAW();
+    @send GDocumentGroup::MSG_GEN_DOCUMENT_GROUP_MARK_DIRTY_BY_FILE(
+              fileHan_g );
+  }
+} /* MSG_G_PROCESS_VERTEX_ADD */
+
+/********************************************************************
+ *                 MSG_G_PROCESS_VERTEX_REMOVE
+ ********************************************************************
+ * SYNOPSIS:     Lets user remove a vertex from the graph.
+ * CALLED BY:    GVertexRemoveTrigger
+ * PARAMETERS:   none
+ * RETURNS:      nothing
+ * STRATEGY:     Get the list of selected vertices and call the
+ *               routine to remove them. Force a redraw and mark
+ *               the document dirty.
+ * ERRORS:       Won't remove if no vertices are selected.
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      03/07/96  Initial version
+ *******************************************************************/
+@extern method GProcessClass, MSG_G_PROCESS_VERTEX_REMOVE {
+  MemHandle       vlist;
+  VertexNumList * vlistPtr;
+  VertexNumber    i;
+
+  vlist = MemAlloc( sizeof( VertexNumList ), 0, 0 );
+  vlistPtr = (VertexNumList*)MemLock( vlist );
+  AMGetSelectedVertices( vlistPtr );
+  for ( i = 0; i < vlistPtr->VNL_count; i++ ) {
+    VertexNumListRemoveNumber( &verticesSelected_g,
+                               vlistPtr->VNL_vertices[i] );
+  }
+  if ( vlistPtr->VNL_count ) {
+    AMRemoveVertexList( vlistPtr );
+    @send GViewControl::MSG_GVC_REDRAW();
+    @send GDocumentGroup::MSG_GEN_DOCUMENT_GROUP_MARK_DIRTY_BY_FILE(
+              fileHan_g );
+  }
+  MemFree( vlist );
+} /* MSG_G_PROCESS_VERTEX_REMOVE */
+
+/********************************************************************
+ *                 MSG_G_PROCESS_VERTEX_RANDOM
+ ********************************************************************
+ * SYNOPSIS:     Create some random vertices.
+ * CALLED BY:    GVertexRandomTrigger
+ * PARAMETERS:   none
+ * RETURNS:      nothing
+ * STRATEGY:     Bring up a dialog asking how many vertices to create,
+ *               then call function to create the specified
+ *               number of random vertices. Force a redraw and
+ *               mark the document dirty.
+ * ERRORS:       Nothing to check.
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      03/07/96  Initial version
+ *******************************************************************/
+@extern method GProcessClass, MSG_G_PROCESS_VERTEX_RANDOM {
+  WWFixedAsDWord n;
+
+  n = MakeWWFixed( VERTEX_MAX_COUNT - theGraph.AM_vertexCount );
+  @call GPromptForNValue::MSG_GEN_VALUE_SET_MAXIMUM( n );
+  if ( UserDoDialog( @GPromptForNBox ) == IC_OK ) {
+    n = @call GPromptForNValue::MSG_GEN_VALUE_GET_VALUE();
+    AMGenerateRandomVertices( IntegerOf( n ) );
+    @send GViewControl::MSG_GVC_REDRAW();
+    @send GDocumentGroup::MSG_GEN_DOCUMENT_GROUP_MARK_DIRTY_BY_FILE(
+              fileHan_g );
+  }
+} /* MSG_G_PROCESS_VERTEX_RANDOM */
+
+/********************************************************************
+ *                 MSG_G_PROCESS_VERTEX_SELECT_ALL
+ ********************************************************************
+ * SYNOPSIS:     Select all the vertices.
+ * CALLED BY:    GVertexSelectTrigger
+ * PARAMETERS:   none
+ * RETURNS:      nothing
+ * STRATEGY:     Call the AMSelectAllVertices function, then cause
+ *               the view to redraw.
+ * ERRORS:       Nothing to check.
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      03/07/96  Initial version
+ *******************************************************************/
+@extern method GProcessClass, MSG_G_PROCESS_VERTEX_SELECT_ALL {
+
+  AMSelectAllVertices();
+  verticesSelected_g.VNL_count = 0;
+  @send GViewControl::MSG_GVC_REDRAW();
+} /* MSG_G_PROCESS_VERTEX_SELECT_ALL */
+
+/********************************************************************
+ *                 MSG_G_PROCESS_VERTEX_UNSELECT_ALL
+ ********************************************************************
+ * SYNOPSIS:     Unselect all the vertices.
+ * CALLED BY:    GVertexUnselectTrigger
+ * PARAMETERS:   none
+ * RETURNS:      nothing
+ * STRATEGY:     Call the AMUnselectAllVertices function, then cause
+ *               the view to redraw.
+ * ERRORS:       Nothing to check.
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      03/07/96  Initial version
+ *******************************************************************/
+@extern method GProcessClass, MSG_G_PROCESS_VERTEX_UNSELECT_ALL {
+
+  AMUnselectAllVertices();
+  verticesSelected_g.VNL_count = 0;
+  @send GViewControl::MSG_GVC_REDRAW();
+} /* MSG_G_PROCESS_VERTEX_UNSELECT_ALL */
+
+/********************************************************************
+ *                 MSG_G_PROCESS_EDGE_ADD
+ ********************************************************************
+ * SYNOPSIS:     Lets user add another edge to the graph.
+ * CALLED BY:    GEdgeAddTrigger
+ * PARAMETERS:   none
+ * RETURNS:      nothing
+ * STRATEGY:     Call the function to add an edge between every
+ *               pair of selected vertices. Force a redraw and
+ *               mark the document dirty.
+ * ERRORS:       Nothing to check.
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      03/07/96  Initial version
+ *******************************************************************/
+@extern method GProcessClass, MSG_G_PROCESS_EDGE_ADD {
+
+  AMMakeSelectedComplete();
+  @send GViewControl::MSG_GVC_REDRAW();
+  @send GDocumentGroup::MSG_GEN_DOCUMENT_GROUP_MARK_DIRTY_BY_FILE(
+            fileHan_g );
+} /* MSG_G_PROCESS_EDGE_ADD */
+
+/********************************************************************
+ *                 MSG_G_PROCESS_EDGE_REMOVE
+ ********************************************************************
+ * SYNOPSIS:     Removes an edge from the graph.
+ * CALLED BY:    GEdgeRemoveTrigger
+ * PARAMETERS:   none
+ * RETURNS:      nothing
+ * STRATEGY:     See if there are two vertices selected, if so,
+ *               remove the edge between them. Force a redraw and
+ *               mark the document dirty.
+ * ERRORS:       Will not remove if no edges are selected.
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      03/07/96  Initial version
+ *******************************************************************/
+@extern method GProcessClass, MSG_G_PROCESS_EDGE_REMOVE {
+  MemHandle     elist;
+  EdgeNumList * elistPtr;
+
+  elist = MemAlloc( sizeof( EdgeNumList ), 0, 0 );
+  elistPtr = (EdgeNumList*)MemLock( elist );
+  AMGetSelectedEdges( elistPtr );
+  if ( elistPtr->ENL_count ) {
+    AMRemoveEdgeList( elistPtr );
+    @send GViewControl::MSG_GVC_REDRAW();
+    @send GDocumentGroup::MSG_GEN_DOCUMENT_GROUP_MARK_DIRTY_BY_FILE(
+              fileHan_g );
+  }
+  MemFree( elist );
+} /* MSG_G_PROCESS_EDGE_REMOVE */
+
+/********************************************************************
+ *                 MSG_G_PROCESS_EDGE_RANDOM
+ ********************************************************************
+ * SYNOPSIS:     Creates some random edges.
+ * CALLED BY:    GEdgeRandomTrigger
+ * PARAMETERS:   none
+ * RETURNS:      nothing
+ * STRATEGY:     Prompt for the number of edges to create, then
+ *               call the function to create that many random edges.
+ *               Force a redraw and mark the document dirty.
+ * ERRORS:       Nothing to check.
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      04/24/96  Initial version
+ *******************************************************************/
+@extern method GProcessClass, MSG_G_PROCESS_EDGE_RANDOM {
+  WWFixedAsDWord n;
+
+  if ( UserDoDialog( @GPromptForNBox ) == IC_OK ) {
+    n = @call GPromptForNValue::MSG_GEN_VALUE_GET_VALUE();
+    AMGenerateRandomEdges( IntegerOf( n ) );
+    @send GViewControl::MSG_GVC_REDRAW();
+    @send GDocumentGroup::MSG_GEN_DOCUMENT_GROUP_MARK_DIRTY_BY_FILE(
+              fileHan_g );
+  }
+} /* MSG_G_PROCESS_EDGE_RANDOM */
+
+/********************************************************************
+ *                 MSG_G_PROCESS_EDGE_SELECT_ALL
+ ********************************************************************
+ * SYNOPSIS:     Select all of the edges in the graph.
+ * CALLED BY:    GEdgeSelectTrigger
+ * PARAMETERS:   none
+ * RETURNS:      nothing
+ * STRATEGY:     Call the function to select all of the edges.
+ *               Force a redraw.
+ * ERRORS:       Nothing to check.
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      03/07/96  Initial version
+ *******************************************************************/
+@extern method GProcessClass, MSG_G_PROCESS_EDGE_SELECT_ALL {
+
+  AMSelectAllEdges();
+  @send GViewControl::MSG_GVC_REDRAW();
+} /* MSG_G_PROCESS_EDGE_SELECT_ALL */
+
+/********************************************************************
+ *                 MSG_G_PROCESS_EDGE_UNSELECT_ALL
+ ********************************************************************
+ * SYNOPSIS:     Unselect all the edges in the graph.
+ * CALLED BY:    GEdgeUnselectTrigger
+ * PARAMETERS:   none
+ * RETURNS:      nothing
+ * STRATEGY:     Call the function to unselect all of the edges.
+ *               Force a redraw.
+ * ERRORS:       Nothing to check.
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      03/07/96  Initial version
+ *******************************************************************/
+@extern method GProcessClass, MSG_G_PROCESS_EDGE_UNSELECT_ALL {
+
+  AMUnselectAllEdges();
+  @send GViewControl::MSG_GVC_REDRAW();
+} /* MSG_G_PROCESS_EDGE_UNSELECT_ALL */
+
+/********************************************************************
+ *                 MSG_G_PROCESS_MST_KRUSKALS
+ ********************************************************************
+ * SYNOPSIS:     Perform Kruskal's minimum spanning tree search
+ *               on the graph.
+ * CALLED BY:    GMSTKruskalsTrigger
+ * PARAMETERS:   none
+ * RETURNS:      nothing
+ * STRATEGY:     Allocate an EdgeNumList, then call Kruskal to find
+ *               the MST. Draw the result and free the list.
+ * ERRORS:       Nothing to check.
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      04/24/96  Initial version
+ *******************************************************************/
+@extern method GProcessClass, MSG_G_PROCESS_MST_KRUSKALS {
+  MemHandle       enl;
+  EdgeNumList *   enlPtr;
+
+  enl = MemAlloc( sizeof( EdgeNumList ), 0, 0 );
+  enlPtr = (EdgeNumList*)MemLock( enl );
+  Kruskal( enlPtr );
+  CreateGState();
+  AMDrawEdgeList( enlPtr );
+  DestroyGState();
+  MemFree( enl );
+} /* MSG_G_PROCESS_MST_KRUSKALS */
+
+/********************************************************************
+ *                 MSG_G_PROCESS_MST_PRIMS
+ ********************************************************************
+ * SYNOPSIS:     Perform Prim's minimum spanning tree search
+ *               on the graph.
+ * CALLED BY:    GMSTPrimsTrigger
+ * PARAMETERS:   none
+ * RETURNS:      nothing
+ * STRATEGY:     Allocate an EdgeNumList, and see if there's a
+ *               vertex selected. If so, use that as the start
+ *               vertex. If not, start at vertex zero.
+ *               Then call Prim to find the MST. Draw the
+ *               result and free the list.
+ * ERRORS:       Nothing to check.
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      04/24/96  Initial version
+ *******************************************************************/
+@extern method GProcessClass, MSG_G_PROCESS_MST_PRIMS {
+  MemHandle       enl;
+  EdgeNumList *   enlPtr;
+
+  if ( verticesSelected_g.VNL_count == 1 ) {
+    enl = MemAlloc( sizeof( EdgeNumList ), 0, 0 );
+    enlPtr = (EdgeNumList*)MemLock( enl );
+    Prim( verticesSelected_g.VNL_vertices[0], enlPtr );
+    CreateGState();
+    AMDrawEdgeList( enlPtr );
+    DestroyGState();
+    MemFree( enl );
+  }
+  else {
+    ErrorMessage( "Select exactly one vertex." );
+  }
+} /* MSG_G_PROCESS_MST_PRIMS */
+
+/********************************************************************
+ *                 MSG_G_PROCESS_MST_BOTH
+ ********************************************************************
+ * SYNOPSIS:     Perform both a Prim's and Kruskal's search.
+ * CALLED BY:    GMSTBothTrigger
+ * PARAMETERS:   none
+ * RETURNS:      nothing
+ * STRATEGY:     Allocate a VertexNumList and get the selected
+ *               start vertex. Set to zero if none selected. Then
+ *               allocate two EdgeNumLists and call Kruskal and Prim
+ *               to find the two MSTs. Then draw both results at
+ *               once. Free the memory at the end.
+ * ERRORS:       Nothing to check.
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      04/24/96  Initial version
+ *******************************************************************/
+@extern method GProcessClass, MSG_G_PROCESS_MST_BOTH {
+  MemHandle       enlP;
+  EdgeNumList *   enlPtrP;
+  MemHandle       enlK;
+  EdgeNumList *   enlPtrK;
+
+  if ( verticesSelected_g.VNL_count == 1 ) {
+    enlP = MemAlloc( sizeof( EdgeNumList ), 0, 0 );
+    enlPtrP = (EdgeNumList*)MemLock( enlP );
+    enlK = MemAlloc( sizeof( EdgeNumList ), 0, 0 );
+    enlPtrK = (EdgeNumList*)MemLock( enlK );
+    Prim( verticesSelected_g.VNL_vertices[0], enlPtrP );
+    Kruskal( enlPtrK );
+    CreateGState();
+    AMDrawDoubleEdgeList( enlPtrK, enlPtrP );
+    DestroyGState();
+    MemFree( enlP );
+    MemFree( enlK );
+  }
+  else {
+    ErrorMessage( "Select exactly one vertex." );
+  }
+} /* MSG_G_PROCESS_MST_BOTH */
+
+/********************************************************************
+ *                 MSG_G_PROCESS_SEARCH_BFS
+ ********************************************************************
+ * SYNOPSIS:     Perform the Breadth First Search on the graph,
+ *               looking for a particular value.
+ * CALLED BY:    GSearchBFSTrigger
+ * PARAMETERS:   none
+ * RETURNS:      nothing
+ * STRATEGY:     Allocate a VertexNumList and get the first two
+ *               selected vertices. Allocate an EdgeNumList and
+ *               pass this and the vertices to BFS. Draw the
+ *               result, and report if goal vertex not found.
+ * ERRORS:       Nothing to check.
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      04/24/96  Initial version
+ *******************************************************************/
+@extern method GProcessClass, MSG_G_PROCESS_SEARCH_BFS {
+  MemHandle       enl;
+  EdgeNumList *   enlPtr;
+  Boolean         found;
+
+  if ( verticesSelected_g.VNL_count == 2 ) {
+    enl = MemAlloc( sizeof( EdgeNumList ), 0, 0 );
+    enlPtr = (EdgeNumList*)MemLock( enl );
+    found = BFS( verticesSelected_g.VNL_vertices[0],
+                 verticesSelected_g.VNL_vertices[1], enlPtr );
+    CreateGState();
+    AMDrawEdgeList( enlPtr );
+    DestroyGState();
+    MemFree( enl );
+    if ( !found ) {
+      ErrorMessage( "Could not reach goal vertex." );
+    }
+  }
+  else {
+    ErrorMessage( "Select exactly two vertices." );
+  }
+} /* MSG_G_PROCESS_SEARCH_BFS */
+
+/********************************************************************
+ *                 MSG_G_PROCESS_SEARCH_DFS
+ ********************************************************************
+ * SYNOPSIS:     Perform the Depth First Search on the graph,
+ *               looking for a particular value.
+ * CALLED BY:    GSearchBFSTrigger
+ * PARAMETERS:   none
+ * RETURNS:      nothing
+ * STRATEGY:
+ * ERRORS:       Nothing to check.
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      04/24/96  Initial version
+ *******************************************************************/
+@extern method GProcessClass, MSG_G_PROCESS_SEARCH_DFS {
+  MemHandle       enl;
+  EdgeNumList *   enlPtr;
+  Boolean         found;
+
+  if ( verticesSelected_g.VNL_count == 2 ) {
+    enl = MemAlloc( sizeof( EdgeNumList ), 0, 0 );
+    enlPtr = (EdgeNumList*)MemLock( enl );
+    found = DFS( verticesSelected_g.VNL_vertices[0],
+                 verticesSelected_g.VNL_vertices[1], enlPtr );
+    CreateGState();
+    AMDrawEdgeList( enlPtr );
+    DestroyGState();
+    MemFree( enl );
+    if ( !found ) {
+      ErrorMessage( "Could not reach goal vertex." );
+    }
+  }
+  else {
+    ErrorMessage( "Select exactly two vertices." );
+  }
+} /* MSG_G_PROCESS_SEARCH_DFS */
+
+/********************************************************************
+ *                 MSG_G_PROCESS_SEARCH_BOTH
+ ********************************************************************
+ * SYNOPSIS:     Do both the BFS and DFS searches.
+ * CALLED BY:    GSearchBothTrigger
+ * PARAMETERS:   none
+ * RETURNS:      nothing
+ * STRATEGY:
+ * ERRORS:       Nothing to check.
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      03/07/96  Initial version
+ *******************************************************************/
+@extern method GProcessClass, MSG_G_PROCESS_SEARCH_BOTH {
+  MemHandle       enlB;
+  EdgeNumList *   enlPtrB;
+  MemHandle       enlD;
+  EdgeNumList *   enlPtrD;
+  Boolean         foundB;
+  Boolean         foundD;
+
+  if ( verticesSelected_g.VNL_count == 2 ) {
+    enlB = MemAlloc( sizeof( EdgeNumList ), 0, 0 );
+    enlPtrB = (EdgeNumList*)MemLock( enlB );
+    enlD = MemAlloc( sizeof( EdgeNumList ), 0, 0 );
+    enlPtrD = (EdgeNumList*)MemLock( enlD );
+    foundB = BFS( verticesSelected_g.VNL_vertices[0],
+                  verticesSelected_g.VNL_vertices[1],
+                  enlPtrB );
+    foundD = DFS( verticesSelected_g.VNL_vertices[0],
+                  verticesSelected_g.VNL_vertices[1],
+                  enlPtrD );
+    CreateGState();
+    AMDrawDoubleEdgeList( enlPtrB, enlPtrD );
+    DestroyGState();
+    MemFree( enlB );
+    MemFree( enlD );
+    if ( !foundB ) {
+      ErrorMessage( "BFS could not reach goal vertex." );
+    }
+    if ( !foundD ) {
+      ErrorMessage( "DFS could not reach goal vertex." );
+    }
+  }
+  else {
+    ErrorMessage( "Select exactly two vertices." );
+  }
+} /* MSG_G_PROCESS_SEARCH_BOTH */
+
+/********************************************************************
+ *                 MSG_G_PROCESS_SHORTEST_PATH
+ ********************************************************************
+ * SYNOPSIS:     Find the shortest path between two vertices.
+ * CALLED BY:    GShortestTrigger
+ * PARAMETERS:   none
+ * RETURNS:      nothing
+ * STRATEGY:
+ * ERRORS:       Nothing to check.
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      03/07/96  Initial version
+ *******************************************************************/
+@extern method GProcessClass, MSG_G_PROCESS_SHORTEST_PATH {
+  MemHandle       enl1;
+  EdgeNumList *   enlPtr1;
+  MemHandle       enl2;
+  EdgeNumList *   enlPtr2;
+  Boolean         found;
+
+  if ( verticesSelected_g.VNL_count == 2 ) {
+    enl1 = MemAlloc( sizeof( EdgeNumList ), 0, 0 );
+    enlPtr1 = (EdgeNumList*)MemLock( enl1 );
+    enl2 = MemAlloc( sizeof( EdgeNumList ), 0, 0 );
+    enlPtr2 = (EdgeNumList*)MemLock( enl2 );
+    found = ShortestPath( verticesSelected_g.VNL_vertices[0],
+                          verticesSelected_g.VNL_vertices[1],
+                          enlPtr1, enlPtr2 );
+    CreateGState();
+    AMDrawDoubleEdgeListInSeries( enlPtr1, enlPtr2 );
+    DestroyGState();
+    MemFree( enl1 );
+    MemFree( enl2 );
+    if ( !found ) {
+      ErrorMessage( "Shortest path not found." );
+    }
+  }
+  else {
+    ErrorMessage( "Select exactly two vertices." );
+  }
+} /* MSG_G_PROCESS_SHORTEST_PATH */
+
+/********************************************************************
+ *                 MSG_G_PROCESS_MAKE_COMPLETE
+ ********************************************************************
+ * SYNOPSIS:     Make the graph a complete graph by filling
+ *               in all the edges.
+ * CALLED BY:    GCompleteTrigger
+ * PARAMETERS:   none
+ * RETURNS:      nothing
+ * STRATEGY:     Call AMMakeCompleteGraph to fill in all of the
+ *               edges with valid costs. Cause a redraw.
+ * ERRORS:       Nothing to check.
+ * REVISION HISTORY:
+ *      Name     Date      Description
+ *      ----     ----      -----------
+ *       NF      03/07/96  Initial version
+ *******************************************************************/
+@extern method GProcessClass, MSG_G_PROCESS_MAKE_COMPLETE {
+
+  AMMakeCompleteGraph();
+  @send GViewControl::MSG_GVC_REDRAW();
+  @send GDocumentGroup::MSG_GEN_DOCUMENT_GROUP_MARK_DIRTY_BY_FILE(
+            fileHan_g );
+} /* MSG_G_PROCESS_MAKE_COMPLETE */
+

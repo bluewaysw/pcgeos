@@ -1,0 +1,241 @@
+#include <geos.h>
+#include <heap.h>
+#include <file.h>
+#include <graphics.h>
+#include <vm.h>
+#include <hugearr.h>
+#include <Ansi/string.h>
+
+@include <Objects/clipbrd.goh>
+
+typedef struct
+{
+	char	bfType[2];
+	dword	bfSize;
+	word	bfReserved1;
+	word	bfReserved2;
+	dword	bfOffs;
+}
+BITMAP_FILE;
+
+typedef struct
+{
+	dword	biSize;
+	dword	biWidth;
+	dword	biHeight;
+	word	biPlanes;
+	word	biBitCnt;
+	dword	biCompression;
+	dword	biSizeImage;
+	dword	biXPelsPerMeter;
+	dword	biYPelsPerMeter;
+	dword	biClrUsed;
+	dword	biClrImportant;
+} BITMAP_INFO; 
+
+BITMAP_INFO		G_bitmapInfo;
+VMBlockHandle	G_bitmapHandle;
+word			G_currentLine;
+
+#define	BI_RGB		0
+#define	BI_RLE8		1
+#define	BI_RLE4		2
+
+
+
+Boolean _pascal _export
+BMPPrologue(BMFormat fmt, FileHandle file, word width, word height)
+{
+	file++;
+
+	if(fmt == BMF_24BIT)
+	{
+		GStateHandle bmstate;
+		G_bitmapHandle = GrCreateBitmap(
+								fmt, width, height, 
+								ClipboardGetClipboardFile(), 0, &bmstate);
+		
+		if(G_bitmapHandle)
+		{
+			GrDestroyBitmap(bmstate, BMD_LEAVE_DATA);
+  			G_currentLine = 0;
+
+			/* init and write bitmap header */
+			G_bitmapInfo.biSize = sizeof(G_bitmapInfo);
+			G_bitmapInfo.biWidth = width;
+			G_bitmapInfo.biHeight = height;
+			G_bitmapInfo.biPlanes = 1;
+			G_bitmapInfo.biBitCnt = 24;
+			G_bitmapInfo.biCompression = BI_RGB;
+			G_bitmapInfo.biSizeImage = ((((dword) width * 3) + 3) & 0xFFFFFFFC) * height;
+			G_bitmapInfo.biXPelsPerMeter = 0;
+			G_bitmapInfo.biYPelsPerMeter = 0;
+			G_bitmapInfo.biClrUsed = 0;
+			G_bitmapInfo.biClrImportant = 0;
+
+			return FALSE;
+		}
+	}
+
+	return TRUE;
+}
+
+Boolean _pascal _export
+BMPSlice(FileHandle file, MemHandle memblock, word size)
+{
+	byte *p_data;
+	Bitmap *p_header;
+	word loop;
+	byte *elemPtr;
+	word elemSize;
+	word lineLoop;
+
+	size++;
+
+	p_header = MemLock(memblock);
+
+	if(p_header)
+	{
+		word hal_count = 0;
+
+		p_data = p_header + 1;
+
+		elemPtr = 0;
+
+		loop = 0;
+		while(loop < p_header->B_height)
+		{
+			if(!hal_count)
+			{
+				if(elemPtr)
+				{
+					HugeArrayDirty(elemPtr);
+					HugeArrayUnlock(elemPtr);
+				}
+
+				hal_count = HAL_COUNT(HugeArrayLock(
+						ClipboardGetClipboardFile(),
+						G_bitmapHandle, 
+						loop + G_currentLine,
+						&elemPtr,
+						&elemSize));
+
+				if(!hal_count)
+				{
+					goto error;
+				}
+			}
+					
+			lineLoop = 0;
+			while(lineLoop < elemSize)
+			{
+				elemPtr[lineLoop] = p_data[lineLoop];
+				
+				lineLoop++;
+			}
+
+			elemPtr += elemSize;
+			hal_count--;
+			p_data += p_header->B_width * 3;
+
+			loop++;
+		}
+
+		HugeArrayDirty(elemPtr);
+		HugeArrayUnlock(elemPtr);
+
+		G_currentLine += loop;
+
+		MemUnlock(memblock);
+
+		if(G_currentLine == G_bitmapInfo.biHeight)
+		{
+			BITMAP_FILE file_header;
+			word loop;
+			RGBValue *elemPtr;
+			word elemSize;
+			word lineLoop;
+			byte tempColor;
+
+			/* init and write file header */
+			file_header.bfType[0] = 'B';
+			file_header.bfType[1] = 'M';
+			file_header.bfReserved1 = 0;
+			file_header.bfReserved2 = 0;
+			file_header.bfOffs = sizeof(file_header) + sizeof(G_bitmapInfo);
+			file_header.bfSize = 
+				file_header.bfOffs + ((((dword) G_bitmapInfo.biWidth * 3) + 3) & 0xFFFFFFFC) * 
+																			G_bitmapInfo.biHeight;
+			if(sizeof(file_header) != FileWrite(file, &file_header, sizeof(file_header), 0))
+			{
+				goto error;
+			}
+			if(sizeof(G_bitmapInfo) != FileWrite(file, &G_bitmapInfo, sizeof(G_bitmapInfo), 0))
+			{
+				goto error;
+			}
+
+			elemPtr = 0;
+
+			/* write the data to the file */
+			loop = (word) G_bitmapInfo.biHeight;
+			while(loop)
+			{
+				word write, written;
+
+				loop--;
+
+				if(!HAL_COUNT(HugeArrayLock(
+					ClipboardGetClipboardFile(),
+					G_bitmapHandle, 
+					loop,
+					&elemPtr,
+					&elemSize)))
+				{
+					goto error;
+				}
+			
+				lineLoop = 0;
+				while(lineLoop < G_bitmapInfo.biWidth)
+				{
+					tempColor = elemPtr[lineLoop].RGB_red;
+					elemPtr[lineLoop].RGB_red = elemPtr[lineLoop].RGB_blue;
+					elemPtr[lineLoop].RGB_blue = tempColor;
+
+					lineLoop++;
+				}
+
+				write = ((G_bitmapInfo.biWidth * 3) + 3) & 0xFFFC;
+				written = FileWrite(file, elemPtr, write, 0);
+
+				HugeArrayUnlock(elemPtr);
+			
+				if(write != written)
+				{
+					goto error;
+				}
+			}
+		}
+
+		return FALSE;
+	}
+
+error:
+	/* remove the temporary bitmap */
+	VMFreeVMChain(ClipboardGetClipboardFile(), 
+								VMCHAIN_MAKE_FROM_VM_BLOCK(G_bitmapHandle));
+
+	return TRUE;
+}
+
+Boolean _pascal _export
+BMPEpilogue(FileHandle file)
+{
+	file++;
+
+	/* remove the temporary bitmap */
+	VMFreeVMChain(ClipboardGetClipboardFile(), 
+								VMCHAIN_MAKE_FROM_VM_BLOCK(G_bitmapHandle));
+
+	return FALSE;
+}

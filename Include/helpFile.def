@@ -1,0 +1,100 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		helpFile.def
+
+AUTHOR:		Gene Anderson, Sep 15, 1992
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	Gene	9/15/92		Initial revision
+
+
+DESCRIPTION:
+	Definition for Help file format
+		
+	$Id: helpFile.def,v 1.1 97/04/04 14:24:40 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+SetDef	__HELPFILE
+
+StartLibrary	ui
+
+UseLib Objects/vTextC.def
+
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+		Help file format
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Help files are created in GeoWrite, but saved in a special format.
+In part, this is because the text needs to be accessed a page at a time,
+rather than as a continuous stream.  It allows compressing the text more
+easily for later decompression a page at a time.
+
+	For a text object, there are a variety of data structures that
+account for the text and the appearance of the text:
+	1. text
+	2. character runs
+	3. character attributes
+	4. paragraph runs
+	5. paragraph attributes
+	6. type runs
+	7. type attributes
+	8. graphic runs
+	9. graphics
+	10. names
+
+	For a help file, the text is saved page by page, as are the
+various runs.  There is only one copy of the various attribute structures,
+as well as one copy of the names.  In addition, there is a single
+compression dictionary used for all the text in the document.
+
+	The text in the help file will be referenced by the names array --
+each context name that refers to a page will have the DB group and item
+of the associated help text stored with it.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+HelpFileFlags	record
+    HFF_CREATED_BY_STUDIO:1	; This file was produced by the Condo 
+				; Studio app, not GeoWrite, so its map
+				; block uses the CondoFileMapBlock struct.
+    HFF_HELP_FILE:1		;This is a help file, not a content file
+	:14
+HelpFileFlags	end
+
+HelpCompressType	etype	byte
+HCT_NONE		enum HelpCompressType	;no compression
+HCT_TANG_FULTS		enum HelpCompressType	;Doug & Benson
+HCT_PKZIP		enum HelpCompressType
+
+HELP_FILE_PROTO_MAJOR	equ	2
+HELP_FILE_PROTO_MINOR	equ	0
+
+HelpFileMapBlock	struct
+    HFMB_protocolMajor	word
+    HFMB_protocolMinor	word	
+    HFMB_flags		HelpFileFlags
+    HFMB_compressType	HelpCompressType
+    HFMB_dictionary	word		;VM handle of dictionary, if any
+    HFMB_names		word		;VM handle of names array
+    HFMB_charAttrs	word		;VM handle of char attributes
+    HFMB_paraAttrs	word		;VM handle of paragraph attributes
+    HFMB_types		word		;VM handle of type attributes
+    HFMB_graphics	word		;VM handle of graphics
+    HFMB_reserved	byte 32 dup (?)	;reserved for future use
+HelpFileMapBlock	ends
+
+HelpFileNameArrayElement	struct
+    HFNE_meta		VisTextNameArrayElement
+    HFNE_reserved	byte 8 dup (?)	;reserved for future use
+HelpFileNameArrayElement	ends
+
+
+EndLibrary	ui
+

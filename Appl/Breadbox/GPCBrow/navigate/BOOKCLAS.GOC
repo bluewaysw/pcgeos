@@ -1,0 +1,445 @@
+/*
+ *                          ==CONFIDENTIAL INFORMATION==
+ *
+ * COPYRIGHT 1994-99 BREADBOX COMPUTER COMPANY -- ALL RIGHTS RESERVED  --
+ * THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER
+ * A NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ * RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ * NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ * CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ * AGREEMENT.
+ *
+*/
+/***************************************************************************
+ *  FILE:  BOOKCLAS.GOC
+ ***************************************************************************/
+
+/*-------------------------------------------------------------------------
+ | Project:  WebMagick (HTML Browser)
+ |           Copyright (c) 1997 Breadbox Computer Company
+ *-----------------------------------------------------------------------*/
+
+@include <stdapp.goh>
+@include "options.goh"
+
+
+@ifdef COMPILE_OPTION_BOOKMARKS
+
+@include "bookclas.goh"
+@include "bookmark.goh"
+@include "htmlview.goh"
+
+#define NUM_BOOKMARKS_IN_TRIGGER_LIST  10
+
+optr BDLocateListFromDialog(optr dialog) ;
+word BDGetListItemSelected(optr dialog) ;
+void BDRebuildTriggerList(word lowestItem) ;
+void BDRedrawListItem(optr dialog, word item) ;
+void BDSelectItem(optr dialog, word item) ;
+
+/*=========================================================================*
+ *  METHODS FOR CLASS:  BookmarksDialogClass
+ *=========================================================================*/
+
+
+    @classdecl BookmarksDialogClass ;
+
+
+/*-------------------------------------------------------------------------
+ | Method:  BookmarksDialogClass::MSG_GEN_INTERACTION_INITIATE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Handle initializing the data.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/13/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method BookmarksDialogClass, MSG_GEN_INTERACTION_INITIATE
+{
+    optr list ;
+
+    @callsuper() ;
+
+    list = BDLocateListFromDialog(oself) ;
+    @call list::MSG_GEN_DYNAMIC_LIST_INITIALIZE(BookmarksGetCount()) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  BookmarksDialogClass::MSG_BOOKMARKS_DIALOG_QUERY
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Query for bookmark data.
+ |
+ | Inputs:
+ |    optr list                   -- List needing the data
+ |    word item                   -- Item in list being queried
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/13/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method BookmarksDialogClass, MSG_BOOKMARKS_DIALOG_QUERY
+{
+    TCHAR *p_title ;
+
+    /* Lock in the item to be shown */
+    p_title = BookmarkLock(item, NULL) ;
+    if (p_title)  {
+        @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, p_title) ;
+        BookmarkUnlock(p_title) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  BookmarksDialogClass::MSG_BOOKMARKS_DIALOG_GO
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Go to the currently selected bookmark by sending an event to the
+ |    application's model object.
+ |
+ | Inputs:
+ |    optr trigger                -- Calling trigger
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/14/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method BookmarksDialogClass, MSG_BOOKMARKS_DIALOG_GO
+{
+    word item ;
+    EventHandle event ;
+
+    /* Determine what item is selected */
+    item = BDGetListItemSelected(oself) ;
+    if (item != GIGS_NONE)  {
+        /* If valid, jump to that location */
+        event = @record
+                     URLDocumentClass::MSG_URL_DOCUMENT_GO_TO_BOOKMARK(item) ;
+        @send application::MSG_META_SEND_CLASSED_EVENT(event, TO_APP_MODEL);
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  BookmarksDialogClass::MSG_BOOKMARKS_DIALOG_DELETE
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Go to the currently selected bookmark by sending an event to the
+ |    application's model object.
+ |
+ | Inputs:
+ |    optr trigger                -- Calling trigger
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/14/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method BookmarksDialogClass, MSG_BOOKMARKS_DIALOG_DELETE
+{
+    word item ;
+    optr list ;
+
+    /* Determine what item is selected */
+    item = BDGetListItemSelected(oself) ;
+    if (item != GIGS_NONE)  {
+        /* If valid, delete that item */
+        list = BDLocateListFromDialog(oself) ;
+        @call list::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(item, 1) ;
+        BookmarkDelete(item) ;
+        BDRebuildTriggerList(item) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  BookmarksDialogClass::MSG_BOOKMARKS_DIALOG_EDIT
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Edit the currently selected bookmark.
+ |
+ | Inputs:
+ |    optr trigger                -- Calling trigger
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/14/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@extern object BookmarkEditDialog ;
+@extern object BookmarkEditDialogNameText ;
+@extern object BookmarkEditDialogURLText ;
+@method BookmarksDialogClass, MSG_BOOKMARKS_DIALOG_EDIT
+{
+    word item ;
+    TCHAR *p_title ;
+    TCHAR *p_url ;
+    MemHandle memTitle, memURL ;
+
+    /* Determine what item is selected */
+    item = BDGetListItemSelected(oself) ;
+    if (item != GIGS_NONE)  {
+        p_title = BookmarkLock(item, &p_url) ;
+        if (p_title)  {
+            /* Copy the data into the bookmark edit dialog */
+            @call BookmarkEditDialogNameText::MSG_VIS_TEXT_REPLACE_ALL_PTR(p_title, 0) ;
+            @call BookmarkEditDialogURLText::MSG_VIS_TEXT_REPLACE_ALL_PTR(p_url, 0) ;
+            BookmarkUnlock(p_title) ;
+
+            /* If valid, edit that item */
+            if (UserDoDialog(@BookmarkEditDialog) == IC_OK)  {
+                /* If the user clicked OK, then change the text. */
+                memTitle = @call BookmarkEditDialogNameText::
+                                     MSG_VIS_TEXT_GET_ALL_BLOCK(NullHandle) ;
+                memURL = @call BookmarkEditDialogURLText::
+                                   MSG_VIS_TEXT_GET_ALL_BLOCK(NullHandle) ;
+                p_title = MemLock(memTitle) ;
+                p_url = MemLock(memURL) ;
+
+                /* Do the actual change in the database. */
+                BookmarkChange(item, p_title, p_url) ;
+
+                /* Free any used memory */
+                MemUnlock(memTitle) ;
+                MemUnlock(memURL) ;
+                MemFree(memTitle) ;
+                MemFree(memURL) ;
+
+                /* Make the dynamic list reflect the change */
+                BDRedrawListItem(oself, item) ;
+
+                /* Update the trigger list */
+                BDRebuildTriggerList(item) ;
+            }
+        }
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  BookmarksDialogClass::MSG_BOOKMARKS_DIALOG_EDIT
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Edit the currently selected bookmark.
+ |
+ | Inputs:
+ |    optr trigger                -- Calling trigger
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/14/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method BookmarksDialogClass, MSG_BOOKMARKS_DIALOG_UP
+{
+    word item ;
+
+    /* Determine what item is selected */
+    item = BDGetListItemSelected(oself) ;
+    if ((item != GIGS_NONE) && (item != 0))  {
+        /* If valid, swap with the previous item */
+        BookmarksSwap(item, item-1) ;
+
+        /* Redraw the swapped items */
+        BDRedrawListItem(oself, item) ;
+        BDRedrawListItem(oself, item-1) ;
+        BDSelectItem(oself, item-1) ;
+
+        /* Make sure the trigger list is updated too. */
+        BDRebuildTriggerList(item-1) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Method:  BookmarksDialogClass::MSG_BOOKMARKS_DIALOG_DOWN
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Edit the currently selected bookmark.
+ |
+ | Inputs:
+ |    optr trigger                -- Calling trigger
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/14/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@method BookmarksDialogClass, MSG_BOOKMARKS_DIALOG_DOWN
+{
+    word item ;
+    word num ;
+
+    /* Determine what item is selected */
+    item = BDGetListItemSelected(oself) ;
+    num = BookmarksGetCount() ;
+    if ((item != GIGS_NONE) && (item < (num-1)))  {
+        /* If valid, swap with the previous item */
+        BookmarksSwap(item, item+1) ;
+
+        /* Redraw the swapped items */
+        BDRedrawListItem(oself, item) ;
+        BDRedrawListItem(oself, item+1) ;
+        BDSelectItem(oself, item+1) ;
+
+        /* Make sure the trigger list is updated too. */
+        BDRebuildTriggerList(item) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  BDLocateListFromDialog
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Figure out the location of the list from the dialog's optr.
+ |
+ | Inputs:
+ |    optr dialog                 -- BookmarksDialogClass object pointer
+ |
+ | Outputs:
+ |    optr                        -- optr to GenDynamicList of bookmarks
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/14/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@extern object BookmarksDynamicList ;
+optr BDLocateListFromDialog(optr dialog)
+{
+    return ConstructOptr(
+               OptrToHandle(dialog),
+               OptrToChunk(@BookmarksDynamicList)) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  BDGetListItemSelected
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Get what item is currently selected in the dynamic list in the given
+ |
+ | Inputs:
+ |    optr dialog                 -- BookmarksDialogClass object pointer
+ |
+ | Outputs:
+ |    word                        -- Dialog's selected item in list.
+ |                                   GIGS_NONE if nothing selected.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/14/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+word BDGetListItemSelected(optr dialog)
+{
+    optr list ;
+
+    list = BDLocateListFromDialog(dialog) ;
+    return @call list::MSG_GEN_ITEM_GROUP_GET_SELECTION() ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  BDRebuildTriggerList
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Cause the bookmark trigger list to get rebuilt.
+ |
+ | Inputs:
+ |    word lowestItem             -- Earliest item affected.  0 for always.
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/14/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+@extern object BookmarkTriggerList ;
+void BDRebuildTriggerList(word lowestItem)
+{
+    /* Only rebuild if affecting the first NUM_BOOKMARKS_IN_TRIGGER_LIST */
+    if (lowestItem < NUM_BOOKMARKS_IN_TRIGGER_LIST)
+        BookmarksBuildUIList(@BookmarkTriggerList) ;
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  BDRedrawListItem
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Cause an item in the dialog's list to be redrawn with the correct
+ |    moniker.
+ |
+ | Inputs:
+ |    optr dialog                 -- BookmarksDialogClass object
+ |    word item                   -- Entry to redraw
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/14/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+void BDRedrawListItem(optr dialog, word item)
+{
+    optr list ;
+    TCHAR *p_title ;
+
+    list = BDLocateListFromDialog(dialog) ;
+    p_title = BookmarkLock(item, NULL) ;
+    if (p_title)  {
+        @call list::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, p_title) ;
+        BookmarkUnlock(p_title) ;
+    }
+}
+
+/*-------------------------------------------------------------------------
+ | Routine:  BDSelectItem
+ *-------------------------------------------------------------------------
+ |
+ | Description:
+ |    Select one item in the list.
+ |
+ | Inputs:
+ |    optr dialog                 -- BookmarksDialogClass object
+ |    word item                   -- Entry to select
+ |
+ | Revision History:
+ |    Who  Date:     Comments:
+ |    ---  --------  ---------
+ |    LES  01/14/98  Created
+ |
+ *-----------------------------------------------------------------------*/
+void BDSelectItem(optr dialog, word item)
+{
+    optr list ;
+
+    list = BDLocateListFromDialog(dialog) ;
+    @call list::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(item, FALSE) ;
+}
+
+
+@endif
+
+/***************************************************************************
+ *  END OF FILE:  INIGUARD.GOC
+ ***************************************************************************/
+

@@ -1,0 +1,447 @@
+
+/**************************************************************
+ *  ==CONFIDENTIAL INFORMATION==
+ *  COPYRIGHT 1994-2000 BREADBOX COMPUTER COMPANY --
+ *  ALL RIGHTS RESERVED  --
+ *  THE FOLLOWING CONFIDENTIAL INFORMATION IS BEING DISCLOSED TO YOU UNDER A
+ *  NON-DISCLOSURE AGREEMENT AND MAY NOT BE DISCLOSED OR FORWARDED BY THE
+ *  RECIPIENT TO ANY OTHER PERSON OR ENTITY NOT COVERED BY THE SAME
+ *  NON-DISCLOSURE AGREEMENT COVERING THE RECIPIENT. USE OF THE FOLLOWING
+ *  CONFIDENTIAL INFORMATION IS RESTRICTED TO THE TERMS OF THE NON-DISCLOSURE
+ *  AGREEMENT.
+ **************************************************************/
+
+/*
+ **************************************************************************
+ *  FILE:			exp_mtds.goc
+ *  PROJECT:		GPC Banker
+ *  DESCRIPTION:	This file has methods for the export
+ *			     to Quicken QIF functions
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include "gpcbnkr.goh"
+@include "externs.goh"
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+
+
+/***********************************************************************
+ *
+ * FUNCTION:	QIFFileWrite (char* buffer, FileHandle fh)
+ *
+ * CALLED BY:	MSG_EXPORT_QIF
+ *      	
+ *
+ * STRATEGY:    returns FALSE for no error TRUE for error
+ *		
+ *
+ ***********************************************************************/
+Boolean QIFFileWrite (char* buffer, FileHandle fh)
+{
+word			length, fileCloseError;
+
+
+    /* now write the buffer to the .QIF file */
+    length = FileWrite(fh,
+			  buffer,
+			  strlen(buffer),
+			  FALSE);
+    /* check for write error */
+    if (length != strlen(buffer))  {
+	  /* show message and bail out */
+	  NotifyDBox(0, @ExpWriteErrMsg);
+	  fileCloseError = FileClose(fh, FALSE);
+	  if (fileCloseError) NotifyDBox(0, @ExpCloseErrMsg);
+	  FilePopDir();
+	  @send GPCBnkrApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+	  return (TRUE);
+	  }
+    else  return (FALSE);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_OPEN_EXPORT for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	Calls the dialog box when the trigger
+ *                  is clicked
+ *
+ *
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_OPEN_EXPORT
+{
+ TimerDateAndTime	date;
+ char			dateString[DATE_TIME_BUFFER_SIZE + 1];
+ Boolean			notThere;
+ word			count;
+ 
+
+    /* start out in Banker Files */
+    MemLock (OptrToHandle(@BankerFolderTxt));
+    notThere = @call ExpFileSel::MSG_GEN_PATH_SET
+					 (LMemDeref(@BankerFolderTxt),
+					 SP_DOCUMENT);
+    MemUnlock (OptrToHandle(@BankerFolderTxt));
+
+    /* or Document if not there */
+    if(notThere)  @call ExpFileSel::MSG_GEN_PATH_SET(".", SP_DOCUMENT);
+
+    /* set default name */
+    MemLock (OptrToHandle(@DefaultQIF));
+    @call ExpFileName::MSG_VIS_TEXT_REPLACE_ALL_PTR(LMemDeref(@DefaultQIF), 0);
+    MemUnlock (OptrToHandle(@DefaultQIF));
+
+    /* put system date in To: date box */
+    TimerGetDateAndTime(&date);
+    LocalFormatDateTime(dateString, DTF_SHORT, &date);
+    @call ExpTo::MSG_VIS_TEXT_REPLACE_ALL_PTR(dateString, 0);
+
+    /* and 1 Jan current year in the From: date box */ 
+    date.TDAT_month = 1;
+    date.TDAT_day = 1;
+    LocalFormatDateTime(dateString, DTF_SHORT, &date);
+    @call ExpFrom::MSG_VIS_TEXT_REPLACE_ALL_PTR(dateString, 0);
+
+    /* Open the dialog box */
+    @call ExportDBox::MSG_GEN_INTERACTION_INITIATE();
+
+    /* select UNNAMED part of default name */
+    @call ExpFileName::MSG_VIS_TEXT_GET_ALL_PTR(dateString);
+    count = 0;
+    while (dateString[count] != '.')  count++;
+
+    @send ExpFileName::MSG_META_GRAB_FOCUS_EXCL();
+    @send ExpFileName::MSG_META_GRAB_TARGET_EXCL(); 
+    @send ExpFileName::MSG_VIS_TEXT_SELECT_RANGE_SMALL(0, count);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:	MSG_EXPORT_QIF for GPCBnkrProcessClass
+ *
+ * DESCRIPTION:	 Creates the selected file and does the export
+ *              
+ *     
+ *              
+ *
+ ***********************************************************************/
+@extern method GPCBnkrProcessClass, MSG_EXPORT_QIF
+{
+ TimerDateAndTime	date;
+ char			dateFString[DATE_SIZE], dateTString[DATE_SIZE];
+ dword			toDateNum, fromDateNum, transDateNum;
+ char			QIFName[13];
+ char			QIFPath[PATH_BUFFER_SIZE];
+ char			recordBuffer[ENTRY_SIZE + 5];
+ char			amtString[MAX_TEXT_LEN], numString[CKNUM_SIZE];
+ FloatNum			amount;
+ FileHandle		QIFFileHandle;
+ DiskHandle		QIFDiskhandle;
+ word			fileCloseError, i, j;
+ MemHandle		mh;
+ TransSortStruct	*trArrayElement;
+ TransStruct		*trans;
+ DBItem			transItem, multiItem;
+ DBGroup			multiGroup;
+ Boolean			isNeg;
+
+
+    /* first see if the dates are OK */
+    @call ExpTo::MSG_VIS_TEXT_GET_ALL_PTR(dateTString);
+    /* Exit if date no good */
+    if (!DateCheck(dateTString))  {
+	  /* send the focus back to the date field */
+	  @send ExpTo::MSG_META_GRAB_FOCUS_EXCL();
+	  return;
+	  }
+    LocalParseDateTime(dateTString, DTF_SHORT, &date);
+    /* convert to comparison number */
+    toDateNum = MakeDateNum(date);
+    @call ExpFrom::MSG_VIS_TEXT_GET_ALL_PTR(dateFString);
+    /* Exit if date no good */
+    if (!DateCheck(dateFString))  {
+	  /* send the focus back to the date field */
+	  @send ExpFrom::MSG_META_GRAB_FOCUS_EXCL();
+	  return;
+	  }
+    LocalParseDateTime(dateFString, DTF_SHORT, &date);
+    /* convert to comparison number */
+    fromDateNum = MakeDateNum(date);
+    if (fromDateNum > toDateNum)  {  /* from later than to */
+	  NotifyDBox(0, @ExpWriteErrMsg);
+	  return;
+	  } /* end of bad dates */
+
+
+    /* get the exp file name */
+    @call ExpFileName::MSG_VIS_TEXT_GET_ALL_PTR(QIFName);
+
+    /* get the file's path and disk handle */
+    @call ExpFileSel::MSG_GEN_PATH_GET(QIFPath, sizeof(QIFPath));
+    QIFDiskhandle = @call ExpFileSel::MSG_GEN_PATH_GET_DISK_HANDLE();
+
+    /* save our Banker file directory */
+    FilePushDir();
+
+    /* and set the QIF file dir  - FileSel doesn't do this */
+    FileSetCurrentPath(QIFDiskhandle, QIFPath);
+
+    /* and create the CSV file */
+    QIFFileHandle = FileCreate(QIFName,
+			       ((FILE_CREATE_ONLY | FCF_NATIVE)
+			       | (FILE_ACCESS_RW | FILE_DENY_RW)),
+			       0);
+    /* if QIFFileHandle is NULL then there was an error */
+    if (QIFFileHandle == NullHandle)  {
+	  /* if file exists just tell user & wait for new name */
+       if (ThreadGetError() == ERROR_FILE_EXISTS)  {
+		NotifyDBox(0, @FileExistsErrMsg);
+		}
+	    /* for any other error - bail out */
+	    else  {
+		NotifyDBox(0, @ExpCreateErrMsg);
+		@send ExportDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+		}
+	  FilePopDir();
+	  return;
+       }
+
+    /* dismiss the file selector box now */
+    @send ExportDBox::MSG_GEN_GUP_INTERACTION_COMMAND(IC_DISMISS);
+
+    /* mark app busy */
+    @send GPCBnkrApp::MSG_GEN_APPLICATION_MARK_BUSY();
+
+    /* init the QIF file with the type (bank) */
+    MemLock (OptrToHandle(@Type1String));
+    strcpy(recordBuffer, LMemDeref(@Type1String));
+    strcat(recordBuffer, LMemDeref(@QIFEOLString));
+    MemUnlock (OptrToHandle(@Type1String));
+
+    /* now write the buffer to the .QIF file */
+    if (QIFFileWrite (recordBuffer, QIFFileHandle)) return;
+
+    /* get the sort array VMBlock */
+    transListVMBHandle = VMFind(GPCBnkrFile, NullHandle, (currentAcct*10)+ALLSORT);
+    VMLock(GPCBnkrFile, transListVMBHandle ,&mh);
+    /* some initialization */
+    multiFlag = FALSE;
+    numMultis = 0;
+    /* cycle thru the index elements to get the selected ones */
+    for (i = 0; i < numTrans; i++)  {
+	  /* get the ith element info */
+	  trArrayElement = ChunkArrayElementToPtrHandles(
+					mh,
+					transListChunkArray,
+					i,
+					0);
+	  transDateNum = ((dword)(trArrayElement->TSS_year) * (dword)10000) +
+				  ((dword)(trArrayElement->TSS_month) * (dword)100) +
+				  (dword)trArrayElement->TSS_day;
+	  transItem = trArrayElement->TSS_item;
+	  /* is transDate >= from date? */
+	  if (transDateNum >= fromDateNum)  {
+		/* OK is it <= to date? */
+		if (transDateNum <= toDateNum)  {
+		   /* get the transaction */
+		   trans = DBLock(GPCBnkrFile, currentAcctGroup, transItem);
+		   /* if a multi parent, save some info */
+		   if (trans->TS_numMultis) {
+			 multiFlag = TRUE;
+			 numMultis = trans->TS_numMultis;
+			 multiItem = trans->TS_multiItem;
+			 multiGroup = trans->TS_multiGroup;
+			 }
+		   /* now get the transaction info and export line by line */
+		   /* first the date ... */
+		   date.TDAT_year = trans->TS_year;
+		   date.TDAT_month = trans->TS_month;
+		   date.TDAT_day = trans->TS_day;
+		   LocalFormatDateTime(dateTString, DTF_SHORT, &date);
+		   MemLock (OptrToHandle(@Type1String));
+		   strcpy(recordBuffer, LMemDeref(@QIFDateString));
+		   strcat(recordBuffer, dateTString);
+		   strcat(recordBuffer, LMemDeref(@QIFEOLString));
+		   MemUnlock (OptrToHandle(@Type1String));
+		   if (QIFFileWrite (recordBuffer, QIFFileHandle)) return;
+
+		   /* next the amount... */
+		   isNeg = TRUE;
+		   if ((trans->TS_type == TRANS_DP)
+					  ||(trans->TS_type == TRANS_CR)
+					  ||(trans->TS_type == TRANS_XFP)) isNeg = FALSE;
+		   if (isNeg) {
+			 FloatPushNumber(&trans->TS_amount);
+			 FloatNegate();
+			 FloatPopNumber(&amount);
+			 }
+		   else  {
+			 amount = trans->TS_amount;
+			 }
+		   FloatFloatToAscii_StdFormat(amtString,
+								&amount,
+								FFAF_FROM_ADDR,
+								14,
+								2);
+		   MemLock (OptrToHandle(@Type1String));
+		   strcpy(recordBuffer, LMemDeref(@QIFAmountString));
+		   strcat(recordBuffer, amtString);
+		   strcat(recordBuffer, LMemDeref(@QIFEOLString));
+		   MemUnlock (OptrToHandle(@Type1String));
+		   if (QIFFileWrite (recordBuffer, QIFFileHandle)) return;
+
+		   /* next the cleared status... */
+		   if (trans->TS_cleared)  {
+			 MemLock (OptrToHandle(@Type1String));
+			 strcpy(recordBuffer, LMemDeref(@QIFClearedString));
+			 MemUnlock (OptrToHandle(@Type1String));
+		      if (QIFFileWrite (recordBuffer, QIFFileHandle)) return;
+			 } /* end of cleared if */
+
+		   /* next the check number or trans type... */
+		   MemLock (OptrToHandle(@Type1String));
+		   strcpy(recordBuffer, LMemDeref(@QIFCheckString));
+		   switch (trans->TS_type) {
+			 case TRANS_CK:
+			    UtilHex32ToAscii(numString,
+						(sdword) trans->TS_number,
+						UHTAF_NULL_TERMINATE);
+			    strcat(recordBuffer, numString);
+			    break;
+			 case TRANS_DP:
+			    strcat(recordBuffer, LMemDeref(@ImpQIFDEP));
+			    break;
+			 case TRANS_DB:
+			    strcat(recordBuffer, LMemDeref(@ImpQIFDEB));
+			    break;
+			 case TRANS_CR:
+			    strcat(recordBuffer, LMemDeref(@ImpQIFCR));
+			    break;
+			 case TRANS_XFM:
+			    strcat(recordBuffer, LMemDeref(@ImpQIFXfer));
+			    break;
+			 case TRANS_XFP:
+			    strcat(recordBuffer, LMemDeref(@ImpQIFXfer));
+			    break;
+			 } /* end switch */
+		   strcat(recordBuffer, LMemDeref(@QIFEOLString));
+		   MemUnlock (OptrToHandle(@Type1String));
+		   if (QIFFileWrite (recordBuffer, QIFFileHandle)) return;
+
+		   /* next the payee... */
+		   MemLock (OptrToHandle(@Type1String));
+		   strcpy(recordBuffer, LMemDeref(@QIFPayeeString));
+		   if (strlen(trans->TS_payee))
+			 strcat(recordBuffer, trans->TS_payee);
+		   strcat(recordBuffer, LMemDeref(@QIFEOLString));
+		   MemUnlock (OptrToHandle(@Type1String));
+		   if (QIFFileWrite (recordBuffer, QIFFileHandle)) return;
+
+		   /* next the memo... */
+		   if (strlen(trans->TS_memo))  {
+			 MemLock (OptrToHandle(@Type1String));
+			 strcpy(recordBuffer, LMemDeref(@QIFMemoString));
+			 strcat(recordBuffer, trans->TS_memo);
+			 strcat(recordBuffer, LMemDeref(@QIFEOLString));
+			 MemUnlock (OptrToHandle(@Type1String));
+		      if (QIFFileWrite (recordBuffer, QIFFileHandle)) return;
+			 }  /* end of memo if */
+
+		   /* next the category... */
+		   if (strlen(trans->TS_category))  {
+			 MemLock (OptrToHandle(@Type1String));
+			 strcpy(recordBuffer, LMemDeref(@QIFCategoryString));
+			 strcat(recordBuffer, trans->TS_category);
+			 strcat(recordBuffer, LMemDeref(@QIFEOLString));
+			 MemUnlock (OptrToHandle(@Type1String));
+		      if (QIFFileWrite (recordBuffer, QIFFileHandle)) return;
+			 }  /* end of cat if */
+		   /* done with the regular transaction stuff */
+		   DBUnlock(trans);
+
+		   if (multiFlag)  {
+			 for (j = 0; j < numMultis; j++)  {
+			    /* get the transaction */
+			    trans = DBLock(GPCBnkrFile, multiGroup, multiItem);
+			    /* save pointer to next multi item */
+			    multiItem = trans->TS_multiItem;
+			    /* this is a  multi child - gets only cat, memo & amt */
+			    /* first the cat */
+			    if (strlen(trans->TS_category))  {
+				  MemLock (OptrToHandle(@Type1String));
+				  strcpy(recordBuffer, LMemDeref(@QIFSplitCatString));
+				  strcat(recordBuffer, trans->TS_category);
+				  strcat(recordBuffer, LMemDeref(@QIFEOLString));
+				  MemUnlock (OptrToHandle(@Type1String));
+				  if (QIFFileWrite (recordBuffer, QIFFileHandle)) return;
+				  }  /* end of cat if */
+			    /* next the memo ... */
+			    if (strlen(trans->TS_memo))  {
+				  MemLock (OptrToHandle(@Type1String));
+				  strcpy(recordBuffer, LMemDeref(@QIFSplitMemoString));
+				  strcat(recordBuffer, trans->TS_memo);
+				  strcat(recordBuffer, LMemDeref(@QIFEOLString));
+				  MemUnlock (OptrToHandle(@Type1String));
+				  if (QIFFileWrite (recordBuffer, QIFFileHandle)) return;
+				  }  /* end of memo if */
+			    /* and the amount ... */
+			    isNeg = TRUE;
+			    if ((trans->TS_type == TRANS_DP)
+					  ||(trans->TS_type == TRANS_CR)
+					  ||(trans->TS_type == TRANS_XFP)) isNeg = FALSE;
+			    if (isNeg) {
+				  FloatPushNumber(&trans->TS_amount);
+				  FloatNegate();
+				  FloatPopNumber(&amount);
+				  }
+			    else  amount = trans->TS_amount;
+			    FloatFloatToAscii_StdFormat(amtString,
+								&amount,
+								FFAF_FROM_ADDR,
+								14,
+								2);
+			    MemLock (OptrToHandle(@Type1String));
+			    strcpy(recordBuffer, LMemDeref(@QIFSplitAmountString));
+			    strcat(recordBuffer, amtString);
+			    strcat(recordBuffer, LMemDeref(@QIFEOLString));
+			    MemUnlock (OptrToHandle(@Type1String));
+		         if (QIFFileWrite (recordBuffer, QIFFileHandle)) return;
+			    DBUnlock(trans);
+			    }  /* end of is multi for (j) loop */
+			 multiFlag = FALSE;
+			 }  /* end of is multi if */
+
+		   /* finally the end of transaction code */
+		   MemLock (OptrToHandle(@Type1String));
+		   strcpy(recordBuffer, LMemDeref(@QIFEOEString));
+		   MemUnlock (OptrToHandle(@Type1String));
+		   if (QIFFileWrite (recordBuffer, QIFFileHandle)) return;
+		   }  /* end of <= to date if */
+		else  {  /* we're past our range */
+		   i = numTrans;  /* bail out of loop */
+		   }
+		}  /* end of >= from if */
+	  }  /* end of i for loop */
+    VMUnlock(mh);
+
+    /* Done so close the file */
+    fileCloseError = FileClose(QIFFileHandle, FALSE);
+    if (fileCloseError) NotifyDBox(0, @ExpCloseErrMsg);
+    FilePopDir();
+    @send GPCBnkrApp::MSG_GEN_APPLICATION_MARK_NOT_BUSY();
+
+
+}

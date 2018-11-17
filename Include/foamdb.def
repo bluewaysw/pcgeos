@@ -1,0 +1,610 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) Geoworks 1994, 1995 -- All Rights Reserved
+			GEOWORKS CONFIDENTIAL
+
+FILE:		foamdb.def
+
+
+REVISION HISTORY:
+	
+	Name	Date		Description
+	----	----		-----------
+	atw	11/ 1/94	Initial revision
+	ss	6/23/95		Added FoamDBGetNextPrevRecord
+
+DESCRIPTION:
+	Contains description of a general database engine
+		
+	$Id: foamdb.def,v 1.1 97/04/04 14:26:14 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+SetDef	__FOAMDB
+StartLibrary	foamdb
+
+FoamDBActionType	etype	word
+	FDBAT_RECORD_ADDED		enum	FoamDBActionType
+	; Indicates that an record was added to the database
+
+	FDBAT_RECORD_CHANGED		enum	FoamDBActionType
+	; Indicates that an record changed
+
+	FDBAT_RECORD_DELETED		enum	FoamDBActionType
+	; Indicates that an record was deleted
+
+	FDBAT_DB_CHANGED		enum 	FoamDBActionType
+	; Indicates that there were large-scale changes to the database
+	; (restored from backup, or whatever), so the database may need to
+	; be rescanned.
+
+	FDBAT_DB_CLOSED			enum	FoamDBActionType
+	; Indicates that the foam DB file was closed...
+
+INVISIBLE_RECORD	equ	-1
+FoamDBChangeNotification	struct
+;
+;	This is the notification sent out when the database is modified.
+;
+
+	FDBCN_fileHan		hptr
+	; The handle of the database that has been changed
+
+	FDBCN_action		FoamDBActionType
+	; Indicates the type of modification that just occurred
+
+;	The following fields are only filled in if FDBCN_action is
+;	FDBAT_ENTRY_DELETED, FDBAT_ENTRY_CHANGED, or FDBAT_ENTRY_ADDED
+
+	FDBCN_entry		dword
+	; The record number that was just modified/deleted/added (this 
+	; is an index into the visible array, or INVISIBLE_RECORD if the
+	; item was invisible)
+
+	FDBCN_id		dword
+	; The ID of the record that was just added/modified/deleted
+
+FoamDBChangeNotification	ends
+
+FoamDBFlags	record
+	:16
+FoamDBFlags	end
+
+FoamDBMap	struct
+	FDBM_recordID		dword
+	;The ID of the next record that will be allocated
+
+	FDBM_fieldNameElementArray	word
+	;The VM handle of the block containing the element array with 
+	; the field names.
+
+	FDBM_mainArray		word
+	;handle of HugeArray that contains all the visible cards
+
+	FDBM_secretArray	word
+	;handle of HugeArray that contains all the secret cards
+
+
+	FDBM_flags		FoamDBFlags
+	;word of flags
+
+	FDBM_reserved		word
+	;reserved for future use
+FoamDBMap	ends
+
+FoamDBRecordFlags	record
+	FDBRF_INVISIBLE:1
+	; If set, the record is not normally visible
+	FDBRF_TEMPORARILY_VISIBLE:1
+	; If set, the record should be treated as if it is visible
+	FDBRF_NOT_YET_SAVED:1
+	; If set, the record was never saved to the DB, so we do not have to
+	; try to delete it before we save it out.
+	:1
+	FDBRF_RESERVED_FOR_CLIENT_USE:4
+	; Can be used by clients
+FoamDBRecordFlags	end
+
+FieldHeader	struct
+	FH_id			word
+	FH_nameToken		word
+	FH_size			word	;# bytes in the field, not counting
+					; the FieldHeader (0 if no data)
+	FH_type			byte
+	FH_data		label	byte
+FieldHeader	ends
+
+RecordHeader	struct
+	RH_id		dword
+	; The unique ID of this record
+
+	RH_fieldID	word
+	; The ID that will be assigned to the next field that is created
+
+	RH_fieldCount	word
+	; The # fields
+
+	RH_flags	FoamDBRecordFlags
+	; Flags for the record
+
+	RH_fieldData	label	FieldHeader
+RecordHeader	ends
+
+
+
+
+
+global	FoamDBOpen:far
+;
+; Opens a DB file, or creates one if it doesn't exist
+;
+; Pass:	ds:dx - filename
+;	cx - map block size
+;		cx = 0 if no additional space needed, else
+;		cx = (size FoamDBMap) + (size additional info)
+;	bx - major protocol number
+;	ax - minor protocol number
+; Return:	carry set if error (ax = error code, or -1 if protocol error)
+;		bx = file handle
+;
+
+global	FoamDBClose:far
+;
+; Closes a DB file
+;
+; Pass: bx - handle of DB
+; Return: same as VMClose
+;
+
+global	FoamDBCreateEmptyRecord:far
+;
+; Creates a record with no fields, and stores the information in a memory block
+;
+; Pass: bx - DB handle
+; Return: ax - handle of record data
+;
+
+global	FoamDBDuplicateRecord:far
+;
+; Duplicates the passed record, and assigns a new ID number to it
+;
+; Pass: bx - DB handle
+;	ax - handle of record to duplicate
+;
+; Return: ax - handle of duplicate record
+;
+
+global	FoamDBGetRecordID:far
+;
+; Given a record handle, gets the record ID
+;
+; Pass: ax - record handle
+;
+; Return: dx.cx - record ID
+;
+
+global	FoamDBAddFieldToRecord:far
+;
+; Adds a field to a record
+;
+; Pass: ax - handle of block w/record data
+; 	bx - DB handle
+; 	ds:si - ptr to name string
+;	dl - field type
+;
+; Return: DX - ID number of field	
+;
+
+global	FoamDBDeleteFieldFromRecord:far
+;
+; Deletes a field from the passed record
+;
+; Pass: ax - handle of record data
+;	bx - DB handle
+;	dx - field ID
+; Return: nothing 
+;
+
+global	FoamDBSetFieldName:far
+;
+; Sets the name of a field
+;
+; Pass:		ax - handle of block w/record data
+;		bx - DB handle
+;		dx - field ID
+;		ds:si - new field name
+; Return:	nada
+;
+
+global	FoamDBSetFieldData:far
+;
+; Sets the data for the field
+;
+; Pass:	bx - handle of DB
+;	ax - handle of block containing record data
+;	dx - field ID
+;	ds:si - ptr to field data
+;	cx - size of field data
+;
+; Return: nada
+;
+
+global	FoamDBGetFieldName:far
+;
+; Gets the name of a field	
+;
+; Pass: ax - handle of block w/record data
+;	bx - DB handle
+;	dx - field ID
+;	es:di - dest for null-terminated field name
+;	cx - max # bytes to copy
+;
+; Return: carry set if field did not exist
+;
+
+global	FoamDBGetFieldType:far
+;
+; Gets the type of a field
+;
+; Pass: ax - handle of block w/record data
+;	bx - DB handle
+;	dx - field ID
+;
+; Return: carry set if field did not exist
+;	  dl - field type (FH_type)
+;
+
+global	FoamDBGetFieldData:far
+;
+; Gets the data from a field
+;
+; Pass: ax - handle of block w/record data
+;	bx - DB handle
+;	dx - field ID
+;	es:di - dest for null-terminated field data
+;	cx - max # bytes to copy
+;
+; Return: cx - # bytes of data copied
+;         carry set if field did not exist
+;
+
+global	FoamDBFieldEnum:far
+;
+; Calls a callback for each field in the passed record
+;
+; Pass: ax - handle of block w/record data
+;	bx:di - vfptr to callback routine
+;	cx, dx, bp - data for callback
+;
+;		Callback routine:
+;			Pass:	
+;				DS:SI <- ptr to FieldHeader structure
+;				cx, dx, bp - data for callback
+;			Return:
+;				cx, dx, bp - data to return/pass to next 
+;						invocation of the callback
+;				carry set - abort callback
+;
+; Return:	cx, dx, bp, carry - set from callback
+;
+
+global FoamDBLockedRecordEnum:far
+;
+; Calls a callback for each field in the passed record
+;
+; Pass: ds:si - ptr to a locked record
+;    	bx:di - vfptr to callback routine
+;	cx, dx, bp - data for callback
+;
+;		Callback routine:
+;			Pass:	
+;				DS:SI <- ptr to FieldHeader structure
+;				cx, dx, bp - data for callback
+;			Return:
+;				cx, dx, bp - data to return/pass to next 
+;						invocation of the callback
+;				carry set - abort callback
+;
+; Return:	cx, dx, bp, carry - set from callback
+;
+
+global	FoamDBDiscardRecord:far
+;
+; Discards any changes made to a record - if the record exists in the database,
+; the database version remains intact.	
+;
+; Pass: bx - DB handle
+;	ax - record data (freed by routine)
+;
+; Return: nothing
+; Destroyed: ax
+;
+
+global	FoamDBSaveRecord:far
+;
+; Inserts a record in the database
+;
+; Pass: bx - DB handle
+;	ax - record data (freed by routine)
+;	cx:dx - callback to determine what record we should insert before
+;
+;		Callback is passed:
+;			es:di we are inserting (item 1)
+;			ds:si in database (item 2)
+;		Return:
+;			ax < 0 if item1 < item2
+;			else, ax > 0 (do not return AX = 0)
+; Return: dx.ax - index of position in database where item was inserted
+;
+
+global	FoamDBDeleteRecord:far
+;
+; Deletes a record from the database
+;
+; Pass: bx - DB handle
+;	ax - handle of record (freed by routine)
+; Return: carry set if the item was not in the database
+;
+
+global	FoamDBGetRecordFromID:far
+;
+; Given an ID, returns the data for the record associated with it
+;
+; Pass: bx - DB handle
+;	dx.ax - ID
+;
+; Return: ax - handle of block containing record data, or 0 if record not in DB
+;
+
+global	FoamDBGetNextPrevRecord:far
+;
+; Given an ID, returns index into huge array of next/previous record
+;
+; Pass: bx - DB handle
+;	dx.ax - ID
+;	cx - count (signed, describing how many records forward or
+; 	            previous we`re looking for)
+;
+; Return: carry clear--
+;	 	dx.ax - index of target record in huge array
+;	  carry set--
+;		record doesn't exist (dx.ax = trash)
+;
+
+
+global	FoamDBGetNumVisibleRecords:far
+;
+; Returns the # visible records in the database
+;
+; Pass: bx - DB handle
+; Return: dx.ax - # visible records
+;
+
+global	FoamDBGetVisibleRecord:far
+;
+; Given an index, 'N',  returns the Nth visible record.
+;
+; Pass: bx - file handle
+;	dx.ax - index of item to get
+;
+; Return: ax - handle of block with record data (or 0 if index out of bounds)
+;
+
+global FoamDBVisibleRecordEnum:far
+;
+; Calls a callback for every item in the array of visible records
+;
+; Pass: bx - DB handle
+;	ax.si - callback routine
+;	cx, dx, bp, es - data for callback routine
+;
+;	Callback params:
+;		Pass: ds:di - RecordHeader
+;		      cx, dx, bp, es - data for callback routine
+;		Return: cx, dx, bp, es - data for next callback
+;			carry set to stop enumeration
+;
+
+global	FoamDBVisibleRecordEnumWithRange:far
+;
+; Calls a callback on the array of visible records, starting with the
+; record # (Element to start at), and process (Number to process)
+; records only.
+;
+; Pass: bx - DB handle
+;	ax.si - callback routine
+;	cx, dx, bp, es - data for callback routine
+;	On stack:
+;		Element to start at	dword (pushed first)
+;		Number to process	dword (pushed second)
+;
+;	Callback params:
+;		Pass: ds:di - RecordHeader
+;		      cx, dx, bp, es - data for callback routine
+;		Return: cx, dx, bp, es - data for next callback
+;			carry set to stop enumeration
+;
+
+global	FoamDBMapNameToToken:far
+;
+; Given a field name, returns the token in the database associated with it.
+;
+; Pass: bx - db handle
+;	es:di - name to look for
+; Return: carry clear if field name existed in database
+;		ax = token
+;	  carry set if no fields in DB have this name
+;
+
+global	FoamDBMapTokenToName:far
+;
+; Given a field name token, returns the string associated with it
+;
+; Pass: bx - db handle
+;	ax - field name token
+;	cx - max # bytes to copy
+;	es:di - dest for name
+; Return: carry set if token out of bounds
+;
+
+global FoamDBSetNameForToken:far
+;
+; Given a field name token, changes the name associated with the token to
+; the passed name
+;
+; Pass: bx - db handle
+;	ax - field name token
+;	es:di - name
+;
+; Return: nothing
+;
+
+global	HugeArrayBinarySearch:far
+;
+; Performs a binary search on a huge array
+;
+;Pass:	bx - handle of database
+;	di - handle of huge array
+;	ds:si - ptr to data to search for
+;	cx:dx - vfptr to callback
+;
+;	bp - data to pass to callback (stack frame)
+;
+;		Callback is passed:
+;
+;		es:di - fptr to data record	(item 1)
+;		ds:si - fptr to data record	(item 2)
+;		
+;		Callback returns:
+;			
+;		AX - 0 if items match
+;		     -1 if item1 < item2
+;		     1 if item1 > item2 
+;		
+;Return: dx.ax - index of matching item (or index of where item should
+;			be in the database)
+;	 carry set if not found	
+;
+
+global FoamDBSuspendNotifications:far
+;
+; Suspends notifications temporarily on a database. Note that the code
+; uses a count, so calls to FoamDBSuspendNotifications must be matched
+; by calls to FoamDBResumeNotifications.
+;
+; Pass: bx - handle of database
+;
+; Return: nothing
+;
+
+global FoamDBResumeNotifications:far
+;
+; Resumes notifications for a database -
+;
+; Pass: bx - handle of database
+;
+
+global FoamDBGetCurrentRecordID:far
+;
+; Gets the ID that would be assigned to the next new record
+;
+; Pass: bx - DB handle
+;
+; Return: dx.ax - record ID
+;
+
+global FoamDBSetCurrentRecordID:far
+;
+; Sets the ID that will be assigned to the next new record
+;
+; Pass: bx - DB handle
+;	dx.ax - record ID
+;
+; Return: nothing
+;
+
+global FoamDBBinarySearch:far
+;
+; Do a binary search on the name of a record.
+;
+; Pass: bx - DB handle
+;	ax - record to find handle.
+;
+; Return: dx.ax - record ID
+;
+
+global FoamDBSuspendUpdates:far
+;
+; Suspends updates temporarily on a database. Note that the code
+; uses a count, so calls to FoamDBSuspendUpdates must be matched
+; by calls to FoamDBResumeUpdates.
+;
+; Pass: bx - handle of database
+;
+; Return: nothing
+;
+
+global FoamDBResumeUpdates:far
+;
+; Resumes updates for a database -
+;
+; Pass: bx - db handle
+;
+
+global FoamDBResortDatabase:far
+;
+; Resorts the database 
+;
+; Pass: bx - DB handle
+;	cx:dx - callback that determines sort order (the same routine that is
+;			passed to FoamDBSaveRecord)
+;	bp - data for callback
+;	
+;		Callback is passed:
+;			es:di we are inserting (item 1)
+;			ds:si in database (item 2)
+;		Return:
+;			ax < 0 if item1 < item2
+;			else, ax > 0 (do not return AX = 0)
+;
+; Return: nothing
+;
+
+; C definitions
+;
+global	FOAMDBOPEN:far
+global	FOAMDBCLOSE:far
+global	FOAMDBCREATEEMPTYRECORD:far
+global	FOAMDBADDFIELDTORECORD:far
+global	FOAMDBDELETEFIELDFROMRECORD:far
+global	FOAMDBSETFIELDNAME:far
+global	FOAMDBSETFIELDDATA:far
+global	FOAMDBGETFIELDNAME:far
+global	FOAMDBGETFIELDDATA:far
+global	FOAMDBFIELDENUM:far
+global	FOAMDBSAVERECORD:far
+global	FOAMDBDISCARDRECORD:far
+global	FOAMDBDELETERECORD:far
+global	FOAMDBGETRECORDFROMID:far
+global	FOAMDBGETNUMVISIBLERECORDS:far
+global	FOAMDBGETVISIBLERECORD:far
+global	FOAMDBDUPLICATERECORD:far
+global  FOAMDBVISIBLERECORDENUMWITHRANGE:far
+global  FOAMDBVISIBLERECORDENUM:far
+global  FOAMDBGETFIELDTYPE:far
+global	FOAMDBMAPTOKENTONAME:far
+global	FOAMDBMAPNAMETOTOKEN:far
+global	FOAMDBLOCKEDRECORDENUM:far
+global	FOAMDBGETRECORDID:far
+global	FOAMDBGETNEXTPREVRECORD:far
+global	FOAMDBSUSPENDNOTIFICATIONS:far
+global	FOAMDBRESUMENOTIFICATIONS:far
+global	FOAMDBGETCURRENTRECORDID:far
+global	FOAMDBSETCURRENTRECORDID:far
+global	FOAMDBBINARYSEARCH:far
+global	FOAMDBSUSPENDUPDATES:far
+global	FOAMDBRESUMEUPDATES:far
+global	FOAMDBSETNAMEFORTOKEN:far
+global	FOAMDBRESORTDATABASE:far
+
+EndLibrary	foamdb
+

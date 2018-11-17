@@ -1,0 +1,325 @@
+COMMENT @%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GeoWorks 1992 -- All Rights Reserved
+
+PROJECT:	PC GEOS
+MODULE:		
+FILE:		bigcalcCalc.def
+
+AUTHOR:		Christian Puscasiu, Feb 28, 1992
+
+REVISION HISTORY:
+	Name	Date		Description
+	----	----		-----------
+	CP	2/28/92		Initial revision
+	andres	10/29/96	modified for DOVE
+
+DESCRIPTION:
+	
+		
+	$Id: bigcalcCalc.def,v 1.1 97/04/04 14:38:16 newdeal Exp $
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%@
+
+;----------------------------------------------------------------------------
+;	Constants Definitions
+;----------------------------------------------------------------------------
+ERROR_MSG_NUM_DIS_OUT_OF_RANGE	enum	FatalErrors
+;
+;	[+-]DECIMAL_PLACES[E[+-]xxx] == 1+15+1+3
+;	max # of chars in the display
+;
+
+NUMBER_DISPLAY_WIDTH	equ 18
+NUMBER_NUM_CHARS	equ 20
+
+
+
+
+;
+; all legal chars for inouts into number field.  used by filter
+;
+InputToken	etype	byte
+
+	IT_ZERO		enum	InputToken, 0
+	IT_DIGIT	enum	InputToken, 1
+	IT_SIGN		enum	InputToken, 2
+	IT_EXP		enum	InputToken, 3
+	IT_DECIMAL	enum	InputToken, 4
+
+;
+; used in bigcalcFiniteState.asm to filter fp input
+;
+FiniteStateTableEntryStruct	struct
+	FSTES_destination	word
+	FSTES_rule		nptr
+FiniteStateTableEntryStruct	ends
+
+;
+; aux. attributes to aid in the correct operation of the calculator
+; display
+;
+CalcInputFieldAttributes	record
+	CIFA_unaryOpDone		:1
+;	set right after a unary operation, unset after a binary
+;	only applicable in infix mode
+;
+	CIFA_inRecursion	:1
+;	Special flag set when replacing contents of entire display
+;
+	CIFA_enter		:1
+;	Set in RPN mode only after user has just pressed Enter.
+;	The next operation will duplicate TOS if it is set.
+;
+;;	CIFA_clear		:1	; no longer used -dhunter 9/6/2000
+;
+	CIFA_operationDone	:1
+;	Set after a unary or binary operation or clear all, or by replacing
+;	contents of entire display via memory or PCF.  Reset after
+;	editing the display.  A clear operation with this bit set will
+;	perform a clear all.
+;
+;;	CIFA_inputDone		:1	; no longer used -dhunter 9/11/2000
+;
+	:12
+;
+;	blanks to be used when later dificulties will arise :)
+;
+
+CalcInputFieldAttributes	end
+	
+
+;----------------------------------------------------------------------------
+;	Class definitions
+;----------------------------------------------------------------------------
+;
+; If changes are made here they also have to be added to bigcalcCalc.uih
+;
+
+InputFieldClass		class	GenTextClass
+
+MSG_IF_GET_FROM_CALC	message
+;
+; gets the currnetly displayed fp number
+;
+; PASS: RETURN: DESTROYED: nothing
+;
+
+MSG_IF_SEND_TO_CALC	message
+;
+; sends the currently displayed number to the main calculator display
+;
+; PASS: RETURN: DESTROYED: nothing
+;
+
+MSG_IF_INTERNAL_KBD_CHAR	message
+;
+; Internal version of MSG_META_KBD_CHAR to avoid an infinite loop
+;
+; Pass:
+;	cx = character value
+;	dl = CharFlags
+;	dh = ShiftState
+;	bp low = ToggleState
+;	bp high = scan code
+; Return:
+;	nothing
+;	ax, cx, dx, bp - destroyed
+;
+
+MSG_IF_CURRENCY_LEFT_TO_RIGHT	message
+;
+; does the conversion of the left field into the right field
+;
+; PASS: RETURN: DESTROYED: nothing
+;
+
+MSG_IF_CURRENCY_RIGHT_TO_LEFT	message
+;
+; does the conversion of the right field into the left field
+;
+;
+; PASS: RETURN: DESTROYED: nothing
+;
+
+InputFieldClass		endc
+
+
+; this is the class of the maon calculator display.
+CalcInputFieldClass		class	InputFieldClass
+;
+; This will decide on correct key-sequences will send messages to the
+; floating point library.  Most of the messages just work on the
+; attribute field which keeps the status the input
+;
+
+MSG_CALC_IF_SET_OP_DONE_BIT	message
+;
+; sets the operationDone bit in the instance data of the display,
+; which means that the next input will clear the display first
+;
+; PASS: RETURN: DESTROYED: nothing
+;
+
+if 0	; No longer required -dhunter 9/11/00
+MSG_CALC_IF_SET_INPUT_DONE_BIT	message
+;
+; sets the inputDone bit in the instance data of the display
+;
+; PASS: RETURN: DESTROYED: nothing
+;
+endif
+
+MSG_CALC_IF_CLEAR_OP_DONE_BIT	message
+;
+; clears the operationDone bit in the instance data of the display
+; This should be called after a single clear
+;
+; PASS: RETURN: DESTROYED: nothing
+;
+
+if 0	; No longer required -dhunter 9/11/00
+MSG_CALC_IF_CLEAR_INPUT_DONE_BIT	message
+;
+; clears the operationDone bit and the clear bits in the 
+; instance data of the display
+;
+; PASS: RETURN: DESTROYED: nothing
+;
+endif
+
+MSG_CALC_IF_CHECK_OP_DONE_BIT	message
+;
+; checks wether the operationsDoneBit is set.  
+; RETURN: carry set if bit set
+;		carry unset if bit unset
+;
+
+MSG_CALC_IF_CHECK_ENTER_BIT	message
+;
+; checks wether the enterBit is set.  
+; RETURN: carry set if bit set
+;	  carry unset if bit unset
+;
+
+MSG_CALC_IF_SET_ENTER_BIT	message
+;
+; sets the enter bit in the instance data of the display
+;
+; PASS: RETURN: DESTROYED: nothing
+;
+
+MSG_CALC_IF_CLEAR_ENTER_BIT	message
+;
+; clears the enter bit in the instance data of the display
+;
+; PASS: RETURN: DESTROYED: nothing
+;
+
+if 0	; No longer required. -dhunter 9/12/00
+MSG_CALC_IF_CHECK_CLEAR_BIT	message
+;
+; checks wether the enterBit is set.  
+; RETURN: carry set if bit set
+;	  carry unset if bit unset
+;
+
+MSG_CALC_IF_SET_CLEAR_BIT	message
+;
+; sets the clear bit in the instance data of the display
+;
+
+
+MSG_CALC_IF_CLEAR_CLEAR_BIT	message
+;
+; clears the clear bit in the instance data of the display
+;
+endif
+
+MSG_CALC_IF_CHECK_UNARY_OP_DONE	message
+;
+; checks wether a unary operation has been doen
+; RETURN:	carry set if bit is on
+;		carry unset if bit os off
+;
+
+MSG_CALC_IF_SET_UNARY_OP_DONE	message
+;
+; sets the unaryOpDoneBit
+;
+
+MSG_CALC_IF_CLEAR_UNARY_OP_DONE	message
+;
+; clears the unaryOpDone bit
+;
+	CIFI_attributes		CalcInputFieldAttributes
+	;
+	;will keep the status of the current string that is being displayed
+
+	CIFI_replaceLength	word
+	;
+
+CalcInputFieldClass		endc
+
+MemoryInputFieldClass		class	InputFieldClass
+;
+; the fp input field of the Memory functions
+;
+
+MSG_MEM_IF_MEMORY_PLUS		message
+MSG_MEM_IF_MEMORY_MINUS		message
+;
+; adds/subtracts the current number to the active memory
+;
+; PASS: RETURN: DESTROY: nothing 
+;
+
+MSG_MEM_IF_SAVE_OPTIONS_AND_SEND_IC	message
+;
+; Causes the passed InteractionCommand to be sent to the parent dialog
+; box, as well as MSG_META_SAVE_OPTIONS.
+;
+; PASS:		cx	= InteractionCommand
+;		DX	= Chunk handle of parent object to which
+;			  we will send the SAVE_OPTIONS
+;
+; RETURN:	nothing
+;
+; DESTROY:	nothing 
+;
+
+	MIFI_fpMemory		word	5	dup(0)
+	;
+	; stores the fp number of the active display as its bit
+	; representation, which is more precise than just the ascii
+	; chars that are stored in the text field alone.
+	;
+
+MemoryInputFieldClass		endc
+
+PaperRollClass		class	GenTextClass
+
+MSG_PAPER_ROLL_CLEAR_PAPERROLL	message
+;
+; clears the paper tape
+;
+; PASS: RETURN: DESTROY: nothing 
+;
+
+MSG_PAPER_ROLL_CHECK_LENGTH	message
+;
+; checks the number of entries on the papertape
+;
+; PASS: RETURN: DESTROY: nothing 
+;
+
+PaperRollClass		endc
+
+CalcTriggerClass	class	GenTriggerClass
+CalcTriggerClass	endc
+
+CalcBooleanClass	class	GenBooleanClass
+CalcBooleanClass	endc
+
+CalcWorksheetListClass	class	GenItemGroupClass
+CalcWorksheetListClass	endc

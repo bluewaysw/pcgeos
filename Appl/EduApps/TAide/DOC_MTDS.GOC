@@ -1,0 +1,905 @@
+/***************************************************************************
+ *  FILE:           doc_mtds.goc
+ *  PROJECT:        Breadbox Teacher's Aide
+ *  DESCRIPTION:    This file has methods for document manipulation
+ *
+ **************************************************************************
+ */
+/*
+ ***************************************************************************
+ *      Include files
+ ***************************************************************************
+ */
+
+@include "taide.goh"
+@include "externs.goh"
+@include "tadocico.goh"
+
+
+//@extern visMoniker TADocIconMonikerList;
+
+/*
+ ***************************************************************************
+ *      Class & Message Definitions
+ ***************************************************************************
+ */
+
+/*********************************************************************
+ *  the globals declared as extern in .goh
+ ********************************************************************
+*/
+
+word g_sysPointSize = 0;
+VMFileHandle g_letterFileHan = 0;
+Boolean g_showLetters = FALSE;
+word g_numName = NUM_ONLY;
+
+
+/*
+ ***************************************************************************
+ *      Code for Document Manipulation
+ ***************************************************************************
+ */
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_PROCESS_CREATE_UI_THREAD for TAProcessClass
+ *             ThreadHandle *newThread
+ *             ClassStruct  *class
+ *             word         stackSize
+ *
+ * DESCRIPTION:  see if we can bump up the ui stack
+ *                 
+ *
+ ***********************************************************************/
+/*@extern method TAProcessClass, MSG_PROCESS_CREATE_UI_THREAD
+{
+
+    stackSize = INTERFACE_THREAD_DEF_STACK_SIZE + 4000;
+    return @callsuper() ;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_GEN_PROCESS_OPEN_APPLICATION for TAProcessClass
+ *
+ * DESCRIPTION:  do some opening stuff
+ *
+ *
+ ***********************************************************************/
+@extern method TAProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+ Boolean		initError;
+
+
+    /* get the system font size (for grade element dlist)*/
+    initError = InitFileReadInteger("ui", "fontsize", &g_sysPointSize);
+    if (initError) g_sysPointSize = 12;
+
+
+    /* create the layout dir if it isn't there */
+    FilePushDir();
+    FileSetStandardPath(TA_LAYOUT_SP);
+    FileCreateDir(TA_LAYOUT_DIR);
+    FilePopDir();
+
+    /* do we have a letter conversion table? */
+    FilePushDir();
+    FileSetCurrentPath(SP_USER_DATA, ".");
+    g_letterFileHan = VMOpen("TA Letter Grades", VMAF_FORCE_READ_WRITE, VMO_OPEN, 0);
+    FilePopDir();
+    if (g_letterFileHan)  {
+	  @send SUShowLettersItem::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  }
+    else {
+	  @send SUShowLettersItem::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  }
+
+    initError = InitFileReadBoolean("Teacher's Aide", "letterGrades", &g_showLetters);
+    if (initError) g_showLetters = FALSE;
+    if (g_showLetters)
+	  @call SUShowLettersItem::MSG_GEN_USE_VIS_MONIKER(
+						   OptrToChunk(@DontShowLettersMoniker),
+						   VUM_NOW);
+    else
+	  @call SUShowLettersItem::MSG_GEN_USE_VIS_MONIKER(
+						   OptrToChunk(@ShowLettersMoniker),
+						   VUM_NOW);
+
+    @callsuper();
+
+        /* needed to install app tiny token in newUI */
+	 @call TAApp::MSG_GEN_APPLICATION_INSTALL_TOKEN();
+
+    /* needed to install doc token */
+    @call process::MSG_GEN_PROCESS_INSTALL_TOKEN();
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_GEN_PROCESS_CLOSE_APPLICATION for TAProcessClass
+ *
+ * DESCRIPTION:  do some closing stuff
+ *
+ *
+ ***********************************************************************/
+@extern method TAProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+
+    if (g_letterFileHan)  VMClose(g_letterFileHan, FALSE);
+
+    @callsuper();
+
+    return NULL;
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE for
+ *                                    TADocumentClass
+ *
+ *
+ * DESCRIPTION: Called to initialize a created opened document.
+ *
+ *
+ ***********************************************************************/
+@extern method TADocumentClass, MSG_GEN_DOCUMENT_INITIALIZE_DOCUMENT_FILE
+{
+ VMMapStruct        *VMmapPtr;
+ MemHandle      mh;
+ VMBlockHandle      vmbh;
+ BasicDBError       error;
+ BasicDBRecordID    recordID;
+ word           i, j;
+ GradeTypeStruct    *gradeTypePtr;
+ AttCodeStruct      *attCodePtr;
+ MemHandle      mem ;
+ SeatingClassBlock  *p_seating ;
+
+	 /* create the student database */
+	 pself->TADI_stuDBHan = 0;
+    error = BasicDBCreate(pself->GDI_fileHandle, &pself->TADI_stuDBHan, FALSE);
+	 if (error) NotifyDBox(0, @BDBCreateError);
+	 else {
+			error = BasicDBIndexCreate(pself->GDI_fileHandle,
+                     pself->TADI_stuDBHan,
+                     BDBILF_AUTO_UPDATE,
+                     VFC_NAME,
+							&pself->TADI_stuNameIndex);
+			if (error) NotifyDBox(0, @BDBCreateIndexError);
+			error = BasicDBIndexCreate(pself->GDI_fileHandle,
+                     pself->TADI_stuDBHan,
+							BDBILF_AUTO_UPDATE,
+                     VFC_NUMBER,
+							&pself->TADI_stuNumIndex);
+		}
+
+	 /* create the student default info database */
+    error = BasicDBCreate(pself->GDI_fileHandle,
+				 &pself->TADI_stuDefDBHan,
+				 FALSE);
+	 /* create the default record */
+    mh = MakeNewStuRec(pself->GDI_fileHandle, pself->TADI_stuDefDBHan);
+	 /* now save the empty record */
+    error = BasicDBSaveRecord(pself->GDI_fileHandle,
+                       pself->TADI_stuDefDBHan,
+                       mh,
+                       StuDefaultsCallback,
+							  &recordID);
+	 pself->TADI_isNewStu = TRUE;
+    pself->TADI_numStudents = 0;
+
+    /* Create a VM block for the 4 stu pick list ------------------ */
+    for (i = 0; i < 4; i++)  {
+      vmbh = VMAlloc(pself->GDI_fileHandle, 256, STU_PICK_TEAM + i);
+      /* create an lmem block to attach to it */
+      mh = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+      /* create the chunk array  */
+      MemLock(mh);
+      pself->TADI_pickListChunkArray[i] = ChunkArrayCreate(
+                mh,
+                NAME_SIZE,
+                0,
+                0);
+      /* and attach the block to the VM - */
+      VMAttach(pself->GDI_fileHandle, vmbh, mh);
+      MemUnlock(mh);
+      }
+
+    /* and the default grade types array ---------------------------------- */
+    vmbh = VMAlloc(pself->GDI_fileHandle, 256, GRADE_TYPES);
+    /* create an lmem block to attach to it */
+    mh = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+    /* create the chunk array  */
+    MemLock(mh);
+    pself->TADI_gradeTypesChunkArray = ChunkArrayCreate(
+                mh,
+                sizeof(GradeTypeStruct),
+                0,
+                0);
+    /* put default items into the array */
+    MemLock (OptrToHandle(@GradeTypeStr1));
+    for (i = 0; i < NUM_DEFAULT_GRADE_TYPES; i++)  {
+      gradeTypePtr = ChunkArrayAppendHandles(
+                  mh,
+                  pself->TADI_gradeTypesChunkArray,
+                  0);
+      strcpy(gradeTypePtr->GTS_type, LMemDeref(@GradeTypeStr1[i]));
+      for (j = 0; j < MAX_GRADE_PDS; j++) {
+        gradeTypePtr->GTS_weight[j] = 0;
+        }
+      }
+    MemUnlock (OptrToHandle(@GradeTypeStr1));
+    /* and attach the block to the VM - */
+    VMAttach(pself->GDI_fileHandle, vmbh, mh);
+    MemUnlock(mh);
+
+    /* and the default attendance codes array ----------------------------- */
+    vmbh = VMAlloc(pself->GDI_fileHandle, 256, ATT_CODE);
+    /* create an lmem block to attach to it */
+    mh = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+    /* create the chunk array  */
+    MemLock(mh);
+    pself->TADI_attCodeChunkArray = ChunkArrayCreate(
+                mh,
+                sizeof(AttCodeStruct),
+                0,
+                0);
+    /* put default items into the array */
+    MemLock (OptrToHandle(@AttCodeStrings1));
+    for (i = 0; i < 6; i++)  {
+      attCodePtr = ChunkArrayAppendHandles(
+                  mh,
+                  pself->TADI_attCodeChunkArray,
+                  0);
+      strcpy(attCodePtr->ACS_type, LMemDeref(@AttCodeStrings1[i]));
+      i++;
+      strcpy(attCodePtr->ACS_code, LMemDeref(@AttCodeStrings1[i]));
+      }
+    MemUnlock (OptrToHandle(@AttCodeStrings1));
+    /* and attach the block to the VM - */
+    VMAttach(pself->GDI_fileHandle, vmbh, mh);
+    MemUnlock(mh);
+
+	 /* and the default holidays array ------------------------------------ */
+    vmbh = VMAlloc(pself->GDI_fileHandle, 256, HOLIDAY);
+    /* create an lmem block to attach to it */
+    mh = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+    /* create the chunk array  */
+    MemLock(mh);
+    pself->TADI_holidayChunkArray = ChunkArrayCreate(
+                mh,
+                sizeof(HolidaysStruct),
+                0,
+                0);
+    /* and attach the block to the VM - */
+    VMAttach(pself->GDI_fileHandle, vmbh, mh);
+    MemUnlock(mh);
+
+
+
+    /* and the 6 grade period element arrays ------------------------------ */
+    for (i = 0; i < MAX_GRADE_PDS; i++) {
+      vmbh = VMAlloc(pself->GDI_fileHandle, 256, GRADE_ELEM_1 + i);
+      /* create an lmem block to attach to it */
+      mh = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+      /* create the chunk array  */
+      MemLock(mh);
+      pself->TADI_gradeElemChunkArray[i] = ChunkArrayCreate(
+                mh,
+                sizeof(GradeElementStruct),
+                0,
+                0);
+      /* and attach the block to the VM - */
+      VMAttach(pself->GDI_fileHandle, vmbh, mh);
+      MemUnlock(mh);
+      }
+
+
+    /* now a VM Map Block */
+    vmbh = VMAlloc(pself->GDI_fileHandle, sizeof(VMMapStruct), 0);
+    VMSetMapBlock(pself->GDI_fileHandle, vmbh);
+    VMmapPtr = VMLock(pself->GDI_fileHandle, vmbh, &mh);
+    /* store some globals we'll need */
+    VMmapPtr->VMMS_StuDBHan = pself->TADI_stuDBHan;
+    VMmapPtr->VMMS_numStudents = pself->TADI_numStudents;
+  //  VMmapPtr->VMMS_delStuDBHan = pself->TADI_delStuDBHan;
+    VMmapPtr->VMMS_delStuDBHan = 0;
+    VMmapPtr->VMMS_numDelStudents = 0;
+    VMmapPtr->VMMS_stuNameIndex = pself->TADI_stuNameIndex;
+    VMmapPtr->VMMS_stuNumIndex = pself->TADI_stuNumIndex;
+    VMmapPtr->VMMS_curStuIndex = pself->TADI_stuNameIndex;
+    VMmapPtr->VMMS_stuDefDBHan = pself->TADI_stuDefDBHan;
+    VMmapPtr->VMMS_pickListChunkArray[0] = pself->TADI_pickListChunkArray[0];
+    VMmapPtr->VMMS_pickListChunkArray[1] = pself->TADI_pickListChunkArray[1];
+    VMmapPtr->VMMS_pickListChunkArray[2] = pself->TADI_pickListChunkArray[2];
+    VMmapPtr->VMMS_pickListChunkArray[3] = pself->TADI_pickListChunkArray[3];
+    VMmapPtr->VMMS_gradeTypesChunkArray = pself->TADI_gradeTypesChunkArray;
+    VMmapPtr->VMMS_attCodeChunkArray = pself->TADI_attCodeChunkArray;
+    VMmapPtr->VMMS_holidayChunkArray = pself->TADI_holidayChunkArray;
+    for (i = 0; i < MAX_GRADE_PDS; i++) {
+      VMmapPtr->VMMS_gradeElemChunkArray[i] =
+                              pself->TADI_gradeElemChunkArray[i];
+	 VMmapPtr->VMMS_gpStart[i] = 0;
+	 VMmapPtr->VMMS_numElements[i] = 0;
+	 }
+    VMmapPtr->VMMS_extraFieldName[0] = 0;
+    VMmapPtr->VMMS_curNumAttDays = 0;
+    VMmapPtr->VMMS_curStuNoteSortPref = VFC_DATE;
+    VMmapPtr->VMMS_showWeekends = FALSE;
+    VMmapPtr->VMMS_showSemesters = FALSE;
+    VMmapPtr->VMMS_curGradePd = 0;
+    VMmapPtr->VMMS_numGradePds = 0;
+    VMmapPtr->VMMS_curModule = MOD_ATTENDANCE;
+    VMmapPtr->VMMS_seatingLayout = VMAlloc(pself->GDI_fileHandle, sizeof(SeatingClassBlock), 0) ;
+    VMmapPtr->VMMS_numTypes = NUM_DEFAULT_GRADE_TYPES;
+
+    /* Allocate and intialize the seating */
+    p_seating = VMLock(pself->GDI_fileHandle, VMmapPtr->VMMS_seatingLayout, &mem) ;
+    if (p_seating)  {
+        memset(p_seating, 0, sizeof(p_seating)) ;
+        VMDirty(mem) ;
+        VMUnlock(mem) ;
+    }
+
+    VMDirty(mh);
+	 VMUnlock(mh);
+
+	 return(FALSE);
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT for
+ *                                    TADocumentClass
+ *
+ *
+ * DESCRIPTION: Called to initialize a newly opened document.
+ *
+ *
+ ***********************************************************************/
+@extern method TADocumentClass, MSG_GEN_DOCUMENT_ATTACH_UI_TO_DOCUMENT
+{
+ VMMapStruct        *VMmapPtr;
+ MemHandle      mh;
+ VMBlockHandle      vmbh;
+ word           i, numColumns/*, numCodes*/;
+ optr   gPItem[MAX_GRADE_PDS - 1] = {
+    @GP2Trigger,
+    @GP3Trigger,
+    @GP4Trigger,
+    @GP5Trigger,
+    @GP6Trigger};
+/*jfhtest */
+//char string[50];
+
+    /* get our VMmap block */
+    vmbh = VMGetMapBlock(pself->GDI_fileHandle);
+    VMmapPtr = VMLock(pself->GDI_fileHandle, vmbh, &mh);
+    /* retrieve enough info to get started */
+    pself->TADI_stuDBHan = VMmapPtr->VMMS_StuDBHan;
+    pself->TADI_numStudents = VMmapPtr->VMMS_numStudents;
+    pself->TADI_stuNameIndex = VMmapPtr->VMMS_stuNameIndex;
+    pself->TADI_stuNumIndex = VMmapPtr->VMMS_stuNumIndex;
+    pself->TADI_curStuIndex = VMmapPtr->VMMS_curStuIndex;
+    pself->TADI_curNumAttDays = VMmapPtr->VMMS_curNumAttDays;
+    pself->TADI_curGradePd = VMmapPtr->VMMS_curGradePd;
+    pself->TADI_curModule = VMmapPtr->VMMS_curModule;
+    pself->TADI_numGradePds = VMmapPtr->VMMS_numGradePds;
+    pself->TADI_numTypes = VMmapPtr->VMMS_numTypes;
+    pself->TADI_attCodeChunkArray = VMmapPtr->VMMS_attCodeChunkArray;
+    pself->TADI_holidayChunkArray = VMmapPtr->VMMS_holidayChunkArray;
+    pself->TADI_gradeTypesChunkArray = VMmapPtr->VMMS_gradeTypesChunkArray;
+    for (i = 0; i < MAX_GRADE_PDS; i++) {
+      pself->TADI_gradeElemChunkArray[i] =
+                     VMmapPtr->VMMS_gradeElemChunkArray[i];
+	 pself->TADI_numElements[i] = VMmapPtr->VMMS_numElements[i];
+	 }
+    pself->TADI_showWeekends = VMmapPtr->VMMS_showWeekends;
+	 pself->TADI_showSemesters = VMmapPtr->VMMS_showSemesters;
+
+	 /* Tell the seating module where its data is */
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCSeating))::
+              MSG_SEATING_SET_VM_SETTINGS(
+                  pself->GDI_fileHandle,
+                  VMmapPtr->VMMS_seatingLayout) ;
+    VMUnlock(mh);
+
+    /* set some grid stuff */
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCANamesGrid))::
+        MSG_VIS_GRID_SET_DESTINATION(oself);
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCAttendGrid))::
+        MSG_VIS_GRID_SET_DESTINATION(oself);
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradesGrid))::
+        MSG_VIS_GRID_SET_DESTINATION(oself);
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCAttTitlesGrid))::
+        MSG_VIS_GRID_SET_DESTINATION(oself);
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradeTitlesGrid))::
+        MSG_VIS_GRID_SET_DESTINATION(oself);
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCAttendGrid))::
+                MSG_VIS_TEXT_GRID_SET_TEXT_OBJECT(
+                ConstructOptr(pself->GDI_display, OptrToChunk(@AttendTextGridObj)));
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCAttendGrid))::
+                MSG_VIS_TEXT_GRID_SET_QUERY_DATA_MSG(
+                              MSG_SHOW_ATTENDANCE_GRID_DATA);
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCAttendGrid))::
+                MSG_VIS_TEXT_GRID_SET_SAVE_DATA_MSG(
+                              MSG_SAVE_ATTENDANCE_GRID_DATA);
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradesGrid))::
+                MSG_VIS_TEXT_GRID_SET_TEXT_OBJECT(
+                ConstructOptr(pself->GDI_display, OptrToChunk(@GradeTextGridObj)));
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradesGrid))::
+                MSG_VIS_TEXT_GRID_SET_QUERY_DATA_MSG(
+                              MSG_SHOW_GRADE_GRID_DATA);
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradesGrid))::
+                MSG_VIS_TEXT_GRID_SET_SAVE_DATA_MSG(
+                              MSG_SAVE_GRADE_GRID_DATA);
+
+    /* draw right number of rows in the grids */
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@TADisplay))::
+			    MSG_META_SUSPEND();
+    for (i = 0; i < (word)pself->TADI_numStudents; i++) {
+      @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCANamesGrid))::
+                    MSG_VIS_GRID_ADD_ROW(VIS_GRID_LOCATION_PAST_END, NAME_HEIGHT);
+      @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCAttendGrid))::
+                    MSG_VIS_GRID_ADD_ROW(VIS_GRID_LOCATION_PAST_END, NAME_HEIGHT);
+      @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradesGrid))::
+                    MSG_VIS_GRID_ADD_ROW(VIS_GRID_LOCATION_PAST_END, NAME_HEIGHT);
+      }
+
+	 /* and the school year date columns */
+    if (pself->TADI_curGradePd < MAX_GRADE_PDS)  {
+	  /* regular grade period */
+	  for (i = 0; i < pself->TADI_curNumAttDays; i++) {
+		@call ConstructOptr(pself->GDI_display, OptrToChunk(@MCAttTitlesGrid))::
+		   MSG_VIS_GRID_ADD_COLUMN(VIS_GRID_LOCATION_PAST_END, ATT_WIDTH);
+		@call ConstructOptr(pself->GDI_display, OptrToChunk(@MCAttendGrid))::
+		   MSG_VIS_GRID_ADD_COLUMN(VIS_GRID_LOCATION_PAST_END, ATT_WIDTH);
+	  }
+	  numColumns = 2;
+	  }
+    else {
+	  numColumns = pself->TADI_numGradePds + 1;
+	  }
+
+/*jfhtest */
+/*UtilHex32ToAscii(string, numColumns, UHTAF_NULL_TERMINATE);
+strcat(string, " - attend cols");
+UserStandardDialog(0, 0, 0, 0, string,
+			  ((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+			  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+*/
+//jfh 9/10/01 Everything is fine up to here.  When I create a new file I get
+//					numColumns = 2 reported by the above UserStdDialog
+
+	 for (i = 0; i < numColumns; i++) {
+	  @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCAttTitlesGrid))::
+			MSG_VIS_GRID_ADD_COLUMN(VIS_GRID_LOCATION_PAST_END, ATT_SUMMARY_WIDTH);
+
+//jfh 9/10/01 But in Geos2xec (that comes with the old Ensemble & Zoomer SDK)
+//					the app crashes at this message with a KR-06, which seems to
+//					indicate memory trashing somewhere.  It runs fine in all Geos
+//					3.x implementations but crashes in 2.x
+
+/*jfhtest */
+/*UtilHex32ToAscii(string, i, UHTAF_NULL_TERMINATE);
+strcat(string, " - attend title col add");
+UserStandardDialog(0, 0, 0, 0, string,
+			  ((CDT_NOTIFICATION << CDBF_DIALOG_TYPE_OFFSET) |
+			  (GIT_NOTIFICATION << CDBF_INTERACTION_TYPE_OFFSET)));
+*/
+	  @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCAttendGrid))::
+		   MSG_VIS_GRID_ADD_COLUMN(VIS_GRID_LOCATION_PAST_END, ATT_SUMMARY_WIDTH);
+	  }
+
+	 /* and how many grade columns */
+    /* first the elements... */
+    if (pself->TADI_curGradePd == MAX_GRADE_PDS) {
+	  /* summary pd */
+	  numColumns = 0;
+	  @send SUGradeElemsItem::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send SUGradeTypesItem::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  }
+    else {
+	  numColumns = pself->TADI_numElements[pself->TADI_curGradePd];
+	  @send SUGradeElemsItem::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  @send SUGradeTypesItem::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+	  }
+    /* add the types... */
+    numColumns += pself->TADI_numTypes;
+    numColumns++;  /* the final */
+
+	 /* figger out how many grade columns */
+    if (pself->TADI_curGradePd < MAX_GRADE_PDS) {
+	  /* a regular grade period = E + T + F */
+	  numColumns = pself->TADI_numElements[pself->TADI_curGradePd]
+				+ pself->TADI_numTypes
+				+ 1;
+	  }
+    else  {  /* the summary pd = gps + F */
+	  numColumns = pself->TADI_numGradePds + 1;
+	  /* and semesters if selected */
+	  if (pself->TADI_showSemesters) numColumns += 2;
+	  }
+
+	 /* set up the columns */
+    for (i = 0; i < (numColumns); i++) {
+	 @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradeTitlesGrid))::
+             MSG_VIS_GRID_ADD_COLUMN(VIS_GRID_LOCATION_PAST_END, GRADE_WIDTH);
+      @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradesGrid))::
+             MSG_VIS_GRID_ADD_COLUMN(VIS_GRID_LOCATION_PAST_END, GRADE_WIDTH);
+      }
+/*    @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCGradesGrid))::
+			MSG_VIS_SET_SIZE(numColumns * GRADE_WIDTH,
+						  (pself->TADI_numStudents - 1) * NAME_HEIGHT);
+*/
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@TADisplay))::
+			    MSG_META_UNSUSPEND();
+
+    /* Link the seating object to this document */
+    @call ConstructOptr(pself->GDI_display, OptrToChunk(@MCSeating))::
+             MSG_SEATING_SET_DESTINATION(oself) ;
+
+    /* disable grade pd menu items that don't have dates */
+    for (i = 0; i < (MAX_GRADE_PDS - 1); i++)  {
+	  if ((i + 1) < (pself->TADI_numGradePds))
+         @send gPItem[i]::MSG_GEN_SET_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+       else
+         @send gPItem[i]::MSG_GEN_SET_NOT_USABLE(VUM_DELAYED_VIA_APP_QUEUE);
+	  }
+
+    /* show the last selected module */
+    @send self::MSG_CHANGE_MODULE(pself->TADI_curModule);
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_META_GAINED_MODEL_EXCL for TADocumentClass
+ *
+ *
+ * DESCRIPTION: Put the doc file data into the right places.
+ *
+ *
+ ***********************************************************************/
+@extern method TADocumentClass, MSG_META_GAINED_MODEL_EXCL
+{
+ VMMapStruct        *VMmapPtr;
+ MemHandle      mh;
+ VMBlockHandle      vmbh;
+ word           i;
+ char           periodStr[NAME_SIZE], string[NAME_SIZE];
+
+
+    /* get our VMmap block */
+    vmbh = VMGetMapBlock(pself->GDI_fileHandle);
+    VMmapPtr = VMLock(pself->GDI_fileHandle, vmbh, &mh);
+    /* retrieve the info for the globals */
+    pself->TADI_stuDBHan = VMmapPtr->VMMS_StuDBHan;
+ //   pself->TADI_delStuDBHan = VMmapPtr->VMMS_delStuDBHan;
+    pself->TADI_numStudents = VMmapPtr->VMMS_numStudents;
+    pself->TADI_stuNameIndex = VMmapPtr->VMMS_stuNameIndex;
+    pself->TADI_stuNumIndex = VMmapPtr->VMMS_stuNumIndex;
+    pself->TADI_curStuIndex = VMmapPtr->VMMS_curStuIndex;
+    pself->TADI_stuDefDBHan = VMmapPtr->VMMS_stuDefDBHan;
+    pself->TADI_pickListChunkArray[0] = VMmapPtr->VMMS_pickListChunkArray[0];
+    pself->TADI_pickListChunkArray[1] = VMmapPtr->VMMS_pickListChunkArray[1];
+    pself->TADI_pickListChunkArray[2] = VMmapPtr->VMMS_pickListChunkArray[2];
+    pself->TADI_pickListChunkArray[3] = VMmapPtr->VMMS_pickListChunkArray[3];
+    pself->TADI_gradeTypesChunkArray = VMmapPtr->VMMS_gradeTypesChunkArray;
+    pself->TADI_attCodeChunkArray = VMmapPtr->VMMS_attCodeChunkArray;
+    pself->TADI_holidayChunkArray = VMmapPtr->VMMS_holidayChunkArray;
+    for (i = 0; i < MAX_GRADE_PDS; i++) {
+      pself->TADI_gradeElemChunkArray[i] =
+                            VMmapPtr->VMMS_gradeElemChunkArray[i];
+	 pself->TADI_numElements[i] = VMmapPtr->VMMS_numElements[i];
+	 }
+    pself->TADI_curNumAttDays = VMmapPtr->VMMS_curNumAttDays;
+    pself->TADI_curStuNoteSortPref = VMmapPtr->VMMS_curStuNoteSortPref;
+    pself->TADI_showWeekends = VMmapPtr->VMMS_showWeekends;
+    pself->TADI_showSemesters = VMmapPtr->VMMS_showSemesters;
+    pself->TADI_curGradePd = VMmapPtr->VMMS_curGradePd;
+    pself->TADI_curModule = VMmapPtr->VMMS_curModule;
+    pself->TADI_numGradePds = VMmapPtr->VMMS_numGradePds;
+    pself->TADI_numTypes = VMmapPtr->VMMS_numTypes;
+    VMUnlock(mh);
+
+    pself->TADI_openStuRecMH = NullHandle;
+
+	 /* if there are students... */
+    if (pself->TADI_numStudents) {
+      pself->TADI_curStudent = 0;
+      /* set the prev/next buttons as needed */
+      @send MSDBPrevButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+      if (pself->TADI_numStudents > 1)
+        @send MSDBNextButton::MSG_GEN_SET_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+      else
+        @send MSDBNextButton::MSG_GEN_SET_NOT_ENABLED(VUM_DELAYED_VIA_APP_QUEUE);
+      }
+
+    /* show the right grade period in the corner */
+	 MemLock(OptrToHandle(@GradePdStr));
+	 if (pself->TADI_curGradePd < MAX_GRADE_PDS) {
+	  UtilHex32ToAscii(periodStr,
+				    (dword) (pself->TADI_curGradePd + 1),
+				    UHTAF_NULL_TERMINATE);
+	  strcpy(string, "\t");
+	  strcat(string, LMemDeref(@GradePdStr));
+	  strcat(string, " ");
+	  strcat(string, periodStr);
+	  }
+	 else {
+	  strcpy(string, "\t");
+	  strcat(string, LMemDeref(@SummaryStr));
+	  strcat(string, " ");
+	  }
+	 MemUnlock(OptrToHandle(@GradePdStr));
+
+    @send ConstructOptr(pself->GDI_display, OptrToChunk(@MCCornerGPText))::
+				   MSG_VIS_TEXT_REPLACE_ALL_PTR(string, 0);
+
+    StudentSeatingLabelsReset(pself->GDI_fileHandle,
+                              pself->TADI_stuDBHan,
+                        pself->TADI_curStuIndex,
+                        pself->GDI_display) ;
+
+    @callsuper();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_META_LOST_MODEL_EXCL for TADocumentClass
+ *
+ * DESCRIPTION: Called when file is closed.
+ *
+ *
+ ***********************************************************************/
+@extern method TADocumentClass, MSG_META_LOST_MODEL_EXCL
+{
+
+
+    @callsuper();
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT for TADocumentClass
+ *
+ * DESCRIPTION: Called when file is closed.
+ *
+ *
+ ***********************************************************************/
+@extern method TADocumentClass, MSG_GEN_DOCUMENT_DETACH_UI_FROM_DOCUMENT
+{
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_GEN_DOCUMENT_CLOSE for TADocumentClass
+ *
+ * DESCRIPTION: Called when file is closed.
+ *              Checks if we're in a different grade period or
+ *                 module than when we started.  If so marks doc
+ *                 dirty so it can open where user closed it
+ *
+ ***********************************************************************/
+@extern method TADocumentClass, MSG_GEN_DOCUMENT_CLOSE
+{
+ VMMapStruct		*VMmapPtr;
+ MemHandle		mh;
+ VMBlockHandle		vmbh;
+ Boolean			changed = FALSE;
+
+
+    vmbh = VMGetMapBlock(pself->GDI_fileHandle);
+    VMmapPtr = VMLock(pself->GDI_fileHandle, vmbh, &mh);
+    if (VMmapPtr->VMMS_curModule != pself->TADI_curModule)  {
+	  VMmapPtr->VMMS_curModule = pself->TADI_curModule;
+	  changed = TRUE;
+	  }
+    if (VMmapPtr->VMMS_curGradePd != pself->TADI_curGradePd) {
+	  VMmapPtr->VMMS_curGradePd = pself->TADI_curGradePd;
+	  changed = TRUE;
+	  }
+    if (VMmapPtr->VMMS_curNumAttDays != pself->TADI_curNumAttDays) {
+	  VMmapPtr->VMMS_curNumAttDays = pself->TADI_curNumAttDays;
+	  changed = TRUE;
+	  }
+
+    if (changed) {
+	  VMDirty(mh);
+       /* need this to make it happen in the closing process */
+	  @send self::MSG_GEN_DOCUMENT_MARK_DIRTY();
+	  }
+    VMUnlock(mh);
+
+    return (@callsuper());
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_GEN_DOCUMENT_SAVE_AS_COMPLETED for TADocumentClass
+ *
+ * DESCRIPTION: Called on Save As.
+ *
+ *
+ ***********************************************************************/
+
+@extern method TADocumentClass, MSG_GEN_DOCUMENT_SAVE_AS_COMPLETED
+{
+
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_GEN_PROCESS_INSTALL_TOKEN for TAProcessClass
+ *
+ * DESCRIPTION: Associates token with docs
+ *
+ *              needs token.h include
+ ***********************************************************************/
+
+@extern method TAProcessClass, MSG_GEN_PROCESS_INSTALL_TOKEN
+{
+	 dword   TATokenChars;
+	 TokenFlags  TATokenFlags;
+
+    @callsuper();
+
+	 TATokenChars = TOKEN_CHARS('T', 'A', (dword) 'd', (dword) '1');
+    /* it won't work w/o the two casts */
+	 if (!TokenGetTokenInfo(TATokenChars, 16431, &TATokenFlags)) {
+
+		 TokenDefineToken(TATokenChars,
+        16431,
+		  @TADocIconMonikerList,
+        0);
+    }
+}
+
+/***********************************************************************
+ *
+ * MESSAGE: MSG_LAUNCH_TOOL for TAProcessClass
+ *                  (word whichApp)
+ * DESCRIPTION: launches a Geos app
+ *                  Won't bring up minimized app !!!
+ *
+ *
+ *
+ ***********************************************************************/
+
+@extern method TAProcessClass, MSG_LAUNCH_TOOL
+{
+ GeodeToken     appToken;
+ GeodeHandle    appHandle;
+ MemHandle      mh;
+ word           numServers;
+ IACPConnection iacpConnectionToken;
+ EventHandle    eventToTop;
+ word           connectionFlags = 0;
+
+
+    appToken.GT_manufID = 0;
+    if (whichApp == APP_CALC)  {
+	  strcpy(appToken.GT_chars, "BCAL");
+	  /* check to see if app is running already */
+	  appHandle = GeodeFind("bigcalc",7,0,0);
+	  }
+    if (whichApp == APP_PLAN)  {
+	  strcpy(appToken.GT_chars, "PLNR");
+	  /* check to see if app is running already */
+	  appHandle = GeodeFind("geoplan",7,0,0);
+	  }
+
+
+    if(appHandle == NullHandle)  {  /* calc is not running */
+	  /* set up a launch block for it */
+	  mh = IACPCreateDefaultLaunchBlock(MSG_GEN_PROCESS_OPEN_APPLICATION);
+	  /* start it */
+	  iacpConnectionToken = IACPConnect(
+		   &appToken,
+             IACPCF_OBEY_LAUNCH_MODEL||IACPSM_USER_INTERACTIBLE,
+             mh,
+             0,
+             &numServers);
+	  /* check to see if it got started */
+	  if (numServers != 1) {
+		/* it didn't so bail out... */
+		return;
+		}
+	  /* and close the IACP connection */
+	  IACPShutdown(iacpConnectionToken, NullOptr);
+	  }  /* end of not running if */
+
+    else  {  /* it is already running */
+	  /* connect to it */
+	  iacpConnectionToken = IACPConnect(
+			 &appToken,
+                connectionFlags,
+                NULL,
+                NullOptr,
+                &numServers);
+	  /* encapsulate a message telling calc to come to the top */
+	  eventToTop = @record GenApplicationClass::MSG_GEN_BRING_TO_TOP();
+	  /* send our message to calc */
+	  IACPSendMessage(iacpConnectionToken,
+                   eventToTop,
+                   TO_MODEL,
+                   NullHandle,  /* no return msg needed */
+                   IACPS_CLIENT);
+	  /* close the connection */
+	  IACPShutdown(iacpConnectionToken, NullOptr);
+	  }  /* end of found it running else */
+
+}
+
+/***********************************************************************
+ *
+ * MESSAGE:		Various GET and SET messages for TADoc
+ *
+ * DESCRIPTION:
+ *
+ *
+ ***********************************************************************/
+/* dword curStudent */
+@extern method TADocumentClass, MSG_TADOC_SET_CUR_STUDENT
+{
+    pself->TADI_curStudent = curStudent;
+}
+
+@extern method TADocumentClass, MSG_TADOC_GET_FILE_HANDLE
+{
+    return(pself->GDI_fileHandle);
+}
+
+@extern method TADocumentClass, MSG_TADOC_GET_STUDB_HANDLE
+{
+    return(pself->TADI_stuDBHan);
+}
+
+@extern method TADocumentClass, MSG_TADOC_GET_CUR_STU_INDEX_HANDLE
+{
+    return(pself->TADI_curStuIndex);
+}
+
+@extern method TADocumentClass, MSG_TADOC_GET_CUR_GRADE_PD
+{
+    return(pself->TADI_curGradePd);
+}
+
+@extern method TADocumentClass, MSG_TADOC_GET_GRADE_ELEMENT_ARRAY
+/* word whichGP */
+{
+    return(pself->TADI_gradeElemChunkArray[whichGP]);
+}
+
+@extern method TADocumentClass, MSG_TADOC_GET_CUR_NUM_ATT_DAYS
+{
+    return(pself->TADI_curNumAttDays);
+}
+
+@extern method TADocumentClass, MSG_TADOC_SEATING_SET_CURRENT
+/* word row */
+{
+    FileHandle docFileHan;
+    VMBlockHandle  stuDBHan, curStuIndex;
+
+    docFileHan = @call oself::MSG_TADOC_GET_FILE_HANDLE();
+    stuDBHan = @call oself::MSG_TADOC_GET_STUDB_HANDLE();
+    curStuIndex = @call oself::MSG_TADOC_GET_CUR_STU_INDEX_HANDLE();
+
+    StudentSeatingSetCurrent(docFileHan,
+                        stuDBHan,
+                        curStuIndex,
+                        pself->GDI_display,
+                        row) ;
+}

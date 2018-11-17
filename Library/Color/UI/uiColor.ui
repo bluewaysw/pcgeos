@@ -1,0 +1,1114 @@
+/*
+ * Project:	PC GEOS
+ * Module:	Text
+ * File:	UI/uiColor.ui
+ *
+ * Author:	Tony Requist
+ *
+ *	This file contains the user interface description for a color selector
+ *
+ *	$Id: uiColor.ui,v 1.2 98/04/24 00:39:57 gene Exp $
+ *
+ */
+
+class Color256Selector = GenGadget {
+}
+
+class ColorSample = GenGadget {
+	width = wordComp : COLOR_SAMPLE_DEFAULT_WIDTH;
+	height = wordComp : COLOR_SAMPLE_DEFAULT_HEIGHT;
+}
+
+class ColorBar = GenGadget {
+	color = wordComp : 0;
+}
+
+class ColorOtherDialog = GenInteraction {
+}
+
+class CustomColor = GenInteraction {
+	colors = typeComp "SavedColors" : "<0>";
+}
+
+class ColorValue = GenValue {
+}
+
+#define COLOR_WIDTH 14
+#define COLOR_HEIGHT 14
+
+#define COLOR_ENTRY(name, color) \
+name = GenItem { \
+	moniker = { \
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT; \
+	    gstring { \
+		GSBeginString | \
+		GSSetAreaColorMap CMT_DITHER | \
+		GSSetAreaColorIndex	color | \
+		GSFillRect	0, 0, <COLOR_WIDTH>, <COLOR_HEIGHT> | \
+		GSEndString \
+	    } \
+	} \
+	identifier = #color; \
+}
+
+/***/
+
+/*
+ * NO_CONTROLLERS exclusion is done in uiManager.asm, because no UI
+ * components are left here.
+ * -- kho, 7/19/1995
+ */
+
+start ColorSelectorUI, notDetachable;
+
+/***/
+
+ColorsList = GenItemGroup {
+	genStates = default -usable;
+	children =
+		BlackItem, DarkBlueItem, DarkGreenItem, DarkCyanItem,
+		DarkRedItem, DarkVioletItem, BrownItem, LightGrayItem,
+		DarkGrayItem, LightBlueItem, LightGreenItem, LightCyanItem,
+		LightRedItem, LightVioletItem, YellowItem, WhiteItem;
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_ITEM_GROUP_TOOLBOX_STYLE,
+		HINT_IF_SYSTEM_ATTRS { SystemAttrs mask SA_HORIZONTALLY_TINY },
+			HINT_WRAP_AFTER_CHILD_COUNT {
+				word	8
+			},
+		HINT_ELSE,
+			HINT_WRAP_AFTER_CHILD_COUNT {
+				word	16
+			},
+		HINT_ENDIF,
+		ATTR_GEN_ITEM_GROUP_STATUS_MSG { word MSG_CS_SET_CF_INDEX }
+	}
+}
+
+COLOR_ENTRY(BlackItem, C_BLACK)
+COLOR_ENTRY(DarkBlueItem, C_BLUE)
+COLOR_ENTRY(DarkGreenItem, C_GREEN)
+COLOR_ENTRY(DarkCyanItem, C_CYAN)
+COLOR_ENTRY(DarkRedItem, C_RED)
+COLOR_ENTRY(DarkVioletItem, C_VIOLET)
+COLOR_ENTRY(BrownItem, C_BROWN)
+COLOR_ENTRY(LightGrayItem, C_LIGHT_GRAY)
+COLOR_ENTRY(DarkGrayItem, C_DARK_GRAY)
+COLOR_ENTRY(LightBlueItem, C_LIGHT_BLUE)
+COLOR_ENTRY(LightGreenItem, C_LIGHT_GREEN)
+COLOR_ENTRY(LightCyanItem, C_LIGHT_CYAN)
+COLOR_ENTRY(LightRedItem, C_LIGHT_RED)
+COLOR_ENTRY(LightVioletItem, C_LIGHT_VIOLET)
+COLOR_ENTRY(YellowItem, C_YELLOW)
+COLOR_ENTRY(WhiteItem, C_WHITE)
+
+
+
+
+ColorRGBGroup = GenInteraction {
+	genStates = default -usable;
+	children = RGBSpinners, OtherColorTrigger, OtherColor;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY
+	}
+}
+
+RGBSpinners = GenInteraction {
+	children =
+		RedSpin, GreenSpin, BlueSpin, RGBColorSample;
+	hints = {
+		HINT_IF_SYSTEM_ATTRS { SystemAttrs mask SA_HORIZONTALLY_TINY },
+			HINT_ORIENT_CHILDREN_VERTICALLY,
+			HINT_CENTER_CHILDREN_ON_MONIKERS,
+		HINT_ELSE,
+			HINT_ORIENT_CHILDREN_HORIZONTALLY,
+			HINT_CENTER_CHILDREN_VERTICALLY,
+		HINT_ENDIF
+	}
+}
+
+RedSpin = GenValue {
+	moniker = 'R', "Red:";
+	value = 0;
+	minimum = 0;
+	maximum = 255;
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		ATTR_GEN_VALUE_STATUS_MSG {word MSG_CS_SET_CF_RGB_RED}
+	}
+}
+
+GreenSpin = GenValue {
+	moniker = 'G', "Green:";
+	value = 0;
+	minimum = 0;
+	maximum = 255;
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		ATTR_GEN_VALUE_STATUS_MSG {word MSG_CS_SET_CF_RGB_GREEN}
+	}
+}
+
+BlueSpin = GenValue {
+	moniker = 'B', "Blue:";
+	value = 0;
+	minimum = 0;
+	maximum = 255;
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		ATTR_GEN_VALUE_STATUS_MSG {word MSG_CS_SET_CF_RGB_BLUE}
+	}
+}
+
+RGBColorSample = ColorSample {
+	width = 16;
+	height = 16;
+}
+
+/***/
+
+OtherColorTrigger = GenTrigger {
+	moniker = 'C', "Custom";
+	action = MSG_GEN_INTERACTION_INITIATE, OtherColor;
+	hints = {
+		HINT_TRIGGER_BRINGS_UP_WINDOW
+	}
+}
+
+OtherColor = ColorOtherDialog {
+	moniker = "Custom Color";
+	attributes = default +notUserInitiatable;
+	visibility = dialog;
+	type = properties;
+	children =
+		OtherCustomSelectGroup,
+		OtherSelectorGroup,
+		OtherApplyTrigger;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CUSTOM_CHILD_SPACING { word 10 },
+		ATTR_GEN_HELP_CONTEXT { char "dbOtherColor", 0 }
+	}
+}
+
+OtherApplyTrigger = GenTrigger {
+	action = MSG_GEN_APPLY, "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_SEEK_REPLY_BAR,
+		ATTR_GEN_TRIGGER_INTERACTION_COMMAND {word IC_APPLY}
+	}
+}
+
+OtherModeList = GenItemGroup {
+	selection = CST_256;
+	children =
+		Other256Item,
+		OtherRGBItem;
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		ATTR_GEN_ITEM_GROUP_STATUS_MSG {
+			word MSG_CS_SET_SELECTOR_TYPE
+		}
+	}
+}
+
+Other256Item = GenItem {
+	moniker = '6', "6x6x6";
+	identifier = CST_256;
+}
+
+OtherRGBItem = GenItem {
+	moniker = 'R', "RGB";
+	identifier = CST_RGB;
+}
+
+OtherSelectorGroup = GenInteraction {
+	children = Other256List, OtherRGBGroup;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_CENTER_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY
+	}
+}
+
+Other256List = Color256Selector {
+}
+
+OtherRGBGroup = GenInteraction {
+	genStates = default -usable;
+	children = OtherRedGroup, OtherGreenGroup, OtherBlueGroup;
+	hints = {
+		HINT_EXPAND_HEIGHT_TO_FIT_PARENT,
+		HINT_FULL_JUSTIFY_CHILDREN_VERTICALLY,
+		HINT_INCLUDE_ENDS_IN_CHILD_SPACING
+	}
+}
+
+OtherRedGroup = GenInteraction {
+	children = OtherRedBar, OtherRedSpinGroup;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_RIGHT_JUSTIFY_CHILDREN
+	}
+}
+
+OtherRedBar = ColorBar {
+	color = CBC_RED;
+}
+
+OtherRedSpinGroup = GenInteraction {
+	children = OtherRedValue, OtherRedSpin;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY
+	}
+}
+
+OtherRedValue = ColorValue {
+	moniker = 'R', "Red:";
+	minimum = 0;
+	maximum = 255;
+	genAttributes = default +readOnly;
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		ATTR_GEN_VALUE_STATUS_MSG {word MSG_CS_SET_CF_RGB_RED}
+	}
+}
+
+OtherRedSpin = ColorValue {
+	minimum = 0;
+	maximum = 255;
+	destination = OtherRedValue;
+	hints = {
+		ATTR_GEN_VALUE_STATUS_MSG {word MSG_COLOR_VALUE_STATUS_MSG},
+		HINT_VALUE_ANALOG_DISPLAY,
+		HINT_VALUE_NO_DIGITAL_DISPLAY,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, COLOR_BAR_DEFAULT_WIDTH/2>
+			SpecHeight <>
+		}
+	}
+}
+
+OtherGreenGroup = GenInteraction {
+	children = OtherGreenBar, OtherGreenSpinGroup;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_RIGHT_JUSTIFY_CHILDREN
+	}
+}
+
+OtherGreenBar = ColorBar {
+	color = CBC_GREEN;
+}
+
+OtherGreenSpinGroup = GenInteraction {
+	children = OtherGreenValue, OtherGreenSpin;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY
+	}
+}
+
+OtherGreenValue = ColorValue {
+	moniker = 'G', "Green:";
+	minimum = 0;
+	maximum = 255;
+	genAttributes = default +readOnly;
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		ATTR_GEN_VALUE_STATUS_MSG {word MSG_CS_SET_CF_RGB_GREEN},
+	}
+}
+
+OtherGreenSpin = ColorValue {
+	minimum = 0;
+	maximum = 255;
+	destination = OtherGreenValue;
+	hints = {
+		ATTR_GEN_VALUE_STATUS_MSG {word MSG_COLOR_VALUE_STATUS_MSG},
+		HINT_VALUE_ANALOG_DISPLAY,
+		HINT_VALUE_NO_DIGITAL_DISPLAY,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, COLOR_BAR_DEFAULT_WIDTH/2>
+			SpecHeight <>
+		}
+	}
+}
+
+OtherBlueGroup = GenInteraction {
+	children = OtherBlueBar, OtherBlueSpinGroup;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ORIENT_CHILDREN_VERTICALLY,
+		HINT_RIGHT_JUSTIFY_CHILDREN
+	}
+}
+
+OtherBlueBar = ColorBar {
+	color = CBC_BLUE;
+}
+
+OtherBlueSpinGroup = GenInteraction {
+	children = OtherBlueValue, OtherBlueSpin;
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY
+	}
+}
+
+OtherBlueValue = ColorValue {
+	moniker = 'B', "Blue:";
+	minimum = 0;
+	maximum = 255;
+	genAttributes = default +readOnly;
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		ATTR_GEN_VALUE_STATUS_MSG {word MSG_CS_SET_CF_RGB_BLUE},
+	}
+}
+
+OtherBlueSpin = ColorValue {
+	minimum = 0;
+	maximum = 255;
+	destination = OtherBlueValue;
+	hints = {
+		ATTR_GEN_VALUE_STATUS_MSG {word MSG_COLOR_VALUE_STATUS_MSG},
+		HINT_VALUE_ANALOG_DISPLAY,
+		HINT_VALUE_NO_DIGITAL_DISPLAY,
+		HINT_FIXED_SIZE {
+			SpecWidth <SST_PIXELS, COLOR_BAR_DEFAULT_WIDTH/2>
+			SpecHeight <>
+		}
+	}
+}
+
+OtherCustomSelectGroup = GenInteraction {
+	children = OtherCustomGroup, OtherModeList;
+	hints = {
+		HINT_ORIENT_CHILDREN_VERTICALLY
+	}
+}
+
+OtherCustomGroup = CustomColor {
+	moniker = "Selected Colors";
+	children =
+		OtherCustomSampleGroup,
+		OtherCustomColorList;
+	hints = {
+		HINT_DRAW_IN_BOX
+	}
+}
+
+OtherCustomSampleGroup = GenInteraction {
+	children = OtherCustomColorAdd, OtherColorSampleGroup;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_CENTER_CHILDREN_VERTICALLY
+	}
+}
+
+OtherCustomColorList = GenItemGroup {
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	behaviorType = exclusiveNone;
+	children =
+		CustomColor0,
+		CustomColor1,
+		CustomColor2,
+		CustomColor3,
+		CustomColor4,
+		CustomColor5,
+		CustomColor6,
+		CustomColor7,
+		CustomColor8,
+		CustomColor9,
+		CustomColor10,
+		CustomColor11,
+		CustomColor12,
+		CustomColor13,
+		CustomColor14,
+		CustomColor15;
+	hints = {
+		ATTR_GEN_ITEM_GROUP_SET_MODIFIED_ON_REDUNDANT_SELECTION,
+		ATTR_GEN_ITEM_GROUP_STATUS_MSG {
+			word MSG_CS_CUSTOM_COLOR_SELECT
+		},
+		HINT_WRAP_AFTER_CHILD_COUNT {
+			word 8
+		},
+		HINT_TOOLBOX
+	}
+}
+
+CustomColor0 = GenItem { identifier = 0; }
+CustomColor1 = GenItem { identifier = 1; }
+CustomColor2 = GenItem { identifier = 2; }
+CustomColor3 = GenItem { identifier = 3; }
+CustomColor4 = GenItem { identifier = 4; }
+CustomColor5 = GenItem { identifier = 5; }
+CustomColor6 = GenItem { identifier = 6; }
+CustomColor7 = GenItem { identifier = 7; }
+CustomColor8 = GenItem { identifier = 8; }
+CustomColor9 = GenItem { identifier = 9; }
+CustomColor10 = GenItem { identifier = 10; }
+CustomColor11 = GenItem { identifier = 11; }
+CustomColor12 = GenItem { identifier = 12; }
+CustomColor13 = GenItem { identifier = 13; }
+CustomColor14 = GenItem { identifier = 14; }
+CustomColor15 = GenItem { identifier = 15; }
+
+OtherCustomColorAdd = GenTrigger {
+	genStates = default -enabled;
+	moniker = 'S', "Store";
+	action = MSG_CS_ADD_CUSTOM_COLOR, "TO_OBJ_BLOCK_OUTPUT";
+}
+
+OtherColorSampleGroup = GenInteraction {
+	children = OtherColorSample;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_CENTER_CHILDREN_HORIZONTALLY
+	}
+}
+
+OtherColorSample = ColorSample {
+}
+
+/***/
+
+FilledBox = GenInteraction {
+	genStates = default -usable;
+	children = FilledList, DrawMaskRange;
+	hints = {
+		HINT_EXPAND_WIDTH_TO_FIT_PARENT,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		HINT_FULL_JUSTIFY_CHILDREN_HORIZONTALLY
+	}
+}
+
+FilledList = GenItemGroup {
+	children = FilledItem, UnfilledItem;
+	selection = SDM_100;
+	numSelections = 1;
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_ORIENT_CHILDREN_HORIZONTALLY,
+		ATTR_GEN_ITEM_GROUP_STATUS_MSG {
+			word MSG_CS_SET_FILLED_STATUS
+		}
+	}
+}
+
+FilledItem = GenItem {
+	moniker = 'F', "Filled";
+	identifier = SDM_100;
+}
+
+UnfilledItem = GenItem {
+	moniker = 'U', "Unfilled"; 
+	identifier = SDM_0;
+}
+
+DrawMaskRange = GenValue {
+	moniker = 'S', "% Shaded:";
+	value = "0";
+	minimum = "0";
+	maximum = "100";
+	/*
+	 * Use a step size of 1.5625 since that is what is actually
+	 * representable in the graphics system.
+	 */
+	increment = 1;
+	incrementFrac = "0x9000";
+	displayFormat = decimal;
+
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		ATTR_GEN_VALUE_STATUS_MSG {word MSG_CS_SET_DRAW_MASK},
+		ATTR_GEN_VALUE_DECIMAL_PLACES {word 1}
+	}
+}
+
+/***/
+
+PatternList = GenItemGroup {
+	genStates = default -usable;
+	moniker = 'P', "Pattern:";
+	children = SolidItem, VerticalItem, HorizontalItem, Degree45Item,
+			Degree135Item, BrickItem, SlantedBrickItem;
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_IF_SYSTEM_ATTRS { SystemAttrs mask SA_HORIZONTALLY_TINY },
+			HINT_WRAP_AFTER_CHILD_COUNT {
+				word	8
+			},
+		HINT_ITEM_GROUP_TOOLBOX_STYLE,
+		ATTR_GEN_ITEM_GROUP_STATUS_MSG { word MSG_CS_SET_PATTERN }
+	}
+}
+
+SolidItem = GenItem {
+	moniker = { \
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT; \
+	    gstring { \
+		GSBeginString | \
+		GSSetAreaPattern	<<PT_SOLID, 0>> | \
+		GSFillRect	0, 0, <COLOR_WIDTH>, <COLOR_HEIGHT> | \
+		GSEndString \
+	    } \
+	}
+	identifier = PT_SOLID;
+}
+
+VerticalItem = GenItem {
+	moniker = { \
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT; \
+	    gstring { \
+		GSBeginString | \
+		GSSetAreaPattern	<<PT_SYSTEM_HATCH, SH_VERTICAL>> | \
+		GSFillRect	0, 0, <COLOR_WIDTH>, <COLOR_HEIGHT> | \
+		GSEndString \
+	    } \
+	}
+	identifier = "(SH_VERTICAL shl 8) or PT_SYSTEM_HATCH";
+}
+
+HorizontalItem = GenItem {
+	moniker = { \
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT; \
+	    gstring { \
+		GSBeginString | \
+		GSSetAreaPattern	<<PT_SYSTEM_HATCH, SH_HORIZONTAL>> | \
+		GSFillRect	0, 0, <COLOR_WIDTH>, <COLOR_HEIGHT> | \
+		GSEndString \
+	    } \
+	}
+	identifier = "(SH_HORIZONTAL shl 8) or PT_SYSTEM_HATCH";
+}
+
+Degree45Item = GenItem {
+	moniker = { \
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT; \
+	    gstring { \
+		GSBeginString | \
+		GSSetAreaPattern	<<PT_SYSTEM_HATCH, SH_45_DEGREE>> | \
+		GSFillRect	0, 0, <COLOR_WIDTH>, <COLOR_HEIGHT> | \
+		GSEndString \
+	    } \
+	}
+	identifier = "(SH_45_DEGREE shl 8) or PT_SYSTEM_HATCH";
+}
+
+Degree135Item = GenItem {
+	moniker = { \
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT; \
+	    gstring { \
+		GSBeginString | \
+		GSSetAreaPattern	<<PT_SYSTEM_HATCH, SH_135_DEGREE>> | \
+		GSFillRect	0, 0, <COLOR_WIDTH>, <COLOR_HEIGHT> | \
+		GSEndString \
+	    } \
+	}
+	identifier = "(SH_135_DEGREE shl 8) or PT_SYSTEM_HATCH";
+}
+
+BrickItem = GenItem {
+	moniker = { \
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT; \
+	    gstring { \
+		GSBeginString | \
+		GSSetAreaPattern	<<PT_SYSTEM_HATCH, SH_BRICK>> | \
+		GSFillRect	0, 0, <COLOR_WIDTH>, <COLOR_HEIGHT> | \
+		GSEndString \
+	    } \
+	}
+	identifier = "(SH_BRICK shl 8) or PT_SYSTEM_HATCH";
+}
+
+SlantedBrickItem = GenItem {
+	moniker = { \
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT; \
+	    gstring { \
+		GSBeginString | \
+		GSSetAreaPattern	<<PT_SYSTEM_HATCH, SH_SLANTED_BRICK>> | \
+		GSFillRect	0, 0, <COLOR_WIDTH>, <COLOR_HEIGHT> | \
+		GSEndString \
+	    } \
+	}
+	identifier = "(SH_SLANTED_BRICK shl 8) or PT_SYSTEM_HATCH";
+}
+
+/*
+
+PatternRange = GenValue {
+	genStates = default -usable;
+	moniker = "Pattern:";
+	value = "0";
+	minimum = "0";
+	maximum = "10";
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		ATTR_GEN_VALUE_STATUS_MSG {word MSG_CS_SET_PATTERN}
+	}
+}
+
+*/
+
+end ColorSelectorUI;
+
+start ColorSelectorToolboxUI, notDetachable;
+
+ColorsToolboxList = GenItemGroup {
+	genStates = default -usable;
+	children = BlackTool, DarkBlueTool, DarkGreenTool, DarkCyanTool,
+		   DarkRedTool, DarkVioletTool, BrownTool, LightGrayTool,
+		   DarkGrayTool, LightBlueTool, LightGreenTool,
+		   LightCyanTool, LightRedTool, LightVioletTool,
+		   YellowTool, WhiteTool;
+	applyMsg = "MSG_COLOR_SELECTOR_APPLY_COLOR";
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_TOOLBOX,
+		HINT_ITEM_GROUP_TOOLBOX_STYLE,
+		HINT_SAME_ORIENTATION_AS_PARENT
+	}
+}
+
+BlackTool = GenItem { identifier = C_BLACK; }
+DarkBlueTool = GenItem { identifier = C_BLUE; }
+DarkGreenTool = GenItem { identifier = C_GREEN; }
+DarkCyanTool = GenItem { identifier = C_CYAN; }
+DarkRedTool = GenItem { identifier = C_RED; }
+DarkVioletTool = GenItem { identifier = C_VIOLET; }
+BrownTool = GenItem { identifier = C_BROWN; }
+LightGrayTool = GenItem { identifier = C_LIGHT_GRAY; }
+DarkGrayTool = GenItem { identifier = C_DARK_GRAY; }
+LightBlueTool = GenItem { identifier = C_LIGHT_BLUE; }
+LightGreenTool = GenItem { identifier = C_LIGHT_GREEN; }
+LightCyanTool = GenItem { identifier = C_LIGHT_CYAN; }
+LightRedTool = GenItem { identifier = C_LIGHT_RED; }
+LightVioletTool = GenItem { identifier = C_LIGHT_VIOLET; }
+YellowTool = GenItem { identifier = C_YELLOW; }
+WhiteTool = GenItem { identifier = C_WHITE; }
+
+/***/
+
+DrawMaskToolboxList = GenItemGroup {
+	genStates = default -usable;
+	children = Mask100Tool, Mask875Tool, Mask75Tool, Mask625Tool,
+		Mask50Tool, Mask375Tool, Mask25Tool, Mask125Tool, Mask0Tool;
+	applyMsg = "MSG_COLOR_SELECTOR_APPLY_DRAW_MASK";
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_TOOLBOX,
+		HINT_ITEM_GROUP_TOOLBOX_STYLE,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+
+Mask100Tool = GenItem { identifier = SDM_100; }
+Mask875Tool = GenItem { identifier = SDM_87_5; }
+Mask75Tool = GenItem { identifier = SDM_75; }
+Mask625Tool = GenItem { identifier = SDM_62_5; }
+Mask50Tool = GenItem { identifier = SDM_50; }
+Mask375Tool = GenItem { identifier = SDM_37_5; }
+Mask25Tool = GenItem { identifier = SDM_25; }
+Mask125Tool = GenItem { identifier = SDM_12_5; }
+Mask0Tool = GenItem { identifier = SDM_0; }
+
+PatternToolboxList = GenItemGroup {
+	genStates = default -usable;
+	children = SolidTool, VerticalTool, HorizontalTool, Degree45Tool,
+			Degree135Tool, BrickTool, SlantedBrickTool;
+	applyMsg = "MSG_COLOR_SELECTOR_APPLY_PATTERN";
+	destination = "TO_OBJ_BLOCK_OUTPUT";
+	hints = {
+		HINT_TOOLBOX,
+		HINT_ITEM_GROUP_TOOLBOX_STYLE,
+		HINT_ITEM_GROUP_MINIMIZE_SIZE,
+		HINT_ORIENT_CHILDREN_HORIZONTALLY
+	}
+}
+
+SolidTool = GenItem {
+	identifier = PT_SOLID;
+}
+
+VerticalTool = GenItem {
+	identifier = "(SH_VERTICAL shl 8) or PT_SYSTEM_HATCH";
+}
+
+HorizontalTool = GenItem {
+	identifier = "(SH_HORIZONTAL shl 8) or PT_SYSTEM_HATCH";
+}
+
+Degree45Tool = GenItem {
+	identifier = "(SH_45_DEGREE shl 8) or PT_SYSTEM_HATCH";
+}
+
+Degree135Tool = GenItem {
+	identifier = "(SH_135_DEGREE shl 8) or PT_SYSTEM_HATCH";
+}
+
+BrickTool = GenItem {
+	identifier = "(SH_BRICK shl 8) or PT_SYSTEM_HATCH";
+}
+
+SlantedBrickTool = GenItem {
+	identifier = "(SH_SLANTED_BRICK shl 8) or PT_SYSTEM_HATCH";
+}
+
+end ColorSelectorToolboxUI;
+
+
+#define AREA_COLOR_MONIKER(name, color) \
+visMoniker name = { \
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT; \
+	    gstring { \
+		GSBeginString | \
+		GSSetAreaColorMap CMT_DITHER | \
+		GSSetAreaColorIndex	color | \
+		GSFillRect	0, 0, <COLOR_WIDTH>, <COLOR_HEIGHT> | \
+		GSEndString \
+	    } \
+}
+
+#define LINE_COLOR_MONIKER(name, color) \
+visMoniker name = { \
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT; \
+	    gstring { \
+		GSBeginString | \
+		GSSetLineColorMap CMT_DITHER | \
+		GSSetLineColorIndex	color | \
+		GSSetLineEnd LE_BUTTCAP | \
+		GSSetLineWidth 5 | \
+		GSDrawLine 1,1, <COLOR_WIDTH-2>, <COLOR_HEIGHT-2> | \
+		GSEndString \
+	    } \
+}
+
+#define TEXT_COLOR_MONIKER(name, color) \
+visMoniker name = { \
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT; \
+	    gstring { \
+		GSBeginString | \
+		GSSetFont FID_BERKELEY, 10 | \
+		GSSetTextColorIndex	color | \
+		GSSetTextColorMap CMT_DITHER | \
+		GSDrawText	0, 0, <Tt> | \
+		GSEndString \
+	    } \
+}
+
+#define AREA_DRAW_MASK_MONIKER(name, drawMask) \
+visMoniker name = { \
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT; \
+	    gstring { \
+		GSBeginString | \
+		GSSetAreaMask	drawMask | \
+		GSFillRect	0, 0, <COLOR_WIDTH>, <COLOR_HEIGHT> | \
+		GSEndString \
+	    } \
+}
+
+#define LINE_DRAW_MASK_MONIKER(name, drawMask) \
+visMoniker name = { \
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT; \
+	    gstring { \
+		GSBeginString | \
+		GSSetLineEnd LE_BUTTCAP | \
+		GSSetLineWidth 5 | \
+		GSSetLineMask	drawMask | \
+		GSDrawLine 1,1, <COLOR_WIDTH-2>, <COLOR_HEIGHT-2> | \
+		GSEndString \
+	    } \
+}
+
+#define TEXT_DRAW_MASK_MONIKER(name, drawMask) \
+visMoniker name = { \
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT; \
+	    gstring { \
+		GSBeginString | \
+		GSSetFont FID_BERKELEY, 10 | \
+		GSSetTextMask	drawMask | \
+		GSDrawText	0, 0, <Tt> | \
+		GSEndString \
+	    } \
+}
+
+start ColorMonikers, data;
+
+#include "Art/mkrAreaColor.ui"
+#include "Art/mkrAreaMask.ui"
+#include "Art/mkrAreaPattern.ui"
+#include "Art/mkrLineColor.ui"
+#include "Art/mkrLineMask.ui"
+#include "Art/mkrTextColor.ui"
+#include "Art/mkrTextMask.ui"
+#include "Art/mkrTextPattern.ui"
+
+AREA_COLOR_MONIKER(AreaBlackMoniker, C_BLACK)
+AREA_COLOR_MONIKER(AreaDarkBlueMoniker, C_BLUE)
+AREA_COLOR_MONIKER(AreaDarkGreenMoniker, C_GREEN)
+AREA_COLOR_MONIKER(AreaDarkCyanMoniker, C_CYAN)
+AREA_COLOR_MONIKER(AreaDarkRedMoniker, C_RED)
+AREA_COLOR_MONIKER(AreaDarkVioletMoniker, C_VIOLET)
+AREA_COLOR_MONIKER(AreaBrownMoniker, C_BROWN)
+AREA_COLOR_MONIKER(AreaLightGrayMoniker, C_LIGHT_GRAY)
+AREA_COLOR_MONIKER(AreaDarkGrayMoniker, C_DARK_GRAY)
+AREA_COLOR_MONIKER(AreaLightBlueMoniker, C_LIGHT_BLUE)
+AREA_COLOR_MONIKER(AreaLightGreenMoniker, C_LIGHT_GREEN)
+AREA_COLOR_MONIKER(AreaLightCyanMoniker, C_LIGHT_CYAN)
+AREA_COLOR_MONIKER(AreaLightRedMoniker, C_LIGHT_RED)
+AREA_COLOR_MONIKER(AreaLightVioletMoniker, C_LIGHT_VIOLET)
+AREA_COLOR_MONIKER(AreaYellowMoniker, C_YELLOW)
+AREA_COLOR_MONIKER(AreaWhiteMoniker, C_WHITE)
+
+LINE_COLOR_MONIKER(LineBlackMoniker, C_BLACK)
+LINE_COLOR_MONIKER(LineDarkBlueMoniker, C_BLUE)
+LINE_COLOR_MONIKER(LineDarkGreenMoniker, C_GREEN)
+LINE_COLOR_MONIKER(LineDarkCyanMoniker, C_CYAN)
+LINE_COLOR_MONIKER(LineDarkRedMoniker, C_RED)
+LINE_COLOR_MONIKER(LineDarkVioletMoniker, C_VIOLET)
+LINE_COLOR_MONIKER(LineBrownMoniker, C_BROWN)
+LINE_COLOR_MONIKER(LineLightGrayMoniker, C_LIGHT_GRAY)
+LINE_COLOR_MONIKER(LineDarkGrayMoniker, C_DARK_GRAY)
+LINE_COLOR_MONIKER(LineLightBlueMoniker, C_LIGHT_BLUE)
+LINE_COLOR_MONIKER(LineLightGreenMoniker, C_LIGHT_GREEN)
+LINE_COLOR_MONIKER(LineLightCyanMoniker, C_LIGHT_CYAN)
+LINE_COLOR_MONIKER(LineLightRedMoniker, C_LIGHT_RED)
+LINE_COLOR_MONIKER(LineLightVioletMoniker, C_LIGHT_VIOLET)
+LINE_COLOR_MONIKER(LineYellowMoniker, C_YELLOW)
+LINE_COLOR_MONIKER(LineWhiteMoniker, C_WHITE)
+
+TEXT_COLOR_MONIKER(TextBlackMoniker, C_BLACK)
+TEXT_COLOR_MONIKER(TextDarkBlueMoniker, C_BLUE)
+TEXT_COLOR_MONIKER(TextDarkGreenMoniker, C_GREEN)
+TEXT_COLOR_MONIKER(TextDarkCyanMoniker, C_CYAN)
+TEXT_COLOR_MONIKER(TextDarkRedMoniker, C_RED)
+TEXT_COLOR_MONIKER(TextDarkVioletMoniker, C_VIOLET)
+TEXT_COLOR_MONIKER(TextBrownMoniker, C_BROWN)
+TEXT_COLOR_MONIKER(TextLightGrayMoniker, C_LIGHT_GRAY)
+TEXT_COLOR_MONIKER(TextDarkGrayMoniker, C_DARK_GRAY)
+TEXT_COLOR_MONIKER(TextLightBlueMoniker, C_LIGHT_BLUE)
+TEXT_COLOR_MONIKER(TextLightGreenMoniker, C_LIGHT_GREEN)
+TEXT_COLOR_MONIKER(TextLightCyanMoniker, C_LIGHT_CYAN)
+TEXT_COLOR_MONIKER(TextLightRedMoniker, C_LIGHT_RED)
+TEXT_COLOR_MONIKER(TextLightVioletMoniker, C_LIGHT_VIOLET)
+TEXT_COLOR_MONIKER(TextYellowMoniker, C_YELLOW)
+TEXT_COLOR_MONIKER(TextWhiteMoniker, C_WHITE)
+
+AREA_DRAW_MASK_MONIKER(AreaMask100Moniker, SDM_100)
+AREA_DRAW_MASK_MONIKER(AreaMask875Moniker, SDM_87_5)
+AREA_DRAW_MASK_MONIKER(AreaMask75Moniker, SDM_75)
+AREA_DRAW_MASK_MONIKER(AreaMask625Moniker, SDM_62_5)
+AREA_DRAW_MASK_MONIKER(AreaMask50Moniker, SDM_50)
+AREA_DRAW_MASK_MONIKER(AreaMask375Moniker, SDM_37_5)
+AREA_DRAW_MASK_MONIKER(AreaMask25Moniker, SDM_25)
+AREA_DRAW_MASK_MONIKER(AreaMask125Moniker, SDM_12_5)
+AREA_DRAW_MASK_MONIKER(AreaMask0Moniker, SDM_0)
+
+LINE_DRAW_MASK_MONIKER(LineMask100Moniker, SDM_100)
+LINE_DRAW_MASK_MONIKER(LineMask875Moniker, SDM_87_5)
+LINE_DRAW_MASK_MONIKER(LineMask75Moniker, SDM_75)
+LINE_DRAW_MASK_MONIKER(LineMask625Moniker, SDM_62_5)
+LINE_DRAW_MASK_MONIKER(LineMask50Moniker, SDM_50)
+LINE_DRAW_MASK_MONIKER(LineMask375Moniker, SDM_37_5)
+LINE_DRAW_MASK_MONIKER(LineMask25Moniker, SDM_25)
+LINE_DRAW_MASK_MONIKER(LineMask125Moniker, SDM_12_5)
+LINE_DRAW_MASK_MONIKER(LineMask0Moniker, SDM_0)
+
+TEXT_DRAW_MASK_MONIKER(TextMask100Moniker, SDM_100)
+TEXT_DRAW_MASK_MONIKER(TextMask875Moniker, SDM_87_5)
+TEXT_DRAW_MASK_MONIKER(TextMask75Moniker, SDM_75)
+TEXT_DRAW_MASK_MONIKER(TextMask625Moniker, SDM_62_5)
+TEXT_DRAW_MASK_MONIKER(TextMask50Moniker, SDM_50)
+TEXT_DRAW_MASK_MONIKER(TextMask375Moniker, SDM_37_5)
+TEXT_DRAW_MASK_MONIKER(TextMask25Moniker, SDM_25)
+TEXT_DRAW_MASK_MONIKER(TextMask125Moniker, SDM_12_5)
+TEXT_DRAW_MASK_MONIKER(TextMask0Moniker, SDM_0)
+
+visMoniker AreaPatternSolidMoniker = {
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT;
+	    gstring {
+		GSBeginString
+		GSSetAreaPattern	<<PT_SOLID, 0>>
+		GSFillRect	0, 0, <COLOR_WIDTH>, <COLOR_HEIGHT>
+		GSEndString
+	    }
+}
+
+visMoniker AreaPatternVerticalMoniker = {
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT;
+	    gstring {
+		GSBeginString
+		GSSetAreaPattern	<<PT_SYSTEM_HATCH, SH_VERTICAL>>
+		GSFillRect	0, 0, <COLOR_WIDTH>, <COLOR_HEIGHT>
+		GSEndString
+	    }
+}
+
+visMoniker AreaPatternHorizontalMoniker = {
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT;
+	    gstring {
+		GSBeginString
+		GSSetAreaPattern	<<PT_SYSTEM_HATCH, SH_HORIZONTAL>>
+		GSFillRect	0, 0, <COLOR_WIDTH>, <COLOR_HEIGHT>
+		GSEndString
+	    }
+}
+
+visMoniker AreaPatternDegree45Moniker = {
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT;
+	    gstring {
+		GSBeginString
+		GSSetAreaPattern	<<PT_SYSTEM_HATCH, SH_45_DEGREE>>
+		GSFillRect	0, 0, <COLOR_WIDTH>, <COLOR_HEIGHT>
+		GSEndString
+	    }
+}
+
+visMoniker AreaPatternDegree135Moniker = {
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT;
+	    gstring {
+		GSBeginString
+		GSSetAreaPattern	<<PT_SYSTEM_HATCH, SH_135_DEGREE>>
+		GSFillRect	0, 0, <COLOR_WIDTH>, <COLOR_HEIGHT>
+		GSEndString
+	    }
+}
+
+visMoniker AreaPatternBrickMoniker = {
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT;
+	    gstring {
+		GSBeginString
+		GSSetAreaPattern	<<PT_SYSTEM_HATCH, SH_BRICK>>
+		GSFillRect	0, 0, <COLOR_WIDTH>, <COLOR_HEIGHT>
+		GSEndString
+	    }
+}
+
+visMoniker AreaPatternSlantedBrickMoniker = {
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT;
+	    gstring {
+		GSBeginString
+		GSSetAreaPattern	<<PT_SYSTEM_HATCH, SH_SLANTED_BRICK>>
+		GSFillRect	0, 0, <COLOR_WIDTH>, <COLOR_HEIGHT>
+		GSEndString
+	    }
+}
+
+visMoniker TextPatternSolidMoniker = {
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT;
+	    gstring {
+		GSBeginString
+		GSSetTextPattern	<<PT_SOLID, 0>>
+		GSSetFont FID_BERKELEY, 10 | \
+		GSDrawText	0, 0, <Tt> | \
+		GSEndString
+	    }
+}
+
+visMoniker TextPatternVerticalMoniker = {
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT;
+	    gstring {
+		GSBeginString
+		GSSetTextPattern	<<PT_SYSTEM_HATCH, SH_VERTICAL>>
+		GSSetFont FID_BERKELEY, 10 | \
+		GSDrawText	0, 0, <Tt> | \
+		GSEndString
+	    }
+}
+
+visMoniker TextPatternHorizontalMoniker = {
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT;
+	    gstring {
+		GSBeginString
+		GSSetTextPattern	<<PT_SYSTEM_HATCH, SH_HORIZONTAL>>
+		GSSetFont FID_BERKELEY, 10 | \
+		GSDrawText	0, 0, <Tt> | \
+		GSEndString
+	    }
+}
+
+visMoniker TextPatternDegree45Moniker = {
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT;
+	    gstring {
+		GSBeginString
+		GSSetTextPattern	<<PT_SYSTEM_HATCH, SH_45_DEGREE>>
+		GSSetFont FID_BERKELEY, 10 | \
+		GSDrawText	0, 0, <Tt> | \
+		GSEndString
+	    }
+}
+
+visMoniker TextPatternDegree135Moniker = {
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT;
+	    gstring {
+		GSBeginString
+		GSSetTextPattern	<<PT_SYSTEM_HATCH, SH_135_DEGREE>>
+		GSSetFont FID_BERKELEY, 10 | \
+		GSDrawText	0, 0, <Tt> | \
+		GSEndString
+	    }
+}
+
+visMoniker TextPatternBrickMoniker = {
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT;
+	    gstring {
+		GSBeginString
+		GSSetTextPattern	<<PT_SYSTEM_HATCH, SH_BRICK>>
+		GSSetFont FID_BERKELEY, 10 | \
+		GSDrawText	0, 0, <Tt> | \
+		GSEndString
+	    }
+}
+
+visMoniker TextPatternSlantedBrickMoniker = {
+	    cachedSize = COLOR_WIDTH, COLOR_HEIGHT;
+	    gstring {
+		GSBeginString
+		GSSetTextPattern	<<PT_SYSTEM_HATCH, SH_SLANTED_BRICK>>
+		GSSetFont FID_BERKELEY, 10 | \
+		GSDrawText	0, 0, <Tt> | \
+		GSEndString
+	    }
+}
+
+end	ColorMonikers;
+
+/*
+ * Strings for controllers
+ */
+
+start ControlStrings, data;
+
+chunk FilledName = "Filled/Unfilled";
+chunk ColorListName = "Color List";
+chunk ColorRGBName = "Color RGB";
+chunk DrawMaskName = "Gray Screen";
+chunk PatternName = "Patterns";
+chunk ColorOtherName = "Other color selectors";
+
+chunk CustomColorString = ": Custom Color";
+
+chunk AreaColorListHelp = "Area color";
+chunk LineColorListHelp = "Line color";
+chunk TextColorListHelp = "Text color";
+
+chunk AreaDrawMaskListHelp = "Area shading";
+chunk LineDrawMaskListHelp = "Line shading";
+chunk TextDrawMaskListHelp = "Text shading";
+
+chunk AreaPatternListHelp = "Area pattern";
+chunk TextPatternListHelp = "Text pattern";
+
+end ControlStrings;
+

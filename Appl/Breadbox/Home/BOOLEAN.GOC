@@ -1,0 +1,71 @@
+@include <stdapp.goh>
+@include "homeapp.goh"
+@include "home.goh"
+#include <timedate.h>
+
+@extern method HomeBooleanGroupClass, MSG_SET_DAYS {
+	TimerDateAndTime now;
+	word setThese;
+
+	switch (daysToSet) {
+		case D_TODAY:
+			TimerGetDateAndTime(&now);
+			setThese = 1 << (byte) now.TDAT_dayOfWeek;
+			break;
+		case D_TOMORROW:
+			TimerGetDateAndTime(&now);
+			setThese = 1 << (((byte) now.TDAT_dayOfWeek + 1) % 7);
+			break;
+		case D_WEEKENDS:
+			setThese = D_SATURDAY | D_SUNDAY;
+			break;
+		case D_WEEKDAYS:
+			setThese = 0x007F & ~D_SATURDAY & ~D_SUNDAY;
+			break;
+	}
+	@send self::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(setThese,
+																			 0x007F & ~setThese);
+	@send self::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_MODIFIED_STATE(setThese,
+																				0x007F & ~setThese);
+}
+
+@extern method HomeBooleanGroupClass, MSG_SET_RANDOM {
+	if (selectedBooleans) @send TimeValueAndGlyphsGroup::MSG_GEN_SET_ENABLED(VUM_NOW);
+	else @send TimeValueAndGlyphsGroup::MSG_GEN_SET_NOT_ENABLED(VUM_NOW);
+}
+
+@extern method HomeBooleanGroupClass, MSG_SET_ONCE, MSG_CHECK_ONCE {
+	sbyte loop, day;
+	TimerDateAndTime now;
+
+	if (message == MSG_CHECK_ONCE) goto checkState;
+	if (!selectedBooleans) return;
+	/* we want to clear all but the "first" set Boolean in the group, to make it clear
+		to the user that this event really will happen just once... */
+  findFirstBit:	
+	TimerGetDateAndTime(&now); /* we do this so we can be smarter and start our search */
+	day = now.TDAT_dayOfWeek; /* for the "first" bit today, instead of at Sunday  */
+	for (loop = 0; loop < 7; loop++) {
+		day = (now.TDAT_dayOfWeek + loop) % 7;
+		if (pself->GBGI_selectedBooleans & (1 << day)) /* if this bit is set... */
+			goto gotFirstBit;
+	}
+	/* if we get here, no bits are set, so we don't need to do anything... */
+	return;
+  gotFirstBit:
+	/* okay, we've found the "first" selected day, so we clear everything else. */
+	@send self::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE((1 << day), 0x007F & ~(1 << day));
+	@send self::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_MODIFIED_STATE((1 << day), 0x007F & ~(1 << day));
+	return;
+
+  checkState:
+	/* this is where we check to see whether we should allow the user to set more than one
+		day in the DaysGroup--if the "Once Only" box is checked, it makes sense to restrict
+		the user to selecting only one day... */
+	if (!@call OnceOnly::MSG_GEN_BOOLEAN_GROUP_GET_SELECTED_BOOLEANS())
+		return; /* if "Once Only" isn't checked, the user can do whatever he or she wants. */
+	@call self::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_STATE(changedBooleans, 0x007F & ~changedBooleans);
+	@call self::MSG_GEN_BOOLEAN_GROUP_SET_GROUP_MODIFIED_STATE(changedBooleans, 0x007F & ~changedBooleans);
+	goto findFirstBit;
+}
+

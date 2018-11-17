@@ -1,0 +1,78 @@
+$Id: README2,v 1.1 96/03/21 12:04:09 jwu Exp $
+
+From: weber@tungsten.seattle.geoworks.com (Eric Weber)
+Subject: PPP driver and access points
+Date: Tue, 19 Mar 96 11:21:44 PST
+
+
+Here's a really brief description of access points:
+-----------------------------------------------------------------------------
+
+All of the parameters relating to a single Internet service provider
+are grouped into an "access point", which is essentially an init file
+category, although it is only accessed through the API in the accpnt
+library.  These only apply to outgoing calls.
+
+For an Internet provider, the parameters currently are:
+	provider name
+	phone number
+	user name
+	prompt password (see below)
+	password (see below)
+
+	modem init string
+	ip address for local machine
+	ip gateway
+	ip network mask
+	nameserver address
+
+The only required fields are the ones in the first group, and
+possibly the nameserver address.  However, if the provider is using
+the Microsoft extensions to the PPP/IPCP protocol, or is running a
+DHCP server, we can get the nameserver address automaticly.
+
+If an IP address is provided, we will try to use it, but if the server
+wants us to use something different we will.
+
+The IP gateway field is not used.
+
+The network mask controls whether we interpret incoming packets as
+broadcasts or not.  If left blank, we will use a default mask based on
+the current local address.  If in the process of determining the
+nameserver address, we happen to be given a netmask by the DHCP
+server, we will use it in preference to the default or user-supplied
+masks.
+
+Passwords:
+-----------------------------------------------------------------------------
+The password is stored in the clear in the initfile.  This is only
+moderately risky, since there is no simple way to view the init file.
+The password is never displayed by the UI.
+
+If the "prompt password" boolean is turned on, PPP will not use the
+stored password but will put up a dialog just before connecting which
+prompts for the password.  This is primarily intended to support
+companies which use continuously changing passwords, but it can also
+be used to avoid storing a sensitive password in the system.
+
+The provider can authenticate the caller using either of PPP's two
+builtin security schemes: PAP or CHAP.  Password Authentication
+Protocol (PAP) means they request the password and we send it to them
+as clear text.  Challenge Handshake Authentication Protocol
+(CHAP) means they send us a randomly genereated "challenge" string,
+we encrypt it with the password and send it back.  CHAP has the
+advantage that an eavesdropper can't get the password. 
+
+By default, we offer to use CHAP but accept anything the server asks
+for (i.e. CHAP, PAP, or nothing).  If the Internet provider is also
+the GSM provider, they may consider the caller's phone number to be
+sufficient authentication and not require any authentication, in which
+case the "user name" and "password" settings become irrelevant.
+
+If our software is the server (i.e. PPP answers an incoming data
+call), it may or may not demand authentication from the caller, using
+either PAP or CHAP, depending on how it is configured.  If
+authentication is desired, there is a list of usernames and passwords
+in the init file, and the caller must match one of them.
+
+

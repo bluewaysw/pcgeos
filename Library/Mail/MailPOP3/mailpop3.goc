@@ -1,0 +1,1824 @@
+/*%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+	Copyright (c) GlobalPC 1998.  All rights reserved.
+	GLOBALPC CONFIDENTIAL
+
+PROJECT:	GlobalPC Mail Library
+MODULE:		
+FILE:		mailhub.goc
+
+AUTHOR:		IanPorteous, Oct 30, 1998
+
+ROUTINES:
+	Name			Description
+	----			-----------
+
+REVISION HISTORY:
+	Name	        Date		Description
+	----	        ----		-----------
+	porteous	10/30/98   	Initial version.
+
+DESCRIPTION:
+
+	
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
+
+@include <stdapp.goh>
+@include <mailhub.goh>
+@include <mailpop3.goh>
+@include <socket.goh>
+
+#include <chunkarr.h>
+#include <Ansi/string.h>
+#include <Ansi/stdlib.h>
+#include <geoMisc.h>
+#include <localize.h>
+#include <initfile.h>
+
+@include "mailfatals.goh"
+#include "buffer.h"
+@include "mime.goh"
+
+#if ERROR_CHECK
+FatalErrors mailsmtpFatalErrors;
+Warnings    mailsmtpWarnings;
+#endif
+
+char CRLF[] = {CR,LF,0};
+char CRCR[] = {CR,CR,0};
+char BRCRLF[] = {'>',CR,LF,0};
+char ENDDATA[] = {CR,LF,'.',CR,LF,0};
+char EQCRLF[] = {'=',CR,LF,0};
+
+char   CRLFFOLD[] = {CR,LF,' ',' ',' ',' ',0};
+char   QTEQCRLFFOLD[] = {'?','=',CR,LF,' ',' ',' ',' ',0};
+char   QUOTECRLF[] = {'\"',CR,LF,0};
+char   CMSP[] = {',',' ',0};
+
+char mimeVersion[] = "MIME-VERSION";
+
+@ifdef EFAX_SUPPORT
+char fromHdrField[] = "FROM";
+Boolean fromEFax = FALSE;
+@endif /* EFAX_SUPPORT */
+
+MailError _pascal
+GetUUE(MailMessage *msg, BufferBlock *block, FileHandle fHan);
+
+MailError _pascal
+GetUUEAttachment(MailMessage *msg, BufferBlock *block);
+
+/***********************************************************************
+ *	
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Receive a block of data from Socket (i.e., server).
+ * PARAMETERS:	    int (const byte *data, word len)
+ * SIDE EFFECTS:    Changes @self->HTSMTPI_currentState.
+ *
+ * STRATEGY:	    Check that the response is "+OK"
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *      porteous        11/18/98
+ *	
+ ***********************************************************************/
+Boolean _pascal
+ParseReturnCode(char *data,int len)
+{
+    while (len) {
+	if (ISWHITE(*data)) {
+	    ++data;
+	    --len;
+	} else {
+	    break;
+	}
+    };
+
+    if (*data == '+') {
+	return TRUE;
+    } else if (*data == '-') {
+	return FALSE;
+    } else {
+	EC_ERROR(MAILPOP3_UNEXPECTED_RESPONSE);
+	return FALSE;
+    }
+
+}	/* End of MSG_HT_STREAM_PUT_BLOCK.	*/
+
+@if 0
+
+
+/***********************************************************************
+ *		POP3NextState
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	porteous	11/18/98   	Initial Revision
+ *
+ ***********************************************************************/
+static MPOP3State _pascal
+POP3NextState (nextState, responseCode)
+{
+    switch (responseCode) {
+    case 211:                       /* System status */
+    case 214:                       /* Help message */
+    case 220:                       /* Service ready */
+    case 221:                       /* Service closing transmission */
+    case 250:                       /* Action okay */
+    case 251:                       /* User not local, will forward */
+    case 354:                       /* Start email input, end <CRLF>.<CRLF> */
+    case 421:                       /* Closing transmission */
+    case 450:                       /* Mailbox busy/unavailable */
+    case 451:                       /* Aborted, local error in processing */
+    case 452:                       /* Insufficient system storage */
+    case 500:                       /* Command syntax error */
+    case 501:                       /* Bad arguments */
+    case 502:                       /* Command not implemented */
+    case 503:                       /* Bad sequence of commands */
+    case 504:                       /* Command parameter not implemented */
+    case 550:                       /* Mailbox not found/unavailable */
+    case 551:                       /* User not local, try <forward-path> */
+    case 552:                       /* Aborted, exceed storage allocation */
+    case 553:                       /* Mailbox syntax incorrect/not allowed */
+    case 554:                       /* Transaction failed, huh? */
+    default:
+	return MPOP3_ERROR;
+    }
+}	/* End of POP3NextState.	*/
+
+@endif
+
+
+
+/***********************************************************************
+ *		POP3Login
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Send the username and passwd and make sure we get a 
+ *              positive response.
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	porteous	11/18/98   	Initial Revision
+ *
+ ***********************************************************************/
+MailError _pascal
+POP3Login (InboxStruct *box)
+{
+    MemHandle memHan, dataHan;
+    char *p;
+    MailError ret;
+    Socket sock;
+    int len;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    sock = box->IB_socket;
+    
+    memHan = box->IB_storageBlock;
+    if (MemLock(memHan)) {
+	p = LMemDerefHandles(memHan, box->IB_userName);
+	SocketSend(sock, "USER ", 5, 0, 0);
+	SocketSend(sock, p, strlen(p), 0, 0);
+	ret = SocketSend(sock, CRLF, 2, 0, 0); 
+	if (ret == SE_NORMAL) {
+	    dataHan = MailGetReturnData(sock, &len);
+	    if (dataHan) {
+		p = MemLock(dataHan);
+		if (ParseReturnCode(p,len)) {
+		    p = LMemDerefHandles(memHan,box->IB_userPasswd);
+		    SocketSend(sock, "PASS ", 5, 0, 0);
+		    SocketSend(sock, p, strlen(p), 0, 0);
+		    ret = SocketSend(sock, CRLF, 2, 0, 0); 	
+		    MemUnlock(dataHan);
+		    MemFree(dataHan);
+		    if (ret == SE_NORMAL) {
+			dataHan = MailGetReturnData(sock, &len);
+			if (dataHan) {
+			    p = MemLock(dataHan);
+			    if (ParseReturnCode(p,len)) {
+				/* login succeeded
+				 */
+				ret = ME_NONE;
+			    } else {
+				ret = ME_LOGIN_FAILED;
+			    }
+			    MemUnlock(dataHan);
+			    MemFree(dataHan);
+			} else {
+			    ret = ME_LOGIN_FAILED;
+			}
+		    }
+		} else {
+		    MemUnlock(dataHan);
+		    MemFree(dataHan);
+		    ret = ME_LOGIN_FAILED;
+		}
+	    } else {
+		ret = ME_OUT_OF_MEMORY;
+	    }
+	}
+	MemUnlock(memHan);
+    } else {
+	ret = ME_OUT_OF_MEMORY;
+    }
+    POPDS;
+    
+    return ret;
+
+}	/* End of POP3Login.	*/
+
+    
+
+
+/***********************************************************************
+ *		MailinLogin
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Login to the pop3 server
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	porteous	11/17/98   	Initial Revision
+ *
+ ***********************************************************************/
+MailError _pascal
+MailinLogin (InboxStruct *box, char *userName, char *passwd)
+{
+    MemHandle memHan;
+    ChunkHandle chunk;
+    SocketError ret = ME_NONE;
+    int len;
+    char *p;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    memHan = MailGetReturnData(box->IB_socket, &len);
+    if (memHan && (p = MemLock(memHan)) && (ParseReturnCode(p,len))) {
+	MemUnlock(memHan);
+	MemFree(memHan);
+	/* Allocate an LMemHeap to hold the strings for all of the fields 
+	 */
+	memHan = MemAllocLMem(LMEM_TYPE_GENERAL, 0);
+	if ((box->IB_storageBlock = memHan) && (MemLock(memHan))) {
+	    /* copy the userName ot IB_userName
+	     */
+	    chunk = LMemAlloc(memHan,strlen(userName)+sizeof(TCHAR));
+	    p = (char *)LMemDerefHandles(memHan,chunk);
+	    strcpy(p,userName);
+	    box->IB_userName = chunk;
+
+	    /* copy the passwd to IB_passwd
+	     */
+	    chunk = LMemAlloc(memHan,strlen(passwd)+sizeof(TCHAR));
+	    p = (char *)LMemDerefHandles(memHan,chunk);
+	    strcpy(p,passwd);
+	    box->IB_userPasswd = chunk;
+
+	    MemUnlock(memHan);	
+	} else { 
+	    if (memHan) {
+		MemFree(memHan);
+	    }
+	    ret = ME_OUT_OF_MEMORY;
+	}
+
+	if (ret == ME_NONE) {
+	    ret = POP3Login(box);
+	} 
+	POPDS;	
+	return ret;
+    } else {
+	if (memHan) {
+	    MemFree(memHan);
+	}
+	POPDS;	
+	return ME_LOGIN_FAILED;
+    }
+
+
+
+}	/* End of MailinLogin.	*/
+
+
+
+/***********************************************************************
+ *		MailinOpen
+ ***********************************************************************
+ *
+ * SYNOPSIS:	connect ot the server and login
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:       The proto is assumed to be POP3
+ *                 Path is used to determine what subdirectory of Privdata
+ *                 to download file to.
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	11/17/98   	Initial Revision
+ *
+ ***********************************************************************/
+MailError _pascal
+MailinOpen (char *serverName, InboxProtocol proto, char *clientName, char *passwd, char *path, INBOX *boxHandle, word accPntID)
+{
+    Socket sock;
+    MailError rcode;
+    SocketPort port;
+    InboxStruct *box;
+    ChunkHandle chunk;
+    char *p;
+
+    *boxHandle = MemAlloc(sizeof(InboxStruct), HF_SWAPABLE | HF_SHARABLE, 
+			  HAF_LOCK | HAF_NO_ERR);
+
+    if (proto != IB_PROTOCOL_POP3) {
+	return ME_PROTOCOL_NOT_SUPPORTED;
+    }
+
+    /* Open a connection to the POP3 server
+     */
+    if (*boxHandle) {
+	box = (InboxStruct *)MemDeref(*boxHandle);
+	box->IB_storageBlock = NULL;
+	port.SP_port = POP3;
+	port.SP_manuf = MANUFACTURER_ID_SOCKET_16BIT_PORT;
+	
+	rcode = MailSocketConnect(serverName, &sock, port, accPntID);
+	if (rcode == ME_NONE) {
+	    box->IB_socket = sock;
+	}
+    } 
+
+    /* login to the POP3 server
+     */
+    if (rcode == ME_NONE) {
+	rcode = MailinLogin(box,clientName,passwd);
+	
+	/* Save the path for later use.
+	 */ 
+	if (box->IB_storageBlock && !rcode) {
+	    MemLock(box->IB_storageBlock);
+	    chunk = LMemAlloc(box->IB_storageBlock,strlen(path)+sizeof(TCHAR));
+	    p = (char *)LMemDerefHandles(box->IB_storageBlock,chunk);
+	    strcpy(p,path);
+	    box->IB_path = chunk;
+	    MemUnlock(box->IB_storageBlock);
+	}
+    }
+    MemUnlock(*boxHandle);
+
+    return rcode;
+
+}	/* End of MailinOpen.	*/
+
+
+
+/***********************************************************************
+ *		MailinGetMessageCount
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get the message count from the pop3 server
+ * CALLED BY:	global
+ * RETURN:	message count in mcount
+ *              if unable return error and mcount = 0;
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	11/20/98   	Initial Revision
+ *
+ ***********************************************************************/
+MailError _pascal
+MailinGetMessageCount (INBOX boxHandle, word *mcount)
+{
+    InboxStruct *box;
+    Socket sock;
+    MailError ret;
+    MemHandle memHan;
+    int len;
+    char *p;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    *mcount = 0;
+    box = MemLock(boxHandle);
+    sock = box->IB_socket;
+
+    SocketSend(sock, "STAT", 4, 0, 0);
+    ret = SocketSend(sock, CRLF, 2, 0, 0);
+    if (ret == SE_NORMAL) {
+	memHan = MailGetReturnData(box->IB_socket, &len);
+	if (memHan) {
+	    p = MemLock(memHan);
+	    if (ParseReturnCode(p,len)) {
+		for(;!ISDIGIT(*p) && len;++p,--len);
+		*mcount = atoi(p);
+	    } else {
+		ret = ME_NETWORK_ERROR;
+	    }
+	    MemUnlock(memHan);
+	    MemFree(memHan);
+	} else {
+	    ret = ME_NETWORK_ERROR;
+	}
+    }
+    MemUnlock(boxHandle);
+
+    POPDS;
+    return ret;
+}	/* End of MailinGetMessageCount.	*/
+
+
+/***********************************************************************
+ *	   Parse Return Size
+ ***********************************************************************
+ *
+ * SYNOPSIS:	    Receive a block of data from Socket (i.e., server).
+ * PARAMETERS:	    int (const byte *data, word len)
+ * SIDE EFFECTS:    Changes @self->HTSMTPI_currentState.
+ *
+ * STRATEGY:	    return the size, response should be "+OK 2 200"
+ *
+ * REVISION HISTORY:
+ *	Name		Date		Description
+ *	----		----		-----------
+ *      porteous        11/18/98
+ *	
+ ***********************************************************************/
+#define SKIP_WHITE for(;ISWHITE(*data);++data,--len)
+#define SKIP_NON_WHITE for(;!ISWHITE(*data);++data,--len)
+
+dword _pascal
+atodw(const TCHAR *__s)
+{
+    dword n=0;
+    int i;
+
+    for (i=0; __s[i] >= _TEXT('0') && __s[i] <= _TEXT('9'); ++i)
+	n = 10 * n + (__s[i] - _TEXT('0'));
+
+    return  n;
+}
+
+dword _pascal
+ParseReturnSizeList(char *data,int len)
+{
+    if (!ParseReturnCode(data, len)) {
+	return 0;
+    } else { 
+	SKIP_WHITE;       /* skip ws before +OK */
+	SKIP_NON_WHITE;   /* skip +OK */
+	SKIP_WHITE;       /* skip ws between +OK and message number */
+	SKIP_NON_WHITE;   /* skip message number */
+	SKIP_WHITE;       /* skip white after number */
+	return atodw(data);/* return the size */
+    }
+
+}	
+
+dword _pascal
+ParseReturnSizeRetr(char *data,int len)
+{
+    if (!ParseReturnCode(data, len)) {
+	return 0;
+    } else { 
+	SKIP_WHITE;       /* skip ws before +OK */
+	SKIP_NON_WHITE;   /* skip +OK */
+	SKIP_WHITE;       /* skip ws between +OK and message number */
+	return atodw(data);/* return the size */
+    }
+
+}	
+
+
+/***********************************************************************
+ *		MailinGetMessageSize
+ ***********************************************************************
+ *
+ * SYNOPSIS:	return the size of the message in bytes
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	11/24/98   	Initial Revision
+ *
+ ***********************************************************************/
+MailError _pascal
+MailinGetMessageSize (INBOX boxHandle, int messageNumber, dword *messageSize)
+{
+    InboxStruct *box;
+    Socket sock;
+    MailError ret;
+    MemHandle memHan;
+    int len;
+    char *p;
+    char msgNum[6];  /* limited to 100K messages 
+		      * (#of messages not message size) 
+		      */
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    box = MemLock(boxHandle);
+    sock = box->IB_socket;
+    itoa(messageNumber+1, msgNum);
+    SocketSend(sock, "LIST ", 5, 0, 0);
+    SocketSend(sock, msgNum, strlen(msgNum), 0, 0);
+    ret = SocketSend(sock, CRLF, 2, 0, 0);
+    if (ret == ME_NONE) {
+	memHan = MailGetReturnData(box->IB_socket, &len);
+	if (memHan) {
+	    p = MemLock(memHan);
+	    *messageSize = ParseReturnSizeList(p, len);
+	    MemUnlock(memHan);
+	    MemFree(memHan);
+	} else {
+	    ret = ME_NETWORK_ERROR;
+	}
+    }
+
+    MemUnlock(boxHandle);
+    POPDS;
+    return ret;
+}	/* End of MailinGetMessageSize.	*/
+
+
+
+/***********************************************************************
+ *		POP3GetHdr
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get the header of the mail message and store it in a block
+ * CALLED BY:	
+ * RETURN:	MailError or 
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	11/25/98   	Initial Revision
+ *
+ ***********************************************************************/
+#define RETR_1ST_LINE_RESP_SIZE 80
+MailError
+POP3GetHdr (MailMessage *msg, BufferBlock *block)
+{
+    MemHandle headerHandle;
+    char *headerPtr, c;
+    int len = 0, i = 0, matchLen;
+    char match[] = {CR,LF,CR,LF,0};
+    MailError ret = ME_NONE;
+    char size[RETR_1ST_LINE_RESP_SIZE];
+    dword rSize;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    /* first get the message size and save this in msg
+     */
+    BufferLockBlock(block);
+    for (i = 0; i < RETR_1ST_LINE_RESP_SIZE-1; ++i) {
+	ret = BufferGetNextByte(block, &c);
+	if (ret != ME_NONE) {
+	    break;
+	}
+	if (c == CR) {
+	    ret = BufferGetNextByte(block, &c); /* consume LF */
+	    break;
+	} 
+	size[i] = c;
+    }
+    BufferUnlockBlock(block);
+    if (ret != ME_NONE) {
+	POPDS;
+	return ret;
+    }
+
+    size [i] = 0;
+    rSize = ParseReturnSizeRetr(size,strlen(size));
+    EC_WARNING_IF(rSize != msg->MM_size, MAILPOP3_SIZE_RETR_AND_SIZE_LIST_MISMATCH);
+
+    msg->MM_remainingSize = msg->MM_size;
+    /* Download the message header until you get to CRLF CRLF.  We don't 
+     * have to worry about getting a false start on the match, so we
+     * only have to do a simplified string search.
+     */
+    msg->MM_header = 0;
+    matchLen = strlen(match);
+
+    if (!(headerHandle = MemAlloc(MAX_HEADER_SIZE+sizeof(NULL), 
+		 HF_SWAPABLE | HF_SHARABLE, HAF_LOCK))) {
+	ret = ME_OUT_OF_MEMORY;
+    } else {
+	headerPtr = MemDeref(headerHandle);
+	BufferLockBlock(block);
+	i = 0;
+	while ((len < MAX_HEADER_SIZE) && (i < matchLen)) {
+	    ret = BufferGetNextByte(block, &c);
+	    if (ret == ME_NONE) {
+		--(msg->MM_remainingSize);
+		if (c == match[i]) {
+		    ++i;
+		} else {
+		    i = 0;
+		}
+		headerPtr[len] = c;
+		++len;
+	    } else { 
+		/* Fatal Network Error 
+		 */
+		BufferUnlockBlock(block);
+		MemFree(headerHandle);
+		goto fatalError;
+	    }
+		
+	}
+	BufferUnlockBlock(block);
+	headerPtr[len] = NULL;
+	if (len >= MAX_HEADER_SIZE) {
+	    MemUnlock(headerHandle);
+	    MemFree(headerHandle);
+	    ret = ME_POP3_HEADER_TOO_LARGE;
+	} else {
+	    MemReAlloc(headerHandle, len+sizeof(NULL), HAF_NO_ERR);
+	    MemUnlock(headerHandle);
+	    msg->MM_header = headerHandle;
+	}
+
+    }
+
+fatalError:    
+    POPDS;
+    return ret;
+}	/* End of GetHdr.	*/
+
+
+/***********************************************************************
+ *		POP3GetMessageBody
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get the rest of the message from the socket and put it in
+ *              msg->MM_bodyFile;
+ * CALLED BY:	MailinGetMessage
+ * RETURN:	MailError , ME_OUT_OF_MEMORY, or a SocketError
+ *              msg->MM_bodyFile with the downloaded message body.
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	11/30/98   	Initial Revision
+ *
+ ***********************************************************************/
+#define CRLF_BUFFER_SIZE 5
+MailError _pascal
+POP3GetMessageBody (MailMessage *msg, BufferBlock *block)
+{
+    char c;
+    char match[] = {CR,LF,'b','e','g','i','n',' ','#','#','#',' '};
+    char matchCRLF[] = {CR,LF,'.',CR,LF};
+    char buffer[sizeof(match)];
+    MailError ret;
+    int i=0,bufferIndex=0,charsInBuffer=0,j=0;
+    Boolean stop;
+    dword updateTime = 0;
+ 
+    ret = ME_NONE;
+    BufferLockBlock(block);
+    while(msg->MM_remainingSize > 0) {
+	--(msg->MM_remainingSize);
+	stop = UpdateProgress(msg, &updateTime);
+	if (stop) {
+	    ret = ME_USER_INTERRUPTED;
+	    break;
+	}
+	if (ret = BufferGetNextByte(block, &c)) {
+	    /* error */
+	    break;
+	} else {
+	    /* look for the end of message just in case 
+	     * MM_remainaingSize is not correct
+	     */
+	    if (c == matchCRLF[j]) {
+		++j;
+	    } else if ( c == matchCRLF[0] ) {
+		j = 1;
+	    } else {
+		j = 0;
+	    }
+	    
+	    if (j == sizeof(matchCRLF)) {
+		msg->MM_size -= msg->MM_remainingSize;
+		msg->MM_remainingSize = 0;
+		break;
+	    }
+
+	    /* check to see if there is a uuencoded attachment in this 
+	     * email file. We simply look for a line that begins with
+	     * "begin ### "
+	     */
+	    if ((c == match[i]) || ((match[i] == '#') && ISDIGIT(c))) {
+		++i;
+	    } else if ( c == match[0] ) {
+		i = 1;
+	    } else {
+		i = 0;
+	    }
+
+	    /* because we don't want to write the beginning part of a 
+	     * uuencoded file to the message body, we need to keep a 
+	     * buffer, and only write characters to the body when we are
+	     * sure they are not part of a match
+	     */
+	    bufferIndex = bufferIndex % sizeof(match);
+	    if (charsInBuffer >= sizeof(match)) {
+		FileWrite(msg->MM_bodyFile, &buffer[bufferIndex],1,TRUE);
+	    } else {
+		++charsInBuffer;
+	    }
+	    buffer[bufferIndex] = c;
+	    ++bufferIndex;
+	    
+	    if (i == sizeof(match)) {
+		charsInBuffer = 0;
+		ret = GetUUEAttachment(msg, block);
+		if (msg->MM_remainingSize <= 0) {
+		    /* the uue attachment has been downloaded and the
+		     * end of the message has been reached.
+		     */
+		    break;
+		}
+	    } 
+	}
+    }
+
+    /* write out any characters left in the buffer 
+     */
+    bufferIndex += sizeof(match) - charsInBuffer;
+    for (i=0;i<charsInBuffer;++i) {
+	c = buffer[(bufferIndex+i)%sizeof(match)];
+	FileWrite(msg->MM_bodyFile, &c,1,TRUE);
+    }
+
+    BufferUnlockBlock(block);
+    
+    return ret;
+
+}	/* End of POP3GetMessageBody.	*/
+
+
+/***********************************************************************
+ *		GetUUEAttachment
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Download and decode a UUE attahcment
+ *
+ * CALLED BY:	POP3GetMessageBody
+ * PASSED:      BufferBlock *block, should already be locked.
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *    This routine assumes that the input stream should be at 
+ * the first character of the label for the uuencoded attachment.
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	06/23/99   	Initial Revision
+ *
+ ***********************************************************************/
+MailError _pascal
+GetUUEAttachment(MailMessage *msg, BufferBlock *block) 
+{
+    FileLongName origName;
+    char *tempName, c, *temp;
+    int i;
+    FileHandle fHan = NULL;
+    MemHandle tempNameHan = NULL;
+    TCHAR *iboxName, *attName;
+    MailError ret = ME_NONE;
+
+    /* get the file name
+     */
+    origName[0] = NULL;
+    for (i = 0;(i < FILE_LONGNAME_LENGTH) && 
+	     ((msg->MM_remainingSize) > 0); ++i) {
+	if (BufferGetNextByte(block, &c)) {
+	    break;
+	}
+	--(msg->MM_remainingSize);
+	UpdateProgress(msg, 0);  /* force update */
+	if (!ISWHITE(c)) {
+	    origName[i] = c;
+	} else {
+	    /* eat the linefeed */
+	    BufferGetNextByte(block,&c);
+	    break;
+	}
+    }     
+    origName[i]=NULL;
+    
+    /* open a file for the attachment
+     */
+    tempName = NULL;
+    
+    FilePushDir();
+    MemLock(msg->MM_storageBlock);
+    temp = LMemDerefHandles(msg->MM_storageBlock,msg->MM_path);
+    if (FileSetCurrentPath(SP_PRIVATE_DATA,temp)) { 
+	iboxName = MailLockStdString(MSS_INBOX_FOLDER);
+	attName = MailLockStdString(MSS_ATTACH_DIR);
+	FileSetCurrentPath(NULL, iboxName);
+	if (FileSetCurrentPath(NULL, attName)) {
+	    fHan = FileCreate(origName, FILE_CREATE_ONLY | FCF_NATIVE |
+			      FILE_DENY_RW | FILE_ACCESS_RW, 0);
+	    if (!fHan) {
+		tempName = FileCreateNewFile(&fHan,origName,&tempNameHan);
+		strcpy(origName,tempName);
+	    } 
+	} else if (!FileCreateDir(attName)) {
+	    FileSetCurrentPath(NULL, attName);
+	    fHan = FileCreate(origName,
+			      FILE_CREATE_ONLY | FCF_NATIVE |
+			      FILE_DENY_RW | FILE_ACCESS_RW, 0);
+	    if (!fHan) {
+		tempName = FileCreateNewFile(&fHan,origName,&tempNameHan);
+		strcpy(origName,tempName);
+	    }
+	}
+	MailUnlockStdString(MSS_INBOX_FOLDER);
+	MailUnlockStdString(MSS_ATTACH_DIR);
+    }
+    MemUnlock(msg->MM_storageBlock);
+    
+    /* download the uue file and then save the path away
+     */
+    if (fHan) {
+	ret = GetUUE(msg, block, fHan);
+	FileClose(fHan,TRUE);
+	AddAttachmentName(msg,origName);
+	FilePopDir();
+    } else {
+	ret = ME_FILE_ERROR;
+    }
+    if (tempNameHan) {
+	MemFree(tempNameHan);
+    }
+
+    return ret;
+}
+
+
+/***********************************************************************
+ *		GetUUE
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Download and decode a UUE attahcment
+ *
+ * CALLED BY:	GetUUEAttachment
+ * PASSED:      BufferBlock *block, should already be locked.
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *    This routine takes a file handle and downloads and decodes 
+ * the text until it reaches either "end" at the beginning of a 
+ * line, or the end of the file
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	06/23/99   	Initial Revision
+ *
+ ***********************************************************************/
+MailError _pascal
+GetUUE(MailMessage *msg, BufferBlock *block, FileHandle fHan) 
+{
+
+    MemHandle lineHandle;
+    char *line;
+    int len;
+    Boolean stop;
+    MailError ret = ME_NONE;
+    dword updateTime = 0;
+
+    lineHandle = MemAlloc(MAX_LINE_LEN+sizeof(NULL), 
+			  HF_SWAPABLE | HF_SHARABLE, HAF_LOCK | HAF_NO_ERR );
+    line = MemDeref(lineHandle);
+
+    while (msg->MM_remainingSize > 0) {
+	len = MAX_LINE_LEN;
+	GetLine(block, line, &len);
+	/* either reached the end, 
+	 * or there was an error
+	 */
+	line[len]=NULL;
+	msg->MM_remainingSize -= len;
+	stop = UpdateProgress(msg, &updateTime);
+
+	if (len == 0) {
+	    ret = ME_NETWORK_ERROR;
+	    break;
+	}
+	if (stop == TRUE) {
+	    ret =  ME_USER_INTERRUPTED;
+	    break;
+	}
+	
+	if ((line[0] == '.') && (line[1]==CR) && (line[2]==LF)) {
+	    msg->MM_remainingSize = 0;
+	    break;
+	} 
+
+	if (!LocalCmpStrings(line,"end",strlen("end"))) {
+	    break;
+	}
+
+	DecodeLine(line, &len, TE_UU);
+	FileWrite(fHan, line, len, TRUE);
+    }
+    MemFree(lineHandle);
+
+    return ret;
+}
+
+
+
+/***********************************************************************
+ *		ConvertCRLFtoCR
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Convert from the external conventions of crlf to the 
+ *              goes convention of cr
+ * CALLED BY:	MailinGetMessage
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	porteous	12/02/98   	Initial Revision
+ *
+ ***********************************************************************/
+void _pascal
+ConvertCRLFToCR (char *data)
+{
+    char *writePtr;
+    
+    writePtr = data;
+
+    while (*data != NULL) {
+	if (*(word *)data == CRLF_WORD)  {
+	    *writePtr = *data;
+	    ++writePtr;
+	    data += 2;
+	} else {
+	    *writePtr = *data;
+	    ++writePtr;
+	    ++data;
+	}
+    }
+    *writePtr = NULL;
+
+}	/* End of ConvertCRLFtoCR.	*/
+
+
+/***********************************************************************
+ *		MailinOpenInFile
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Create the file used for downloading the body of the 
+ *              message
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	12/15/98   	Initial Revision
+ *
+ ***********************************************************************/
+MailError _pascal
+MailinOpenInFile (InboxStruct *box, MailMessage *msg)
+{
+    FileHandle fHan = NULL;
+    char fileName[PATH_LENGTH_ZT];
+    char *path, *data;
+    MailError ret;
+    TCHAR *iboxName;
+
+    ret = ME_NONE;
+
+    fileName[0] = NULL;
+    FilePushDir();
+    MemLock(box->IB_storageBlock);
+    path = LMemDerefHandles(box->IB_storageBlock, box->IB_path);
+    if (FileSetCurrentPath(SP_PRIVATE_DATA,path)) { 
+	iboxName = MailLockStdString(MSS_INBOX_FOLDER);
+	if (FileSetCurrentPath(NULL, iboxName)) {
+	    fHan = FileCreateTempFile(fileName, FILE_CREATE_TRUNCATE | 
+				  FCF_NATIVE | FILE_DENY_RW | FILE_ACCESS_RW,
+				  FILE_ATTR_NORMAL);
+	} else {
+	    ret = ME_FILE_ERROR;
+	}
+	MailUnlockStdString(MSS_INBOX_FOLDER);
+    } else {
+	ret = ME_FILE_ERROR;
+    }
+    if (fHan) {
+	msg->MM_bodyFile = fHan;
+	MemLock(msg->MM_storageBlock);
+	msg->MM_fileName = LMemAlloc(msg->MM_storageBlock,
+				     strlen(fileName)+sizeof(TCHAR));
+	msg->MM_path = LMemAlloc(msg->MM_storageBlock,
+				 strlen(path)+sizeof(TCHAR));
+	if (msg->MM_path) {
+	    /* Copy the path from the INBOX to the msg for later use 
+	     */
+	    data = LMemDerefHandles(msg->MM_storageBlock,msg->MM_path);
+	    strcpy(data,path);
+	    data = LMemDerefHandles(msg->MM_storageBlock,msg->MM_fileName);
+	    strcpy(data, fileName);
+	} else {
+	    ret = ME_OUT_OF_MEMORY;
+	}
+	MemUnlock(msg->MM_storageBlock);
+    } else {
+	ret = ME_COULD_NOT_OPEN_FILE;
+    }
+    
+    MemUnlock(box->IB_storageBlock);
+    FilePopDir();
+
+    return ret;
+
+}	/* End of MailinOpenInFile.	*/
+
+
+/***********************************************************************
+ *		WriteHeader
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	porteous	1/05/99   	Initial Revision
+ *
+ ***********************************************************************/
+void
+WriteHeader (FileHandle fHan, MailMessage *msg)
+{
+    char *hdrPtr;
+    int len;
+
+    hdrPtr = MemLock(msg->MM_header);
+    ConvertCRLFToCR(hdrPtr);
+    len = strlen(hdrPtr);
+    FileWrite(fHan,hdrPtr, len, TRUE);
+    MemUnlock(msg->MM_header);
+}	/* End of WriteHeader.	*/
+
+
+/***********************************************************************
+ *		WriteAttachmentList
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Write string of attachments to the end of the header
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	1/05/99   	Initial Revision
+ *
+ ***********************************************************************/
+void
+WriteAttachmentList (FileHandle fHan, MailMessage *msg)
+{
+    char *attachList;
+    int len;
+    TCHAR *afn;
+
+    if (msg->MM_attachment) {
+	/* If there is an attachment then we need to overwrite the second of
+	 * CR that designated the end of header
+	 */
+	FilePos(fHan, -1, FILE_POS_RELATIVE);
+
+	MemLock(msg->MM_storageBlock);
+	attachList = LMemDerefHandles(msg->MM_storageBlock,msg->MM_attachment);
+	len = strlen(attachList);
+
+	PUSHDS;
+	SET_DS_LIB_DGROUP;
+
+	afn = MailLockStdString(MSS_ATTACH_FIELD_OUT);
+	FileWrite(fHan, afn, strlen(afn), TRUE);
+	MailUnlockStdString(MSS_ATTACH_FIELD_OUT);
+	FileWrite(fHan, attachList, len, TRUE);
+	FileWrite(fHan, CRCR, strlen(CRCR), TRUE);
+	MemUnlock(msg->MM_storageBlock);
+
+	POPDS;
+    }
+    
+}	/* End of WriteAttachmentList.	*/
+
+
+
+/***********************************************************************
+ *		WriteUIDL
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Write the UIDL, if any, after the header
+ * CALLED BY:	CopyToNewBodyFile
+ * RETURN:	none
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	Date		Description
+ *	----	----		-----------
+ *	gene	02/22/00   	Initial Revision
+ *
+ ***********************************************************************/
+void
+WriteUIDL (FileHandle fHan,  MailMessage *msg, TCHAR *uidl)
+{
+#if ERROR_CHECK
+    TCHAR *hdr, *data;
+    MemHandle bufHan;
+#endif
+    word len = strlen(uidl);
+    TCHAR *xuidlStr;
+
+    if (len) {
+	/*
+	 * backup over second CR
+	 */
+	FilePos(fHan, -1, FILE_POS_RELATIVE);
+#if ERROR_CHECK
+	/*
+	 * check that the UIDL we have matches any already in the header,
+	 * as some POP3 servers use X-UIDL to store it
+	 */
+	hdr = MemLock(msg->MM_header);
+	bufHan = MemAlloc(FIELD_BUFFER_BLOCK_SIZE,
+			  HF_DYNAMIC,
+			  HAF_STANDARD_NO_ERR_LOCK);
+	data = MemDeref(bufHan);
+	MailGetHdrValue822("X-UIDL", data, FIELD_BUFFER_BLOCK_SIZE, hdr);
+	if (data[0]) {
+	    if (strcmp(data, uidl)) {
+		EC_ERROR(MAILPOP3_UNEXPECTED_RESPONSE);
+	    }
+	}
+	MemUnlock(msg->MM_header);
+	MemFree(bufHan);
+#endif
+	/*
+	 * write X-UIDL: <uidl>
+	 */
+	xuidlStr = MailLockStdString(MSS_XUIDL_FIELD_OUT);
+	FileWrite(fHan, xuidlStr, strlen(xuidlStr), TRUE);
+	MailUnlockStdString(MSS_XUIDL_FIELD_OUT);
+	FileWrite(fHan, uidl, len, TRUE);
+	FileWrite(fHan, CRCR, 2, TRUE);
+    }
+}
+
+
+/***********************************************************************
+ *		CopyToNewBodyFile
+ ***********************************************************************
+ *
+ * SYNOPSIS:	copy the old message body to the new file, 
+ *              converting CRLF to CR along the way
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	12/16/98   	Initial Revision
+ *
+ ***********************************************************************/
+#define COPY_BUFFER_SIZE 1024
+MailError _pascal 
+CopyToNewBodyFile (MailMessage *msg, InboxStruct *box, TCHAR *uidl)
+{
+    FileHandle fHan;
+    char *name, *path, *readBuffer, *writeBuffer, c;
+    char fileName[PATH_LENGTH_ZT];
+    Boolean tCR;
+    MailError ret = ME_NONE;
+    TCHAR *iboxName;
+    word readLen, writeLen, i;
+
+    /* create a new temporary file for the message body
+     */
+    fileName[0] = NULL;
+    FilePushDir();
+    MemLock(box->IB_storageBlock);
+    path = LMemDerefHandles(box->IB_storageBlock, box->IB_path);
+    if (FileSetCurrentPath(SP_PRIVATE_DATA,path)) { 
+	iboxName = MailLockStdString(MSS_INBOX_FOLDER);
+	if (FileSetCurrentPath(NULL, iboxName)) {
+	    fHan = FileCreateTempFile(fileName, FILE_CREATE_TRUNCATE | 
+				  FCF_NATIVE | FILE_DENY_RW | FILE_ACCESS_RW,
+				  FILE_ATTR_NORMAL);
+	} else {
+	    ret = ME_FILE_ERROR;
+	}
+	MailUnlockStdString(MSS_INBOX_FOLDER);
+    } else {
+	ret = ME_FILE_ERROR;
+    }
+
+    if (!ret) {
+	WriteHeader(fHan, msg);
+	WriteUIDL(fHan, msg, uidl);
+	WriteAttachmentList(fHan, msg);
+
+	/* copy the old message body to the new file, converting CRLF to CR
+	 * along the way
+	 */
+	tCR = FALSE;
+	FilePos(msg->MM_bodyFile, 0, FILE_POS_START);
+	readBuffer = (char *)malloc(COPY_BUFFER_SIZE);
+	writeBuffer = readBuffer;
+	while((readLen=FileRead(msg->MM_bodyFile,readBuffer,COPY_BUFFER_SIZE, 0)) && (readLen != -1)) {
+	    writeLen = 0;
+	    for (i = 0; i<readLen; ++i) {
+		c = readBuffer[i];
+		if (c == NULL) {
+		    ; /* do not write NULLS to the new file */
+		} else if (c == CR) {
+		    tCR = TRUE;
+		    writeBuffer[writeLen] = c;
+		    ++writeLen;
+		} else if ((c == LF) && (tCR == TRUE)) {
+		    tCR = FALSE;
+		} 
+#if EC
+		else if (c == 0xcc) {
+		    EC_ERROR(-1);
+		}
+#endif
+		else {
+		    tCR = FALSE;
+		    writeBuffer[writeLen] = c;
+		    ++writeLen;
+		}
+	    }
+	    FileWrite(fHan,writeBuffer, writeLen, TRUE);	    
+	}
+	free(readBuffer);
+
+	/* delete the old file and update the appropriate fields 
+	 * in the msg structure.
+	 */
+	MemLock(msg->MM_storageBlock);
+	name = LMemDerefHandles(msg->MM_storageBlock,msg->MM_fileName);
+	FileClose(msg->MM_bodyFile,FILE_NO_ERRORS);
+	FileDelete(name);
+	strcpy(name,fileName);
+	FileClose(fHan,FILE_NO_ERRORS);
+	msg->MM_bodyFile = NULL; 
+	MemUnlock(msg->MM_storageBlock);
+	MemUnlock(box->IB_storageBlock);
+	FilePopDir();
+    }
+    return ret;
+}	/* End of CopyToNewBodyFile.	*/
+
+
+
+/***********************************************************************
+ *		DeleteMsgFile
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Delete the body file for this message.
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	10/25/99   	Initial Revision
+ *
+ ***********************************************************************/
+void
+DeleteMsgFile (InboxStruct *box,MailMessage *msg)
+{
+    char *name, *temp;
+
+
+    /* delete the old file and update the appropriate fields 
+     * in the msg structure.
+     */
+    MemLock(msg->MM_storageBlock);
+
+    if (msg->MM_attachment) {
+	name = LMemDerefHandles(msg->MM_storageBlock,msg->MM_attachment);
+	while (*name != NULL) {
+	    temp = name;
+	    while(*temp != ';') {
+		++temp;
+	    }
+	    *temp = NULL;
+	    FileDelete(name);
+	    name = temp;
+	    ++name;
+	}
+    }
+
+    /* set the directory to location of the msg file
+     */
+    MemLock(box->IB_storageBlock);
+    name = LMemDerefHandles(box->IB_storageBlock, box->IB_path);
+    if (FileSetCurrentPath(SP_PRIVATE_DATA,name)) { 
+	name = MailLockStdString(MSS_INBOX_FOLDER);
+	if (FileSetCurrentPath(NULL, name)) {
+	}
+	MailUnlockStdString(MSS_INBOX_FOLDER);
+    }
+    MemUnlock(box->IB_storageBlock);
+
+    /* delete the msg file
+     */
+    name = LMemDerefHandles(msg->MM_storageBlock,msg->MM_fileName);
+    if (msg->MM_bodyFile != NULL) {
+	FileClose(msg->MM_bodyFile,FILE_NO_ERRORS);
+    }
+    FileDelete(name);
+    name[0] = NULL;
+    MemUnlock(msg->MM_storageBlock);
+
+}	/* End of DeleteMsgFile.	*/
+
+
+/***********************************************************************
+ *		MailinGetMessage
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:     Download message
+ *               First parse the header according to rfc 822
+ *       	 Then if the body is mime, decode the mime.
+ *	         If the body is not mime, just put the text in 
+ *	         in the msg body.
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	11/17/98   	Initial Revision
+ *      dmedeiros       08/04/00        Added flag to signify eFax messages.
+ *
+ ***********************************************************************/
+MailError _pascal
+MailinGetMessage (INBOX boxHandle, int messageNumber, MailMessage *msg)
+{
+    MailError ret = ME_NONE;
+    InboxStruct *box;
+    BufferBlock block;
+    MemHandle buffer;
+    char *data, *hdr, msgNum[6]; /* limited to 100K Messages */
+    Socket sock;
+    Boolean done;
+    MailUIDL uidl;
+    
+@ifdef EFAX_SUPPORT
+    MemHandle mHandle;
+    word strSize;
+@endif /* EFAX_SUPPORT */
+
+    msg->MM_msgNumber = messageNumber+1;
+    box = MemLock(boxHandle);
+    sock = box->IB_socket;
+    ret = BufferInit(&block, sock);
+    if (ret != ME_NONE) {
+	MemUnlock(boxHandle);
+	return ret;
+    }
+    
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    /* open the file to download the message to
+     */
+    msg->MM_size = 0;
+    if (!(ret = MailinOpenInFile(box,msg))) {
+	/*
+	 * get the unique ID listing using UIDL.
+	 *
+	 * XXX: should we exit if we can't get it?
+	 * XXX: No, because then we won't work with servers
+	 *      that don't support the UIDL command.
+	 */
+	uidl[0] = 0;
+	ret = MailinGetUIDL(boxHandle, messageNumber, &uidl);
+	/*
+	 * get the size using LIST, because some POP3 servers do not
+	 * return the size with RETR, e.g., harvard.net, mail.newdealinc.com
+	 */
+	ret = MailinGetMessageSize(boxHandle, messageNumber, &msg->MM_size);
+	if (ret != ME_NONE) {
+	    goto fatalError;
+	}
+
+	SocketSend(sock, "RETR ", 5, 0, 0);
+	itoa(msg->MM_msgNumber, msgNum);
+	SocketSend(sock, msgNum, strlen(msgNum), 0, 0);
+	SocketSend(sock, CRLF, 2, 0, 0);
+
+	/*
+	 * Get the message header and save it in the msg structure
+	 */
+	ret = POP3GetHdr(msg, &block);
+	if (ret != ME_NONE) {
+	    goto fatalError;
+	}
+	UpdateProgress(msg, 0);  /* force update */
+	/* Allocate a buffer to pass to GetHdrValue
+	 */
+	data = NULL;
+	if (msg->MM_header) {
+	    hdr = MemLock(msg->MM_header);
+	    buffer = MemAlloc(FIELD_BUFFER_BLOCK_SIZE, HF_SWAPABLE | 
+			      HF_SHARABLE, HAF_LOCK | HAF_NO_ERR );
+	    data = MemDeref(buffer);
+
+@ifdef EFAX_SUPPORT
+	    /* determine if the message is from eFax. */	    
+	    MailGetHdrValue822(fromHdrField, data, FIELD_BUFFER_BLOCK_SIZE, hdr);	    
+	    
+	    LocalUpcaseString(data, 0);
+	    if(!InitFileReadStringBlock("eFax", "domainName", &mHandle, 
+					IFCC_UPCASE << IFRF_CHAR_CONVERT_OFFSET, 
+					&strSize)) {
+		if(strstr(data, MemLock(mHandle))) fromEFax = TRUE;
+		MemFree(mHandle);
+	    }
+@endif   /* EFAX_SUPPORT */
+
+	    MailGetHdrValue822(mimeVersion, data, FIELD_BUFFER_BLOCK_SIZE, hdr);
+	    MemUnlock(msg->MM_header);
+	    /* until we have mime decoding working, we will just pretend 
+	     * it is all text.
+	     */
+	}
+
+	if (data) {
+	    if  (data[0]) { 
+		/* This is a mime email message, so we need to 
+		 * go parse the header
+		 */
+		MemUnlock(buffer);
+		MemFree(buffer);
+		data = MemLock(msg->MM_header);
+		ret = POP3Mime(data, &block, msg);
+
+@ifdef EFAX_SUPPORT
+		/* done with any eFax attachment renaming */
+		fromEFax = FALSE;
+@endif /* EFAX_SUPPORT */
+
+		MemUnlock(msg->MM_header);
+	    } else {
+		/* this is just a normal email message just 
+		 * go ahead and return 
+		 * the message body.
+		 */
+		MemUnlock(buffer);
+		MemFree(buffer);
+		ret = POP3GetMessageBody(msg, &block);
+	    }
+	    /* Now create a new body file and copy the header and the 
+	     * old body file to converting CR to CRLF along the way.
+	     */
+	    if (ret == ME_NONE) {
+		CopyToNewBodyFile(msg,box, uidl);
+	    }  else {
+		DeleteMsgFile(box,msg);
+	    }
+	}
+    }
+
+fatalError:
+
+    POPDS;
+
+    BufferClose(&block);
+    MemUnlock(boxHandle);
+
+    return ret;
+}	/* End of MailinGetMessage.	*/
+
+
+/***********************************************************************
+ *		MailinMessageDelete
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	12/02/98   	Initial Revision
+ *
+ ***********************************************************************/
+void _pascal
+MailinMessageDelete (INBOX boxHandle, int messageNumber)
+{
+    char msgNum[6];
+    InboxStruct *box;
+    MemHandle memHan;
+    int len;
+    
+    box = MemLock(boxHandle);
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    if (box) {
+	SocketSend(box->IB_socket, "DELE ", 5, 0, 0);
+	itoa(messageNumber+1, msgNum);
+	SocketSend(box->IB_socket, msgNum, strlen(msgNum), 0, 0);
+	SocketSend(box->IB_socket, CRLF, 2, 0, 0);
+	memHan = MailGetReturnData(box->IB_socket, &len);
+	if (memHan) {
+	    MemFree(memHan);
+	}
+    }
+    /* free all of the blocks allocated for this message
+     */
+    MemUnlock(boxHandle);
+
+    POPDS;
+}	/* End of MessageDelete.	*/
+
+
+
+
+/***********************************************************************
+ *		MailinClose
+ ***********************************************************************
+ *
+ * SYNOPSIS:	
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	12/02/98   	Initial Revision
+ *
+ ***********************************************************************/
+void _pascal
+MailinClose (INBOX boxHandle)
+{
+    InboxStruct *box;
+    int len;
+    MemHandle memHan;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    box = MemLock(boxHandle);
+
+    if (box) {
+	SocketSend(box->IB_socket, "QUIT ", 5, 0, 0);
+	SocketSend(box->IB_socket, CRLF, 2, 0, 0);
+	memHan = MailGetReturnData(box->IB_socket, &len);
+	if (memHan) {
+	    MemFree(memHan);
+	}
+    }
+
+    POPDS;
+
+    SocketClose(box->IB_socket);
+    MemUnlock(boxHandle);
+    MemFree(boxHandle);
+}	/* End of MailinClose.	*/
+
+
+
+/***********************************************************************
+ *		MailinCloseFast
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Force the socket to close immediatly, don't tell the 
+ *              other side that we are quitting.
+ * CALLED BY:	
+ * RETURN:	
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:
+ *	
+ * REVISION HISTORY:
+ *	Name	        Date		Description
+ *	----	        ----		-----------
+ *	porteous	12/02/98   	Initial Revision
+ *      ed              07/27/00        Removed & mapped to MailinClose in gp
+ *
+ ***********************************************************************/
+#if 0
+void _pascal
+MailinCloseFast (INBOX boxHandle)
+{
+    InboxStruct *box;
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    box = MemLock(boxHandle);
+
+    SocketCloseSend(box->IB_socket);
+    SocketReset(box->IB_socket);
+    SocketClose(box->IB_socket);
+
+    POPDS;
+    MemUnlock(boxHandle);
+    MemFree(boxHandle);
+}	/* End of MailinClose.	*/
+#endif
+
+
+/***********************************************************************
+ *		MailinGetUIDL
+ ***********************************************************************
+ *
+ * SYNOPSIS:	Get the UIDL for a message
+ * CALLED BY:	GLOBAL
+ * RETURN:	MailError - ME_NONE or error
+ *              uidl - filled in with UIDL, if available
+ * SIDE EFFECTS:
+ *	
+ * STRATEGY:     
+ *	
+ * REVISION HISTORY:
+ *	Name	 Date		Description
+ *	----	 ----		-----------
+ *	gene     02/20/00   	Initial Revision
+ *
+ ***********************************************************************/
+MailError _pascal
+MailinGetUIDL (INBOX boxHandle, int messageNumber, TCHAR *uidl)
+{
+    InboxStruct *box;
+    Socket sock;
+    MailError ret = ME_NONE;
+    MemHandle respHan;
+    word len, i;
+    TCHAR *p, c, msgNum[6];
+
+    PUSHDS;
+    SET_DS_LIB_DGROUP;
+
+    box = MemLock(boxHandle);
+    sock = box->IB_socket;
+
+    /*
+     * send UIDL <msg>
+     */
+    itoa(messageNumber+1, msgNum);
+    SocketSend(sock, "UIDL ", 5, 0, 0);
+    SocketSend(sock, msgNum, strlen(msgNum), 0, 0);
+    ret = SocketSend(sock, CRLF, 2, 0, 0);
+    if (ret == SE_NORMAL) {
+	/*
+	 * get the response data
+	 */
+	respHan = MailGetReturnData(box->IB_socket, &len);
+	if (respHan) {
+	    /*
+	     * make sure the response was +OK
+	     */
+	    p = MemLock(respHan);
+	    if (ParseReturnCode(p, len)) {
+		/*
+		 * skip "+OK <msg> "
+		 */
+		p = strchr(p, ' ');
+		EC_ERROR_IF(!p, MAILPOP3_UNEXPECTED_RESPONSE);
+	    skipMessageNum:
+		p = strchr(p+1, ' ');
+		EC_ERROR_IF(!p, MAILPOP3_UNEXPECTED_RESPONSE);
+		p++;
+		/*
+		 * copy everything else up to the end of the line
+		 */
+		for (i = 0; i < len; i++) {
+		    c = p[i];
+		    uidl[i] = c;
+		    if (c == C_CR) {
+			uidl[i] = 0;
+			break;
+		    }
+		}
+	    } else if (isdigit(p[0])) {
+		/*
+		 * Solaris Mail Servers don't include the +OK
+		 * in front of the message number (grrr...)
+		 * so if there is a number at the start,
+		 * hope this is what we're looking at. gene 2/20/01
+		 */
+		goto skipMessageNum;
+	    } else {
+		ret = ME_UNEXPECTED_VALUE;
+	    }
+	    MemFree(respHan);
+	} else {
+	    ret = ME_UIDL_NOT_SUPPORTED;
+	}
+    } else {
+	ret = ME_NETWORK_ERROR;
+    }
+    /*
+     * clean up
+     */
+    MemUnlock(boxHandle);
+    POPDS;
+    return(ret);
+}
